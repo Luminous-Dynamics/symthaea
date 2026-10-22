@@ -210,13 +210,6 @@ pub enum CastingEvidenceError {
         /// Required minimum.
         minimum: usize,
     },
-    /// Calibration partition cannot support the requested finite-sample quantile.
-    InsufficientConformalCalibration {
-        /// Number of calibration observations.
-        actual: usize,
-        /// Required minimum for the requested miscoverage.
-        minimum: usize,
-    },
     /// Miscoverage probability is not finite and strictly between zero and one.
     InvalidMiscoverage,
     /// Same observation ID appears multiple times, including across partitions.
@@ -289,10 +282,6 @@ impl fmt::Display for CastingEvidenceError {
             Self::InsufficientTrainingRecords { actual, minimum } => write!(
                 f,
                 "casting benchmark needs at least {minimum} training records; received {actual}"
-            ),
-            Self::InsufficientConformalCalibration { actual, minimum } => write!(
-                f,
-                "casting benchmark needs at least {minimum} conformal calibration records; received {actual}"
             ),
             Self::InvalidMiscoverage => {
                 f.write_str("casting benchmark miscoverage must be finite and strictly between 0 and 1")
@@ -440,30 +429,6 @@ impl CastingSplitManifest {
             });
         }
 
-        if model.sample_count() != training.len()
-            || observation_values_digest(
-                b"symthaea-casting-training-observations-v1",
-                training,
-            ) != model.training_data_digest_blake3()
-        {
-            return Err(CastingEvidenceError::TrainingDataModelMismatch);
-        }
-        if calibrator.fitted_model_digest_blake3() != model.model_digest_blake3() {
-            return Err(CastingEvidenceError::ConformalCalibratorModelMismatch);
-        }
-        if calibrator.calibration_sample_count() != calibration.len() {
-            return Err(CastingEvidenceError::CalibrationSampleCountMismatch {
-                calibrator_count: calibrator.calibration_sample_count(),
-                partition_count: calibration.len(),
-            });
-        }
-        if observation_values_digest(
-            b"symthaea-casting-conformal-observations-v1",
-            calibration,
-        ) != calibrator.calibration_data_digest_blake3()
-        {
-            return Err(CastingEvidenceError::CalibrationDataMismatch);
-        }
         if calibration.is_empty() {
             return Err(CastingEvidenceError::EmptyPartition {
                 partition: CastingDataPartition::ConformalCalibration,
@@ -472,15 +437,6 @@ impl CastingSplitManifest {
         if holdout.is_empty() {
             return Err(CastingEvidenceError::EmptyPartition {
                 partition: CastingDataPartition::Holdout,
-            });
-        }
-
-        let rank = ((calibration.len() as f64 + 1.0) * (1.0 - miscoverage)).ceil() as usize;
-        let minimum = ((1.0 - miscoverage) / miscoverage).ceil().max(1.0) as usize;
-        if rank == 0 || rank > calibration.len() {
-            return Err(CastingEvidenceError::InsufficientConformalCalibration {
-                actual: calibration.len(),
-                minimum,
             });
         }
 
@@ -536,6 +492,30 @@ impl CastingSplitManifest {
                 holdout: holdout_class,
             });
         }
+        if model.sample_count() != training.len()
+            || observation_values_digest(
+                b"symthaea-casting-training-observations-v1",
+                training,
+            ) != model.training_data_digest_blake3()
+        {
+            return Err(CastingEvidenceError::TrainingDataModelMismatch);
+        }
+        if calibrator.fitted_model_digest_blake3() != model.model_digest_blake3() {
+            return Err(CastingEvidenceError::ConformalCalibratorModelMismatch);
+        }
+        if calibrator.calibration_sample_count() != calibration.len() {
+            return Err(CastingEvidenceError::CalibrationSampleCountMismatch {
+                calibrator_count: calibrator.calibration_sample_count(),
+                partition_count: calibration.len(),
+            });
+        }
+        if observation_values_digest(
+            b"symthaea-casting-conformal-observations-v1",
+            calibration,
+        ) != calibrator.calibration_data_digest_blake3()
+        {
+            return Err(CastingEvidenceError::CalibrationDataMismatch);
+        }
         let process_population_digest = population
             .expect("non-empty training, calibration, and holdout were checked")
             .0;
@@ -562,7 +542,7 @@ impl CastingSplitManifest {
         );
 
         Ok(Self {
-            version: 1,
+            version: 2,
             miscoverage,
             process_population_digest,
             fitted_model_digest_blake3,
@@ -841,7 +821,7 @@ mod tests {
         let first = create_manifest(&training, &calibration, &holdout, 0.5).unwrap();
         let second = create_manifest(&training, &calibration, &holdout, 0.5).unwrap();
 
-        assert_eq!(first.version(), 1);
+        assert_eq!(first.version(), 2);
         assert_eq!(first.nominal_coverage(), 0.5);
         assert_eq!(first.training().record_count(), 3);
         assert_eq!(first.conformal_calibration().record_count(), 2);
@@ -953,13 +933,23 @@ mod tests {
     #[test]
     fn refuses_insufficient_training_and_conformal_calibration_sizes() {
         let (training, calibration, holdout) = valid_partitions();
+        let (model, calibrator) = fit_model_and_calibrator(&training, &calibration, 0.5);
+
         assert!(matches!(
-            create_manifest(&training[..2], &calibration, &holdout, 0.5),
+            CastingSplitManifest::create(
+                &model,
+                &calibrator,
+                &training[..2],
+                &calibration,
+                &holdout
+            ),
             Err(CastingEvidenceError::InsufficientTrainingRecords { .. })
         ));
+
+        let short_calibration = observations(&calibration[..1]);
         assert!(matches!(
-            create_manifest(&training, &calibration[..1], &holdout, 0.05),
-            Err(CastingEvidenceError::InsufficientConformalCalibration {
+            ChvorinovConformalCalibrator::calibrate(&model, &short_calibration, 0.05),
+            Err(super::super::casting::CastingModelError::NotEnoughConformalCalibration {
                 actual: 1,
                 minimum: 19
             })
@@ -1011,7 +1001,7 @@ mod tests {
         let mut reordered = training.clone();
         reordered.swap(0, 1);
         let reordered_manifest =
-            CastingSplitManifest::create(&reordered, &calibration, &holdout, 0.5).unwrap();
+            create_manifest(&reordered, &calibration, &holdout, 0.5).unwrap();
         assert_ne!(
             original.manifest_digest_blake3(),
             reordered_manifest.manifest_digest_blake3()
