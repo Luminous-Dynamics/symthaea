@@ -12,6 +12,7 @@ categories = ["science", "simulation"]
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-epistemic-types = { path = "../symthaea-epistemic-types" }
 anyhow = { workspace = true }
 serde = { workspace = true }
 
