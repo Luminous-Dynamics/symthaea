@@ -97,17 +97,17 @@ Therefore, the two hybrid key-share directions alone imply at least **14 fragmen
 
 Benchmark the real trade-off: setup latency and completion probability across loss rates; bytes/fragments per successful session; radio airtime and energy; peak memory; CPU and wall-clock cost on the intended embedded hardware; and session recovery after loss/restart. Compare the secure protocol against itself under link conditions, and against a reviewed implementation on a comparable platform.
 
-## K-9 — Pending KEM state and encoded inputs needed explicit bounds
+## K-7 — X25519 low-order input can produce a publicly known traffic key (mitigated in this branch)
 
-Before this change, `receive_kem_public_key` copied arbitrary-length public-key bytes into an unbounded `HashMap<String, Vec<u8>>`, and `decapsulate_and_derive` passed arbitrary ciphertext lengths to the KEM API before recording a candidate. A caller-controlled stream of unique peer labels could grow the pending-public-key map without a cap; malformed lengths were not rejected at the API boundary.
+The original `PeerKeyStore::agree` derived encryption/authentication keys from the X25519 shared secret without checking `SharedSecret::was_contributory()`. RFC 7748 §6.1 explains that a small-order input can produce an all-zero shared secret and describes checking for that result; §7 explains that non-contributory behavior can eliminate the other party's private-key contribution. The `x25519-dalek` API exposes `SharedSecret::was_contributory()`. References:
+- RFC 7748: https://www.rfc-editor.org/rfc/rfc7748.html
+- `x25519-dalek::SharedSecret` API: https://docs.rs/x25519-dalek/latest/x25519_dalek/struct.SharedSecret.html
 
-**Mitigation in this branch:**
-- Validate ML-KEM-768 public keys at exactly 1,184 bytes and ciphertexts at exactly 1,088 bytes before storing or decapsulating.
-- Bound peer labels at 256 bytes and pending public-key/candidate maps at 256 unique peers each.
-- Return errors for invalid lengths, empty/oversized peer identifiers, and capacity exhaustion without inserting new state.
-- Add tests for public-key lengths 0/1,183/1,185, ciphertext lengths 0/1,087/1,089, and refusal of a 257th pending KEM exchange.
+Because the key derivation uses fixed HKDF-SHA-256 info `symthaea-mesh-chacha20-v1`, an all-zero DH result makes the encryption key reproducible from public source code and constants. If a malformed/untrusted public key reaches that original implementation, ciphertext under the derived key is not confidential.
 
-Regression coverage is in `test_kem_public_key_length_and_peer_id_are_validated_before_storage`, `test_pending_kem_exchange_count_is_bounded`, `test_pending_candidate_count_is_bounded_before_kem_work`, and `test_invalid_kem_ciphertext_lengths_do_not_create_candidates`. The public-key-length check confirms only the encoding size; it does not authenticate the key or prove it is cryptographically valid. `TaggedPublicKey` construction/encapsulation can still reject malformed contents at the crypto boundary. Identity/transcript binding and rate limits at the transport edge remain mandatory. The new tests have not been compiled or run locally.
+**Fix now present in this branch:** `PeerKeyStore::agree` calls `was_contributory()` before KDF work or key-store mutation and returns a `TrustVerificationError` on non-contributory results. Its return type is now `Result<[u8; 32], SwarmError>`; `ContinuousMind::agree_with_peer` propagates rejection as `Result<Option<[u8; 32]>, SwarmError>`. A new regression test, `x25519_low_order_peer_keys_are_rejected_without_storing_keys`, requires an error and verifies neither encryption nor authentication keys are stored. Valid test callers now handle the fallible result.
+
+This is a source-level mitigation and regression-test addition; it has **not** been compiled or run locally. The API change may require downstream caller updates. Also, this check does not authenticate the peer public key, bind identity/transcript, or provide forward secrecy; those remain separate requirements. Extend the regression corpus to known low-order encodings beyond all-zero and keep any unsupported raw public-key entrypoints fail-closed.
 
 ## K-8 — The service was marking a one-sided KEM exchange as complete
 
@@ -124,17 +124,17 @@ The partial service path also treated PQC failure as non-fatal and continued usi
 
 These are intentional API behavior changes: with `pqc-handshake` enabled, the service will now fail closed until the complete bidirectional exchange, transcript binding and key confirmation are implemented. That is safer than claiming a protection it does not provide; deployments requiring uninterrupted service must make an explicit policy decision before enabling the incomplete feature.
 
-## K-7 — X25519 low-order input can produce a publicly known traffic key (mitigated in this branch)
+## K-9 — Pending KEM state and encoded inputs needed explicit bounds
 
-The original `PeerKeyStore::agree` derived encryption/authentication keys from the X25519 shared secret without checking `SharedSecret::was_contributory()`. RFC 7748 §6.1 explains that a small-order input can produce an all-zero shared secret and describes checking for that result; §7 explains that non-contributory behavior can eliminate the other party's private-key contribution. The `x25519-dalek` API exposes `SharedSecret::was_contributory()`. References:
-- RFC 7748: https://www.rfc-editor.org/rfc/rfc7748.html
-- `x25519-dalek::SharedSecret` API: https://docs.rs/x25519-dalek/latest/x25519_dalek/struct.SharedSecret.html
+Before this change, `receive_kem_public_key` copied arbitrary-length public-key bytes into an unbounded `HashMap<String, Vec<u8>>`, and `decapsulate_and_derive` passed arbitrary ciphertext lengths to the KEM API before recording a candidate. A caller-controlled stream of unique peer labels could grow the pending-public-key map without a cap; malformed lengths were not rejected at the API boundary.
 
-Because the key derivation uses fixed HKDF-SHA-256 info `symthaea-mesh-chacha20-v1`, an all-zero DH result makes the encryption key reproducible from public source code and constants. If a malformed/untrusted public key reaches that original implementation, ciphertext under the derived key is not confidential.
+**Mitigation in this branch:**
+- Validate ML-KEM-768 public keys at exactly 1,184 bytes and ciphertexts at exactly 1,088 bytes before storing or decapsulating.
+- Bound peer labels at 256 bytes and pending public-key/candidate maps at 256 unique peers each.
+- Return errors for invalid lengths, empty/oversized peer identifiers, and capacity exhaustion without inserting new state.
+- Add tests for public-key lengths 0/1,183/1,185, ciphertext lengths 0/1,087/1,089, and refusal of a 257th pending KEM exchange.
 
-**Fix now present in this branch:** `PeerKeyStore::agree` calls `was_contributory()` before KDF work or key-store mutation and returns a `TrustVerificationError` on non-contributory results. Its return type is now `Result<[u8; 32], SwarmError>`; `ContinuousMind::agree_with_peer` propagates rejection as `Result<Option<[u8; 32]>, SwarmError>`. A new regression test, `x25519_low_order_peer_keys_are_rejected_without_storing_keys`, requires an error and verifies neither encryption nor authentication keys are stored. Valid test callers now handle the fallible result.
-
-This is a source-level mitigation and regression-test addition; it has **not** been compiled or run locally. The API change may require downstream caller updates. Also, this check does not authenticate the peer public key, bind identity/transcript, or provide forward secrecy; those remain separate requirements. Extend the regression corpus to known low-order encodings beyond all-zero and keep any unsupported raw public-key entrypoints fail-closed.
+Regression coverage is in `test_kem_public_key_length_and_peer_id_are_validated_before_storage`, `test_pending_kem_exchange_count_is_bounded`, `test_pending_candidate_count_is_bounded_before_kem_work`, and `test_invalid_kem_ciphertext_lengths_do_not_create_candidates`. The public-key-length check confirms only the encoding size; it does not authenticate the key or prove it is cryptographically valid. `TaggedPublicKey` construction/encapsulation can still reject malformed contents at the crypto boundary. Identity/transcript binding and rate limits at the transport edge remain mandatory. The new tests have not been compiled or run locally.
 
 ## Immediate disposition
 
