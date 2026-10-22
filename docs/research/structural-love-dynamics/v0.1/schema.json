@@ -85,7 +85,8 @@
             "VIABILITY",
             "CAUSALITY",
             "PROVENANCE",
-            "CONSCIOUSNESS"
+            "CONSCIOUSNESS",
+            "FEEDBACK"
           ]
         },
         "risk_level": {
@@ -172,7 +173,9 @@
             "SEPARATE_CORRELATION_CAUSATION",
             "REJECT_SYNTHETIC_PARTNER_AS_OBSERVATION",
             "STATE_PHI_ESTIMATOR_LIMITS",
-            "DO_NOT_INFER_CONSCIOUSNESS_FROM_PHI"
+            "DO_NOT_INFER_CONSCIOUSNESS_FROM_PHI",
+            "GATE_UNGROUNDED_RELATIONAL_FEEDBACK",
+            "ALLOW_BOUNDED_VALIDATED_MEASUREMENT_FEEDBACK"
           ]
         },
         "must_do": {
