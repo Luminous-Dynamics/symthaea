@@ -9,6 +9,21 @@ The relevant evaluation frontier is moving from "did the system produce a good a
 
 ## Current external evidence
 
+### Stanford HAI — October 19, 2026 task-execution update
+
+Stanford HAI's latest benchmark synthesis reports three complementary levels of evaluation. MedHELM spans 121 clinical tasks across 22 subcategories and 37 datasets; its win-rate ranges are weakest for administration/workflow (0.53–0.63) and clinical decision support (0.63–0.77). PhysicianBench checks 100 long-horizon tasks using 670 task checks across 21 specialties; its best tested model completed 46% of tasks on one attempt and 28% across all three repeated attempts. HealthAdminBench's best tested agent completed 36.3% of administrative tasks end-to-end even though the best cited subtask rate was materially higher. These benchmarks use different systems and graders; compare directionally, not as a common leaderboard.
+
+The central finding relevant to this work is that an agent can narrate an action it never actually completes, lose state while moving across documents/systems, or pass many subtasks while failing end-to-end. That supports measuring state transitions, externalized outcomes, retries, omissions, and repeatability—rather than grading only final text.
+
+Source: https://hai.stanford.edu/news/measuring-what-medical-ai-can-actually-do (published 2026-10-19; accessed 2026-10-22).
+
+### AgentClinic and tool-using clinical systems
+
+AgentClinic is a multimodal simulated clinical-agent benchmark covering nine specialties and seven languages, explicitly designed around sequential patient interaction, incomplete information, and tool use: https://www.nature.com/articles/s41746-026-02674-7 (published 2026-04-27).
+
+A separate 2026 study compared general-purpose agent systems across AgentClinic, MedAgentsBench, and Humanity's Last Exam. It found modest gains over baseline models in several clinical evaluations alongside substantial resource costs (>10× token usage and >2× latency) and remaining hallucinations: https://www.nature.com/articles/s41746-026-02443-6 (published 2026-02-18).
+
+
 ### Stanford HAI: task execution rather than answer scoring
 
 Stanford HAI's October 19, 2026 synthesis, *Measuring What Medical AI Can Actually Do*, reports results from several task-oriented benchmarks:
