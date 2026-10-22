@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "experiment_id": "synthetic-smoke-example-not-a-device-result",
+  "measurement_origin": "synthetic_fixture",
+  "scenario_corpus_sha256": "a032939ef1fbe013a4fa57d6dfae08464ea5fd3428d473c8bd9f70e40177f409",
+  "scoring_code_sha256": "748fffa154f928ae33c6ab062014724e3c6c4668275432e90cf85a4875c61252",
+  "raw_samples_sha256": "24dfd2f61a22687f007810d27836504f442da0f32bb5ec1b37fe81faa6ae336d",
+  "baseline_config_sha256": "65035227e05e346551d8fc6cac01b71a3e0e4ae88cfae717ed172abc7f5bfeca",
+  "candidate_config_sha256": "886b1184dd9791e20836bf3c3d5532d41b442c59c9cdad42e488796a65ac4aa3",
+  "device": {
+    "model": "SYNTHETIC-NO-PHYSICAL-DEVICE",
+    "soc": "SYNTHETIC-NO-SOC",
+    "os_build": "synthetic-fixture",
+    "unit_token": "synthetic-unit-not-a-real-device",
+    "runtime_id": "synthetic-runtime",
+    "application_build_sha256": "2a4442c7bf16c4b4c9d31f71b91e076f82910821f920cf5684b376f38a7d11ba",
+    "energy_measurement_method": "synthetic_fixture",
+    "calibration_id": null
+  },
+  "samples": [
+    {
+      "pair_id": "smoke-pair-1",
+      "scenario_id": "SYNTHETIC-FOREGROUND-001",
+      "baseline": {
+        "energy_joules": 4.0,
+        "success": true,
+        "latency_ms": 120.0,
+        "severe_thermal_seconds": 0.0,
+        "privacy_violation_count": 0
+      },
+      "candidate": {
+        "energy_joules": 2.8,
+        "success": true,
+        "latency_ms": 121.0,
+        "severe_thermal_seconds": 0.0,
+        "privacy_violation_count": 0
+      }
+    },
+    {
+      "pair_id": "smoke-pair-2",
+      "scenario_id": "SYNTHETIC-FOREGROUND-001",
+      "baseline": {
+        "energy_joules": 4.1,
+        "success": true,
+        "latency_ms": 121.0,
+        "severe_thermal_seconds": 0.0,
+        "privacy_violation_count": 0
+      },
+      "candidate": {
+        "energy_joules": 2.8699999999999997,
+        "success": true,
+        "latency_ms": 122.0,
+        "severe_thermal_seconds": 0.0,
+        "privacy_violation_count": 0
+      }
+    }
+  ]
+}
