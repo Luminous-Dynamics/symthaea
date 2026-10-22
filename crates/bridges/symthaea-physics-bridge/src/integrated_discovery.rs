@@ -783,8 +783,8 @@ mod tests {
                 if misspec_robust.overconfident_under_misspecification { 1 } else { 0 };
             misspec_nominal_detected += if misspec_nominal.model_discrepancy_detected { 1 } else { 0 };
             misspec_robust_detected += if misspec_robust.model_discrepancy_detected { 1 } else { 0 };
-            misspec_nominal_unresolved += usize::from(misspec_nominal.final_live > 1);
-            misspec_robust_unresolved += usize::from(misspec_robust.final_live > 1);
+            misspec_nominal_unresolved += if misspec_nominal.final_live > 1 { 1 } else { 0 };
+            misspec_robust_unresolved += if misspec_robust.final_live > 1 { 1 } else { 0 };
             paired.push(RobustEIGPair {
                 clean_nominal_success: clean_nominal.success,
                 clean_robust_success: clean_robust.success,
