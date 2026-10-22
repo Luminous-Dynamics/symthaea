@@ -1,0 +1,41 @@
+name: Security Audit Verifier Unit Tests
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-audit-verifier-tests-${{ github.event.pull_request.number || github.ref }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  verifier-tests:
+    name: Test independent verifier policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact PR head (unprivileged test only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate Python runtime
+        run: python3 -c 'import sys; assert sys.version_info >= (3, 10), sys.version'
+
+      - name: Compile and run verifier adversarial tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/scripts/verify_security_audit_trust_anchor.py
+          python3 -m unittest discover -s .github/scripts -p 'test_verify_security_audit_trust_anchor.py' -v
