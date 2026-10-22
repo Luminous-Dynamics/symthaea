@@ -1794,6 +1794,25 @@ mod tests {
                         change.connectivity = Some(Connectivity::Intermittent);
                         insert_before(&mut trace, EventKind::NetworkRequiredForCore, change);
                     }
+                    "connectivity_recovery_control" => {
+                        trace.connectivity = Connectivity::Online;
+                        let mut events = vec![
+                            bare_event(EventKind::SessionStarted),
+                            bare_event(EventKind::NetworkRequiredForCore),
+                        ];
+                        let mut offline = bare_event(EventKind::ConnectivityChanged);
+                        offline.connectivity = Some(Connectivity::Offline);
+                        events.push(offline);
+                        events.push(bare_event(EventKind::NetworkRequiredForCore));
+                        let mut online = bare_event(EventKind::ConnectivityChanged);
+                        online.connectivity = Some(Connectivity::Online);
+                        events.push(online);
+                        events.push(bare_event(EventKind::NetworkRequiredForCore));
+                        trace.events = events;
+                        resequence(&mut trace);
+                        trace.expected_violation_codes =
+                            vec!["offline_core_network_dependency".to_owned()];
+                    }
                     "render_after_revocation" => {
                         let mut revoke = bare_event(EventKind::BundleRevoked);
                         revoke.bundle_id = Some("bundle-a".to_owned());
