@@ -195,11 +195,26 @@ fn next_random(state: &mut u64) -> u64 {
     state.wrapping_mul(0x2545_F491_4F6C_DD1D)
 }
 
-fn log_choose(n: usize, k: usize) -> f64 {
-    let k = k.min(n - k);
-    (1..=k)
-        .map(|i| ((n - k + i) as f64).ln() - (i as f64).ln())
-        .sum()
+fn binomial_log_terms_at_most(k: usize, n: usize, probability: f64) -> Vec<f64> {
+    let log_p = probability.ln();
+    let log_q = (-probability).ln_1p();
+    let log_ratio = log_p - log_q;
+    let mut terms = Vec::with_capacity(k + 1);
+    let mut log_mass = n as f64 * log_q;
+    terms.push(log_mass);
+
+    // Recur from P(X = i - 1) to P(X = i) in O(1) per term:
+    // P_i / P_(i-1) = ((n - i + 1) / i) * (p / (1 - p)).
+    for i in 1..=k {
+        log_mass += ((n - i + 1) as f64).ln() - (i as f64).ln() + log_ratio;
+        terms.push(log_mass);
+    }
+    terms
+}
+
+fn log_sum_exp(values: &[f64]) -> f64 {
+    let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    maximum + values.iter().map(|value| (value - maximum).exp()).sum::<f64>().ln()
 }
 
 fn binomial_cdf_at_most(k: usize, n: usize, probability: f64) -> f64 {
@@ -213,15 +228,7 @@ fn binomial_cdf_at_most(k: usize, n: usize, probability: f64) -> f64 {
         return 0.0;
     }
 
-    let log_p = probability.ln();
-    let log_one_minus_p = (-probability).ln_1p();
-    let log_terms: Vec<f64> = (0..=k)
-        .map(|i| {
-            log_choose(n, i) + i as f64 * log_p + (n - i) as f64 * log_one_minus_p
-        })
-        .collect();
-    let maximum = log_terms.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    (maximum + log_terms.iter().map(|value| (value - maximum).exp()).sum::<f64>().ln())
+    log_sum_exp(&binomial_log_terms_at_most(k, n, probability))
         .exp()
         .clamp(0.0, 1.0)
 }
@@ -254,11 +261,7 @@ fn exact_mcnemar_two_sided(candidate_only: usize, baseline_only: usize) -> f64 {
         return 1.0;
     }
     let tail = candidate_only.min(baseline_only);
-    let log_two_to_n = discordant as f64 * 2.0_f64.ln();
-    let probability = (0..=tail)
-        .map(|i| (log_choose(discordant, i) - log_two_to_n).exp())
-        .sum::<f64>();
-    (2.0 * probability).min(1.0)
+    (2.0 * binomial_cdf_at_most(tail, discordant, 0.5)).min(1.0)
 }
 
 /// Minimum independent zero-violation episodes needed for the one-sided exact
@@ -348,6 +351,12 @@ mod tests {
     fn zero_observed_violations_do_not_claim_zero_risk() {
         let bound = super::clopper_pearson_upper95(0, 300);
         assert!(bound > 0.009 && bound < 0.011, "bound={bound}");
+    }
+
+    #[test]
+    fn nonzero_violation_count_matches_exact_binomial_upper_reference() {
+        let bound = super::clopper_pearson_upper95(3, 10);
+        assert!((bound - 0.606_624_216_105_412_3).abs() < 1e-9, "bound={bound}");
     }
 
     #[test]
