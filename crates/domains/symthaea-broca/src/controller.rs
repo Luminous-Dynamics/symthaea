@@ -66,6 +66,43 @@ impl GpuEmbeddingCache {
     }
 }
 
+/// Versioned seed derivation scheme for Broca token embeddings.
+///
+/// V1 remains the compatibility default. V2 changes token vectors and must be
+/// treated as a distinct initialization condition in checkpoint and benchmark
+/// comparisons; it is not applied retroactively to loaded checkpoints.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum TokenEmbeddingSeedScheme {
+    /// Historical concatenation of the seed phrase, delimiter, and label.
+    #[default]
+    LegacyV1,
+    /// Length-prefixed domain tuple and explicit 24-bit coordinate mapping.
+    DomainSeparatedV2,
+}
+
+fn token_embedding_from_seed(
+    genesis: &GenesisSeed,
+    label: &str,
+    scheme: TokenEmbeddingSeedScheme,
+) -> ContinuousHV {
+    match scheme {
+        TokenEmbeddingSeedScheme::LegacyV1 => {
+            ContinuousHV::from_genesis(genesis, label, HDC_DIMENSION)
+        }
+        TokenEmbeddingSeedScheme::DomainSeparatedV2 => genesis.hv_v2(label, HDC_DIMENSION),
+    }
+}
+
 /// Configuration for the language controller.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LanguageControllerConfig {
@@ -175,6 +212,7 @@ pub struct LanguageControllerConfig {
     /// Number of highway layers (1-3 recommended).
     #[serde(default = "default_highway_layers")]
     pub highway_layers: usize,
+
 }
 
 fn default_highway_layers() -> usize {
@@ -286,6 +324,8 @@ pub struct LanguageController {
     learning_rate: f32,
     /// Configuration.
     config: LanguageControllerConfig,
+    /// Seed scheme used for future vocabulary extensions.
+    token_embedding_seed_scheme: TokenEmbeddingSeedScheme,
     /// Current sequence position (reset between generations).
     current_pos: usize,
     /// Coherence feedback from the generator (Phase 3: adaptive dt).
@@ -309,8 +349,26 @@ pub struct LanguageController {
 }
 
 impl LanguageController {
-    /// Create a new controller from a genesis seed and config.
+    /// Create a controller using the configured token-embedding seed scheme.
+    ///
+    /// The config defaults to V1 to preserve existing model initialization.
     pub fn new(genesis: &GenesisSeed, config: &LanguageControllerConfig) -> Self {
+        Self::new_with_token_embedding_seed_scheme(
+            genesis,
+            config,
+            TokenEmbeddingSeedScheme::LegacyV1,
+        )
+    }
+
+    /// Create a controller with an explicit token-embedding seed scheme.
+    ///
+    /// The recurrent network and all non-token parameters keep their existing
+    /// initializer, isolating this option to the weight-tied token table.
+    pub fn new_with_token_embedding_seed_scheme(
+        genesis: &GenesisSeed,
+        config: &LanguageControllerConfig,
+        seed_scheme: TokenEmbeddingSeedScheme,
+    ) -> Self {
         let neuron_config = UnifiedConfig {
             tau_base: 0.02,                    // 20ms — matches token generation rate
             backbone_tau: config.backbone_tau, // Configurable state dependency for coherent sequences
@@ -328,13 +386,14 @@ impl LanguageController {
 
         let network = HdcLtcUnifiedNetwork::from_genesis(net_config, genesis);
 
-        // Genesis-seeded token embeddings
+        // Seed scheme is isolated to token rows; the recurrent network above
+        // intentionally retains its existing initialization for controlled A/B.
         let token_embeddings: Vec<ContinuousHV> = (0..config.vocab_size)
             .map(|i| {
-                ContinuousHV::from_genesis(
+                token_embedding_from_seed(
                     genesis,
                     &format!("broca::token_emb::{i}"),
-                    HDC_DIMENSION,
+                    seed_scheme,
                 )
             })
             .collect();
@@ -371,6 +430,7 @@ impl LanguageController {
             orthogonal_positions,
             learning_rate: config.learning_rate,
             config: config.clone(),
+            token_embedding_seed_scheme: seed_scheme,
             current_pos: 0,
             coherence_for_dt: 1.0,
             last_effective_dt: config.dt_per_token,
@@ -851,18 +911,22 @@ impl LanguageController {
         context_hvs: Option<&[&ContinuousHV]>,
     ) {
         let emb = if let Some(ctx) = context_hvs {
-            // Algebraically compose from surrounding semantics
+            // Algebraically compose from surrounding semantics when context exists.
             if ctx.is_empty() {
-                ContinuousHV::from_genesis(
+                token_embedding_from_seed(
                     genesis,
                     &format!("broca::token_emb::{name}"),
-                    HDC_DIMENSION,
+                    self.token_embedding_seed_scheme,
                 )
             } else {
                 ContinuousHV::bundle(ctx)
             }
         } else {
-            ContinuousHV::from_genesis(genesis, &format!("broca::token_emb::{name}"), HDC_DIMENSION)
+            token_embedding_from_seed(
+                genesis,
+                &format!("broca::token_emb::{name}"),
+                self.token_embedding_seed_scheme,
+            )
         };
         self.token_embeddings.push(emb);
         // Invalidate GPU cache — will be rebuilt on next compute_logits if needed
@@ -1544,4 +1608,105 @@ mod tests {
 
         assert_eq!(ctrl.highway_weights(), ctrl2.highway_weights());
     }
+    #[test]
+    fn token_seed_scheme_does_not_change_controller_config_wire_shape() {
+        let config = test_config();
+        let encoded = serde_json::to_value(&config).expect("controller config should serialize");
+        let object = encoded
+            .as_object()
+            .expect("controller config should serialize as an object");
+        assert!(
+            !object.contains_key("token_embedding_seed_scheme"),
+            "runtime-only seed scheme must not alter the serialized config/checkpoint shape"
+        );
+    }
+
+    #[test]
+    fn legacy_token_seed_scheme_remains_the_exact_default() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let default_controller = LanguageController::new(&genesis, &config);
+        let explicit_legacy = LanguageController::new_with_token_embedding_seed_scheme(
+            &genesis,
+            &config,
+            TokenEmbeddingSeedScheme::LegacyV1,
+        );
+
+        assert_eq!(
+            default_controller.token_embeddings().len(),
+            explicit_legacy.token_embeddings().len()
+        );
+        for (index, (default, explicit)) in default_controller
+            .token_embeddings()
+            .iter()
+            .zip(explicit_legacy.token_embeddings())
+            .enumerate()
+        {
+            assert_eq!(
+                default.values,
+                explicit.values,
+                "default initialization changed at token row {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn domain_separated_token_seed_scheme_is_repeatable_and_distinct() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let first = LanguageController::new_with_token_embedding_seed_scheme(
+            &genesis,
+            &config,
+            TokenEmbeddingSeedScheme::DomainSeparatedV2,
+        );
+        let second = LanguageController::new_with_token_embedding_seed_scheme(
+            &genesis,
+            &config,
+            TokenEmbeddingSeedScheme::DomainSeparatedV2,
+        );
+        let legacy = LanguageController::new(&genesis, &config);
+
+        assert_eq!(first.token_embeddings().len(), config.vocab_size);
+        for (index, (a, b)) in first
+            .token_embeddings()
+            .iter()
+            .zip(second.token_embeddings())
+            .enumerate()
+        {
+            assert_eq!(a.values, b.values, "V2 is not repeatable at row {index}");
+            assert!(
+                a.values.iter().all(|value| value.is_finite()),
+                "V2 emitted a non-finite coordinate at row {index}"
+            );
+        }
+        assert_ne!(
+            first.token_embeddings()[0].values,
+            legacy.token_embeddings()[0].values,
+            "V2 must be independently distinguishable from legacy initialization"
+        );
+    }
+
+    #[test]
+    fn appended_tokens_follow_the_active_seed_scheme() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut controller = LanguageController::new_with_token_embedding_seed_scheme(
+            &genesis,
+            &config,
+            TokenEmbeddingSeedScheme::DomainSeparatedV2,
+        );
+        let old_vocab_size = controller.vocab_size();
+
+        controller.append_token(&genesis, "new-token", None);
+
+        assert_eq!(controller.vocab_size(), old_vocab_size + 1);
+        assert_eq!(
+            controller.token_embeddings()[old_vocab_size].values,
+            genesis
+                .hv_v2("broca::token_emb::new-token", HDC_DIMENSION)
+                .values,
+            "appended V2 rows must not silently revert to the legacy stream"
+        );
+    }
+
 }
