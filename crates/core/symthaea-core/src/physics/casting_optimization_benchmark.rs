@@ -26,16 +26,18 @@ enum SyntheticCase {
     HeteroscedasticNoise = 3,
     FidelityDiscrepancy = 4,
     FailedCorner = 5,
+    RastriginMultimodal = 6,
 }
 
 impl SyntheticCase {
-    const ALL: [Self; 6] = [
+    const ALL: [Self; 7] = [
         Self::SmoothBowl,
         Self::CoupledFactors,
         Self::FeasibleIsland,
         Self::HeteroscedasticNoise,
         Self::FidelityDiscrepancy,
         Self::FailedCorner,
+        Self::RastriginMultimodal,
     ];
 
     fn name(self) -> &'static str {
@@ -46,6 +48,7 @@ impl SyntheticCase {
             Self::HeteroscedasticNoise => "heteroscedastic-noise",
             Self::FidelityDiscrepancy => "fidelity-discrepancy",
             Self::FailedCorner => "failed-corner",
+            Self::RastriginMultimodal => "rastrigin-multimodal",
         }
     }
 
@@ -57,6 +60,7 @@ impl SyntheticCase {
             | Self::FailedCorner => Point { x: 0.37, y: 0.62 },
             Self::CoupledFactors => Point { x: 0.20, y: 0.29 },
             Self::FeasibleIsland => Point { x: 0.72, y: 0.31 },
+            Self::RastriginMultimodal => Point { x: 0.5, y: 0.5 },
         }
     }
 
@@ -69,6 +73,17 @@ impl SyntheticCase {
             }
             Self::FeasibleIsland => {
                 (point.x - 0.72).powi(2) + (point.y - 0.31).powi(2)
+            }
+            Self::RastriginMultimodal => {
+                // Map normalized coordinates [0,1]^2 to the standard [-5.12, 5.12]^2
+                // Rastrigin domain. Its known global minimum is exactly 0 at (0,0),
+                // which maps to normalized point (0.5, 0.5); numerous local minima
+                // make this a useful non-convex acquisition stress fixture.
+                let x = 10.24 * (point.x - 0.5);
+                let y = 10.24 * (point.y - 0.5);
+                20.0
+                    + x * x - 10.0 * (2.0 * std::f64::consts::PI * x).cos()
+                    + y * y - 10.0 * (2.0 * std::f64::consts::PI * y).cos()
             }
             _ => (point.x - 0.37).powi(2) + (point.y - 0.62).powi(2),
         }
@@ -1125,6 +1140,14 @@ mod tests {
         assert!(summary
             .iter()
             .any(|row| row.design == SamplingDesign::AdaptiveNearestNeighbor));
+    }
+
+    #[test]
+    fn rastrigin_multimodal_fixture_has_known_global_minimum() {
+        let case = SyntheticCase::RastriginMultimodal;
+        assert_abs_close(case.objective(Point { x: 0.5, y: 0.5 }), 0.0, 1e-12);
+        assert!(case.objective(Point { x: 0.6, y: 0.5 }) > 0.0);
+        assert_abs_close(case.known_optimum_value(), 0.0, 1e-12);
     }
 
     #[test]
