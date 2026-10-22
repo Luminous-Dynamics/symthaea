@@ -6,7 +6,7 @@ Status: isolated Rust research prototype and paired synthetic benchmark. Exact-h
 
 The CUSUM branch accumulates residual excess above a fixed allowance and calibrates its alarm threshold on a nominal synthetic panel. It is a useful change detector, but its false-alarm behavior depends on the calibration/test protocol and assumptions about the nominal residual sequence.
 
-This branch adds a different object: a nonnegative e-process for a bounded risk signal. The key hypothesis is explicit. For losses \(L_t \in [0,1]\), suppose the safe-system null claims
+This branch adds a different object: a nonnegative e-process for a bounded risk signal. The fixed per-episode constructor in this first prototype is useful as a comparator, but repeatedly resetting it with the same threshold only gives a per-episode bound. Follow-up research in [EPROCESS_LIFETIME_ALPHA_SPENDING_V1.md](EPROCESS_LIFETIME_ALPHA_SPENDING_V1.md) adds summable alpha spending so the global false-alarm budget is not reused at every reset. The key hypothesis is explicit. For losses \(L_t \in [0,1]\), suppose the safe-system null claims
 \[
 \mathbb{E}[L_t \mid \mathcal{F}_{t-1}] \leq \epsilon
 \]
