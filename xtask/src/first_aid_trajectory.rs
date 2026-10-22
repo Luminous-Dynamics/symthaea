@@ -1686,7 +1686,9 @@ mod tests {
                     );
                     actual_evaluate(&trace)
                 }
-                "mutation_or_control" if case.execution_target.as_deref() == Some("workflow_gate") => {
+                "mutation_or_control"
+                    if case.execution_target.as_deref() == Some("workflow_gate") =>
+                {
                     workflow_gate_count += 1;
                     continue;
                 }
