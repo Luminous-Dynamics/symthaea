@@ -58,7 +58,7 @@ The analyzer deliberately emits `overall_confirmatory_decision = not_evaluated_.
 
 ## Counterfactual sensitivity analysis
 
-The Rust `analyze_counterfactual_sensitivity` binary joins the suite's stable base/variant outcome IDs to the transfer-selectivity JSONL rows. For example, after both files have been checked against their JSON Schemas:
+The Rust `analyze_counterfactual_sensitivity` binary joins the suite's stable base/variant outcome IDs to the transfer-selectivity JSONL rows. The suite pins the source-artifact digest, then binds each outcome to a separate target artifact path and digest (base and counterfactual) plus the exact statement digest; two byte-distinct artifacts cannot claim one shared path or hash. The synthetic pair paths are placeholders and are not presented as real Lean files. For example, after both files have been checked against their JSON Schemas:
 
 ```bash
 cargo run --locked --bin analyze_counterfactual_sensitivity -- \
@@ -66,7 +66,7 @@ cargo run --locked --bin analyze_counterfactual_sensitivity -- \
   counterfactual-sensitivity-report.json 10000 20261022
 ```
 
-It checks source artifact/insight provenance, separate base/counterfactual target-artifact and statement digests, component IDs, labels/statuses, independent reviewer identities/evidence/reason codes, matched model/config/prompt/budget, the budget caps, and outcome-row uniqueness. Split/component isolation is checked across the whole suite, even when a run scores only one partition. The report separates compatible-base recall, counterfactual compatibility recall, sensitivity and false acceptance on incompatible variants, paired contract adherence, decision stability on semantics-preserving pairs, probability Brier score and the mean absolute probability shift for no-op variants. It reports per-mutation-kind sensitivity / false acceptance and component-bootstrap percentile intervals for the aggregate metrics.
+It checks source artifact/insight provenance, separate base/counterfactual target-artifact paths and digests plus statement digests, component IDs, labels/statuses, independent reviewer identities/evidence/reason codes, matched model/config/prompt/budget, the budget caps, and outcome-row uniqueness. Split/component isolation is checked across the whole suite, even when a run scores only one partition. The report separates compatible-base recall, counterfactual compatibility recall, sensitivity and false acceptance on incompatible variants, paired contract adherence, decision stability on semantics-preserving pairs, probability Brier score and the mean absolute probability shift for no-op variants. It reports per-mutation-kind sensitivity / false acceptance and component-bootstrap percentile intervals for the aggregate metrics.
 
 The report calls rates `ratio` and Brier / probability-delta metrics `mean`; it includes hashes of exact suite and outcome bytes. It always emits an unassessed confirmatory decision. This is intentional: a well-formed synthetic join does not establish expert-adjudicated compatibility, checker-backed transfer utility, or a SOTA result. CI uses the seven-pair, fourteen-row synthetic fixture to exercise the end-to-end path and mutates missing-row, provenance, reviewer-evidence and over-budget cases. The primary exact-target proof-utility endpoint remains unchanged.
 
