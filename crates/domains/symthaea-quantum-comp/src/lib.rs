@@ -40,6 +40,7 @@ pub mod experiment;
 pub mod fixtures;
 pub mod interop;
 pub mod matrix;
+pub mod mis_verifier;
 pub mod migration;
 pub mod noise_sweep;
 pub mod phase_hdc;
