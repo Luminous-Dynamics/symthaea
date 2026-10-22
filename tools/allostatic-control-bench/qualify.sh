@@ -12,6 +12,7 @@ source_files=(
   "tools/allostatic-control-bench/src/lib.rs"
   "tools/allostatic-control-bench/src/calibration.rs"
   "tools/allostatic-control-bench/src/drift_monitor.rs"
+  "tools/allostatic-control-bench/src/innovation_monitor.rs"
   "tools/allostatic-control-bench/src/model_mismatch.rs"
   "tools/allostatic-control-bench/src/multistep_viability.rs"
   "tools/allostatic-control-bench/src/robust_viability.rs"
@@ -20,11 +21,13 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-model-mismatch-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-multistep-viability-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-ood-fallback-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-residual-monitor-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
   "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
   "docs/research/OOD_REACHABILITY_FALLBACK_V1.md"
+  "docs/research/SEQUENTIAL_RESIDUAL_MONITOR_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -52,6 +55,8 @@ horizon_out="${out_base}-multistep-horizon.csv"
 horizon_summary_out="${out_base}-multistep-horizon-summary.csv"
 ood_out="${out_base}-ood-fallback.csv"
 ood_summary_out="${out_base}-ood-fallback-summary.csv"
+residual_out="${out_base}-residual-monitor.csv"
+residual_summary_out="${out_base}-residual-monitor-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -387,6 +392,94 @@ if ! awk -F, '
   exit 1
 fi
 
+# Sequential residual monitoring compares score-only and residual evidence.
+# A score-preserving shift must remain invisible to the score-only channel; the
+# residual monitor must detect observable shifts and preserve the sensor-blind control.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-residual-monitor-bench -- \
+  "$tmpdir/residual-a.csv" "$tmpdir/residual-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-residual-monitor-bench -- \
+  "$tmpdir/residual-b.csv" "$tmpdir/residual-summary-b.csv"
+if ! cmp -s "$tmpdir/residual-a.csv" "$tmpdir/residual-b.csv" ||
+   ! cmp -s "$tmpdir/residual-summary-a.csv" "$tmpdir/residual-summary-b.csv"; then
+  printf 'FAIL: repeated residual-monitor raw and summary outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 13) failed = 1; next }
+  {
+    if (NF != 13) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "residual_only_shift" &&
+        $2 != "observable_strong_shift" && $2 != "stealth_score_shift" &&
+        $2 != "sensor_blind_shift") failed = 1
+    if ($3 !~ /^[0-9]+$/ || $3 < 200000 || $3 >= 200300) failed = 1
+    if ($4 != 0 && $4 != 12) failed = 1
+    if ($5 !~ /^[0-9]*[.]?[0-9]+$/ || $6 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        $8 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($7 !~ /^[0-9]+$/ || $7 > 48 || $9 !~ /^[0-9]+$/ || $9 > 48) failed = 1
+    if ($10 != "true" && $10 != "false") failed = 1
+    if ($11 != "true" && $11 != "false") failed = 1
+    if ($12 != "true" && $12 != "false") failed = 1
+    if ($13 != "true" && $13 != "false") failed = 1
+    if (($7 > 0) != ($10 == "true") || ($9 > 0) != ($11 == "true")) failed = 1
+    expected_shift = ($2 == "nominal" ? 0 : 12)
+    if ($4 != expected_shift || ($12 == "true") != ($2 != "nominal")) failed = 1
+    if (($13 == "true") != ($2 == "residual_only_shift" ||
+        $2 == "observable_strong_shift" || $2 == "stealth_score_shift")) failed = 1
+    key = $1 SUBSEP $3
+    if ($2 == "nominal") {
+      nominal_score_step[key] = $7
+      nominal_residual_step[key] = $9
+    } else if ($2 != "observable_strong_shift") {
+      if ($7 != nominal_score_step[key]) failed = 1
+      if ($2 == "sensor_blind_shift" && $9 != nominal_residual_step[key]) failed = 1
+    } else {
+      strong_residual_step[key] = $9
+      if ($7 < 12) failed = 1
+    }
+    if ($2 == "stealth_score_shift" && $9 != strong_residual_step[key]) failed = 1
+    unique = $1 SUBSEP $2 SUBSEP $3
+    if (seen[unique]++) failed = 1
+    counts[$1 SUBSEP $2]++
+    rows++
+  }
+  END {
+    if (NR != 7501 || rows != 7500 || failed) exit 1
+    for (key in counts) if (counts[key] != 300) exit 1
+  }
+' "$tmpdir/residual-a.csv"; then
+  printf 'FAIL: residual-monitor raw schema, paired negative controls or episode coverage is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 12) failed = 1; next }
+  {
+    if (NF != 12) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "residual_only_shift" &&
+        $2 != "observable_strong_shift" && $2 != "stealth_score_shift" &&
+        $2 != "sensor_blind_shift") failed = 1
+    if ($3 != 300 || $4 != ($2 == "nominal" ? 0 : 300)) failed = 1
+    for (i = 5; i <= 10; i++) if ($i !~ /^[0-9]+$/) failed = 1
+    if ($7 > $5 || $8 > $6 || $9 != $4 - $7 || $10 != $4 - $8) failed = 1
+    if ($11 != "NA" && ($11 !~ /^[0-9]*[.]?[0-9]+$/ || $11 < 0 || $11 > 47)) failed = 1
+    if ($12 != "NA" && ($12 !~ /^[0-9]*[.]?[0-9]+$/ || $12 < 0 || $12 > 47)) failed = 1
+    if ($2 == "nominal" && ($5 > 30 || $6 > 30 || $7 != 0 || $8 != 0)) failed = 1
+    if ($2 == "observable_strong_shift" && ($7 < 270 || $8 < 270)) failed = 1
+    if ($2 == "stealth_score_shift" && ($7 > 30 || $8 < 270)) failed = 1
+    if ($2 == "sensor_blind_shift" && $8 > 30) failed = 1
+    rows++
+  }
+  END { if (NR != 26 || rows != 25 || failed) exit 1 }
+' "$tmpdir/residual-summary-a.csv"; then
+  printf 'FAIL: residual-monitor summary coverage, false-alarm, detection or delay gates are invalid\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -413,6 +506,8 @@ cp "$tmpdir/horizon-a.csv" "$horizon_out"
 cp "$tmpdir/horizon-summary-a.csv" "$horizon_summary_out"
 cp "$tmpdir/ood-a.csv" "$ood_out"
 cp "$tmpdir/ood-summary-a.csv" "$ood_summary_out"
+cp "$tmpdir/residual-a.csv" "$residual_out"
+cp "$tmpdir/residual-summary-a.csv" "$residual_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -440,6 +535,10 @@ cp "$tmpdir/ood-summary-a.csv" "$ood_summary_out"
   printf 'ood_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$ood_out") - 1 ))"
   printf 'ood_summary_sha256=%s\n' "$(sha256sum "$ood_summary_out" | awk '{print $1}')"
   printf 'ood_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$ood_summary_out") - 1 ))"
+  printf 'residual_frontier_sha256=%s\n' "$(sha256sum "$residual_out" | awk '{print $1}')"
+  printf 'residual_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$residual_out") - 1 ))"
+  printf 'residual_summary_sha256=%s\n' "$(sha256sum "$residual_summary_out" | awk '{print $1}')"
+  printf 'residual_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$residual_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -453,4 +552,6 @@ printf 'Multi-step viability horizon frontier: %s\n' "$horizon_out"
 printf 'Multi-step viability horizon summary: %s\n' "$horizon_summary_out"
 printf 'OOD fallback frontier: %s\n' "$ood_out"
 printf 'OOD fallback summary: %s\n' "$ood_summary_out"
+printf 'Sequential residual frontier: %s\n' "$residual_out"
+printf 'Sequential residual summary: %s\n' "$residual_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
