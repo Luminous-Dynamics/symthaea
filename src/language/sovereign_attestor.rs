@@ -261,6 +261,69 @@ mod tests {
     }
 
     #[test]
+    fn legacy_v1_transcript_collision_is_reproduced_and_rejected() {
+        // Both records produce the exact same v1 concatenated message, despite
+        // having different labels, hashes, binary claims, and verdicts.
+        // The repeated bytes make the boundary shift deterministic and keep
+        // both variable string fields valid UTF-8.
+        let attestor = SovereignAttestor::new();
+        let original = ProofAttestation {
+            label: "A".to_string(),
+            smtlib2_hash: [b'B'; 32],
+            binary_hash: Some([b'C'; 32]),
+            verdict: "D".to_string(),
+            signature: Vec::new(),
+            public_key: attestor.keys.public_key().to_vec(),
+            transcript_version: 1,
+        };
+        let mut changed = ProofAttestation {
+            label: "AB".to_string(),
+            smtlib2_hash: {
+                let mut bytes = [b'B'; 32];
+                bytes[31] = b'C';
+                bytes
+            },
+            binary_hash: Some({
+                let mut bytes = [b'C'; 32];
+                bytes[31] = b'D';
+                bytes
+            }),
+            verdict: String::new(),
+            signature: Vec::new(),
+            public_key: attestor.keys.public_key().to_vec(),
+            transcript_version: 1,
+        };
+
+        fn legacy_message(attestation: &ProofAttestation) -> Vec<u8> {
+            let mut message = Vec::new();
+            message.extend_from_slice(attestation.label.as_bytes());
+            message.extend_from_slice(&attestation.smtlib2_hash);
+            if let Some(hash) = attestation.binary_hash {
+                message.extend_from_slice(&hash);
+            }
+            message.extend_from_slice(attestation.verdict.as_bytes());
+            message
+        }
+
+        let original_message = legacy_message(&original);
+        let changed_message = legacy_message(&changed);
+        assert_eq!(original_message, changed_message);
+
+        let signature = attestor.keys.sign(&original_message).unwrap();
+        changed.signature = signature.clone();
+        let legacy_public_key = attestor.keys.public_key().to_vec();
+
+        // This is the exact condition that made the old verifier accept both
+        // records: the bytes being verified are identical and actual_binary=None
+        // skips the optional binary comparison.
+        assert!(verify_signature(&changed_message, &signature, &legacy_public_key).unwrap());
+
+        // The new verifier rejects v1 format rather than pretending the legacy
+        // ambiguous transcript can be interpreted unambiguously.
+        assert!(!SovereignAttestor::verify(&changed, None));
+    }
+
+    #[test]
     fn v2_transcript_binds_version_and_option_tag() {
         let attestor = SovereignAttestor::new();
         let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(b"artifact"));
