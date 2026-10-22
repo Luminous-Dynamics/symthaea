@@ -628,6 +628,21 @@ fn audit(
             valid_generation_tiers,
             format!("runs[{index}] has missing or invalid observed generation_tiers"),
         );
+        let tiers = run.get("generation_tiers").and_then(Value::as_array);
+        let has_tier = |target: &str| {
+            tiers.is_some_and(|values| values.iter().any(|tier| tier.as_str() == Some(target)))
+        };
+        let tiers_compatible_with_requested_backend = match model_mode {
+            "native" => !has_tier("LocalLLM") && !has_tier("CloudLLM"),
+            "ollama" => !has_tier("CloudLLM"),
+            "cloud" => !has_tier("LocalLLM"),
+            _ => false,
+        };
+        push_check(
+            &mut errors,
+            tiers_compatible_with_requested_backend,
+            format!("runs[{index}] observed generation_tiers conflict with requested model_mode {model_mode}"),
+        );
 
         push_check(
             &mut errors,
@@ -1452,15 +1467,17 @@ mod tests {
     #[test]
     fn generation_tier_summary_distinguishes_simulated_and_external_routes() {
         let mut report = valid_fixture();
+        report["model_mode"] = Value::String("ollama".to_string());
+        report["model_label"] = Value::String("gemma4:e2b".to_string());
+        report["runtime_configuration"]["requested_backend"] = Value::String("ollama".to_string());
+        report["runtime_configuration"]["requested_model"] = Value::String("gemma4:e2b".to_string());
         report["runs"][0]["generation_tiers"] = serde_json::json!(["Simulated", "LocalLLM"]);
         report["summary"]["gcs_off"]["generation_tier_attempts"] = serde_json::json!({
             "Native": 0, "Hardware": 0, "LocalLLM": 1, "CloudLLM": 0, "Simulated": 1
         });
         report["summary"]["gcs_off"]["runs_with_external_llm_tier"] = Value::from(1);
         report["summary"]["gcs_off"]["runs_with_simulated_tier"] = Value::from(1);
-        let errors = audit(&report, None, None);
-        assert!(errors.iter().all(|error| !error.contains("generation_tier_attempts")));
-        assert!(errors.iter().any(|error| error.contains("wins") || error.contains("summary")));
+        assert!(audit(&report, None, None).is_empty());
     }
 
     #[test]
