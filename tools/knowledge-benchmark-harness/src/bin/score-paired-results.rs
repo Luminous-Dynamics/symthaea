@@ -1809,6 +1809,80 @@ mod tests {
         );
     }
 
+    fn held_out_bootstrap_fixture() -> (Plan, Vec<PairCase>, Vec<Observation>) {
+        let mut plan = fixture_plan();
+        plan.phase = "preregistered_held_out".into();
+        plan.synthetic_only = false;
+        plan.benchmark.split = "holdout".into();
+        plan.benchmark.source_family_disjoint = true;
+        plan.benchmark.rights_review_status = "approved".into();
+        plan.preregistration.held_out_access = "sealed_until_freeze".into();
+
+        let mut pairs = Vec::new();
+        let mut observations = Vec::new();
+        for index in 0..20 {
+            let pair_id = format!("holdout-{index:02}");
+            let mut case = pair(
+                &pair_id,
+                "context_swap",
+                "local_change",
+                if index == 0 { "release_blocker" } else { "major" },
+                true,
+            );
+            case.split = "holdout".into();
+            case.synthetic_only = false;
+            case.source_family_ids = vec![format!("independent-family-{index:02}")];
+            pairs.push(case);
+            observations.push(observation(
+                "base",
+                "s1",
+                &pair_id,
+                "incorrect",
+            ));
+            observations.push(observation(
+                "candidate",
+                "s2",
+                &pair_id,
+                if index == 0 { "incorrect" } else { "local_change" },
+            ));
+        }
+        (plan, pairs, observations)
+    }
+
+    #[test]
+    fn positive_interval_does_not_override_a_candidate_critical_gate_failure() {
+        let (plan, pairs, observations) = held_out_bootstrap_fixture();
+        let clusters = source_family_clusters(&pairs).unwrap();
+        assert_eq!(clusters.len(), 20);
+        let comparisons =
+            compute_pairwise_comparisons(&plan, &pairs, &observations, &clusters).unwrap();
+        assert_eq!(comparisons.len(), 1);
+        assert!(
+            comparisons[0].confidence_interval_low > 0.0,
+            "fixture must show a positive interval to exercise non-compensatory gating"
+        );
+        assert!(
+            !comparisons[0].candidate_improvement_supported,
+            "a release-blocker failure must prevent an improvement claim"
+        );
+    }
+
+    #[test]
+    fn sufficiently_supported_held_out_improvement_requires_all_candidate_gates() {
+        let (plan, pairs, mut observations) = held_out_bootstrap_fixture();
+        for row in &mut observations {
+            if row.system_id == "s2" {
+                row.observed_relation = "local_change".into();
+            }
+        }
+        let clusters = source_family_clusters(&pairs).unwrap();
+        let comparisons =
+            compute_pairwise_comparisons(&plan, &pairs, &observations, &clusters).unwrap();
+        assert_eq!(comparisons.len(), 1);
+        assert!(comparisons[0].confidence_interval_low > 0.0);
+        assert!(comparisons[0].candidate_improvement_supported);
+    }
+
     #[test]
     fn declared_input_digest_mismatch_fails_closed() {
         let error = verify_sha256("source pack", b"observed bytes", &"0".repeat(64)).unwrap_err();
