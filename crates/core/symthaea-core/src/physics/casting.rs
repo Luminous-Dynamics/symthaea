@@ -746,6 +746,13 @@ impl ChvorinovModel {
     pub fn training_data_digest_blake3(&self) -> [u8; 32] {
         self.training_data_digest_blake3
     }
+
+    /// Return the fitted-model identity digest, including exact fit parameters and
+    /// the ordered training-observation digest. Use it to bind derived calibrators
+    /// and benchmark receipts to this precise fitted model.
+    pub fn model_digest_blake3(&self) -> [u8; 32] {
+        self.identity_digest()
+    }
 }
 
 /// Calculate the thermal modulus using SI units.
