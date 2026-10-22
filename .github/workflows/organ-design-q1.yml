@@ -1,0 +1,56 @@
+name: Organ Design Q1
+
+on:
+  push:
+    branches:
+      - main
+      - research/organ-design-evidence-bounded-ranking-v0
+    paths:
+      - "research/organ-design-q1/**"
+      - ".github/workflows/organ-design-q1.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "research/organ-design-q1/**"
+      - ".github/workflows/organ-design-q1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: organ-design-q1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  q1-contract:
+    name: Synthetic ranking contract and hostile fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+
+      - name: Execute Q1 verifier and emit exact-head receipt
+        env:
+          Q1_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          bash research/organ-design-q1/verify-q1.sh \
+            "${RUNNER_TEMP}/organ-design-q1-receipt.json" \
+            "$Q1_SOURCE_COMMIT"
+
+      - name: Upload exact-head Q1 contract receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: organ-design-q1-receipt-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/organ-design-q1-receipt.json
+          if-no-files-found: warn
+          retention-days: 30

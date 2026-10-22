@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-organ-design-q1"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Isolated synthetic-only, evidence-bounded candidate ranking contract for organ-design research"
+publish = false
+
+# Keep this research contract outside the production workspace until the API,
+# domain ownership and evidence semantics receive independent review.
+[workspace]
+
+[dev-dependencies]
+serde_json = "1"
+sha2 = "0.10"
