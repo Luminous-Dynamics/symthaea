@@ -23,11 +23,27 @@ const VIEW_COUNTS: [usize; 3] = [1, 3, 9];
 const MAX_VIEWS: usize = 9;
 const OBSERVATION_NOISE_LEVELS: [f64; 3] = [0.10, 0.20, 0.30];
 const UNKNOWN_SHADOW_NOISE: f64 = 0.02;
+const SHARED_CORRUPTION: f64 = 0.05;
 const MIN_TOP_TWO_MARGIN: f64 = 0.02;
 const SIMILARITY_THRESHOLDS: [f64; 8] = [0.70, 0.80, 0.90, 0.94, 0.96, 0.98, 0.99, 1.00];
 
 type BenchResult<T> = Result<T, Box<dyn Error>>;
-type GroupKey = (u64, usize, usize, &'static str);
+type GroupKey = (u64, usize, usize, &'static str, &'static str);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ViewMode {
+    Independent,
+    Correlated,
+}
+
+impl ViewMode {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Independent => "independent",
+            Self::Correlated => "correlated_5pct_shared",
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 struct Score {
@@ -58,10 +74,11 @@ fn main() -> BenchResult<()> {
     println!("# dimension={DIMENSION},registered_prototypes={PROTOTYPE_COUNT}");
     println!("# seeds=13,29,41,53,67;replicates_per_identity={REPLICATES_PER_IDENTITY}");
     println!("# views=1,3,9;observation_noise=0.10,0.20,0.30;near_unknown_latent_distance=0.02");
+    println!("# view_modes=independent,correlated_5pct_shared; same approximate marginal corruption per view");
     println!("# score thresholds are a descriptive sweep; no threshold was selected on evaluation rows");
     println!("# exact_twin_unknown reuses the known query's ranked vector scores but has no registered identity");
     println!("# Wilson upper endpoints are descriptive IID approximations, not clustered risk certificates");
-    println!("record_type,seed,noise_fraction,view_count,query_kind,score_threshold,margin_threshold,queries,known_queries,accepted,top1_correct,top1_accuracy,coverage,accepted_errors,selective_risk,risk_upper95,unknown_false_accepts,unknown_false_accept_rate,false_accept_upper95,mean_best_similarity,mean_top_two_margin,mean_fusion_us,mean_scan_us,stored_vector_payload_bytes,observed_view_payload_bytes");
+    println!("record_type,seed,noise_fraction,view_mode,view_count,query_kind,score_threshold,margin_threshold,queries,known_queries,accepted,top1_correct,top1_accuracy,coverage,accepted_errors,selective_risk,risk_upper95,unknown_false_accepts,unknown_false_accept_rate,false_accept_upper95,mean_best_similarity,mean_top_two_margin,mean_fusion_us,mean_scan_us,stored_vector_payload_bytes,observed_view_payload_bytes");
 
     for seed in SEEDS {
         let bank = build_bank(seed)?;
@@ -75,56 +92,58 @@ fn main() -> BenchResult<()> {
                 )?;
 
                 for replicate in 0..REPLICATES_PER_IDENTITY {
-                    let known_views = make_views(
-                        latent, noise_fraction, seed, 0x4b4e_4f57 + noise_index as u64,
-                        identity_index, replicate,
-                    )?;
-                    let unknown_views = make_views(
-                        &unknown_latent, noise_fraction, seed, 0x554e_4b4e + noise_index as u64,
-                        identity_index, replicate,
-                    )?;
-
-                    for view_count in VIEW_COUNTS {
-                        let (known_query, known_fusion_us) = fuse_prefix(
-                            &known_views,
-                            view_count,
-                            derive_seed(seed, 0x4655_534b, (identity_index * 100 + replicate) as u64),
+                    for view_mode in [ViewMode::Independent, ViewMode::Correlated] {
+                        let known_views = make_views(
+                            latent, noise_fraction, seed, 0x4b4e_4f57 + noise_index as u64,
+                            identity_index, replicate, view_mode,
                         )?;
-                        let (known_rank, known_scan_us) = rank(&bank, &known_query)?;
-                        let known = Score {
-                            correct_top1: Some(known_rank.0.as_str() == identity),
-                            best_similarity: known_rank.1,
-                            top_two_margin: known_rank.2,
-                            fusion_us: known_fusion_us,
-                            scan_us: known_scan_us,
-                        };
-                        scores.entry((seed, noise_index, view_count, "known"))
-                            .or_default().push(known);
-
-                        // The semantic label changes; no observable vector value does.
-                        scores.entry((seed, noise_index, view_count, "exact_twin_unknown"))
-                            .or_default().push(Score { correct_top1: None, ..known });
-
-                        let (unknown_query, unknown_fusion_us) = fuse_prefix(
-                            &unknown_views,
-                            view_count,
-                            derive_seed(seed, 0x4655_4e4b, (identity_index * 100 + replicate) as u64),
+                        let unknown_views = make_views(
+                            &unknown_latent, noise_fraction, seed, 0x554e_4b4e + noise_index as u64,
+                            identity_index, replicate, view_mode,
                         )?;
-                        let (unknown_rank, unknown_scan_us) = rank(&bank, &unknown_query)?;
-                        scores.entry((seed, noise_index, view_count, "near_unknown"))
-                            .or_default().push(Score {
-                                correct_top1: None,
-                                best_similarity: unknown_rank.1,
-                                top_two_margin: unknown_rank.2,
-                                fusion_us: unknown_fusion_us,
-                                scan_us: unknown_scan_us,
-                            });
+
+                        for view_count in VIEW_COUNTS {
+                            let (known_query, known_fusion_us) = fuse_prefix(
+                                &known_views,
+                                view_count,
+                                derive_seed(seed, 0x4655_534b, (identity_index * 100 + replicate) as u64),
+                            )?;
+                            let (known_rank, known_scan_us) = rank(&bank, &known_query)?;
+                            let known = Score {
+                                correct_top1: Some(known_rank.0.as_str() == identity),
+                                best_similarity: known_rank.1,
+                                top_two_margin: known_rank.2,
+                                fusion_us: known_fusion_us,
+                                scan_us: known_scan_us,
+                            };
+                            scores.entry((seed, noise_index, view_count, view_mode.as_str(), "known"))
+                                .or_default().push(known);
+
+                            // The semantic label changes; no observable vector value does.
+                            scores.entry((seed, noise_index, view_count, view_mode.as_str(), "exact_twin_unknown"))
+                                .or_default().push(Score { correct_top1: None, ..known });
+
+                            let (unknown_query, unknown_fusion_us) = fuse_prefix(
+                                &unknown_views,
+                                view_count,
+                                derive_seed(seed, 0x4655_4e4b, (identity_index * 100 + replicate) as u64),
+                            )?;
+                            let (unknown_rank, unknown_scan_us) = rank(&bank, &unknown_query)?;
+                            scores.entry((seed, noise_index, view_count, view_mode.as_str(), "near_unknown"))
+                                .or_default().push(Score {
+                                    correct_top1: None,
+                                    best_similarity: unknown_rank.1,
+                                    top_two_margin: unknown_rank.2,
+                                    fusion_us: unknown_fusion_us,
+                                    scan_us: unknown_scan_us,
+                                });
+                        }
                     }
                 }
             }
         }
 
-        for ((row_seed, noise_index, view_count, query_kind), values) in scores {
+        for ((row_seed, noise_index, view_count, view_mode, query_kind), values) in scores {
             for threshold in SIMILARITY_THRESHOLDS {
                 let summary = summarize(&values, query_kind, threshold, MIN_TOP_TWO_MARGIN);
                 let noise_fraction = OBSERVATION_NOISE_LEVELS[noise_index];
@@ -153,7 +172,7 @@ fn main() -> BenchResult<()> {
                 let observed_bytes = view_count * DIMENSION * std::mem::size_of::<i8>();
 
                 println!(
-                    "evaluation,{row_seed},{noise_fraction:.2},{view_count},{query_kind},{threshold:.2},{MIN_TOP_TWO_MARGIN:.2},{},{},{},{},{top1_accuracy},{:.6},{},{:.6},{risk_upper},{},{false_accept_rate:.6},{false_accept_upper},{:.6},{:.6},{:.4},{:.4},{stored_bytes},{observed_bytes}",
+                    "evaluation,{row_seed},{noise_fraction:.2},{view_mode},{view_count},{query_kind},{threshold:.2},{MIN_TOP_TWO_MARGIN:.2},{},{},{},{},{top1_accuracy},{:.6},{},{:.6},{risk_upper},{},{false_accept_rate:.6},{false_accept_upper},{:.6},{:.6},{:.4},{:.4},{stored_bytes},{observed_bytes}",
                     summary.queries,
                     summary.known_queries,
                     summary.accepted,
@@ -193,13 +212,35 @@ fn make_views(
     domain: u64,
     identity_index: usize,
     replicate: usize,
+    view_mode: ViewMode,
 ) -> BenchResult<Vec<PatternVector>> {
+    let shared_base = match view_mode {
+        ViewMode::Independent => None,
+        ViewMode::Correlated => Some(latent.with_noise(
+            SHARED_CORRUPTION,
+            derive_seed(
+                seed,
+                domain ^ 0x5348_4152,
+                (identity_index * REPLICATES_PER_IDENTITY + replicate) as u64,
+            ),
+        )?),
+    };
+    // If shared corruption has rate c and independent residual corruption rate e,
+    // their XOR has marginal error c + e - 2ce. Choose e to approximately match the
+    // requested per-view marginal corruption while introducing positive correlation.
+    let residual_noise = if view_mode == ViewMode::Correlated {
+        (noise_fraction - SHARED_CORRUPTION) / (1.0 - 2.0 * SHARED_CORRUPTION)
+    } else {
+        noise_fraction
+    };
+    let view_source = shared_base.as_ref().unwrap_or(latent);
+
     (0..MAX_VIEWS)
         .map(|view_index| {
             let index = ((identity_index * REPLICATES_PER_IDENTITY + replicate) * MAX_VIEWS
                 + view_index) as u64;
-            Ok(latent.with_noise(
-                noise_fraction,
+            Ok(view_source.with_noise(
+                residual_noise,
                 derive_seed(seed, domain + identity_index as u64, index),
             )?)
         })
@@ -320,11 +361,34 @@ mod tests {
     #[test]
     fn majority_fusion_improves_a_fixed_noisy_pattern() {
         let pattern = PatternVector::seeded_random(DIMENSION, 211).expect("pattern");
-        let views = make_views(&pattern, 0.20, 223, 0x5445_5354, 0, 0).expect("views");
+        let views = make_views(
+            &pattern, 0.20, 223, 0x5445_5354, 0, 0, ViewMode::Independent,
+        ).expect("views");
         let single = views[0].similarity(&pattern).expect("single similarity");
         let fused = PatternVector::bundle(&views, 227).expect("fused observation");
         let fused_similarity = fused.similarity(&pattern).expect("fused similarity");
         assert!(fused_similarity > single + 0.10, "single={single}, fused={fused_similarity}");
+    }
+
+    #[test]
+    fn correlated_views_are_more_similar_to_each_other_than_independent_views() {
+        let pattern = PatternVector::seeded_random(DIMENSION, 239).expect("pattern");
+        let independent = make_views(
+            &pattern, 0.20, 241, 0x5445_5354, 0, 0, ViewMode::Independent,
+        ).expect("independent views");
+        let correlated = make_views(
+            &pattern, 0.20, 241, 0x5445_5354, 0, 0, ViewMode::Correlated,
+        ).expect("correlated views");
+        let independent_agreement = independent[0]
+            .similarity(&independent[1])
+            .expect("independent agreement");
+        let correlated_agreement = correlated[0]
+            .similarity(&correlated[1])
+            .expect("correlated agreement");
+        assert!(
+            correlated_agreement > independent_agreement,
+            "shared corruption should induce cross-view correlation: independent={independent_agreement}, correlated={correlated_agreement}"
+        );
     }
 
     #[test]

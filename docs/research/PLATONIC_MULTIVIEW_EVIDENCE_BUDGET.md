@@ -10,13 +10,13 @@ Move from “classify this one vector” to “choose the next action under an e
 ## Protocol
 
 - Five fixed seeds; 32 registered bipolar prototypes at 4,096 dimensions.
-- Three independent per-view noise rates (10%, 20%, 30%) and fusion budgets of 1, 3, and 9 observations. Views are independently corrupted from one latent pattern; multi-view cases use a coordinate-wise majority bundle.
+- Three target per-view noise rates (10%, 20%, 30%), fusion budgets of 1, 3, and 9 observations, and two observation models: independent corruption and 5% shared corruption plus independent residual corruption chosen to approximately match marginal noise. Multi-view cases use a coordinate-wise majority bundle.
 - **Known:** query views come from an exact registered latent prototype.
 - **Near unknown:** a latent vector is first changed by 2% of coordinates and is not entered in memory; subsequent views are noisy samples of this separate latent vector.
 - **Exact-vector twin:** reuses the identical fused query and scores from a known case, while changing only the hidden semantic identity to “unregistered.” Any vector-only acceptance rule must produce the same decision for both.
-- The runner emits a fixed grid of score thresholds (0.70 through 1.00) at a fixed top-two margin. Every threshold is reported; none is selected using evaluation results. Rows stay separated by seed, observation noise, view count, and query kind.
+- The runner emits a fixed grid of score thresholds (0.70 through 1.00) at a fixed top-two margin, separately for independent and correlated views. Every threshold is reported; none is selected using evaluation results. Rows stay separated by seed, observation noise, correlation mode, view count, and query kind.
 
-The experiment separates two effects: repeated independent views may recover a stable latent vector and distinguish it from a nearby unknown; they cannot distinguish two semantic labels attached to the exact same observable vector. Only an independently authenticated source of identity evidence can resolve that second case.
+The experiment separates three effects: repeated independent views may recover a stable latent vector; correlated errors reduce the effective value of repeated views; and neither independent nor correlated views can distinguish two semantic labels attached to the exact same observable vector. Only an independently authenticated source of identity evidence can resolve that second case.
 
 ## Metrics
 
@@ -27,7 +27,7 @@ Per operating point: top-1 correctness for known queries, accepted coverage, acc
 These are targets, not achieved results:
 
 1. For known noisy queries, more independent views should improve top-1 recall or accepted coverage at matched held-out risk on at least the declared low/moderate-noise regimes.
-2. For 2%-corrupted near-unknown latent patterns, multi-view fusion should increase separability of known versus unknown score distributions where signal-to-noise permits it. If it only makes false accepts more confident, that negative outcome must remain visible.
+2. For 2%-corrupted near-unknown latent patterns, multi-view fusion should increase separability of known versus unknown score distributions where signal-to-noise permits it. Quantify the reduction in gain under shared corruption rather than assuming all views are independent. If it only makes false accepts more confident, that negative outcome must remain visible.
 3. For exact-vector twins, acceptance decisions must match 100% for all thresholds and view counts. Any mismatch is a benchmark bug.
 4. Report marginal results by seed/noise/view count; no pooled score may hide a failure mode.
 5. Require at least five additional independent seeds and larger query counts before using the proposed 5% upper-risk / 70% coverage target as an acceptance claim. Account for identity-level clustering and use a certificate appropriate to the sampling design.
