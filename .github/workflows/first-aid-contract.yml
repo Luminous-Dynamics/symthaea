@@ -176,10 +176,13 @@ jobs:
           cargo test -p xtask first_aid_model::tests -- --nocapture 2>&1 | tee target/first-aid/state-model-test.log
           edge_count="$(grep -Eo 'model_production_edge_comparisons=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
           policy_count="$(grep -Eo 'production_policy_truth_table_cases_compared=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
+          two_action_count="$(grep -Eo 'model_production_two_action_sequence_comparisons=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
           test "$edge_count" = "1344"
           test "$policy_count" = "18"
+          test "$two_action_count" = "21504"
           echo "edge_comparison_count=$edge_count" >> "$GITHUB_OUTPUT"
           echo "policy_truth_table_comparison_count=$policy_count" >> "$GITHUB_OUTPUT"
+          echo "two_action_sequence_comparison_count=$two_action_count" >> "$GITHUB_OUTPUT"
 
       - name: Verify guideline change-impact validator unit tests
         run: cargo test -p xtask guideline_change_impact::tests -- --nocapture
@@ -198,6 +201,7 @@ jobs:
           TRAJECTORY_TEST_OUTCOME: ${{ steps.trajectory-tests.outcome }}
           MODEL_PRODUCTION_EDGE_COMPARISON_COUNT: ${{ steps.state-model-tests.outputs.edge_comparison_count }}
           POLICY_TRUTH_TABLE_CASE_COMPARISON_COUNT: ${{ steps.state-model-tests.outputs.policy_truth_table_comparison_count }}
+          MODEL_PRODUCTION_TWO_ACTION_SEQUENCE_COMPARISON_COUNT: ${{ steps.state-model-tests.outputs.two_action_sequence_comparison_count }}
         run: cargo run -p xtask -- first-aid-trajectory-validate --out target/first-aid-trajectory-receipt.json
 
       - name: Run the synthetic guideline change-impact validator
@@ -261,6 +265,7 @@ jobs:
             .trajectory_test_outcome == "success" and
             .model_production_edge_comparison_count == 1344 and
             .policy_truth_table_comparison_count == 18 and
+            .model_production_two_action_sequence_comparison_count == 21504 and
             (.rustc_version | startswith("rustc 1.96.0 ")) and
             (.cargo_version | startswith("cargo 1.96.0 "))
           ' target/first-aid-trajectory-receipt.json
