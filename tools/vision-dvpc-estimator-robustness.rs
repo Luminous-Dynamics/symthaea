@@ -494,7 +494,7 @@ fn summarize(results: &[RunResult]) -> Vec<SummaryResult> {
     let mut output = Vec::new();
     for regime in Regime::ALL {
         for budget_percent in BUDGET_PERCENTAGES {
-            let random_by_seed: BTreeMap<u64, f64> = results
+            let random_by_seed: BTreeMap<u64, (f64, usize)> = results
                 .iter()
                 .filter(|row| row.regime == regime
                     && row.budget_percent == budget_percent
