@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:marine-experiment-selection-receipt:v1",
+  "title": "Symthaea marine experiment-selection benchmark receipt v1",
+  "description": "Content-addressed summary receipt for a deterministic synthetic experiment-selection benchmark. Digest verification is integrity checking only, not scientific validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "body_sha256"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "suite_id",
+        "benchmark_source_revision",
+        "experiment_catalog_version",
+        "scenario_generator_version",
+        "toy_oracle_version",
+        "scenario_count",
+        "scenario_corpus_sha256",
+        "execution_trace_sha256",
+        "paired_seeds",
+        "budget_units_per_scenario",
+        "experiment_catalog",
+        "summaries",
+        "limitations"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "suite_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "benchmark_source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "experiment_catalog_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_generator_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "toy_oracle_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "scenario_corpus_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "execution_trace_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "paired_seeds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "budget_units_per_scenario": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "experiment_catalog": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/experiment"
+          }
+        },
+        "summaries": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/summary"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "body_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "parameter": {
+      "enum": [
+        "propulsion_energy_demand",
+        "usable_battery_energy",
+        "required_water_depth",
+        "available_water_depth",
+        "required_charge_power",
+        "available_charge_power"
+      ]
+    },
+    "policy": {
+      "enum": [
+        "cheapest_first",
+        "round_robin",
+        "seeded_random",
+        "constraint_criticality",
+        "exhaustive_toy_oracle"
+      ]
+    },
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "target",
+        "cost_units",
+        "retained_width_fraction"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "$ref": "#/$defs/parameter"
+        },
+        "cost_units": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "retained_width_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "seed",
+        "evaluated_scenarios",
+        "mean_resolved_constraints",
+        "mean_robust_feasible_constraints",
+        "mean_robust_infeasible_constraints",
+        "full_resolution_fraction",
+        "mean_budget_spent_units",
+        "mean_cost_to_full_resolution_units",
+        "mean_normalized_interval_width_reduction",
+        "mean_oracle_regret_constraints"
+      ],
+      "properties": {
+        "policy": {
+          "$ref": "#/$defs/policy"
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "evaluated_scenarios": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mean_resolved_constraints": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "mean_robust_feasible_constraints": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "mean_robust_infeasible_constraints": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "full_resolution_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mean_budget_spent_units": {
+          "type": "number",
+          "minimum": 0
+        },
+        "mean_cost_to_full_resolution_units": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "mean_normalized_interval_width_reduction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mean_oracle_regret_constraints": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3
+        }
+      }
+    }
+  }
+}

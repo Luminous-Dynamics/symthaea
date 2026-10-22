@@ -11,6 +11,7 @@
 #![deny(unsafe_code)]
 
 mod assessor;
+pub mod experiment_selection;
 mod model;
 
 pub use assessor::{AssessmentError, AssessmentReport, Finding, FindingStatus, assess};
