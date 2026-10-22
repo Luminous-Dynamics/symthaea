@@ -171,9 +171,17 @@ pub struct ContinuousMind {
     /// Aggregate mesh telemetry counters.
     #[cfg(feature = "mesh")]
     pub(crate) mesh_stats: crate::swarm::mesh::MeshStats,
-    /// Ring buffer of recently seen (source_id, sequence) pairs for deduplication.
+    /// Ring buffer of recently seen packet keys for unauthenticated telemetry only.
+    /// Authenticated traffic uses the replay windows after successful MAC verification.
     #[cfg(feature = "mesh")]
     mesh_seen_packets: VecDeque<([u8; 8], u32, u8)>,
+    /// Replay windows keyed by authenticated (source_id, payload_type).
+    /// State is only mutated after MAC verification and is bounded/fail-closed.
+    #[cfg(feature = "mesh")]
+    mesh_replay_windows: std::collections::HashMap<
+        ([u8; 8], u8),
+        crate::mind::mesh::AuthenticatedSequenceWindow,
+    >,
     /// Start of the current bandwidth budget window.
     #[cfg(feature = "mesh")]
     mesh_bandwidth_window_start: std::time::Instant,
@@ -337,6 +345,8 @@ impl ContinuousMind {
             mesh_stats: crate::swarm::mesh::MeshStats::default(),
             #[cfg(feature = "mesh")]
             mesh_seen_packets: VecDeque::with_capacity(128),
+            #[cfg(feature = "mesh")]
+            mesh_replay_windows: std::collections::HashMap::new(),
             #[cfg(feature = "mesh")]
             mesh_bandwidth_window_start: std::time::Instant::now(),
             #[cfg(feature = "mesh")]
