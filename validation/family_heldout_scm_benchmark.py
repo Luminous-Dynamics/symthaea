@@ -168,6 +168,11 @@ def validate_scm(scm: SCM) -> None:
         for pos in range(len(ps)):
             if not parent_is_essential(scm.truth_tables[child], len(ps), pos):
                 raise AssertionError("declared parent is not functionally essential")
+    remaining = set(range(scm.node_count))
+    while remaining:
+        ready = {node for node in remaining if not (set(scm.parents[node]) & remaining)}
+        if not ready: raise AssertionError("SCM parents contain a directed cycle")
+        remaining -= ready
     topology_parents(scm.node_count, scm.topology_family, scm.seed)
 
 
