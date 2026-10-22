@@ -536,8 +536,9 @@ impl MambaWrapper {
 
     /// Compute E2E token loss at a specific position (Improvement B).
     ///
-    /// Injects [0..pos) as context (no grad), makes [pos] a Var, detaches state,
-    /// injects [pos+1..N) as context, teacher-forces, backward, returns gradient at pos.
+    /// Warm-starts and processes the prefix without gradients, detaches before
+    /// the differentiable anchor, preserves its graph through the suffix and
+    /// teacher-forced next-token cross-entropy, then returns the anchor gradient.
     pub fn compute_e2e_token_loss_at(
         &mut self,
         sequence: &[Vec<f32>],
@@ -590,6 +591,12 @@ impl MambaWrapper {
 
         // Teacher-force the previous token; score the target token.
         let teacher_token = tokens[0];
+        if teacher_token as usize >= self.config.vocab_size {
+            anyhow::bail!(
+                "E2E teacher token {teacher_token} is outside configured vocabulary of size {}",
+                self.config.vocab_size
+            );
+        }
         let target_idx = tokens[1] as usize;
         let input = Tensor::new(&[teacher_token], &self.device)?;
         let logits = self.model.forward(&input, &mut self.state)?.squeeze(0)?;
