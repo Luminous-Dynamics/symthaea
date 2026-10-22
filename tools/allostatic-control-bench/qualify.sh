@@ -22,12 +22,14 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-multistep-viability-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-ood-fallback-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-task-scope-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-sequential-scope-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
   "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
   "docs/research/OOD_REACHABILITY_FALLBACK_V1.md"
   "docs/research/TASK_RELEVANT_SCOPE_MONITOR_V1.md"
+  "docs/research/SEQUENTIAL_SCOPE_CUSUM_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -57,6 +59,8 @@ ood_out="${out_base}-ood-fallback.csv"
 ood_summary_out="${out_base}-ood-fallback-summary.csv"
 scope_out="${out_base}-task-scope.csv"
 scope_summary_out="${out_base}-task-scope-summary.csv"
+sequential_out="${out_base}-sequential-scope.csv"
+sequential_summary_out="${out_base}-sequential-scope-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -462,6 +466,147 @@ if ! awk -F, '
   exit 1
 fi
 
+# Calibrated sequential CUSUM over residuals. Pointwise and cumulative
+# thresholds are independently calibrated from nominal episode maxima.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-sequential-scope-bench -- \
+  "$tmpdir/sequential-a.csv" "$tmpdir/sequential-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-sequential-scope-bench -- \
+  "$tmpdir/sequential-b.csv" "$tmpdir/sequential-summary-b.csv"
+if ! cmp -s "$tmpdir/sequential-a.csv" "$tmpdir/sequential-b.csv" ||
+   ! cmp -s "$tmpdir/sequential-summary-a.csv" "$tmpdir/sequential-summary-b.csv"; then
+  printf 'FAIL: repeated sequential-scope raw and summary outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 14) failed = 1; next }
+  {
+    if (NF != 14) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "gradual_shift" &&
+        $2 != "abrupt_shift" && $2 != "stealth_shift") failed = 1
+    if ($3 !~ /^[0-9]+$/ || $3 < 50000 || $3 >= 50300) failed = 1
+    if ($4 !~ /^[0-7]$/) failed = 1
+    if ($5 !~ /^[0-9]*[.]?[0-9]+$/ || $6 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        $9 !~ /^[0-9]*[.]?[0-9]+$/ || $10 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    for (i = 7; i <= 7; i++) if ($i != "true" && $i != "false") failed = 1
+    if ($11 != "true" && $11 != "false") failed = 1
+    if ($8 !~ /^[0-8]$/ || $12 !~ /^[0-8]$/) failed = 1
+    if ($13 != "true" && $13 != "false") failed = 1
+    if ($14 != "true" && $14 != "false") failed = 1
+    if (($5 > $6) != ($7 == "true")) failed = 1
+    if (($2 == "nominal") != ($13 == "false")) failed = 1
+    if ($9 < 0 || ($4 == 0 && $9 != 0)) failed = 1
+    if ($10 < 0) failed = 1
+
+    key = $1 SUBSEP $2 SUBSEP $3
+    if ($4 == 0) {
+      next_step[key] = 0
+      prev_cusum[key] = 0
+      first_point[key] = 8
+      first_cusum[key] = 8
+      episode_max[key] = 0
+      episode_below[key] = "true"
+      recorded_point_first[key] = $8
+      recorded_cusum_first[key] = $12
+    } else if ($4 != next_step[key]) failed = 1
+
+    if ($5 > episode_max[key]) episode_max[key] = $5
+    if ($5 > $6) episode_below[key] = "false"
+    expected_cusum = prev_cusum[key] + $5 - 0.010
+    if (expected_cusum < 0) expected_cusum = 0
+    if (($9 - expected_cusum > 0.000001) || (expected_cusum - $9 > 0.000001)) failed = 1
+    prev_cusum[key] = $9
+    if ($7 == "true" && first_point[key] == 8) first_point[key] = $4
+    if ($11 == "true" && first_cusum[key] == 8) first_cusum[key] = $4
+    if ($8 != recorded_point_first[key] || $12 != recorded_cusum_first[key]) failed = 1
+    if ($14 != episode_below[key]) {
+      # The full-episode flag is only final on step 7; compare there.
+      if ($4 == 7) failed = 1
+    }
+
+    rowkey = key SUBSEP $4
+    if (seen[rowkey]++) failed = 1
+    pairkey = $1 SUBSEP $3 SUBSEP $4
+    if ($2 == "nominal") {
+      nominal_score[pairkey] = $5
+      nominal_point_alarm[pairkey] = $7
+      nominal_cusum_stat[pairkey] = $9
+      nominal_cusum_alarm[pairkey] = $11
+      nominal_point_first[pairkey] = $8
+      nominal_cusum_first[pairkey] = $12
+      nominal_below[pairkey] = $14
+    }
+    if ($2 == "stealth_shift") {
+      if (nominal_score[pairkey] != $5 ||
+          nominal_point_alarm[pairkey] != $7 ||
+          nominal_cusum_stat[pairkey] != $9 ||
+          nominal_cusum_alarm[pairkey] != $11 ||
+          nominal_point_first[pairkey] != $8 ||
+          nominal_cusum_first[pairkey] != $12 ||
+          nominal_below[pairkey] != $14) failed = 1
+    }
+    next_step[key] = $4 + 1
+    rows++
+  }
+  END {
+    if (NR != 48001 || rows != 48000 || failed) exit 1
+    for (key in next_step) {
+      if (next_step[key] != 8 || first_point[key] != recorded_point_first[key] ||
+          first_cusum[key] != recorded_cusum_first[key]) exit 1
+      if ((episode_max[key] <= $6) != (episode_below[key] == "true")) exit 1
+    }
+  }
+' "$tmpdir/sequential-a.csv"; then
+  printf 'FAIL: sequential-scope raw schema, CUSUM recurrence, step accounting or stealth pairing is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 24) failed = 1; next }
+  {
+    if (NF != 24) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "gradual_shift" &&
+        $2 != "abrupt_shift" && $2 != "stealth_shift") failed = 1
+    if ($3 != 300) failed = 1
+    for (i = 4; i <= 9; i++) if ($i !~ /^[0-9]+$/ || $i > 300) failed = 1
+    if ($4 < $6 || $5 < $7 || $6 > $4 || $7 > $5) failed = 1
+    if ($10 != "NA" && $10 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($11 != "NA" && $11 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($12 != "NA" && $12 !~ /^[0-9]+$/) failed = 1
+    if ($13 != "NA" && $13 !~ /^[0-9]+$/) failed = 1
+    if ($14 != "NA" && $14 !~ /^[0-9]+$/) failed = 1
+    if ($15 != "NA" && $15 !~ /^[0-9]+$/) failed = 1
+    for (i = 16; i <= 18; i++) if ($i !~ /^[0-9]+$/ || $i > 300) failed = 1
+    if ($19 !~ /^[0-9]*[.]?[0-9]+$/ || $20 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        $21 !~ /^[0-9]*[.]?[0-9]+$/ || $22 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($23 < 0 || $23 > 300 || $24 < 0 || $24 > $23) failed = 1
+    if ($2 == "nominal" && ($4 > 30 || $5 > 30 || $8 != 0 || $9 != 0)) failed = 1
+    if ($2 == "gradual_shift" &&
+        ($4 != 0 || $8 != 300 || $5 < 240 || $9 > 60 ||
+         $23 != 300 || $24 < 240)) failed = 1
+    if ($2 == "abrupt_shift" && ($4 < 270 || $5 < 270 || $8 > 30 || $9 > 30)) failed = 1
+    if ($2 == "stealth_shift" && ($4 > 30 || $5 > 30 || $8 < 270 || $9 < 270)) failed = 1
+    key = $1 SUBSEP $2
+    if (seen[key]++) failed = 1
+    if ($2 == "nominal") {
+      nominal_point[key] = $4
+      nominal_cusum[key] = $5
+    }
+    if ($2 == "stealth_shift" &&
+        (nominal_point[$1 SUBSEP "nominal"] != $4 ||
+         nominal_cusum[$1 SUBSEP "nominal"] != $5)) failed = 1
+    rows++
+  }
+  END { if (NR != 21 || rows != 20 || failed) exit 1 }
+' "$tmpdir/sequential-summary-a.csv"; then
+  printf 'FAIL: sequential-scope summary schema, detection targets or matched-control gates are invalid\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -490,6 +635,8 @@ cp "$tmpdir/ood-a.csv" "$ood_out"
 cp "$tmpdir/ood-summary-a.csv" "$ood_summary_out"
 cp "$tmpdir/scope-a.csv" "$scope_out"
 cp "$tmpdir/scope-summary-a.csv" "$scope_summary_out"
+cp "$tmpdir/sequential-a.csv" "$sequential_out"
+cp "$tmpdir/sequential-summary-a.csv" "$sequential_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -521,6 +668,10 @@ cp "$tmpdir/scope-summary-a.csv" "$scope_summary_out"
   printf 'task_scope_rows_excluding_header=%s\n' "$(( $(wc -l < "$scope_out") - 1 ))"
   printf 'task_scope_summary_sha256=%s\n' "$(sha256sum "$scope_summary_out" | awk '{print $1}')"
   printf 'task_scope_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$scope_summary_out") - 1 ))"
+  printf 'sequential_scope_sha256=%s\n' "$(sha256sum "$sequential_out" | awk '{print $1}')"
+  printf 'sequential_scope_rows_excluding_header=%s\n' "$(( $(wc -l < "$sequential_out") - 1 ))"
+  printf 'sequential_scope_summary_sha256=%s\n' "$(sha256sum "$sequential_summary_out" | awk '{print $1}')"
+  printf 'sequential_scope_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$sequential_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -536,4 +687,6 @@ printf 'OOD fallback frontier: %s\n' "$ood_out"
 printf 'OOD fallback summary: %s\n' "$ood_summary_out"
 printf 'Task-relevant scope frontier: %s\n' "$scope_out"
 printf 'Task-relevant scope summary: %s\n' "$scope_summary_out"
+printf 'Sequential CUSUM scope frontier: %s\n' "$sequential_out"
+printf 'Sequential CUSUM scope summary: %s\n' "$sequential_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
