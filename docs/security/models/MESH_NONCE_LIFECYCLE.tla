@@ -71,8 +71,9 @@ Restart(sender) ==
   /\ UNCHANGED <<usedPairs, reuseDetected>>
 
 \* Rotation may choose any configured epoch, including a previously used one.
-\* Reusing an epoch is legal in the legacy model and must be blocked by a
-\* strict allocator unless the effective key namespace has changed.
+\* Epoch reuse alone is not necessarily a collision: the strict property is
+\* uniqueness of each complete (effective-key, nonce) pair. This model keeps
+\* the effective key fixed so reset/wrap counterexamples remain observable.
 RotateEpoch(sender, epoch) ==
   /\ epoch \in EpochValues
   /\ epochs' = [epochs EXCEPT ![sender] = epoch]
