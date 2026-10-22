@@ -130,6 +130,14 @@
       "name": "evaluator_oracle",
       "deployable_baseline": false,
       "role": "diagnostic_upper_bound"
+    },
+    {
+      "id": "B8",
+      "name": "safety_constrained_active_model_discrimination",
+      "deployable_baseline": true,
+      "status": "research_prototype_not_external_validated",
+      "safety_rule": "candidate action must be horizon-certified under a common hull of every retained model",
+      "update_rule": "remove only hypotheses inconsistent with the observed transition noise set; empty retained set means model-family falsification and uncertified state"
     }
   ],
   "conditions": [
@@ -183,7 +191,16 @@
     "p50_p95_p99_decision_latency",
     "search_work_and_budget_exhaustion",
     "calibration_test_provenance",
-    "raw_trace_and_output_digests"
+    "raw_trace_and_output_digests",
+    "probe_interaction_cost_and_remaining_budget",
+    "hypothesis_count_and_uncertainty_geometry_before_after_probe",
+    "certified_action_count_before_after_probe",
+    "subsequent_false_veto_reduction_at_matched_violation_budget",
+    "probe_information_yield_rate",
+    "false_model_elimination_rate_under_observation_noise",
+    "model_family_falsification_rate",
+    "unidentifiable_model_pair_rate",
+    "actual_plant_membership_separate_from_observation_compatibility"
   ],
   "mandatory_gates": [
     "invalid_input_or_missing_calibration_is_uncertified",
@@ -193,7 +210,12 @@
     "viable_action_sets_are_nested_as_horizon_grows",
     "independent_actual_plant_evaluation",
     "disjoint_calibration_tuning_and_test_seeds",
-    "independent_metrics_recomputation_from_raw_traces"
+    "independent_metrics_recomputation_from_raw_traces",
+    "active_probe_certificate_uses_common_hull_and_common_safe_continuation",
+    "no_information_claim_from_probe_selection_without_observed_uncertainty_reduction",
+    "empty_post_observation_model_set_invalidates_certificates_and_never_restores_prior_silently",
+    "noise_compatibility_is_not_reported_as_true_plant_membership",
+    "active_learning_comparisons_use_fixed_exploration_budget_and_matched_violation_budget"
   ],
   "proposed_targets_not_results": {
     "in_envelope_false_certificates": 0,
@@ -208,5 +230,23 @@
     "https://proceedings.mlr.press/v331/srinivasan26a.html",
     "https://arxiv.org/abs/2609.15315",
     "https://github.com/lindsayspoor/SafeRLEval"
-  ]
+  ],
+  "active_falsification": {
+    "status": "predeclared_external_evaluation_arm",
+    "comparators": [
+      "task_greedy_certified_action",
+      "random_certified_action",
+      "maximin_prediction_box_separation",
+      "probabilistic_information_gain_when_observation_likelihood_is_validated"
+    ],
+    "measures": [
+      "probe_cost",
+      "observed_hypothesis_reduction",
+      "viable_action_gain",
+      "false_model_eliminations",
+      "model_family_falsification",
+      "safe_capability_frontier_after_fixed_interaction_budget"
+    ],
+    "terminology_constraint": "Maximin interval separation is a geometric distinguishability proxy, not mutual information."
+  }
 }
