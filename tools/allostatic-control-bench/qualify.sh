@@ -540,6 +540,7 @@ if ! awk -F, -v raw="$tmpdir/task-risk-a.csv" -v summary="$tmpdir/task-risk-summ
       previous_fixed[key] = 0
       latched_mix[key] = "false"
       latched_fixed[key] = "false"
+      event_at_zero[key] = ($20 == "true" ? 1 : 0)
       report_first_mix[key] = $26
       report_first_fixed[key] = $29
     } else if (!streams[key] || $3 != next_episode[key]) failed = 1
@@ -589,6 +590,9 @@ if ! awk -F, -v raw="$tmpdir/task-risk-a.csv" -v summary="$tmpdir/task-risk-summ
       events_at_fixed[key] = event_count[key]
     }
     latched_fixed[key] = expected_fixed_alarm
+    if ($3 == 1 && loss == 1 && event_at_zero[key] == 1 &&
+        (first_mix[key] != 1 || first_fixed[key] != 1 ||
+         events_at_mix[key] != 2 || events_at_fixed[key] != 2)) failed = 1
 
     if ($2 == "nominal" && loss != 0) failed = 1
     pair_key = $1 SUBSEP $3
@@ -677,6 +681,11 @@ if ! awk -F, -v raw="$tmpdir/task-risk-a.csv" -v summary="$tmpdir/task-risk-summ
     if (raw_rows != 6000 || rows_summary != 20 || failed) exit 1
     for (key in streams) {
       if (next_episode[key] != 300) exit 1
+      if (event_count[key] == 0 &&
+          (first_mix[key] < 300 || first_fixed[key] < 300)) exit 1
+      if (event_count[key] == 300 &&
+          (first_mix[key] != 1 || first_fixed[key] != 1 ||
+           events_at_mix[key] != 2 || events_at_fixed[key] != 2)) exit 1
     }
     for (key in summary_seen) if (!streams[key]) exit 1
   }
