@@ -134,7 +134,7 @@ pub struct EncoderStats {
     /// Total encoding cycles
     pub total_cycles: usize,
 
-    /// Average prediction error (EMA)
+    /// EMA of genuine prediction errors only; degenerate sentinels are excluded.
     pub avg_prediction_error: f32,
 
     /// Attention weight variance (emergence metric)
@@ -143,10 +143,10 @@ pub struct EncoderStats {
     /// Number of primitives with non-uniform attention
     pub diverged_primitives: usize,
 
-    /// Total prediction errors (sum)
+    /// Sum of genuine prediction errors; degenerate sentinels are excluded.
     pub cumulative_error: f32,
 
-    /// Cycles with significant error (above threshold)
+    /// Genuine-comparison cycles above the error threshold; sentinels are excluded.
     pub high_error_cycles: usize,
 
     /// Cycles where PE was the max-error sentinel because no prediction was set
@@ -357,11 +357,18 @@ impl PredictiveHdcEncoder {
         let (bits_saved_persist, bits_saved_zero, bits_kappa) =
             self.compute_bits_saved(&attended_hdv);
 
-        // 5. Update attention weights based on error
-        self.update_attention(&detected_primitives, prediction_error);
+        // 5. Only a genuine comparison may drive attention learning. The public
+        // numeric value remains the legacy 1.0 sentinel for degenerate cases, but
+        // that sentinel is not evidence of surprise and must not train the loop.
+        let valid_prediction_error =
+            (degeneracy == PredictionDegeneracy::Genuine).then_some(prediction_error);
+        if let Some(error) = valid_prediction_error {
+            self.update_attention(&detected_primitives, error);
+        }
 
-        // 6. Update statistics
-        self.update_stats(prediction_error);
+        // Keep structural attention metrics current on every cycle, while keeping
+        // invalid prediction-error sentinels out of PE statistics.
+        self.update_stats(valid_prediction_error);
 
         EncodingResult {
             hdv: attended_hdv,
@@ -777,18 +784,25 @@ impl PredictiveHdcEncoder {
             .fold(0.0_f32, f32::max);
     }
 
-    /// Update statistics
-    fn update_stats(&mut self, error: f32) {
-        // Update error history
-        if self.error_history.len() >= self.config.error_window_size {
-            self.error_history.pop_front();
-        }
-        self.error_history.push_back(error);
+    /// Update statistics. A missing error means this cycle had no valid PE comparison.
+    fn update_stats(&mut self, error: Option<f32>) {
+        if let Some(error) = error {
+            // Only genuine comparisons belong in prediction-error statistics.
+            if self.error_history.len() >= self.config.error_window_size {
+                self.error_history.pop_front();
+            }
+            self.error_history.push_back(error);
 
-        // Compute average error (EMA)
-        let alpha = 0.1;
-        self.stats.avg_prediction_error =
-            self.stats.avg_prediction_error * (1.0 - alpha) + error * alpha;
+            // Compute average error (EMA).
+            let alpha = 0.1;
+            self.stats.avg_prediction_error =
+                self.stats.avg_prediction_error * (1.0 - alpha) + error * alpha;
+
+            self.stats.cumulative_error += error;
+            if error > self.config.error_threshold {
+                self.stats.high_error_cycles += 1;
+            }
+        }
 
         // Compute attention variance (emergence metric) — iterate in-place, no Vec allocation
         let n = self.attention_weights.len() as f32;
@@ -814,11 +828,6 @@ impl PredictiveHdcEncoder {
             .filter(|&&w| (w - initial).abs() > 0.1)
             .count();
 
-        // Update cumulative and high-error counts
-        self.stats.cumulative_error += error;
-        if error > self.config.error_threshold {
-            self.stats.high_error_cycles += 1;
-        }
     }
 
     /// Get compressed representation for LTC input via sparse random projection.
@@ -917,8 +926,10 @@ mod tests {
         })
         .unwrap();
 
-        // Encode several times with high error
+        // Supply a nonzero prediction on every cycle so the tested updates use
+        // genuine prediction errors rather than the startup sentinel.
         for _ in 0..10 {
+            encoder.set_prediction(vec![1.0; 256]);
             encoder.encode("cause effect action");
         }
 
@@ -946,11 +957,77 @@ mod tests {
         let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
 
         for _ in 0..5 {
+            encoder.set_prediction(vec![1.0; 256]);
             encoder.encode("test");
         }
 
         assert_eq!(encoder.stats.total_cycles, 5);
         assert!(encoder.stats.cumulative_error > 0.0);
+    }
+
+    #[test]
+    fn degenerate_prediction_errors_do_not_train_attention_or_pollute_pe_stats() {
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig {
+            error_threshold: 0.0,
+            attention_lr: 0.5,
+            attention_decay: 0.25,
+            ..Default::default()
+        })
+        .unwrap();
+        let initial_attention = encoder.attention_weights_snapshot();
+
+        // Startup has no prior prediction. The legacy result remains a 1.0
+        // sentinel for diagnostics, but it must not be interpreted as surprise.
+        let startup = encoder.encode("cause leads to effect");
+        assert_eq!(startup.prediction_error, 1.0);
+        assert_eq!(
+            encoder.last_prediction_degeneracy(),
+            PredictionDegeneracy::NoPrediction
+        );
+        assert_eq!(encoder.attention_weights_snapshot(), initial_attention);
+        assert_eq!(encoder.stats.avg_prediction_error, 0.0);
+        assert_eq!(encoder.stats.cumulative_error, 0.0);
+        assert_eq!(encoder.stats.high_error_cycles, 0);
+        assert!(encoder.error_history.is_empty());
+
+        // A present but zero-norm prediction is also invalid evidence.
+        encoder.set_prediction(vec![0.0; 256]);
+        let zero = encoder.encode("cause leads to effect");
+        assert_eq!(zero.prediction_error, 1.0);
+        assert_eq!(
+            encoder.last_prediction_degeneracy(),
+            PredictionDegeneracy::ZeroPrediction
+        );
+        assert_eq!(encoder.attention_weights_snapshot(), initial_attention);
+        assert_eq!(encoder.stats.avg_prediction_error, 0.0);
+        assert_eq!(encoder.stats.cumulative_error, 0.0);
+        assert_eq!(encoder.stats.high_error_cycles, 0);
+        assert!(encoder.error_history.is_empty());
+        assert_eq!(encoder.stats.degenerate_no_prediction_cycles, 1);
+        assert_eq!(encoder.stats.degenerate_zero_prediction_cycles, 1);
+    }
+
+    #[test]
+    fn genuine_prediction_error_still_updates_attention_and_pe_stats() {
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig {
+            error_threshold: 0.0,
+            attention_lr: 0.5,
+            ..Default::default()
+        })
+        .unwrap();
+        let initial_attention = encoder.attention_weights_snapshot();
+        encoder.set_prediction(vec![1.0; 256]);
+
+        let result = encoder.encode("cause leads to effect");
+
+        assert_eq!(
+            encoder.last_prediction_degeneracy(),
+            PredictionDegeneracy::Genuine
+        );
+        assert!(result.prediction_error > 0.0);
+        assert!(encoder.stats.cumulative_error > 0.0);
+        assert_eq!(encoder.error_history.len(), 1);
+        assert_ne!(encoder.attention_weights_snapshot(), initial_attention);
     }
 
     #[test]
