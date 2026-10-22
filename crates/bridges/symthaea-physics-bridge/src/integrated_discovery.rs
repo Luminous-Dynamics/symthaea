@@ -709,7 +709,7 @@ fn run_trial_with_discrepancy(
             let context_features = chosen
                 .iter()
                 .map(|(_, value)| {
-                    (2.0 * (value - VAR_RANGE.0) / (VAR_RANGE.1 - VAR_RANGE.0) - 1.0)
+                    (2.0 * (*value - VAR_RANGE.0) / (VAR_RANGE.1 - VAR_RANGE.0) - 1.0)
                         .clamp(-1.0, 1.0)
                 })
                 .collect::<Vec<_>>();
@@ -1203,6 +1203,115 @@ mod tests {
         assert!(round_ci_low.is_finite() && round_ci_high.is_finite());
         assert!((0.0..=1.0).contains(&(raw_successes as f64 / SEEDS as f64)));
         assert!((0.0..=1.0).contains(&(eig_successes as f64 / SEEDS as f64)));
+    }
+
+    /// End-to-end integration check for the prequential PIT monitor. The monitor activates
+    /// only after the candidate set becomes a singleton, when each random validation query has
+    /// a model-visible Gaussian predictive distribution. The CDF is computed from the candidate
+    /// prediction and the declared noise model before using the current outcome in any policy
+    /// update. This is a diagnostic and deliberately does not assert that the policy wins.
+    #[test]
+    fn prequential_pit_audits_are_wired_into_adaptive_discovery() {
+        const SEEDS: u64 = 32;
+        const DISCREPANCY: f64 = 0.12;
+        let config = PipelineConfig {
+            typed_candidates: true,
+            active_selection: true,
+            smoothing: false,
+        };
+
+        let mut clean_baseline_successes = 0usize;
+        let mut clean_pit_successes = 0usize;
+        let mut clean_pit_alarms = 0usize;
+        let mut misspec_baseline_false_singletons = 0usize;
+        let mut misspec_pit_false_singletons = 0usize;
+        let mut misspec_pit_detections = 0usize;
+        let mut pit_audit_queries = 0usize;
+        let mut protocol_failures = 0usize;
+
+        for seed in 1..=SEEDS {
+            let clean_baseline = run_trial_with_discrepancy(
+                seed,
+                config,
+                MAX_ROUNDS,
+                ActiveSelector::ExpectedInformationGain,
+                0.0,
+            );
+            let clean_pit = run_trial_with_discrepancy(
+                seed,
+                config,
+                MAX_ROUNDS,
+                ActiveSelector::InformationGainWithPrequentialPitAudits,
+                0.0,
+            );
+            let misspecified_baseline = run_trial_with_discrepancy(
+                seed,
+                config,
+                MAX_ROUNDS,
+                ActiveSelector::ExpectedInformationGain,
+                DISCREPANCY,
+            );
+            let misspecified_pit = run_trial_with_discrepancy(
+                seed,
+                config,
+                MAX_ROUNDS,
+                ActiveSelector::InformationGainWithPrequentialPitAudits,
+                DISCREPANCY,
+            );
+
+            clean_baseline_successes += usize::from(clean_baseline.success);
+            clean_pit_successes += usize::from(clean_pit.success);
+            clean_pit_alarms += usize::from(clean_pit.prequential_pit_alarm);
+            misspec_baseline_false_singletons +=
+                usize::from(misspecified_baseline.overconfident_under_misspecification);
+            misspec_pit_false_singletons +=
+                usize::from(misspecified_pit.overconfident_under_misspecification);
+            misspec_pit_detections +=
+                usize::from(misspecified_pit.model_discrepancy_detected);
+            pit_audit_queries += misspecified_pit.audit_queries + clean_pit.audit_queries;
+            protocol_failures += usize::from(clean_pit.monitoring_protocol_invalid);
+            protocol_failures += usize::from(misspecified_pit.monitoring_protocol_invalid);
+        }
+
+        println!(
+            concat!(
+                "prequential_pit_integrated,seeds={SEEDS},budget={MAX_ROUNDS},",
+                "discrepancy={DISCREPANCY},clean_baseline_successes={clean_baseline_successes},",
+                "clean_pit_successes={clean_pit_successes},clean_pit_alarms={clean_pit_alarms},",
+                "misspec_baseline_false_singletons={misspec_baseline_false_singletons},",
+                "misspec_pit_false_singletons={misspec_pit_false_singletons},",
+                "misspec_pit_detections={misspec_pit_detections},",
+                "pit_audit_queries={pit_audit_queries},protocol_failures={protocol_failures}"
+            )
+        );
+
+        assert_eq!(protocol_failures, 0, "PIT monitor must fail closed only on real protocol defects");
+        assert!(
+            pit_audit_queries > 0,
+            "the integrated policy never reached a singleton audit"
+        );
+        assert!(clean_baseline_successes <= SEEDS as usize);
+        assert!(clean_pit_successes <= SEEDS as usize);
+        assert!(misspec_pit_detections <= SEEDS as usize);
+        assert!(misspec_pit_false_singletons <= SEEDS as usize);
+    }
+
+    #[test]
+    fn prequential_pit_policy_rejects_smoothed_measurements() {
+        let outcome = run_trial_with_discrepancy(
+            1,
+            PipelineConfig {
+                typed_candidates: true,
+                active_selection: true,
+                smoothing: true,
+            },
+            MAX_ROUNDS,
+            ActiveSelector::InformationGainWithPrequentialPitAudits,
+            0.12,
+        );
+        assert!(outcome.monitoring_protocol_invalid);
+        assert!(outcome.selection_failed);
+        assert!(!outcome.success);
     }
 
     /// Pilot testing whether scheduled, seeded audit experiments reduce false confidence
