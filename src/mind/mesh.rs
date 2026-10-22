@@ -127,8 +127,8 @@ mod authenticated_sequence_window_tests {
         let mut window = AuthenticatedSequenceWindow::default();
 
         assert!(window.check_and_mark(100, now));
-        assert!(window.check_and_mark(36, now));
-        assert!(!window.check_and_mark(35, now));
+        assert!(window.check_and_mark(37, now)); // 63 behind is still inside the window.
+        assert!(!window.check_and_mark(36, now)); // 64 behind is outside the window.
     }
 
     #[test]
