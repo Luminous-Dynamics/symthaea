@@ -117,7 +117,7 @@ impl RelationalCore {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PhiDyadStatus {
     /// The current facade does not receive independent partner observations.
-    UnavailableNoIndependentPartnerObservations,
+    UnavailableNoIndependentPairedStreams,
     /// Reserved for a future provenance-validated observation path.
     AvailableFromIndependentPartnerObservations,
 }
@@ -126,7 +126,7 @@ pub enum PhiDyadStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PartnerStateEvidenceStatus {
     /// No independently sourced partner observations are currently wired in.
-    UnavailableNoIndependentPartnerObservations,
+    UnavailableNoIndependentPairedStreams,
     /// Reserved for a future independently sourced observation path.
     AvailableFromIndependentPartnerObservations,
 }
@@ -156,13 +156,13 @@ impl PartnershipState {
     /// Evidence status of the partner-state fields. The current facade has no
     /// independent partner-observation input, so its estimates are unavailable.
     pub fn partner_state_status(&self) -> PartnerStateEvidenceStatus {
-        PartnerStateEvidenceStatus::UnavailableNoIndependentPartnerObservations
+        PartnerStateEvidenceStatus::UnavailableNoIndependentPairedStreams
     }
 
     /// Evidence status of the dyadic Phi estimate. Never infer availability
     /// from the numeric value, since a valid estimate could also equal zero.
     pub fn phi_dyad_status(&self) -> PhiDyadStatus {
-        PhiDyadStatus::UnavailableNoIndependentPartnerObservations
+        PhiDyadStatus::UnavailableNoIndependentPairedStreams
     }
 }
 
@@ -211,11 +211,11 @@ mod provenance_tests {
         assert_eq!(relational.partner.stage, RelationshipStage::NoRelation);
         assert_eq!(
             relational.partnership_state().phi_dyad_status(),
-            PhiDyadStatus::UnavailableNoIndependentPartnerObservations
+            PhiDyadStatus::UnavailableNoIndependentPairedStreams
         );
         assert_eq!(
             relational.partnership_state().partner_state_status(),
-            PartnerStateEvidenceStatus::UnavailableNoIndependentPartnerObservations
+            PartnerStateEvidenceStatus::UnavailableNoIndependentPairedStreams
         );
         assert!(
             relational.trajectory.points().is_empty(),
@@ -230,11 +230,11 @@ mod provenance_tests {
         assert_eq!(state.phi_dyad, 0.0);
         assert_eq!(
             state.phi_dyad_status(),
-            PhiDyadStatus::UnavailableNoIndependentPartnerObservations
+            PhiDyadStatus::UnavailableNoIndependentPairedStreams
         );
         assert_eq!(
             state.partner_state_status(),
-            PartnerStateEvidenceStatus::UnavailableNoIndependentPartnerObservations
+            PartnerStateEvidenceStatus::UnavailableNoIndependentPairedStreams
         );
     }
 
@@ -261,7 +261,7 @@ mod provenance_tests {
         assert_eq!(state.reciprocity, 0.0);
         assert_eq!(state.stage, RelationshipStage::NoRelation);
         assert_eq!(state.phi_dyad, 0.0);
-        assert_eq!(state.phi_dyad_status(), PhiDyadStatus::UnavailableNoIndependentPartnerObservations);
+        assert_eq!(state.phi_dyad_status(), PhiDyadStatus::UnavailableNoIndependentPairedStreams);
         assert_eq!(state.trajectory_points, 0);
     }
 }
