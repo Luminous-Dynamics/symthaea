@@ -289,6 +289,13 @@ On the same frozen targets, checker and total budget, compare a minimal shell ag
 
 A proposed additional engineering target is at least 25% lower cost at fixed semantic-gate solve rate relative to the strongest validated local-repair baseline, without increasing false acceptance. That target is aspirational and informed by cost-aware prover work, not a PITB result. Preserve the current +10pp paired utility gate as the separate primary endpoint. This gives Symthaea a potentially distinctive research question: not just whether a proof strategy transfers, but whether a coordinator knows *when its preconditions fail, when to abandon it, and what verified next action is worth the cost*.
 
+
+## 22 October 2026 update: paired outcome analysis now includes actual resource costs
+
+The counterfactual analyzer now requires measured runtime usage on both sides of each pair and reports calls, tokens, wall time and micro-USD separately for the compatible base and counterfactual target. It adds component-clustered intervals for cost/token/time ratios and signed variant-minus-base deltas, and the report schema distinguishes bounded rates, nonnegative means and signed paired differences. CI exercises missing-usage and paired-resource assertions as well as provenance/reviewer mutations.
+
+This is an important guardrail, not a result. The synthetic fixture deliberately gives its adjudicated base and variant rows equal costs and matched inference budgets, so its cost ratio of 1 and zero delta only verify the reporting path. The analyzer's paired costs are not a full success–cost frontier, because the base and counterfactual are different reviewed targets. To compare with CoCo-Prover-like resource-routing work, PITB needs multiple preregistered spending caps per method and must report (i) verified semantic-gate solves at each cap, (ii) cost at fixed verified-solve rates, and (iii) uncertainty under target-family clustering. The primary proof-success and transfer-applicability scores remain separate.
+
 ## Research references
 
 - Kim, Han & Hwang, [Benchmarking Testing in Automated Theorem Proving](https://aclanthology.org/2026.acl-industry.150/), ACL 2026 Industry Track.
