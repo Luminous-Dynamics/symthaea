@@ -278,10 +278,26 @@ mod tests {
 
     #[test]
     fn margin_consuming_errors_score_higher_than_equally_sized_safe_direction_errors() {
-        let harmful = score_prediction_error(0.17, 0.86, 0.15, 0.88, limits(), scales())
-            .expect("finite harmful residual");
-        let benign = score_prediction_error(0.40, 0.50, 0.38, 0.52, limits(), scales())
-            .expect("finite benign residual");
+        let margin_sensitive_scales =
+            PredictionErrorScales::new(0.05, 0.05, 0.02).expect("valid scales");
+        let harmful = score_prediction_error(
+            0.17,
+            0.86,
+            0.149,
+            0.881,
+            limits(),
+            margin_sensitive_scales,
+        )
+        .expect("finite harmful residual");
+        let benign = score_prediction_error(
+            0.40,
+            0.50,
+            0.38,
+            0.52,
+            limits(),
+            margin_sensitive_scales,
+        )
+        .expect("finite benign residual");
         assert!(harmful.score() > benign.score());
         assert!(harmful.false_safe_prediction());
         assert!(!benign.false_safe_prediction());
