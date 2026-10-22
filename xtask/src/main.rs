@@ -123,12 +123,27 @@ fn main() -> anyhow::Result<()> {
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
         }
-        Commands::CryptoCalibrate { suite, task_id, all, list, dry_run, out } => {
+        Commands::CryptoCalibrate {
+            suite,
+            task_id,
+            all,
+            list,
+            dry_run,
+            out,
+        } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .parent()
                 .expect("xtask lives one level below the workspace root")
                 .to_path_buf();
-            crypto_calibrate::run(&root, &suite, task_id.as_deref(), all, list, dry_run, out.as_deref())?;
+            crypto_calibrate::run(
+                &root,
+                &suite,
+                task_id.as_deref(),
+                all,
+                list,
+                dry_run,
+                out.as_deref(),
+            )?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
