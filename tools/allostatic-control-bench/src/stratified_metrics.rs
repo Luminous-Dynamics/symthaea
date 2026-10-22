@@ -338,20 +338,26 @@ mod tests {
             (
                 "cartpole".to_owned(),
                 (0..30)
-                    .map(|seed| TaskEpisode {
-                        seed,
-                        baseline_score: 0.4,
-                        candidate_score: 0.6,
+                    .map(|seed| {
+                        let delta = if seed % 2 == 0 { 0.1 } else { 0.3 };
+                        TaskEpisode {
+                            seed,
+                            baseline_score: 0.4,
+                            candidate_score: 0.4 + delta,
+                        }
                     })
                     .collect(),
             ),
             (
                 "quadrotor".to_owned(),
                 (0..10)
-                    .map(|seed| TaskEpisode {
-                        seed,
-                        baseline_score: 0.7,
-                        candidate_score: 0.6,
+                    .map(|seed| {
+                        let delta = if seed % 2 == 0 { -0.2 } else { 0.0 };
+                        TaskEpisode {
+                            seed,
+                            baseline_score: 0.7,
+                            candidate_score: 0.7 + delta,
+                        }
                     })
                     .collect(),
             ),
@@ -364,9 +370,11 @@ mod tests {
             StratifiedSummary::from_tasks(&fixture(), 1_000, 17).expect("valid task fixture");
         assert!((summary.macro_mean_delta - 0.05).abs() < 1e-12);
         assert!((summary.macro_iqm_delta - 0.05).abs() < 1e-12);
-        assert!((summary.macro_paired_win_rate - 0.5).abs() < 1e-12);
+        assert!((summary.macro_paired_win_rate - 0.625).abs() < 1e-12);
         assert_eq!(summary.task_count, 2);
         assert_eq!(summary.total_pairs, 40);
+        assert!(summary.macro_mean_delta_ci95_low < summary.macro_mean_delta_ci95_high);
+        assert!(summary.macro_iqm_delta_ci95_low < summary.macro_iqm_delta_ci95_high);
     }
 
     #[test]
