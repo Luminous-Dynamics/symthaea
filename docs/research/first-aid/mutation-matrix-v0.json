@@ -725,6 +725,9 @@
     "edge_differential_scope": "For each reachable abstract state, replay its breadth-first shortest event-history witness, append each of the 16 actions, and compare ordered violations from the production JSON trace checker with the abstract transition model; expected 84 states and 1,344 edges. Same repo, shared design intent, and finite abstraction; not independent clinical ground truth.",
     "policy_truth_table_differential_status": "implemented_in_source",
     "policy_truth_table_differential_test_name": "orthogonal_policy_truth_tables_match_production_trace_checker",
-    "policy_truth_table_differential_scope": "18 connectivity, freshness/presentation, sensitivity/consent, and unknown-normalization combinations are each compared against the production trace checker; no claim that these truth tables model temporal coupling between those domains."
+    "policy_truth_table_differential_scope": "18 connectivity, freshness/presentation, sensitivity/consent, and unknown-normalization combinations are each compared against the production trace checker; no claim that these truth tables model temporal coupling between those domains.",
+    "two_action_sequence_differential_status": "implemented_in_source",
+    "two_action_sequence_differential_test_name": "every_reachable_state_two_action_suffix_matches_production_trace_checker",
+    "two_action_sequence_differential_scope": "For each of 84 reachable abstract states, take its breadth-first shortest witness, append every ordered pair from the 16-action alphabet, and compare the full ordered violation list from model replay to the production JSON trace checker: 84 × 16 × 16 = 21,504 sequences. This is bounded suffix coverage, not all possible event histories or clinical ground truth."
   }
 }
