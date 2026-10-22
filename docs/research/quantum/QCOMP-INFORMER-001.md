@@ -154,6 +154,26 @@ Use paired per-instance differences between every informer and A0, A2, and A4. R
 
 A single average score cannot hide a material regression on one declared family.
 
+### Sequential best-arm identification is a competitive baseline, not a blank slate
+
+The adaptive shot planner is a conservative finite-horizon baseline. It should not be described as a new best-arm-identification algorithm in its own right. Relevant prior art includes:
+
+- [Track-and-Stop (Garivier & Kaufmann, COLT 2016)](https://proceedings.mlr.press/v49/garivier16a.html), an asymptotically optimal fixed-confidence strategy for best-arm identification in its stated stochastic model.
+- [APGAI (Jourdan, Delahaye-Duriez & Réda, JMLR 2026)](https://www.jmlr.org/papers/v27/24-0680.html), an anytime good-arm-identification method with time-uniform error bounds. Good-arm identification is not the same objective as finding the highest-scoring vertex; use APGAI only for a separately declared threshold/abstention task, including cases where no candidate meets the threshold.
+- Uniform fixed-budget sampling, the current finite-horizon Bonferroni planner, and an appropriate fixed-budget best-arm baseline such as Successive Rejects or a validated KL-based method.
+
+Compare all applicable methods on identical synthetic sample streams, candidate means/gaps, candidate counts, maximum shot budgets, and seed lists. Report selected-arm error, coverage, abstention, total/mean/p95 observations, and regret to the synthetic best arm. For adaptive methods, document confidence assumptions and optional-stopping treatment. Keep no-good-arm detection separate from best-arm identification.
+
+The current simulator uses independent Bernoulli candidate streams by design. Actual QAOA bitstrings can generate dependent per-vertex observations within each shot and can drift across calibration windows. The synthetic harness validates planner invariants and controlled iid behavior only; it is not a validated measurement-noise model. Add correlated and nonstationary stress tests as separate robustness strata, and do not interpret miscalibration under violated assumptions as a surprise-free guarantee.
+
+The first runnable policy-validation target is:
+`cargo run -p symthaea-quantum-comp --example mis_shot_benchmark -- 2000 20261022 > trials.csv 2> summary.txt`
+It emits per-trial records plus coverage, selective-error and baseline-accuracy Wilson intervals. Before a research claim, preserve these files, the executable/compiler versions and their SHA-256 digests, and scale the confirmation campaign beyond this quick diagnostic where rare-error precision is needed.
+
+### Dual runtime accounting: benchmark-standard and deployment cost
+
+Follow the current [QOBLIB submission guide](https://github.com/ZIB-AOPT/QOBLIB/blob/main/CONTRIBUTING.md) exactly when submitting standardized results: it requires solver/source details and separates total, time-to-solution, CPU, GPU, and QPU runtime; the guide excludes hardware queue and compilation time from its runtime fields. To avoid underestimating practical value, produce an additional operational ledger alongside—not instead of—the QOBLIB-conforming numbers. In that ledger show preprocessing, compilation, calibration, data transfer, circuit execution, retries, postprocessing, cache invalidation, and independent verification. Report queue time separately; amortize reusable compilation/calibration only under a stated repeated-workload model. Never compare one method's standardized runtime against another's all-in elapsed wall time.
+
 ## 8. Statistical and anti-leakage protocol
 
 - Freeze hypotheses, cohort, primary outcome, budgets, run count, and analysis before the confirmatory run.
