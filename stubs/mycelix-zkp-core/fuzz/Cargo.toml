@@ -9,6 +9,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+sha2 = "0.10"
 mycelix-zkp-core = { path = "..", features = ["dilithium"] }
 
 [[bin]]
