@@ -72,6 +72,7 @@ struct BackendAttemptRecord {
     tier: String,
     backend_name: String,
     success: bool,
+    verification_passed: Option<bool>,
     elapsed_ms: u128,
     estimated_energy_cost: f64,
 }
@@ -328,11 +329,12 @@ fn run_candidate(
         compile_errors: oracle.compile_errors, agent_elapsed_ms, verification_elapsed_ms,
         iterations: result.iterations_used, energy: result.total_energy,
         final_phase: format!("{}", result.final_phase),
-        selected_generation_tiers: result.generation_tiers.iter().map(ToString::to_string).collect(),
+        selected_generation_tiers: result.selected_generation_tiers.iter().map(ToString::to_string).collect(),
         backend_attempts: result.actual_backend_attempts.iter().map(|attempt| BackendAttemptRecord {
             tier: attempt.tier.to_string(),
             backend_name: attempt.backend_name.clone(),
             success: attempt.success,
+            verification_passed: attempt.verification_passed,
             elapsed_ms: attempt.elapsed_ms,
             estimated_energy_cost: attempt.estimated_energy_cost,
         }).collect(),
@@ -367,6 +369,7 @@ fn eval_json(result: &EvalResult) -> serde_json::Value {
             "tier": attempt.tier,
             "backend_name": attempt.backend_name,
             "success": attempt.success,
+            "verification_passed": attempt.verification_passed,
             "elapsed_ms": attempt.elapsed_ms,
             "estimated_energy_cost": attempt.estimated_energy_cost
         })).collect::<Vec<_>>()
