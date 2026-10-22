@@ -140,10 +140,11 @@ pub(super) fn run(
         );
         for task in &suite.tasks {
             println!(
-                "{}\tcategory={}\tregressions={}\tsecurity_notion={}",
+                "{}\tcategory={}\tattacks={}\tpositive_controls={}\tsecurity_notion={}",
                 task.task_id,
                 task.category,
                 task.source_regressions.len(),
+                task.positive_controls.len(),
                 task.security_notion
             );
         }
