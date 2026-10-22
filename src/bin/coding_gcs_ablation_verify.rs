@@ -258,6 +258,7 @@ fn audit(
     );
 
     // Verify the preflight controls are present and align with the frozen task bank.
+    let empty_source_digest = blake3::hash(b"").to_hex().to_string();
     let controls = report.get("oracle_controls").unwrap_or(report);
     let references = controls.get("reference_controls").and_then(Value::as_array);
     let empty_patches = controls.get("empty_patch_controls").and_then(Value::as_array);
@@ -336,7 +337,7 @@ fn audit(
             push_check(
                 &mut errors,
                 str_field(control, "empty_patch_blake3").is_some_and(|s| {
-                    is_hex(s, 64) && s == blake3::hash(b"").to_hex().as_str()
+                    is_hex(s, 64) && s == empty_source_digest.as_str()
                 }),
                 format!("empty-patch digest is malformed or differs from the empty source for task {id}"),
             );
@@ -701,7 +702,7 @@ mod tests {
                 }],
                 "empty_patch_controls": [{
                     "task_id": "task_a",
-                    "empty_patch_blake3": "d".repeat(64),
+                    "empty_patch_blake3": blake3::hash(b"").to_hex().to_string(),
                     "empty_patch_fails": true,
                     "compiled": false,
                     "compile_errors": ["expected missing function"]
@@ -823,7 +824,8 @@ mod tests {
     fn valid_receipt_passes_with_external_pins() {
         let report = valid_fixture();
         let manifest_sha = str_field(&report, "task_manifest_blake3").unwrap();
-        assert!(audit(&report, Some(&"1".repeat(40)), Some(manifest_sha)).is_empty());
+        let expected_source_sha = "1".repeat(40);
+        assert!(audit(&report, Some(expected_source_sha.as_str()), Some(manifest_sha)).is_empty());
     }
 
     #[test]
