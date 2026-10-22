@@ -1,0 +1,441 @@
+{
+  "protocol_version": "1.1.0",
+  "status": "protocol_and_analysis_utility_not_external_executed",
+  "repository": "Luminous-Dynamics/symthaea",
+  "benchmark_plan": "external_runtime_assurance",
+  "revision_pinning": {
+    "required": true,
+    "fields": [
+      "benchmark_repository_url",
+      "benchmark_git_commit",
+      "environment_config_digest",
+      "dependency_lock_digest",
+      "simulator_version",
+      "control_frequency_hz",
+      "physics_step_hz",
+      "policy_revision",
+      "rust_toolchain",
+      "hardware_and_os"
+    ],
+    "fail_closed_if_missing": true
+  },
+  "task_families": [
+    {
+      "id": "safe_control_gym_cartpole",
+      "phase": 1,
+      "environment_family": "CartPole",
+      "adapter_required": true,
+      "native_units_preserved": true
+    },
+    {
+      "id": "safe_control_gym_quadrotor",
+      "phase": 1,
+      "environment_family": "Quadrotor",
+      "adapter_required": true,
+      "native_units_preserved": true
+    },
+    {
+      "id": "safety_gymnasium_navigation_or_manipulation",
+      "phase": 2,
+      "environment_family": "Safety-Gymnasium",
+      "adapter_required": true,
+      "run_only_after_phase_1_reproduction": true
+    }
+  ],
+  "seed_partitions": {
+    "nominal_calibration": {
+      "first": 100000,
+      "last": 100999,
+      "count": 1000,
+      "usage": "monitor threshold only"
+    },
+    "nominal_test": {
+      "first": 200000,
+      "last": 200299,
+      "count": 300
+    },
+    "within_envelope": {
+      "first": 300000,
+      "last": 300299,
+      "count": 300
+    },
+    "dynamics_parameter_shift": {
+      "first": 400000,
+      "last": 400299,
+      "count": 300
+    },
+    "observation_actuator_shift": {
+      "first": 500000,
+      "last": 500299,
+      "count": 300
+    },
+    "compound_shift": {
+      "first": 600000,
+      "last": 600299,
+      "count": 300
+    },
+    "stealth_score_negative_control": {
+      "first": 700000,
+      "last": 700299,
+      "count": 300
+    },
+    "overlap_forbidden": true,
+    "paired_exogenous_disturbance_tapes": true
+  },
+  "policies": [
+    {
+      "id": "B0",
+      "name": "task_native_reference",
+      "deployable_baseline": true
+    },
+    {
+      "id": "B1",
+      "name": "unshielded_reference",
+      "deployable_baseline": false,
+      "role": "utility_and_failure_reference"
+    },
+    {
+      "id": "B2",
+      "name": "point_prediction_shield",
+      "deployable_baseline": true
+    },
+    {
+      "id": "B3",
+      "name": "global_interval_shield",
+      "deployable_baseline": true
+    },
+    {
+      "id": "B4",
+      "name": "state_action_conditioned_shield",
+      "deployable_baseline": true
+    },
+    {
+      "id": "B5",
+      "name": "always_reachability",
+      "deployable_baseline": true
+    },
+    {
+      "id": "B6",
+      "name": "score_triggered_predictive_reachability_switch",
+      "deployable_baseline": true
+    },
+    {
+      "id": "B7",
+      "name": "residual_aware_monitor_with_reachability_fallback",
+      "deployable_baseline": true,
+      "status": "proposed_not_implemented"
+    },
+    {
+      "id": "O0",
+      "name": "evaluator_oracle",
+      "deployable_baseline": false,
+      "role": "diagnostic_upper_bound"
+    },
+    {
+      "id": "B8",
+      "name": "safety_constrained_active_model_discrimination",
+      "deployable_baseline": true,
+      "status": "research_prototype_not_external_validated",
+      "safety_rule": "candidate action must be horizon-certified under a common hull of every retained model",
+      "update_rule": "remove only hypotheses inconsistent with the observed transition noise set; empty retained set means model-family falsification and uncertified state"
+    },
+    {
+      "id": "B9",
+      "name": "task_native_mpsc_safety_filter",
+      "deployable_baseline": true,
+      "status": "reproduce_only_for_supported_pinned_task",
+      "reference": "Safe-Control-Gym MPSC safety filter"
+    },
+    {
+      "id": "B10",
+      "name": "task_native_cbf_or_neural_cbf_filter",
+      "deployable_baseline": true,
+      "status": "reproduce_only_when_task_constraints_match",
+      "reference": "Safe-Control-Gym CBF / neural network CBF safety filters"
+    },
+    {
+      "id": "B11",
+      "name": "conformalized_sls_mpc",
+      "deployable_baseline": true,
+      "status": "external_reference_requires_pinned_reproduction_or_documented_adaptation",
+      "reference": "https://proceedings.mlr.press/v331/srinivasan26a.html"
+    },
+    {
+      "id": "B12",
+      "name": "gpu_sls_robust_mpc",
+      "deployable_baseline": true,
+      "status": "external_reference_requires_pinned_reproduction_or_documented_adaptation_and_hardware_disclosure",
+      "reference": "https://arxiv.org/abs/2604.07644"
+    },
+    {
+      "id": "B13",
+      "name": "a_sls_learning_aware_robust_adaptive_mpc",
+      "deployable_baseline": true,
+      "status": "latest_research_comparator_requires_pinned_reproduction_or_documented_adaptation",
+      "reference": "https://arxiv.org/abs/2610.20925",
+      "comparison_focus": "guaranteed future parameter learning and correlated reachable-tube contraction"
+    }
+  ],
+  "conditions": [
+    {
+      "id": "nominal",
+      "envelope_relation": "inside_predictive",
+      "monitor_score_source": "observed_nominal"
+    },
+    {
+      "id": "within_envelope",
+      "envelope_relation": "inside_declared",
+      "monitor_score_source": "observed"
+    },
+    {
+      "id": "dynamics_parameter_shift",
+      "envelope_relation": "outside_predictive",
+      "monitor_score_source": "observed"
+    },
+    {
+      "id": "observation_actuator_shift",
+      "envelope_relation": "may_be_outside_predictive",
+      "monitor_score_source": "observed"
+    },
+    {
+      "id": "compound_shift",
+      "envelope_relation": "must_be_measured",
+      "monitor_score_source": "observed"
+    },
+    {
+      "id": "stealth_score_negative_control",
+      "envelope_relation": "outside_predictive_inside_fallback_if_constructed",
+      "monitor_score_source": "paired_nominal_score"
+    }
+  ],
+  "required_metrics": [
+    "episode_violation_rate",
+    "one_sided_95_percent_violation_upper_bound",
+    "normalized_violation_magnitude",
+    "integrated_normalized_violation_exposure",
+    "maximum_constraint_excursion",
+    "time_to_first_violation",
+    "false_certificate_count_and_rate",
+    "predictive_and_fallback_envelope_membership_rates",
+    "reward_and_task_success",
+    "safe_action_availability",
+    "false_veto_rate_among_oracle_safe_actions",
+    "no_certified_action_rate",
+    "monitor_false_alarm_rate",
+    "shift_miss_rate",
+    "time_to_alarm",
+    "p50_p95_p99_decision_latency",
+    "search_work_and_budget_exhaustion",
+    "calibration_test_provenance",
+    "raw_trace_and_output_digests",
+    "probe_interaction_cost_and_remaining_budget",
+    "hypothesis_count_and_uncertainty_geometry_before_after_probe",
+    "certified_action_count_before_after_probe",
+    "subsequent_false_veto_reduction_at_matched_violation_budget",
+    "probe_information_yield_rate",
+    "false_model_elimination_rate_under_observation_noise",
+    "model_family_falsification_rate",
+    "unidentifiable_model_pair_rate",
+    "actual_plant_membership_separate_from_observation_compatibility",
+    "stale_certificate_reuse_attempts",
+    "stale_certificate_rejections_by_reason",
+    "false_acceptance_rate_for_stale_certificates",
+    "certificate_validation_p50_p95_p99_latency",
+    "noise_adjusted_pairwise_model_separation",
+    "guaranteed_probe_discriminability_under_declared_measurement_bounds",
+    "paired_mean_delta_with_95_percent_paired_bootstrap_interval",
+    "exact_one_sided_clopper_pearson_violation_rate_upper_bound",
+    "exact_mcnemar_test_for_paired_episode_violations"
+  ],
+  "mandatory_gates": [
+    "invalid_input_or_missing_calibration_is_uncertified",
+    "budget_exhaustion_is_uncertified",
+    "empty_fallback_never_reverts_to_predictive_policy",
+    "horizon_1_parity_with_one_step_evaluator",
+    "viable_action_sets_are_nested_as_horizon_grows",
+    "independent_actual_plant_evaluation",
+    "disjoint_calibration_tuning_and_test_seeds",
+    "independent_metrics_recomputation_from_raw_traces",
+    "active_probe_certificate_uses_common_hull_and_common_safe_continuation",
+    "no_information_claim_from_probe_selection_without_observed_uncertainty_reduction",
+    "empty_post_observation_model_set_invalidates_certificates_and_never_restores_prior_silently",
+    "noise_compatibility_is_not_reported_as_true_plant_membership",
+    "active_learning_comparisons_use_fixed_exploration_budget_and_matched_violation_budget",
+    "certificate_lease_binds_state_model_limits_calibration_authority_monitor_and_evidence_revisions",
+    "stale_certificate_rejected_after_any_bound_context_change",
+    "certificate_validation_and_action_application_are_atomic_or_toctou_tested",
+    "certificate_horizon_and_expiry_are_checked_at_use",
+    "active_probe_discrimination_is_discounted_by_declared_observation_noise_bounds",
+    "paired_policy_comparisons_have_identical_episode_seed_coverage_per_condition",
+    "paired_inference_fails_closed_on_duplicate_or_missing_policy_seed_pairs",
+    "no_silent_pooling_across_scenarios_or_shield_settings",
+    "episode_level_pairs_not_control_ticks_are_bootstrap_resampling_units",
+    "zero_observed_violations_are_not_reported_as_zero_underlying_risk"
+  ],
+  "proposed_targets_not_results": {
+    "in_envelope_false_certificates": 0,
+    "false_veto_reduction_vs_global_margin_fraction": 0.2,
+    "nominal_return_loss_fraction_max": 0.05,
+    "note": "Targets are hypotheses and must be reported with denominators, confidence intervals, and per-condition results."
+  },
+  "references": [
+    "https://github.com/learnsyslab/safe-control-gym",
+    "https://safety-gymnasium.readthedocs.io/en/latest/",
+    "https://proceedings.mlr.press/v283/contreras25a.html",
+    "https://proceedings.mlr.press/v331/srinivasan26a.html",
+    "https://arxiv.org/abs/2609.15315",
+    "https://github.com/lindsayspoor/SafeRLEval",
+    "https://arxiv.org/abs/2610.20925"
+  ],
+  "active_falsification": {
+    "status": "predeclared_external_evaluation_arm",
+    "comparators": [
+      "task_greedy_certified_action",
+      "random_certified_action",
+      "maximin_prediction_box_separation",
+      "probabilistic_information_gain_when_observation_likelihood_is_validated"
+    ],
+    "measures": [
+      "probe_cost",
+      "observed_hypothesis_reduction",
+      "viable_action_gain",
+      "false_model_eliminations",
+      "model_family_falsification",
+      "safe_capability_frontier_after_fixed_interaction_budget"
+    ],
+    "terminology_constraint": "Maximin interval separation is a geometric distinguishability proxy, not mutual information."
+  },
+  "certificate_lifecycle": {
+    "status": "required_external_adapter_gate",
+    "bound_fields": [
+      "state_revision",
+      "dynamics_revision",
+      "limits_revision",
+      "calibration_revision",
+      "authority_revision",
+      "monitor_epoch",
+      "evidence_digest",
+      "issued_step",
+      "expiry_step",
+      "certified_horizon"
+    ],
+    "reject_when": [
+      "state_revision_changed",
+      "dynamics_revision_changed",
+      "limits_revision_changed",
+      "calibration_revision_changed",
+      "authority_revision_changed",
+      "monitor_epoch_changed",
+      "evidence_digest_changed",
+      "lease_expired",
+      "clock_regressed",
+      "requested_horizon_exceeds_certified_horizon"
+    ],
+    "rule": "A rejected lease requires recertification; never downgrade an invalidation to a warning and continue using the cached permission."
+  },
+  "comparison_rules": [
+    "Native MPSC/CBF and neural-CBF filters must be compared only on tasks/configurations where their constraints and action semantics match.",
+    "Modern conformal SLS-MPC and GPU-SLS references count as headline comparators only after pinned reproduction or documented mathematical adaptation.",
+    "Hardware-accelerated runtime comparisons must publish hardware, solver, precision, deadline and compute budgets; do not infer speed superiority from different hardware.",
+    "A-SLS (2026-10-14 preprint) is a priority comparator for active learning because it plans with guaranteed future parameter-uncertainty reduction; do not describe interval-gap active probing as equivalent to A-SLS.",
+    "A geometric pairwise-separation probe may claim guaranteed one-step distinguishability only when all candidate observation sets are disjoint after declared measurement-noise expansion.",
+    "Report matched episode-pair effect estimates with uncertainty; use exact one-sided binomial upper confidence limits for episode violation rates.",
+    "Analyze each scenario and shielded setting separately before any predeclared cross-task aggregation; do not claim universal superiority from one pairwise p-value.",
+    "The paired-inference CLI synthetic self-test artifact is qualification evidence for the analysis tool only, not external control-performance evidence."
+  ],
+  "published_reference_points": {
+    "a_sls_2026_preprint": {
+      "source": "https://arxiv.org/abs/2610.20925",
+      "status": "author_reported_not_reproduced_by_symthaea",
+      "simulation_gpu": "NVIDIA RTX 4090",
+      "hardware_experiment_cpu": "Apple M4 Pro",
+      "quadruped": {
+        "task": "61-state whole-body quadruped; 8 uncertain damping parameters; 12 control inputs",
+        "a_sls_successes": 38,
+        "total_runs": 40,
+        "baseline": "non-adaptive SLS",
+        "baseline_successes": 24,
+        "median_solve_time_ms": 16.1,
+        "control_budget_ms": 32
+      },
+      "crazyflie": {
+        "task": "physical Crazyflie; learn unknown thrust-to-acceleration parameter online",
+        "hardware_runs": 15,
+        "median_solve_time_ms": 8.15,
+        "control_budget_ms": 50
+      },
+      "comparability_rule": "Do not compare these numbers directly with Symthaea scalar synthetic runs; pin the implementation and match task, assumptions, sensing, constraints, hardware and deadlines."
+    }
+  },
+  "paired_inference": {
+    "status": "implemented_analysis_utility_synthetic_selftest_only",
+    "input_contract": "unquoted episode CSV with scenario, seed, policy, shielded, a finite numeric metric and a binary episode-level violation field",
+    "pairing_unit": "complete episode keyed by scenario, seed and shielded setting",
+    "effects": [
+      "baseline_mean",
+      "candidate_mean",
+      "candidate_minus_baseline_mean",
+      "median_paired_delta"
+    ],
+    "uncertainty": {
+      "method": "percentile paired bootstrap of episode-level differences",
+      "confidence_level": 0.95,
+      "default_replicates": 10000,
+      "replicates_must_be_at_least": 1000,
+      "deterministic_prng": true,
+      "bootstrap_seed": "deterministic per scenario and shielded flag; emitted as bootstrap_seed"
+    },
+    "violation_risk": {
+      "rate": "observed episode-level violations / paired episode count",
+      "upper_confidence_bound": "one-sided 95% exact Clopper-Pearson",
+      "paired_test": "exact two-sided McNemar on discordant paired episode outcomes"
+    },
+    "fail_closed_on": [
+      "missing_columns",
+      "duplicate_header_or_policy_episode_row",
+      "missing_baseline_or_candidate_seed_pair",
+      "non_finite_metric",
+      "invalid_episode_violation_flag",
+      "quoted_csv_field"
+    ],
+    "interpretation_rule": "No automatic winner label; metric direction must be preregistered and per-condition outcomes must remain visible.",
+    "output_columns": [
+      "scenario",
+      "shielded",
+      "metric",
+      "baseline_policy",
+      "candidate_policy",
+      "n_pairs",
+      "baseline_mean",
+      "candidate_mean",
+      "candidate_minus_baseline_mean",
+      "median_paired_delta",
+      "paired_bootstrap_ci95_low",
+      "paired_bootstrap_ci95_high",
+      "bootstrap_replicates",
+      "bootstrap_seed",
+      "baseline_violations",
+      "candidate_violations",
+      "candidate_only_violations",
+      "baseline_only_violations",
+      "mcnemar_exact_two_sided_p",
+      "baseline_violation_rate",
+      "candidate_violation_rate",
+      "baseline_violation_upper95_exact",
+      "candidate_violation_upper95_exact"
+    ],
+    "risk_precision_examples": [
+      {
+        "target_one_sided_95_upper_rate": 0.01,
+        "required_independent_zero_violation_episodes": 299
+      },
+      {
+        "target_one_sided_95_upper_rate": 0.001,
+        "required_independent_zero_violation_episodes": 2995
+      },
+      {
+        "note": "Exact zero-event binomial planning formula; assumes independent Bernoulli episodes and says nothing about untested distributions or dependent sampling."
+      }
+    ]
+  }
+}
