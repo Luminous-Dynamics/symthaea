@@ -50,17 +50,53 @@ impl std::fmt::Display for BackendTier {
     }
 }
 
+/// One backend invocation observed during a dispatch, including fallback attempts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackendAttempt {
+    /// Effective tier inferred from the backend implementation that was invoked.
+    pub tier: BackendTier,
+    /// Backend-reported name (e.g. Ollama, Anthropic, Simulated).
+    pub backend_name: String,
+    /// Whether the backend returned a non-empty response.
+    pub success: bool,
+}
+
 /// Result of an intelligent dispatch decision.
 #[derive(Debug, Clone)]
 pub struct DispatchResult {
-    /// The generated code (or error message).
+    /// Generated code (or error message).
     pub output: String,
-    /// Which backend tier was used.
+    /// Selected routing tier before fallback; this can differ from backend_attempts.
     pub tier: BackendTier,
+    /// Actual backend invocations, in order, including failed calls and fallbacks.
+    pub backend_attempts: Vec<BackendAttempt>,
     /// Energy cost of this generation.
     pub energy_cost: f64,
-    /// Whether the generation succeeded.
+    /// Whether the final generation result was successful.
     pub success: bool,
+}
+
+fn effective_backend_tier(backend_name: &str, selected_tier: BackendTier) -> BackendTier {
+    if backend_name.eq_ignore_ascii_case("simulated") {
+        BackendTier::Simulated
+    } else if backend_name.eq_ignore_ascii_case("ollama") {
+        BackendTier::LocalLlm
+    } else {
+        selected_tier
+    }
+}
+
+fn record_backend_attempt(
+    attempts: &mut Vec<BackendAttempt>,
+    backend_name: &str,
+    selected_tier: BackendTier,
+    success: bool,
+) {
+    attempts.push(BackendAttempt {
+        tier: effective_backend_tier(backend_name, selected_tier),
+        backend_name: backend_name.to_string(),
+        success,
+    });
 }
 
 /// Per-backend success tracking for adaptive routing.
@@ -349,55 +385,93 @@ impl IntelligentDispatcher {
             self.select_tier(epistemic, prediction_error, consciousness_level)
         };
 
+        let mut backend_attempts = Vec::new();
         let (output, success, cost) = match tier {
             BackendTier::Native => {
                 // Native generation is handled externally by CodeGenerator.
-                // Return a signal that the caller should use native path.
+                // The selected tier is tracked separately from LLM backend attempts.
                 self.native_stats.record(true);
                 ("[NATIVE: use CodeGenerator]".to_string(), true, COST_NATIVE)
             }
             BackendTier::Hardware => {
                 // Hardware generation is handled externally by DriverEmitter.
-                (
-                    "[HARDWARE: use DriverEmitter]".to_string(),
-                    true,
-                    COST_NATIVE,
-                )
+                ("[HARDWARE: use DriverEmitter]".to_string(), true, COST_NATIVE)
             }
-            BackendTier::LocalLlm => match self.local_llm.generate(prompt, params).await {
-                Ok(output) => {
-                    let success = !output.is_empty();
-                    self.local_stats.record(success);
-                    (output, success, COST_LOCAL_LLM)
+            BackendTier::LocalLlm => {
+                let backend_name = self.local_llm.name().to_string();
+                match self.local_llm.generate(prompt, params).await {
+                    Ok(output) => {
+                        let success = !output.is_empty();
+                        self.local_stats.record(success);
+                        record_backend_attempt(
+                            &mut backend_attempts,
+                            &backend_name,
+                            BackendTier::LocalLlm,
+                            success,
+                        );
+                        (output, success, COST_LOCAL_LLM)
+                    }
+                    Err(e) => {
+                        self.local_stats.record(false);
+                        record_backend_attempt(
+                            &mut backend_attempts,
+                            &backend_name,
+                            BackendTier::LocalLlm,
+                            false,
+                        );
+                        (format!("Local LLM error: {e}"), false, COST_LOCAL_LLM)
+                    }
                 }
-                Err(e) => {
-                    self.local_stats.record(false);
-                    (format!("Local LLM error: {e}"), false, COST_LOCAL_LLM)
-                }
-            },
+            }
             BackendTier::CloudLlm => {
                 if let Some(ref cloud) = self.cloud_llm {
+                    let cloud_name = cloud.name().to_string();
                     match cloud.generate(prompt, params).await {
                         Ok(output) => {
                             let success = !output.is_empty();
                             self.cloud_stats.record(success);
+                            record_backend_attempt(
+                                &mut backend_attempts,
+                                &cloud_name,
+                                BackendTier::CloudLlm,
+                                success,
+                            );
                             (output, success, COST_CLOUD_LLM)
                         }
                         Err(e) => {
                             self.cloud_stats.record(false);
-                            // Fall back to local LLM on cloud failure
+                            record_backend_attempt(
+                                &mut backend_attempts,
+                                &cloud_name,
+                                BackendTier::CloudLlm,
+                                false,
+                            );
                             tracing::warn!(
                                 target: "symthaea::dispatcher",
                                 error = %e,
                                 "Cloud LLM failed, falling back to local"
                             );
+                            let local_name = self.local_llm.name().to_string();
                             match self.local_llm.generate(prompt, params).await {
                                 Ok(output) => {
-                                    self.local_stats.record(true);
-                                    (output, true, COST_LOCAL_LLM)
+                                    let success = !output.is_empty();
+                                    self.local_stats.record(success);
+                                    record_backend_attempt(
+                                        &mut backend_attempts,
+                                        &local_name,
+                                        BackendTier::LocalLlm,
+                                        success,
+                                    );
+                                    (output, success, COST_LOCAL_LLM)
                                 }
                                 Err(e2) => {
                                     self.local_stats.record(false);
+                                    record_backend_attempt(
+                                        &mut backend_attempts,
+                                        &local_name,
+                                        BackendTier::LocalLlm,
+                                        false,
+                                    );
                                     (
                                         format!("All LLMs failed: cloud={e}, local={e2}"),
                                         false,
@@ -408,20 +482,43 @@ impl IntelligentDispatcher {
                         }
                     }
                 } else {
-                    // No cloud backend configured — use local
+                    // A forced CloudLlm tier can reach this branch without a cloud
+                    // backend; record only the backend that is actually invoked.
+                    let local_name = self.local_llm.name().to_string();
                     match self.local_llm.generate(prompt, params).await {
                         Ok(output) => {
-                            self.local_stats.record(true);
-                            (output, true, COST_LOCAL_LLM)
+                            let success = !output.is_empty();
+                            self.local_stats.record(success);
+                            record_backend_attempt(
+                                &mut backend_attempts,
+                                &local_name,
+                                BackendTier::LocalLlm,
+                                success,
+                            );
+                            (output, success, COST_LOCAL_LLM)
                         }
                         Err(e) => {
                             self.local_stats.record(false);
+                            record_backend_attempt(
+                                &mut backend_attempts,
+                                &local_name,
+                                BackendTier::LocalLlm,
+                                false,
+                            );
                             (format!("Local LLM error: {e}"), false, COST_LOCAL_LLM)
                         }
                     }
                 }
             }
-            BackendTier::Simulated => ("// simulated code output".to_string(), true, 0.0),
+            BackendTier::Simulated => {
+                record_backend_attempt(
+                    &mut backend_attempts,
+                    "Simulated",
+                    BackendTier::Simulated,
+                    true,
+                );
+                ("// simulated code output".to_string(), true, 0.0)
+            }
         };
 
         self.total_energy += cost;
@@ -438,6 +535,7 @@ impl IntelligentDispatcher {
         DispatchResult {
             output,
             tier,
+            backend_attempts,
             energy_cost: cost,
             success,
         }
