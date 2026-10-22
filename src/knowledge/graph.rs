@@ -1517,6 +1517,63 @@ mod tests {
     }
 
     #[test]
+    fn imported_evidence_links_reject_unbound_adjudication_ids_atomically() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let context = |witness: &str, family: &str, evidence: &str| ClaimContext {
+            subject: "subject".into(),
+            predicate: "predicate".into(),
+            object: "object".into(),
+            witness_id: witness.into(),
+            source_family_id: family.into(),
+            context_id: "shared-context".into(),
+            temporal_scope: Some("period-a".into()),
+            event_time: Some(1),
+            claim_kind: ClaimKind::SourceAttested,
+            polarity: ClaimPolarity::Positive,
+            evidence_ids: vec![evidence.into()],
+        };
+        let (a, _) = graph
+            .insert_grounded(
+                make_encoding("claim a", 0.5),
+                1,
+                None,
+                false,
+                context("witness-a", "family-a", "evidence-a"),
+            )
+            .unwrap();
+        let (b, _) = graph
+            .insert_grounded(
+                make_encoding("claim b", 0.5),
+                2,
+                None,
+                false,
+                context("witness-b", "family-b", "evidence-b"),
+            )
+            .unwrap();
+        let invalid = EvidenceLink {
+            from_fact_id: a,
+            to_fact_id: b,
+            relation: EvidenceRelation::Corroborates,
+            status: EvidenceLinkStatus::Adjudicated,
+            evidence_ids: vec![
+                "evidence-a".into(),
+                "evidence-b".into(),
+                "unbound-id".into(),
+            ],
+            rationale: Some("malformed persisted-link control".into()),
+            causal_argument: None,
+            transmission_chain: None,
+            detected_at_cycle: 3,
+        };
+        let before = graph.evidence_links().len();
+        let error = graph.import_evidence_links(&[invalid]).unwrap_err();
+        assert!(error.contains("not declared by either claim context"));
+        assert_eq!(graph.evidence_links().len(), before);
+        assert_eq!(graph.get_fact(a).unwrap().corroboration_count, 0);
+        assert_eq!(graph.get_fact(b).unwrap().corroboration_count, 0);
+    }
+
+    #[test]
     fn adjudication_rejects_unbound_extra_evidence_ids() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
         let context_a = make_claim_context(
