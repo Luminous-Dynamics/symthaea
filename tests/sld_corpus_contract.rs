@@ -657,17 +657,34 @@ fn validate_evaluation_receipt(receipt: &Value) -> Vec<String> {
         status => errors.push(format!("invalid run_status {status}")),
     }
 
-    // A complete census may still be non-comparable when a case was skipped,
-    // errored, or could not be adjudicated. Behavior failures remain comparable
-    // evidence and are handled by the non-compensable release gates.
+    // A complete census is not comparison-eligible until the exact oracle has
+    // independent, blind, fully resolved review evidence bound to the receipt.
     let incomparable_outcomes = counts.get("ERROR").copied().unwrap_or(0)
         + counts.get("SKIPPED").copied().unwrap_or(0)
         + counts.get("INDETERMINATE").copied().unwrap_or(0);
+    let oracle = &receipt["oracle_adjudication"];
+    let oracle_complete = oracle["status"].as_str() == Some("COMPLETE")
+        && oracle["ledger_sha256"].as_str().is_some_and(|s| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()))
+        && oracle["protocol_sha256"].as_str().is_some_and(|s| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()))
+        && oracle["rubric_sha256"].as_str() == receipt["evaluator"]["rubric_sha256"].as_str()
+        && oracle["expected_case_count"].as_u64() == Some(expected as u64)
+        && oracle["cases_with_two_independent_initial_reviews"].as_u64() == Some(expected as u64)
+        && oracle["cases_adjudicated"].as_u64() == Some(expected as u64)
+        && oracle["cases_indeterminate"].as_u64() == Some(0)
+        && oracle["unresolved_disagreements"].as_u64() == Some(0)
+        && oracle["reviewer_count"].as_u64().is_some_and(|n| n >= 2)
+        && oracle["blind_initial_reviews"] == true
+        && oracle["case_assignment_randomized"] == true
+        && oracle["case_authors_excluded_from_adjudication"] == true
+        && oracle["conflicts_disclosed"] == true
+        && oracle["completed_at"].as_str().is_some_and(|s| !s.trim().is_empty())
+        && receipt["evaluator"]["independent_adjudication_status"].as_str() == Some("COMPLETE");
     let expected_eligibility = if run_status == "COMPLETE"
         && missing == 0
         && observed == expected
         && duplicate_count == 0
         && incomparable_outcomes == 0
+        && oracle_complete
     {
         "COMPARABLE"
     } else {
@@ -705,7 +722,7 @@ fn valid_evaluation_receipt() -> Value {
         "receipt_id": "SLD-RUN-20261022-BASELINE01",
         "schema_version": "sld-evaluation-receipt-0.1",
         "run_status": "COMPLETE",
-        "comparison_eligibility": "COMPARABLE",
+        "comparison_eligibility": "NOT_COMPARABLE",
         "evaluation_mode": "MODEL_BEHAVIOR",
         "started_at": "2026-10-22T10:00:00Z",
         "finished_at": "2026-10-22T10:01:00Z",
@@ -759,6 +776,24 @@ fn valid_evaluation_receipt() -> Value {
             "agreement_statistic": null,
             "agreement_value": null,
             "independent_adjudication_status": "NOT_PERFORMED"
+        },
+        "oracle_adjudication": {
+            "status": "NOT_PERFORMED",
+            "ledger_sha256": null,
+            "protocol_sha256": "8".repeat(64),
+            "rubric_sha256": "5".repeat(64),
+            "reviewer_count": 0,
+            "expected_case_count": 2,
+            "cases_with_two_independent_initial_reviews": 0,
+            "cases_adjudicated": 0,
+            "cases_indeterminate": 0,
+            "unresolved_disagreements": 0,
+            "critical_cases_reviewed": 0,
+            "blind_initial_reviews": false,
+            "case_assignment_randomized": false,
+            "case_authors_excluded_from_adjudication": false,
+            "conflicts_disclosed": false,
+            "completed_at": null
         },
         "environment": {
             "os_arch": "test-only",
