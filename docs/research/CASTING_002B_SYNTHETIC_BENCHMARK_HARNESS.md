@@ -14,7 +14,7 @@ The test-only module `physics::casting_optimization_benchmark` implements a dete
 - an **adaptive nearest-neighbor explore/exploit baseline** with a four-point LHS warm start, followed by a frozen candidate-lattice score: nearest observed objective minus a fixed distance-based exploration bonus;
 - a minimal **Gaussian-process lower-confidence-bound (GP-LCB) Bayesian-optimization baseline** with a fixed RBF kernel, empirical constant prior mean, fixed observation-noise variance and diagonal jitter, and a fixed LCB exploration coefficient.
 
-It defines seven synthetic cases with known objective minima:
+It defines eight synthetic cases with known objective minima:
 
 1. smooth bowl;
 2. coupled-factor ridge;
@@ -22,7 +22,8 @@ It defines seven synthetic cases with known objective minima:
 4. heteroscedastic observation noise;
 5. biased cheap/low-fidelity observations versus an expensive/high-fidelity oracle;
 6. a deterministic failed-query corner;
-7. a non-convex Rastrigin landscape with a known global optimum and many local minima.
+7. a non-convex Rastrigin landscape with a known global optimum and many local minima;
+8. the standard Beale analytical benchmark over its declared domain, with the known global minimizer mapped into normalized coordinates.
 
 Every record stores the chosen point, status, fidelity, evaluation-only ground-truth value, observed objective where available, cost units and cumulative cost. A run receipt retains all records and a domain-separated BLAKE3 transcript digest. Failed and infeasible attempts are recorded and charged. Zero budget and cumulative-cost overflow fail closed.
 
@@ -40,7 +41,7 @@ The GP-LCB constants are deliberately fixed: RBF length scale 0.25, signal varia
 
 ## Test inventory
 
-The 22 authored tests cover:
+The 23 authored tests cover:
 - known-answer minima and feasibility at each declared optimum;
 - equal query budgets, complete status counts, cumulative cost accounting and non-negative regret;
 - exact replay of records, metrics and transcript digest at a fixed seed;
@@ -60,7 +61,8 @@ The 22 authored tests cover:
 - duplicate-location covariance regularization and non-finite/asymmetric covariance rejection;
 - GP acquisition deterministic replay and truth-leakage negative control;
 - rejection of non-finite observations, malformed/non-positive-definite covariance and accidental use of sequential strategies as fixed samplers;
-- a known-answer Rastrigin global minimum for non-convex optimization testing.
+- a known-answer Rastrigin global minimum for non-convex optimization testing;
+- the standard Beale benchmark's known global minimum.
 
 Test command:
 
@@ -73,11 +75,12 @@ Tests are authored but have not been compiled or run in the current authoring en
 ## Promotion ladder
 
 1. **Harness integrity:** run the exact-head tests; independently review objective truth, sampling semantics, cost accounting and transcript digest.
-2. **DOE comparison:** add a preregistered response-surface/factorial baseline for cases where its assumptions and factor design are appropriate.
-3. **GP-BO validation:** independently review the current fixed-hyperparameter GP-LCB baseline; run exact-head tests and compare it against the nearest-neighbor heuristic over the frozen suite, including the multimodal Rastrigin fixture.
-4. **Multi-fidelity:** compare low-/high-fidelity acquisition under a frozen discrepancy model and explicit costs. Penalize choices that over-trust a cheap but biased model.
-5. **Statistical report:** at least 100 paired seeds per synthetic case when practical, including per-run data, medians/quantiles, paired differences and uncertainty intervals. If runtime forces a smaller count, preregister and disclose it before seeing results.
-6. **Matched physical validation:** choose a named, non-critical part/process with competent foundry and metrology review. Freeze inspection, units, sample units, hard constraints, cost boundaries, holdout, stopping policy and failed-run handling before data collection.
+2. **Analytical parity:** add the McCormick, Eggholder and Holder-table functions used by the 2026 continuous-casting BO paper, freeze each domain and reference optimum, and compare at equal evaluation budgets.
+3. **DOE comparison:** add a preregistered response-surface/factorial baseline for cases where its assumptions and factor design are appropriate.
+4. **GP-BO validation:** independently review the current fixed-hyperparameter GP-LCB baseline; run exact-head tests and compare it against the nearest-neighbor heuristic over the frozen suite, including the multimodal Rastrigin fixture.
+5. **Multi-fidelity:** compare low-/high-fidelity acquisition under a frozen discrepancy model and explicit costs. Penalize choices that over-trust a cheap but biased model.
+6. **Statistical report:** at least 100 paired seeds per synthetic case when practical, including per-run data, medians/quantiles, paired differences and uncertainty intervals. If runtime forces a smaller count, preregister and disclose it before seeing results.
+7. **Matched physical validation:** choose a named, non-critical part/process with competent foundry and metrology review. Freeze inspection, units, sample units, hard constraints, cost boundaries, holdout, stopping policy and failed-run handling before data collection.
 
 ## Research motivation
 
