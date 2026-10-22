@@ -261,3 +261,33 @@ This addresses a structural failure mode in symbolic discovery: uniform prior ma
 - Existing uniform-prior tests and behavior remain available for matched ablation; no baseline is silently replaced.
 
 The next integration step is to attach stable structural-family identifiers to generated candidates and derive explicit family-balanced weights without claiming generic symbolic equivalence. Compare family recovery and expression recovery separately. This should be tested jointly with omitted-family misspecification, because prior rebalancing cannot recover a law that the candidate generator never represents.
+
+
+## New implementation direction: acquisition robust to prior ambiguity
+
+The core selector now includes `select_experiment_by_minimum_weighted_information_gain_per_cost`, exported alongside the uniform and single-weighted-prior APIs.
+
+The caller supplies a predeclared finite set of plausible prior distributions over the same candidate representation. For each admissible experiment (x), the selector evaluates weighted EIG per cost under every supplied scenario and uses
+
+```text
+robust_score(x) = min over prior scenarios q in Q of EIG_q(x) / cost(x)
+```
+
+It chooses the experiment with the highest positive robust score. A malformed scenario invalidates the request instead of silently dropping that adverse scenario; individual experiments whose predictions or cost are invalid are ineligible, and no result is returned when no candidate has a valid positive score across every scenario. Ties preserve candidate input order.
+
+This is **scenario-robust acquisition**, not a reproduction of maximin robust Bayesian experimental design based on Sibson mutual information and PAC-Bayes bounds. It is a tractable engineering baseline for asking whether an experiment stays useful when candidate priors are uncertain. A genuine prior ambiguity set needs domain justification; an arbitrary list of scenarios is not a guarantee against all possible priors. Always retain nominal weighted EIG as a comparator, report all per-scenario scores, and evaluate cost and clean-world recovery.
+
+### Prior-fragility regression case
+
+The new deterministic test compares three hypotheses and two candidate experiments under two predeclared priors. Under the first prior, experiment 0 has weighted EIG approximately 0.500 nats versus 0.325 for experiment 1. Under the second prior, experiment 0 falls to approximately 0.199 nats while experiment 1 rises to approximately 0.647 nats. The minimum across scenarios therefore favors experiment 1 (approximately 0.325 versus 0.199). These are calculated reference values for the synthetic fixture, not external benchmark results or a claim about scientific-discovery performance.
+
+The test additionally requires the robust selector to reject an empty scenario set, mismatched weights, non-finite weights, and a prior scenario with no positive mass. The next evaluation should vary the size and construction of the scenario set, compare nominal and robust choices under held-out prior shifts, and measure regret against a truth-aware evaluator-only oracle without exposing that oracle to the policy.
+
+## Updated literature mapping
+
+- Callahan & Catanach (AISTATS 2026), [On the Misinformation in a Statistical Experiment](https://proceedings.mlr.press/v300/callahan26a.html), motivate treating inferential error and model error as different failure modes. They also show why an information criterion must not be assumed to retain its familiar decision axioms under misspecification.
+- Abdulsamad et al. (2026), [Maximin Robust Bayesian Experimental Design](https://arxiv.org/abs/2603.14094), provide a distinct formal adversarial design framework using Sibson mutual information and PAC-Bayes analysis. Symthaea's finite scenario minimum is deliberately a simpler baseline, not equivalent to their guarantees.
+- Shaer et al. (ICML 2026), [Testing For Distribution Shifts with Conditional Conformal Test Martingales](https://proceedings.mlr.press/v306/shaer26a.html), provide a more relevant next step for sequential regime changes: fixed-reference conformal test martingales aim to preserve anytime-valid false-alarm control while avoiding contamination of the null reference by post-shift observations. That should be benchmarked against the current batch conformal detector when long-lived scientific discovery streams are supported.
+- Lee (UAI 2026), [Diagnosing Conformal Prediction Failures Under Distribution Shift](https://proceedings.mlr.press/v337/lee26g.html), demonstrates that equal shifts can cause different calibration failures in different models. A single pooled residual threshold should therefore not be treated as a universal detector of model inadequacy.
+
+These papers help define baselines and assumptions. They do not show that the new Symthaea API outperforms those approaches; that claim requires faithful comparison under matched tasks, budgets, and evaluation criteria.
