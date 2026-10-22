@@ -602,6 +602,12 @@ fn join_pairs(
         )?;
         let base_status = required_string(base_adj, "status", &format!("{ctx}.base_adjudication"))?;
         let base_label = required_string(base_adj, "label", &format!("{ctx}.base_adjudication"))?;
+        if base_status == "adjudicated"
+            && required_string(variant_adj, "status", &format!("{ctx}.counterfactual_adjudication"))? == "adjudicated"
+            && reviewer_ids(base_adj, &format!("{ctx}.base_adjudication"))?
+                != reviewer_ids(variant_adj, &format!("{ctx}.counterfactual_adjudication"))? {
+            bail!("{ctx}: base and counterfactual require the same independent reviewer set");
+        }
         let variant_status = required_string(
             variant_adj,
             "status",
@@ -806,6 +812,21 @@ fn metric_json_value(metric: &Metric, name: &str) -> Value {
         "ci_95": metric.ci_95,
         "defined_bootstrap_replicates": metric.defined_bootstrap_replicates
     })
+}
+
+fn reviewer_ids(adjudication: &Value, context: &str) -> Result<BTreeSet<String>> {
+    let reviewers = adjudication
+        .get("reviewer_decisions")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}.reviewer_decisions must be an array"))?;
+    let mut ids = BTreeSet::new();
+    for reviewer in reviewers {
+        let id = required_string(reviewer, "reviewer_id", context)?.to_owned();
+        if !ids.insert(id.clone()) {
+            bail!("{context}: duplicate reviewer ID {id}");
+        }
+    }
+    Ok(ids)
 }
 
 fn validate_matched_arm(base: &Value, variant: &Value, context: &str) -> Result<()> {
