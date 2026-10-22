@@ -208,7 +208,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         build_mode: build_mode(),
         operating_system: std::env::consts::OS,
         architecture: std::env::consts::ARCH,
-        logical_cpu_count: std::thread::available_parallelism().ok().map(usize::from),
+        logical_cpu_count: std::thread::available_parallelism().ok().map(|count| count.get()),
         scoring_backend_mode: scoring_backend_mode(),
         rayon_parallel_feature_enabled: cfg!(feature = "parallel"),
         candle_logits_feature_enabled: cfg!(any(feature = "mamba-cpu", feature = "gpu-logits")),
