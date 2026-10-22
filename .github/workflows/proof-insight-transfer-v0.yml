@@ -1392,6 +1392,10 @@ jobs:
           over_budget[0]["run"]["actual_tokens"] = 1001
           cases.append(("over-budget row", over_budget))
 
+          unmatched_arm = copy.deepcopy(source_rows)
+          unmatched_arm[1]["run"]["config_sha256"] = "0" * 64
+          cases.append(("unmatched run configuration", unmatched_arm))
+
           for name, rows in cases:
               bad_path = Path(f"{report_path.parent}/bad-counterfactual-{name.replace(' ', '-')}.jsonl")
               bad_path.write_text("".join(json.dumps(row) + "\n" for row in rows))
@@ -1402,7 +1406,7 @@ jobs:
               )
               if result.returncode == 0:
                   raise SystemExit(f"counterfactual analyzer negative control unexpectedly passed: {name}")
-          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, four malformed-link/budget controls")
+          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, five malformed-link/arm/budget controls")
           PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
