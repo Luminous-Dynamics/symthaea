@@ -98,18 +98,13 @@ impl RelationalCore {
 
     /// Get current partnership state summary.
     pub(super) fn partnership_state(&self) -> PartnershipState {
-        let (phi_dyad, phi_dyad_status) = match self.compute_phi_dyad() {
-            Some(value) => (value, PhiDyadStatus::AvailableFromIndependentPartnerObservations),
-            None => (0.0, PhiDyadStatus::UnavailableNoIndependentPartnerObservations),
-        };
+        let phi_dyad = self.compute_phi_dyad().unwrap_or(0.0);
         PartnershipState {
-            partner_state_status: PartnerStateEvidenceStatus::UnavailableNoIndependentPartnerObservations,
             stage: self.partner.stage,
             trust: self.partner.trust,
             vulnerability: self.partner.vulnerability,
             reciprocity: self.partner.reciprocity,
             phi_dyad,
-            phi_dyad_status,
             interactions: self.partner.interactions_count,
             trajectory_points: self.trajectory.points().len(),
         }
@@ -139,26 +134,36 @@ pub enum PartnerStateEvidenceStatus {
 /// Summary of partnership state for external consumers.
 #[derive(Debug, Clone)]
 pub struct PartnershipState {
-    /// Evidence status governing interpretation of partner-state fields.
-    pub partner_state_status: PartnerStateEvidenceStatus,
     /// Current relationship stage.
     pub stage: RelationshipStage,
-    /// Trust level (0.0-1.0).
+    /// Trust level (0.0-1.0). See partner_state_status() before interpreting.
     pub trust: f32,
-    /// Vulnerability level (0.0-1.0).
+    /// Vulnerability level (0.0-1.0). See partner_state_status() before interpreting.
     pub vulnerability: f32,
-    /// Reciprocity level (0.0-1.0).
+    /// Reciprocity level (0.0-1.0). See partner_state_status() before interpreting.
     pub reciprocity: f32,
-    /// Current Phi-dyad value. Zero is a compatibility placeholder when the
-    /// status says the estimate is unavailable; do not interpret it as an
-    /// observed zero-valued Φ measurement.
+    /// Current Phi-dyad value. Zero is a compatibility placeholder when
+    /// phi_dyad_status() says the estimate is unavailable; do not interpret it
+    /// as an observed zero-valued Φ measurement.
     pub phi_dyad: f64,
-    /// Explicitly distinguishes unavailable input from a measured value.
-    pub phi_dyad_status: PhiDyadStatus,
     /// Total interactions.
     pub interactions: u64,
     /// Number of trajectory points recorded.
     pub trajectory_points: usize,
+}
+
+impl PartnershipState {
+    /// Evidence status of the partner-state fields. The current facade has no
+    /// independent partner-observation input, so its estimates are unavailable.
+    pub fn partner_state_status(&self) -> PartnerStateEvidenceStatus {
+        PartnerStateEvidenceStatus::UnavailableNoIndependentPartnerObservations
+    }
+
+    /// Evidence status of the dyadic Phi estimate. Never infer availability
+    /// from the numeric value, since a valid estimate could also equal zero.
+    pub fn phi_dyad_status(&self) -> PhiDyadStatus {
+        PhiDyadStatus::UnavailableNoIndependentPartnerObservations
+    }
 }
 
 /// Serializable state for pause/resume persistence.
@@ -205,11 +210,11 @@ mod provenance_tests {
         assert_eq!(relational.partner.reciprocity, 0.0);
         assert_eq!(relational.partner.stage, RelationshipStage::NoRelation);
         assert_eq!(
-            relational.partnership_state().phi_dyad_status,
+            relational.partnership_state().phi_dyad_status(),
             PhiDyadStatus::UnavailableNoIndependentPartnerObservations
         );
         assert_eq!(
-            relational.partnership_state().partner_state_status,
+            relational.partnership_state().partner_state_status(),
             PartnerStateEvidenceStatus::UnavailableNoIndependentPartnerObservations
         );
         assert!(
@@ -224,11 +229,11 @@ mod provenance_tests {
         let state = relational.partnership_state();
         assert_eq!(state.phi_dyad, 0.0);
         assert_eq!(
-            state.phi_dyad_status,
+            state.phi_dyad_status(),
             PhiDyadStatus::UnavailableNoIndependentPartnerObservations
         );
         assert_eq!(
-            state.partner_state_status,
+            state.partner_state_status(),
             PartnerStateEvidenceStatus::UnavailableNoIndependentPartnerObservations
         );
     }
@@ -256,7 +261,7 @@ mod provenance_tests {
         assert_eq!(state.reciprocity, 0.0);
         assert_eq!(state.stage, RelationshipStage::NoRelation);
         assert_eq!(state.phi_dyad, 0.0);
-        assert_eq!(state.phi_dyad_status, PhiDyadStatus::UnavailableNoIndependentPartnerObservations);
+        assert_eq!(state.phi_dyad_status(), PhiDyadStatus::UnavailableNoIndependentPartnerObservations);
         assert_eq!(state.trajectory_points, 0);
     }
 }
