@@ -22,7 +22,7 @@ const BET_FRACTIONS: [f64; 3] = [0.25, 0.50, 0.75];
 const FIXED_BET_FRACTION: f64 = 0.50;
 const FIXED_BET: f64 = FIXED_BET_FRACTION / RISK_BOUND;
 
-const INPUT_HEADER: &str = "operating_point,condition,episode_seed,feature_score,feature_threshold,feature_alarm,scope_score,scope_threshold,scope_alarm,combined_alarm,outside_predictor_envelope,first_feature_alarm_step,first_scope_alarm_step,first_combined_alarm_step,first_false_safe_step,feature_flagged_by_false_safe_step,scope_flagged_by_false_safe_step,combined_flagged_by_false_safe_step,scope_false_safe_override";
+const INPUT_HEADER: &str = "operating_point,condition,episode_index,feature_score,feature_threshold,feature_alarm,scope_score,scope_threshold,scope_alarm,combined_alarm,outside_predictor_envelope,first_feature_alarm_step,first_scope_alarm_step,first_combined_alarm_step,first_false_safe_step,feature_flagged_by_false_safe_step,scope_flagged_by_false_safe_step,combined_flagged_by_false_safe_step,scope_false_safe_override";
 const RAW_HEADER: &str = "operating_point,condition,episode_seed,feature_score,feature_threshold,feature_alarm,scope_score,scope_threshold,scope_alarm,combined_alarm,outside_predictor_envelope,first_feature_alarm_step,first_scope_alarm_step,first_combined_alarm_step,first_false_safe_step,feature_flagged_by_false_safe_step,scope_flagged_by_false_safe_step,combined_flagged_by_false_safe_step,scope_false_safe_override,observed_false_safe_event,mixture_log_e,mixture_component_log_e_1,mixture_component_log_e_2,mixture_component_log_e_3,mixture_latched_alarm,mixture_first_alarm_episode,fixed_log_e,fixed_latched_alarm,fixed_first_alarm_episode,log_alarm_threshold,risk_bound,bet_fraction_1,bet_fraction_2,bet_fraction_3";
 const SUMMARY_HEADER: &str = "operating_point,condition,episodes,false_safe_events,false_safe_event_rate,mixture_alarm,mixture_first_alarm_episode,fixed_alarm,fixed_first_alarm_episode,first_false_safe_episode,mixture_delay_episodes,fixed_delay_episodes,mixture_events_at_alarm,fixed_events_at_alarm,mixture_final_log_e,fixed_final_log_e,log_alarm_threshold,risk_bound,global_delta,parallel_monitors";
 
@@ -45,7 +45,7 @@ struct InputRow {
     fields: Vec<String>,
     operating_point: String,
     condition: String,
-    episode_seed: usize,
+    episode_index: usize,
     first_false_safe_step: usize,
     scope_false_safe_override: bool,
     outside_predictor_envelope: bool,
@@ -61,7 +61,7 @@ impl InputRow {
             )
             .into());
         }
-        let episode_seed = fields[2].parse::<usize>()?;
+        let episode_index = fields[2].parse::<usize>()?;
         let first_false_safe_step = fields[14].parse::<usize>()?;
         if first_false_safe_step > HORIZON {
             return Err(IoError::new(
@@ -84,7 +84,7 @@ impl InputRow {
         Ok(Self {
             operating_point: fields[0].clone(),
             condition: fields[1].clone(),
-            episode_seed,
+            episode_index,
             first_false_safe_step,
             scope_false_safe_override: parse_bool(&fields[18], "scope false-safe override")?,
             outside_predictor_envelope: parse_bool(&fields[10], "predictor-envelope label")?,
@@ -196,13 +196,13 @@ fn process_stream(
     for (episode, row) in rows.iter().enumerate() {
         if row.operating_point != first.operating_point
             || row.condition != first.condition
-            || row.episode_seed != episode
+            || row.episode_index != episode
             || !OPERATING_POINTS.contains(&row.operating_point.as_str())
             || !CONDITIONS.contains(&row.condition.as_str())
         {
             return Err(IoError::new(
                 ErrorKind::InvalidData,
-                "task-risk rows are not in the expected unique stream order",
+                "task-risk rows are not in the expected unique episode-index order",
             )
             .into());
         }
