@@ -7,6 +7,7 @@ on:
       - "tools/allostatic-control-bench/**"
       - "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
       - "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
+      - "docs/research/ASSUMPTION_BOUND_CERTIFICATE_LEASES_V1.md"
       - ".github/workflows/allostatic-control-bench.yml"
   workflow_dispatch:
 
@@ -54,3 +55,5 @@ jobs:
             allostatic-control-v1-mismatch-frontier-summary.csv
             allostatic-control-v1-multistep-horizon.csv
             allostatic-control-v1-multistep-horizon-summary.csv
+            allostatic-control-v1-certificate-leases.csv
+            allostatic-control-v1-certificate-leases-summary.csv

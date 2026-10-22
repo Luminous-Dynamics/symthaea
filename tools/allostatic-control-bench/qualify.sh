@@ -11,6 +11,7 @@ source_files=(
   "tools/allostatic-control-bench/Cargo.lock"
   "tools/allostatic-control-bench/src/lib.rs"
   "tools/allostatic-control-bench/src/calibration.rs"
+  "tools/allostatic-control-bench/src/certificate_lease.rs"
   "tools/allostatic-control-bench/src/model_mismatch.rs"
   "tools/allostatic-control-bench/src/multistep_viability.rs"
   "tools/allostatic-control-bench/src/robust_viability.rs"
@@ -18,10 +19,12 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-control-report.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-model-mismatch-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-multistep-viability-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-certificate-lease-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
   "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
+  "docs/research/ASSUMPTION_BOUND_CERTIFICATE_LEASES_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -47,6 +50,8 @@ mismatch_out="${out_base}-mismatch-frontier.csv"
 mismatch_summary_out="${out_base}-mismatch-frontier-summary.csv"
 horizon_out="${out_base}-multistep-horizon.csv"
 horizon_summary_out="${out_base}-multistep-horizon-summary.csv"
+certificate_lease_out="${out_base}-certificate-leases.csv"
+certificate_lease_summary_out="${out_base}-certificate-leases-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -259,6 +264,72 @@ if ! awk -F, '
   exit 1
 fi
 
+# Certificate leases must become unusable when any supporting assumption changes.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-certificate-lease-bench -- \
+  "$tmpdir/certificate-a.csv" "$tmpdir/certificate-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-certificate-lease-bench -- \
+  "$tmpdir/certificate-b.csv" "$tmpdir/certificate-summary-b.csv"
+if ! cmp -s "$tmpdir/certificate-a.csv" "$tmpdir/certificate-b.csv" ||
+   ! cmp -s "$tmpdir/certificate-summary-a.csv" "$tmpdir/certificate-summary-b.csv"; then
+  printf 'FAIL: repeated certificate lease outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 11) failed = 1; next }
+  {
+    if (NF != 11) failed = 1
+    if ($1 != "valid_within_age" && $1 != "state_revision_changed" &&
+        $1 != "dynamics_revision_changed" && $1 != "limits_revision_changed" &&
+        $1 != "calibration_revision_changed" && $1 != "authority_revision_changed" &&
+        $1 != "monitor_epoch_changed" && $1 != "supporting_evidence_changed" &&
+        $1 != "lease_expired" && $1 != "clock_regressed" &&
+        $1 != "longer_horizon_requested" && $1 != "uncertified_action_not_issued" &&
+        $1 != "zero_digest_context_rejected") failed = 1
+    if ($2 != "true" && $2 != "false") failed = 1
+    if ($3 != "true" && $3 != "false") failed = 1
+    if ($4 != "push" && $4 != "maintain" && $4 != "emergency_recover") failed = 1
+    if ($5 != $6) failed = 1
+    if ($7 != "true" && $7 != "false") failed = 1
+    if ($8 !~ /^[0-9]+$/ || $9 !~ /^[0-9]+$/ ||
+        $10 !~ /^[0-9]+$/ || $11 !~ /^[0-9]+$/) failed = 1
+    if (($6 == "accepted") != ($7 == "true")) failed = 1
+    if ($2 == "true" && $3 != "true") failed = 1
+    if ($1 == "valid_within_age" &&
+        ($2 != "true" || $3 != "true" || $6 != "accepted" || $8 != 101 || $9 != 101)) failed = 1
+    if ($1 == "state_revision_changed" && $6 != "state_revision_changed") failed = 1
+    if ($1 == "dynamics_revision_changed" && $6 != "dynamics_revision_changed") failed = 1
+    if ($1 == "limits_revision_changed" && $6 != "limits_revision_changed") failed = 1
+    if ($1 == "calibration_revision_changed" && $6 != "calibration_revision_changed") failed = 1
+    if ($1 == "authority_revision_changed" && $6 != "authority_revision_changed") failed = 1
+    if ($1 == "monitor_epoch_changed" && $6 != "monitor_epoch_changed") failed = 1
+    if ($1 == "supporting_evidence_changed" && $6 != "supporting_evidence_changed") failed = 1
+    if ($1 == "lease_expired" && ($6 != "expired" || $9 <= $8)) failed = 1
+    if ($1 == "clock_regressed" && ($6 != "clock_regressed" || $9 >= 100)) failed = 1
+    if ($1 == "longer_horizon_requested" && ($6 != "horizon_insufficient" || $11 <= $10)) failed = 1
+    if ($1 == "uncertified_action_not_issued" && ($2 != "false" || $6 != "issue_rejected" || $4 != "push")) failed = 1
+    if ($1 == "zero_digest_context_rejected" && ($2 != "false" || $3 != "false" || $6 != "invalid_context")) failed = 1
+    seen[$1]++
+    rows++
+  }
+  END { if (NR != 14 || rows != 13 || failed) exit 1; for (key in seen) if (seen[key] != 1) exit 1 }
+' "$tmpdir/certificate-a.csv"; then
+  printf 'FAIL: certificate lease invalidation, horizon or fail-closed issuance contract is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 6) failed = 1; next }
+  {
+    if (NF != 6 || $3 != $4 || $6 != "true") failed = 1
+    rows++
+  }
+  END { if (NR != 14 || rows != 13 || failed) exit 1 }
+' "$tmpdir/certificate-summary-a.csv"; then
+  printf 'FAIL: certificate lease summary does not match expected rejection reasons\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -283,6 +354,8 @@ cp "$tmpdir/mismatch-a.csv" "$mismatch_out"
 cp "$tmpdir/mismatch-summary-a.csv" "$mismatch_summary_out"
 cp "$tmpdir/horizon-a.csv" "$horizon_out"
 cp "$tmpdir/horizon-summary-a.csv" "$horizon_summary_out"
+cp "$tmpdir/certificate-a.csv" "$certificate_lease_out"
+cp "$tmpdir/certificate-summary-a.csv" "$certificate_lease_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -306,6 +379,10 @@ cp "$tmpdir/horizon-summary-a.csv" "$horizon_summary_out"
   printf 'multistep_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$horizon_out") - 1 ))"
   printf 'multistep_summary_sha256=%s\n' "$(sha256sum "$horizon_summary_out" | awk '{print $1}')"
   printf 'multistep_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$horizon_summary_out") - 1 ))"
+  printf 'certificate_lease_sha256=%s\n' "$(sha256sum "$certificate_lease_out" | awk '{print $1}')"
+  printf 'certificate_lease_rows_excluding_header=%s\n' "$(( $(wc -l < "$certificate_lease_out") - 1 ))"
+  printf 'certificate_lease_summary_sha256=%s\n' "$(sha256sum "$certificate_lease_summary_out" | awk '{print $1}')"
+  printf 'certificate_lease_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$certificate_lease_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -317,4 +394,6 @@ printf 'Model-mismatch safety frontier: %s\n' "$mismatch_out"
 printf 'Model-mismatch frontier summary: %s\n' "$mismatch_summary_out"
 printf 'Multi-step viability horizon frontier: %s\n' "$horizon_out"
 printf 'Multi-step viability horizon summary: %s\n' "$horizon_summary_out"
+printf 'Certificate lease frontier: %s\n' "$certificate_lease_out"
+printf 'Certificate lease summary: %s\n' "$certificate_lease_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
