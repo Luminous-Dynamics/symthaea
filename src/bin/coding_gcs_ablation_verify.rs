@@ -54,6 +54,22 @@ fn manifest_digest(manifest: &[Value]) -> Option<String> {
     Some(blake3::hash(rows.join("\n").as_bytes()).to_hex().to_string())
 }
 
+fn task_digest_from_manifest(task: &Value) -> Option<String> {
+    let id = str_field(task, "task_id")?;
+    let description = str_field(task, "description")?;
+    let expected_symbol = str_field(task, "expected_symbol")?;
+    let reference_source = str_field(task, "reference_source")?;
+    let test_source = str_field(task, "test_source")?;
+    let canonical = format!(
+        "{id}\n{description}\n{expected_symbol}\n{reference_source}\n{test_source}"
+    );
+    Some(blake3::hash(canonical.as_bytes()).to_hex().to_string())
+}
+
+fn declared_test_function_count(test_source: &str) -> u64 {
+    test_source.matches("#[test]").count() as u64
+}
+
 fn score_success(run: &Value, expected: u64) -> bool {
     expected > 0
         && bool_field(run, "compiled") == Some(true)
@@ -198,12 +214,37 @@ fn audit(
         let digest = str_field(task, "task_digest_blake3").unwrap_or("");
         let reference_digest = str_field(task, "reference_source_blake3").unwrap_or("");
         let test_digest = str_field(task, "test_source_blake3").unwrap_or("");
+        let reference_source = str_field(task, "reference_source").unwrap_or("");
+        let test_source = str_field(task, "test_source").unwrap_or("");
         let expected = u64_field(task, "expected_test_functions").unwrap_or(0);
+        let recomputed_task_digest = task_digest_from_manifest(task);
         push_check(&mut errors, !id.is_empty(), format!("task_manifest[{index}] has empty task_id"));
         push_check(
             &mut errors,
             is_hex(digest, 64) && is_hex(reference_digest, 64) && is_hex(test_digest, 64),
             format!("task_manifest[{index}] has malformed BLAKE3 digest"),
+        );
+        push_check(
+            &mut errors,
+            recomputed_task_digest.as_deref() == Some(digest),
+            format!("task_manifest[{index}] task digest does not match its declared content"),
+        );
+        push_check(
+            &mut errors,
+            is_hex(reference_digest, 64)
+                && reference_digest == blake3::hash(reference_source.as_bytes()).to_hex().as_str(),
+            format!("task_manifest[{index}] reference-source digest does not match the included source"),
+        );
+        push_check(
+            &mut errors,
+            is_hex(test_digest, 64)
+                && test_digest == blake3::hash(test_source.as_bytes()).to_hex().as_str(),
+            format!("task_manifest[{index}] test-source digest does not match the included fixture"),
+        );
+        push_check(
+            &mut errors,
+            expected > 0 && expected == declared_test_function_count(test_source),
+            format!("task_manifest[{index}] expected test count does not match the included fixture"),
         );
         push_check(
             &mut errors,
@@ -668,12 +709,27 @@ mod tests {
     }
 
     fn valid_fixture() -> Value {
+        let task_id = "task_a";
+        let description = "Implement task_a as a true-returning predicate.";
+        let expected_symbol = "task_a";
+        let reference_source = "pub fn task_a() -> bool { true }";
+        let test_source = "#[test] fn task_a_is_true() { assert!(task_a()); }";
+        let canonical = format!(
+            "{task_id}\n{description}\n{expected_symbol}\n{reference_source}\n{test_source}"
+        );
+        let task_digest = blake3::hash(canonical.as_bytes()).to_hex().to_string();
+        let reference_digest = blake3::hash(reference_source.as_bytes()).to_hex().to_string();
+        let test_digest = blake3::hash(test_source.as_bytes()).to_hex().to_string();
         let manifest = vec![serde_json::json!({
-            "task_id": "task_a",
-            "task_digest_blake3": "a".repeat(64),
+            "task_id": task_id,
+            "description": description,
+            "expected_symbol": expected_symbol,
+            "reference_source": reference_source,
+            "test_source": test_source,
+            "task_digest_blake3": task_digest,
             "expected_test_functions": 1,
-            "reference_source_blake3": "b".repeat(64),
-            "test_source_blake3": "c".repeat(64)
+            "reference_source_blake3": reference_digest,
+            "test_source_blake3": test_digest
         })];
         let manifest_sha = manifest_digest(&manifest).unwrap();
         serde_json::json!({
@@ -695,7 +751,7 @@ mod tests {
             "oracle_controls": {
                 "reference_controls": [{
                     "task_id": "task_a",
-                    "reference_blake3": "b".repeat(64),
+                    "reference_blake3": reference_digest,
                     "reference_passes": true,
                     "tests_expected": 1,
                     "tests_passed": 1,
