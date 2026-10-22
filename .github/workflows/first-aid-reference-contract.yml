@@ -1,0 +1,110 @@
+name: First-Aid Reference Contract (Specification Only)
+
+on:
+  push:
+    branches:
+      - research/first-aid-reference-contract-v0
+    paths:
+      - ".github/workflows/first-aid-reference-contract.yml"
+      - "docs/research/first-aid/REFERENCE_ORACLE_CONTRACT_V0.md"
+      - "docs/research/first-aid/reference-oracle-contract-v0.json"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/first-aid-reference-contract.yml"
+      - "docs/research/first-aid/REFERENCE_ORACLE_CONTRACT_V0.md"
+      - "docs/research/first-aid/reference-oracle-contract-v0.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: first-aid-reference-contract-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  specification-contract:
+    name: Validate specification structure (non-clinical)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact change head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify checked-out revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$expected" = "$actual"
+
+      - name: Validate machine-readable reference contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="docs/research/first-aid/reference-oracle-contract-v0.json"
+          jq -e '
+            .schema_version == "first-aid-reference-oracle-contract-v0" and
+            .status == "proposed_synthetic_process_contract" and
+            .clinical_use_authorized == false and
+            (.claim_ceiling | contains("no clinical safety or patient-outcome claim")) and
+            .provenance.implementation_independence_required == true and
+            .provenance.external_domain_review_status == "not_yet_performed" and
+            .provenance.blinded_holdout_status == "not_available_in_public_repo" and
+            .trace_semantics.events_are_ordered == true and
+            .trace_semantics.violations_preserve_occurrence_order == true and
+            .trace_semantics.repeated_violation_codes_preserved == true and
+            (.event_contract | length) == 15 and
+            ([.event_contract[].kind] | length) == ([.event_contract[].kind] | unique | length) and
+            all(.event_contract[];
+              (.kind | type == "string" and length > 0) and
+              (.required_fields | type == "array") and
+              (.allowed_fields | type == "array")) and
+            (.violation_codes | length) == ([.violation_codes[]] | unique | length) and
+            ((.violation_codes | sort) as $codes |
+              ([.event_contract[] |
+                ((.violations // [])[]?.code),
+                ((.violation_order // [])[]?.code)] | unique | sort) == $codes)
+          ' "$file" > /dev/null
+
+      - name: Validate explicit non-clinical claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          doc="docs/research/first-aid/REFERENCE_ORACLE_CONTRACT_V0.md"
+          grep -Fq "not a medical protocol" "$doc"
+          grep -Fq "public held-out-by-generation split" "$doc"
+          grep -Fq "independently of implementation tuning" "$doc"
+          grep -Fq "not evidence that the selected medical protocol is correct" "$doc"
+
+      - name: Emit specification identity receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          doc="docs/research/first-aid/REFERENCE_ORACLE_CONTRACT_V0.md"
+          contract="docs/research/first-aid/reference-oracle-contract-v0.json"
+          mkdir -p target
+          jq -n             --arg status "specification_structure_validated"             --arg claim_ceiling "synthetic process-contract specification only; no clinical validation"             --arg source_revision "$(git rev-parse HEAD)"             --arg spec_sha256 "$(sha256sum "$doc" | awk '{print $1}')"             --arg contract_sha256 "$(sha256sum "$contract" | awk '{print $1}')"             --arg workflow_sha256 "$(sha256sum .github/workflows/first-aid-reference-contract.yml | awk '{print $1}')"             --argjson event_kind_count "$(jq '.event_contract | length' "$contract")"             --argjson violation_code_count "$(jq '.violation_codes | length' "$contract")"             '{
+              receipt_version: "first-aid-reference-contract-receipt-v0",
+              status: $status,
+              claim_ceiling: $claim_ceiling,
+              source_revision: $source_revision,
+              specification_sha256: $spec_sha256,
+              contract_sha256: $contract_sha256,
+              workflow_sha256: $workflow_sha256,
+              event_kind_count: $event_kind_count,
+              violation_code_count: $violation_code_count
+            }' > target/first-aid-reference-contract-receipt.json
+          jq . target/first-aid-reference-contract-receipt.json
+
+      - name: Publish specification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: first-aid-reference-contract-${{ github.event.pull_request.head.sha || github.sha }}
+          path: target/first-aid-reference-contract-receipt.json
+          if-no-files-found: error
+          retention-days: 30
