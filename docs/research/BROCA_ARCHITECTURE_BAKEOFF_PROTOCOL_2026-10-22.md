@@ -88,7 +88,9 @@ Do not assume that increasing free-form thought tokens is the best way to spend 
 
 Match or report the actual total budget (preprocessing, update, retrieval, answer generation, memory, and latency), rather than comparing only decode tokens. Test on long-context QA, multi-hop retrieval, summarization, conflict resolution and complex instruction following. Include a no-update control and a random/unrelated-context update as negative controls. Any temporary update must be reset between examples unless cross-example learning is the explicit experiment; otherwise leakage invalidates the result.
 
-This experiment is motivated by *Let's (not) just put things in Context: Test-Time Training for Long-context LLMs* (ICLR 2026), which reports substantial gains from targeted context-specific updates in its tested Qwen3-4B settings on subsets of LongBench-v2 and ZeroScrolls. Those results are evidence that the allocation of test-time compute is worth testing; they are not evidence that the same method will work for Liquid Broca. See https://proceedings.iclr.cc/paper_files/paper/2026/hash/b619cd6dcc986856b8a8da2b08d89396-Abstract-Conference.html.
+This experiment is motivated by *Let's (not) just put things in Context: Test-Time Training for Long-context LLMs* (ICLR 2026), which reports 12.6 and 14.1 percentage-point average gains for Qwen3-4B on the evaluated subsets of LongBench-v2 and ZeroScrolls. Those results are evidence that the allocation of test-time compute is worth testing; they are not evidence that the same method will work for Liquid Broca. See https://proceedings.iclr.cc/paper_files/paper/2026/hash/b619cd6dcc986856b8a8da2b08d89396-Abstract-Conference.html.
+
+Test-time adaptation also has a systems-efficiency trap: *Test-Time Training Done Right* (ICLR 2026) reports that some prior TTT layers achieve less than 5% FLOPs utilization under small online update batches, motivating chunked/parallel update designs and explicit throughput measurements rather than accuracy-only comparisons: https://proceedings.iclr.cc/paper_files/paper/2026/hash/ffbfff81fb78e4bb558273b91e12e318-Abstract-Conference.html. *In-Place Test-Time Training* (ICLR 2026) investigates adapting final projection weights as temporary fast weights with an objective aligned to next-token prediction: https://proceedings.iclr.cc/paper_files/paper/2026/hash/ba6f5879d7f382241316f7dda7e6b8ac-Abstract-Conference.html. These are candidate designs for controlled comparison, not methods assumed to transfer to Mamba or HDC.
 
 ## 5. Provisional acceptance thresholds
 
@@ -133,6 +135,8 @@ Use the following papers and evaluation frameworks as comparison references, not
 - HELMET long-context benchmark: https://arxiv.org/abs/2410.02694 (seven application-centric categories; the ICLR 2025 paper reports weak correlation between simple needle-in-a-haystack performance and downstream long-context quality).
 - HELM Long Context leaderboard and transparent run details: https://crfm.stanford.edu/helm/long-context/latest/
 - Context-specific test-time training (ICLR 2026): https://proceedings.iclr.cc/paper_files/paper/2026/hash/b619cd6dcc986856b8a8da2b08d89396-Abstract-Conference.html
+- In-Place Test-Time Training (ICLR 2026): https://proceedings.iclr.cc/paper_files/paper/2026/hash/ba6f5879d7f382241316f7dda7e6b8ac-Abstract-Conference.html
+- Test-Time Training Done Right (ICLR 2026): https://proceedings.iclr.cc/paper_files/paper/2026/hash/ffbfff81fb78e4bb558273b91e12e318-Abstract-Conference.html
 
 Published claims use different scales, training data, hardware, and inference stacks. The fairest achievable comparison here is against local baselines run under matching budgets; any broader industry comparison must explicitly state incompatibilities.
 
