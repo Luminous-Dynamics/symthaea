@@ -2,7 +2,7 @@ name: Levin and Abstract Pattern Experiments
 
 on:
   pull_request:
-    branches: [main, feat/platonic-pattern-interaction-benchmark]
+    branches: [main, feat/platonic-pattern-interaction-benchmark, research/identity-evidence-gated-retrieval]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/levin-pattern-experiments.yml"
