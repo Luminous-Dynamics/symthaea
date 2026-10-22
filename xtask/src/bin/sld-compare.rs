@@ -131,6 +131,8 @@ struct OracleAdjudication {
     case_assignment_randomized: bool,
     case_authors_excluded_from_adjudication: bool,
     conflicts_disclosed: bool,
+    initial_label_pairwise_agreement_rate: Option<f64>,
+    initial_label_unanimous_case_rate: Option<f64>,
     completed_at: Option<String>,
 }
 
@@ -379,6 +381,8 @@ fn validate_receipt<'r>(
             && oracle.case_assignment_randomized
             && oracle.case_authors_excluded_from_adjudication
             && oracle.conflicts_disclosed
+            && oracle.initial_label_pairwise_agreement_rate.is_some_and(|rate| rate.is_finite() && (0.0..=1.0).contains(&rate))
+            && oracle.initial_label_unanimous_case_rate.is_some_and(|rate| rate.is_finite() && (0.0..=1.0).contains(&rate))
             && oracle.completed_at.as_ref().is_some_and(|at| !at.trim().is_empty()),
         "{label}: oracle independence/blinding/conflict/completion evidence is incomplete"
     );
@@ -927,6 +931,8 @@ mod tests {
                 "case_assignment_randomized": true,
                 "case_authors_excluded_from_adjudication": true,
                 "conflicts_disclosed": true,
+                "initial_label_pairwise_agreement_rate": 1.0,
+                "initial_label_unanimous_case_rate": 1.0,
                 "completed_at": "2026-10-22T12:02:00Z"
             },
             "environment": {
