@@ -107,6 +107,30 @@ Keep the protocol's proposed targets separate from measured outcomes. For a conf
 5. Freeze the eligible test manifest and analysis configuration, then compare full insight, high-similarity incompatible decoy, precondition ablation and no-insight control under matched budgets.
 6. Publish null and adverse results alongside gains. Promote no result unless the current-head code, protocol digests, data receipts, kernel checks and independent CI evidence agree.
 
+## Follow-on track: proof-state interventions with a fixed theorem
+
+Statement mutations are necessary controls, but they confound strategy applicability with changes to the theorem's truth, difficulty, and statement fidelity. A separate, higher-control experiment should intervene on a **real, replayed Lean proof state** while leaving the target theorem statement unchanged.
+
+### Paired intervention
+
+For each pair, freeze the theorem statement digest, Lean/toolchain and imported environment digests, current goal-type digest, proof-state ancestry, and all model/checker/budget settings. Capture a base state and a variant obtained by applying exactly one legal state operation and then recording the actual elaborated state—not by editing a context JSON file by hand.
+
+Useful interventions include:
+
+- **Required hypothesis hidden:** from a replayed state where a prerequisite such as `h : a ≤ b` is in scope and the goal does not depend on the local name `h`, apply a recorded legal `clear h` operation. The target theorem statement and current goal type remain fixed; the local context changes.
+- **Semantics-preserving context presentation:** alpha-rename a local hypothesis/binder or reorder independent declarations where Lean permits it. The same required proposition remains available and the insight should not become inapplicable merely because its surface name changed.
+- **Irrelevant fact removed:** remove a local declaration independently adjudicated as irrelevant to the insight's preconditions. This is a negative control against systems that treat every context change as a reason to abstain.
+
+A confirmatory pair must bind both serialized proof-state snapshots to the exact replay receipt, share one `target_statement_sha256`, share one `goal_type_sha256` and environment digest, and identify the sole changed local declaration. The intervention receipt must include the accepted Lean state operation, the before/after declaration type digests, state digests, and the pre-registered precondition ID. Reject states that could not be replayed from the pinned source/toolchain or whose target/goal/environment binding drifts.
+
+### What to score—and what not to infer
+
+The primary outcome for this track is **strategy applicability and action selection at a proof state**, not whether the target theorem is true. If hiding a local fact leaves the goal unprovable from that state, this does not make the original theorem false; it means that a proof move depending on the hidden fact is unavailable in the intervened state. A subsequent proof of the same goal under the reduced context is valid useful evidence if it actually closes and passes the kernel, but failure or timeout is not a counterexample to the theorem.
+
+Report (a) sensitivity to genuinely absent prerequisites, (b) stability on alpha-renamed/equivalent context presentations, (c) correct non-abstention after irrelevant facts are removed, (d) alternative-plan recovery and exact kernel-checked closure when achieved, and (e) action/call/token/time/cost by paired state. Keep these metrics separate from theorem-level transfer selectivity and exact-target proof utility. A system should fail if it either applies a premise-dependent move after its premise vanished or abstains on every altered context.
+
+This design isolates a cleaner causal question than statement mutation alone: **does the system track the prerequisite in the actual proof state, or does it only react to surface similarity and mutation labels?** It is a proposed next track, not yet an implemented schema, executed state replayer, dataset, or measured result. The existing statement-mutation suite remains necessary for testing formal-equivalence handling and statement fidelity.
+
 ## Relation to external work
 
 T² shows why compilation is an insufficient proxy for semantic correctness by using dependent successor theorems ([ACL 2026 paper](https://aclanthology.org/2026.acl-industry.150/)). FormalRewardBench uses expert-curated proof-error mutations for proof evaluation ([paper](https://arxiv.org/abs/2605.10141)). A 2026 audit of Lean benchmarks documents how incorrect or incomplete specifications, vacuous theorems, missing hypotheses and unsound axioms can distort reported scores ([PMLR paper](https://proceedings.mlr.press/v306/ammanamanchi26a.html)). PITB's proposed distinction is to study *whether a typed strategy's declared preconditions causally govern transfer decisions and verified utility*; that is a research hypothesis and should not be presented as an established SOTA result or an unprecedented capability before a literature review and matched experiments.
