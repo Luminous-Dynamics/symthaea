@@ -187,9 +187,11 @@ pub struct NetworkService {
     /// Service start time
     start_time: std::time::Instant,
 
-    /// Optional PQC handshake manager for quantum-resistant key exchange.
-    /// When set, `run_handshake_for_peer()` performs ML-KEM-768 encapsulation
-    /// after classical Ed25519 verification, deriving a hybrid session key.
+    /// Optional experimental PQC exchange manager.
+    ///
+    /// The bidirectional KEM transport and key-confirmation protocol is
+    /// incomplete; with this feature enabled, handshakes fail closed until
+    /// responder-side decapsulation and transcript-bound key confirmation exist.
     #[cfg(feature = "pqc-handshake")]
     pqc_manager: Option<Arc<RwLock<super::pqc_handshake::PqcHandshakeManager>>>,
 
@@ -743,9 +745,10 @@ impl NetworkService {
             .write()
             .verify_response(peer_id, &signed_nonce, &agent_key)?;
 
-        // ── PQC Key Exchange (Phase 2 of hybrid handshake) ──────────
-        // After classical Ed25519 verification, perform ML-KEM-768
-        // key encapsulation for quantum-resistant session key derivation.
+        // ── PQC Key-Agreement Requirement (experimental) ──────────────
+        // When enabled, require the full PQC handshake. The current exchange
+        // is intentionally fail-closed until both sides decapsulate and confirm
+        // the same key over an authenticated transcript.
         #[cfg(feature = "pqc-handshake")]
         if let Some(ref pqc) = self.pqc_manager {
             match self
