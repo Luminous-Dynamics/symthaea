@@ -371,7 +371,7 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
         .count();
     let runs_with_simulated_tier = mode
         .iter()
-        .filter(|run| run.generation_tiers.iter().any(|tier| tier == "Simulated"))
+        .filter(|run| run.generation_tiers.iter().any(|tier| tier.as_str() == "Simulated"))
         .count();
     let runs_with_no_generation_attempts = mode
         .iter()
