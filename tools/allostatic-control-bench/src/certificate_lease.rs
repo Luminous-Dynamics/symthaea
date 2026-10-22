@@ -124,7 +124,7 @@ impl CertificateRejection {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CertificateLease {
     action: Action,
     context: CertificateContext,
