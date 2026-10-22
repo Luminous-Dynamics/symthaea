@@ -17,7 +17,7 @@ The CLI accepts the benchmark CSV schema already used by the allostatic-control 
 - a user-selected finite numeric outcome metric, such as `task_reward` or `cumulative_exposure`;
 - a user-selected binary episode-level violation field, such as `unsafe_episode`.
 
-This v1 parser deliberately accepts only unquoted CSV cells and fails closed on quoting, duplicate policy rows, non-finite metrics, missing headers, missing matched policy/seed pairs, and invalid violation flags. Do not silently pre-filter episodes to make a comparison pass. If an adapter emits a different or quoted CSV dialect, add a tested adapter rather than loosening this parser invisibly.
+This v1 parser deliberately accepts only unquoted CSV cells and fails closed on quoting, duplicate policy rows, non-finite metrics, missing headers, missing matched policy/seed pairs, and invalid violation flags. The metric and violation column names must be simple slugs. It resolves input/output paths and refuses to overwrite the source through path aliases. Reports are written to a same-directory temporary file and renamed into place only after every condition is analyzed and the file is flushed. Derived means and bootstrap accumulation use scaled arithmetic and non-finite results are rejected. Do not silently pre-filter episodes to make a comparison pass. If an adapter emits a different or quoted CSV dialect, add a tested adapter rather than loosening this parser invisibly.
 
 Example invocation:
 
