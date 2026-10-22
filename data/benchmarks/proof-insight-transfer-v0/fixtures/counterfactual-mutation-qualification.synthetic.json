@@ -19,7 +19,13 @@
         "base_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "variant_artifact_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
         "base_statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
-        "variant_statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        "variant_statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "pair_id": "cf-qualification-0",
+        "component_id": "component-qualification-0",
+        "split": "test",
+        "target_family_id": "synthetic-target-family-0",
+        "base_outcome_pair_id": "outcome-qualification-0-base",
+        "variant_outcome_pair_id": "outcome-qualification-0-variant"
       },
       "mutation": {
         "kind": "formatting_only",
@@ -104,7 +110,13 @@
         "base_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "variant_artifact_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
         "base_statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
-        "variant_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+        "variant_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "pair_id": "cf-qualification-1",
+        "component_id": "component-qualification-1",
+        "split": "test",
+        "target_family_id": "synthetic-target-family-1",
+        "base_outcome_pair_id": "outcome-qualification-1-base",
+        "variant_outcome_pair_id": "outcome-qualification-1-variant"
       },
       "mutation": {
         "kind": "equivalent_reformulation",
@@ -189,7 +201,13 @@
         "base_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "variant_artifact_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
         "base_statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
-        "variant_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+        "variant_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "pair_id": "cf-qualification-2",
+        "component_id": "component-qualification-2",
+        "split": "test",
+        "target_family_id": "synthetic-target-family-2",
+        "base_outcome_pair_id": "outcome-qualification-2-base",
+        "variant_outcome_pair_id": "outcome-qualification-2-variant"
       },
       "mutation": {
         "kind": "precondition_removed",
@@ -274,7 +292,13 @@
         "base_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "variant_artifact_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
         "base_statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
-        "variant_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+        "variant_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "pair_id": "cf-qualification-3",
+        "component_id": "component-qualification-3",
+        "split": "test",
+        "target_family_id": "synthetic-target-family-3",
+        "base_outcome_pair_id": "outcome-qualification-3-base",
+        "variant_outcome_pair_id": "outcome-qualification-3-variant"
       },
       "mutation": {
         "kind": "predicate_changed",
