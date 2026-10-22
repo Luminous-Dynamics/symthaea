@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/schemas/symthaea-coding-oracle-mutation-v1.schema.json",
+  "title": "Symthaea Coding Oracle Mutation Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_id",
+    "benchmark",
+    "source_revision",
+    "fixture_digest_blake3",
+    "runtime",
+    "summary",
+    "tasks"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "schema_id": {
+      "const": "symthaea.coding-oracle-mutation.v1"
+    },
+    "benchmark": {
+      "const": "symthaea_coding_oracle_mutation"
+    },
+    "source_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "fixture_digest_blake3": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rustc_version",
+        "os",
+        "arch",
+        "debug_assertions",
+        "code_generation_feature",
+        "executor"
+      ],
+      "properties": {
+        "rustc_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "os": {
+          "type": "string",
+          "minLength": 1
+        },
+        "arch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "debug_assertions": {
+          "type": "boolean"
+        },
+        "code_generation_feature": {
+          "type": "boolean"
+        },
+        "executor": {
+          "const": "CodeExecutor::with_real_execution"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_count",
+        "expected_test_functions",
+        "reference_controls_passed",
+        "mutants_killed",
+        "mutation_kill_rate",
+        "qualified",
+        "elapsed_ms",
+        "qualification_errors"
+      ],
+      "properties": {
+        "task_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "expected_test_functions": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reference_controls_passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mutants_killed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mutation_kill_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "qualified": {
+          "type": "boolean"
+        },
+        "elapsed_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "qualification_errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "fixture_digest_blake3",
+          "reference_source_digest_blake3",
+          "mutant_source_digest_blake3",
+          "reference_source",
+          "mutant_source",
+          "test_source",
+          "tests_expected",
+          "reference",
+          "mutant",
+          "reference_control_passed",
+          "mutation_killed"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fixture_digest_blake3": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "reference_source_digest_blake3": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "mutant_source_digest_blake3": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "reference_source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mutant_source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "test_source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tests_expected": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reference_control_passed": {
+            "type": "boolean"
+          },
+          "mutation_killed": {
+            "type": "boolean"
+          },
+          "reference": {
+            "$ref": "#/$defs/variant"
+          },
+          "mutant": {
+            "$ref": "#/$defs/variant"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "compiled",
+        "simulated",
+        "tests_expected",
+        "tests_executed",
+        "tests_passed",
+        "tests_failed",
+        "elapsed_ms",
+        "compile_errors",
+        "runtime_error"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "compile_failed",
+            "simulated_unverified",
+            "missing_oracle",
+            "no_tests_executed",
+            "test_count_mismatch",
+            "unverified"
+          ]
+        },
+        "compiled": {
+          "type": "boolean"
+        },
+        "simulated": {
+          "type": "boolean"
+        },
+        "tests_expected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tests_executed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tests_passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tests_failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "elapsed_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compile_errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "runtime_error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}
