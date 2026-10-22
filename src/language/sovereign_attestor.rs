@@ -45,8 +45,8 @@ pub struct SovereignAttestor {
     keys: DilithiumKeypair,
 }
 
-static PROCESS_ATTESTOR: Lazy<Mutex<SovereignAttestor>> =
-    Lazy::new(|| Mutex::new(SovereignAttestor::from_env_or_generate()));
+static PROCESS_ATTESTOR: Lazy<Result<Mutex<SovereignAttestor>, String>> =
+    Lazy::new(|| SovereignAttestor::from_env_or_generate().map(Mutex::new));
 
 impl SovereignAttestor {
     /// Create a new attestor with random keys.
@@ -57,35 +57,69 @@ impl SovereignAttestor {
     }
 
     /// Create an attestor from stable environment key material when present.
-    pub fn from_env_or_generate() -> Self {
-        match (
-            std::env::var("SYMTHAEA_ATTESTOR_PUBLIC_KEY_HEX"),
-            std::env::var("SYMTHAEA_ATTESTOR_SECRET_KEY_HEX"),
-        ) {
-            (Ok(public_hex), Ok(secret_hex)) => {
-                let public = decode_hex(&public_hex);
-                let secret = decode_hex(&secret_hex);
-                if let (Ok(public), Ok(secret)) = (public, secret) {
-                    if let Ok(keys) = DilithiumKeypair::from_bytes(public, secret) {
-                        return Self { keys };
-                    }
-                }
-                Self::new()
-            }
-            _ => Self::new(),
+    ///
+    /// If neither variable is set, create a process-local random key. If either
+    /// variable is configured, both must be present and valid. Invalid configured
+    /// identity material is an error, never a reason to silently rotate identity.
+    pub fn from_env_or_generate() -> Result<Self, String> {
+        use std::env::VarError;
+
+        let public_env = std::env::var("SYMTHAEA_ATTESTOR_PUBLIC_KEY_HEX");
+        let secret_env = std::env::var("SYMTHAEA_ATTESTOR_SECRET_KEY_HEX");
+        let public_absent = matches!(&public_env, Err(VarError::NotPresent));
+        let secret_absent = matches!(&secret_env, Err(VarError::NotPresent));
+
+        if public_absent && secret_absent {
+            return Ok(Self::new());
         }
+
+        let (public_hex, secret_hex) = match (public_env, secret_env) {
+            (Ok(public), Ok(secret)) => (public, secret),
+            _ => {
+                return Err(
+                    "configured attestor identity requires both public and secret key variables"
+                        .to_string(),
+                );
+            }
+        };
+
+        let public = decode_hex(&public_hex)
+            .map_err(|_| "configured attestor public key is not valid hex".to_string())?;
+        let secret = decode_hex(&secret_hex)
+            .map_err(|_| "configured attestor secret key is not valid hex".to_string())?;
+        let keys = DilithiumKeypair::from_bytes(public, secret)
+            .map_err(|_| "configured attestor key material failed validation".to_string())?;
+
+        // Verify pair consistency even on branches that do not yet contain the
+        // stronger from_bytes guard. This avoids treating same-length mismatched
+        // key material as a configured identity.
+        const CONFIG_CHECK: &[u8] = b"SYMTHAEA-ATTESTOR-CONFIG-CHECK/v1";
+        let signed = keys
+            .sign(CONFIG_CHECK)
+            .map_err(|_| "configured attestor keypair cannot sign".to_string())?;
+        let valid = verify_signature(CONFIG_CHECK, &signed, keys.public_key())
+            .map_err(|_| "configured attestor keypair cannot verify".to_string())?;
+        if !valid {
+            return Err("configured attestor public and secret keys do not match".to_string());
+        }
+
+        Ok(Self { keys })
     }
 
     /// Sign with the stable process attestor.
+    ///
+    /// Configuration or signing errors are returned instead of silently
+    /// generating an attestation under a different process identity.
     pub fn attest_with_process_key(
         label: &str,
         smtlib2: &str,
         verdict: &str,
         binary_data: Option<&[u8]>,
-    ) -> ProofAttestation {
-        PROCESS_ATTESTOR
-            .lock()
-            .attest(label, smtlib2, verdict, binary_data)
+    ) -> Result<ProofAttestation, String> {
+        let attestor = PROCESS_ATTESTOR
+            .as_ref()
+            .map_err(|error| error.clone())?;
+        attestor.lock().attest(label, smtlib2, verdict, binary_data)
     }
 
     /// Sign a proof verdict and an optional binary realization.
@@ -95,7 +129,7 @@ impl SovereignAttestor {
         smtlib2: &str,
         verdict: &str,
         binary_data: Option<&[u8]>,
-    ) -> ProofAttestation {
+    ) -> Result<ProofAttestation, String> {
         let smt_hash: [u8; 32] = Sha256::digest(smtlib2.as_bytes()).into();
         let binary_hash = binary_data.map(|data| Sha256::digest(data).into());
 
@@ -109,12 +143,14 @@ impl SovereignAttestor {
             transcript_version: TRANSCRIPT_VERSION_V2,
         };
 
-        // The signature field is excluded from the signed transcript itself.
-        // This wrapper currently returns an empty signature only if the
-        // underlying key/signing operation fails; verification then fails closed.
+        // Do not return an apparently complete attestation with an empty
+        // signature when the signing operation fails.
         let message = signing_message_v2(&attestation);
-        attestation.signature = self.keys.sign(&message).unwrap_or_default();
-        attestation
+        attestation.signature = self
+            .keys
+            .sign(&message)
+            .map_err(|_| "attestation signing failed".to_string())?;
+        Ok(attestation)
     }
 
     /// Verify an attestation and, when one is claimed, the actual binary artifact.
