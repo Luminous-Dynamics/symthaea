@@ -18,6 +18,12 @@
 //! the history of ranks, not arbitrary information about raw scores. Callers pass tie breakers
 //! explicitly so their source and provenance can be recorded. This implementation validates their
 //! numeric range but cannot prove randomness, independence, or exchangeability.
+//! 
+//! In an adaptive experiment, query choices can make raw residual scores non-identically
+//! distributed even when the physical law is correct. Do not feed such residuals directly into
+//! this PRM unless a predeclared transformation and the actual data protocol justify the required
+//! joint-exchangeability null. For known conditional predictive distributions, a prequential PIT
+//! martingale is a separate and more appropriate hypothesis test.
 //!
 //! The portfolio is 0.5 times the Order e-process plus 0.5 times the Dispersion e-process. Each
 //! constituent uses the paper's online Newton step betting update. Wealth is accumulated in log
