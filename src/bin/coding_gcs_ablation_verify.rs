@@ -1287,6 +1287,14 @@ mod tests {
     }
 
     #[test]
+    fn killed_mutant_can_have_nonzero_test_process_exit() {
+        let mut report = valid_fixture();
+        report["oracle_controls"]["mutation_controls"][0]["runtime_error"] =
+            Value::String("test binary exited nonzero after assertion failure".to_string());
+        assert!(audit(&report, None, None).is_empty());
+    }
+
+    #[test]
     fn surviving_mutant_is_rejected() {
         let mut report = valid_fixture();
         report["oracle_controls"]["mutation_controls"][0]["tests_failed"] = Value::from(0);
