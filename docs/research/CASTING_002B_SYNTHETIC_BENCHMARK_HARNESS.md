@@ -78,6 +78,7 @@ A 2026 review of computational modeling, AI, and digital twins in metal casting 
 - Essam et al. (2026), casting simulation / AI / digital twin review: https://link.springer.com/article/10.1007/s43939-026-00685-5
 - NIST (5 October 2026), *On Methods of Uncertainty Quantification in Computational Modeling and Simulation*: https://www.nist.gov/publications/methods-uncertainty-quantification-computational-modeling-and-simulation-harmonizing
 - Pei et al. (2025), revised LHS + Bayesian optimization + phase-field case study: https://www.nature.com/articles/s41524-025-01524-6
+- Bayesian optimization-driven framework for CFD problems applied to continuous casting, *Computers & Fluids* (30 August 2026), compared an open-source BO framework to commercial CAESES on a submerged-entry-nozzle geometry problem using a single-phase water approximation. Treat as an algorithmic comparator, not matched molten-metal physical validation: https://www.sciencedirect.com/science/article/pii/S0045793026002276
 
 ## Nonclaims
 
