@@ -1,0 +1,527 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea Rust Repository-Repair Benchmark Preregistration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_id",
+    "protocol_version",
+    "status",
+    "created_utc",
+    "dataset",
+    "agent",
+    "treatments",
+    "environment",
+    "budget",
+    "endpoints",
+    "analysis",
+    "exclusions",
+    "artifacts"
+  ],
+  "properties": {
+    "protocol_id": {
+      "const": "symthaea-rust-repair"
+    },
+    "protocol_version": {
+      "type": "string",
+      "pattern": "^0\\.[0-9]+\\.[0-9]+$"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "locked"
+      ]
+    },
+    "created_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "repository_url",
+        "code_revision_sha",
+        "data_revision",
+        "split",
+        "language_slice",
+        "task_count",
+        "task_ids_sha256",
+        "manifest_sha256"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "code_revision_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "data_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "split": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language_slice": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "task_ids_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent_name",
+        "agent_harness_commit",
+        "model_provider",
+        "model_id",
+        "model_revision",
+        "model_identity_evidence"
+      ],
+      "properties": {
+        "agent_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "agent_harness_commit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "model_provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_identity_evidence": {
+          "enum": [
+            "provider_usage_record",
+            "provider_request_id_only",
+            "application_reported_only",
+            "local_model_digest",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "treatments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline",
+        "candidate",
+        "changed_factor",
+        "order_policy",
+        "repeats_per_task"
+      ],
+      "properties": {
+        "baseline": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "changed_factor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "order_policy": {
+          "enum": [
+            "randomized_paired",
+            "counterbalanced_paired"
+          ]
+        },
+        "randomization_seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "repeats_per_task": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "os_architecture",
+        "rust_toolchain",
+        "container_image_digest",
+        "lockfile_sha256",
+        "network_policy",
+        "cpu_gpu_description"
+      ],
+      "properties": {
+        "os_architecture": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rust_toolchain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "container_image_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "lockfile_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "network_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cpu_gpu_description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource_limits": {
+          "type": "object"
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_wall_clock_minutes_per_run",
+        "max_agent_tokens_per_run",
+        "max_cost_usd_per_run",
+        "max_retries"
+      ],
+      "properties": {
+        "max_wall_clock_minutes_per_run": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_agent_tokens_per_run": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_cost_usd_per_run": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "endpoints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary",
+        "task_weighting",
+        "success_definition",
+        "secondary"
+      ],
+      "properties": {
+        "primary": {
+          "const": "paired_pass_at_1_absolute_difference"
+        },
+        "task_weighting": {
+          "enum": [
+            "task_weighted",
+            "repository_weighted"
+          ]
+        },
+        "success_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "secondary": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alpha",
+        "target_effect_percentage_points",
+        "non_inferiority_margin_percentage_points",
+        "cluster_keys",
+        "bootstrap_resamples",
+        "bootstrap_seed",
+        "power_analysis"
+      ],
+      "properties": {
+        "alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "target_effect_percentage_points": {
+          "type": "number"
+        },
+        "non_inferiority_margin_percentage_points": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cluster_keys": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "bootstrap_resamples": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "bootstrap_seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "power_analysis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "analysis_code_commit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "exclusions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "predeclared_rules",
+        "unresolved_policy",
+        "publish_exclusion_ledger"
+      ],
+      "properties": {
+        "predeclared_rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unresolved_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publish_exclusion_ledger": {
+          "type": "boolean"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_receipt_location",
+        "auditor_revision",
+        "independent_audit_required",
+        "signature_policy"
+      ],
+      "properties": {
+        "raw_receipt_location": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "auditor_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "independent_audit_required": {
+          "type": "boolean"
+        },
+        "signature_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "locked"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dataset": {
+            "properties": {
+              "data_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "task_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "task_ids_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "manifest_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "agent": {
+            "properties": {
+              "agent_harness_commit": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "model_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_revision": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "treatments": {
+            "required": [
+              "randomization_seed"
+            ],
+            "properties": {
+              "randomization_seed": {
+                "type": "integer"
+              }
+            }
+          },
+          "environment": {
+            "properties": {
+              "container_image_digest": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "lockfile_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "analysis": {
+            "required": [
+              "bootstrap_seed",
+              "power_analysis",
+              "analysis_code_commit"
+            ],
+            "properties": {
+              "bootstrap_seed": {
+                "type": "integer"
+              },
+              "power_analysis": {
+                "type": "string",
+                "minLength": 1
+              },
+              "analysis_code_commit": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              }
+            }
+          },
+          "artifacts": {
+            "required": [
+              "raw_receipt_location",
+              "auditor_revision"
+            ],
+            "properties": {
+              "raw_receipt_location": {
+                "type": "string",
+                "minLength": 1
+              },
+              "auditor_revision": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

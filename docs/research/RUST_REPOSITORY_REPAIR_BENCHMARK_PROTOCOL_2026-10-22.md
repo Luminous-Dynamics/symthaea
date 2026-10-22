@@ -1,0 +1,120 @@
+# Rust Repository-Repair Benchmark Protocol (2026-10-22)
+
+**Protocol status:** proposal / preregistration required before scored trials  
+**Protocol ID:** `symthaea-rust-repair`  
+**Version:** `0.1.0`
+
+This protocol is an execution contract and research plan, not a report of measured performance. No repository-repair SOTA result is claimed. The current eight-task GCS pilot remains a small, public-fixture mechanism study.
+
+## 1. Questions and falsifiable claims
+
+Separate three claims that must not be conflated:
+
+1. **Harness validity:** did the intended task, toolchain, model route and test oracle actually run, and can an independent auditor reproduce the scoring from preserved evidence?
+2. **Mechanism effect:** with everything else fixed, do Geodesic Code Synthesis (GCS) advisories improve correct patch rate, reduce cost per verified fix, or improve another preregistered endpoint?
+3. **Repository generalization:** does an observed effect transfer from short functions to held-out issues across repositories, task families and realistic build/test conditions?
+
+A result at one level does not establish the next. Receipt consistency is not proof of execution; application-reported model-tier telemetry is not provider attestation.
+
+## 2. Two complementary evaluation lanes
+
+### Lane A — external Rust comparison
+
+Use the official Rust slice of [SWE-bench-Live MultiLang](https://github.com/microsoft/SWE-bench-Live) as the first external starting point. Its project announcement dated October 1, 2026 identifies C/C++, C#, Java, TypeScript/JavaScript, Go and Rust support. The public leaderboard's 71.0% entry dated October 8 is over 300 valid instances and is **not** a Rust-only score. Do not compare Symthaea's internal pilot percentage to it.
+
+As inspected on October 22, 2026, the upstream *code repository* was at commit `62d02936a0726fbf4597b05bd07b09fb99eddae6` (README update, September 25, 2026). That SHA pins the project code only; it does **not** prove which Hugging Face/data revision supplied the leaderboard's task set. Before any scored run, additionally pin:
+- immutable dataset revision or release identifier;
+- exact split and Rust filter definition;
+- ordered task IDs plus SHA-256 digest;
+- per-task base-repository commit/container image where supplied;
+- official evaluation harness commit and configuration.
+
+If the upstream task data cannot be resolved to an immutable revision and reproducible task list, stop and report the blocker. Do not silently substitute the latest moving split or describe a partial sample as the official benchmark. Respect upstream license, redistribution and leaderboard-submission rules.
+
+### Lane B — Symthaea-held-out Rust repairs
+
+Curate 50–100 reviewed development tasks, then a held-out confirmatory set targeting 250–500 tasks distributed over many repositories and task families. The final count must be supported by a preregistered power/precision analysis; task count cannot compensate for too few independent repository clusters.
+
+Include multi-file fixes, regression-preserving refactors, dependency and compiler errors, concurrency, parser/security boundaries, performance regressions, stateful behavior and tasks requiring understanding of repository conventions. Do not let all tasks be synthetic one-function changes. Keep public development tasks distinct from private confirmatory tasks.
+
+Every task must have a prompt whose requested behavior can reasonably be inferred, an immutable base commit, a reference patch that satisfies the stated behavior, hidden fail-to-pass tests and pass-to-pass regression tests. Record explicit exclusions and rationale before observing candidate system results.
+
+## 3. Task-quality contract
+
+A task is eligible only after all of these controls pass:
+
+1. **Reference control:** the reference patch applies cleanly, builds and passes all required fail-to-pass and pass-to-pass tests.
+2. **Base control:** the unpatched base exhibits the expected fail-to-pass failure; pre-existing pass-to-pass tests pass.
+3. **Oracle-discrimination controls:** plausible semantic mutants compile and are rejected by behavioral assertions. A compiler error is not a behavioral kill. Categorize equivalent mutants and adjudicate them before calculating mutation adequacy.
+4. **False-negative review:** a valid alternative implementation or independently written solution is not rejected merely for differing from the gold patch's implementation details.
+5. **Prompt/test consistency:** reviewers inspect the prompt, expected behavior and hidden assertions separately from the gold patch. Flag underspecification, prompt/test contradictions, over-specific tests, low-coverage tests and tests that reward implementation-specific details.
+6. **Reproducibility:** the task can be built and evaluated in the pinned clean image; flaky, unavailable-dependency or unresolvable cases are excluded before the test set is locked, with a public exclusion ledger that does not reveal hidden assertions.
+
+Use at least two independent reviewers per task for initial curation and a third adjudicator for disagreements. Reviewers should decide from the task statement, interface/context and behavior before seeing the gold diff where practical. Re-run quality checks when a task, verifier, container or dependency changes.
+
+This review burden is deliberate. OpenAI's July 8, 2026 audit of a public SWE-Bench Pro split found 27.4% flagged by its automated pipeline and 34.1% labelled broken in a human annotation campaign, and it withdrew its earlier recommendation to adopt the benchmark. The exact rates apply to the audited split, not every later revision; the method is the lesson: task quality must be measured, not inferred from popularity.
+
+## 4. Paired experiment for GCS
+
+**Primary causal contrast:** the same agent and model with GCS advisories enabled versus disabled.
+
+Hold constant model/provider and revision, system/developer prompt, tool set, sampling settings, context/token/time budgets, network access, repository base commit, image digest, compiler, dependencies, test oracle and stopping rules. Randomize the order of on/off trials per task and repeat. Store the randomization seed before scoring.
+
+For each pair:
+- classify both outcomes as `pass`, `fail` or `unresolved`;
+- define `pass` only when the patch applies, real compilation completes, all hidden fail-to-pass tests pass, all required pass-to-pass tests pass, and the evaluator reports no invalid/missing test execution;
+- count only pairs with complete oracles in both arms for the paired treatment-effect estimate;
+- preserve all unresolved runs and all assigned tasks in the published denominator. Never convert unresolved into a behavioral failure or a tie.
+
+Report sensitivity bounds assigning unresolved outcomes against each arm in turn. If unresolved rates are materially different across arms or task families, the result is not decision-grade until the cause is understood. Provisional release gate: unresolved outcomes below 2% overall and an arm difference below 1 percentage point; these are proposed internal quality gates, not an industry standard.
+
+Observed generation tiers should be recorded, but labelled as application-reported. For any provider-backed trial, preserve the provider request/response identifiers and usage records where available. Requested model name plus observed tier is not proof of which model the provider served.
+
+## 5. Primary and secondary outcomes
+
+**Primary endpoint:** absolute paired pass@1 difference (GCS-on minus GCS-off) on eligible confirmatory task pairs, reported in percentage points. Pre-register whether the target population is task-weighted or repository-weighted; task-weighted is the default, with repository-weighted as a sensitivity analysis.
+
+Secondary endpoints:
+- repeated-run pass frequency and pass@k, reported separately;
+- compile success, oracle-completion and unresolved rates;
+- paired wins, losses and ties;
+- pass-to-pass regression rate, including security-relevant regression categories;
+- patch application rate and test execution completeness;
+- cost per verified fix, input/output tokens, retries, wall-clock time and p50/p95 latency;
+- energy/compute only when the measurement method and hardware attribution are recorded;
+- results by task family, repository and task difficulty.
+
+A task that is not attempted, times out, refuses or fails to produce a patch remains in the assigned-task denominator. Distinguish agent failure, infrastructure failure and invalid oracle in run statuses; apply exclusions only by preregistered rules and report sensitivity results including excluded/unresolved tasks.
+
+## 6. Statistics and superiority gates
+
+For GCS on/off comparisons, use paired binary-outcome analysis and confidence intervals for the paired absolute effect. Cluster resampling by repository is required for repository-level claims; within a repository, tasks are not assumed independent. Report the number of repositories and task families alongside the interval. Pre-register random seed, resample count and analysis code revision. Ten thousand bootstrap resamples may be used for reporting, but do not imply that resampling creates information absent from a small sample.
+
+Target for a confirmatory superiority claim: at least +5 absolute percentage points in held-out pass@1 versus the same-model, same-budget baseline and a repository-clustered 95% confidence interval excluding zero. Alternative practical-success target: at least 20% lower cost per verified fix while remaining within a 1.5-percentage-point correctness non-inferiority margin. These are goals, not evidence of current performance; finalize sample size and non-inferiority rationale before data collection.
+
+Also report negative and inconclusive results. Require independent replication before claiming state-of-the-art or general superiority. Cross-model results should be stratified by exact model and harness configuration; never attribute a model+harness result solely to the model or Symthaea.
+
+## 7. Run receipt and provenance minimums
+
+The locked preregistration and per-run receipt must distinguish preregistered identity from observed telemetry and include, at minimum:
+
+- protocol version, benchmark/dataset revision, split, ordered task IDs and externally pinned task-manifest digest;
+- exact Symthaea source commit, agent/harness revision, GCS configuration, prompt/configuration digest and randomization seed;
+- requested backend/provider/model/revision separately from observed generation tiers, provider usage/request IDs where available, and an explicit indication when identity is only self-reported;
+- OS/architecture, CPU/GPU, Rust toolchain, dependency lockfile, container image digest, network policy and resource limits;
+- task/base commit, patch digest, build/test commands, discovered and expected test counts, raw exit statuses, fail-to-pass/pass-to-pass counts, stdout/stderr/log references, timing and usage/cost records;
+- status for every assigned run, error taxonomy, auditor version, and a signature or separately controlled immutable artifact reference where available.
+
+Hashing supports byte-integrity checks. A digest by itself does not authenticate its producer or prove a process ran. Preserve raw evidence and audit in a separately managed environment.
+
+## 8. Versioning and change control
+
+Treat prompt/task changes, dataset/split changes, tool/model/budget changes, and container/resource changes as a new evaluation release requiring new scored runs. Verifier-only changes require regrading archived patches when the environment supports it and must be called out. Pure metadata/documentation fixes may reuse results only after an explicit review. Do not pool scores from incompatible versions as one series.
+
+The release artifact should contain the locked preregistration, task manifest digest, raw receipts, independent audit output, exclusions, analysis script, confidence intervals and a machine-readable result summary. Keep task contents private where necessary, while publishing enough version and validity metadata to make the claim auditable.
+
+## 9. Execution checklist
+
+Before running a scored task, require a locked preregistration validated against `schemas/rust-repair-preregistration.schema.json`. Start with dataset provenance and task quality; then validate the environment; then run paired GCS trials; only after that run confirmatory held-out tasks. Do not wait on a queued CI run to do independent source review, dataset investigation or protocol development—but do not represent unexecuted tests as passing.
+
+**Current status:** protocol drafted; no immutable SWE-bench-Live task-data revision or Rust task-ID manifest has yet been pinned; no external or held-out score has been measured under this protocol.
