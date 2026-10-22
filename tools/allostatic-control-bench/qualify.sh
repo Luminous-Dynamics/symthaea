@@ -698,6 +698,7 @@ if ! awk -F, '
       first_fixed_alarm[key] = 8
       recorded_first_alarm[key] = $18
       recorded_fixed_first_alarm[key] = $29
+      fixed_latched[key] = "false"
       recorded_below[key] = $14
       latched[key] = "false"
       episode_max_score[key] = 0
@@ -745,7 +746,6 @@ if ! awk -F, '
     if ($28 != expected_fixed_alarm) failed = 1
     if ($28 == "true" && first_fixed_alarm[key] == 8) first_fixed_alarm[key] = $4
     fixed_latched[key] = expected_fixed_alarm
-    if ($29 != recorded_fixed_first_alarm[key]) failed = 1
     if ($29 != recorded_fixed_first_alarm[key]) failed = 1
     if ($14 != recorded_below[key]) failed = 1
     if ($5 > episode_max_score[key]) episode_max_score[key] = $5
@@ -831,6 +831,8 @@ if ! awk -F, '
     if ($23 != "NA" && $23 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
     if ($24 != "NA" && $24 !~ /^[0-9]+$/) failed = 1
     if ($25 != "NA" && $25 !~ /^[0-9]+$/) failed = 1
+    if ($20 == 0 && ($23 != "NA" || $24 != "NA" || $25 != "NA")) failed = 1
+    if ($20 > 0 && ($23 == "NA" || $24 == "NA" || $25 == "NA")) failed = 1
     if ($26 < 0 || $26 > 300 || $26 > $10) failed = 1
     if ($27 !~ /^-?[0-9]*[.]?[0-9]+$/ || $28 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
     if (($29 - 0.5 > 0.000001) || (0.5 - $29 > 0.000001)) failed = 1
