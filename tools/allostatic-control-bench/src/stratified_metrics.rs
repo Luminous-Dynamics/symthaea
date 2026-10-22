@@ -65,7 +65,9 @@ impl StratifiedSummary {
         random_seed: u64,
     ) -> Result<(Vec<TaskSummary>, Self), String> {
         if tasks.len() < 2 {
-            return Err("at least two distinct tasks are required for stratified aggregation".to_owned());
+            return Err(
+                "at least two distinct tasks are required for stratified aggregation".to_owned(),
+            );
         }
         if bootstrap_replicates < MIN_BOOTSTRAP_REPLICATES {
             return Err(format!(
@@ -318,7 +320,12 @@ fn is_slug(value: &str) -> bool {
     !value.is_empty()
         && value
             .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-' || byte == b'.')
+            .all(|byte| {
+                byte.is_ascii_alphanumeric()
+                    || byte == b'_'
+                    || byte == b'-'
+                    || byte == b'.'
+            })
 }
 
 #[cfg(test)]
