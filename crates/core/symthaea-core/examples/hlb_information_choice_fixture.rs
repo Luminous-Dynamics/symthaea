@@ -174,7 +174,7 @@ impl Policy {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct PrivateWorld {
     goal: Side,
     initial_cue: Side,
@@ -305,7 +305,7 @@ fn summarize(scenario: &Scenario, episodes: usize) -> Vec<PolicySummary> {
                     .wrapping_add(episode_index as u64)
                     .wrapping_add(1);
                 let result = run_episode(scenario, seed, policy);
-                correct += usize::from(result.correct);
+                if result.correct { correct += 1; }
                 total_score += i64::from(result.score_bps);
                 probes += result.probes;
                 invalid_actions += result.invalid_actions;
@@ -398,7 +398,7 @@ fn expected_accuracy_after_probe(cue_accuracy_bps: u16, probe_accuracy_bps: u16)
 }
 
 fn sample_signal(goal: Side, accuracy_bps: u16, rng: &mut SplitMix64) -> Side {
-    let sample = (rng.next_u64() % u64::from(REWARD_BPS)) as u16;
+    let sample = (rng.next_u64() % (REWARD_BPS as u64)) as u16;
     if sample < accuracy_bps {
         goal
     } else {
