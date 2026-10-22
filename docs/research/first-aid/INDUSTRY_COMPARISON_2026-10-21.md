@@ -9,6 +9,13 @@ The relevant evaluation frontier is moving from "did the system produce a good a
 
 ## Current external evidence
 
+### NVIDIA: task completion plus process scoring
+
+NVIDIA's September 21, 2026 engineering article, *How to Evaluate AI Agents From Tool Calls to Task Completion*, describes a practical evaluation stack with step-level process scoring and end-to-end environment-state verification. It recommends reporting success alongside consistency, cost and latency, and warns that tool-call scores alone do not establish goal completion. This independently converges with our design direction: score both the path and the final state, and make verification executable.
+
+Source: https://developer.nvidia.com/blog/how-to-evaluate-ai-agents-from-tool-calls-to-task-completion/ (published 2026-09-21).
+
+
 ### Stanford HAI — October 19, 2026 task-execution update
 
 Stanford HAI's latest benchmark synthesis reports three complementary levels of evaluation. MedHELM spans 121 clinical tasks across 22 subcategories and 37 datasets; its win-rate ranges are weakest for administration/workflow (0.53–0.63) and clinical decision support (0.63–0.77). PhysicianBench checks 100 long-horizon tasks using 670 task checks across 21 specialties; its best tested model completed 46% of tasks on one attempt and 28% across all three repeated attempts. HealthAdminBench's best tested agent completed 36.3% of administrative tasks end-to-end even though the best cited subtask rate was materially higher. These benchmarks use different systems and graders; compare directionally, not as a common leaderboard.
