@@ -60,8 +60,7 @@
       "required": [
         "commit_sha",
         "working_tree",
-        "toolchain",
-        "lockfile_sha256"
+        "toolchain"
       ],
       "properties": {
         "commit_sha": {
@@ -78,13 +77,6 @@
         "toolchain": {
           "type": "string",
           "minLength": 1
-        },
-        "lockfile_sha256": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "pattern": "^[0-9a-f]{64}$"
         }
       }
     },
