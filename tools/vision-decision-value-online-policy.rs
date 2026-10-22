@@ -377,11 +377,12 @@ impl DecisionValueAllocatorV1 {
                 ));
             }
 
+            let expected_cost_units = input.escalation_cost_upper_bound_units;
             return Ok(self.fallback_commit(
                 input,
                 Some(lower_bound),
                 AllocationReason::ValueBelowThreshold,
-                input.escalation_cost_upper_bound_units,
+                expected_cost_units,
             ));
         }
 
@@ -390,11 +391,12 @@ impl DecisionValueAllocatorV1 {
             Err(EstimateFailure::Invalid) => AllocationReason::ValueEstimateInvalid,
             Ok(_) => unreachable!(),
         };
+        let expected_cost_units = input.escalation_cost_upper_bound_units;
         Ok(self.fallback_commit(
             input,
             None,
             reason,
-            input.escalation_cost_upper_bound_units,
+            expected_cost_units,
         ))
     }
 
