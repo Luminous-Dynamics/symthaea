@@ -321,7 +321,10 @@ fn report_group(
         "NA".to_owned()
     };
     let selective_risk_upper95 = if accepted_n > 0 {
-        format!("{:.6}", wilson_upper_95(accepted_errors, accepted_n).expect("nonzero accepted count"))
+        format!(
+            "{:.6}",
+            wilson_upper_95(accepted_errors, accepted_n).expect("nonzero accepted count")
+        )
     } else {
         "NA".to_owned()
     };
@@ -331,7 +334,10 @@ fn report_group(
         "NA".to_owned()
     };
     let false_accept_upper95 = if unknown_n > 0 {
-        format!("{:.6}", wilson_upper_95(unknown_accepted, unknown_n).expect("nonzero unknown count"))
+        format!(
+            "{:.6}",
+            wilson_upper_95(unknown_accepted, unknown_n).expect("nonzero unknown count")
+        )
     } else {
         "NA".to_owned()
     };
