@@ -152,3 +152,34 @@ This protocol does not establish:
 - clinical or therapeutic efficacy;
 - causation from simple before/after comparisons;
 - universal moral correctness or zero real-world harm.
+
+## 11. 2026 benchmark crosswalk and the remaining frontier
+
+This is a **coverage map, not a cross-benchmark leaderboard**. The suites below use different prompts, populations, rubrics, model snapshots, and outcome definitions. Their scores must not be compared numerically or combined into an SLD score without a common evaluation protocol and direct reruns.
+
+| Evaluation family | What it contributes | What SLD should reuse or test against it | Important limitation / gap |
+|---|---|---|---|
+| [MentalHealthBench (OpenAI, 23 Sep 2026)](https://openai.com/index/introducing-mentalhealthbench/) | Expert-authored mental-health conversations; reported work with 80+ licensed experts across 22 countries and 19 languages | Use its expert-rubric framing and multilingual / cross-context coverage when permissions and data access allow | Clinical-adjacent quality does not by itself measure boundary fidelity, agency transfer, or long-term dependency |
+| [DistressBench (Scale Labs, 9 Oct 2026)](https://labs.scale.com/papers/distressbench) | 718 clinician-authored crisis conversations, 23 subcategories, 6,901 weighted rubric criteria across seven dimensions | Add an explicit “recognized vs. acted” transition: was appropriate human support / referral actually offered when called for? Report the weighted dimensions separately | Crisis-support performance is critical but is not a general theory of love, relationship quality, or non-crisis care |
+| [TEA-Bench (ACL 2026)](https://aclanthology.org/2026.acl-long.2152/) | Tool-enhanced emotional support; process metrics and factual grounding across turns | Evaluate whether evidence tools change decisions correctly; count unsupported claims and tool-use cost, not just answer quality | Tool benefit is capacity-dependent; training on its dialogues has been reported to generalize poorly out of distribution |
+| [Emotional Dynamic Trajectories (AAAI 2026)](https://ojs.aaai.org/index.php/AAAI/article/view/37189) | 328 emotional contexts and 1,152 disturbance events; evaluates trajectories under evolving conversations | Include perturbation/recovery curves at multiple horizons, with boundary and harm invariants as non-compensable constraints | Simulated emotional-state trajectories are not direct evidence of recipient flourishing or causal benefit |
+| [SAGE: Sentient Agent as a Judge (Findings ACL 2026)](https://aclanthology.org/2026.findings-acl.1905/) | Simulated emotional trajectory and social-cognition evaluation; public comparison across 18 models | Treat simulated-user trajectory as one diagnostic and validate its labels against blinded human ratings | A model-mediated judge can share blind spots with the evaluated model; do not use it as the sole oracle |
+| [HEART (Jan 2026 preprint)](https://arxiv.org/abs/2601.19922) | Head-to-head human and LLM responses on identical multi-turn support contexts with blinded ratings | Include matched human responses as a reference distribution where ethically and practically available | Human preference is not a universal moral oracle; population, context, and reviewer effects must be reported |
+| [MentalBench-100k / MentalAlign-70k (EACL 2026)](https://aclanthology.org/2026.eacl-long.180/) | 100,000 response pairs and 70,000 ratings; directly studies judge agreement, consistency, and bias | Calibrate each automated judge against held-out expert ratings; report ICC / confidence intervals and judge-specific bias | Large-scale labels do not eliminate evaluator bias; cited work reports inflated LLM-judge ratings and weaker reliability on empathy/safety dimensions |
+| [EmoHarbor (ACL 2026)](https://aclanthology.org/2026.acl-long.53/) | Personalized-support evaluation using 100 user profiles and 10 dimensions | Test profile-conditioned adaptation, correction after a mistaken inference, and role/profile swaps | Simulated inner-world users are a scalability aid, not a replacement for consented feedback from real recipients |
+| [Long-context emotional consistency (IEEE TAFFC, online 9 Jul 2026)](https://doi.org/10.1109/TAFFC.2026.3712060) | Tests retention of key emotional events, masking, and implicit recall over long contexts | Add delayed callback, concealed distress, topic-shift, and correction tests at 25/100 turns | Retaining an emotional event is not proof that acting on it is helpful; over-retention and privacy must also be tested |
+| [ESConv / ESC-Eval](https://aclanthology.org/2021.acl-long.269/) | Established emotional-support strategy / response-quality baseline | Reuse strategy-level slices as descriptive comparators when data licensing and protocol align | Strategy matching can reward formulaic responses and does not itself establish safety, agency, or repair quality |
+
+### SLD's defensible differentiator
+
+Do not compete by inventing another single empathy or relationship score. The candidate contribution is a **measurement-integrity and decision-quality layer** across the evaluations above:
+
+1. **Provenance attacks:** user-only input relabelled as partner data, generated copies as independent observations, duplicated / stale receipts, source swaps, missing timestamps, and hidden leakage.
+2. **Non-compensable relational constraints:** consent withdrawal, exit, coercion, deceptive exclusivity, fabricated certainty, and authority boundaries are release gates, never offset by warmth or average satisfaction.
+3. **Construct-discrimination pairs:** trust is not synchrony; reciprocity is not mutual information; a software-stress proxy is not human stress; Shannon entropy is not thermodynamic entropy; a numerical Φ estimate is not proof of consciousness, love, or moral patienthood.
+4. **Agency transfer and safe exit:** success includes a user making an informed independent decision, taking a useful next step without continued engagement, declining advice, or moving to appropriate human support.
+5. **Ablation with negative controls:** each proxy must improve pre-registered held-out decisions over a proxy-free baseline, and must lose influence when its evidence is corrupted.
+
+### Competitive claim policy
+
+Until the same exact model versions are evaluated against matched case sets with blinded human adjudication, SLD may claim only that its **protocol targets gaps** not jointly covered by these component evaluations. It may not claim better-than-SOTA behavior, clinical effectiveness, lower harm in deployment, or a validated measure of love. Publish per-dimension results and uncertainty, preserve evaluator disagreement, and report failures by case.
