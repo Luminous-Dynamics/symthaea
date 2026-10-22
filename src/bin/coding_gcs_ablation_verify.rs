@@ -1789,6 +1789,47 @@ mod tests {
     }
 
     #[test]
+    fn cloud_mode_accepts_and_reports_failed_cloud_then_local_fallback() {
+        let mut report = valid_fixture();
+        report["model_mode"] = Value::String("cloud".to_string());
+        report["model_label"] = Value::String("claude-sonnet-4-20250514".to_string());
+        report["runtime_configuration"]["requested_backend"] = Value::String("cloud".to_string());
+        report["runtime_configuration"]["requested_model"] = Value::String("claude-sonnet-4-20250514".to_string());
+        report["runs"][0]["selected_generation_tiers"] = serde_json::json!(["CloudLLM"]);
+        report["runs"][0]["backend_attempts"] = serde_json::json!([
+            {
+                "tier": "CloudLLM", "backend_name": "Anthropic", "success": false,
+                "verification_passed": null, "elapsed_ms": 5, "estimated_energy_cost": 50.0
+            },
+            {
+                "tier": "LocalLLM", "backend_name": "Ollama", "success": true,
+                "verification_passed": null, "elapsed_ms": 11, "estimated_energy_cost": 10.0
+            }
+        ]);
+        report["summary"]["gcs_off"]["selected_tier_decisions"] = serde_json::json!({
+            "Native": 0, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 1, "Simulated": 0
+        });
+        report["summary"]["gcs_off"]["backend_attempts_by_tier"] = serde_json::json!({
+            "Native": 0, "Hardware": 0, "LocalLLM": 1, "CloudLLM": 1, "Simulated": 0
+        });
+        report["summary"]["gcs_off"]["backend_attempts_by_name"] =
+            serde_json::json!({"Anthropic": 1, "Ollama": 1});
+        report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(2);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(16);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(5);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(11);
+        report["summary"]["gcs_off"]["backend_attempt_estimated_energy_total"] = Value::from(60.0);
+        report["summary"]["gcs_off"]["runs_with_external_backend_attempts"] = Value::from(1);
+        report["summary"]["gcs_off"]["runs_with_simulated_backend_attempts"] = Value::from(0);
+        report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
+        assert!(audit(&report, None, None).is_empty());
+    }
+
+    #[test]
     fn latency_percentiles_use_nearest_rank_and_reject_invalid_input() {
         let values = vec![120_u64, 10, 100, 20];
         assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.50), Some(20));
