@@ -107,6 +107,10 @@ struct Judge {
 struct Evaluator {
     rubric_sha256: String,
     judge_panel: Vec<Judge>,
+    human_review_status: String,
+    #[serde(default)]
+    human_rater_count: Option<usize>,
+    independent_adjudication_status: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -457,6 +461,16 @@ fn validate_compatibility(a: &Receipt, b: &Receipt) -> Result<()> {
     ensure!(
         a.evaluator.judge_panel == b.evaluator.judge_panel,
         "judge panel identity/version mismatch"
+    );
+    ensure!(
+        a.evaluator.human_review_status == b.evaluator.human_review_status
+            && a.evaluator.human_rater_count == b.evaluator.human_rater_count,
+        "human-review protocol/count mismatch"
+    );
+    ensure!(
+        a.evaluator.independent_adjudication_status == "COMPLETE"
+            && b.evaluator.independent_adjudication_status == "COMPLETE",
+        "independent oracle adjudication must be COMPLETE before model comparison"
     );
     ensure!(
         !a.evaluator.judge_panel.is_empty(),
@@ -877,6 +891,15 @@ mod tests {
         let mut b = fixture_receipt();
         b.subject.model_id = "model-b".to_string();
         b.generation.max_turns += 1;
+        assert!(validate_compatibility(&a, &b).is_err());
+    }
+
+
+    #[test]
+    fn compatibility_rejects_unadjudicated_oracle() {
+        let mut a = fixture_receipt();
+        let b = fixture_receipt();
+        a.evaluator.independent_adjudication_status = "NOT_PERFORMED".to_string();
         assert!(validate_compatibility(&a, &b).is_err());
     }
 
