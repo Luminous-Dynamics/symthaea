@@ -27,7 +27,7 @@ Moral reasoning evaluation is moving beyond one-answer accuracy:
 - **PluriHarms (ICLR 2026)** measures both perceived harm and human disagreement, using 150 prompts and 15,000 ratings from 100 annotators: https://proceedings.iclr.cc/paper_files/paper/2026/hash/04cea5800f4d71fe0d89d5f64e33408e-Abstract-Conference.html
 - **OVERTONBENCH (ICLR 2026)** measures coverage of diverse viewpoints rather than assuming agreement is always the target: https://proceedings.iclr.cc/paper_files/paper/2026/hash/4444eb0b68174180d2a46841c951e7f3-Abstract-Conference.html
 - **CORDA (August 2026)** tests how a system prioritizes principles when every option has a cost: https://www.raillab.org/publication/singh-2026-corda/
-- The 2025 Nature roadmap recommends adversarial and confirmatory evaluations that distinguish appropriate reasoning from merely appropriate-seeming explanations: https://www.nature.com/articles/s41586-025-10021-1
+- The 2026 Nature roadmap (published 18 February 2026) recommends adversarial and confirmatory evaluations that distinguish appropriate reasoning from merely appropriate-seeming explanations: https://www.nature.com/articles/s41586-025-10021-1
 - A 2026 position paper identifies a gap between representing moral values and correctly identifying/applying context-sensitive norms: https://arxiv.org/abs/2608.14566
 
 These benchmarks answer complementary questions. None by itself is a general certificate of moral competence, and leaderboard results cannot be compared unless versions, prompts, decoding, splits, aggregation, and cost are matched.
