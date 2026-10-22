@@ -97,6 +97,64 @@ impl Default for ParsedMoralScenario {
     }
 }
 
+/// Which kind of unquoted text signal supported a consent-state assessment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConsentEvidenceBasis {
+    /// No recognized unquoted consent signal was established.
+    NoAssertedEvidence,
+    /// A recognized explicit affirmative phrase was found outside quoted text.
+    ExplicitAffirmativeCue,
+    /// A recognized explicit refusal/withdrawal phrase was found.
+    ExplicitDenialCue,
+    /// A recognized statement that consent was not obtained was found.
+    ExplicitAbsenceCue,
+    /// The text explicitly characterized permission as assumed or presumed.
+    ExplicitAssumptionCue,
+    /// The unquoted input was interrogative; no proposition is asserted.
+    Interrogative,
+}
+
+/// Auditable text-level consent assessment.
+///
+/// This reports lexical evidence only. It does not authenticate a speaker,
+/// establish that a claim is true, or authorize an action. The selected cue is
+/// the deterministic longest match in its category, not proof that the
+/// statement is accurate or that consent is in scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConsentTextAssessment {
+    /// Classified epistemic state.
+    pub state: ConsentState,
+    /// Category selected by the parser.
+    pub basis: ConsentEvidenceBasis,
+    /// Recognized cue, when one was selected.
+    pub matched_phrase: Option<String>,
+    /// Whether an unquoted question mark forced the result to Unknown.
+    pub question_suppressed: bool,
+    /// Whether text inside supported quote delimiters was masked from matching.
+    pub quoted_text_suppressed: bool,
+}
+
+impl ConsentTextAssessment {
+    /// Whether a lexical affirmative cue was found. This is not authorization.
+    pub fn has_affirmative_cue(&self) -> bool {
+        self.state == ConsentState::Given
+            && self.basis == ConsentEvidenceBasis::ExplicitAffirmativeCue
+            && self.matched_phrase.is_some()
+    }
+
+    /// A short explanation suitable for diagnostic logs.
+    pub fn explanation(&self) -> &'static str {
+        match self.basis {
+            ConsentEvidenceBasis::NoAssertedEvidence => "No recognized unquoted consent evidence",
+            ConsentEvidenceBasis::ExplicitAffirmativeCue => "Explicit affirmative wording detected; truth and scope unverified",
+            ConsentEvidenceBasis::ExplicitDenialCue => "Explicit refusal or withdrawal wording detected",
+            ConsentEvidenceBasis::ExplicitAbsenceCue => "Wording states consent was not obtained",
+            ConsentEvidenceBasis::ExplicitAssumptionCue => "Consent is described as assumed, not affirmatively granted",
+            ConsentEvidenceBasis::Interrogative => "Question does not assert a consent state",
+        }
+    }
+}
+
 /// Lightweight moral semantic parser
 #[derive(Debug, Clone)]
 pub struct MoralParser {
@@ -985,7 +1043,7 @@ impl MoralParser {
         };
 
         // Detect consent state (check phrases first, then words)
-        scenario.consent = self.detect_consent(&lower);
+        scenario.consent = self.assess_consent_evidence(&lower).state;
 
         // Detect negation
         scenario.has_negation = self.detect_negation(&words);
@@ -1050,51 +1108,60 @@ impl MoralParser {
         result
     }
 
-    /// Detect consent state from explicit, unquoted textual evidence.
+    /// Return a traceable, text-level assessment of consent evidence.
     ///
-    /// Positive consent is never inferred merely because the scenario mentions
-    /// asking, permission, or consent as a topic. An interrogative unquoted
-    /// input does not establish a consent state. Silence maps to Unknown.
-    fn detect_consent(&self, text: &str) -> ConsentState {
+    /// Supported quoted spans are masked; interrogative inputs are conservatively
+    /// Unknown; cues are selected deterministically (longest match, then lexical
+    /// tie-break) so logs and benchmark outputs are reproducible. This is not an
+    /// authorization decision or speaker/provenance verification.
+    pub fn assess_consent_evidence(&self, text: &str) -> ConsentTextAssessment {
         let evidence_text = Self::strip_quoted_consent_text(text);
+        let quoted_text_suppressed = evidence_text != text;
 
-        // A question asks whether a proposition holds; it does not assert that
-        // it holds. This conservative whole-input fallback avoids turning
-        // "Did she refuse consent?" into an asserted refusal from surface cues.
         if evidence_text.contains('?') {
-            return ConsentState::Unknown;
+            return ConsentTextAssessment {
+                state: ConsentState::Unknown,
+                basis: ConsentEvidenceBasis::Interrogative,
+                matched_phrase: None,
+                question_suppressed: true,
+                quoted_text_suppressed,
+            };
         }
 
-        // Check explicit refusal/withdrawal before other signals.
-        for phrase in &self.consent_denied_words {
-            if evidence_text.contains(phrase.as_str()) {
-                return ConsentState::Denied;
+        fn longest_matching_cue(cues: &HashSet<String>, text: &str) -> Option<String> {
+            cues.iter()
+                .map(String::as_str)
+                .filter(|cue| text.contains(*cue))
+                .max_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)))
+                .map(str::to_owned)
+        }
+
+        let categories = [
+            (&self.consent_denied_words, ConsentState::Denied, ConsentEvidenceBasis::ExplicitDenialCue),
+            (&self.consent_absent_words, ConsentState::Absent, ConsentEvidenceBasis::ExplicitAbsenceCue),
+            (&self.consent_implied_words, ConsentState::Implied, ConsentEvidenceBasis::ExplicitAssumptionCue),
+            (&self.consent_given_words, ConsentState::Given, ConsentEvidenceBasis::ExplicitAffirmativeCue),
+        ];
+
+        for (cues, state, basis) in categories {
+            if let Some(matched_phrase) = longest_matching_cue(cues, &evidence_text) {
+                return ConsentTextAssessment {
+                    state,
+                    basis,
+                    matched_phrase: Some(matched_phrase),
+                    question_suppressed: false,
+                    quoted_text_suppressed,
+                };
             }
         }
 
-        // Stated failure to obtain consent is distinct from explicit refusal.
-        for phrase in &self.consent_absent_words {
-            if evidence_text.contains(phrase.as_str()) {
-                return ConsentState::Absent;
-            }
+        ConsentTextAssessment {
+            state: ConsentState::Unknown,
+            basis: ConsentEvidenceBasis::NoAssertedEvidence,
+            matched_phrase: None,
+            question_suppressed: false,
+            quoted_text_suppressed,
         }
-
-        // Assumption is recorded before shorter overlapping positive cues, so
-        // "I assumed she agreed" cannot be mistaken for explicit agreement.
-        for phrase in &self.consent_implied_words {
-            if evidence_text.contains(phrase.as_str()) {
-                return ConsentState::Implied;
-            }
-        }
-
-        // Only affirmative wording outside quotes and interrogatives counts.
-        for phrase in &self.consent_given_words {
-            if evidence_text.contains(phrase.as_str()) {
-                return ConsentState::Given;
-            }
-        }
-
-        ConsentState::Unknown
     }
 
     /// Detect negation in words
@@ -1875,6 +1942,38 @@ mod tests {
             parser.parse("She gave consent to share the report.").consent,
             ConsentState::Given
         );
+    }
+
+    #[test]
+    fn consent_assessment_explains_state_and_selects_cues_deterministically() {
+        use super::ConsentEvidenceBasis;
+
+        let parser = MoralParser::new();
+        let given = parser.assess_consent_evidence("She gave consent to share the report.");
+        assert_eq!(given.state, ConsentState::Given);
+        assert_eq!(given.basis, ConsentEvidenceBasis::ExplicitAffirmativeCue);
+        assert!(given.has_affirmative_cue());
+        assert!(given.matched_phrase.is_some());
+
+        let denied = parser.assess_consent_evidence("She refused consent before I continued.");
+        assert_eq!(denied.state, ConsentState::Denied);
+        assert_eq!(denied.basis, ConsentEvidenceBasis::ExplicitDenialCue);
+        assert!(!denied.has_affirmative_cue());
+
+        let implied = parser.assess_consent_evidence("I assumed she agreed to treatment.");
+        assert_eq!(implied.state, ConsentState::Implied);
+        assert_eq!(implied.basis, ConsentEvidenceBasis::ExplicitAssumptionCue);
+
+        let question = parser.assess_consent_evidence("Did she refuse consent?");
+        assert_eq!(question.state, ConsentState::Unknown);
+        assert_eq!(question.basis, ConsentEvidenceBasis::Interrogative);
+        assert!(question.question_suppressed);
+        assert!(!question.has_affirmative_cue());
+
+        let quoted = parser.assess_consent_evidence("The report says \"she gave consent\" but the source is unknown.");
+        assert_eq!(quoted.state, ConsentState::Unknown);
+        assert!(quoted.quoted_text_suppressed);
+        assert_eq!(quoted.basis, ConsentEvidenceBasis::NoAssertedEvidence);
     }
 
     #[test]
