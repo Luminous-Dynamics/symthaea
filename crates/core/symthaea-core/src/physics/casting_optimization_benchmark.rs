@@ -201,6 +201,7 @@ enum BenchmarkError {
     ZeroBudget,
     EmptySeedSet,
     AdaptiveRequiresHistory,
+    AdaptiveCandidatePoolExhausted,
     CostOverflow,
 }
 
@@ -211,6 +212,9 @@ impl fmt::Display for BenchmarkError {
             Self::EmptySeedSet => f.write_str("paired benchmark requires at least one seed"),
             Self::AdaptiveRequiresHistory => {
                 f.write_str("adaptive sampling requires a sequential observation history")
+            }
+            Self::AdaptiveCandidatePoolExhausted => {
+                f.write_str("adaptive candidate lattice has no unqueried candidate left")
             }
             Self::CostOverflow => f.write_str("benchmark cumulative cost overflowed"),
         }
@@ -438,7 +442,8 @@ fn run_benchmark(
             if query_index < adaptive_warm_start.len() {
                 adaptive_warm_start[query_index]
             } else {
-                choose_adaptive_point(&records).ok_or(BenchmarkError::AdaptiveRequiresHistory)?
+                choose_adaptive_point(&records)
+                    .ok_or(BenchmarkError::AdaptiveCandidatePoolExhausted)?
             }
         } else {
             fixed_points[query_index]
@@ -458,7 +463,11 @@ fn run_benchmark(
                 let observed = record
                     .observed_objective
                     .expect("feasible trial has an observation");
-                if cost_to_target.is_none() && observed <= SYNTHETIC_TARGET_OBJECTIVE {
+                // The synthetic evaluator confirms target achievement against
+                // noise-free truth only after this query; the strategy sees observations.
+                if cost_to_target.is_none()
+                    && record.true_objective_for_evaluation_only <= SYNTHETIC_TARGET_OBJECTIVE
+                {
                     cost_to_target = Some(record.cumulative_cost_units);
                 }
                 if best_observed_objective.map_or(true, |best| observed < best) {
@@ -717,6 +726,31 @@ mod tests {
             .map(|record| (record.point.x.to_bits(), record.point.y.to_bits()))
             .collect::<std::collections::HashSet<_>>();
         assert_eq!(distinct_points.len(), BUDGET);
+    }
+
+    #[test]
+    fn adaptive_candidate_lattice_exhaustion_is_explicit() {
+        let mut records = Vec::new();
+        let mut cost = 0_u64;
+        for ix in 0..16 {
+            for iy in 0..16 {
+                cost += HIGH_FIDELITY_COST_UNITS;
+                let point = Point {
+                    x: (ix as f64 + 0.5) / 16.0,
+                    y: (iy as f64 + 0.5) / 16.0,
+                };
+                records.push(TrialRecord {
+                    point,
+                    status: TrialStatus::Feasible,
+                    fidelity: Fidelity::High,
+                    true_objective_for_evaluation_only: 1.0,
+                    observed_objective: Some(1.0),
+                    cost_units: HIGH_FIDELITY_COST_UNITS,
+                    cumulative_cost_units: cost,
+                });
+            }
+        }
+        assert_eq!(choose_adaptive_point(&records), None);
     }
 
     #[test]
