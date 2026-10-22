@@ -1061,8 +1061,8 @@ mod tests {
     fn scenario_robust_selector_avoids_prior_fragile_partition() {
         let hypotheses = [0_usize, 1, 2, 3];
         let scenarios = vec![
+            vec![0.49, 0.01, 0.49, 0.01],
             vec![0.49, 0.49, 0.01, 0.01],
-            vec![0.01, 0.01, 0.49, 0.49],
         ];
         let experiments = [0_usize, 1_usize];
         let prediction_table = [[0.0_f64, 0.0, 10.0, 10.0], [0.0, 10.0, 0.0, 10.0]];
