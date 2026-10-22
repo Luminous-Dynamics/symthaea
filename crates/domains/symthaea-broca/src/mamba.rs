@@ -141,9 +141,9 @@ pub trait MambaBackend: Send + Sync {
         _tokens: &[u32],
         _pos: usize,
     ) -> Result<Vec<f32>> {
-        // Default: return zero gradient
-        let d = self.d_model();
-        Ok(vec![0.0f32; d])
+        anyhow::bail!(
+            "this MambaBackend does not implement E2E context gradients; refusing a silent zero-gradient update"
+        )
     }
 
     /// Compute E2E token loss at multiple positions simultaneously.
