@@ -113,6 +113,8 @@ jobs:
           grep -Fq "fn ${oracle_test}(" xtask/src/first_aid_trajectory.rs
           mutation_suite_test="$(jq -r '.differential_oracle.mutation_suite_test_name' "$matrix")"
           grep -Fq "fn ${mutation_suite_test}(" xtask/src/first_aid_trajectory.rs
+          matrix_runner_test="$(jq -r '.differential_oracle.matrix_runner_test_name' "$matrix")"
+          grep -Fq "fn ${matrix_runner_test}(" xtask/src/first_aid_trajectory.rs
           state_model_test="$(jq -r '.differential_oracle.state_model_test_name' "$matrix")"
           grep -Fq "fn ${state_model_test}(" xtask/src/first_aid_model.rs
           while IFS= read -r gate_ref; do
