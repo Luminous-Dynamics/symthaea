@@ -1,0 +1,70 @@
+name: First-Aid Clinical Evidence Gate (Metadata Only)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/research/first-aid/CLINICAL_EVIDENCE_PROVENANCE_CONTRACT_V0.md"
+      - "docs/research/first-aid/clinical-evidence-sources-v0.json"
+      - "tools/first-aid-evidence-gate/**"
+      - ".github/workflows/first-aid-clinical-evidence-gate.yml"
+  push:
+    branches:
+      - "research/first-aid-clinical-evidence-gate-v0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: first-aid-clinical-evidence-gate-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  evidence-registry:
+    name: Validate evidence metadata, not clinical advice
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format check
+        run: cargo fmt --manifest-path tools/first-aid-evidence-gate/Cargo.toml -- --check
+
+      - name: Focused tests
+        run: cargo test --manifest-path tools/first-aid-evidence-gate/Cargo.toml
+
+      - name: Clippy with warnings denied
+        run: cargo clippy --manifest-path tools/first-aid-evidence-gate/Cargo.toml --all-targets -- -D warnings
+
+      - name: Emit claim-disposition receipt
+        env:
+          FIRST_AID_TESTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --manifest-path tools/first-aid-evidence-gate/Cargo.toml -- docs/research/first-aid/clinical-evidence-sources-v0.json > /tmp/first-aid-evidence-receipt.json
+          cat /tmp/first-aid-evidence-receipt.json
+          grep -q '"clinical_use_authorized": false' /tmp/first-aid-evidence-receipt.json
+          grep -q '"claim_disposition": "BLOCKED_NO_ADJUDICATED_CLAIMS"' /tmp/first-aid-evidence-receipt.json
+          grep -q "\"tested_revision\": \"$FIRST_AID_TESTED_SHA\"" /tmp/first-aid-evidence-receipt.json
+          {
+            echo "- Tested revision: ${FIRST_AID_TESTED_SHA}"
+            echo "- Rust: $(rustc --version)"
+            echo "- Manifest SHA-256: $(sha256sum tools/first-aid-evidence-gate/Cargo.toml | cut -d' ' -f1)"
+            echo "- Registry SHA-256: $(sha256sum docs/research/first-aid/clinical-evidence-sources-v0.json | cut -d' ' -f1)"
+            echo "- Lockfile SHA-256: $(sha256sum tools/first-aid-evidence-gate/Cargo.lock | cut -d' ' -f1)"
+            echo ""
+            echo "Required disposition: blocked until claims are independently adjudicated. Metadata/process integrity only."
+            echo ""
+            echo 'JSON receipt:'
+            cat /tmp/first-aid-evidence-receipt.json
+          } >> "$GITHUB_STEP_SUMMARY"
