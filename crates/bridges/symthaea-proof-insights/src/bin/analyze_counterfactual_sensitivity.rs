@@ -1129,7 +1129,9 @@ fn join_pairs(
             &format!("{ctx}.target"),
         )?;
         if base_artifact_digest == counterfactual_artifact_digest {
-            bail!("{ctx}: base and counterfactual artifact digests must differ for an artifact-changing contrast");
+            bail!(
+                "{ctx}: base and counterfactual artifact digests must differ for an artifact-changing contrast"
+            );
         }
         let base_statement_digest = required_string(
             target,
