@@ -122,10 +122,14 @@ jobs:
           grep -Fq "fn ${matrix_runner_test}(" xtask/src/first_aid_trajectory.rs
           state_model_test="$(jq -r '.differential_oracle.state_model_test_name' "$matrix")"
           grep -Fq "fn ${state_model_test}(" xtask/src/first_aid_model.rs
+          edge_differential_test="$(jq -r '.differential_oracle.edge_differential_test_name' "$matrix")"
+          grep -Fq "fn ${edge_differential_test}(" xtask/src/first_aid_model.rs
           policy_truth_table_test="$(jq -r '.differential_oracle.policy_truth_table_test_name' "$matrix")"
           grep -Fq "fn ${policy_truth_table_test}(" xtask/src/first_aid_model.rs
           jq -e '
             (.differential_oracle.policy_truth_table_scope | type == "string" and length > 0) and
+            .differential_oracle.edge_differential_status == "unit_test_added_pending_exact_head_validation" and
+            (.differential_oracle.edge_differential_scope | type == "string" and length > 0) and
             .differential_oracle.policy_truth_table_test_name == "exhaustive_orthogonal_policy_truth_tables_cover_non_lifecycle_invariants"
           ' "$matrix"
           while IFS= read -r gate_ref; do
