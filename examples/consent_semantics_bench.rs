@@ -271,8 +271,8 @@ fn main() {
         let baseline_after = strict_lexical_baseline(after);
         let candidate_ok = candidate_before == expected_before && candidate_after == expected_after;
         let baseline_ok = baseline_before == expected_before && baseline_after == expected_after;
-        candidate_directional_correct += usize::from(candidate_ok);
-        baseline_directional_correct += usize::from(baseline_ok);
+        candidate_directional_correct += if candidate_ok { 1 } else { 0 };
+        baseline_directional_correct += if baseline_ok { 1 } else { 0 };
         println!("COUNTERFACTUAL {id} expected={}->{} candidate={}->{} candidate_correct={} baseline={}->{} baseline_correct={}",
             label(expected_before), label(expected_after),
             label(candidate_before), label(candidate_after), candidate_ok,
