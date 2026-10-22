@@ -123,7 +123,7 @@ jobs:
               "base_snapshot_sha256": hashlib.sha256(base_state["block"].encode("utf-8")).hexdigest(),
               "variant_snapshot_sha256": hashlib.sha256(variant_state["block"].encode("utf-8")).hexdigest(),
               "base_local_context_sha256": hashlib.sha256("\n".join(base_state["declarations"]).encode("utf-8")).hexdigest(),
-              "variant_local_context_sha256": hashlib.sha256("\\n".join(variant_state["declarations"]).encode("utf-8")).hexdigest(),
+              "variant_local_context_sha256": hashlib.sha256("\n".join(variant_state["declarations"]).encode("utf-8")).hexdigest(),
               "goal_type_sha256": hashlib.sha256(base_state["goal"].encode("utf-8")).hexdigest(),
               "goal_type_preserved": True,
               "required_declaration_present_before": True,
