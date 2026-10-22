@@ -34,6 +34,8 @@ The nearest-neighbor strategy remains a transparent heuristic, not Bayesian opti
 
 The paired comparison helper runs all five strategies over the same ordered seed list and reports per-strategy run count, median simple regret, target hit rate, median cost-to-target among successful runs, and mean cost units per run. The target hit rate is essential because the conditional cost among successful runs alone would omit strategies that never reached the target. Target achievement is defined relative to each case's frozen reference minimum plus a 0.05 objective gap, and is confirmed against noise-free objective truth only after each query; that truth is never an acquisition input.
 
+The analytical comparator objectives retain their raw values: McCormick uses a reference minimum of approximately -1.913222954981037, Eggholder approximately -959.6406627208397, and Holder table approximately -19.20850256788675. Their reference coordinates are published numerical approximations, so independent validation should retain the stated tolerances rather than claim symbolic exactness.
+
 ## Important scope limits
 
 This is the **first executable baseline tranche**, not the complete CASTING-002A benchmark. It does not yet implement learned GP hyperparameters, expected-improvement acquisition, multi-fidelity acquisition, a DOE/response-surface solver, or a foundry solver adapter. The fidelity discrepancy exists to stress later method-selection code; no adaptive method currently decides when to purchase a low- or high-fidelity evaluation.
@@ -98,9 +100,8 @@ A 2026 review of computational modeling, AI, and digital twins in metal casting 
 - SFU Virtual Library of Simulation Experiments, optimization function catalogue: https://www.sfu.ca/~ssurjano/optimization.html
 - Eggholder domain and many-local-minima description: https://www.sfu.ca/~ssurjano/egg.html
 - McCormick domain/reference: https://www.sfu.ca/~ssurjano/mccorm.html
-- 2026 continuous-casting BO versus CAESES paper: https://www.sciencedirect.com/science/article/pii/S0045793026002276
-- A Bayesian optimization-driven framework for CFD problems applied to continuous casting (Computers & Fluids, 30 August 2026): compared open-source BO against commercial CAESES on analytical benchmark functions and a single-phase-water submerged-entry-nozzle geometry case: https://www.sciencedirect.com/science/article/pii/S0045793026002276
-- Bayesian optimization-driven framework for CFD problems applied to continuous casting, *Computers & Fluids* (30 August 2026), compared an open-source BO framework to commercial CAESES on a submerged-entry-nozzle geometry problem using a single-phase water approximation. Treat as an algorithmic comparator, not matched molten-metal physical validation: https://www.sciencedirect.com/science/article/pii/S0045793026002276
+- Holder-table benchmark formula and reference minima: https://jungtaek.github.io/notes/benchmarks_bo.pdf
+- A Bayesian optimization-driven framework for CFD problems applied to continuous casting, *Computers & Fluids* (30 August 2026): compares open-source BO with commercial CAESES on four analytical functions and a single-phase-water submerged-entry-nozzle geometry case. This is an algorithmic comparator, not matched molten-metal physical validation: https://www.sciencedirect.com/science/article/pii/S0045793026002276
 
 ## Nonclaims
 
