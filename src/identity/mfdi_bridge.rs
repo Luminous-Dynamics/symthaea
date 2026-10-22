@@ -423,8 +423,15 @@ impl MfdiBridge {
             .unwrap_or(AssuranceLevel::E0Anonymous)
     }
 
-    /// Set identity from external verification
+    /// Set identity after an external verification process.
+    ///
+    /// This method is an explicit trust-onboarding boundary: the supplied
+    /// identity's public key is added to the authorized request-signer set.
+    /// Callers must not invoke it for an identity that has not already passed
+    /// their required authentication and assurance checks.
     pub fn set_identity(&mut self, identity: MfdiIdentity) {
+        self.trusted_request_keys
+            .insert(identity.public_key.to_bytes());
         self.current_identity = Some(identity);
     }
 
