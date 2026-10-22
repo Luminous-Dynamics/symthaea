@@ -116,7 +116,7 @@ impl RelationalCore {
 /// not a judgement about a relationship or a claim about consciousness.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PhiDyadStatus {
-    /// The current facade does not receive independent partner observations.
+    /// The current facade does not supply independently sourced user and assistant streams to the dyadic estimator.
     UnavailableNoIndependentPairedStreams,
     /// Reserved for a future provenance-validated observation path.
     AvailableFromIndependentPartnerObservations,
@@ -211,7 +211,7 @@ mod provenance_tests {
         assert_eq!(relational.partner.stage, RelationshipStage::NoRelation);
         assert_eq!(
             relational.partnership_state().phi_dyad_status(),
-            PhiDyadStatus::UnavailableNoIndependentPartnerObservations
+            PhiDyadStatus::UnavailableNoIndependentPairedStreams
         );
         assert_eq!(
             relational.partnership_state().partner_state_status(),
@@ -230,7 +230,7 @@ mod provenance_tests {
         assert_eq!(state.phi_dyad, 0.0);
         assert_eq!(
             state.phi_dyad_status(),
-            PhiDyadStatus::UnavailableNoIndependentPartnerObservations
+            PhiDyadStatus::UnavailableNoIndependentPairedStreams
         );
         assert_eq!(
             state.partner_state_status(),
@@ -261,7 +261,7 @@ mod provenance_tests {
         assert_eq!(state.reciprocity, 0.0);
         assert_eq!(state.stage, RelationshipStage::NoRelation);
         assert_eq!(state.phi_dyad, 0.0);
-        assert_eq!(state.phi_dyad_status(), PhiDyadStatus::UnavailableNoIndependentPartnerObservations);
+        assert_eq!(state.phi_dyad_status(), PhiDyadStatus::UnavailableNoIndependentPairedStreams);
         assert_eq!(state.trajectory_points, 0);
     }
 }
