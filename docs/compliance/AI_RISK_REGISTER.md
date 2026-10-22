@@ -71,7 +71,7 @@ Risks are scored using: **Likelihood** (1-5) x **Impact** (1-5) = **Risk Score**
 | Field | Value |
 |-------|-------|
 | **Description** | HDC moral algebra produces incorrect moral verdicts on novel or adversarial inputs outside training distribution |
-| **Likelihood** | 3 (Moderate — 91.1% classification accuracy leaves ~9% error rate; adversarial inputs not systematically tested) |
+| **Likelihood** | 3 (Moderate — the historical 91.1% classification score is unqualified and is not a validated estimate of residual error; adversarial inputs remain incompletely tested) |
 | **Impact** | 5 (Critical — incorrect moral verdicts could permit harmful actions or block beneficial ones) |
 | **Risk Score** | **15 (High)** |
 | **Existing Controls** | Three-stage ethics pipeline (MoralParser + MoralAlgebra -> ValueEvaluator -> HarmoniesIntegrator); deontological verdict with consent violation detection; moral topology anomaly detection (drift alerts, completeness failures); veto system (Allow/Warn/Veto) |
@@ -100,10 +100,10 @@ Risks are scored using: **Likelihood** (1-5) x **Impact** (1-5) = **Risk Score**
 | **Likelihood** | 3 (Moderate — consent detection relies on HDC pattern matching, which may miss implicit coercion) |
 | **Impact** | 5 (Critical — consent violations are the most serious ethical failure mode) |
 | **Risk Score** | **15 (High)** |
-| **Existing Controls** | `consent_violation: bool` in EthicsEngineOutput; deontological verdict includes violations list; moral concern threshold (-0.3) triggers conservative override; `judge_consent_action()` has explicit Denied/Absent handling; `denied_consent_violation_prototype()`; adversarial consent tests |
-| **Residual Risk** | Medium–High until action-specific policy explicitly distinguishes unknown evidence from consent and exact-head validation passes. The text parser is heuristic, and its legacy verdict type has no dedicated Undetermined value. |
-| **Mitigation** | (a) Preserve explicit Denied and Absent violation checks; (b) represent missing/unspecified consent as `ConsentState::Unknown`, never as implied consent; (c) for actions whose policy requires consent, treat Unknown/Neutral as non-authorization and request clarification or block; (d) keep an independent scope-bound consent/authorization gate and human review for consent-adjacent cases |
-| **Evidence** | `src/cognitive_loop/ethics_engine.rs`, `src/hdc/moral_algebra/primitives.rs`, `src/hdc/moral_parser.rs`, `src/hdc/moral_algebra/operators.rs`, `tests/adversarial_moral_algebra.rs`; draft unqualified change in `fix/moral-consent-unknown-v1` |
+| **Existing Controls** | `consent_violation: bool` in EthicsEngineOutput; direct Denied/Absent handling in `judge_consent_action()`; five-state consent evidence; conservative quote/question parsing guards; standalone scope/identity/action/purpose/validity/revocation precondition in `src/hdc/moral_algebra/consent_policy.rs`; adversarial tests and diagnostic confusion-matrix runner |
+| **Residual Risk** | **High until exact-head validation passes and the precondition is integrated behind a trusted evidence adapter and action-specific policy.** The pure helper does not verify cryptographic provenance, is not wired to action dispatch, and does not make parser output an authorization record. The parser remains heuristic and the legacy verdict type has no dedicated Undetermined value. |
+| **Mitigation** | (a) Preserve explicit Denied and Absent violation checks; (b) represent missing/unspecified consent as `ConsentState::Unknown`, never as implied consent; (c) for consent-required actions, fail closed for Unknown/Implied and require exact subject/action/purpose, validity, revocation, identity and authority checks; (d) integrate `evaluate_consent_gate` only behind independently verified evidence and retain human review for consent-adjacent cases; (e) do not call the policy helper a standalone authorization/security boundary |
+| **Evidence** | `src/cognitive_loop/ethics_engine.rs`, `src/hdc/moral_algebra/{primitives.rs,operators.rs,consent_policy.rs}`, `src/hdc/moral_parser.rs`, `tests/adversarial_moral_algebra.rs`, `examples/consent_semantics_bench.rs`, and `docs/research/CONSENT_POLICY_AND_MORAL_EVALUATION_PROTOCOL_2026-10.md`; exact-head compile/test evidence still pending |
 
 ---
 
