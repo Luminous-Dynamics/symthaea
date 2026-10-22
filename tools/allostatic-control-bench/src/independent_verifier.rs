@@ -72,20 +72,8 @@ fn add_and_clamp(state: Interval, delta: Interval) -> Option<Interval> {
     if !lower_sum.is_finite() || !upper_sum.is_finite() || lower_sum > upper_sum {
         return None;
     }
-    let clamped_lower = if lower_sum < 0.0 {
-        0.0
-    } else if lower_sum > 1.0 {
-        1.0
-    } else {
-        lower_sum
-    };
-    let clamped_upper = if upper_sum < 0.0 {
-        0.0
-    } else if upper_sum > 1.0 {
-        1.0
-    } else {
-        upper_sum
-    };
+    let clamped_lower = lower_sum.clamp(0.0, 1.0);
+    let clamped_upper = upper_sum.clamp(0.0, 1.0);
     Interval::new(clamped_lower, clamped_upper)
 }
 
