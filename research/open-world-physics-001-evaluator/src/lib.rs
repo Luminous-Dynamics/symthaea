@@ -620,7 +620,6 @@ fn summarize(policy: QueryPolicy, rows: &[CaseResult]) -> Option<PolicySummary> 
     })
 }
 
-
 fn candidate_pool(family: LawFamily, count: usize, seed: u64) -> Vec<Law> {
     let mut candidates = candidate_grid(family);
     let family_salt = match family {
@@ -714,8 +713,7 @@ fn evaluate_selection_bottleneck(
     family_best.sort_by(|left, right| left.0.total_cmp(&right.0));
     let delta_bic_to_runner_up = (family_best[1].0 - family_best[0].0).max(0.0);
     let (_, selected_law, selected_training_nrmse, selected_heldout_nrmse) = family_best[0];
-    let selection_regret_nrmse =
-        (selected_heldout_nrmse - oracle_pool_heldout_nrmse).max(0.0);
+    let selection_regret_nrmse = (selected_heldout_nrmse - oracle_pool_heldout_nrmse).max(0.0);
 
     Some(SelectionBottleneckCase {
         world_id: world.id.to_owned(),
@@ -1085,7 +1083,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn candidate_selection_curve_separates_ranking_regret_from_pool_quality() {
         let first = run_reference_benchmark();
@@ -1109,7 +1106,7 @@ mod tests {
             assert!(
                 (row.selection_regret_nrmse
                     - (row.selected_heldout_nrmse - row.oracle_pool_heldout_nrmse).max(0.0))
-                    .abs()
+                .abs()
                     <= 1.0e-12
             );
         }
