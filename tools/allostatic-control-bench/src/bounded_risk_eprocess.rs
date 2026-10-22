@@ -182,7 +182,11 @@ impl BoundedRiskEProcess {
         Some(self.alarmed)
     }
 
-    /// Reset the evidence stream, for example when starting a distinct episode.
+    /// Reset the evidence stream within the same preallocated episode budget.
+    ///
+    /// A reset does not grant a new false-alarm budget. For a new episode, build
+    /// a new monitor with a fresh alpha-spending index; do not call reset to
+    /// restart a detector while reusing the same index.
     pub fn reset(&mut self) {
         self.log_e_value = 0.0;
         self.alarmed = false;
@@ -491,8 +495,8 @@ mod tests {
         let allocated: f64 = (1..=100_000)
             .map(|episode| 0.05 / (5.0 * episode as f64 * (episode + 1) as f64))
             .sum();
-        assert!(allocated <= 0.05);
-        assert!(allocated > 0.049);
+        assert!(allocated <= 0.05 / 5.0);
+        assert!(allocated > 0.0098);
     }
 
     #[test]
