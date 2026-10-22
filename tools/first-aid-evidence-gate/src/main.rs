@@ -201,8 +201,14 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
                     &[]
                 }
             };
-        for source_id in claim_source_ids.iter().filter_map(Value::as_str) {
-            if !source_ids.contains(source_id) {
+        if let Some(source_id_value) = claim_source_ids.first() {
+            let Some(source_id) = source_id_value.as_str() else {
+                errors.push(format!("{context}: primary source ID must be a string"));
+                continue;
+            };
+            if source_id.trim().is_empty() {
+                errors.push(format!("{context}: primary source ID must not be blank"));
+            } else if !source_ids.contains(source_id) {
                 errors.push(format!("{context}: unknown source_id '{source_id}'"));
             } else {
                 let registered = sources
@@ -274,12 +280,20 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
 
             let null_adjudicator = Value::Null;
             let adjudicator = claim.get("adjudicator").unwrap_or(&null_adjudicator);
+            require_text(adjudicator, "adjudicator_id", &context, &mut errors);
             require_text(adjudicator, "qualification", &context, &mut errors);
             if adjudicator.get("independent").and_then(Value::as_bool) != Some(true)
                 || field_str(adjudicator, "decision") != Some("approve")
             {
                 errors.push(format!(
                     "{context}: approval requires a separate independent approving adjudicator"
+                ));
+            }
+            if field_str(adjudicator, "adjudicator_id")
+                .is_some_and(|id| reviewer_ids.contains(id))
+            {
+                errors.push(format!(
+                    "{context}: adjudicator identity must differ from every reviewer identity"
                 ));
             }
         }
@@ -456,6 +470,54 @@ mod tests {
         }]);
         let errors = validate_registry(&input).expect_err("source edition mismatch must fail");
         assert!(errors.iter().any(|error| error.contains("source_edition must match")));
+    }
+
+    #[test]
+    fn non_string_primary_source_id_is_rejected() {
+        let mut input = registry();
+        input["claims"] = json!([{
+            "claim_id": "TEST-004",
+            "topic": "synthetic_topic_only",
+            "population": "must_be_reviewed",
+            "setting": "must_be_reviewed",
+            "target_jurisdiction": "ZA",
+            "locale": "en-ZA",
+            "source_edition": "2025",
+            "source_locator": "not_a_real_clinical_claim",
+            "limitations": "synthetic gate test",
+            "claim_status": "unreviewed",
+            "source_ids": [7]
+        }]);
+        let errors = validate_registry(&input).expect_err("non-string source reference must fail");
+        assert!(errors.iter().any(|error| error.contains("primary source ID must be a string")));
+    }
+
+    #[test]
+    fn adjudicator_cannot_also_be_one_of_the_reviewers() {
+        let mut input = registry();
+        input["claims"] = json!([{
+            "claim_id": "TEST-005",
+            "topic": "synthetic_topic_only",
+            "population": "must_be_reviewed",
+            "setting": "must_be_reviewed",
+            "target_jurisdiction": "ZA",
+            "locale": "en-ZA",
+            "source_edition": "2025",
+            "source_locator": "not_a_real_clinical_claim",
+            "limitations": "synthetic gate test",
+            "claim_status": "approved_for_reference_evaluation_only",
+            "source_ids": ["IFRC-IFA-2025"],
+            "localization_status": "reviewed_for_target_jurisdiction",
+            "review_date": "2026-10-22",
+            "source_update_trigger": "new published edition",
+            "reviewers": [
+                {"reviewer_id":"R1","qualification":"qualified reviewer","decision":"approve","independent":true},
+                {"reviewer_id":"R2","qualification":"qualified reviewer","decision":"approve","independent":true}
+            ],
+            "adjudicator": {"adjudicator_id":"R1","qualification":"qualified adjudicator","decision":"approve","independent":true}
+        }]);
+        let errors = validate_registry(&input).expect_err("reviewer cannot adjudicate own review");
+        assert!(errors.iter().any(|error| error.contains("adjudicator identity must differ")));
     }
 
     #[test]
