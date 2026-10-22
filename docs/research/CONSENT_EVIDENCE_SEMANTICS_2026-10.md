@@ -21,7 +21,7 @@ The old affirmative cue set also treated words such as `asked`, `asking`, `permi
 5. Give explicit assumption phrases precedence over shorter overlapping positive phrases.
 6. Avoid adding parser confidence for an unknown consent state.
 7. Encode Unknown as its own consent HDC state and keep the CFC parser feature neutral (0.0), instead of carrying the former implied-consent feature (0.5).
-8. In `judge_consent_action`, an Unknown state yields a Neutral judgment rather than letting action similarity turn missing consent evidence into Good. The legacy verdict enum has no dedicated Undetermined variant, so Neutral is a compatibility boundary—not a claim of certainty.
+8. In `judge_consent_action`, Unknown and Implied states yield a Neutral judgment rather than letting action similarity turn missing or assumed consent into Good. The legacy verdict enum has no dedicated Undetermined variant, so Neutral is a compatibility boundary—not a claim of certainty.
 
 ## Small deterministic contract matrix
 
@@ -42,7 +42,7 @@ This table is a fixture contract for the phrases listed, not evidence of general
 
 Unknown is not the same as a proven consent violation. It is also **not permission**. The consent parser does not decide which actions require consent, verify identity, bind purpose/scope, validate revocation/freshness, or grant authority. Those decisions belong in the existing policy/authority boundary.
 
-The current `EncodedMoralScenario::is_consent_violation` treats explicit Absent and Denied as violations when a patient is detected; this patch intentionally does not convert every Unknown in ordinary text into a violation. The caller of `judge_consent_action` gets a Neutral result for Unknown, and must not interpret it as a permit. The legacy `MoralVerdict` type cannot distinguish "ethically neutral" from "underdetermined"; a later API should return an explicit typed disposition without silently breaking existing consumers.
+The current `EncodedMoralScenario::is_consent_violation` treats explicit Absent and Denied as violations when a patient is detected; this patch intentionally does not convert every Unknown in ordinary text into a violation. The caller of `judge_consent_action` gets a Neutral result for Unknown or Implied, and must not interpret it as a permit. The legacy `MoralVerdict` type cannot distinguish "ethically neutral" from "underdetermined"; a later API should return an explicit typed disposition without silently breaking existing consumers.
 
 ## Tests added or updated
 
@@ -51,7 +51,7 @@ The current `EncodedMoralScenario::is_consent_violation` treats explicit Absent 
 - Common negated-consent phrasing must not be treated as affirmative consent.
 - HDC encodings include all five states and property-test pairwise distinguishability.
 - The classifier maps Unknown to a neutral feature value.
-- Consent-sensitive judgment with Unknown cannot produce Good from action similarity.
+- Consent-sensitive judgment with Unknown or Implied cannot produce Good from action similarity.
 
 ## Benchmark programme
 
