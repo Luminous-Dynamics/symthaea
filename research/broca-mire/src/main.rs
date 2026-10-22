@@ -292,6 +292,11 @@ struct MemoryModel {
     capacity: Option<usize>,
     ignore_episode: bool,
     ignore_versions: bool,
+    /// When enabled, retain version/deletion metadata separately from the
+    /// capacity-bounded payload cache. This metadata ledger is intentionally
+    /// unbounded in this first diagnostic arm.
+    persistent_ledger: bool,
+    ledger: HashMap<Key, (u32, bool)>,
     entries: HashMap<Key, Entry>,
     clock: u64,
 }
@@ -310,9 +315,17 @@ impl MemoryModel {
             capacity,
             ignore_episode,
             ignore_versions,
+            persistent_ledger: false,
+            ledger: HashMap::new(),
             entries: HashMap::new(),
             clock: 0,
         }
+    }
+
+    fn with_persistent_ledger(name: &'static str, capacity: usize) -> Self {
+        let mut model = Self::new(name, "baseline", Some(capacity), false, false);
+        model.persistent_ledger = true;
+        model
     }
 
     fn normalize_key(&self, mut key: Key) -> Key {
@@ -331,7 +344,19 @@ impl MemoryModel {
         let touch = self.next_clock();
         let normalized = self.normalize_key(key);
 
-        if !self.ignore_versions {
+        if self.persistent_ledger {
+            if let Some((current_version, _)) = self.ledger.get(&normalized) {
+                if version <= *current_version {
+                    return;
+                }
+            }
+            self.ledger.insert(normalized, (version, value.is_none()));
+            if value.is_none() {
+                // The small control-plane ledger outlives the evictable payload.
+                self.entries.remove(&normalized);
+                return;
+            }
+        } else if !self.ignore_versions {
             if let Some(previous) = self.entries.get(&normalized) {
                 if version <= previous.version {
                     return;
@@ -367,6 +392,25 @@ impl MemoryModel {
     fn query(&mut self, key: Key) -> Option<u64> {
         let touch = self.next_clock();
         let normalized = self.normalize_key(key);
+
+        if self.persistent_ledger {
+            match self.ledger.get(&normalized) {
+                // Deleted or never-written keys are not visible.
+                Some((_, true)) | None => return None,
+                Some((version, false)) => {
+                    // If payload was evicted, abstain instead of returning stale
+                    // data. A live metadata version must match the payload version.
+                    if let Some(entry) = self.entries.get_mut(&normalized) {
+                        if entry.version == *version {
+                            entry.last_touch = touch;
+                            return entry.value;
+                        }
+                    }
+                    return None;
+                }
+            }
+        }
+
         if let Some(entry) = self.entries.get_mut(&normalized) {
             entry.last_touch = touch;
             entry.value
@@ -620,6 +664,7 @@ fn system_specs(capacity: usize) -> Vec<MemoryModel> {
     vec![
         MemoryModel::new("exact_versioned_reference", "baseline", None, false, false),
         MemoryModel::new("bounded_lru_versioned", "baseline", Some(capacity), false, false),
+        MemoryModel::with_persistent_ledger("bounded_payload_persistent_ledger", capacity),
         MemoryModel::new("mutation_namespace_blind", "mutation_control", None, true, false),
         MemoryModel::new("mutation_version_ignoring", "mutation_control", None, false, true),
     ]
@@ -645,6 +690,17 @@ fn validate_self_checks(runs: &[(&'static str, &'static str, Vec<QueryResult>)])
         row.family == "cross_namespace" && row.expected.is_none() && row.actual.is_some()
     }) {
         return Err("namespace mutation control was not detected; refusing to emit scores".into());
+    }
+
+    let ledger = runs
+        .iter()
+        .find(|(name, _, _)| *name == "bounded_payload_persistent_ledger")
+        .ok_or_else(|| "missing bounded-payload/persistent-ledger candidate".to_owned())?;
+    if ledger.2.iter().any(|row| {
+        (row.family == "stale_update" && row.actual != row.expected)
+            || (row.family == "deletion_replay" && row.actual.is_some())
+    }) {
+        return Err("persistent ledger failed stale-update or deletion-replay self-check".into());
     }
 
     let version_mutant = runs
@@ -758,6 +814,21 @@ mod tests {
         assert!(summarize(&results)
             .values()
             .any(|summary| summary.cross_namespace_leaks > 0));
+    }
+
+    #[test]
+    fn persistent_ledger_prevents_stale_and_deleted_values_from_resurrecting() {
+        let actions = build_fixture(19, 4, 32);
+        let mut ledger = MemoryModel::with_persistent_ledger(
+            "bounded_payload_persistent_ledger",
+            8,
+        );
+        let results = run_model(&actions, &mut ledger);
+        assert!(results.iter().filter(|row| row.family == "stale_update").all(QueryResult::correct));
+        assert!(results.iter().filter(|row| row.family == "deletion_replay").all(QueryResult::correct));
+        assert!(results.iter().any(|row| {
+            row.family == "stable_retention" && !row.correct()
+        }), "bounded payload should expose capacity misses separately from version correctness");
     }
 
     #[test]
