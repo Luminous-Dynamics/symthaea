@@ -1,0 +1,1617 @@
+{
+  "corpus_id": "BIOPROTEIN-GATE-CORPUS-V1",
+  "schema_version": "1.0.0",
+  "status": "synthetic_design_fixture_only",
+  "created_at": "2026-10-18",
+  "disclaimer": "Every candidate, source, amount, gate and digest is synthetic. These fixtures test decision semantics only and must never be interpreted as food composition, formulation advice, biological results, safety evidence, regulatory status, price data, or lifecycle assessment.",
+  "schema_file": "bioprotein-gate-corpus-schema-v1.json",
+  "case_count": 29,
+  "cases": [
+    {
+      "case_id": "BIOP-GATE0-001",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-01",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-01"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "eligible_for_declared_comparison",
+        "reason_codes": [
+          "ALL_DECLARED_SYNTHETIC_GATES_PASS"
+        ],
+        "claims_allowed": [
+          "evidence_eligibility"
+        ],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Baseline synthetic positive control: current source, permitted rights, matched target, normalized basis and all requested gates pass."
+    },
+    {
+      "case_id": "BIOP-GATE0-002",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-02",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "unknown",
+          "permission_evidence_present": false,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": null
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "RIGHTS_UNKNOWN"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Unknown redistribution status blocks inclusion in a public fixture even when other gates pass."
+    },
+    {
+      "case_id": "BIOP-GATE0-003",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-03",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "revoked",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-03"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "RIGHTS_REVOKED"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Revoked source permission cannot be treated as valid because the data were previously accessible."
+    },
+    {
+      "case_id": "BIOP-GATE0-004",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-04",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "expired",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-04"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "RIGHTS_EXPIRED"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Expired permission evidence requires review before reuse."
+    },
+    {
+      "case_id": "BIOP-GATE0-005",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-05",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "attribution_required",
+          "permission_evidence_present": true,
+          "attribution_required": true,
+          "attribution_present": false,
+          "permission_evidence_ref": "synthetic-permission-05"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "ATTRIBUTION_MISSING"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "An attribution-required source is not eligible for public inclusion while the required attribution is absent."
+    },
+    {
+      "case_id": "BIOP-GATE0-006",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-06",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-06"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "stale",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "SOURCE_STALE"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Stale source review prevents a current evidence-eligibility claim."
+    },
+    {
+      "case_id": "BIOP-GATE1-001",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "nutrition_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-07",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-07"
+        },
+        "identity_match": "match",
+        "target_match": "mismatch",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "TARGET_SPECIES_MISMATCH"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "A profile for the wrong target species must not be reused."
+    },
+    {
+      "case_id": "BIOP-GATE1-002",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "nutrition_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-08",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-08"
+        },
+        "identity_match": "mismatch",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "INGREDIENT_IDENTITY_MISMATCH"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "A nutrient profile cannot be assigned to a different ingredient identity."
+    },
+    {
+      "case_id": "BIOP-GATE1-003",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "nutrition_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-09",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-09"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "unknown",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "missing_required",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "REQUIRED_NUTRITION_UNKNOWN"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Unknown required nutrition is not a pass and must not be imputed."
+    },
+    {
+      "case_id": "BIOP-GATE1-004",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "nutrition_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-10",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-10"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "mixed_without_conversion",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "not_comparable",
+        "reason_codes": [
+          "BASIS_MIXED_WITHOUT_CONVERSION"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Mixed as-fed/dry-matter-like basis states are non-comparable until a traceable conversion is supplied."
+    },
+    {
+      "case_id": "BIOP-GATE1-005",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "nutrition_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-11",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-11"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "incompatible_units",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "not_comparable",
+        "reason_codes": [
+          "UNITS_INCOMPATIBLE"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Incompatible units prevent direct numeric comparison."
+    },
+    {
+      "case_id": "BIOP-GATE1-006",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "nutrition_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-12",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-12"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "eligible_for_declared_comparison",
+        "reason_codes": [
+          "ALL_DECLARED_SYNTHETIC_GATES_PASS"
+        ],
+        "claims_allowed": [
+          "nutrition_feasibility"
+        ],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Positive control: declared normalized synthetic values and required nutrition gate are present."
+    },
+    {
+      "case_id": "BIOP-GATE1-007",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "nutrition_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-13",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-13"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "fail",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 0,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "NUTRITION_GATE_FAILED"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "A failed hard nutritional gate cannot be offset by lower cost."
+    },
+    {
+      "case_id": "BIOP-GATE1-008",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "nutrition_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-14",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-14"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "unknown",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "NUTRITION_GATE_UNKNOWN"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Unknown nutritional adequacy cannot be represented as adequate."
+    },
+    {
+      "case_id": "BIOP-GATE2-001",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "nutrition_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-15",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-15"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "fail",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 0,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "SAFETY_GATE_FAILED"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "A failed safety gate blocks candidate eligibility regardless of cost or modeled impact."
+    },
+    {
+      "case_id": "BIOP-GATE2-002",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "nutrition_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-16",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-16"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "not_assessed",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "SAFETY_NOT_ASSESSED"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Safety not assessed is not evidence of safety."
+    },
+    {
+      "case_id": "BIOP-GATE2-003",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "cultivated_process_screen",
+        "requested_claim": "scenario_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-17",
+        "ingredient_class": "cultivated_cell",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-17"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "unknown",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "AUTHORIZATION_UNKNOWN"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Unresolved authorization status blocks any claim that the candidate is cleared for the declared use."
+    },
+    {
+      "case_id": "BIOP-GATE2-004",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "cultivated_process_screen",
+        "requested_claim": "scenario_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-18",
+        "ingredient_class": "cultivated_cell",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-18"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "fail",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "AUTHORIZATION_FAILED"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "A declared authorization failure blocks the use case."
+    },
+    {
+      "case_id": "BIOP-GATE2-005",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "scenario_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-19",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-19"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "unavailable",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "RESOURCE_UNAVAILABLE"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "A required unavailable input makes the candidate infeasible in this scenario."
+    },
+    {
+      "case_id": "BIOP-GATE2-006",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "scenario_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-20",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-20"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "seasonal_unknown",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "SEASONAL_AVAILABILITY_UNKNOWN"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Seasonally unknown supply is not assumed available."
+    },
+    {
+      "case_id": "BIOP-GATE3-001",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "lca_comparison",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-21",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-21"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "incomplete",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "not_comparable",
+        "reason_codes": [
+          "LCA_EVIDENCE_INCOMPLETE"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "An incomplete lifecycle boundary prevents LCA ranking but need not erase separately eligible nutrition evidence."
+    },
+    {
+      "case_id": "BIOP-GATE3-002",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "scenario_feasibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-22",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-22"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-b",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "not_comparable",
+        "reason_codes": [
+          "SCENARIO_DIGEST_MISMATCH"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Candidate values evaluated under different scenario digests cannot be directly ranked as one aligned comparison."
+    },
+    {
+      "case_id": "BIOP-GATE4-001",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-23",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-23"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "simulated",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "reported_as": "measured",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "invalid_evidence",
+        "reason_codes": [
+          "SIMULATED_REPORTED_AS_MEASURED"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "A simulation cannot be relabeled as a measured result."
+    },
+    {
+      "case_id": "BIOP-GATE4-002",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-24",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-24"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "eligible_for_declared_comparison",
+        "reason_codes": [
+          "ALL_DECLARED_SYNTHETIC_GATES_PASS"
+        ],
+        "claims_allowed": [
+          "evidence_eligibility"
+        ],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Synthetic positive control remains explicitly synthetic; this is a structural test only, not a nutrition result."
+    },
+    {
+      "case_id": "BIOP-GATE4-003",
+      "request": {
+        "target_species": "synthetic-livestock-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "feed_screen",
+        "requested_claim": "animal_outcome",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-25",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-25"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "unknown",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "simulated",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "reported_as": "simulated",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "modeled"
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "ANIMAL_OUTCOME_NOT_MEASURED"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "A modeled feed-conversion or health outcome cannot be reported as an observed trial result."
+    },
+    {
+      "case_id": "BIOP-GATE4-004",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "cost_comparison",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-26",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": true,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-26"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": ""
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "invalid_evidence",
+        "reason_codes": [
+          "INVALID_COST_BASIS"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Cost values with no comparable declared basis cannot drive a cost-efficiency claim."
+    },
+    {
+      "case_id": "BIOP-GATE0-007",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-rights-missing-evidence",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": false,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": null
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "RIGHTS_EVIDENCE_MISSING"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "A source marked permitted without the evidence record that substantiates the scoped right must be blocked."
+    },
+    {
+      "case_id": "BIOP-GATE0-008",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-attribution-rights-good",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "attribution_required",
+          "permission_evidence_present": true,
+          "attribution_required": true,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-scoped-permission-attr-good"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "eligible_for_declared_comparison",
+        "reason_codes": [
+          "ALL_DECLARED_SYNTHETIC_GATES_PASS"
+        ],
+        "claims_allowed": [
+          "evidence_eligibility"
+        ],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Positive control: a scoped permission evidence record and required attribution are both present."
+    },
+    {
+      "case_id": "BIOP-GATE0-009",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-attribution-rights-no-proof",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "attribution_required",
+          "permission_evidence_present": false,
+          "attribution_required": true,
+          "attribution_present": true,
+          "permission_evidence_ref": null
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete",
+        "outcome_evidence_state": "not_requested"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "RIGHTS_EVIDENCE_MISSING"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Attribution does not substitute for evidence that the source grants the intended right."
+    }
+  ],
+  "case_schema_file": "bioprotein-gate-schema-v1.json"
+}
