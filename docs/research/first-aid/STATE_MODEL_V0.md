@@ -37,7 +37,16 @@ The two bundle identities are a finite abstraction for identity mismatch, not a 
 
 The checker performs breadth-first exploration from the initial state. For each distinct reachable state it applies each of the 16 declared abstract actions, checks the next state and violations against the invariants, and enqueues newly discovered states until reaching a fixed point. A finite fixed-point traversal avoids relying on sampled traces for this abstract model.
 
-The exact explored graph is pinned at 84 reachable abstract states and 1,344 state/action transitions; the Rust test prints both counts and fails if either changes. A changed count requires reviewing the state/action space rather than silently accepting a smaller graph. The dedicated workflow binds the model source digest, model-specification digest, and test outcome into the trace-contract receipt.
+The exact lifecycle graph is pinned at 84 reachable abstract states and 1,344 state/action transitions; the Rust test prints both counts and fails if either changes. A changed count requires reviewing the state/action space rather than silently accepting a smaller graph.
+
+A second exhaustive test covers 18 **orthogonal policy combinations** that are deliberately kept outside the lifecycle product graph to prevent a Cartesian state-space explosion:
+
+- Six connectivity/requirement combinations: online, offline, or intermittent connectivity when the core workflow either does or does not require the network.
+- Six resource freshness/presentation combinations: fresh, stale, or unknown resource state, each presented as confirmed or unconfirmed.
+- Four data sensitivity/consent combinations: sensitive or non-sensitive payload, with or without consent scope.
+- Two unknown-normalization cases: no normalization event vs. an explicit unknown-normalization event.
+
+These are finite truth-table probes, not temporal models of network recovery, resource invalidation, consent changes, or their interactions with lifecycle state. Those combined paths still need generated sequence tests. The dedicated workflow binds the model source digest, model-specification digest, and test outcome into the trace-contract receipt.
 
 ## What it does not establish
 
