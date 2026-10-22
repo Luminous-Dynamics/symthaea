@@ -209,6 +209,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "statistic",
         "numerator",
         "denominator",
         "estimate",
@@ -252,6 +253,12 @@
         "defined_bootstrap_replicates": {
           "type": "integer",
           "minimum": 0
+        },
+        "statistic": {
+          "enum": [
+            "ratio",
+            "mean"
+          ]
         }
       }
     }
