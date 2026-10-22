@@ -9,6 +9,7 @@ on:
       - "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
       - "docs/research/OOD_REACHABILITY_FALLBACK_V1.md"
       - "docs/research/SAFETY_CONSTRAINED_ACTIVE_FALSIFICATION_V1.md"
+      - "docs/research/SAFETY_CONSTRAINED_ACTIVE_FALSIFICATION_V1.md"
       - ".github/workflows/allostatic-control-bench.yml"
   workflow_dispatch:
 
@@ -60,3 +61,5 @@ jobs:
             allostatic-control-v1-ood-fallback-summary.csv
             allostatic-control-v1-safe-probe.csv
             allostatic-control-v1-safe-probe-summary.csv
+            allostatic-control-v1-active-learning.csv
+            allostatic-control-v1-active-learning-summary.csv
