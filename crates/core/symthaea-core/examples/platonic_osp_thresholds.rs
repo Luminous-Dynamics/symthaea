@@ -132,7 +132,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             seed,
             "global_threshold",
             "all",
-            global_threshold,
+            Some(global_threshold),
             selection.len(),
             global_selection.errors,
             certification.len(),
