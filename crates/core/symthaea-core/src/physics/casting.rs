@@ -334,7 +334,10 @@ impl ChvorinovConformalCalibrator {
         self.log_residual_quantile
     }
 
-    /// Return the number of calibration observations supplied by the caller. Independence and exchangeability are not inferred by the API.
+    /// Return the number of calibration observations supplied by the caller.
+    ///
+    /// Independence and exchangeability are protocol obligations, not properties
+    /// that the API can infer from numeric values alone.
     pub fn calibration_sample_count(&self) -> usize {
         self.calibration_sample_count
     }
@@ -1046,8 +1049,14 @@ mod tests {
         let expected_relative_errors = [3.0 / 33.0, 1.0 / 44.2];
         let expected_median_relative_error =
             (expected_relative_errors[0] + expected_relative_errors[1]) / 2.0;
-        assert!((report.median_absolute_relative_error.unwrap() - expected_median_relative_error).abs() < 1e-6);
-        assert!((report.mean_absolute_relative_error.unwrap() - expected_median_relative_error).abs() < 1e-6);
+        assert!(
+            (report.median_absolute_relative_error.unwrap() - expected_median_relative_error).abs()
+                < 1e-6
+        );
+        assert!(
+            (report.mean_absolute_relative_error.unwrap() - expected_median_relative_error).abs()
+                < 1e-6
+        );
         assert_eq!(
             report.points[2].status,
             CastingValidationStatus::AbstainedOutsideCalibrationDomain
