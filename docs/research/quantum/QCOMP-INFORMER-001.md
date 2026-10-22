@@ -160,7 +160,10 @@ The adaptive shot planner is a conservative finite-horizon baseline. It should n
 
 - [Track-and-Stop (Garivier & Kaufmann, COLT 2016)](https://proceedings.mlr.press/v49/garivier16a.html), an asymptotically optimal fixed-confidence strategy for best-arm identification in its stated stochastic model.
 - [APGAI (Jourdan, Delahaye-Duriez & Réda, JMLR 2026)](https://www.jmlr.org/papers/v27/24-0680.html), an anytime good-arm-identification method with time-uniform error bounds. Good-arm identification is not the same objective as finding the highest-scoring vertex; use APGAI only for a separately declared threshold/abstention task, including cases where no candidate meets the threshold.
-- Uniform fixed-budget sampling, the current finite-horizon Bonferroni planner, and an appropriate fixed-budget best-arm baseline such as Successive Rejects or a validated KL-based method.
+- Uniform fixed-budget sampling, the current finite-horizon Bonferroni planner, and **Successive Rejects** as a published fixed-budget baseline.
+- **Continuous Rejects (CR)** for a modern fixed-budget adaptive baseline; the NeurIPS 2023 paper analyzes its guarantees under its stochastic arm model and reports better theoretical performance than Successive Rejects in that setting: https://proceedings.neurips.cc/paper_files/paper/2023/hash/364d565b4b726c607aa40e1632045873-Abstract-Conference.html
+- **Almost Tracking** for anytime/fixed-budget best-arm identification, from AISTATS 2026. It is reported as not requiring the total budget in advance and retaining samples, which makes it a useful alternative to the current finite-horizon error-spending policy: https://proceedings.mlr.press/v300/komiyama26a.html
+- **Track-and-Stop** for fixed-confidence identification and **APGAI** only for a separately defined good-arm/threshold task. Do not pool these objectives into one leaderboard score.
 
 Compare all applicable methods on identical synthetic sample streams, candidate means/gaps, candidate counts, maximum shot budgets, and seed lists. Report selected-arm error, coverage, abstention, total/mean/p95 observations, and regret to the synthetic best arm. For adaptive methods, document confidence assumptions and optional-stopping treatment. Keep no-good-arm detection separate from best-arm identification.
 
@@ -173,6 +176,12 @@ It emits per-trial records plus coverage, selective-error and baseline-accuracy 
 ### Dual runtime accounting: benchmark-standard and deployment cost
 
 Follow the current [QOBLIB submission guide](https://github.com/ZIB-AOPT/QOBLIB/blob/main/CONTRIBUTING.md) exactly when submitting standardized results: it requires solver/source details and separates total, time-to-solution, CPU, GPU, and QPU runtime; the guide excludes hardware queue and compilation time from its runtime fields. To avoid underestimating practical value, produce an additional operational ledger alongside—not instead of—the QOBLIB-conforming numbers. In that ledger show preprocessing, compilation, calibration, data transfer, circuit execution, retries, postprocessing, cache invalidation, and independent verification. Report queue time separately; amortize reusable compilation/calibration only under a stated repeated-workload model. Never compare one method's standardized runtime against another's all-in elapsed wall time.
+
+### Run-level comparison should span objectives and stopping regimes
+
+The sampling comparison now includes fixed-budget best-arm selection (Successive Rejects, Continuous Rejects, Almost Tracking, uniform allocation), fixed-confidence stopping (Track-and-Stop), and good-arm/threshold identification (APGAI only when the objective is explicitly a threshold). These methods have different contracts, so report them in separate tables or panels with the same candidate means/observation streams and declared budget. The current Bonferroni policy is a conservative reference, not a presumed state-of-the-art method.
+
+The synthetic benchmark's candidate-observation budget is independent of the execution accounting contract described below. First compare policies within the same statistical observation model; then evaluate each under the same physical-batch/cost adapter. Do not use a stochastic bandit guarantee when sample distribution assumptions fail due to drift or dependent/time-varying measurements.
 
 ### Physical measurement batches are not candidate observations
 
