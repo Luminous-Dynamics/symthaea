@@ -19,7 +19,7 @@ The documented `cargo run --example coding_agent_benchmark` target was also abse
 - Count a task as correct only if it compiles, has a non-empty predeclared oracle, executes exactly the expected test count, and has zero failing tests.
 - Add unit tests for missing, zero-run, partial, fully passing, and failing oracles.
 
-This deliberately uses a conservative policy: compile-only work can contribute to compilation metrics but cannot silently contribute to correctness. The static fixture format is the source of the expected-test count; if the fixture format changes, the expected-count parser must change with it.
+This deliberately uses a conservative policy: compile-only work can contribute to compilation metrics but cannot silently contribute to correctness. Static inspection of the present suite found **11 hard tasks with empty test fixtures**; they remain useful compilation probes but will be marked `missing_oracle` and excluded from the correctness numerator until independent behavioral tests are authored. The static fixture format is the source of the expected-test count; if the fixture format changes, the expected-count parser must change with it.
 
 ## Local verification protocol
 
