@@ -1982,3 +1982,57 @@ fn test_fragment_wrong_key_rejected() {
         "Wrong key must fail"
     );
 }
+
+
+// ============================================================================
+// Legacy AEAD nonce-uniqueness regression witnesses
+// ============================================================================
+
+/// This test intentionally reproduces a known-broken legacy behavior; it is
+/// not a passing security invariant. The first six source-ID bytes are copied
+/// into the nonce while the final two are ignored. With a shared key, distinct
+/// IDs can therefore reuse a nonce and reveal the XOR of equal-length plaintexts.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn legacy_nonce_source_id_truncation_reveals_plaintext_xor() {
+    let key = [0x5Au8; 32];
+    let source_a = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
+    let source_b = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x99, 0xAA];
+    let plaintext_a = *b"plaintext-one!!!";
+    let plaintext_b = *b"plaintext-two!!!";
+
+    assert_ne!(source_a, source_b);
+    assert_eq!(&source_a[..6], &source_b[..6]);
+
+    let packet_a = encrypt_packet_typed(&plaintext_a, &key, &source_a, 3, 0x42, 7);
+    let packet_b = encrypt_packet_typed(&plaintext_b, &key, &source_b, 3, 0x42, 7);
+
+    assert_eq!(
+        &packet_a[..AEAD_NONCE_SIZE],
+        &packet_b[..AEAD_NONCE_SIZE],
+        "legacy source-ID truncation must reproduce the nonce collision"
+    );
+
+    let ciphertext_a =
+        &packet_a[AEAD_NONCE_SIZE..packet_a.len() - AEAD_TAG_SIZE];
+    let ciphertext_b =
+        &packet_b[AEAD_NONCE_SIZE..packet_b.len() - AEAD_TAG_SIZE];
+    assert_eq!(ciphertext_a.len(), plaintext_a.len());
+    assert_eq!(ciphertext_b.len(), plaintext_b.len());
+
+    let leaked_relation: Vec<u8> = ciphertext_a
+        .iter()
+        .zip(ciphertext_b.iter())
+        .map(|(a, b)| *a ^ *b)
+        .collect();
+    let expected_relation: Vec<u8> = plaintext_a
+        .iter()
+        .zip(plaintext_b.iter())
+        .map(|(a, b)| *a ^ *b)
+        .collect();
+
+    assert_eq!(
+        leaked_relation, expected_relation,
+        "reused ChaCha20 stream reveals plaintext_a XOR plaintext_b"
+    );
+}
