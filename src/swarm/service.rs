@@ -668,6 +668,7 @@ impl NetworkService {
         // A PQC-required build must not bypass key agreement via LocalTrust.
         #[cfg(feature = "pqc-handshake")]
         if !self.config.require_handshake {
+            channel.close();
             return Err(SwarmError::TrustVerificationError {
                 reason: "PQC feature enabled while require_handshake=false; refusing LocalTrust downgrade".to_string(),
             });
@@ -765,8 +766,9 @@ impl NetworkService {
                 Some(pqc) => pqc,
                 None => {
                     // Classical verification already inserted this peer into the
-                    // trust map. Roll it back before returning the setup error.
+                    // trust map. Roll it back and close before returning the error.
                     self.handshake.write().remove_peer(peer_id);
+                    channel.close();
                     return Err(SwarmError::TrustVerificationError {
                         reason: "PQC feature enabled but no KEM manager is configured".to_string(),
                     });
@@ -786,6 +788,7 @@ impl NetworkService {
                     // Do not downgrade to classical-only. Roll back the trust
                     // mutation from classical verification and return the error.
                     self.handshake.write().remove_peer(peer_id);
+                    channel.close();
                     tracing::warn!(
                         peer = peer_id,
                         error = %e,
