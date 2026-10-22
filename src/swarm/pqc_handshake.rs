@@ -50,11 +50,15 @@
 //! Requires `pqc-handshake` feature (implies `swarm` transport, `identity`,
 //! `mesh-key-exchange`, and the current compile-only `mycelix-crypto` stub).
 //!
-//! ## References
+//! ## Design references
 //!
-//! - NIST FIPS 203 (2024) — ML-KEM (Module-Lattice Key Encapsulation Mechanism)
-//! - Bindel et al. (2019) — Hybrid key exchange in TLS 1.3
-//! - Schwabe et al. (2020) — CRYSTALS-Kyber algorithm specification
+//! - NIST FIPS 203 — final ML-KEM standard
+//! - RFC 10024 — standardized TLS 1.3 `X25519MLKEM768` hybrid group
+//! - RFC 9954 — TLS 1.3 hybrid key-exchange framework
+//!
+//! These standards are references for future integration, not evidence that this
+//! module implements them. The current workspace backend is a compile-only stub,
+//! and this module does not establish a session.
 
 use crate::swarm::{SwarmConfig, SwarmError, SwarmResult};
 use mycelix_crypto::pqc::ml_kem::MlKem768KeyPair;
@@ -106,7 +110,10 @@ impl Drop for PqcCandidateKey {
 // KEM PUBLIC KEY EXCHANGE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Data sent during PQC handshake phase 2: KEM public key + encapsulation.
+/// Experimental wire-payload shape only; not an active protocol message.
+///
+/// Do not transmit this type as a security claim: the current KEM backend is a
+/// compile stub and the service deliberately does not complete a handshake.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KemExchange {
     /// ML-KEM-768 public key bytes (1184 bytes).
@@ -121,11 +128,12 @@ pub struct KemExchange {
 // PQC HANDSHAKE MANAGER
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Manages research-stage ML-KEM exchange state.
+/// Manages experimental KEM API plumbing; it does not establish sessions.
 ///
-/// This type does not currently establish a completed hybrid session: KEM
-/// results remain pending until a reviewed, transcript-bound key-confirmation
-/// protocol exists. Do not treat candidate derivation as session establishment.
+/// The workspace-local backend is a deterministic all-zero compile stub and is
+/// explicitly refused by the public KEM operations. Even after a real backend
+/// is selected, KEM results must remain candidates until a reviewed, transcript-
+/// bound protocol and explicit key confirmation exist.
 pub struct PqcHandshakeManager {
     /// Classical handshake manager (Ed25519 or BLAKE3 fallback).
     classical: crate::swarm::handshake::HybridHandshake,
