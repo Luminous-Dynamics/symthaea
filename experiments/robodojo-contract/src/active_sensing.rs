@@ -57,6 +57,7 @@ pub enum SensingStopReason {
     PosteriorForecastUnavailable,
     RiskRemainsAboveLimit,
     ConfidenceRemainsBelowThreshold,
+    NetBenefitBelowThreshold,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -234,6 +235,9 @@ pub fn choose_active_sensing(
     );
     let utility_after = expected_utility(after_success, after_unsafe, policy);
     let net_benefit = utility_after - utility_before - sensing_cost(option, policy);
+    if !net_benefit.is_finite() {
+        return Err(SensingError::InvalidCost);
+    }
 
     if !within_budget {
         if must_sense_for_risk || must_improve_confidence {
@@ -267,7 +271,11 @@ pub fn choose_active_sensing(
             });
         }
         return Ok(SensingDecision::StopAndEscalate {
-            reason: SensingStopReason::ConfidenceRemainsBelowThreshold,
+            reason: if after_unsafe > policy.maximum_unsafe_event_probability {
+                SensingStopReason::RiskRemainsAboveLimit
+            } else {
+                SensingStopReason::NetBenefitBelowThreshold
+            },
             estimated_net_benefit: Some(net_benefit),
         });
     }
@@ -430,6 +438,36 @@ mod tests {
             choose_active_sensing(current, &candidate, policy()).unwrap(),
             SensingDecision::StopAndEscalate {
                 reason: SensingStopReason::RequiredSensorUnavailable,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn utility_overflow_is_rejected_instead_of_becoming_a_decision() {
+        let mut current_policy = policy();
+        current_policy.utility_per_joule = f64::MAX;
+        let mut candidate = option();
+        candidate.energy_cost_j = 10.0;
+        assert_eq!(
+            choose_active_sensing(state(), &candidate, current_policy),
+            Err(SensingError::InvalidCost)
+        );
+    }
+
+    #[test]
+    fn risk_failure_is_reported_when_confidence_is_high_but_risk_is_not_reduced() {
+        let mut current = state();
+        current.predicted_success_without_sensing = 0.3;
+        current.unsafe_event_probability_without_sensing = 0.01;
+        let mut candidate = option();
+        candidate.predicted_success_after_sensing = Some(0.95);
+        candidate.unsafe_event_probability_after_sensing = Some(0.2);
+        let decision = choose_active_sensing(current, &candidate, policy()).unwrap();
+        assert!(matches!(
+            decision,
+            SensingDecision::StopAndEscalate {
+                reason: SensingStopReason::RiskRemainsAboveLimit,
                 ..
             }
         ));
