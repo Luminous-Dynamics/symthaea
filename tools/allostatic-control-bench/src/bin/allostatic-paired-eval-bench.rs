@@ -131,14 +131,7 @@ fn run() -> Result<(), String> {
         return Err("no rows found for the selected baseline/candidate policies".to_owned());
     }
 
-    let mut output = fs::File::create(output_path)
-        .map_err(|error| format!("cannot create output CSV {output_path}: {error}"))?;
-    writeln!(
-        output,
-        "scenario,shielded,metric,baseline_policy,candidate_policy,n_pairs,baseline_mean,candidate_mean,candidate_minus_baseline_mean,median_paired_delta,paired_bootstrap_ci95_low,paired_bootstrap_ci95_high,bootstrap_replicates,bootstrap_seed,baseline_violations,candidate_violations,candidate_only_violations,baseline_only_violations,mcnemar_exact_two_sided_p,baseline_violation_rate,candidate_violation_rate,baseline_violation_upper95_exact,candidate_violation_upper95_exact"
-    )
-    .map_err(|error| format!("cannot write report header: {error}"))?;
-
+    let mut summaries: Vec<(String, bool, u64, PairedSummary)> = Vec::new();
     for ((scenario, shielded), by_seed) in rows {
         let mut paired = Vec::with_capacity(by_seed.len());
         for (seed, policies) in by_seed {
@@ -171,8 +164,20 @@ fn run() -> Result<(), String> {
             .wrapping_add(if shielded { 1 } else { 0 });
         let summary = PairedSummary::from_samples(&paired, bootstrap_replicates, random_seed)
             .map_err(|error| format!("{scenario}/{shielded}: {error}"))?;
+        summaries.push((scenario, shielded, random_seed, summary));
+    }
+
+    // Write atomically only after every condition passes validation and analysis.
+    let mut report = fs::File::create(output_path)
+        .map_err(|error| format!("cannot create output CSV {output_path}: {error}"))?;
+    writeln!(
+        report,
+        "scenario,shielded,metric,baseline_policy,candidate_policy,n_pairs,baseline_mean,candidate_mean,candidate_minus_baseline_mean,median_paired_delta,paired_bootstrap_ci95_low,paired_bootstrap_ci95_high,bootstrap_replicates,bootstrap_seed,baseline_violations,candidate_violations,candidate_only_violations,baseline_only_violations,mcnemar_exact_two_sided_p,baseline_violation_rate,candidate_violation_rate,baseline_violation_upper95_exact,candidate_violation_upper95_exact"
+    )
+    .map_err(|error| format!("cannot write report header: {error}"))?;
+    for (scenario, shielded, random_seed, summary) in summaries {
         write_summary_row(
-            &mut output,
+            &mut report,
             &scenario,
             shielded,
             metric_name,
@@ -182,8 +187,7 @@ fn run() -> Result<(), String> {
             &summary,
         )?;
     }
-
-    output
+    report
         .flush()
         .map_err(|error| format!("cannot flush report: {error}"))?;
     Ok(())
