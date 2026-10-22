@@ -345,10 +345,8 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let prediction_error = encoding_res.prediction_error;
         let prediction_error_valid = encoding_res.prediction_error_valid;
-        let _t_surprise = Instant::now();
-        let (surprise_triggered, exploration_action) =
-            self.run_surprise_exploration(&encoding_res.compressed_state);
-        module_timings.surprise_exploration = _t_surprise.elapsed().as_micros() as u64;
+        let surprise_triggered = encoding_res.surprise_triggered;
+        let exploration_action = encoding_res.exploration_action;
 
         // Exploration can change confidence/curiosity state, so compute the
         // adaptive threshold after the single exploration update for this cycle.
