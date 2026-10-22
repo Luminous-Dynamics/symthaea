@@ -52,6 +52,8 @@
       "additionalProperties": false,
       "required": [
         "pair_id",
+        "base_outcome_pair_id",
+        "counterfactual_outcome_pair_id",
         "component_id",
         "split",
         "source_insight",
@@ -204,6 +206,18 @@
         },
         "counterfactual_adjudication": {
           "$ref": "#/$defs/adjudication"
+        },
+        "base_outcome_pair_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "counterfactual_outcome_pair_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
         }
       }
     },
