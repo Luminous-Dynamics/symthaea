@@ -282,7 +282,10 @@
     "stratified_bootstrap_resamples_episodes_within_each_task_not_tasks_as_episodes",
     "paired_win_rate_counts_ties_as_half_and_is_not_mislabeled_as_independent_probability_of_improvement",
     "cross_task_aggregate_cannot_hide_task_regressions_or_replace_task_level_safety_bounds",
-    "fixed_task_suite_bootstrap_interval_is_not_claimed_as_generalization_to_unseen_tasks"
+    "fixed_task_suite_bootstrap_interval_is_not_claimed_as_generalization_to_unseen_tasks",
+    "task_balanced_score_iqm_uses_equal_task_mass_not_episode_count_mass",
+    "paired_win_rate_is_distinct_from_independent_episode_marginal_superiority",
+    "task_balanced_score_iqm_delta_has_stratified_bootstrap_interval"
   ],
   "proposed_targets_not_results": {
     "in_envelope_false_certificates": 0,
@@ -477,7 +480,10 @@
       "macro_mean_delta_with_95_percent_stratified_bootstrap_interval",
       "macro_task_iqm_delta_with_95_percent_stratified_bootstrap_interval",
       "macro_paired_win_rate_with_95_percent_stratified_bootstrap_interval",
-      "fraction_tasks_with_positive_mean_delta"
+      "fraction_tasks_with_positive_mean_delta",
+      "task_balanced_normalized_score_iqm_baseline_candidate_delta_and_stratified_bootstrap_interval",
+      "per_task_marginal_probability_of_superiority_independent_episode_draws_ties_half",
+      "macro_task_marginal_probability_of_superiority_with_stratified_bootstrap_interval"
     ],
     "bootstrap": {
       "replicates_min": 1000,
@@ -496,6 +502,46 @@
       "input_output_path_alias"
     ],
     "qualification_artifact": "allostatic-control-v1-stratified-aggregate.csv",
-    "interpretation_rule": "Report task-level values with equal-task-weight macro statistics; aggregate intervals are conditional on the fixed task suite and do not establish external safety."
+    "interpretation_rule": "Report task-level values with equal-task-weight macro statistics; aggregate intervals are conditional on the fixed task suite and do not establish external safety.",
+    "output_schema": [
+      "row_type",
+      "task",
+      "n_pairs",
+      "baseline_mean",
+      "candidate_mean",
+      "mean_delta",
+      "task_iqm_paired_delta",
+      "paired_win_rate",
+      "marginal_probability_of_superiority",
+      "macro_baseline_mean",
+      "macro_candidate_mean",
+      "macro_mean_delta",
+      "macro_mean_delta_ci95_low",
+      "macro_mean_delta_ci95_high",
+      "macro_task_iqm_paired_delta",
+      "macro_task_iqm_delta_ci95_low",
+      "macro_task_iqm_delta_ci95_high",
+      "macro_paired_win_rate",
+      "macro_paired_win_rate_ci95_low",
+      "macro_paired_win_rate_ci95_high",
+      "macro_marginal_probability_of_superiority",
+      "macro_marginal_probability_ci95_low",
+      "macro_marginal_probability_ci95_high",
+      "task_balanced_baseline_iqm",
+      "task_balanced_candidate_iqm",
+      "task_balanced_iqm_delta",
+      "task_balanced_iqm_delta_ci95_low",
+      "task_balanced_iqm_delta_ci95_high",
+      "fraction_tasks_positive_mean_delta",
+      "task_count",
+      "bootstrap_replicates",
+      "bootstrap_seed"
+    ],
+    "metric_definitions": {
+      "task_iqm_paired_delta": "IQM of the candidate-minus-baseline paired score deltas within this task.",
+      "task_balanced_iqm": "IQM of the task-equal-weight mixture of normalized scores; each task contributes equal total mass regardless of episode count.",
+      "paired_win_rate": "Candidate wins on the same seed pair, with ties counting half.",
+      "marginal_probability_of_superiority": "Within-task probability a candidate score from one episode exceeds a baseline score from an independently drawn episode, with ties counting half; task averages weighted equally."
+    }
   }
 }
