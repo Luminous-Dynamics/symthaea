@@ -223,6 +223,70 @@ fn validate_graph_snapshot(
     Ok(())
 }
 
+fn read_graph_fact_records(
+    conn: &rusqlite::Connection,
+) -> Result<Vec<GraphFactRecord>, String> {
+    let mut statement = conn
+        .prepare(
+            "SELECT fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json
+             FROM knowledge_facts ORDER BY cycle DESC, id DESC",
+        )
+        .map_err(|error| error.to_string())?;
+    statement
+        .query_map([], |row| {
+            let claim_context = row
+                .get::<_, Option<String>>(7)?
+                .map(|raw| {
+                    serde_json::from_str::<ClaimContext>(&raw).map_err(|error| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            7,
+                            rusqlite::types::Type::Text,
+                            Box::new(error),
+                        )
+                    })
+                })
+                .transpose()?;
+            Ok(GraphFactRecord {
+                fact_id: row.get::<_, Option<i64>>(0)?.map(|id| id as u64),
+                fact: FactRecord {
+                    vector_bytes: row.get(1)?,
+                    source_text: row.get(2)?,
+                    confidence: row.get(3)?,
+                    domain: row.get(4)?,
+                    cycle: row.get::<_, i64>(5)? as u64,
+                    is_causal: row.get(6)?,
+                },
+                claim_context,
+            })
+        })
+        .map_err(|error| error.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("Graph fact record decoding failed: {error}"))
+}
+
+fn read_evidence_link_records(
+    conn: &rusqlite::Connection,
+) -> Result<Vec<EvidenceLink>, String> {
+    let mut statement = conn
+        .prepare("SELECT link_json FROM knowledge_evidence_links ORDER BY id")
+        .map_err(|error| error.to_string())?;
+    let encoded = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|error| error.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("Evidence link row decoding failed: {error}"))?;
+
+    encoded
+        .iter()
+        .enumerate()
+        .map(|(index, raw)| {
+            serde_json::from_str::<EvidenceLink>(raw).map_err(|error| {
+                format!("Evidence link JSON decoding failed at row {}: {error}", index + 1)
+            })
+        })
+        .collect()
+}
+
 /// A serializable causal edge record
 #[derive(Debug, Clone)]
 pub struct CausalEdgeRecord {
