@@ -955,6 +955,85 @@ mod tests {
     }
 
     #[test]
+    fn load_graph_snapshot_rejects_tampered_persisted_link() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_tampered_link_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let context = |witness: &str, family: &str, evidence: &str| ClaimContext {
+            subject: "subject".into(),
+            predicate: "predicate".into(),
+            object: "object".into(),
+            witness_id: witness.into(),
+            source_family_id: family.into(),
+            context_id: "shared-context".into(),
+            temporal_scope: Some("period-a".into()),
+            event_time: Some(1),
+            claim_kind: super::super::claim_provenance::ClaimKind::SourceAttested,
+            polarity: super::super::claim_provenance::ClaimPolarity::Positive,
+            evidence_ids: vec![evidence.into()],
+        };
+        let facts = vec![
+            GraphFactRecord {
+                fact_id: Some(10),
+                fact: FactRecord {
+                    vector_bytes: vec![10; 2048],
+                    source_text: "claim a".into(),
+                    confidence: 0.5,
+                    domain: None,
+                    cycle: 1,
+                    is_causal: false,
+                },
+                claim_context: Some(context("witness-a", "family-a", "evidence-a")),
+            },
+            GraphFactRecord {
+                fact_id: Some(20),
+                fact: FactRecord {
+                    vector_bytes: vec![20; 2048],
+                    source_text: "claim b".into(),
+                    confidence: 0.5,
+                    domain: None,
+                    cycle: 2,
+                    is_causal: false,
+                },
+                claim_context: Some(context("witness-b", "family-b", "evidence-b")),
+            },
+        ];
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence.save_graph_facts(&facts).unwrap();
+
+        let tampered = EvidenceLink {
+            from_fact_id: 10,
+            to_fact_id: 20,
+            relation: EvidenceRelation::Corroborates,
+            status: EvidenceLinkStatus::Adjudicated,
+            evidence_ids: vec![
+                "evidence-a".into(),
+                "evidence-b".into(),
+                "attacker-added-unbound-id".into(),
+            ],
+            rationale: Some("tampered provenance payload".into()),
+            causal_argument: None,
+            transmission_chain: None,
+            detected_at_cycle: 3,
+        };
+        let connection = rusqlite::Connection::open(&db_path).unwrap();
+        connection
+            .execute(
+                "INSERT INTO knowledge_evidence_links (link_json) VALUES (?1)",
+                rusqlite::params![serde_json::to_string(&tampered).unwrap()],
+            )
+            .unwrap();
+        drop(connection);
+
+        let error = persistence.load_graph_snapshot().unwrap_err();
+        assert!(error.contains("not declared by either endpoint context"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn graph_snapshot_rejects_unbound_adjudication_evidence_ids() {
         let context = |witness: &str, family: &str, evidence: &str| ClaimContext {
             subject: "symbol-x".into(),
