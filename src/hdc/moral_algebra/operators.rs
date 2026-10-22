@@ -1096,15 +1096,15 @@ impl MoralAlgebra {
             ConsentState::Given => 0.0,   // Explicit affirmative consent signal
         };
 
-        // The legacy verdict enum has no dedicated Undetermined variant. Preserve
-        // a Neutral verdict for Unknown so action similarity cannot upgrade missing
-        // consent evidence into a positive consent-sensitive judgment. Neutral is
-        // not an authorization permit; callers needing authority must use a separate
-        // scope-bound consent/authorization policy.
+        // The legacy verdict enum has no dedicated Undetermined variant. Neutral
+        // is therefore used for Unknown and Implied in this consent-sensitive path:
+        // neither missing evidence nor an assumption may be upgraded to Good by
+        // action similarity. Neutral is not an authorization permit; callers needing
+        // authority must use a separate scope-bound consent/authorization policy.
         let verdict = match consent {
-            ConsentState::Unknown => MoralVerdict::Neutral,
+            ConsentState::Unknown | ConsentState::Implied => MoralVerdict::Neutral,
             ConsentState::Denied | ConsentState::Absent => MoralVerdict::ConsentViolation,
-            ConsentState::Given | ConsentState::Implied => {
+            ConsentState::Given => {
                 if good_sim > bad_sim {
                     MoralVerdict::Good
                 } else if bad_sim > good_sim {
