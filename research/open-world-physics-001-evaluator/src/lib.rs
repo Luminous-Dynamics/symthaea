@@ -27,11 +27,13 @@ const BIC_DECISIVE_DELTA: f64 = 2.0;
 const CANDIDATES_PER_FAMILY: &[usize] = &[1, 3, 10, 30];
 /// Independent paired seed replications for each diagnostic world.
 const SELECTION_REPLICATION_COUNT: usize = 5;
-const SELECTION_SEED_SCHEDULE: &str = "splitmix64(world_seed ^ 0x53454c4543540001 ^ (replication_index * 0x9e3779b97f4a7c15))";
+const SELECTION_SEED_SCHEDULE: &str =
+    "splitmix64(world_seed ^ 0x53454c4543540001 ^ (replication_index * 0x9e3779b97f4a7c15))";
 const SELECTION_SEED_SALT: u64 = 0x5345_4c45_4354_0001;
 /// Bootstrap repetitions for paired candidate-budget deltas.
 const SELECTION_BOOTSTRAP_REPLICATES: usize = 2_000;
-const SELECTION_BOOTSTRAP_METHOD: &str = "paired_hierarchical_world_then_seed_resampling_percentile_95_v1";
+const SELECTION_BOOTSTRAP_METHOD: &str =
+    "paired_hierarchical_world_then_seed_resampling_percentile_95_v1";
 
 const AMPLITUDES: &[f64] = &[0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
 const EXPONENTS: &[f64] = &[1.0, 1.5, 2.0, 2.5, 3.0];
@@ -951,7 +953,6 @@ fn summarize_selection_bottleneck(
     })
 }
 
-
 #[derive(Clone, Copy)]
 struct BudgetDelta {
     selected_heldout: f64,
@@ -1047,9 +1048,7 @@ fn build_budget_comparison(
     }
 
     let count = deltas.len() as f64;
-    let mean = |metric: fn(&BudgetDelta) -> f64| {
-        deltas.iter().map(metric).sum::<f64>() / count
-    };
+    let mean = |metric: fn(&BudgetDelta) -> f64| deltas.iter().map(metric).sum::<f64>() / count;
     let seed_base = SELECTION_SEED_SALT
         ^ (smaller_budget as u64).rotate_left(11)
         ^ (larger_budget as u64).rotate_left(29)
@@ -1435,13 +1434,25 @@ mod tests {
         let second = run_reference_benchmark();
         assert_eq!(first, second);
         assert!(first.verify_receipt());
-        assert_eq!(first.body.selection_bottleneck_cases.len(), 72 * SELECTION_REPLICATION_COUNT);
-        assert_eq!(first.body.selection_replication_count, SELECTION_REPLICATION_COUNT);
+        assert_eq!(
+            first.body.selection_bottleneck_cases.len(),
+            72 * SELECTION_REPLICATION_COUNT
+        );
+        assert_eq!(
+            first.body.selection_replication_count,
+            SELECTION_REPLICATION_COUNT
+        );
         assert_eq!(first.body.selection_seed_schedule, SELECTION_SEED_SCHEDULE);
         assert_eq!(first.body.selection_bottleneck_summaries.len(), 8);
         assert_eq!(first.body.selection_budget_comparisons.len(), 6);
-        assert_eq!(first.body.selection_bootstrap_replicates, SELECTION_BOOTSTRAP_REPLICATES);
-        assert_eq!(first.body.selection_bootstrap_method, SELECTION_BOOTSTRAP_METHOD);
+        assert_eq!(
+            first.body.selection_bootstrap_replicates,
+            SELECTION_BOOTSTRAP_REPLICATES
+        );
+        assert_eq!(
+            first.body.selection_bootstrap_method,
+            SELECTION_BOOTSTRAP_METHOD
+        );
         assert_eq!(
             first.body.selection_diagnostic_corpus_sha256,
             selection_diagnostic_corpus_sha256()
@@ -1501,10 +1512,11 @@ mod tests {
         }
 
         for comparison in &first.body.selection_budget_comparisons {
-            assert_eq!(comparison.paired_case_count, 9 * SELECTION_REPLICATION_COUNT);
-            assert!(
-                comparison.to_candidates_per_family > comparison.from_candidates_per_family
+            assert_eq!(
+                comparison.paired_case_count,
+                9 * SELECTION_REPLICATION_COUNT
             );
+            assert!(comparison.to_candidates_per_family > comparison.from_candidates_per_family);
             for value in [
                 comparison.mean_selected_heldout_delta_larger_minus_smaller,
                 comparison.selected_heldout_delta_ci95_low,
