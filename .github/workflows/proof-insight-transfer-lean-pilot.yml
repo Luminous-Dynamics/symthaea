@@ -45,12 +45,18 @@ jobs:
           set -euo pipefail
           cd data/benchmarks/proof-insight-transfer-v0/lean-pilot
           mkdir -p "$RUNNER_TEMP/pitb-lean-pilot-receipt"
-          log="$RUNNER_TEMP/pitb-lean-pilot-receipt/lake-build.log"
+          out="$RUNNER_TEMP/pitb-lean-pilot-receipt"
+          log="$out/lake-build.log"
           lake build 2>&1 | tee "$log"
           olean=".lake/build/lib/lean/PITBCounterfactualPilot.olean"
           test -s "$olean"
-          lean --version > "$RUNNER_TEMP/pitb-lean-pilot-receipt/lean-version.txt"
-          lake --version > "$RUNNER_TEMP/pitb-lean-pilot-receipt/lake-version.txt"
+          lean --version > "$out/lean-version.txt"
+          lake --version > "$out/lake-version.txt"
+
+          # Re-elaborate the source directly so proof-state trace messages are
+          # captured even when the preceding Lake build hit an incremental cache.
+          trace_log="$out/proof-state-trace.log"
+          lake env lean PITBCounterfactualPilot.lean -o "$out/PITBCounterfactualPilot.trace.olean" 2>&1 | tee "$trace_log"
           python - "$RUNNER_TEMP/pitb-lean-pilot-receipt" "$olean" <<'PY'
           import hashlib
           import json
@@ -66,6 +72,65 @@ jobs:
               return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
           import re
+
+          source = Path("PITBCounterfactualPilot.lean")
+          state_trace_path = out / "proof-state-trace.log"
+          state_trace = state_trace_path.read_text()
+
+          def normalize(text):
+              return " ".join(text.split())
+
+          def extract_state(label):
+              begin = f"PITB_STATE_BEGIN:{label}"
+              end = f"PITB_STATE_END:{label}"
+              if state_trace.count(begin) != 1 or state_trace.count(end) != 1:
+                  raise SystemExit(f"expected exactly one structured {label} proof-state trace")
+              start = state_trace.index(begin)
+              finish = state_trace.index(end, start)
+              if finish <= start:
+                  raise SystemExit(f"malformed {label} proof-state trace boundaries")
+              block = state_trace[start:finish]
+              goal_lines = [
+                  line.split("PITB_STATE_GOAL:", 1)[1]
+                  for line in block.splitlines()
+                  if "PITB_STATE_GOAL:" in line
+              ]
+              declaration_lines = [
+                  line.split("PITB_STATE_DECL:", 1)[1]
+                  for line in block.splitlines()
+                  if "PITB_STATE_DECL:" in line
+              ]
+              if len(goal_lines) != 1:
+                  raise SystemExit(f"expected one target goal in {label} proof-state trace")
+              return {
+                  "block": block,
+                  "goal": normalize(goal_lines[0]),
+                  "declarations": [normalize(line) for line in declaration_lines],
+              }
+
+          base_state = extract_state("base")
+          variant_state = extract_state("variant")
+          if base_state["goal"] != variant_state["goal"]:
+              raise SystemExit("fixed-target intervention changed the elaborated goal type")
+          if not any(line.startswith("h:") and normalize(line[2:]) == "a ≤ b" for line in base_state["declarations"]):
+              raise SystemExit("base trace does not contain the required local declaration h : a ≤ b")
+          if any(line.startswith("h:") for line in variant_state["declarations"]):
+              raise SystemExit("variant trace still contains the cleared local declaration h")
+          if not any(line.startswith("hEq:") for line in variant_state["declarations"]):
+              raise SystemExit("variant trace lost the alternate equality route needed to close the same goal")
+          state_trace_receipt = {
+              "operation": "clear h",
+              "base_snapshot_sha256": hashlib.sha256(base_state["block"].encode("utf-8")).hexdigest(),
+              "variant_snapshot_sha256": hashlib.sha256(variant_state["block"].encode("utf-8")).hexdigest(),
+              "base_local_context_sha256": hashlib.sha256("\\n".join(base_state["declarations"]).encode("utf-8")).hexdigest(),
+              "variant_local_context_sha256": hashlib.sha256("\\n".join(variant_state["declarations"]).encode("utf-8")).hexdigest(),
+              "goal_type_sha256": hashlib.sha256(base_state["goal"].encode("utf-8")).hexdigest(),
+              "goal_type_preserved": True,
+              "required_declaration_present_before": True,
+              "required_declaration_absent_after": True,
+              "alternate_route_hypothesis_present_after": True,
+              "trace_log_sha256": hashlib.sha256(state_trace_path.read_bytes()).hexdigest(),
+          }
 
           source = Path("PITBCounterfactualPilot.lean")
           lakefile = Path("lakefile.lean")
@@ -136,8 +201,11 @@ jobs:
                   "sha256": digest(olean),
               },
               "build_log_sha256": digest(out / "lake-build.log"),
+              "proof_state_intervention_trace": state_trace_receipt,
               "checks": {
                   "lake_build": "passed",
+                  "direct_reelaboration_with_structured_state_trace": "passed",
+                  "same_goal_and_required_hypothesis_withdrawal_verified_from_trace": "passed",
                   "lean_kernel_checked_examples": "passed",
                   "nanoda_independent_type_check": "passed",
                   "sorry_disallowed_by_nanoda": True,
@@ -172,5 +240,6 @@ jobs:
             ${{ runner.temp }}/pitb-lean-pilot-receipt/lean-version.txt
             ${{ runner.temp }}/pitb-lean-pilot-receipt/lake-version.txt
             ${{ runner.temp }}/pitb-lean-pilot-receipt/lake-build.log
+            ${{ runner.temp }}/pitb-lean-pilot-receipt/proof-state-trace.log
           if-no-files-found: error
           retention-days: 90
