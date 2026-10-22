@@ -1285,6 +1285,7 @@ jobs:
 
           cross_split_family = copy.deepcopy(fixture)
           cross_split_family["pairs"][1]["source_insight"]["family_id"] = cross_split_family["pairs"][0]["source_insight"]["family_id"]
+          cross_split_family["pairs"][1]["component_id"] = cross_split_family["pairs"][0]["component_id"]
           cross_split_family["pairs"][1]["split"] = "test"
           mutants.append(cross_split_family)
 
