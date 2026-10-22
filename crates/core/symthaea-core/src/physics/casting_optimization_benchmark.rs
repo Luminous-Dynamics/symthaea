@@ -17,7 +17,7 @@ use std::fmt;
 
 const LOW_FIDELITY_COST_UNITS: u64 = 1;
 const HIGH_FIDELITY_COST_UNITS: u64 = 10;
-const SYNTHETIC_TARGET_OBJECTIVE: f64 = 0.05;
+const SYNTHETIC_TARGET_GAP: f64 = 0.05;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -82,18 +82,18 @@ impl SyntheticCase {
             },
             // Standard McCormick minimizer, normalized from x in [-1.5, 4], y in [-3, 4].
             Self::McCormick => Point {
-                x: 0.9528024488034021 / 5.5,
-                y: 1.4528024488034021 / 7.0,
+                x: 0.9528024397785507 / 5.5,
+                y: 1.452802440731628 / 7.0,
             },
-            // Eggholder reference minimizer is on the x=512 boundary.
+            // Eggholder reference minimum is on the x=512 boundary.
             Self::Eggholder => Point {
                 x: 1.0,
-                y: (404.2319 + 512.0) / 1024.0,
+                y: (404.23180824 + 512.0) / 1024.0,
             },
-            // One of the four Holder-table global minima, using a frozen approximate point.
+            // One of the four Holder-table global minima, at a published high-precision reference.
             Self::HolderTable => Point {
-                x: (8.05502 + 10.0) / 20.0,
-                y: (9.66459 + 10.0) / 20.0,
+                x: (8.055023472141116 + 10.0) / 20.0,
+                y: (9.664590028909654 + 10.0) / 20.0,
             },
         }
     }
@@ -130,41 +130,24 @@ impl SyntheticCase {
                     + (2.625 - x + x * y.powi(3)).powi(2)
             }
             Self::McCormick => {
-                let raw = |x: f64, y: f64| {
-                    (x + y).sin() + (x - y).powi(2) - 1.5 * x + 2.5 * y + 1.0
-                };
-                let physical = (-1.5 + 5.5 * point.x, -3.0 + 7.0 * point.y);
-                // Subtract the frozen best-known reference value so the benchmark's
-                // declared approximate minimizer has objective zero; additive shifting
-                // leaves rankings and regret differences unchanged.
-                let reference = Self::McCormick.optimum();
-                let reference_physical =
-                    (-1.5 + 5.5 * reference.x, -3.0 + 7.0 * reference.y);
-                raw(physical.0, physical.1) - raw(reference_physical.0, reference_physical.1)
+                let x = -1.5 + 5.5 * point.x;
+                let y = -3.0 + 7.0 * point.y;
+                (x + y).sin() + (x - y).powi(2) - 1.5 * x + 2.5 * y + 1.0
             }
             Self::Eggholder => {
-                let raw = |x: f64, y: f64| {
-                    -(y + 47.0) * (x / 2.0 + y + 47.0).abs().sqrt().sin()
-                        - x * (x - (y + 47.0)).abs().sqrt().sin()
-                };
-                let physical = (1024.0 * point.x - 512.0, 1024.0 * point.y - 512.0);
-                let reference = Self::Eggholder.optimum();
-                let reference_physical =
-                    (1024.0 * reference.x - 512.0, 1024.0 * reference.y - 512.0);
-                raw(physical.0, physical.1) - raw(reference_physical.0, reference_physical.1)
+                let x = 1024.0 * point.x - 512.0;
+                let y = 1024.0 * point.y - 512.0;
+                -(y + 47.0) * (x / 2.0 + y + 47.0).abs().sqrt().sin()
+                    - x * (x - (y + 47.0)).abs().sqrt().sin()
             }
             Self::HolderTable => {
-                let raw = |x: f64, y: f64| {
-                    -(x.sin() * y.cos()
-                        * (1.0 - (x * x + y * y).sqrt() / std::f64::consts::PI)
-                            .abs()
-                            .exp())
-                    .abs()
-                };
-                let physical = (20.0 * point.x - 10.0, 20.0 * point.y - 10.0);
-                let reference = Self::HolderTable.optimum();
-                let reference_physical = (20.0 * reference.x - 10.0, 20.0 * reference.y - 10.0);
-                raw(physical.0, physical.1) - raw(reference_physical.0, reference_physical.1)
+                let x = 20.0 * point.x - 10.0;
+                let y = 20.0 * point.y - 10.0;
+                -(x.sin() * y.cos()
+                    * (1.0 - (x * x + y * y).sqrt() / std::f64::consts::PI)
+                        .abs()
+                        .exp())
+                .abs()
             }
             _ => (point.x - 0.37).powi(2) + (point.y - 0.62).powi(2),
         }
@@ -183,7 +166,12 @@ impl SyntheticCase {
     }
 
     fn known_optimum_value(self) -> f64 {
-        self.objective(self.optimum())
+        match self {
+            Self::McCormick => -1.913222954981037,
+            Self::Eggholder => -959.6406627208397,
+            Self::HolderTable => -19.20850256788675,
+            _ => self.objective(self.optimum()),
+        }
     }
 
     fn observation(self, point: Point, fidelity: Fidelity, run_seed: u64) -> f64 {
@@ -876,7 +864,8 @@ fn run_benchmark(
                 // The synthetic evaluator confirms target achievement against
                 // noise-free truth only after this query; the strategy sees observations.
                 if cost_to_target.is_none()
-                    && record.true_objective_for_evaluation_only <= SYNTHETIC_TARGET_OBJECTIVE
+                    && record.true_objective_for_evaluation_only
+                        <= case.known_optimum_value() + SYNTHETIC_TARGET_GAP
                 {
                     cost_to_target = Some(record.cumulative_cost_units);
                 }
