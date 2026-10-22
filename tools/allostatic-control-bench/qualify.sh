@@ -16,6 +16,7 @@ source_files=(
   "tools/allostatic-control-bench/src/model_mismatch.rs"
   "tools/allostatic-control-bench/src/multistep_viability.rs"
   "tools/allostatic-control-bench/src/robust_viability.rs"
+  "tools/allostatic-control-bench/src/rank_martingale.rs"
   "tools/allostatic-control-bench/src/main.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-control-report.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-model-mismatch-bench.rs"
@@ -23,6 +24,7 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-ood-fallback-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-residual-monitor-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-monitorability-frontier-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-predictive-rank-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
@@ -30,6 +32,7 @@ source_files=(
   "docs/research/OOD_REACHABILITY_FALLBACK_V1.md"
   "docs/research/SEQUENTIAL_RESIDUAL_MONITOR_V1.md"
   "docs/research/MONITORABILITY_PREEMPTION_FRONTIER_V1.md"
+  "docs/research/PREDICTIVE_RANK_MARTINGALE_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -61,6 +64,8 @@ residual_out="${out_base}-residual-monitor.csv"
 residual_summary_out="${out_base}-residual-monitor-summary.csv"
 monitorability_out="${out_base}-monitorability-frontier.csv"
 monitorability_summary_out="${out_base}-monitorability-frontier-summary.csv"
+predictive_rank_out="${out_base}-predictive-rank-frontier.csv"
+predictive_rank_summary_out="${out_base}-predictive-rank-frontier-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -580,6 +585,79 @@ if ! awk -F, '
   exit 1
 fi
 
+# Compare fixed-reference predictive-rank martingales to repeated point thresholds
+# and a fixed-horizon episode-maximum threshold. This tests onset-time sensitivity
+# and the repeated-testing failure mode of a pointwise threshold.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-predictive-rank-bench -- \
+  "$tmpdir/predictive-rank-a.csv" "$tmpdir/predictive-rank-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-predictive-rank-bench -- \
+  "$tmpdir/predictive-rank-b.csv" "$tmpdir/predictive-rank-summary-b.csv"
+if ! cmp -s "$tmpdir/predictive-rank-a.csv" "$tmpdir/predictive-rank-b.csv" ||
+   ! cmp -s "$tmpdir/predictive-rank-summary-a.csv" "$tmpdir/predictive-rank-summary-b.csv"; then
+  printf 'FAIL: predictive-rank raw and summary outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 12) failed = 1; next }
+  {
+    if (NF != 12) failed = 1
+    if ($1 != "up_shift" && $1 != "down_shift" &&
+        $1 != "scale_shift" && $1 != "sensor_blind") failed = 1
+    if ($2 != "0.04" && $2 != "0.10" && $2 != "0.20") failed = 1
+    if ($3 != 1 && $3 != 17 && $3 != 65 && $3 != 193) failed = 1
+    if ($4 !~ /^[0-9]+$/ || $4 < 200000 || $4 >= 200300) failed = 1
+    if ($5 !~ /^[0-9]*[.]?[0-9]+$/ || $6 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    for (i = 7; i <= 11; i++) if ($i !~ /^[0-9]+$/ || $i > 256) failed = 1
+    if ($12 !~ /^[0-9]*[.]?[0-9]+([eE][-+]?[0-9]+)?$/ || $12 < 0) failed = 1
+    unique = $1 SUBSEP $2 SUBSEP $3 SUBSEP $4
+    if (seen[unique]++) failed = 1
+    key = $4
+    if ($1 == "sensor_blind") {
+      if (!(key in blind_steps)) {
+        blind_steps[key] = $7 SUBSEP $8 SUBSEP $9 SUBSEP $10 SUBSEP $11
+        blind_wealth[key] = $12
+      } else if (blind_steps[key] != ($7 SUBSEP $8 SUBSEP $9 SUBSEP $10 SUBSEP $11) ||
+                 blind_wealth[key] != $12) failed = 1
+    }
+    rows++
+  }
+  END { if (NR != 14401 || rows != 14400 || failed) exit 1 }
+' "$tmpdir/predictive-rank-a.csv"; then
+  printf 'FAIL: predictive-rank raw schema, seed coverage or sensor-blind parity failed\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 24) failed = 1; next }
+  {
+    if (NF != 24) failed = 1
+    if ($1 != "up_shift" && $1 != "down_shift" &&
+        $1 != "scale_shift" && $1 != "sensor_blind") failed = 1
+    if ($2 != "0.04" && $2 != "0.10" && $2 != "0.20") failed = 1
+    if ($3 != 1 && $3 != 17 && $3 != 65 && $3 != 193) failed = 1
+    if ($4 != 300) failed = 1
+    for (i = 5; i <= 19; i++) if ($i !~ /^[0-9]+$/ || $i > 300) failed = 1
+    for (i = 0; i < 5; i++) if ($(15+i) + $(10+i) != 300) failed = 1
+    for (i = 20; i <= 24; i++)
+      if ($i != "NA" && ($i !~ /^[0-9]*[.]?[0-9]+$/ || $i < 0 || $i > 255)) failed = 1
+    if ($1 == "sensor_blind" && $3 == 1 && $2 == "0.04") {
+      if ($10 > 60 || $14 > 60 || $19 > 60) failed = 1
+      if ($5 < 200) failed = 1
+    }
+    if (($1 == "up_shift" || $1 == "down_shift") && $2 == "0.20" && $3 == 1 &&
+        $12 < 240) failed = 1
+    if ($1 == "scale_shift" && $2 == "0.20" && $3 == 1 && $13 < 240) failed = 1
+    key = $1 SUBSEP $2 SUBSEP $3
+    if (seen[key]++) failed = 1
+    rows++
+  }
+  END { if (NR != 49 || rows != 48 || failed) exit 1 }
+' "$tmpdir/predictive-rank-summary-a.csv"; then
+  printf 'FAIL: predictive-rank summary schema, multiple-testing control or strong-shift gates failed\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -610,6 +688,8 @@ cp "$tmpdir/residual-a.csv" "$residual_out"
 cp "$tmpdir/residual-summary-a.csv" "$residual_summary_out"
 cp "$tmpdir/monitorability-a.csv" "$monitorability_out"
 cp "$tmpdir/monitorability-summary-a.csv" "$monitorability_summary_out"
+cp "$tmpdir/predictive-rank-a.csv" "$predictive_rank_out"
+cp "$tmpdir/predictive-rank-summary-a.csv" "$predictive_rank_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -645,6 +725,10 @@ cp "$tmpdir/monitorability-summary-a.csv" "$monitorability_summary_out"
   printf 'monitorability_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$monitorability_out") - 1 ))"
   printf 'monitorability_summary_sha256=%s\n' "$(sha256sum "$monitorability_summary_out" | awk '{print $1}')"
   printf 'monitorability_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$monitorability_summary_out") - 1 ))"
+  printf 'predictive_rank_frontier_sha256=%s\n' "$(sha256sum "$predictive_rank_out" | awk '{print $1}')"
+  printf 'predictive_rank_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$predictive_rank_out") - 1 ))"
+  printf 'predictive_rank_summary_sha256=%s\n' "$(sha256sum "$predictive_rank_summary_out" | awk '{print $1}')"
+  printf 'predictive_rank_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$predictive_rank_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -662,4 +746,6 @@ printf 'Sequential residual frontier: %s\n' "$residual_out"
 printf 'Sequential residual summary: %s\n' "$residual_summary_out"
 printf 'Monitorability frontier: %s\n' "$monitorability_out"
 printf 'Monitorability summary: %s\n' "$monitorability_summary_out"
+printf 'Predictive-rank frontier: %s\n' "$predictive_rank_out"
+printf 'Predictive-rank summary: %s\n' "$predictive_rank_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
