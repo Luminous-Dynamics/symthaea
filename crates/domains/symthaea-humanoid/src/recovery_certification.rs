@@ -102,13 +102,10 @@ pub fn certify_adversarial_recovery(
         return invalid_certificate("invalid push-recovery protocol configuration");
     }
     let mut cases = Vec::new();
-    let mut maximum_directional_asymmetry = 0.0f64;
     for disturbance_time_s in config.disturbance_times_s.iter().copied() {
         let mut protocol = protocol_template.clone();
         protocol.settle_seconds = disturbance_time_s;
         let matrix = run_push_recovery_matrix(simulator, &protocol, &config.force_levels_n);
-        maximum_directional_asymmetry =
-            maximum_directional_asymmetry.max(matrix.directional_asymmetry);
         cases.extend(matrix.cases.into_iter().map(
             |PushRecoveryCaseResult {
                  direction,
@@ -123,95 +120,228 @@ pub fn certify_adversarial_recovery(
         ));
     }
 
-    let count = cases.len().max(1) as f64;
-    let recovery_rate = cases.iter().filter(|case| case.result.recovered).count() as f64 / count;
-    let fall_rate = cases.iter().filter(|case| case.result.fell).count() as f64 / count;
-    let worst_uprightness = cases
-        .iter()
-        .map(|case| case.result.min_uprightness)
-        .fold(f64::INFINITY, f64::min);
-    let worst_capture_margin_m = cases
-        .iter()
-        .map(|case| case.result.min_capture_margin_m)
-        .fold(f64::INFINITY, f64::min);
-    let recovery_times = cases
-        .iter()
-        .filter_map(|case| case.result.recovery_time_s)
-        .collect::<Vec<_>>();
-    let mean_recovery_time_s = (!recovery_times.is_empty())
-        .then(|| recovery_times.iter().sum::<f64>() / recovery_times.len() as f64);
-    let monotonicity_violations = count_monotonicity_violations(&cases);
+    summarize_adversarial_recovery_cases(cases, protocol_template, config)
+}
 
-    let mut failure_reasons = Vec::new();
-    if recovery_rate < config.minimum_recovery_rate {
-        failure_reasons.push(format!(
-            "recovery rate {:.3} is below {:.3}",
-            recovery_rate, config.minimum_recovery_rate
-        ));
+
+/// Recompute an adversarial-recovery summary from frozen case records without
+/// invoking the simulator. Release verifiers use this to reject edited summary
+/// fields and pass flags; it verifies record consistency, not simulator truth.
+pub fn certify_adversarial_recovery_cases(
+    cases: Vec<TimedRecoveryCase>,
+    protocol_template: &PushRecoveryProtocol,
+    config: &AdversarialRecoveryCertificationConfig,
+) -> AdversarialRecoveryCertificate {
+    if !config.validate() {
+        return invalid_certificate("invalid adversarial recovery certification configuration");
     }
-    if fall_rate > config.maximum_fall_rate {
-        failure_reasons.push(format!(
-            "fall rate {:.3} exceeds {:.3}",
-            fall_rate, config.maximum_fall_rate
-        ));
+    if !protocol_is_valid(protocol_template) {
+        return invalid_certificate("invalid push-recovery protocol configuration");
     }
-    if maximum_directional_asymmetry > config.maximum_directional_asymmetry {
-        failure_reasons.push(format!(
-            "directional asymmetry {:.3} exceeds {:.3}",
-            maximum_directional_asymmetry, config.maximum_directional_asymmetry
-        ));
-    }
-    if worst_uprightness < config.minimum_uprightness {
-        failure_reasons.push(format!(
-            "worst uprightness {:.3} is below {:.3}",
-            worst_uprightness, config.minimum_uprightness
-        ));
-    }
-    if worst_capture_margin_m < config.minimum_capture_margin_m {
-        failure_reasons.push(format!(
-            "worst capture margin {:.3} m is below {:.3} m",
-            worst_capture_margin_m, config.minimum_capture_margin_m
-        ));
-    }
-    if mean_recovery_time_s
-        .map(|value| value > config.maximum_mean_recovery_time_s)
-        .unwrap_or(false)
-    {
-        failure_reasons.push(format!(
-            "mean recovery time {:.3} s exceeds {:.3} s",
-            mean_recovery_time_s.unwrap_or(f64::INFINITY),
-            config.maximum_mean_recovery_time_s
-        ));
-    }
-    if monotonicity_violations > config.maximum_monotonicity_violations {
-        failure_reasons.push(format!(
-            "{} force monotonicity violations exceed {}",
-            monotonicity_violations, config.maximum_monotonicity_violations
-        ));
-    }
-    if cases.iter().any(|case| {
-        !case.result.min_uprightness.is_finite()
-            || !case.result.min_capture_margin_m.is_finite()
-            || !case.result.peak_recovery_effort.is_finite()
+    summarize_adversarial_recovery_cases(cases, protocol_template, config)
+}
+
+fn summarize_adversarial_recovery_cases(
+    cases: Vec<TimedRecoveryCase>,
+    protocol_template: &PushRecoveryProtocol,
+    config: &AdversarialRecoveryCertificationConfig,
+) -> AdversarialRecoveryCertificate {
+        let maximum_directional_asymmetry =
+            maximum_directional_asymmetry_from_cases(&cases, config);
+        let exact_inventory = recovery_case_inventory_is_exact(&cases, config);
+        let case_records_valid = cases.iter().all(recovery_case_is_well_formed);
+        let count = cases.len().max(1) as f64;
+        let recovery_rate = cases.iter().filter(|case| case.result.recovered).count() as f64 / count;
+        let fall_rate = cases.iter().filter(|case| case.result.fell).count() as f64 / count;
+        let worst_uprightness = cases
+            .iter()
+            .map(|case| case.result.min_uprightness)
+            .fold(f64::INFINITY, f64::min);
+        let worst_capture_margin_m = cases
+            .iter()
+            .map(|case| case.result.min_capture_margin_m)
+            .fold(f64::INFINITY, f64::min);
+        let recovery_times = cases
+            .iter()
+            .filter_map(|case| case.result.recovery_time_s)
+            .collect::<Vec<_>>();
+        let mean_recovery_time_s = (!recovery_times.is_empty())
+            .then(|| recovery_times.iter().sum::<f64>() / recovery_times.len() as f64);
+        let monotonicity_violations = count_monotonicity_violations(&cases);
+    
+        let mut failure_reasons = Vec::new();
+        if !exact_inventory {
+            failure_reasons.push(
+                "recovery cases do not exactly cover the configured time/force/direction matrix"
+                    .to_string(),
+            );
+        }
+        if !case_records_valid {
+            failure_reasons.push("one or more recovery case records are malformed".to_string());
+        }
+        if recovery_rate < config.minimum_recovery_rate {
+            failure_reasons.push(format!(
+                "recovery rate {:.3} is below {:.3}",
+                recovery_rate, config.minimum_recovery_rate
+            ));
+        }
+        if fall_rate > config.maximum_fall_rate {
+            failure_reasons.push(format!(
+                "fall rate {:.3} exceeds {:.3}",
+                fall_rate, config.maximum_fall_rate
+            ));
+        }
+        if maximum_directional_asymmetry > config.maximum_directional_asymmetry {
+            failure_reasons.push(format!(
+                "directional asymmetry {:.3} exceeds {:.3}",
+                maximum_directional_asymmetry, config.maximum_directional_asymmetry
+            ));
+        }
+        if worst_uprightness < config.minimum_uprightness {
+            failure_reasons.push(format!(
+                "worst uprightness {:.3} is below {:.3}",
+                worst_uprightness, config.minimum_uprightness
+            ));
+        }
+        if worst_capture_margin_m < config.minimum_capture_margin_m {
+            failure_reasons.push(format!(
+                "worst capture margin {:.3} m is below {:.3} m",
+                worst_capture_margin_m, config.minimum_capture_margin_m
+            ));
+        }
+        if mean_recovery_time_s
+            .map(|value| value > config.maximum_mean_recovery_time_s)
+            .unwrap_or(false)
+        {
+            failure_reasons.push(format!(
+                "mean recovery time {:.3} s exceeds {:.3} s",
+                mean_recovery_time_s.unwrap_or(f64::INFINITY),
+                config.maximum_mean_recovery_time_s
+            ));
+        }
+        if monotonicity_violations > config.maximum_monotonicity_violations {
+            failure_reasons.push(format!(
+                "{} force monotonicity violations exceed {}",
+                monotonicity_violations, config.maximum_monotonicity_violations
+            ));
+        }
+
+        AdversarialRecoveryCertificate {
+            schema_version: 1,
+            protocol_id: "symthaea.humanoid.adversarial-recovery.v1".to_string(),
+            scenario_fingerprint: scenario_fingerprint(config, protocol_template),
+            passed: failure_reasons.is_empty(),
+            failure_reasons,
+            cases,
+            recovery_rate,
+            fall_rate,
+            worst_uprightness: finite_or_zero(worst_uprightness),
+            worst_capture_margin_m: finite_or_zero(worst_capture_margin_m),
+            mean_recovery_time_s,
+            maximum_directional_asymmetry,
+            monotonicity_violations,
+        }
+}
+fn recovery_case_inventory_is_exact(
+    cases: &[TimedRecoveryCase],
+    config: &AdversarialRecoveryCertificationConfig,
+) -> bool {
+    if config.force_levels_n.iter().enumerate().any(|(index, force)| {
+        config.force_levels_n[..index].contains(force)
+    }) || config.disturbance_times_s.iter().enumerate().any(|(index, time)| {
+        config.disturbance_times_s[..index].contains(time)
     }) {
-        failure_reasons.push("one or more recovery cases produced non-finite evidence".to_string());
+        return false;
+    }
+    let expected_count = config
+        .force_levels_n
+        .len()
+        .checked_mul(config.disturbance_times_s.len())
+        .and_then(|count| count.checked_mul(PushDirection::ALL.len()));
+    if expected_count != Some(cases.len()) {
+        return false;
+    }
+    config.disturbance_times_s.iter().all(|time| {
+        config.force_levels_n.iter().all(|force| {
+            PushDirection::ALL.iter().all(|direction| {
+                cases
+                    .iter()
+                    .filter(|case| {
+                        case.disturbance_time_s == *time
+                            && case.force_n == *force
+                            && case.direction == *direction
+                    })
+                    .count()
+                    == 1
+            })
+        })
+    })
+}
+
+fn recovery_case_is_well_formed(case: &TimedRecoveryCase) -> bool {
+    let result = &case.result;
+    case.disturbance_time_s.is_finite()
+        && case.disturbance_time_s >= 0.0
+        && case.force_n.is_finite()
+        && case.force_n >= 0.0
+        && result.min_uprightness.is_finite()
+        && (-1.0..=1.0).contains(&result.min_uprightness)
+        && result.min_capture_margin_m.is_finite()
+        && result.peak_recovery_effort.is_finite()
+        && result.peak_recovery_effort >= 0.0
+        && !(result.recovered && result.fell)
+        && result.recovered == result.recovery_time_s.is_some()
+        && result
+            .recovery_time_s
+            .map(|time| time.is_finite() && time > 0.0)
+            .unwrap_or(true)
+}
+
+fn maximum_directional_asymmetry_from_cases(
+    cases: &[TimedRecoveryCase],
+    config: &AdversarialRecoveryCertificationConfig,
+) -> f64 {
+    fn score(result: &crate::recovery_benchmark::PushRecoveryResult) -> f64 {
+        if result.recovered {
+            1.0
+        } else if result.fell {
+            0.0
+        } else {
+            0.5
+        }
     }
 
-    AdversarialRecoveryCertificate {
-        schema_version: 1,
-        protocol_id: "symthaea.humanoid.adversarial-recovery.v1".to_string(),
-        scenario_fingerprint: scenario_fingerprint(config, protocol_template),
-        passed: failure_reasons.is_empty(),
-        failure_reasons,
-        cases,
-        recovery_rate,
-        fall_rate,
-        worst_uprightness: finite_or_zero(worst_uprightness),
-        worst_capture_margin_m: finite_or_zero(worst_capture_margin_m),
-        mean_recovery_time_s,
-        maximum_directional_asymmetry,
-        monotonicity_violations,
+    let opposing_pairs = [
+        (PushDirection::Forward, PushDirection::Backward),
+        (PushDirection::Left, PushDirection::Right),
+        (PushDirection::ForwardLeft, PushDirection::BackwardRight),
+        (PushDirection::ForwardRight, PushDirection::BackwardLeft),
+    ];
+    let mut maximum = 0.0f64;
+    for time in config.disturbance_times_s.iter().copied() {
+        let mut differences = Vec::new();
+        for (left_direction, right_direction) in opposing_pairs {
+            for force in config.force_levels_n.iter().copied() {
+                let left = cases.iter().find(|case| {
+                    case.disturbance_time_s == time
+                        && case.force_n == force
+                        && case.direction == left_direction
+                });
+                let right = cases.iter().find(|case| {
+                    case.disturbance_time_s == time
+                        && case.force_n == force
+                        && case.direction == right_direction
+                });
+                if let (Some(left), Some(right)) = (left, right) {
+                    differences.push((score(&left.result) - score(&right.result)).abs());
+                }
+            }
+        }
+        if !differences.is_empty() {
+            maximum = maximum.max(differences.iter().sum::<f64>() / differences.len() as f64);
+        }
     }
+    maximum
 }
 
 fn count_monotonicity_violations(cases: &[TimedRecoveryCase]) -> usize {
