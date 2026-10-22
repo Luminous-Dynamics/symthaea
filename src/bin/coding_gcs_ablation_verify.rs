@@ -1608,7 +1608,8 @@ mod tests {
         report["runs"][0]["backend_attempts"] = serde_json::json!([{
             "tier": "ImaginaryLLM",
             "backend_name": "SomeBackend",
-            "success": true
+            "success": true,
+            "elapsed_ms": 5
         }]);
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("backend_attempts")));
@@ -1620,7 +1621,8 @@ mod tests {
         report["runs"][0]["backend_attempts"] = serde_json::json!([{
             "tier": "CloudLLM",
             "backend_name": "Ollama",
-            "success": true
+            "success": true,
+            "elapsed_ms": 5
         }]);
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("backend_attempts")));
@@ -1640,7 +1642,8 @@ mod tests {
         report["runs"][0]["backend_attempts"] = serde_json::json!([{
             "tier": "CloudLLM",
             "backend_name": "Anthropic",
-            "success": true
+            "success": true,
+            "elapsed_ms": 5
         }]);
         report["summary"]["gcs_off"]["backend_attempts_by_tier"] = serde_json::json!({
             "Native": 0, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 1, "Simulated": 0
@@ -1648,6 +1651,9 @@ mod tests {
         report["summary"]["gcs_off"]["backend_attempts_by_name"] = serde_json::json!({"Anthropic": 1});
         report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
         report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(5);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(5);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(5);
         report["summary"]["gcs_off"]["runs_with_external_backend_attempts"] = Value::from(1);
         report["summary"]["gcs_off"]["runs_with_simulated_backend_attempts"] = Value::from(0);
         report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
@@ -1667,8 +1673,8 @@ mod tests {
 
         report["runs"][0]["selected_generation_tiers"] = serde_json::json!(["LocalLLM", "LocalLLM"]);
         report["runs"][0]["backend_attempts"] = serde_json::json!([
-            {"tier": "Simulated", "backend_name": "Simulated", "success": true},
-            {"tier": "LocalLLM", "backend_name": "Ollama", "success": true}
+            {"tier": "Simulated", "backend_name": "Simulated", "success": true, "elapsed_ms": 7},
+            {"tier": "LocalLLM", "backend_name": "Ollama", "success": true, "elapsed_ms": 11}
         ]);
         report["summary"]["gcs_off"]["selected_tier_decisions"] = serde_json::json!({
             "Native": 0, "Hardware": 0, "LocalLLM": 2, "CloudLLM": 0, "Simulated": 0
@@ -1681,6 +1687,9 @@ mod tests {
         });
         report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(2);
         report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(18);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(7);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(11);
         report["summary"]["gcs_off"]["runs_with_external_backend_attempts"] = Value::from(1);
         report["summary"]["gcs_off"]["runs_with_simulated_backend_attempts"] = Value::from(1);
         report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
