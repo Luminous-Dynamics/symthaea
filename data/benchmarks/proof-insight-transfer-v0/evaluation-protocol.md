@@ -228,6 +228,15 @@ Proposed gates for a future confirmatory version are at least 90% mutation sensi
 
 This design is motivated by three separate ideas in the literature: T² tests formal statements through dependent successor theorems; FormalRewardBench uses expert-curated proof error injections; effect-grounded tactic representations study the structural edit a tactic induces rather than only its surface text ([T²](https://aclanthology.org/2026.acl-industry.150/), [FormalRewardBench](https://arxiv.org/abs/2605.10141), [effect-grounded tactic representations](https://aclanthology.org/2025.mathnlp-main.12/)). These works motivate the test design, not a claim that the counterfactual track already improves PITB.
 
+
+### Executable paired counterfactual analysis
+
+The Rust `analyze_counterfactual_sensitivity` binary joins the base and counterfactual outcome-row IDs in each suite pair to the selected-split transfer-selectivity JSONL. It fails closed on unreferenced/missing/duplicate outcome rows; source or target provenance drift; mismatched statement digest, component, adjudication label/status, adjudication receipt, reviewer IDs, reviewer evidence or reason codes; and declared-budget overrun.
+
+Report at minimum: compatible-base acceptance recall; compatible counterfactual acceptance recall; rejection-or-abstention sensitivity and false acceptance on incompatible variants; paired contract adherence; exact decision stability on semantics-preserving variants; compatibility-probability Brier score; mean absolute probability shift for no-op variants; and sensitivity/false acceptance by mutation type. It bootstraps connected pair components rather than individual edges and records the exact suite/outcome content digests and seed.
+
+The checked-in synthetic fixture has seven pairs and fourteen outcome rows. CI asserts expected synthetic metrics, validates the aggregate report against an independent Draft 2020-12 engine, and confirms failure for missing paired rows, source provenance drift, reviewer receipt disagreement and over-budget outcomes. The fixture intentionally encodes strong, known answers so the analyzer path is testable; its perfect metrics are **not** benchmark evidence, and the output always retains `overall_confirmatory_decision = not_evaluated_...`. Real benchmark claims require independently reviewed mathematical labels and actual target-checker receipts. The primary exact-target solve endpoint remains unchanged.
+
 ## Insight-component intervention track
 
 This is a separate, pre-registered secondary experiment. It does not add arms to or retroactively alter the primary A-I retrieval ablation. Its purpose is to test **which parts of a typed insight cause measurable utility**, rather than infer causal value from a correlation between record quality and success.
