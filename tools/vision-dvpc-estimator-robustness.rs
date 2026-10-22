@@ -147,7 +147,7 @@ struct RunResult {
     reservation_overruns: usize,
     run_budget_overruns: usize,
     oracle_benefit: f64,
-    regret: f64,
+    regret: Option<f64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -165,12 +165,14 @@ struct SummaryResult {
     seeds: usize,
     mean_task_loss: SummaryStats,
     mean_total_benefit: SummaryStats,
-    mean_regret: SummaryStats,
+    mean_regret: Option<SummaryStats>,
+    valid_regret_seeds: usize,
+    paired_comparable_seeds: usize,
     mean_harmful_escalations: SummaryStats,
     mean_missed_beneficial: SummaryStats,
     mean_charged_units: SummaryStats,
     budget_violation_runs: usize,
-    paired_loss_delta_vs_random: SummaryStats,
+    paired_loss_delta_vs_random: Option<SummaryStats>,
 }
 
 #[derive(Clone)]
@@ -470,7 +472,7 @@ fn run_policy(
         reservation_overruns,
         run_budget_overruns,
         oracle_benefit,
-        regret: oracle_benefit - total_benefit,
+        regret: (run_budget_overruns == 0).then_some(oracle_benefit - total_benefit),
     }
 }
 
@@ -497,7 +499,7 @@ fn summarize(results: &[RunResult]) -> Vec<SummaryResult> {
                 .filter(|row| row.regime == regime
                     && row.budget_percent == budget_percent
                     && row.policy == Policy::BudgetRandom)
-                .map(|row| (row.seed, row.task_loss))
+                .map(|row| (row.seed, (row.task_loss, row.run_budget_overruns)))
                 .collect();
 
             for policy in Policy::ALL {
@@ -509,12 +511,15 @@ fn summarize(results: &[RunResult]) -> Vec<SummaryResult> {
                     .collect();
                 let task_loss: Vec<f64> = rows.iter().map(|row| row.task_loss).collect();
                 let benefit: Vec<f64> = rows.iter().map(|row| row.total_benefit).collect();
-                let regret: Vec<f64> = rows.iter().map(|row| row.regret).collect();
+                let regret: Vec<f64> = rows.iter().filter_map(|row| row.regret).collect();
                 let harmful: Vec<f64> = rows.iter().map(|row| row.harmful_escalations as f64).collect();
                 let missed: Vec<f64> = rows.iter().map(|row| row.missed_beneficial as f64).collect();
                 let charged: Vec<f64> = rows.iter().map(|row| row.charged_units as f64).collect();
                 let paired_delta: Vec<f64> = rows.iter().filter_map(|row| {
-                    random_by_seed.get(&row.seed).map(|random_loss| row.task_loss - random_loss)
+                    if row.run_budget_overruns > 0 { return None; }
+                    random_by_seed.get(&row.seed).and_then(|(random_loss, random_overruns)| {
+                        (*random_overruns == 0).then_some(row.task_loss - random_loss)
+                    })
                 }).collect();
                 output.push(SummaryResult {
                     regime,
@@ -523,12 +528,14 @@ fn summarize(results: &[RunResult]) -> Vec<SummaryResult> {
                     seeds: rows.len(),
                     mean_task_loss: mean_ci(&task_loss),
                     mean_total_benefit: mean_ci(&benefit),
-                    mean_regret: mean_ci(&regret),
+                    mean_regret: (!regret.is_empty()).then(|| mean_ci(&regret)),
+                    valid_regret_seeds: regret.len(),
+                    paired_comparable_seeds: paired_delta.len(),
                     mean_harmful_escalations: mean_ci(&harmful),
                     mean_missed_beneficial: mean_ci(&missed),
                     mean_charged_units: mean_ci(&charged),
                     budget_violation_runs: rows.iter().filter(|row| row.run_budget_overruns > 0).count(),
-                    paired_loss_delta_vs_random: mean_ci(&paired_delta),
+                    paired_loss_delta_vs_random: (!paired_delta.is_empty()).then(|| mean_ci(&paired_delta)),
                 });
             }
         }
@@ -560,29 +567,33 @@ fn render_report() -> String {
     report.push_str("META\toracle_boundary\tevaluator_only_exact_knapsack_from_hidden_paired_values_and_actual_costs\n");
     report.push_str("META\tresource_units\tabstract_integer_cost_units_not_latency_flops_watts_or_energy\n");
     report.push_str("META\tseed_count\t8\n");
+    report.push_str("META\tregret_validity\tINVALID_BUDGET_when_actual_run_budget_is_exceeded\n");
     report.push_str("META\ttrials_per_regime_seed\t256\n");
     report.push_str("META\tinterval\tnormal_approximation_1.96_sd_over_sqrt_n_descriptive_not_confirmatory\n");
     report.push_str("RUN_HEADER\tregime\tpolicy\tbudget_percent\tseed\ttrial_count\tescalations\tbeneficial_escalations\tharmful_escalations\tmissed_beneficial\tcritical_misses\tood_trials\tood_escalations\tood_harmful\ttotal_benefit\ttask_loss\tcharged_units\tbudget_units\treservation_overruns\trun_budget_overruns\toracle_benefit\tregret\n");
     for row in &results {
         report.push_str(&format!(
-            "RUN\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\n",
+            "RUN\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{:.6}\t{}\n",
             row.regime.label(), row.policy.label(), row.budget_percent, row.seed,
             row.trials, row.escalations, row.beneficial_escalations, row.harmful_escalations,
             row.missed_beneficial, row.critical_misses, row.ood_trials, row.ood_escalations,
             row.ood_harmful, row.total_benefit, row.task_loss, row.charged_units,
             row.budget_units, row.reservation_overruns, row.run_budget_overruns,
-            row.oracle_benefit, row.regret
+            row.oracle_benefit, row.regret.map(|value| format!("{value:.6}")).unwrap_or_else(|| "INVALID_BUDGET".to_owned())
         ));
     }
 
-    report.push_str("SUMMARY_HEADER\tregime\tpolicy\tbudget_percent\tseed_count\tmean_task_loss\ttask_loss_ci95_low\ttask_loss_ci95_high\tmean_total_benefit\tbenefit_ci95_low\tbenefit_ci95_high\tmean_regret\tregret_ci95_low\tregret_ci95_high\tmean_harmful_escalations\tharmful_ci95_low\tharmful_ci95_high\tmean_missed_beneficial\tmissed_ci95_low\tmissed_ci95_high\tmean_charged_units\tcharged_ci95_low\tcharged_ci95_high\tbudget_violation_runs\tpaired_loss_delta_vs_random\tdelta_ci95_low\tdelta_ci95_high\n");
+    report.push_str("SUMMARY_HEADER\tregime\tpolicy\tbudget_percent\tseed_count\tvalid_regret_seeds\tpaired_comparable_seeds\tmean_task_loss\ttask_loss_ci95_low\ttask_loss_ci95_high\tmean_total_benefit\tbenefit_ci95_low\tbenefit_ci95_high\tmean_regret\tregret_ci95_low\tregret_ci95_high\tmean_harmful_escalations\tharmful_ci95_low\tharmful_ci95_high\tmean_missed_beneficial\tmissed_ci95_low\tmissed_ci95_high\tmean_charged_units\tcharged_ci95_low\tcharged_ci95_high\tbudget_violation_runs\tpaired_loss_delta_vs_random\tdelta_ci95_low\tdelta_ci95_high\n");
     for row in summarize(&results) {
         report.push_str(&format!(
-            "SUMMARY\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "SUMMARY\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             row.regime.label(), row.policy.label(), row.budget_percent, row.seeds,
+            row.valid_regret_seeds, row.paired_comparable_seeds,
             fmt_stats(row.mean_task_loss), fmt_stats(row.mean_total_benefit),
-            fmt_stats(row.mean_regret), fmt_stats(row.mean_harmful_escalations),
-            fmt_stats(row.mean_missed_beneficial), fmt_stats(row.mean_charged_units),
+            row.mean_regret.map(fmt_stats).unwrap_or_else(|| "UNKNOWN\tUNKNOWN\tUNKNOWN".to_owned()),
+            fmt_stats(row.mean_harmful_escalations), fmt_stats(row.mean_missed_beneficial),
+            fmt_stats(row.mean_charged_units), row.budget_violation_runs,
+            row.paired_loss_delta_vs_random.map(fmt_stats).unwrap_or_else(|| "UNKNOWN\tUNKNOWN\tUNKNOWN".to_owned())
             row.budget_violation_runs, fmt_stats(row.paired_loss_delta_vs_random)
         ));
     }
