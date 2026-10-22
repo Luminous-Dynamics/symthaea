@@ -76,6 +76,7 @@ impl MoralAlgebra {
         consent_hvs.insert(ConsentState::Denied, ContinuousHV::random(dim, 5000023));
         consent_hvs.insert(ConsentState::Absent, ContinuousHV::random(dim, 5000039));
         consent_hvs.insert(ConsentState::Implied, ContinuousHV::random(dim, 5000057));
+        consent_hvs.insert(ConsentState::Unknown, ContinuousHV::random(dim, 5000069));
 
         let mut algebra = Self {
             primitives,
@@ -1085,27 +1086,40 @@ impl MoralAlgebra {
         let good_sim = self.max_similarity_to_prototypes(action_hv, &good_protos);
         let bad_sim = self.max_similarity_to_prototypes(action_hv, &bad_protos);
 
-        // Direct consent state check — no HDC inference needed
+        // Direct consent state check — no HDC inference needed. Unknown evidence is
+        // deliberately not treated as permission or proof of a violation.
         let consent_viol_sim = match consent {
             ConsentState::Denied => 1.0,  // Explicit denial is always a violation
-            ConsentState::Absent => 0.8,  // Missing consent is a strong violation signal
-            ConsentState::Implied => 0.1, // Implied consent is weak but not a violation
-            ConsentState::Given => 0.0,   // Explicit consent = no violation
+            ConsentState::Absent => 0.8,  // Evidence states consent was not obtained
+            ConsentState::Unknown => 0.3, // Underdetermined boundary; never a positive grant
+            ConsentState::Implied => 0.1, // Explicitly stated assumption, not explicit consent
+            ConsentState::Given => 0.0,   // Explicit affirmative consent signal
+        };
+
+        // The legacy verdict enum has no dedicated Undetermined variant. Preserve
+        // a Neutral verdict for Unknown so action similarity cannot upgrade missing
+        // consent evidence into a positive consent-sensitive judgment. Neutral is
+        // not an authorization permit; callers needing authority must use a separate
+        // scope-bound consent/authorization policy.
+        let verdict = match consent {
+            ConsentState::Unknown => MoralVerdict::Neutral,
+            ConsentState::Denied | ConsentState::Absent => MoralVerdict::ConsentViolation,
+            ConsentState::Given | ConsentState::Implied => {
+                if good_sim > bad_sim {
+                    MoralVerdict::Good
+                } else if bad_sim > good_sim {
+                    MoralVerdict::Bad
+                } else {
+                    MoralVerdict::Neutral
+                }
+            }
         };
 
         MoralJudgment {
             good_similarity: good_sim,
             bad_similarity: bad_sim,
             consent_violation_similarity: consent_viol_sim,
-            verdict: if consent_viol_sim > 0.3 {
-                MoralVerdict::ConsentViolation
-            } else if good_sim > bad_sim {
-                MoralVerdict::Good
-            } else if bad_sim > good_sim {
-                MoralVerdict::Bad
-            } else {
-                MoralVerdict::Neutral
-            },
+            verdict,
         }
     }
 
