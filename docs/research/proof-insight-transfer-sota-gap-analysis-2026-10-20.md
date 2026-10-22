@@ -324,3 +324,16 @@ Benchmark comparison should also include dependency-aware retrieval and cost-qua
 - Xin et al., [VeriSoftBench](https://arxiv.org/abs/2602.18307); [repository](https://github.com/utopia-group/VeriSoftBench).
 - [First Proof Batch 3 official results](https://1stproof.org/third-batch-press-release.html), 14 October 2026.
 - [Frozen OpenAI math source snapshot](https://github.com/openai/math/tree/1581d4cbdd69a0faf34b2089614fe2a814316a6a).
+
+## 22 October 2026 update: Lean-calibrated counterfactual qualification
+
+The benchmark now has a small, isolated Lean 4.34.1 calibration package in `data/benchmarks/proof-insight-transfer-v0/lean-pilot/`, alongside a case manifest that binds each pedagogical contrast to source statement fragments and named evidence declarations. The pinned workflow builds the examples, invokes Nanoda with `sorry` disallowed, and emits a content-addressed receipt covering the commit, statement-fragment digests, Lean/Lake versions, compiled artifact, source files and build log.
+
+The calibration deliberately distinguishes three different formal situations: alpha-renamed binder expressions proven equal by reflexivity; a surface-different proposition pair with an explicit kernel-checked `↔` proof; and a premise-removal mutation whose unconditional variant is refuted by a checked counterexample. This is a useful implementation step because the relation label must be supported by a proof artifact, not inferred solely from a mutation name or source hash.
+
+This calibration is **not** a model transfer experiment. The case manifest marks model outcomes `not_run`; no compatible-transfer recall, mutation sensitivity, exact-target utility gain or SOTA improvement follows from it. Promotion to a scored pair requires the exact-head Lean/Nanoda receipt, independent contract adjudication, linkage to actual solver outcome rows and matched budgets.
+
+The external frontier reinforces this design choice. T² evaluates the semantic behavior of formal statements via dependent successor theorems ([ACL 2026](https://aclanthology.org/2026.acl-industry.150/)); the formal benchmark audit documents defects not detected by a kernel check alone ([Faults in Our Formal Benchmarking](https://arxiv.org/abs/2606.29493)); and recent work explicitly trains formal counterexample generation as a complement to proving ([Learning to Disprove](https://arxiv.org/abs/2603.19514)). PITB should compare itself against those capabilities as distinct tasks, not claim their results as its own. Its proposed research contribution remains causal strategy applicability: whether a typed strategy's declared prerequisites predict and govern safe transfer, and whether doing so improves exact-target, semantically qualified proof utility at a matched budget.
+
+**Next qualification gate:** pass the exact-head Lean pilot workflow and validate its uploaded receipt; then use the pilot to test the manifest-to-outcome data path with model outcomes still unscored. Only after independent review and a powered, family-disjoint dataset exists should PITB report confirmatory mutation sensitivity or paired proof-utility results.
+
