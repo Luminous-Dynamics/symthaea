@@ -716,7 +716,14 @@ fn trace_cases() -> Vec<TraceCase> {
             events: vec![
                 enroll(1, "hank-enroll-1", Authority::Enroller, "hank", "vec-H", 1),
                 revoke(2, "hank-revoke-2", Authority::Revoker, "hank", 1, 2),
-                enroll(3, "hank-reenroll-without-recovery", Authority::Enroller, "hank", "vec-H2", 3),
+                enroll(
+                    3,
+                    "hank-reenroll-without-recovery",
+                    Authority::Enroller,
+                    "hank",
+                    "vec-H2",
+                    3,
+                ),
             ],
             expected_codes: vec!["accepted", "accepted", "recovery_required"],
         },
@@ -778,7 +785,12 @@ fn main() -> BenchResult<()> {
                 .get(index)
                 .copied()
                 .unwrap_or("missing_expectation");
-            fixture_canonical.push_str(&format!("{}|{}|{}|", case.id, index + 1, event.canonical()));
+            fixture_canonical.push_str(&format!(
+                "{}|{}|{}|",
+                case.id,
+                index + 1,
+                event.canonical()
+            ));
             fixture_canonical.push_str(expected);
             fixture_canonical.push('\n');
 
