@@ -42,16 +42,21 @@ fn read_f64(value: &Value, key: &str) -> Option<f64> {
 }
 
 fn manifest_digest(manifest: &[Value]) -> Option<String> {
-    let mut rows = Vec::with_capacity(manifest.len());
+    // Match the producer's ordered, length-prefixed (task ID, task digest) encoding.
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&(manifest.len() as u64).to_be_bytes());
     for task in manifest {
         let id = str_field(task, "task_id")?;
         let digest = str_field(task, "task_digest_blake3")?;
         if !is_hex(digest, 64) {
             return None;
         }
-        rows.push(format!("{id}:{digest}"));
+        hasher.update(&(id.len() as u64).to_be_bytes());
+        hasher.update(id.as_bytes());
+        hasher.update(&(digest.len() as u64).to_be_bytes());
+        hasher.update(digest.as_bytes());
     }
-    Some(blake3::hash(rows.join("\n").as_bytes()).to_hex().to_string())
+    Some(hasher.finalize().to_hex().to_string())
 }
 
 fn task_digest_from_manifest(task: &Value) -> Option<String> {
