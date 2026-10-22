@@ -13,6 +13,8 @@ pub mod casting_evidence;
 #[cfg(test)]
 mod casting_golden_tests;
 #[cfg(test)]
+mod casting_multiobjective_benchmark;
+#[cfg(test)]
 mod casting_optimization_benchmark;
 mod consciousness_bridge;
 pub mod constants;
