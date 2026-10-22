@@ -231,7 +231,7 @@ mod tests {
     fn standardized_rms_residual_matches_hand_calculation() {
         let score = standardized_rms_residual(&[3.0, 2.0], &[1.0, 2.0], &[2.0, 1.0])
             .expect("valid residual batch");
-        assert!((score - (0.5_f64 / 2.0).sqrt()).abs() < 1e-12);
+        assert!((score - 0.5_f64.sqrt()).abs() < 1e-12);
     }
 
     #[test]
