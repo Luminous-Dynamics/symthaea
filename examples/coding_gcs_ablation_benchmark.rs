@@ -956,6 +956,58 @@ mod provenance_tests {
     }
 
     #[test]
+    fn mode_summary_distinguishes_selected_tier_decisions_from_actual_backend_attempts() {
+        let run = EvalResult {
+            task_id: "fallback".to_string(),
+            repeat: 1,
+            gcs_advisories_enabled: false,
+            execution_order: "off_then_on".to_string(),
+            code_written: true,
+            expected_symbol_found: true,
+            generated_source_blake3: "a".repeat(64),
+            compiled: true,
+            simulated: false,
+            expected_test_functions: 1,
+            tests_passed: 1,
+            tests_failed: 0,
+            oracle_complete: true,
+            behavioral_success: true,
+            runtime_error: None,
+            compile_errors: Vec::new(),
+            agent_elapsed_ms: 100,
+            verification_elapsed_ms: 10,
+            iterations: 1,
+            energy: 1.0,
+            final_phase: "Done".to_string(),
+            selected_generation_tiers: vec!["LocalLLM".to_string(), "LocalLLM".to_string()],
+            backend_attempts: vec![
+                BackendAttemptRecord {
+                    tier: "Simulated".to_string(),
+                    backend_name: "Simulated".to_string(),
+                    success: true,
+                },
+                BackendAttemptRecord {
+                    tier: "LocalLLM".to_string(),
+                    backend_name: "Ollama".to_string(),
+                    success: false,
+                },
+            ],
+        };
+
+        let summary = mode_summary(&[run], false);
+        assert_eq!(summary["selected_tier_decisions"]["LocalLLM"], 2);
+        assert_eq!(summary["backend_attempts_by_tier"]["LocalLLM"], 1);
+        assert_eq!(summary["backend_attempts_by_tier"]["Simulated"], 1);
+        assert_eq!(summary["backend_attempts_by_name"]["Ollama"], 1);
+        assert_eq!(summary["backend_attempts_by_name"]["Simulated"], 1);
+        assert_eq!(summary["backend_attempts_succeeded"], 1);
+        assert_eq!(summary["backend_attempts_failed"], 1);
+        assert_eq!(summary["runs_with_external_backend_attempts"], 1);
+        assert_eq!(summary["runs_with_simulated_backend_attempts"], 1);
+        assert_eq!(summary["runs_with_no_backend_attempts"], 0);
+    }
+
+    #[test]
     fn latency_percentiles_use_nearest_rank_and_reject_invalid_input() {
         let values = vec![120_u128, 10, 100, 20];
         assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.50), Some(20));
