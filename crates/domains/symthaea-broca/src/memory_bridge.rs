@@ -312,4 +312,53 @@ mod intervention_policy_tests {
         .should_intervene(&[f32::NAN])
         .is_err());
     }
+
+    #[test]
+    fn never_policy_leaves_populated_hdc_bridge_unchanged() {
+        use symthaea_hdc_store::{HdcStore, StoreConfig};
+
+        let dir = tempfile::tempdir().unwrap();
+        let store = HdcStore::create(dir.path().join("memory.hdc"), StoreConfig::default())
+            .unwrap();
+        let mut bridge = MemoryBridge::new(store, 4, 0.5);
+        let remembered = ContinuousHV::random(16_384, 41);
+        bridge.remember(1, &remembered).unwrap();
+
+        let mut current = ContinuousHV::random(16_384, 42);
+        let before = current.as_slice().to_vec();
+        let blended = bridge
+            .blend_past_experiences_with_policy(
+                &mut current,
+                MemoryInterventionPolicy::Never,
+            )
+            .unwrap();
+
+        assert_eq!(blended, 0);
+        assert_eq!(current.as_slice(), before.as_slice());
+    }
+
+    #[test]
+    fn zero_threshold_gate_uses_real_hdc_retrieval_results() {
+        use symthaea_hdc_store::{HdcStore, StoreConfig};
+
+        let dir = tempfile::tempdir().unwrap();
+        let store = HdcStore::create(dir.path().join("memory.hdc"), StoreConfig::default())
+            .unwrap();
+        let mut bridge = MemoryBridge::new(store, 4, 0.5);
+        let remembered = ContinuousHV::random(16_384, 51);
+        bridge.remember(1, &remembered).unwrap();
+
+        let mut current = ContinuousHV::random(16_384, 52);
+        let blended = bridge
+            .blend_past_experiences_with_policy(
+                &mut current,
+                MemoryInterventionPolicy::MinTopSimilarity {
+                    min_similarity: 0.0,
+                },
+            )
+            .unwrap();
+
+        assert_eq!(blended, 1);
+    }
+
 }
