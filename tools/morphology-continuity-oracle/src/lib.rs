@@ -22,6 +22,9 @@ impl Cell3 {
 
 pub type Shape = BTreeSet<Cell3>;
 
+/// SHA-256 of canonical_request_v0_1.txt; re-verified by the dedicated workflow.
+pub const REQUEST_SHA256: &str = "9348ff465116c23bacf9dfa5f1ed6ce98bb14bfa042b228800d6406ef542681f";
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Template {
     pub id: &'static str,
@@ -228,6 +231,11 @@ mod tests {
 
     fn chair_without_backrest(templates: &[Template]) -> Shape {
         shape(templates, "table").clone()
+    }
+
+    #[test]
+    fn canonical_request_digest_is_pinned() {
+        assert_eq!(REQUEST_SHA256, "9348ff465116c23bacf9dfa5f1ed6ce98bb14bfa042b228800d6406ef542681f");
     }
 
     #[test]
