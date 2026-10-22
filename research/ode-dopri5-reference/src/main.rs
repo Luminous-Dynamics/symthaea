@@ -9,7 +9,9 @@ use std::env;
 use std::error::Error;
 
 use ode_solvers::{Dopri5, OutputType, System, Vector2};
-use ode_verify_001_harness::dynamical_system::{HarmonicOscillator, Rk45Integrator, Rk45Tolerances};
+use ode_verify_001_harness::dynamical_system::{
+    HarmonicOscillator, Rk45Integrator, Rk45Tolerances,
+};
 
 const T_END: f64 = 10.0;
 const INITIAL_DT: f64 = 0.2;
@@ -57,15 +59,11 @@ fn max_relative_energy_drift(states: impl Iterator<Item = [f64; 2]>, scale: f64)
 /// dense-output grid. The quintic Hermite interpolant uses the harmonic oscillator's
 /// known first and second derivatives. This is benchmark post-processing, not production
 /// dense output, and its arithmetic is not counted as integration RHS work.
-fn quintic_hermite_sample_grid(
-    times: &[f64],
-    states: &[Vec<f64>],
-) -> Option<Vec<(f64, [f64; 2])>> {
+fn quintic_hermite_sample_grid(times: &[f64], states: &[Vec<f64>]) -> Option<Vec<(f64, [f64; 2])>> {
     if times.len() != states.len()
         || times.len() < 2
         || times[0].abs() > 32.0 * f64::EPSILON
-        || (times[times.len() - 1] - T_END).abs()
-            > 32.0 * f64::EPSILON * T_END.abs().max(1.0)
+        || (times[times.len() - 1] - T_END).abs() > 32.0 * f64::EPSILON * T_END.abs().max(1.0)
         || states
             .iter()
             .any(|state| state.len() != 2 || state.iter().any(|value| !value.is_finite()))
@@ -210,20 +208,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                     &report.simulation.states,
                 ) {
                     Some(samples) => {
-                        let endpoint = samples.last().map(|sample| sample.1).unwrap_or([f64::NAN; 2]);
+                        let endpoint = samples
+                            .last()
+                            .map(|sample| sample.1)
+                            .unwrap_or([f64::NAN; 2]);
                         let endpoint_error = scaled_state_error(endpoint, scale, T_END);
-                        let trajectory_error = max_sampled_scaled_trajectory_error(
-                            samples.iter().copied(),
-                            scale,
-                        );
-                        let energy_drift = max_relative_energy_drift(
-                            samples.iter().map(|sample| sample.1),
-                            scale,
-                        );
+                        let trajectory_error =
+                            max_sampled_scaled_trajectory_error(samples.iter().copied(), scale);
+                        let energy_drift =
+                            max_relative_energy_drift(samples.iter().map(|sample| sample.1), scale);
                         let common_grid_complete = samples.len() == COMMON_OUTPUT_INTERVALS + 1;
-                        let finite = samples.iter().all(|(_, state)| {
-                            state.iter().all(|value| value.is_finite())
-                        }) && report.simulation.states.iter().flatten().all(|value| value.is_finite());
+                        let finite = samples
+                            .iter()
+                            .all(|(_, state)| state.iter().all(|value| value.is_finite()))
+                            && report
+                                .simulation
+                                .states
+                                .iter()
+                                .flatten()
+                                .all(|value| value.is_finite());
                         let pass = common_grid_complete
                             && finite
                             && endpoint_error <= endpoint_error_limit
@@ -293,10 +296,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                         .iter()
                         .map(|state| vec![state[0], state[1]])
                         .collect();
-                    let interpolated_reference = quintic_hermite_sample_grid(
-                        raw_reference_times,
-                        &raw_reference_states_vec,
-                    );
+                    let interpolated_reference =
+                        quintic_hermite_sample_grid(raw_reference_times, &raw_reference_states_vec);
                     let mut common_grid_matches = false;
                     let mut max_common_grid_disagreement = None;
                     let mut endpoint_error = f64::MAX;
@@ -319,9 +320,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                             reference_samples.iter().map(|sample| sample.1),
                             scale,
                         );
-                        max_common_grid_disagreement = custom_samples.as_deref().and_then(|custom| {
-                            max_common_grid_disagreement(custom, &reference_samples, scale)
-                        });
+                        max_common_grid_disagreement =
+                            custom_samples.as_deref().and_then(|custom| {
+                                max_common_grid_disagreement(custom, &reference_samples, scale)
+                            });
                         common_grid_matches = max_common_grid_disagreement.is_some()
                             && common_grid_samples == COMMON_OUTPUT_INTERVALS + 1;
                         finite = endpoint_error.is_finite()
@@ -394,7 +396,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -423,7 +424,10 @@ mod tests {
 
         // Quintic Hermite is a sixth-order local interpolation approximation on this smooth fixture.
         let maximum_error = max_sampled_scaled_trajectory_error(samples.iter().copied(), 1.0);
-        assert!(maximum_error < 1.0e-7, "max interpolation error={maximum_error}");
+        assert!(
+            maximum_error < 1.0e-7,
+            "max interpolation error={maximum_error}"
+        );
     }
 
     #[test]
@@ -453,7 +457,10 @@ mod tests {
         let samples = quintic_hermite_sample_grid(times, &states).unwrap();
         assert_eq!(samples.len(), COMMON_OUTPUT_INTERVALS + 1);
         let maximum_error = max_sampled_scaled_trajectory_error(samples.iter().copied(), 1.0);
-        assert!(maximum_error < 10.0 * rtol, "max sparse-interpolated error={maximum_error}");
+        assert!(
+            maximum_error < 10.0 * rtol,
+            "max sparse-interpolated error={maximum_error}"
+        );
     }
 
     #[test]
@@ -464,7 +471,10 @@ mod tests {
                 (time, [time.cos(), -time.sin()])
             })
             .collect();
-        assert_eq!(max_common_grid_disagreement(&samples, &samples, 1.0), Some(0.0));
+        assert_eq!(
+            max_common_grid_disagreement(&samples, &samples, 1.0),
+            Some(0.0)
+        );
 
         let mut wrong_time = samples.clone();
         wrong_time[20].0 += 1.0e-6;
@@ -478,15 +488,10 @@ mod tests {
     fn quintic_hermite_resampling_rejects_malformed_adaptive_trajectories() {
         assert!(quintic_hermite_sample_grid(&[], &[]).is_none());
         assert!(quintic_hermite_sample_grid(&[0.0, 10.0], &[vec![0.0], vec![0.0]]).is_none());
-        assert!(quintic_hermite_sample_grid(
-            &[0.0, 10.0],
-            &[vec![0.0, 0.0], vec![f64::NAN, 0.0]]
-        )
-        .is_none());
-        assert!(quintic_hermite_sample_grid(
-            &[0.0, 9.0],
-            &[vec![0.0, 0.0], vec![0.0, 0.0]]
-        )
-        .is_none());
+        assert!(
+            quintic_hermite_sample_grid(&[0.0, 10.0], &[vec![0.0, 0.0], vec![f64::NAN, 0.0]])
+                .is_none()
+        );
+        assert!(quintic_hermite_sample_grid(&[0.0, 9.0], &[vec![0.0, 0.0], vec![0.0, 0.0]]).is_none());
     }
 }
