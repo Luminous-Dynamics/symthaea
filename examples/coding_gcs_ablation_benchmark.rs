@@ -1083,6 +1083,41 @@ mod provenance_tests {
     }
 
     #[test]
+    fn mode_summary_counts_compile_rejection_separately_from_test_failures() {
+        let run = EvalResult {
+            task_id: "compile-reject".to_string(),
+            repeat: 1,
+            gcs_advisories_enabled: false,
+            execution_order: "off_then_on".to_string(),
+            code_written: true,
+            expected_symbol_found: true,
+            generated_source_blake3: "b".repeat(64),
+            compiled: false,
+            simulated: false,
+            expected_test_functions: 3,
+            tests_passed: 0,
+            tests_failed: 0,
+            oracle_complete: true,
+            behavioral_success: false,
+            runtime_error: None,
+            compile_errors: vec!["error[E0425]: missing symbol".to_string()],
+            agent_elapsed_ms: 100,
+            verification_elapsed_ms: 3,
+            iterations: 1,
+            energy: 1.0,
+            final_phase: "Done".to_string(),
+            selected_generation_tiers: vec![],
+            backend_attempts: vec![],
+        };
+        let summary = mode_summary(&[run], false);
+        assert_eq!(summary["compile_rejections"], 1);
+        assert_eq!(summary["real_compiles"], 0);
+        assert_eq!(summary["complete_oracles"], 1);
+        assert_eq!(summary["behavioral_successes"], 0);
+        assert_eq!(summary["pass_rate"], 0.0);
+    }
+
+    #[test]
     fn latency_percentiles_use_nearest_rank_and_reject_invalid_input() {
         let values = vec![120_u128, 10, 100, 20];
         assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.50), Some(20));
