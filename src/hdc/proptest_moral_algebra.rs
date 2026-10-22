@@ -151,6 +151,7 @@ proptest! {
             ConsentState::Denied,
             ConsentState::Absent,
             ConsentState::Implied,
+            ConsentState::Unknown,
         ];
         let encoded: Vec<_> = states.iter().map(|s| algebra.encode_consent(*s)).collect();
 
