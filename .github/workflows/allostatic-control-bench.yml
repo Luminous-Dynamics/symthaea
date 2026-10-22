@@ -12,6 +12,7 @@ on:
       - "docs/research/SEQUENTIAL_SCOPE_CUSUM_V1.md"
       - "docs/research/BOUNDED_RISK_EPROCESS_V1.md"
       - "docs/research/EPROCESS_SHIFT_POWER_SURFACE_V1.md"
+      - "docs/research/EPROCESS_ALPHA_SPENT_CHANGEPOINT_V1.md"
       - ".github/workflows/allostatic-control-bench.yml"
   workflow_dispatch:
 
@@ -69,3 +70,5 @@ jobs:
             allostatic-control-v1-risk-eprocess-summary.csv
             allostatic-control-v1-eprocess-shift-power.csv
             allostatic-control-v1-eprocess-shift-power-summary.csv
+            allostatic-control-v1-eprocess-changepoint.csv
+            allostatic-control-v1-eprocess-changepoint-summary.csv
