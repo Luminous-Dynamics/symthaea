@@ -2374,6 +2374,10 @@ name = "coding_oracle_mutation_bench"
 required-features = ["code_generation"]
 
 [[example]]
+name = "coding_oracle_mutation_verify"
+required-features = ["code_generation"]
+
+[[example]]
 name = "benchmark_coding_backends"
 required-features = ["code_generation"]
 
