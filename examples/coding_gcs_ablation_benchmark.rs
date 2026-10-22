@@ -250,14 +250,18 @@ fn evaluate_source(source: &str, test_source: &str) -> OracleRun {
     }
 }
 
-fn is_behaviorally_successful(run: &OracleRun, expected: usize) -> bool {
+fn is_oracle_complete(run: &OracleRun, expected: usize) -> bool {
     expected > 0
         && !run.simulated
         && run.compiled
+        && run.tests_passed + run.tests_failed == expected
+}
+
+fn is_behaviorally_successful(run: &OracleRun, expected: usize) -> bool {
+    is_oracle_complete(run, expected)
         && run.runtime_error.is_none()
         && run.tests_passed == expected
         && run.tests_failed == 0
-        && run.tests_passed + run.tests_failed == expected
 }
 
 fn run_candidate(
@@ -289,10 +293,7 @@ fn run_candidate(
     // CodeExecutor stores a nonzero test-process exit in runtime_error even when
     // ordinary assertions fail. Exact test counts distinguish a completed failing
     // oracle from an incomplete/crashed test run; success still requires no error.
-    let oracle_complete = expected > 0
-        && !oracle.simulated
-        && oracle.compiled
-        && oracle.tests_passed + oracle.tests_failed == expected;
+    let oracle_complete = is_oracle_complete(&oracle, expected);
     let behavioral_success = oracle_complete && is_behaviorally_successful(&oracle, expected);
     EvalResult {
         task_id: task.id.to_string(), repeat, gcs_advisories_enabled,
@@ -584,10 +585,7 @@ fn main() {
         let expected = expected_test_functions(task.test_source);
         let reference = evaluate_source(task.reference_source, task.test_source);
         let reference_passes = is_behaviorally_successful(&reference, expected);
-        let reference_oracle_complete = expected > 0
-            && reference.compiled
-            && !reference.simulated
-            && reference.tests_passed + reference.tests_failed == expected;
+        let reference_oracle_complete = is_oracle_complete(&reference, expected);
         let empty = evaluate_source("", task.test_source);
         // This benchmark's empty patch should fail specifically as a real
         // rustc compilation rejection, not as a sandbox/runner failure.
@@ -629,10 +627,7 @@ fn main() {
             // A failed assertion makes rustc's test binary exit nonzero. Count
             // it as a killed mutant only when the full test catalogue was observed;
             // runtime/infrastructure crashes with missing counts stay unresolved.
-            let mutant_oracle_complete = expected > 0
-                && !mutant.simulated
-                && mutant.compiled
-                && mutant.tests_passed + mutant.tests_failed == expected;
+            let mutant_oracle_complete = is_oracle_complete(&mutant, expected);
             let mutant_killed = mutant_oracle_complete && mutant.tests_failed > 0;
             mutation_controls.push(serde_json::json!({
                 "task_id": task.id,
@@ -799,6 +794,36 @@ mod provenance_tests {
         assert!(parse_cli(&args(&["--unknown"])).is_err());
         assert!(parse_cli(&args(&["--help", "--cloud"])).is_err());
         assert!(parse_cli(&args(&["--help"])).unwrap().is_none());
+    }
+
+    #[test]
+    fn assertion_failure_with_full_counts_is_complete_but_not_success() {
+        let run = OracleRun {
+            compiled: true,
+            simulated: false,
+            tests_passed: 2,
+            tests_failed: 1,
+            runtime_error: Some("test process exited nonzero after assertion failure".to_string()),
+            compile_errors: Vec::new(),
+            elapsed_ms: 10,
+        };
+        assert!(is_oracle_complete(&run, 3));
+        assert!(!is_behaviorally_successful(&run, 3));
+    }
+
+    #[test]
+    fn missing_test_results_remain_unresolved() {
+        let run = OracleRun {
+            compiled: true,
+            simulated: false,
+            tests_passed: 2,
+            tests_failed: 0,
+            runtime_error: Some("test process crashed before all cases completed".to_string()),
+            compile_errors: Vec::new(),
+            elapsed_ms: 10,
+        };
+        assert!(!is_oracle_complete(&run, 3));
+        assert!(!is_behaviorally_successful(&run, 3));
     }
 
     #[test]
