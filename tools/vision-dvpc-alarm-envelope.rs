@@ -13,6 +13,8 @@
 
 #![deny(unsafe_code)]
 
+use std::collections::BTreeMap;
+
 const TRIALS_PER_SEED: usize = 256;
 const SEEDS: [u64; 8] = [11, 23, 37, 41, 59, 71, 83, 97];
 const BUDGET_PERCENTAGES: [u64; 3] = [20, 40, 60];
@@ -691,9 +693,18 @@ fn render_report() -> String {
         ));
     }
 
-    report.push_str("SUMMARY_HEADER\tscenario\tpolicy\tbudget_percent\tseed_count\tmean_escalations\tmean_harmful_escalations\tmean_missed_beneficial\tmean_shifted_harmful\tmean_detected_shift_episodes\tmean_undetected_shift_episodes\tmean_detection_delay_trials\tmean_sensitivity\tmean_false_positive_rate\tmean_false_alarm_beneficial_blocks\tmean_total_benefit\tmean_task_loss\tmean_cvar95_incremental_loss\tmean_charged_units\tmean_detector_cost_units\tbudget_violation_runs\n");
+    report.push_str("SUMMARY_HEADER\tscenario\tpolicy\tbudget_percent\tseed_count\tmean_escalations\tmean_harmful_escalations\tmean_missed_beneficial\tmean_shifted_harmful\tmean_detected_shift_episodes\tmean_undetected_shift_episodes\tmean_detection_delay_trials\tmean_sensitivity\tmean_false_positive_rate\tmean_false_alarm_beneficial_blocks\tmean_total_benefit\tmean_task_loss\tmean_cvar95_incremental_loss\tmean_charged_units\tmean_detector_cost_units\tbudget_violation_runs\tmean_benefit_delta_vs_lcb\tmean_cvar95_delta_vs_lcb\tmean_shifted_harm_delta_vs_lcb\n");
     for scenario in &scenario_rows {
         for budget_percent in BUDGET_PERCENTAGES {
+            let lcb_by_seed: BTreeMap<u64, &RunResult> = results
+                .iter()
+                .filter(|row| {
+                    row.scenario == scenario.name
+                        && row.budget_percent == budget_percent
+                        && row.policy == Policy::LcbOnly
+                })
+                .map(|row| (row.seed, row))
+                .collect();
             for policy in Policy::ALL {
                 let rows: Vec<&RunResult> = results
                     .iter()
@@ -718,13 +729,25 @@ fn render_report() -> String {
                     .iter()
                     .filter_map(|row| row.mean_detection_delay_trials)
                     .collect();
+                let benefit_deltas: Vec<f64> = rows
+                    .iter()
+                    .filter_map(|row| lcb_by_seed.get(&row.seed).map(|base| row.total_benefit - base.total_benefit))
+                    .collect();
+                let cvar_deltas: Vec<f64> = rows
+                    .iter()
+                    .filter_map(|row| lcb_by_seed.get(&row.seed).map(|base| row.cvar95_incremental_loss - base.cvar95_incremental_loss))
+                    .collect();
+                let shifted_harm_deltas: Vec<f64> = rows
+                    .iter()
+                    .filter_map(|row| lcb_by_seed.get(&row.seed).map(|base| row.shifted_harmful as f64 - base.shifted_harmful as f64))
+                    .collect();
                 let violations = rows
                     .iter()
                     .filter(|row| row.reservation_overruns > 0 || row.run_budget_overruns > 0)
                     .count();
 
                 report.push_str(&format!(
-                    "SUMMARY\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                    "SUMMARY\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
                     scenario.name,
                     policy.label(),
                     budget_percent,
@@ -744,7 +767,10 @@ fn render_report() -> String {
                     fmt_opt(mean(&collect(|row| row.cvar95_incremental_loss))),
                     fmt_opt(mean(&collect(|row| row.charged_units as f64))),
                     fmt_opt(mean(&collect(|row| row.detector_cost_units as f64))),
-                    violations
+                    violations,
+                    fmt_opt(mean(&benefit_deltas)),
+                    fmt_opt(mean(&cvar_deltas)),
+                    fmt_opt(mean(&shifted_harm_deltas))
                 ));
             }
         }
