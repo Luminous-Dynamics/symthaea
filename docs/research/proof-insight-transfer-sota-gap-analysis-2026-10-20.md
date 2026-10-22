@@ -224,6 +224,33 @@ A second current-industry comparison underscores why task separation is importan
 
 The next credible advancement is to have the real prover/checker emit matched base and counterfactual outcomes plus receipts, then compare insight treatment with lexical, typed-syntax, dependency and raw-proof retrieval at equal budgets. Until that experiment and an external replication pass, no claim of improved transfer or state-of-the-art performance is justified.
 
+
+## 22 October 2026 update: retrieval must be a strong, adaptive baseline
+
+The newest paired analyzer work makes a stronger experimental design possible, but its value depends on a fair baseline. **Do not compare typed-insight transfer only against no retrieval.** TheoremBench evaluates nearly one hundred classical theorems both with only the main goal and with extracted supporting subtheorems; its authors report that explicit premises improve performance, while its token-efficiency and theorem-coverage measures expose uneven progress across theorem structure ([paper](https://arxiv.org/abs/2606.09450)). ProofFusion's Coq study reports an average 6.89% increase in proved theorems across four provers and 17.50% more solves among previously unprovable tasks using adaptive retrieval in its own 10,782-theorem, 26-project setup ([FSE 2026 paper](https://conf.researchr.org/details/fse-2026/fse-2026-research-papers/57/ProofFusion-Improving-Neural-Theorem-Proving-via-Adaptive-Retrieval-Augmented-Reasoning)). Neither result is numerically comparable to PITB, but both make it indefensible to use weak retrieval as the only comparator.
+
+The next paired-counterfactual experiment should freeze at least these arms on the *same* target pairs:
+
+- **No insight / no retrieval** as a floor.
+- **Strong adaptive premise or dependency retrieval** from a frozen corpus, selected and tuned on validation only.
+- **Raw proof retrieval** to isolate whether gains are just exposure to more proof text.
+- **Typed insight only** to test the structured strategy abstraction.
+- **Typed insight + strong retrieval** to measure complementarity.
+- **Surface-matched incompatible decoy** to test whether preconditions prevent over-transfer.
+
+All arms must have equal caps and retain model/config/prompt hashes, but per-target contents and the exact retrieved items must also be persisted. Use the same target statement and checker where the contrast allows it. On a counterfactual statement variant, the base/variant pair is the unit of semantic intervention; the target statements necessarily differ by the reviewed mutation, while the model, prompt template, configuration, checker policy and resource budget remain matched.
+
+The new outcome analyzer now binds each side to distinct target artifact paths, artifact hashes and statement hashes, plus the source insight's own artifact digest. It also requires matching model/config/prompt/budget across each pair and scans the entire suite for split/component leakage—even when an invocation scores only one partition. This prevents a common reproducibility failure: two claimed variants silently using the same artifact identity or different inference budgets. The synthetic fixtures and their idealized scores verify only this execution contract.
+
+### Better benchmark claim hierarchy
+
+1. **Integrity claim:** the frozen contrast, source artifacts, reviewer judgments, outcome rows and exact run configs join with no provenance or leakage violations.
+2. **Behavioral claim:** the model accepts compatible bases, rejects/abstains on reviewed incompatible changes, and remains stable on semantics-preserving variants.
+3. **Utility claim:** typed insights improve semantic-gate-verified target solves over the strongest validation-selected baseline, with matched budgets and family/component-clustered uncertainty.
+4. **Generalization claim:** the paired result repeats on a held-out artifact bundle and dependency-rich/repository tasks with independent semantic review.
+
+Each level needs its own receipts; passing an earlier level never implies the next one. This gives PITB a plausible research niche—measuring **applicability, not topical resemblance**—without pretending the current synthetic suite proves that insight transfer works. No measured transfer gain or SOTA result is available yet.
+
 ## Research references
 
 - Kim, Han & Hwang, [Benchmarking Testing in Automated Theorem Proving](https://aclanthology.org/2026.acl-industry.150/), ACL 2026 Industry Track.
