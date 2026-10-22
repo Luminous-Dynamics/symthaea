@@ -378,7 +378,6 @@ fn run_policy(
     trials: &[EvaluatorTrial],
 ) -> RunResult {
     let budget_units = budget_capacity(trials, budget_percent);
-    let oracle_benefit = evaluator_oracle_benefit(trials, budget_units);
     let mut charged_units = 0_u64;
     let mut escalations = 0;
     let mut beneficial_escalations = 0;
@@ -450,6 +449,8 @@ fn run_policy(
         }
     }
 
+    // Score the evaluator-only oracle only after every producer choice is committed.
+    let oracle_benefit = evaluator_oracle_benefit(trials, budget_units);
     let task_loss = BASE_TASK_LOSS * trials.len() as f64 - total_benefit;
     RunResult {
         regime,
