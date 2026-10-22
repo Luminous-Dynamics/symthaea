@@ -721,6 +721,11 @@ fn join_pairs(
             "source_commit",
             &format!("{ctx}.source_insight"),
         )?;
+        let source_artifact_digest = required_string(
+            source,
+            "source_artifact_sha256",
+            &format!("{ctx}.source_insight"),
+        )?;
         let source_digest = required_string(
             source,
             "insight_sha256",
@@ -734,7 +739,19 @@ fn join_pairs(
             || artifact_path.split('/').any(|part| part == ".." || part.is_empty()) {
             bail!("{ctx}.target.artifact_path must be a safe repository-relative path");
         }
-        let artifact_digest = required_string(target, "artifact_sha256", &format!("{ctx}.target"))?;
+        let base_artifact_digest = required_string(
+            target,
+            "base_artifact_sha256",
+            &format!("{ctx}.target"),
+        )?;
+        let counterfactual_artifact_digest = required_string(
+            target,
+            "counterfactual_artifact_sha256",
+            &format!("{ctx}.target"),
+        )?;
+        if base_artifact_digest == counterfactual_artifact_digest {
+            bail!("{ctx}: base and counterfactual artifact digests must differ for an artifact-changing contrast");
+        }
         let base_statement_digest = required_string(
             target,
             "base_statement_sha256",
@@ -794,14 +811,23 @@ fn join_pairs(
             .get(&variant_id)
             .with_context(|| format!("{ctx} missing counterfactual outcome {variant_id}"))?;
         validate_matched_arm(base, variant, &ctx)?;
-        for (row, expected_id, label, status, statement_digest, side) in [
-            (base, &base_id, base_label, base_status, base_statement_digest, "base"),
+        for (row, expected_id, label, status, statement_digest, artifact_digest, side) in [
+            (
+                base,
+                &base_id,
+                base_label,
+                base_status,
+                base_statement_digest,
+                base_artifact_digest,
+                "base",
+            ),
             (
                 variant,
                 &variant_id,
                 variant_label,
                 variant_status,
                 variant_statement_digest,
+                counterfactual_artifact_digest,
                 "counterfactual",
             ),
         ] {
@@ -815,6 +841,8 @@ fn join_pairs(
             if required_string_at(row, &["source", "record_id"], &row_ctx)? != source_record
                 || required_string_at(row, &["source", "family_id"], &row_ctx)? != source_family
                 || required_string_at(row, &["source", "source_commit"], &row_ctx)? != source_commit
+                || required_string_at(row, &["source", "artifact_sha256"], &row_ctx)?
+                    != source_artifact_digest
                 || required_string_at(row, &["source", "insight_sha256"], &row_ctx)?
                     != source_digest
             {
