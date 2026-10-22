@@ -193,6 +193,7 @@ struct BenchmarkRun {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BenchmarkError {
     ZeroBudget,
+    EmptySeedSet,
     CostOverflow,
 }
 
@@ -200,6 +201,7 @@ impl fmt::Display for BenchmarkError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ZeroBudget => f.write_str("benchmark budget must be greater than zero"),
+            Self::EmptySeedSet => f.write_str("paired benchmark requires at least one seed"),
             Self::CostOverflow => f.write_str("benchmark cumulative cost overflowed"),
         }
     }
@@ -429,6 +431,71 @@ fn digest_transcript(
         hasher.update(&record.cumulative_cost_units.to_le_bytes());
     }
     *hasher.finalize().as_bytes()
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct StrategySummary {
+    design: SamplingDesign,
+    run_count: usize,
+    median_simple_regret: Option<f64>,
+    target_hit_rate: f64,
+    median_cost_to_target_when_reached: Option<f64>,
+    mean_cost_units_per_run: f64,
+}
+
+fn median_f64(mut values: Vec<f64>) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_by(f64::total_cmp);
+    let mid = values.len() / 2;
+    if values.len() % 2 == 0 {
+        Some((values[mid - 1] + values[mid]) / 2.0)
+    } else {
+        Some(values[mid])
+    }
+}
+
+/// Run all fixed-budget designs against the same ordered seed set for one case.
+/// This pairs stochastic designs by seed; it does not imply that different designs
+/// visit identical query points.
+fn compare_designs(
+    case: SyntheticCase,
+    fidelity: Fidelity,
+    budget: usize,
+    seeds: &[u64],
+) -> Result<Vec<StrategySummary>, BenchmarkError> {
+    if seeds.is_empty() {
+        return Err(BenchmarkError::EmptySeedSet);
+    }
+
+    let mut summaries = Vec::with_capacity(SamplingDesign::ALL.len());
+    for design in SamplingDesign::ALL {
+        let mut runs = Vec::with_capacity(seeds.len());
+        for &seed in seeds {
+            runs.push(run_benchmark(case, design, fidelity, seed, budget)?);
+        }
+
+        let regrets = runs.iter().filter_map(|run| run.simple_regret).collect();
+        let reached_costs = runs
+            .iter()
+            .filter_map(|run| run.cost_to_target.map(|cost| cost as f64))
+            .collect();
+        let target_hits = runs.iter().filter(|run| run.cost_to_target.is_some()).count();
+        let total_cost: u64 = runs.iter().map(|run| run.total_cost_units).sum();
+        let mean_cost_units_per_run = total_cost as f64 / runs.len() as f64;
+
+        summaries.push(StrategySummary {
+            design,
+            run_count: runs.len(),
+            median_simple_regret: median_f64(regrets),
+            target_hit_rate: target_hits as f64 / runs.len() as f64,
+            median_cost_to_target_when_reached: median_f64(reached_costs),
+            mean_cost_units_per_run,
+        });
+    }
+
+    Ok(summaries)
 }
 
 #[cfg(test)]
