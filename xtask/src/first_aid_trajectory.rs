@@ -208,10 +208,10 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         .filter(|case| case["execution_target"] == "workflow_gate")
         .count();
     anyhow::ensure!(
-        matrix_case_count == 43
+        matrix_case_count == 44
             && matrix_frozen_trace_count == 12
-            && matrix_mutation_case_count == 31
-            && matrix_rust_runner_case_count == 29
+            && matrix_mutation_case_count == 32
+            && matrix_rust_runner_case_count == 30
             && matrix_workflow_gate_case_count == 2,
         "mutation matrix case inventory changed without reviewing receipt targets"
     );
@@ -1755,6 +1755,18 @@ mod tests {
                 );
                 actual_reject()
             }
+            "unexpected_event_metadata" => {
+                let mut value: serde_json::Value =
+                    serde_json::from_str(CORPUS_JSON).expect("frozen corpus JSON parses");
+                value["scenarios"][0]["events"][0]["sensitive_payload"] = serde_json::json!(true);
+                let changed: TrajectoryCorpus = serde_json::from_value(value)
+                    .expect("known optional field is syntactically valid");
+                assert!(
+                    validate_corpus(&changed).is_err(),
+                    "event metadata must be scoped to the declared event kind"
+                );
+                actual_reject()
+            }
             "unexpected_connectivity_metadata" => {
                 let mut trace = scenario("FA-TRACE-007");
                 trace
@@ -2039,7 +2051,7 @@ mod tests {
         }
 
         assert_eq!(frozen_count, 12, "frozen trace case count changed");
-        assert_eq!(mutation_count, 29, "Rust matrix-runner case count changed");
+        assert_eq!(mutation_count, 30, "Rust matrix-runner case count changed");
         assert_eq!(workflow_gate_count, 2, "workflow gate case count changed");
         assert_eq!(
             rejection_count, 8,
