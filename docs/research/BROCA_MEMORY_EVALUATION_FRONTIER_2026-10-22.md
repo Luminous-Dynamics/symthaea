@@ -33,6 +33,7 @@ Run public suites through their official data and scoring paths where licensing 
 | [BEAM (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/d7f0cfa0fe759b033d5262e1bb7d4065-Abstract-Conference.html) | Long, coherent conversations up to 10M tokens with 2,000 validated questions | Tests whether behavior survives extreme history length and diverse probing | Official metrics by conversation length and question family |
 | [AMA-Bench (ICML 2026)](https://proceedings.mlr.press/v306/zhao26bs.html) | Memory over long-horizon agent/environment trajectories | Adds observations, actions, and tool outputs beyond dialogue-only memory | Task success by trajectory horizon and state/action dependency |
 | [MIRE](BROCA_MEMORY_INTEGRITY_BENCHMARK_2026-10-22.md) | Adversarial updates, stale replay, deletion, namespace binding, abstention and capacity pressure | Controlled failure detection and regression protection | Per-query trace; mutation controls must fail as intended; exact reference must match evaluator labels |
+| Consolidation decision audit / ConsolidationBench paper | Decide whether evidence stays raw, remains provisional, is summarized, promoted to a skill/rule, or retired | Tests the write-path and abstraction decision, not just retrieval; includes destructive forgetting and cross-level transfer | Keep the published ConsolidationBench evaluation distinct from our proposed synthetic prototype; report downstream transfer and governance separately |
 
 These are complementary datasets, not exchangeable measures. **LongMemEval V1 and V2 are separate evaluation tracks**: V1's 500-question task-accuracy breakdown is not the V2 accuracy–latency frontier. Always name the dataset, release, split and metric. Also disambiguate the two unrelated uses of “Memora”: ACL 2026's *From Recall to Forgetting* is a benchmark using FAMA, while Microsoft Research's *Memora: A Harmonic Memory Representation Balancing Abstraction and Specificity* is a memory architecture/report. Do not treat them as the same contribution. If licensing, download, or evaluator setup prevents faithful reproduction, state the limitation rather than implying an official score.
 
@@ -78,6 +79,45 @@ Report at least these outcomes separately:
 - **Resource cost:** read/write/consolidation compute, tokens, memory traffic, total RAM/VRAM/disk, index/metadata/journal size, energy where measurable, and p50/p95/p99 end-to-end latency.
 
 For each metric show numerator and denominator, exclusions, per-task family, and confidence interval. Retain per-example outcomes so a reviewer can identify whether an aggregate gain hides a catastrophic slice.
+
+
+## 4A. Consolidation is a decision, not a compression ratio
+
+A fresh line of work, [The Epistemics of Agent Memory (September 2026)](https://arxiv.org/abs/2609.33013), shifts attention from “what did the system retain?” to “was the decision to retain, summarize, abstract, or forget justified, and can that decision be audited and reversed?” It introduces ConsolidationBench. Its authors report both positive results and important failures: their boundary learner missed a preregistered criterion, and a promotion/compression policy reported a task-success gain alongside destructive forgetting and cross-level transfer regressions. Treat these as that paper's reported findings, not results for Broca.
+
+This creates a complementary research target for our system: **a lifecycle controller** that separates evidence ingestion from durable belief formation. An observed fact can remain provisional while evidence accumulates. A summary should point back to source episodes. A skill or rule should be promoted only under declared criteria; promotion must not delete the raw evidence it depends on. Retiring a derived abstraction should not accidentally erase still-valid episodes.
+
+### Luminous Dynamics experiment: provisional-to-durable promotion
+
+Tracked in [issue #8445](https://github.com/Luminous-Dynamics/symthaea/issues/8445). This proposed prototype is *not* a reproduction of the published ConsolidationBench.
+
+Compare the policies below on a deterministic oracle-by-construction stream before attempting real traces:
+
+1. Always keep raw records, no consolidation.
+2. Fixed-interval consolidation.
+3. Deduplication-only.
+4. Recency/frequency/utility-threshold retention.
+5. Summary-only promotion.
+6. Typed lifecycle policy: raw → provisional → summary → skill/rule, with explicit retire/retract transitions.
+7. Oracle lifecycle choice, reported strictly as a diagnostic upper bound.
+
+The synthetic ground truth should specify which future tasks depend on which evidence clusters and which abstraction level is appropriate. This lets the evaluator compute decision regret, but the oracle choice and future task labels must never appear in the policy's observable features.
+
+### Mandatory anti-cheating and anti-degeneracy tests
+
+- **Provenance gate:** mechanically inspect observable fields so the policy cannot read future outcomes, answer keys, or generator-internal state.
+- **Probe gate:** test whether individual observable features trivially reveal oracle labels above a preregistered margin.
+- **Count/budget matching:** give all policies the same event stream, query exposure, storage budget and distractor distribution.
+- **Degenerate-forgetting gate:** a policy must not earn high “forgetting precision” by simply forgetting or refusing to write almost everything. Report coverage, load-bearing retention and transfer.
+- **Poison/reversal gate:** inject plausible but false candidate rules, then corrections; require complete provenance and safe rollback without overwriting supporting episodes.
+- **Distribution-shift gate:** vary prevalence, repetition frequency, noise, distractor density and query mix in held-out configurations.
+
+### Metrics
+
+Report end-task success; cross-level transfer accuracy; oracle-normalized decision regret by action; false promotion rate; stale abstraction rate; correction/rollback latency; load-bearing destructive-forgetting rate; coverage–utility curves; compression with complete byte accounting; provenance completeness; and write/consolidation/query latency. Report governance and task utility as separate dimensions.
+
+This distinction is essential: a score computed from a constructed synthetic oracle can establish decision quality **within that generator**, but it cannot establish real-world transfer. Promotion policies must also run on held-out task outcomes, and a governance guarantee does not substitute for task utility.
+
 
 ## 5. Cost accounting: count the whole memory lifecycle
 
