@@ -1577,5 +1577,17 @@ mod tests {
         let body = serde_json::to_vec(&report.body).unwrap();
         report.receipt_sha256 = sha256_hex(&body);
         assert!(!report.verify_receipt());
+
+        let mut report = run_reference_benchmark();
+        report.body.selection_bootstrap_replicates += 1;
+        let body = serde_json::to_vec(&report.body).unwrap();
+        report.receipt_sha256 = sha256_hex(&body);
+        assert!(!report.verify_receipt());
+
+        let mut report = run_reference_benchmark();
+        report.body.selection_bootstrap_method = "untracked-bootstrap".to_owned();
+        let body = serde_json::to_vec(&report.body).unwrap();
+        report.receipt_sha256 = sha256_hex(&body);
+        assert!(!report.verify_receipt());
     }
 }
