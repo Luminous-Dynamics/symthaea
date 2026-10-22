@@ -55,7 +55,7 @@ The ethics pipeline (MoralParser → MoralAlgebra → ValueEvaluator → Harmoni
 |--------|--------|----------|
 | 3-stage ethics pipeline with escalating scrutiny | Done | `ethics_engine.rs` — MoralAlgebra → ValueEvaluator → HarmoniesIntegrator |
 | Adversarial moral test suite | Done | 26 tests in `adversarial_moral_algebra.rs` |
-| Consent violation detection via explicit ConsentState | Done | `judge_consent_action()` — bypasses HDC inference |
+| Consent violation detection via explicit ConsentState | Partial | Denied/Absent have deterministic handling; draft `fix/moral-consent-unknown-v1` separates Unknown from Implied/Given. Exact-head validation and action-specific consent-required policy remain open. |
 | Moral topology anomaly detection | Done | `moral_topology.rs` — detects embedding space anomalies |
 | Property-based testing of moral algebra | Done | Proptest suite verifies cross-equation consistency |
 | 91.1% moral classification accuracy baseline | Done | Validated against moral scenario benchmark |
@@ -92,13 +92,16 @@ The consent violation detection mechanism may fail to identify scenarios where c
 | Monotonic ordering test (Denied > Absent > Implied > Given) | Done | `consistency_consent_violation_sim_monotonic` |
 
 ### Residual Risk
-**Low**. The explicit ConsentState approach eliminates the unreliable HDC inference path. When consent state is known (the common case), detection is deterministic. When consent state must be inferred from text, the HDC path remains available as a fallback with known limitations.
+**Medium–High pending qualification.** Explicit Denied/Absent states have a direct evaluation path, but text extraction remains heuristic. A missing consent mention is not evidence of implied consent, and the legacy verdict enum cannot distinguish neutral from underdetermined. The parser change does not decide which actions require consent and does not issue authority.
 
 ### Acceptance Criteria
 - `judge_consent_action(_, ConsentState::Denied)` always returns `ConsentViolation` verdict
 - `judge_consent_action(_, ConsentState::Absent)` always returns `ConsentViolation` verdict
-- Monotonic ordering maintained: severity(Denied) > severity(Absent) > severity(Implied) > severity(Given)
-- Zero regression in consent detection tests
+- `ConsentState::Unknown` remains distinct from Given, Denied, Absent and Implied in encoded state
+- Unknown consent cannot produce a positive consent-sensitive verdict; Neutral is not an authorization permit
+- Parser silence or an unanswered request is not classified as explicit consent
+- Any action-specific policy that requires consent must fail closed for Unknown until independently verified, scope-bound consent is supplied
+- Exact-head formatting, compilation, focused tests and downstream compatibility pass; no CI result is inferred from authored tests
 
 ### Risk Owner
 Tristan Stoltz
