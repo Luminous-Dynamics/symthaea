@@ -594,8 +594,14 @@ fn validate_adjudication_link(suite_adj: &Value, outcome: &Value, context: &str)
         }
         let reasons = reviewer.get("reason_codes").and_then(Value::as_array)
             .with_context(|| format!("{context}: reviewer reason_codes must be an array"))?;
-        if !reasons.iter().any(|value| value.as_str() == Some(reason)) {
-            bail!("{context}: outcome reviewer reason_codes omit the suite reason code");
+        let outcome_reason = match reason {
+            "preconditions_satisfied" | "no_semantic_change" => "other",
+            "precondition_strengthened" => "missing_precondition",
+            "conclusion_mismatch" => "predicate_mismatch",
+            value => value,
+        };
+        if !reasons.iter().any(|value| value.as_str() == Some(outcome_reason)) {
+            bail!("{context}: outcome reviewer reason_codes omit the mapped suite reason code");
         }
     }
     Ok(())
