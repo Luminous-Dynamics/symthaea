@@ -60,10 +60,22 @@ fn task_digest_from_manifest(task: &Value) -> Option<String> {
     let expected_symbol = str_field(task, "expected_symbol")?;
     let reference_source = str_field(task, "reference_source")?;
     let test_source = str_field(task, "test_source")?;
-    let canonical = format!(
-        "{id}\n{description}\n{expected_symbol}\n{reference_source}\n{test_source}"
-    );
-    Some(blake3::hash(canonical.as_bytes()).to_hex().to_string())
+    let mutants = task.get("mutant_sources")?.as_array()?;
+
+    // Mirror the producer's length-prefixed content encoding. This avoids
+    // ambiguous fixture hashes when any source field contains newlines.
+    let mut hasher = blake3::Hasher::new();
+    for field in [id, description, expected_symbol, reference_source, test_source] {
+        hasher.update(&(field.len() as u64).to_be_bytes());
+        hasher.update(field.as_bytes());
+    }
+    hasher.update(&(mutants.len() as u64).to_be_bytes());
+    for mutant in mutants {
+        let source = mutant.as_str()?;
+        hasher.update(&(source.len() as u64).to_be_bytes());
+        hasher.update(source.as_bytes());
+    }
+    Some(hasher.finalize().to_hex().to_string())
 }
 
 fn declared_test_function_count(test_source: &str) -> u64 {
