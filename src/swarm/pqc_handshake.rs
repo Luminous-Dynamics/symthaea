@@ -418,8 +418,17 @@ mod tests {
     }
 
     #[test]
-    fn test_kem_public_key_length_is_validated_before_storage() {
+    fn test_kem_public_key_length_and_peer_id_are_validated_before_storage() {
         let mut manager = PqcHandshakeManager::new(test_config());
+        let valid_length = vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES];
+
+        assert!(manager.receive_kem_public_key("", &valid_length).is_err());
+        assert!(
+            manager
+                .receive_kem_public_key(&"p".repeat(MAX_KEM_PEER_ID_BYTES + 1), &valid_length)
+                .is_err()
+        );
+        assert!(manager.pending_kem.is_empty());
 
         for length in [0, ML_KEM_768_PUBLIC_KEY_BYTES - 1, ML_KEM_768_PUBLIC_KEY_BYTES + 1] {
             let malformed = vec![0u8; length];
@@ -451,6 +460,44 @@ mod tests {
             "new pending peer beyond the fixed limit must be rejected"
         );
         assert_eq!(manager.pending_kem.len(), MAX_PENDING_KEM_EXCHANGES);
+    }
+
+    #[test]
+    fn test_pending_candidate_count_is_bounded_before_kem_work() {
+        let mut manager = PqcHandshakeManager::new(test_config());
+        let now = std::time::SystemTime::now();
+
+        for index in 0..MAX_PENDING_KEM_EXCHANGES {
+            manager.pending_session_keys.insert(
+                format!("candidate-{index}"),
+                PqcCandidateKey {
+                    candidate_key: [index as u8; 32],
+                    created_at: now,
+                },
+            );
+        }
+        manager
+            .receive_kem_public_key(
+                "peer-over-limit",
+                &vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES],
+            )
+            .unwrap();
+
+        assert!(manager
+            .encapsulate_for_peer("peer-over-limit", &[0x42u8; 32])
+            .is_err());
+        assert!(
+            manager
+                .decapsulate_and_derive(
+                    "peer-over-limit",
+                    &vec![0u8; ML_KEM_768_CIPHERTEXT_BYTES],
+                    &[0x42u8; 32],
+                )
+                .is_err()
+        );
+        assert_eq!(manager.pending_session_count(), MAX_PENDING_KEM_EXCHANGES);
+        assert_eq!(manager.pending_kem.len(), 1);
+        assert_eq!(manager.session_count(), 0);
     }
 
     #[test]
