@@ -9,6 +9,7 @@ source_files=(
   ".github/workflows/allostatic-control-bench.yml"
   "tools/allostatic-control-bench/Cargo.toml"
   "tools/allostatic-control-bench/Cargo.lock"
+  "tools/allostatic-control-bench/external-benchmark-protocol-v1.json"
   "tools/allostatic-control-bench/src/lib.rs"
   "tools/allostatic-control-bench/src/calibration.rs"
   "tools/allostatic-control-bench/src/model_mismatch.rs"
