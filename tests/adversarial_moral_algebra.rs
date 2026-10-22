@@ -562,12 +562,13 @@ fn consistency_harm_always_worse_than_help() {
 fn consistency_consent_violation_sim_monotonic() {
     let ma = algebra();
 
-    // Using judge_consent_action, the consent violation similarity must be
-    // monotonically ordered: Denied > Absent > Implied > Given
+    // This severity proxy is ordered: Denied > Absent > Unknown > Implied > Given.
+    // Unknown is not itself a violation verdict; its score marks the underdetermined boundary.
     let action = ma.encode_consent_action("act", "person", ConsentState::Given);
 
     let denied = ma.judge_consent_action(&action, ConsentState::Denied);
     let absent = ma.judge_consent_action(&action, ConsentState::Absent);
+    let unknown = ma.judge_consent_action(&action, ConsentState::Unknown);
     let implied = ma.judge_consent_action(&action, ConsentState::Implied);
     let given = ma.judge_consent_action(&action, ConsentState::Given);
 
@@ -583,6 +584,12 @@ fn consistency_consent_violation_sim_monotonic() {
         "Absent must have higher violation signal than Implied \
          (absent={:.3}, implied={:.3})",
         absent.consent_violation_similarity,
+        implied.consent_violation_similarity,
+    );
+    assert!(
+        unknown.consent_violation_similarity > implied.consent_violation_similarity,
+        "Unknown must be more cautious than explicit assumption (unknown={:.3}, implied={:.3})",
+        unknown.consent_violation_similarity,
         implied.consent_violation_similarity,
     );
     assert!(
