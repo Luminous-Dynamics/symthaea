@@ -389,11 +389,25 @@ fn main() {
     }
 
     let model_mode = if use_cloud { "cloud" } else if use_llm { "ollama" } else { "native" };
+    let model_label = if use_cloud {
+        std::env::var("ANTHROPIC_MODEL").unwrap_or_else(|_| "claude-sonnet-4-20250514 (repository default)".to_string())
+    } else if use_llm {
+        std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "qwen2.5-coder:7b (repository default)".to_string())
+    } else {
+        "native dispatcher / no external LLM requested".to_string()
+    };
     let report = serde_json::json!({
         "schema_version": SCHEMA_VERSION,
         "benchmark": BENCHMARK_ID,
         "source_revision": std::env::var("GIT_COMMIT_SHA").ok(),
         "model_mode": model_mode,
+        "model_label": model_label,
+        "runtime_configuration": {
+            "compiled_with_geodesic_synthesis": cfg!(feature = "geodesic_synthesis"),
+            "gcs_toggle": "CodingAgentConfig.enable_gcs_advisories",
+            "agent_internal_real_exec": false,
+            "external_oracle_real_exec": true
+        },
         "task_count": tasks.len(),
         "repeats": repeats,
         "task_manifest_blake3": manifest,
