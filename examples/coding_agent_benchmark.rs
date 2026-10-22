@@ -909,7 +909,7 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
     (false, result.compile_errors, 0, 0, false, false)
 }
 
-fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -> TaskResult {
+fn run_task(task: &BenchTask, task_idx: usize, task_count: usize, use_llm: bool, use_cloud: bool) -> TaskResult {
     let temp_dir = tempfile::tempdir().expect("tempdir");
     let config = CodingAgentConfig {
         max_iterations: task.max_iterations,
@@ -937,7 +937,11 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
     let contains_expected = content.contains(task.expected_fn);
     let contains_todo =
         content.contains("TODO") || content.contains("todo!") || content.contains("unimplemented!");
-    let tests_expected = task.test_source.matches("#[test]").count();
+    let tests_expected = task
+        .test_source
+        .lines()
+        .filter(|line| line.trim_start().starts_with("#[test]"))
+        .count();
 
     // Level 2+3: Real compilation and test execution
     let (compiled, compile_errors, tests_passed, tests_failed, fix_attempted, fix_succeeded) =
@@ -979,8 +983,9 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
     };
 
     eprint!(
-        "\r  [{:>2}/50] {} {} {} ",
+        "\r  [{:>2}/{}] {} {} {} ",
         task_idx + 1,
+        task_count,
         task.difficulty,
         status,
         task.description
@@ -1258,7 +1263,7 @@ fn main() {
     let results: Vec<TaskResult> = tasks
         .iter()
         .enumerate()
-        .map(|(i, task)| run_task(task, i, use_llm, use_cloud))
+        .map(|(i, task)| run_task(task, i, tasks.len(), use_llm, use_cloud))
         .collect();
 
     let stats = compute_stats(&results);
