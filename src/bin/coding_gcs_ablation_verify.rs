@@ -60,7 +60,7 @@ fn score_success(run: &Value, expected: u64) -> bool {
         && u64_field(run, "tests_passed") == Some(expected)
         && u64_field(run, "tests_failed") == Some(0)
         && u64_field(run, "tests_passed").unwrap_or(0)
-            + u64_field(run, "tests_failed").unwrap_or(0)
+            .saturating_add(u64_field(run, "tests_failed").unwrap_or(0))
             == expected
 }
 
@@ -99,7 +99,7 @@ fn verify_mode_summary(
     let time_total: u64 = selected_runs
         .iter()
         .map(|run| u64_field(run, "agent_elapsed_ms").unwrap_or(0))
-        .sum();
+        .fold(0_u64, u64::saturating_add);
     let energy_total: f64 = selected_runs
         .iter()
         .map(|run| read_f64(run, "energy").unwrap_or(0.0))
@@ -169,6 +169,9 @@ fn audit(
     let Some(manifest) = report.get("task_manifest").and_then(Value::as_array) else {
         return vec!["task_manifest must be an array".to_string()];
     };
+    if manifest.is_empty() || manifest.len() > 1_000 {
+        return vec!["task_manifest length must be in 1..=1000".to_string()];
+    }
     push_check(&mut errors, !manifest.is_empty(), "task_manifest must not be empty");
     let computed_manifest_sha = manifest_digest(manifest);
     push_check(
@@ -220,9 +223,12 @@ fn audit(
         u64_field(report, "task_count") == Some(task_count),
         "task_count does not match the manifest",
     );
-    push_check(&mut errors, repeats > 0, "repeats must be positive");
+    push_check(&mut errors, repeats > 0 && repeats <= 20, "repeats must be in 1..=20");
+    if repeats == 0 || repeats > 20 {
+        return errors;
+    }
 
-    let runtime = report.get("runtime_configuration").unwrap_or(&Value::Null);
+    let runtime = report.get("runtime_configuration").unwrap_or(report);
     push_check(
         &mut errors,
         bool_field(runtime, "external_oracle_real_exec") == Some(true),
@@ -250,7 +256,7 @@ fn audit(
     );
 
     // Verify the preflight controls are present and align with the frozen task bank.
-    let controls = report.get("oracle_controls").unwrap_or(&Value::Null);
+    let controls = report.get("oracle_controls").unwrap_or(report);
     let references = controls.get("reference_controls").and_then(Value::as_array);
     let empty_patches = controls.get("empty_patch_controls").and_then(Value::as_array);
     push_check(
@@ -462,13 +468,13 @@ fn audit(
         }
     }
 
-    let summary = report.get("summary").unwrap_or(&Value::Null);
+    let summary = report.get("summary").unwrap_or(report);
     let off_runs: Vec<&Value> = runs.iter().filter(|r| bool_field(r, "gcs_advisories_enabled") == Some(false)).collect();
     let on_runs: Vec<&Value> = runs.iter().filter(|r| bool_field(r, "gcs_advisories_enabled") == Some(true)).collect();
-    verify_mode_summary(summary.get("gcs_off").unwrap_or(&Value::Null), &off_runs, false, &mut errors);
-    verify_mode_summary(summary.get("gcs_on").unwrap_or(&Value::Null), &on_runs, true, &mut errors);
+    verify_mode_summary(summary.get("gcs_off").unwrap_or(summary), &off_runs, false, &mut errors);
+    verify_mode_summary(summary.get("gcs_on").unwrap_or(summary), &on_runs, true, &mut errors);
 
-    let paired = summary.get("paired").unwrap_or(&Value::Null);
+    let paired = summary.get("paired").unwrap_or(summary);
     let pair_count = task_count.saturating_mul(repeats);
     let expected_delta = if pair_count == 0 {
         0.0
