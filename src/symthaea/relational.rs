@@ -46,7 +46,6 @@ impl RelationalCore {
             partner,
             trajectory,
             recent_user_input_states,
-            last_phi_dyad: 0.0,
         }
     }
 
