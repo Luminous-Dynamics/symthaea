@@ -97,22 +97,21 @@ Therefore, the two hybrid key-share directions alone imply at least **14 fragmen
 
 Benchmark the real trade-off: setup latency and completion probability across loss rates; bytes/fragments per successful session; radio airtime and energy; peak memory; CPU and wall-clock cost on the intended embedded hardware; and session recovery after loss/restart. Compare the secure protocol against itself under link conditions, and against a reviewed implementation on a comparable platform.
 
-## K-7 — X25519 low-order input can produce a publicly known traffic key
+## K-7 — X25519 low-order input can produce a publicly known traffic key (mitigated in this branch)
 
-`PeerKeyStore::agree` calls static X25519 with the supplied peer public key, then immediately derives encryption/authentication keys from `shared_secret.as_bytes()`. It does not check `SharedSecret::was_contributory()` or reject the all-zero shared secret before deriving keys.
-
-RFC 7748 §6.1 explains that X25519 with a small-order input can produce the all-zero shared secret and explicitly describes checking for that result; its §7 notes that non-contributory behavior can eliminate the other party's private-key contribution. The `x25519-dalek` API exposes `SharedSecret::was_contributory()` for this check. See:
+The original `PeerKeyStore::agree` derived encryption/authentication keys from the X25519 shared secret without checking `SharedSecret::was_contributory()`. RFC 7748 §6.1 explains that a small-order input can produce an all-zero shared secret and describes checking for that result; §7 explains that non-contributory behavior can eliminate the other party's private-key contribution. The `x25519-dalek` API exposes `SharedSecret::was_contributory()`. References:
 - RFC 7748: https://www.rfc-editor.org/rfc/rfc7748.html
 - `x25519-dalek::SharedSecret` API: https://docs.rs/x25519-dalek/latest/x25519_dalek/struct.SharedSecret.html
 
-In this code, the derived encryption key uses fixed HKDF-SHA-256 info `symthaea-mesh-chacha20-v1` and no external salt or identity-bound context. When an all-zero peer public input yields an all-zero DH result, the corresponding encryption key is therefore reproducible from public source code and constants, without either private key. If an untrusted or malformed public key can reach `agree`, ciphertext encrypted under that key is not confidential.
+Because the key derivation uses fixed HKDF-SHA-256 info `symthaea-mesh-chacha20-v1`, an all-zero DH result makes the encryption key reproducible from public source code and constants. If a malformed/untrusted public key reaches that original implementation, ciphertext under the derived key is not confidential.
 
-The deterministic witness `legacy_x25519_low_order_peer_key_produces_publicly_predictable_traffic_key` creates two stores with different local secrets, calls `agree` with an all-zero peer key, independently derives the expected key from a zero shared secret and the fixed HKDF label, then confirms it decrypts ciphertext. This test is intentionally a legacy vulnerability witness, not a security-passing assertion. It has been added but not compiled or executed here.
+**Fix now present in this branch:** `PeerKeyStore::agree` calls `was_contributory()` before KDF work or key-store mutation and returns a `TrustVerificationError` on non-contributory results. Its return type is now `Result<[u8; 32], SwarmError>`; `ContinuousMind::agree_with_peer` propagates rejection as `Result<Option<[u8; 32]>, SwarmError>`. A new regression test, `x25519_low_order_peer_key_is_rejected_without_storing_keys`, requires an error and verifies neither encryption nor authentication keys are stored. Valid test callers now handle the fallible result.
 
-**Remediation gate:** reject non-contributory shared secrets before any key derivation or key-store mutation. Prefer a fallible API (for example, `try_agree -> Result<_, KeyExchangeError>`) and make callers handle rejection. Add vectors for the all-zero and other known low-order inputs; assert that no encryption/authentication key is inserted on rejection. Bind the accepted peer public key to an authenticated identity/transcript and include both public shares in the reviewed session-key schedule. Do not silently map invalid inputs to a default key.
+This is a source-level mitigation and regression-test addition; it has **not** been compiled or run locally. The API change may require downstream caller updates. Also, this check does not authenticate the peer public key, bind identity/transcript, or provide forward secrecy; those remain separate requirements. Extend the regression corpus to known low-order encodings beyond all-zero and keep any unsupported raw public-key entrypoints fail-closed.
 
 ## Immediate disposition
 
+- The X25519 store now rejects a non-contributory shared secret before deriving or storing keys, but this mitigation still needs exact-head test evidence and review.
 - The existing X25519 helper should be described as **static pairwise key derivation**, not forward-secret key exchange.
 - The public challenge nonce must be described as public transcript context, not a secret classical input.
 - The KDF name and comments must match the implemented BLAKE3 derive-key function.
@@ -153,4 +152,4 @@ A model discovery counts only when the issue is independently reproducible again
 
 ## Validation status
 
-Source review and regression-test authoring only. Tests were not compiled or run in this environment. The added/renamed witnesses are `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse`, `legacy_static_x25519_derivation_does_not_bind_peer_source_id`, `legacy_x25519_low_order_peer_key_produces_publicly_predictable_traffic_key`, `legacy_pqc_derivation_succeeds_without_verified_classical_handshake_state`, and `legacy_pqc_session_derivation_does_not_bind_peer_id`; the implicit-rejection test is now `test_invalid_ciphertext_uses_implicit_rejection_and_needs_key_confirmation`. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
+Source review and regression-test authoring only. Tests were not compiled or run in this environment. The regression/limitation tests are `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse`, `legacy_static_x25519_derivation_does_not_bind_peer_source_id`, `x25519_low_order_peer_key_is_rejected_without_storing_keys`, `legacy_pqc_derivation_succeeds_without_verified_classical_handshake_state`, and `legacy_pqc_session_derivation_does_not_bind_peer_id`; the implicit-rejection test is `test_invalid_ciphertext_uses_implicit_rejection_and_needs_key_confirmation`. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
