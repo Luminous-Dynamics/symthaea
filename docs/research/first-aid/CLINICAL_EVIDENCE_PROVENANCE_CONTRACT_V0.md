@@ -31,7 +31,7 @@ The registry must fail closed if its schema, source identifiers, edition metadat
 
 The reviewer fields should use pseudonymous IDs or role attestations; do not put private reviewer contact details or patient data in the public repository.
 
-The only admissible approval in v0 is `approved_for_reference_evaluation_only`. That status may make a case eligible for a software reference benchmark; it does **not** authorize instructions to real people, a clinical product, patient care, or clinical deployment. This gate is evidence bookkeeping, not a clinical reasoning engine.
+For v0, each atomic claim must cite exactly one primary source ID and its registered edition; split cross-source synthesis into separately traceable atomic claims instead of hiding multiple editions behind one locator. The claim's source edition must exactly match the registry entry. The only admissible approval in v0 is `approved_for_reference_evaluation_only`. That status may make a case eligible for a software reference benchmark; it does **not** authorize instructions to real people, a clinical product, patient care, or clinical deployment. This gate is evidence bookkeeping, not a clinical reasoning engine.
 
 ## Fail-closed requirements
 
