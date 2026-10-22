@@ -1,0 +1,187 @@
+{
+  "schema_version": "symthaea-humanoid-medical-robotics-design-v0",
+  "design_version": "0.1.0",
+  "status": "concept_only",
+  "clinical_use_authorized": false,
+  "physical_actuation_authorized": false,
+  "patient_contact_authorized": false,
+  "clinical_function_authorized": false,
+  "tool_design_authorized": "simulation_review_only",
+  "working_program": "HMR-0",
+  "task_envelope": {
+    "allowed_initial_tasks": [
+      "sealed_mock_supply_tote_transfer",
+      "nonclinical_inventory_label_reading",
+      "passive_tray_presentation",
+      "simulated_drawer_or_lever_interaction"
+    ],
+    "prohibited_initial_tasks": [
+      "diagnosis",
+      "triage",
+      "clinical_recommendation",
+      "medication_selection",
+      "medication_dispensing",
+      "medication_administration",
+      "invasive_procedure",
+      "surgery",
+      "rehabilitation",
+      "therapy",
+      "patient_lifting",
+      "patient_transfer",
+      "physical_examination",
+      "patient_contact",
+      "sterile_field_access"
+    ]
+  },
+  "morphology_candidates": [
+    {
+      "id": "M1",
+      "name": "fixed_bench_manipulator",
+      "purpose": "fixed staging and fixture tasks",
+      "status": "baseline_required"
+    },
+    {
+      "id": "M2",
+      "name": "wheeled_mobile_manipulator_humanoid_upper_body",
+      "purpose": "hospital-aisle logistics candidate without bipedal balance",
+      "status": "first_integrated_prototype_candidate"
+    },
+    {
+      "id": "M3",
+      "name": "full_biped_humanoid",
+      "purpose": "evaluate only tasks where stairs or human-space reach provides measured benefit",
+      "status": "research_candidate_not_default"
+    }
+  ],
+  "planes": [
+    {
+      "id": "cognition",
+      "owner": "Symthaea",
+      "authority": "propose_and_explain_tasks_no_direct_actuator_authority"
+    },
+    {
+      "id": "digital_twin",
+      "owner": "Symtropy",
+      "authority": "simulate_versioned_world_robot_tool_episodes"
+    },
+    {
+      "id": "capability_gateway",
+      "owner": "independent_deterministic_component",
+      "authority": "verify_manifests_revisions_permissions_and_evidence"
+    },
+    {
+      "id": "safety_controller",
+      "owner": "independent_safety_hardware_software",
+      "authority": "limit_motion_watchdogs_stop_and_fail_safe"
+    },
+    {
+      "id": "interface_evidence",
+      "owner": "tool_interface_and_evidence_ledger",
+      "authority": "bind_tool_identity_calibration_artifacts_and_receipts"
+    }
+  ],
+  "tool_concepts": [
+    {
+      "tool_id": "SEALED_TOTE_GRIPPER",
+      "revision": "0.1.0",
+      "interaction_domain": "non_patient_object",
+      "intended_use": "grip_and_transfer_sealed_mock_supply_totes",
+      "status": "simulation_review_only",
+      "physical_actuation_enabled": false,
+      "geometry_digest_required": true,
+      "simulation_model_digest_required": true
+    },
+    {
+      "tool_id": "PASSIVE_TRAY_DOCK",
+      "revision": "0.1.0",
+      "interaction_domain": "non_patient_object",
+      "intended_use": "align_and_retain_passive_exchange_tray",
+      "status": "simulation_review_only",
+      "physical_actuation_enabled": false,
+      "geometry_digest_required": true,
+      "simulation_model_digest_required": true
+    },
+    {
+      "tool_id": "DRAWER_LEVER_ADAPTER",
+      "revision": "0.1.0",
+      "interaction_domain": "non_patient_fixture",
+      "intended_use": "simulated_drawer_and_lever_interaction",
+      "status": "simulation_only_not_in_first_physical_release",
+      "physical_actuation_enabled": false,
+      "geometry_digest_required": true,
+      "simulation_model_digest_required": true
+    }
+  ],
+  "evidence_stages": [
+    {
+      "id": "H0",
+      "name": "concept",
+      "physical_actuation": false,
+      "patient_contact": false
+    },
+    {
+      "id": "H1",
+      "name": "simulation_only",
+      "physical_actuation": false,
+      "patient_contact": false
+    },
+    {
+      "id": "H2",
+      "name": "nonhuman_benchtop_fixture",
+      "physical_actuation": "requires_separate_approval",
+      "patient_contact": false
+    },
+    {
+      "id": "H3",
+      "name": "hardware_in_the_loop_isolated_outputs",
+      "physical_actuation": false,
+      "patient_contact": false
+    },
+    {
+      "id": "H4",
+      "name": "facility_nonclinical_pilot",
+      "physical_actuation": "separate_facility_and_safety_approval",
+      "patient_contact": false
+    },
+    {
+      "id": "H5",
+      "name": "clinical_or_patient_interaction",
+      "physical_actuation": "not_authorized_requires_new_program",
+      "patient_contact": "not_authorized_requires_new_program"
+    }
+  ],
+  "initial_benchmark_gates": {
+    "unknown_or_missing_tool_fields_rejected": 1,
+    "unknown_or_missing_source_or_revision_rejected": 1,
+    "patient_contact_or_clinical_function_tool_eligible_for_simulation_review": 0,
+    "physical_actuation_enabled_in_HMR0": 0,
+    "frozen_mutation_suite_detection": 1,
+    "simulated_tool_change_invalidates_prior_plan": 1
+  },
+  "benchmark_units": {
+    "energy": "Wh",
+    "duration": "s",
+    "force": "N",
+    "torque": "N_m",
+    "distance": "m",
+    "angles": "rad"
+  },
+  "standard_status": {
+    "IEC_80601_2_78_2019_AMD1_2024": "applicability_review_required_for_intended_use",
+    "IEC_DIS_80601_2_78_Edition_2": "draft_watchlist_as_of_2026-10-22",
+    "ISO_14971_2019": "risk_management_reference_applicability_review_required",
+    "IEC_62304": "software_lifecycle_reference_applicability_review_required",
+    "IEC_62366_1": "usability_engineering_reference_applicability_review_required",
+    "ISO_13485": "quality_system_reference_applicability_review_required",
+    "ISO_FDIS_13482_Edition_2": "service_robot_standard_excludes_medical_applications"
+  },
+  "assumptions_open": {
+    "bipedal_value_proven": false,
+    "clinical_regulatory_classification_determined": false,
+    "south_african_and_target_market_regulatory_analysis_complete": false,
+    "cleanability_or_sterility_validated": false,
+    "physical_tool_design_validated": false,
+    "independent_hazard_analysis_complete": false
+  },
+  "claim_ceiling": "Concept and synthetic qualification architecture only; no medical correctness, clinical safety, physical robot performance, standard conformity or deployment claim."
+}
