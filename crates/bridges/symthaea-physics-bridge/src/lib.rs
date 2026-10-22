@@ -42,6 +42,7 @@
 #![deny(unsafe_code)]
 
 pub mod bridge;
+pub mod adequacy_calibration;
 pub mod case_studies;
 pub mod catalog;
 pub mod dimensional;
