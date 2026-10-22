@@ -659,6 +659,8 @@ mod tests {
             assert_eq!(trial.adaptive_shots_by_vertex.iter().sum::<u64>(), trial.adaptive_total_shots);
             assert_eq!(trial.uniform_shots_by_vertex.iter().sum::<u64>(), config.max_total_shots);
             assert_eq!(trial.uniform_total_shots, config.max_total_shots);
+            assert_eq!(trial.successive_rejects_shots_by_vertex.iter().sum::<u64>(), trial.successive_rejects_total_shots);
+            assert!(trial.successive_rejects_total_shots <= config.max_total_shots);
             assert_eq!(
                 trial.adaptive_selected_vertex.is_some(),
                 trial.adaptive_correct.is_some()
@@ -678,6 +680,40 @@ mod tests {
         assert_eq!(aggregate.uniform_correct + aggregate.uniform_incorrect, aggregate.trial_count);
         assert!(aggregate.adaptive_mean_shots() <= default_config().max_total_shots as f64);
         assert!(aggregate.uniform_mean_shots() == default_config().max_total_shots as f64);
+    }
+
+    #[test]
+    fn successive_rejects_never_exceeds_budget_for_small_candidate_counts() {
+        for candidate_count in 1..=12 {
+            let probabilities = (0..candidate_count)
+                .map(|vertex| 0.1 + (vertex as f64 / candidate_count as f64) * 0.8)
+                .collect::<Vec<_>>();
+            for budget in [candidate_count as u64, candidate_count as u64 + 1, 32, 128, 512] {
+                if budget < candidate_count as u64 {
+                    continue;
+                }
+                let (selected, shots, _successes, total) =
+                    run_successive_rejects(&probabilities, budget, 20261022)
+                        .expect("valid Successive Rejects run");
+                assert!(selected < candidate_count);
+                assert_eq!(shots.iter().sum::<u64>(), total);
+                assert!(total <= budget, "k={candidate_count}, budget={budget}, used={total}");
+            }
+        }
+    }
+
+    #[test]
+    fn aggregate_counts_successive_rejects_errors_and_costs() {
+        let scenario = MisSamplingScenario::new("known-gap", vec![0.9, 0.1])
+            .expect("valid scenario");
+        let outcomes = simulate_mis_sampling_scenario(&scenario, default_config(), 50, 44)
+            .expect("simulation succeeds");
+        let summary = aggregate_mis_sampling_trials(&outcomes).expect("aggregate succeeds");
+        assert_eq!(
+            summary.successive_rejects_correct + summary.successive_rejects_incorrect,
+            summary.trial_count
+        );
+        assert!(summary.successive_rejects_mean_shots() <= default_config().max_total_shots as f64);
     }
 
     #[test]
