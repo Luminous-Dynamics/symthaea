@@ -893,6 +893,7 @@ impl CodingAgent {
             backend_name: response.backend_name.clone(),
             success: !response.source.trim().is_empty(),
             elapsed_ms: orchestration_elapsed_ms,
+            estimated_energy_cost: tier.estimated_energy_cost(),
         });
 
         if let Some(id) = prediction_id {
