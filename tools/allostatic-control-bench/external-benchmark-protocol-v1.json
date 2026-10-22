@@ -382,7 +382,8 @@
       "confidence_level": 0.95,
       "default_replicates": 10000,
       "replicates_must_be_at_least": 1000,
-      "deterministic_prng": true
+      "deterministic_prng": true,
+      "bootstrap_seed": "deterministic per scenario and shielded flag; emitted as bootstrap_seed"
     },
     "violation_risk": {
       "rate": "observed episode-level violations / paired episode count",
@@ -397,6 +398,31 @@
       "invalid_episode_violation_flag",
       "quoted_csv_field"
     ],
-    "interpretation_rule": "No automatic winner label; metric direction must be preregistered and per-condition outcomes must remain visible."
+    "interpretation_rule": "No automatic winner label; metric direction must be preregistered and per-condition outcomes must remain visible.",
+    "output_columns": [
+      "scenario",
+      "shielded",
+      "metric",
+      "baseline_policy",
+      "candidate_policy",
+      "n_pairs",
+      "baseline_mean",
+      "candidate_mean",
+      "candidate_minus_baseline_mean",
+      "median_paired_delta",
+      "paired_bootstrap_ci95_low",
+      "paired_bootstrap_ci95_high",
+      "bootstrap_replicates",
+      "bootstrap_seed",
+      "baseline_violations",
+      "candidate_violations",
+      "candidate_only_violations",
+      "baseline_only_violations",
+      "mcnemar_exact_two_sided_p",
+      "baseline_violation_rate",
+      "candidate_violation_rate",
+      "baseline_violation_upper95_exact",
+      "candidate_violation_upper95_exact"
+    ]
   }
 }
