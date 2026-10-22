@@ -46,10 +46,20 @@ The Rust implementation:
 - validates finite, positive observations and physical geometry inputs;
 - requires at least three observations for the numerical fit (not as a claim of statistical sufficiency);
 - fits the exponent and constant by ordinary least squares in log space;
+- supports a fixed-exponent fit for a predeclared Chvorinov-style baseline comparison;
 - reports the sample count and in-sample log-space R-squared;
 - records the observed thermal-modulus range and rejects predictions outside it;
+- computes ordered BLAKE3 digests of training and conformal-calibration observations, and binds the fitted model identity into the conformal calibrator;
 - does not infer defect absence, alloy properties, strength, or casting acceptance;
 - includes synthetic arithmetic regression tests, explicitly not physical validation.
+
+### Split-conformal predictive intervals
+
+CASTING-001A now adds a split-conformal calibrator in log-time space. Fit the Chvorinov model on a training set first, then calibrate absolute log residuals on a separate calibration set. For desired miscoverage `alpha`, select the finite-sample residual order statistic at rank `ceil((n + 1) * (1 - alpha))`; if the calibration set cannot support that rank, the API refuses the requested level. The result is a multiplicative interval around the point estimate.
+
+The calibrator is bound to the exact fitted-model digest and keeps a digest of the ordered calibration observations. It rejects out-of-domain requests and intervals that are non-finite or non-positive. These are important reproducibility contracts, not evidence that the interval is physically calibrated yet.
+
+The nominal finite-sample marginal coverage statement requires calibration and future in-domain examples to be exchangeable, and it does not guarantee coverage conditional on every geometry. Repeated castings from one mold, a new alloy or mold population, new geometry, sensor drift, changed operators, and time-dependent process drift can break that assumption. A physical campaign must split by appropriate independent units (such as casting batch, geometry, tooling state, or time period), preserve a final untouched test set, and measure empirical interval coverage and width prospectively. For 95% nominal coverage, the order statistic requires at least 19 independent calibration observations; that is only a mathematical minimum, not a recommendation for statistical power or industrial qualification.
 
 R-squared is a diagnostic, not uncertainty quantification. The next calibration phase needs repeated physical observations, measurement uncertainty, held-out validation, and prediction intervals before the model can support higher-stakes decisions.
 
@@ -139,7 +149,7 @@ Evaluate against a frozen holdout without refitting. The Rust model now reports 
 
 Proposed first target: median absolute relative error no greater than 15% on a frozen, in-domain held-out coupon set, provided the chosen time measurement has materially smaller uncertainty. If that cannot be met, diagnose model mismatch instead of widening tolerances after observing the data.
 
-Next, add prediction intervals and measure empirical coverage on a held-out set. A nominal 90% interval should be judged by observed coverage and width; a point estimate plus R-squared is not a substitute.
+The split-conformal interval implementation is now present, but empirical calibration is still untested on physical data. Measure interval coverage and width on a final untouched set and under plausible process drift. A nominal 90% interval must be judged by observed coverage and width; the mathematical exchangeability guarantee is not a substitute for validation of this manufacturing population.
 
 ### Gate C — physical process improvement
 
@@ -206,6 +216,10 @@ A strong result would show a **Pareto improvement**: fewer physical trials to re
 - [Essam et al. (2026), computational modeling, AI, and digital twins in metal casting](https://link.springer.com/article/10.1007/s43939-026-00685-5) — discusses physics/data/model integration and the limitations of industrial-scale validation and generalization.
 - [American Foundry Society: Casting Defect Analysis](https://www.afsinc.org/courses/casting-defect-analysis) — emphasizes systematic root-cause evaluation and collecting process data instead of assuming a classifier alone determines corrective action.
 - [American Foundry Society: Aluminum Casting Performance Initiative](https://www.afsinc.org/news/2025/05/15/afs-begins-work-aluminum-casting-performance-initiative-acpi-projects) — examples of current industry work on defect recognition and process-related quality.
+- [Pei et al. (2025), Optimizing casting process using a combination of small data machine learning and phase-field simulations](https://www.nature.com/articles/s41524-025-01524-6) — a concrete small-data Bayesian-optimization baseline; its squeeze-casting results are not transferable performance targets for sand-cast coupons without matched evidence.
+- [Essam et al. (2026), computational modeling, AI, and digital twins in metal casting](https://link.springer.com/article/10.1007/s43939-026-00685-5) — documents research-to-industry gaps including uncertainty, cross-population generalization, reproducible benchmarks, sensor integration, and full-production validation.
+- [NIST (2026), On Methods of Uncertainty Quantification in Computational Modeling and Simulation](https://www.nist.gov/publications/methods-uncertainty-quantification-computational-modeling-and-simulation-harmonizing) — supports a risk-based credibility process that connects model uncertainty to metrology practice.
+- [NIST (2026), Digital Twins Workshops Summary Report](https://www.nist.gov/publications/digital-twins-workshops-summary-report) — identifies interoperability, verification/validation/uncertainty quantification, cybersecurity, and workforce readiness as manufacturing digital-twin priorities.
 - [Niiyama, A Modification of Chvorinov's Rule on Solidification Time of Sand Castings](https://www.jstage.jst.go.jp/article/imono/44/12/44_1047/_article) — source for the classic volume/surface-area solidification relation and its limitations.
 - [NIST: Real-Time Monitoring and Control of Additive Manufacturing Processes](https://www.nist.gov/programs-projects/real-time-monitoring-and-control-additive-manufacturing-processes) — useful methodological precedent for calibrated sensing, validated physics-based models, and carefully qualified feedback-control research. It is not direct evidence that the same controller works for casting.
 
