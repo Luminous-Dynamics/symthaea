@@ -880,7 +880,9 @@ impl Rk45Integrator {
             progress.attempted_steps = attempted_steps;
             progress.last_attempted_dt = Some(h);
             progress.min_attempted_dt = Some(
-                progress.min_attempted_dt.map_or(h, |previous| previous.min(h)),
+                progress
+                    .min_attempted_dt
+                    .map_or(h, |previous| previous.min(h)),
             );
             // Cash–Karp 4(5) embedded pair. The six checked derivative calls
             // are deliberately kept in this one implementation for both legacy
@@ -3326,7 +3328,11 @@ mod tests {
         assert_eq!(receipt.last_accepted_state, vec![1.0, 0.0]);
         assert_eq!(receipt.last_accepted_time, 0.0);
         assert_eq!(receipt.last_attempted_dt, Some(0.1));
-        assert!(receipt.min_attempted_dt.is_some_and(|dt| dt > 0.0 && dt <= 0.1));
+        assert!(
+            receipt
+                .min_attempted_dt
+                .is_some_and(|dt| dt > 0.0 && dt <= 0.1)
+        );
         assert_eq!(controller.next_step_size(), Some(0.1));
     }
 
