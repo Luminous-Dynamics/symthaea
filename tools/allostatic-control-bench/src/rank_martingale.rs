@@ -238,8 +238,7 @@ impl RankMartingale {
             .max((self.feature_max - next_predictive_mean).abs())
             .min(1.0);
         let next_radius = 1.0 - next_bound / 4.0;
-        let next_lambda =
-            self.lambda + ONS_STEP_SIZE * gradient / self.accumulated_squared_gradients;
+        let next_lambda = self.lambda + ONS_STEP_SIZE * gradient / self.accumulated_squared_gradients;
         self.lambda = next_lambda.clamp(-next_radius, next_radius);
 
         Some(RankObservation {
