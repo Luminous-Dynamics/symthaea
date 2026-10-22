@@ -357,7 +357,7 @@ impl EnhancedKnowledgeGraph {
         let mut unique_incoming: Vec<EvidenceLink> = Vec::new();
         for link in links {
             self.validate_imported_evidence_link(link)?;
-            if unique_incoming.contains(link) {
+            if unique_incoming.contains(link) || self.evidence_links.contains(link) {
                 continue;
             }
             let symmetric = matches!(
@@ -368,6 +368,7 @@ impl EnhancedKnowledgeGraph {
                     | EvidenceRelation::SemanticNeighbor
                     | EvidenceRelation::SameWitnessVariant
             );
+            let mut already_adjudicated = false;
             for existing in self.evidence_links.iter().chain(unique_incoming.iter()) {
                 let same_direction = existing.from_fact_id == link.from_fact_id
                     && existing.to_fact_id == link.to_fact_id;
@@ -380,8 +381,10 @@ impl EnhancedKnowledgeGraph {
                     && link.status == EvidenceLinkStatus::Adjudicated
                 {
                     if existing.evidence_ids == link.evidence_ids {
-                        // Idempotent re-import of the exact adjudication.
-                        continue;
+                        // Idempotent re-import of the same adjudication, even if
+                        // the persisted row differs only by symmetric orientation.
+                        already_adjudicated = true;
+                        break;
                     }
                     return Err(
                         "fact pair/relation already has an adjudication with different evidence"
@@ -389,8 +392,51 @@ impl EnhancedKnowledgeGraph {
                     );
                 }
             }
-            unique_incoming.push(link.clone());
+            if !already_adjudicated {
+                unique_incoming.push(link.clone());
+            }
         }
+
+        // Adjudication finalizes a prior candidate for the same pair/relation.
+        let finalized: Vec<(FactId, FactId, EvidenceRelation)> = unique_incoming
+            .iter()
+            .filter(|link| link.status == EvidenceLinkStatus::Adjudicated)
+            .map(|link| (link.from_fact_id, link.to_fact_id, link.relation))
+            .collect();
+        let is_symmetric = |relation: EvidenceRelation| {
+            matches!(
+                relation,
+                EvidenceRelation::Corroborates
+                    | EvidenceRelation::Contradicts
+                    | EvidenceRelation::Resembles
+                    | EvidenceRelation::SemanticNeighbor
+                    | EvidenceRelation::SameWitnessVariant
+            )
+        };
+        unique_incoming.retain(|link| {
+            if link.status != EvidenceLinkStatus::Candidate {
+                return true;
+            }
+            !finalized.iter().any(|(from, to, relation)| {
+                *relation == link.relation
+                    && ((*from == link.from_fact_id && *to == link.to_fact_id)
+                        || (is_symmetric(*relation)
+                            && *from == link.to_fact_id
+                            && *to == link.from_fact_id))
+            })
+        });
+        self.evidence_links.retain(|existing| {
+            if existing.status != EvidenceLinkStatus::Candidate {
+                return true;
+            }
+            !finalized.iter().any(|(from, to, relation)| {
+                *relation == existing.relation
+                    && ((*from == existing.from_fact_id && *to == existing.to_fact_id)
+                        || (is_symmetric(*relation)
+                            && *from == existing.to_fact_id
+                            && *to == existing.from_fact_id))
+            })
+        });
 
         for link in &unique_incoming {
             if link.status == EvidenceLinkStatus::Adjudicated {
