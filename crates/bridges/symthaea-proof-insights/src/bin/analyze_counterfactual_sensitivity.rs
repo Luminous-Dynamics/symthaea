@@ -559,7 +559,7 @@ fn calculate_metrics(observations: &[PairObservation], replicates: usize, seed: 
             ci_95: ci,
             defined_bootstrap_replicates: values.len(),
         };
-        out.insert(name.to_owned(), metric_json_value(&metric));
+        out.insert(name.to_owned(), metric_json_value(&metric, name));
     }
     Value::Object(out)
 }
@@ -573,11 +573,18 @@ fn aggregate(observations: &[PairObservation]) -> Counts {
 }
 
 fn metric_json(numerator: usize, denominator: usize, estimate: Option<f64>) -> Value {
-    json!({"numerator":numerator,"denominator":denominator,"estimate":estimate,"ci_95":null,"defined_bootstrap_replicates":0})
+    json!({"statistic":"ratio","numerator":numerator,"denominator":denominator,"estimate":estimate,"ci_95":null,"defined_bootstrap_replicates":0})
 }
 
-fn metric_json_value(metric: &Metric) -> Value {
+fn metric_json_value(metric: &Metric, name: &str) -> Value {
+    let statistic = if name == "compatibility_probability_brier_score"
+        || name == "semantics_preserving_mean_probability_absolute_delta" {
+        "mean"
+    } else {
+        "ratio"
+    };
     json!({
+        "statistic": statistic,
         "numerator": metric.numerator,
         "denominator": metric.denominator,
         "estimate": metric.estimate,
