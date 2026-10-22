@@ -855,6 +855,7 @@ if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summar
     expected_count = rate_values[ri] * 300
     if (($16 - expected_count > 0.000002) ||
         (expected_count - $16 > 0.000002)) failed = 1
+    if ($15 - $16 > 0.25 || $16 - $15 > 0.25) failed = 1
     grid_key = ri SUBSEP method
     if (summary_seen[grid_key]++) failed = 1
     fwer_rate[grid_key] = $7
