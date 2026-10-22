@@ -233,6 +233,61 @@ mod tests {
     }
 
     #[test]
+    fn test_detached_signature_roundtrip_and_exact_size() {
+        let kp = DilithiumKeypair::generate();
+        let message = b"detached signature test";
+        let signature = kp.sign_detached(message).unwrap();
+
+        assert_eq!(signature.len(), SIGNATURE_SIZE);
+        assert!(verify_detached_signature(message, &signature, kp.public_key()).unwrap());
+    }
+
+    #[test]
+    fn test_detached_signature_rejects_mutated_message() {
+        let kp = DilithiumKeypair::generate();
+        let signature = kp.sign_detached(b"original statement").unwrap();
+        assert!(!verify_detached_signature(b"changed statement", &signature, kp.public_key()).unwrap());
+    }
+
+    #[test]
+    fn test_detached_signature_rejects_mutated_signature() {
+        let kp = DilithiumKeypair::generate();
+        let message = b"mutation test";
+        let signature = kp.sign_detached(message).unwrap();
+
+        for index in [0, signature.len() / 2, signature.len() - 1] {
+            let mut mutated = signature.clone();
+            mutated[index] ^= 0x01;
+            assert!(
+                !matches!(verify_detached_signature(message, &mutated, kp.public_key()), Ok(true)),
+                "mutated detached signature at byte {index} was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn test_detached_signature_rejects_truncation_and_wrong_key() {
+        let signer = DilithiumKeypair::generate();
+        let other = DilithiumKeypair::generate();
+        let message = b"key and length negative controls";
+        let signature = signer.sign_detached(message).unwrap();
+
+        assert!(matches!(
+            verify_detached_signature(message, &signature[..signature.len() - 1], signer.public_key()),
+            Err(ZkpError::SignatureInvalid)
+        ));
+        assert!(!verify_detached_signature(message, &signature, other.public_key()).unwrap());
+    }
+
+    #[test]
+    fn test_detached_signature_rejects_wrong_public_key_length() {
+        assert!(matches!(
+            verify_detached_signature(b"message", &[0; SIGNATURE_SIZE], &[0; PUBLIC_KEY_SIZE - 1]),
+            Err(ZkpError::InvalidKeyMaterial(_))
+        ));
+    }
+
+    #[test]
     fn test_verify_rejects_tampered_message() {
         let kp = DilithiumKeypair::generate();
         let sig = kp.sign(b"original").unwrap();
