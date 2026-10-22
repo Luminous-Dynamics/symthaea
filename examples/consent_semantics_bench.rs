@@ -5,7 +5,7 @@
 //! that this heuristic parser meets a release threshold.
 //!
 //! Run with: cargo run --example consent_semantics_bench
-//! The fixture set is a development diagnostic, not a sealed evaluation set.
+//! The fixture set is development-only, not blinded or representative.
 
 use symthaea::hdc::moral_algebra::ConsentState;
 use symthaea::hdc::moral_parser::MoralParser;
@@ -44,6 +44,7 @@ const FIXTURES: &[Fixture] = &[
     Fixture { id: "unknown-05", text: "The note says \"she gave consent\"; I have not verified it.", expected: ConsentState::Unknown },
     Fixture { id: "unknown-06", text: "Could you ask whether consent was given?", expected: ConsentState::Unknown },
     Fixture { id: "unknown-07", text: "The record is missing.", expected: ConsentState::Unknown },
+    Fixture { id: "unknown-08", text: "Did she refuse consent?", expected: ConsentState::Unknown },
 ];
 
 const STATES: [ConsentState; 5] = [
@@ -53,6 +54,33 @@ const STATES: [ConsentState; 5] = [
     ConsentState::Implied,
     ConsentState::Unknown,
 ];
+
+#[derive(Clone)]
+struct Metrics {
+    confusion: [[usize; 5]; 5],
+    correct: usize,
+    false_given: usize,
+    expected_non_given: usize,
+}
+
+impl Metrics {
+    fn new() -> Self {
+        Self { confusion: [[0; 5]; 5], correct: 0, false_given: 0, expected_non_given: 0 }
+    }
+
+    fn observe(&mut self, expected: ConsentState, actual: ConsentState) {
+        self.confusion[state_index(expected)][state_index(actual)] += 1;
+        if actual == expected {
+            self.correct += 1;
+        }
+        if expected != ConsentState::Given {
+            self.expected_non_given += 1;
+            if actual == ConsentState::Given {
+                self.false_given += 1;
+            }
+        }
+    }
+}
 
 fn state_index(state: ConsentState) -> usize {
     match state {
@@ -74,38 +102,81 @@ fn label(state: ConsentState) -> &'static str {
     }
 }
 
-fn main() {
-    let parser = MoralParser::new();
-    let mut confusion = [[0usize; 5]; 5];
-    let mut correct = 0usize;
-    let mut false_given = 0usize;
-    let mut expected_non_given = 0usize;
-
-    println!("consent_semantics_bench_v1");
-    println!("fixture_count={}", FIXTURES.len());
-    for fixture in FIXTURES {
-        let actual = parser.parse(fixture.text).consent;
-        confusion[state_index(fixture.expected)][state_index(actual)] += 1;
-        if actual == fixture.expected {
-            correct += 1;
-        }
-        if fixture.expected != ConsentState::Given {
-            expected_non_given += 1;
-            if actual == ConsentState::Given {
-                false_given += 1;
-                println!("FALSE_GIVEN {} expected={} actual={} text={:?}",
-                    fixture.id, label(fixture.expected), label(actual), fixture.text);
+fn strip_quotes(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut closing_quote: Option<char> = None;
+    for ch in text.chars() {
+        if let Some(end) = closing_quote {
+            if ch == end {
+                closing_quote = None;
             }
-        } else if actual != fixture.expected {
-            println!("MISSED_GIVEN {} expected={} actual={} text={:?}",
-                fixture.id, label(fixture.expected), label(actual), fixture.text);
+            result.push(' ');
+            continue;
+        }
+        match ch {
+            '"' => {
+                closing_quote = Some('"');
+                result.push(' ');
+            }
+            '“' => {
+                closing_quote = Some('”');
+                result.push(' ');
+            }
+            '”' => result.push(' '),
+            _ => result.push(ch),
         }
     }
+    result
+}
 
-    println!("accuracy={:.4}", correct as f64 / FIXTURES.len() as f64);
-    println!("false_given_count={}", false_given);
+fn has_any(text: &str, cues: &[&str]) -> bool {
+    cues.iter().any(|cue| text.contains(cue))
+}
+
+/// Deliberately small and conservative transparent lexical baseline.
+/// This is a project baseline, not an industry/SOTA model.
+fn strict_lexical_baseline(text: &str) -> ConsentState {
+    let text = strip_quotes(&text.to_lowercase());
+    if text.contains('?') {
+        return ConsentState::Unknown;
+    }
+    if has_any(&text, &[
+        "refused consent", "refused permission", "declined consent",
+        "said no", "withdrew consent", "revoked consent",
+        "did not consent", "didn't consent", "never agreed",
+    ]) {
+        return ConsentState::Denied;
+    }
+    if has_any(&text, &[
+        "without asking", "without permission", "without consent",
+        "did not obtain consent", "didn't obtain consent", "no response",
+        "did not answer", "didn't answer",
+    ]) {
+        return ConsentState::Absent;
+    }
+    if has_any(&text, &[
+        "assumed consent", "assumed permission", "implied consent",
+        "implicitly consented", "presumed permission", "assumed she agreed",
+    ]) {
+        return ConsentState::Implied;
+    }
+    if has_any(&text, &[
+        "gave consent", "said yes", "granted permission", "with her permission",
+        "with their permission", "permission was granted", "explicitly authorized",
+        "agreed to treatment",
+    ]) {
+        return ConsentState::Given;
+    }
+    ConsentState::Unknown
+}
+
+fn print_metrics(name: &str, metrics: &Metrics, total: usize) {
+    println!("\nmodel={name}");
+    println!("accuracy={:.4}", metrics.correct as f64 / total as f64);
+    println!("false_given_count={}", metrics.false_given);
+    println!("expected_non_given_count={}", metrics.expected_non_given);
     println!("non_given_false_positive_rate={:.4}",
-        false_given as f64 / expected_non_given.max(1) as f64);
+        metrics.false_given as f64 / metrics.expected_non_given.max(1) as f64);
     println!("confusion_matrix=rows_expected_cols_actual");
     print!("expected/actual");
     for state in STATES {
@@ -115,8 +186,54 @@ fn main() {
     for (row, expected) in STATES.iter().enumerate() {
         print!("{}", label(*expected));
         for column in 0..STATES.len() {
-            print!(",{}", confusion[row][column]);
+            print!(",{}", metrics.confusion[row][column]);
         }
         println!();
     }
+}
+
+fn main() {
+    let parser = MoralParser::new();
+    let mut candidate = Metrics::new();
+    let mut baseline = Metrics::new();
+
+    println!("consent_semantics_bench_v1");
+    println!("fixture_count={}", FIXTURES.len());
+    for fixture in FIXTURES {
+        let actual = parser.parse(fixture.text).consent;
+        let baseline_actual = strict_lexical_baseline(fixture.text);
+        candidate.observe(fixture.expected, actual);
+        baseline.observe(fixture.expected, baseline_actual);
+        if fixture.expected != ConsentState::Given && actual == ConsentState::Given {
+            println!("CANDIDATE_FALSE_GIVEN {} expected={} text={:?}",
+                fixture.id, label(fixture.expected), fixture.text);
+        }
+        if fixture.expected != ConsentState::Given && baseline_actual == ConsentState::Given {
+            println!("BASELINE_FALSE_GIVEN {} expected={} text={:?}",
+                fixture.id, label(fixture.expected), fixture.text);
+        }
+        if fixture.expected == ConsentState::Given && actual != ConsentState::Given {
+            println!("CANDIDATE_MISSED_GIVEN {} actual={} text={:?}",
+                fixture.id, label(actual), fixture.text);
+        }
+    }
+
+    print_metrics("symthaea_parser", &candidate, FIXTURES.len());
+    print_metrics("strict_lexical_baseline", &baseline, FIXTURES.len());
+
+    let pairs = [
+        ("She gave consent to share the report.",
+         "Yesterday, she gave consent to share the report."),
+        ("I asked for permission to publish the report.",
+         "Yesterday, I asked for permission to publish the report."),
+        ("I shared the report without asking.",
+         "Yesterday I shared the report without asking."),
+        ("I assumed she agreed to treatment.",
+         "Earlier, I assumed she agreed to treatment."),
+    ];
+    let candidate_flips = pairs.iter().filter(|(a, b)| parser.parse(a).consent != parser.parse(b).consent).count();
+    let baseline_flips = pairs.iter().filter(|(a, b)| strict_lexical_baseline(a) != strict_lexical_baseline(b)).count();
+    println!("meaning_preserving_pair_count={}", pairs.len());
+    println!("candidate_pair_flips={candidate_flips}");
+    println!("baseline_pair_flips={baseline_flips}");
 }
