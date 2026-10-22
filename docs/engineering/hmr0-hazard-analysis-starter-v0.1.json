@@ -1,0 +1,443 @@
+{
+  "schema_version": "hmr0-hazard-analysis-starter-v0.1",
+  "design_program": "HMR-0",
+  "status": "hazard_identification_only_not_a_risk_assessment_or_safety_case",
+  "reviewed_at": "2026-10-22",
+  "clinical_use_authorized": false,
+  "physical_actuation_authorized": false,
+  "patient_contact_authorized": false,
+  "severity_likelihood_scoring": "deliberately_not_assigned_before_intended_use_environment_user_and_operating_envelope_are_formally_defined",
+  "claim_ceiling": "Starter hazard inventory and candidate verification controls only. No risk acceptability, medical-device compliance, or safety-control effectiveness claim.",
+  "scope": {
+    "intended_initial_use": [
+      "simulation-only sealed mock supply tote transfer",
+      "synthetic inventory-label reading",
+      "passive tray docking on mock fixtures",
+      "simulated drawer/lever interaction"
+    ],
+    "excluded": [
+      "diagnosis",
+      "triage",
+      "medication selection or delivery",
+      "invasive or surgical action",
+      "rehabilitation",
+      "patient lifting or transfer",
+      "patient contact",
+      "sterile-field access",
+      "physical actuation by this benchmark"
+    ]
+  },
+  "common_control_contract": [
+    "Symthaea has no direct actuator authority and cannot approve its own generated design.",
+    "A deterministic capability gateway checks task, tool, revisions, permissions and evidence.",
+    "An independent safety controller must implement any eventual physical safety functions; this document does not establish their adequacy.",
+    "Unknown or malformed evidence fails closed and is not normalized into a valid default.",
+    "Every hazard-control claim must bind to a requirement, exact design revision, test artifact, result and independent reviewer."
+  ],
+  "hazards": [
+    {
+      "id": "HMR0-HZ-001",
+      "hazard": "Unintended robot motion or loss of balance / fall",
+      "initiating_conditions": [
+        "localization or state estimate invalid",
+        "actuator/controller fault",
+        "unexpected obstacle or contact",
+        "unsafe trajectory or stale plan",
+        "power loss during motion"
+      ],
+      "potential_harm": [
+        "collision or impact with nearby people or objects",
+        "damage to equipment or supplies",
+        "robot unable to reach a defined safe state"
+      ],
+      "candidate_controls": [
+        "independent motion/safety supervisor",
+        "bounded velocity/force/workspace limits",
+        "watchdog and stop paths outside the cognitive planner",
+        "fall-state sensing and a hazard-reviewed protective response"
+      ],
+      "verification_cases": [
+        "sensor dropout during trajectory",
+        "controller timeout",
+        "unexpected contact in a surrogate fixture",
+        "power interruption across representative poses"
+      ],
+      "unresolved": [
+        "intended morphology and mass properties",
+        "applicable safe-motion limits",
+        "measured stopping and fall envelope",
+        "hardware-rated controller and brake architecture"
+      ]
+    },
+    {
+      "id": "HMR0-HZ-002",
+      "hazard": "Pinch, crush, or entrapment around joints, end effectors, drawers or fixtures",
+      "initiating_conditions": [
+        "person or object enters pinch zone",
+        "geometry or fixture differs from the model",
+        "unexpected resistance or jam",
+        "excess force or travel"
+      ],
+      "potential_harm": [
+        "pinch/crush injury",
+        "fixture damage",
+        "trapped object or stalled task"
+      ],
+      "candidate_controls": [
+        "explicit swept-volume and pinch-zone models",
+        "fixture-specific force/torque/travel limits",
+        "guarding or physical separation where required",
+        "abort on unmodelled resistance"
+      ],
+      "verification_cases": [
+        "swept-volume boundary grid",
+        "wrong-fixture identity",
+        "jammed drawer / unexpected resistance",
+        "force-sensor threshold injection"
+      ],
+      "unresolved": [
+        "human-access envelope",
+        "validated force/torque limits",
+        "actual geometry tolerances",
+        "applicable collaborative-robot standards for the chosen task"
+      ]
+    },
+    {
+      "id": "HMR0-HZ-003",
+      "hazard": "Tool detachment, incorrect attachment, or wrong end-effector identity",
+      "initiating_conditions": [
+        "tool changer failure",
+        "wrong tool mounted",
+        "stale tool manifest",
+        "identity sensor disagreement",
+        "tool revision changes after planning"
+      ],
+      "potential_harm": [
+        "dropped tool or load",
+        "uncontrolled task result",
+        "collision or damage"
+      ],
+      "candidate_controls": [
+        "positive attachment identity confirmation",
+        "independent detachment detection",
+        "tool revision and payload binding in every plan",
+        "separate stop path and safe-release definition"
+      ],
+      "verification_cases": [
+        "wrong tool identity",
+        "attachment sensor disagreement",
+        "detachment event mid-episode",
+        "tool revision changes between plan and acceptance"
+      ],
+      "unresolved": [
+        "physical tool changer design",
+        "redundant identity sensing",
+        "load retention at power loss",
+        "measured payload/centre-of-mass envelope"
+      ]
+    },
+    {
+      "id": "HMR0-HZ-004",
+      "hazard": "Load slip, drop, or instability during sealed mock-tote handling",
+      "initiating_conditions": [
+        "incorrect mass or centre of mass",
+        "friction differs from model",
+        "tote is damaged or wet",
+        "force envelope exceeded",
+        "grasp points partially occluded"
+      ],
+      "potential_harm": [
+        "dropped load",
+        "equipment damage",
+        "collision with a person or fixture"
+      ],
+      "candidate_controls": [
+        "object/fixture class and mass bounds",
+        "slip or grasp-state monitoring",
+        "force limits backed by measured fixture data",
+        "safe abort/release state"
+      ],
+      "verification_cases": [
+        "mass and centre-of-mass perturbations",
+        "slip/low-friction simulation",
+        "partial-observation case",
+        "fixture limit exceeded"
+      ],
+      "unresolved": [
+        "maximum payload",
+        "pad materials and wear",
+        "coefficient-of-friction evidence",
+        "physical fixture tests"
+      ]
+    },
+    {
+      "id": "HMR0-HZ-005",
+      "hazard": "Stale world model, calibration, permissions, or plan remains usable after context changes",
+      "initiating_conditions": [
+        "obstacle/map update",
+        "tool/camera calibration update",
+        "permission or authorization revoked",
+        "sensor frame change",
+        "plan replay"
+      ],
+      "potential_harm": [
+        "collision",
+        "wrong-object interaction",
+        "unauthorized task execution"
+      ],
+      "candidate_controls": [
+        "revision-bound state and plan digest",
+        "monotonic revision checks",
+        "revocation persistence",
+        "revalidation after any relevant change"
+      ],
+      "verification_cases": [
+        "each revision dimension changes after validation",
+        "failed gate later appears healthy",
+        "plan ID reused with different digest",
+        "unknown or out-of-order event"
+      ],
+      "unresolved": [
+        "canonical production plan bytes and signature",
+        "source of trusted revisions",
+        "end-to-end gateway integration"
+      ]
+    },
+    {
+      "id": "HMR0-HZ-006",
+      "hazard": "Inventory misread or label-to-object mismatch",
+      "initiating_conditions": [
+        "occlusion, glare, low light, damaged label",
+        "duplicate identifier",
+        "wrong tote in expected location",
+        "ambiguous or unsupported payload"
+      ],
+      "potential_harm": [
+        "wrong inventory record",
+        "supply delay or incorrect handoff",
+        "traceability failure"
+      ],
+      "candidate_controls": [
+        "explicit unreadable/ambiguous outcome",
+        "verify label against tote/object identity and task context",
+        "local-only processing",
+        "human confirmation for unresolved discrepancies"
+      ],
+      "verification_cases": [
+        "duplicate/invalid labels",
+        "wrong tote identity",
+        "glare/occlusion matrix",
+        "low confidence must not be normalized into a valid ID"
+      ],
+      "unresolved": [
+        "barcode/RFID choice",
+        "measured precision/recall",
+        "label population and lighting envelope",
+        "facility inventory integration"
+      ]
+    },
+    {
+      "id": "HMR0-HZ-007",
+      "hazard": "Loss of communications, time synchronization, or remote supervision",
+      "initiating_conditions": [
+        "network outage",
+        "latency or packet loss",
+        "clock skew",
+        "remote operator disconnect"
+      ],
+      "potential_harm": [
+        "unmonitored operation",
+        "stale operator command",
+        "failure to recover or report state"
+      ],
+      "candidate_controls": [
+        "local bounded stop behavior",
+        "command expiry and sequence numbers",
+        "time uncertainty surfaced explicitly",
+        "reconnect requires fresh state and authorization"
+      ],
+      "verification_cases": [
+        "network loss at each task phase",
+        "delayed/replayed command",
+        "clock jumps",
+        "supervisor reconnect after state revision"
+      ],
+      "unresolved": [
+        "communications architecture",
+        "maximum tolerated latency",
+        "remote oversight workflow",
+        "cybersecurity threat model"
+      ]
+    },
+    {
+      "id": "HMR0-HZ-008",
+      "hazard": "Low energy reserve or power fault prevents controlled recovery",
+      "initiating_conditions": [
+        "battery estimate drift",
+        "load/route energy underpredicted",
+        "battery degradation",
+        "charging station unavailable"
+      ],
+      "potential_harm": [
+        "stranding in doorway or corridor",
+        "dropped load or uncontrolled stop",
+        "loss of service"
+      ],
+      "candidate_controls": [
+        "conservative return reserve",
+        "energy estimation with uncertainty bounds",
+        "power-loss response independent of mission planner",
+        "battery health and degraded-mode state"
+      ],
+      "verification_cases": [
+        "reserve threshold boundary",
+        "load and route energy perturbations",
+        "battery state estimate corruption",
+        "power failure during representative simulated poses"
+      ],
+      "unresolved": [
+        "battery chemistry and pack design",
+        "measured energy model",
+        "charging interface",
+        "safe mechanical brake/power-off behavior"
+      ]
+    },
+    {
+      "id": "HMR0-HZ-009",
+      "hazard": "Contamination or false cleanability/sterility claims",
+      "initiating_conditions": [
+        "uncleanable crevice or porous material",
+        "soil retained after cleaning",
+        "cleaning cycle undocumented",
+        "tool marked clean without validated evidence"
+      ],
+      "potential_harm": [
+        "contamination transfer in a healthcare environment",
+        "false operational assurance"
+      ],
+      "candidate_controls": [
+        "cleaning_status remains not_assessed until evidence is reviewed",
+        "surface/material and process traceability",
+        "cleanability review as a separate gate",
+        "no sterile-field access in HMR-0"
+      ],
+      "verification_cases": [
+        "manifest that claims cleaning without evidence",
+        "geometry crevice inspection",
+        "missing cleaning-event record",
+        "unknown surface/material must remain unqualified"
+      ],
+      "unresolved": [
+        "material selection",
+        "facility cleaning agents and process",
+        "validation protocol and microbiological expertise",
+        "regulatory/facility requirements"
+      ]
+    },
+    {
+      "id": "HMR0-HZ-010",
+      "hazard": "Unintended capture or disclosure of personal/clinical information",
+      "initiating_conditions": [
+        "wide-field camera or microphone active",
+        "unredacted frames persisted",
+        "network sends identifiable data",
+        "inventory task drifts to patient observation"
+      ],
+      "potential_harm": [
+        "privacy breach",
+        "unauthorized clinical data handling",
+        "loss of trust or regulatory exposure"
+      ],
+      "candidate_controls": [
+        "initial task scope limited to synthetic labels and non-patient fixtures",
+        "no ambient recording by default",
+        "local data minimization and explicit retention policy",
+        "task allowlist and output schema block patient data"
+      ],
+      "verification_cases": [
+        "person enters the sensor field",
+        "PII-like synthetic token",
+        "attempted telemetry export",
+        "task request changes to patient observation"
+      ],
+      "unresolved": [
+        "sensor selection",
+        "facility privacy requirements",
+        "retention and access controls",
+        "target-jurisdiction privacy review"
+      ]
+    },
+    {
+      "id": "HMR0-HZ-011",
+      "hazard": "Cyber compromise or prompt/task injection changes tool, task, or safety policy",
+      "initiating_conditions": [
+        "malicious task content",
+        "compromised update/package",
+        "untrusted tool manifest",
+        "credential compromise",
+        "network service exploited"
+      ],
+      "potential_harm": [
+        "unauthorized task",
+        "safety-gate bypass attempt",
+        "data compromise or service disruption"
+      ],
+      "candidate_controls": [
+        "signed/versioned manifests and source provenance",
+        "allowlisted task/function capability",
+        "least-privilege boundaries",
+        "independent safety controller unreachable by planner commands",
+        "update rollback and revocation"
+      ],
+      "verification_cases": [
+        "unknown manifest field",
+        "signature/revision mismatch",
+        "unauthorized task capability",
+        "replayed stale plan or update"
+      ],
+      "unresolved": [
+        "threat model",
+        "secure boot/update chain",
+        "key lifecycle and recovery",
+        "independent penetration test"
+      ]
+    },
+    {
+      "id": "HMR0-HZ-012",
+      "hazard": "Tool or task silently crosses from nonclinical logistics into clinical function",
+      "initiating_conditions": [
+        "semantic ambiguity in task",
+        "planner expands scope",
+        "unreviewed tool added",
+        "future version enables diagnosis or medication delivery"
+      ],
+      "potential_harm": [
+        "unauthorized clinical decision or action",
+        "unreviewed change to intended use"
+      ],
+      "candidate_controls": [
+        "strict task/function enum",
+        "generator cannot self-approve",
+        "new clinical functions require a separate program and evidence gate",
+        "unknown function is rejected"
+      ],
+      "verification_cases": [
+        "diagnostic-output flag true",
+        "medication-delivery request",
+        "unknown clinical-function enum",
+        "attempt to enable physical actuation through unrecognized field"
+      ],
+      "unresolved": [
+        "eventual intended use",
+        "medical-device classification",
+        "clinical and regulatory governance for any scope expansion"
+      ]
+    }
+  ],
+  "required_next_steps": [
+    "Define intended use and operating environment before assigning severity/likelihood or risk acceptability.",
+    "Map each hazard to a versioned risk-control requirement, verification method and residual-risk review owner.",
+    "Have qualified robotics, functional-safety, medical-device and target-jurisdiction specialists independently review applicability and controls.",
+    "Keep simulated contract outcomes separate from bench measurements, HIL results, controlled field observations and clinical evidence."
+  ]
+}
