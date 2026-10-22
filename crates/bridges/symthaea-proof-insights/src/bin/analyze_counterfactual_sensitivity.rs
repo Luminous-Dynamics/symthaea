@@ -374,7 +374,13 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
         for (field, required, optional) in [
             (
                 "source",
-                &["record_id", "family_id", "source_commit", "artifact_sha256", "insight_sha256"][..],
+                &[
+                    "record_id",
+                    "family_id",
+                    "source_commit",
+                    "artifact_sha256",
+                    "insight_sha256",
+                ][..],
                 &[][..],
             ),
             (
@@ -434,7 +440,9 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
             .get("adjudication")
             .and_then(|x| x.get("reviewer_decisions"))
             .and_then(Value::as_array)
-            .with_context(|| format!("{context}.adjudication.reviewer_decisions must be an array"))?;
+            .with_context(|| {
+                format!("{context}.adjudication.reviewer_decisions must be an array")
+            })?;
         for (reviewer_index, reviewer) in reviewer_rows.iter().enumerate() {
             require_exact_keys(
                 reviewer,
@@ -1088,7 +1096,10 @@ mod tests {
         let reject_all = PairObservation {
             component_id: "c1".into(), mutation_kind: "precondition_removed".into(),
             base_compatible: true, base_accept: false, base_decision: "reject".into(),
-            variant_compatible: false, variant_accept: false, variant_decision: "reject".into(), noop: false,
+            variant_compatible: false,
+            variant_accept: false,
+            variant_decision: "reject".into(),
+            noop: false,
             base_probability: None, variant_probability: None,
         };
         let counts = aggregate(&[reject_all]);
@@ -1119,8 +1130,32 @@ mod tests {
     #[test]
     fn component_bootstrap_is_deterministic_and_seeded() {
         let pairs = vec![
-            PairObservation { component_id:"a".into(), mutation_kind:"x".into(), base_compatible:true, base_accept:true, base_decision:"accept".into(), variant_compatible:false, variant_accept:false, variant_decision:"reject".into(), noop:false, base_probability:None, variant_probability:None },
-            PairObservation { component_id:"b".into(), mutation_kind:"x".into(), base_compatible:true, base_accept:true, base_decision:"accept".into(), variant_compatible:false, variant_accept:true, variant_decision:"accept".into(), noop:false, base_probability:None, variant_probability:None },
+            PairObservation {
+                component_id: "a".into(),
+                mutation_kind: "x".into(),
+                base_compatible: true,
+                base_accept: true,
+                base_decision: "accept".into(),
+                variant_compatible: false,
+                variant_accept: false,
+                variant_decision: "reject".into(),
+                noop: false,
+                base_probability: None,
+                variant_probability: None,
+            },
+            PairObservation {
+                component_id: "b".into(),
+                mutation_kind: "x".into(),
+                base_compatible: true,
+                base_accept: true,
+                base_decision: "accept".into(),
+                variant_compatible: false,
+                variant_accept: true,
+                variant_decision: "accept".into(),
+                noop: false,
+                base_probability: None,
+                variant_probability: None,
+            },
         ];
         let first = calculate_metrics(&pairs, 1_000, 9);
         let second = calculate_metrics(&pairs, 1_000, 9);
