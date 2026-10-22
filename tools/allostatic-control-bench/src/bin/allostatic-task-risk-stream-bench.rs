@@ -158,6 +158,8 @@ fn summary_row(
 
 fn process_stream(
     rows: &[InputRow],
+    expected_operating_point: &str,
+    expected_condition: &str,
     raw_output: &mut String,
     summary_output: &mut String,
     log_threshold: f64,
@@ -170,6 +172,15 @@ fn process_stream(
         .into());
     }
     let first = &rows[0];
+    if first.operating_point != expected_operating_point
+        || first.condition != expected_condition
+    {
+        return Err(IoError::new(
+            ErrorKind::InvalidData,
+            "task-risk stream order disagrees with the declared operating point/condition panel",
+        )
+        .into());
+    }
     let mut mixture = MixtureBoundedRiskEProcess::new(
         RISK_BOUND,
         BET_FRACTIONS,
@@ -326,6 +337,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             let end = row_index + EPISODES;
             process_stream(
                 &rows[row_index..end],
+                operating_point,
+                condition,
                 &mut raw_output,
                 &mut summary_output,
                 log_threshold,
