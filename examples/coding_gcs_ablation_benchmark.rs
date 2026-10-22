@@ -545,6 +545,7 @@ fn main() {
     // Two-sided oracle controls run before any agent trials.
     let mut reference_controls = Vec::new();
     let mut empty_patch_controls = Vec::new();
+    let mut mutation_controls = Vec::new();
     for task in &tasks {
         let expected = expected_test_functions(task.test_source);
         let reference = evaluate_source(task.reference_source, task.test_source);
@@ -566,6 +567,40 @@ fn main() {
         if !reference_passes || !empty_patch_fails {
             eprintln!("Oracle control failed for task {}: reference_passes={}, empty_patch_fails={}", task.id, reference_passes, empty_patch_fails);
             std::process::exit(3);
+        }
+        if task.mutant_sources.is_empty() {
+            eprintln!("Oracle mutation controls missing for task {}", task.id);
+            std::process::exit(3);
+        }
+        for (mutation_index, mutant_source) in task.mutant_sources.iter().enumerate() {
+            let mutant = evaluate_source(mutant_source, task.test_source);
+            let mutant_oracle_complete = expected > 0
+                && !mutant.simulated
+                && mutant.compiled
+                && mutant.runtime_error.is_none()
+                && mutant.tests_passed + mutant.tests_failed == expected;
+            let mutant_killed = mutant_oracle_complete && mutant.tests_failed > 0;
+            mutation_controls.push(serde_json::json!({
+                "task_id": task.id,
+                "mutation_index": mutation_index,
+                "mutation_source_blake3": source_digest(mutant_source),
+                "compiled": mutant.compiled,
+                "simulated": mutant.simulated,
+                "tests_expected": expected,
+                "tests_passed": mutant.tests_passed,
+                "tests_failed": mutant.tests_failed,
+                "runtime_error": mutant.runtime_error,
+                "oracle_complete": mutant_oracle_complete,
+                "mutant_killed": mutant_killed,
+                "compile_errors": mutant.compile_errors.iter().take(2).collect::<Vec<_>>()
+            }));
+            if !mutant_killed {
+                eprintln!(
+                    "Oracle mutation control failed for task {} mutant {}: compiled={}, complete={}, failed_tests={}",
+                    task.id, mutation_index, mutant.compiled, mutant_oracle_complete, mutant.tests_failed
+                );
+                std::process::exit(3);
+            }
         }
     }
 
@@ -632,8 +667,10 @@ fn main() {
         "oracle_controls": {
             "reference_controls": reference_controls,
             "empty_patch_controls": empty_patch_controls,
+            "mutation_controls": mutation_controls,
             "all_references_pass": true,
-            "all_empty_patches_fail": true
+            "all_empty_patches_fail": true,
+            "all_mutants_killed": true
         },
         "summary": {
             "gcs_off": mode_summary(&all_results, false),
