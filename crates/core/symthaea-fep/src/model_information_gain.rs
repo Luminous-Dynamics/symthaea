@@ -216,11 +216,6 @@ pub fn compute_action_information_gains(
             raw_information_gain.max(0.0)
         };
 
-        // Remove only sub-tolerance negative roundoff; do not claim precision
-        // beyond f64 supports.
-        expected_posterior_entropy_nats =
-            (prior_entropy_nats - information_gain_nats).max(0.0);
-
         gains.push(ActionInformationGain {
             action_index,
             information_gain_nats,
