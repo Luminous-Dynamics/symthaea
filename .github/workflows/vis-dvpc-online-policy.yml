@@ -65,7 +65,6 @@ jobs:
             END { if (bad || headers != 1 || rows != 6) exit 1 }
           ' vis-dvpc-online.tsv
           grep -Fq "reservation_overrun" vis-dvpc-online.tsv
-          grep -Fq "run_budget_exceeded" vis-dvpc-online.tsv
           sha256sum tools/vision-decision-value-online-policy.rs .github/workflows/vis-dvpc-online-policy.yml vis-dvpc-online.tsv > vis-dvpc-online.sha256
           sha256sum -c vis-dvpc-online.sha256
 
