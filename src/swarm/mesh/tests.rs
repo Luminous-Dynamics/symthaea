@@ -2110,3 +2110,38 @@ fn legacy_fragment_nonce_reuses_after_16_bit_sequence_wrap() {
         "reused fragment nonce reveals plaintext_a XOR plaintext_b"
     );
 }
+
+
+/// Intentional integration witness: fragment-level AEAD adds a 12-byte nonce
+/// and 16-byte tag to an already MTU-sized LoRa frame. The encrypted result is
+/// 250 bytes although LORA_MTU is 222, so it cannot pass through the receiver's
+/// fixed-size LoRa read buffer as one frame. This records the current broken
+/// size contract; it is not a passing transport-safety invariant.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn legacy_fragment_encryption_exceeds_lora_mtu() {
+    let key = [0x6Du8; 32];
+    let source_id = [0x12, 0x23, 0x34, 0x45, 0x56, 0x67, 0x78, 0x89];
+    let fragments = fragment(0x1234, &[0xA5; PAYLOAD_SIZE]);
+    let frag = fragments.first().expect("non-empty payload produces a fragment");
+    assert_eq!(frag.payload_len as usize, PAYLOAD_SIZE);
+
+    let mut frame = [0u8; LORA_MTU];
+    let frame_len = frag.to_bytes(&mut frame);
+    assert_eq!(frame_len, LORA_MTU);
+
+    let encrypted = encrypt_fragment(
+        &frame[..frame_len],
+        &key,
+        &source_id,
+        frag.thought_id,
+        frag.fragment_index,
+    );
+
+    assert_eq!(
+        encrypted.len(),
+        LORA_MTU + AEAD_NONCE_SIZE + AEAD_TAG_SIZE,
+        "the legacy encryption wrapper exceeds the documented physical frame MTU"
+    );
+    assert!(encrypted.len() > LORA_MTU);
+}
