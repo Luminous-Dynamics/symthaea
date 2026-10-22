@@ -6,7 +6,7 @@
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{HashSet, VecDeque};
+    use std::collections::{HashMap, HashSet, VecDeque, hash_map::Entry};
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     enum Bundle {
@@ -292,6 +292,127 @@ mod tests {
         }
     }
 
+    fn shortest_paths_to_reachable_states() -> HashMap<State, Vec<Action>> {
+        let mut paths = HashMap::from([(State::INITIAL, Vec::new())]);
+        let mut queue = VecDeque::from([State::INITIAL]);
+
+        while let Some(state) = queue.pop_front() {
+            let prefix = paths
+                .get(&state)
+                .expect("queued state has a shortest path")
+                .clone();
+            for action in ACTIONS {
+                let next = transition(state, action).next;
+                if let Entry::Vacant(entry) = paths.entry(next) {
+                    let mut path = prefix.clone();
+                    path.push(action);
+                    entry.insert(path);
+                    queue.push_back(next);
+                }
+            }
+        }
+        paths
+    }
+
+    fn action_event_json(action: Action, sequence: u32) -> serde_json::Value {
+        use serde_json::json;
+
+        match action {
+            Action::StartSession => json!({"sequence": sequence, "kind": "session_started"}),
+            Action::LoadA => json!({
+                "sequence": sequence, "kind": "bundle_loaded",
+                "bundle_id": "bundle-a", "bundle_state": "valid"
+            }),
+            Action::LoadB => json!({
+                "sequence": sequence, "kind": "bundle_loaded",
+                "bundle_id": "bundle-b", "bundle_state": "valid"
+            }),
+            Action::VerifyAValid => json!({
+                "sequence": sequence, "kind": "bundle_verified",
+                "bundle_id": "bundle-a", "bundle_state": "valid", "digest_verified": true
+            }),
+            Action::VerifyABadDigest => json!({
+                "sequence": sequence, "kind": "bundle_verified",
+                "bundle_id": "bundle-a", "bundle_state": "valid", "digest_verified": false
+            }),
+            Action::VerifyAExpired => json!({
+                "sequence": sequence, "kind": "bundle_verified",
+                "bundle_id": "bundle-a", "bundle_state": "expired", "digest_verified": true
+            }),
+            Action::VerifyBValid => json!({
+                "sequence": sequence, "kind": "bundle_verified",
+                "bundle_id": "bundle-b", "bundle_state": "valid", "digest_verified": true
+            }),
+            Action::RevokeA => json!({
+                "sequence": sequence, "kind": "bundle_revoked", "bundle_id": "bundle-a"
+            }),
+            Action::RevokeB => json!({
+                "sequence": sequence, "kind": "bundle_revoked", "bundle_id": "bundle-b"
+            }),
+            Action::Interrupt => json!({"sequence": sequence, "kind": "session_interrupted"}),
+            Action::Resume => json!({"sequence": sequence, "kind": "session_resumed"}),
+            Action::DetectUncertainty => json!({"sequence": sequence, "kind": "uncertainty_detected"}),
+            Action::PreserveUncertainty => json!({"sequence": sequence, "kind": "uncertainty_preserved"}),
+            Action::Handoff => json!({"sequence": sequence, "kind": "handoff_emitted"}),
+            Action::RenderA => json!({
+                "sequence": sequence, "kind": "protocol_rendered", "bundle_id": "bundle-a"
+            }),
+            Action::RenderB => json!({
+                "sequence": sequence, "kind": "protocol_rendered", "bundle_id": "bundle-b"
+            }),
+        }
+    }
+
+    fn action_history_json(actions: &[Action]) -> serde_json::Value {
+        use serde_json::json;
+
+        let events: Vec<_> = actions
+            .iter()
+            .enumerate()
+            .map(|(index, action)| action_event_json(*action, (index + 1) as u32))
+            .collect();
+        json!({
+            "trace_id": "generated-finite-state-edge",
+            "description": "generated abstract state/action path",
+            "criticality": "critical",
+            "connectivity": "online",
+            "events": events,
+            "expected_violation_codes": []
+        })
+    }
+
+    fn violation_code(violation: Violation) -> &'static str {
+        match violation {
+            Violation::InvalidBundleVerification => "invalid_bundle_verification",
+            Violation::RenderWithoutActiveSession => "render_without_active_session",
+            Violation::RenderAfterRevocation => "render_after_revocation",
+            Violation::RenderWithoutVerifiedBundle => "render_without_verified_bundle",
+            Violation::UncertaintyLostAtHandoff => "uncertainty_lost_at_handoff",
+            Violation::UncertaintyLostAtSessionBoundary => "uncertainty_lost_at_session_boundary",
+            Violation::UnknownNormalized => "unknown_normalized",
+            Violation::StaleResourceClaimedConfirmed => "stale_resource_claimed_confirmed",
+            Violation::OfflineCoreNetworkDependency => "offline_core_network_dependency",
+            Violation::IntermittentCoreNetworkDependency => "intermittent_core_network_dependency",
+            Violation::SensitiveDataEgressWithoutConsent => "sensitive_data_egress_without_consent",
+        }
+    }
+
+    fn model_violation_codes(actions: &[Action]) -> Vec<String> {
+        let mut state = State::INITIAL;
+        let mut codes = Vec::new();
+        for action in actions {
+            let outcome = transition(state, *action);
+            codes.extend(
+                outcome
+                    .violations
+                    .into_iter()
+                    .map(|violation| violation_code(violation).to_owned()),
+            );
+            state = outcome.next;
+        }
+        codes
+    }
+
     fn reachable_states() -> HashSet<State> {
         let mut seen = HashSet::from([State::INITIAL]);
         let mut queue = VecDeque::from([State::INITIAL]);
@@ -433,6 +554,47 @@ mod tests {
             "abstract_states_explored={} state_action_transitions_checked={}",
             states.len(),
             transition_count
+        );
+    }
+
+    #[test]
+    fn every_reachable_state_action_edge_matches_production_trace_checker() {
+        let paths = shortest_paths_to_reachable_states();
+        assert_eq!(paths.len(), 84, "finite model's reachable state count changed");
+
+        let mut compared_edges = 0usize;
+        for (target_state, prefix) in &paths {
+            let mut replayed_state = State::INITIAL;
+            for action in prefix {
+                replayed_state = transition(replayed_state, *action).next;
+            }
+            assert_eq!(
+                replayed_state, *target_state,
+                "shortest-path witness must reach its indexed state"
+            );
+
+            for action in ACTIONS {
+                let mut edge_path = prefix.clone();
+                edge_path.push(action);
+                let generated_trace = action_history_json(&edge_path);
+                let model_codes = model_violation_codes(&edge_path);
+                let production_codes = super::super::first_aid_trajectory::inspect_trace_json(
+                    &generated_trace,
+                )
+                .expect("generated abstract history must satisfy the event schema");
+
+                assert_eq!(
+                    production_codes,
+                    model_codes,
+                    "trace/model mismatch at state {target_state:?} via {action:?}; path={edge_path:?}"
+                );
+                compared_edges += 1;
+            }
+        }
+
+        assert_eq!(
+            compared_edges, 1_344,
+            "every reachable state/action edge must be differentially checked"
         );
     }
 
