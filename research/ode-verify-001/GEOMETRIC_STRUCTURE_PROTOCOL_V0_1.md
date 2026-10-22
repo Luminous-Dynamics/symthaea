@@ -77,3 +77,10 @@ These references motivate the design; they do not certify this repository or est
 ## Nonlinear extension
 
 The follow-on [GEOM-ODE-002 protocol](NONLINEAR_SYMPLECTICITY_PROTOCOL_V0_1.md) extends the one-step map tests to the nonlinear, two-degree-of-freedom Hénon–Heiles Hamiltonian. It estimates the tangent map with a frozen centered finite-difference rule and checks M^T J M - J over nine state/timestep pairs, with RK4 as a negative control. This numerical-map test is separate from the symbolic polynomial conservation obligation in [PR #8177](https://github.com/Luminous-Dynamics/symthaea/pull/8177); neither one alone establishes empirical physical validity.
+
+
+## Work–precision baseline implemented
+
+The executable [`oscillator_work_precision.rs`](examples/oscillator_work_precision.rs) now reports a fixed-step baseline for Euler, RK4, and Velocity-Verlet on the same analytical oscillator over four periods and five refinements. It reports observed derivative evaluations, full-trajectory and final-state errors, maximum relative energy drift, and median wall time over repeated runs.
+
+The run time includes checked-driver overhead, allocation and trajectory recording. Do not compare it directly with solver-kernel microbenchmarks or external engines. The test gates check error refinement and finite metrics; they do not gate noisy wall-clock values. This first report establishes the repository's own reproducible baseline, after which external work–precision comparisons can be performed with pinned environments and semantically aligned models.
