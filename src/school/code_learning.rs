@@ -1906,6 +1906,8 @@ pub fn lesson_from_failure(
             return None;
         };
 
+    let test_source = format!("#[test]\nfn auto_generated_lesson_behavior() {{\n    {}\n}}\n", test);
+
     Some(CodeLesson {
         objective_id: format!("auto_drill_{}", name),
         spec: CodeSpec {
@@ -1919,7 +1921,7 @@ pub fn lesson_from_failure(
             epistemic_status: EpistemicStatus::Probable,
             metadata: HashMap::new(),
         },
-        test_source: Some(test.to_string()),
+        test_source: Some(test_source),
     })
 }
 
@@ -2472,6 +2474,8 @@ mod tests {
         assert!(lesson.is_some());
         let l = lesson.unwrap();
         assert!(l.spec.name.contains("type_conversion"));
+        assert_eq!(count_expected_rust_test_functions(l.test_source.as_deref()), 1);
+        assert!(l.test_source.as_deref().unwrap().contains("fn auto_generated_lesson_behavior"));
     }
 
     #[test]
