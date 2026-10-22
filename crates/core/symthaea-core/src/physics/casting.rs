@@ -75,6 +75,19 @@ pub enum CastingModelError {
     NonPositiveExponent,
     /// The fitted parameters or diagnostics were not finite and positive where required.
     InvalidCalibrationParameters,
+    /// A conformal miscoverage probability was invalid.
+    InvalidMiscoverage,
+    /// Too few independent calibration observations support the requested coverage.
+    NotEnoughConformalCalibration {
+        /// Number of supplied calibration observations.
+        actual: usize,
+        /// Minimum count required by the finite-sample quantile.
+        minimum: usize,
+    },
+    /// A conformal calibrator was applied to a different fitted model.
+    ConformalModelMismatch,
+    /// A predictive interval was not finite and strictly positive.
+    InvalidPredictionInterval,
     /// A holdout evaluation set was empty.
     EmptyValidationSet,
     /// A requested prediction lies outside the measured calibration domain.
@@ -110,6 +123,19 @@ impl fmt::Display for CastingModelError {
             }
             Self::InvalidCalibrationParameters => {
                 f.write_str("casting calibration produced invalid parameters or diagnostics")
+            }
+            Self::InvalidMiscoverage => {
+                f.write_str("conformal miscoverage must be finite and strictly between 0 and 1")
+            }
+            Self::NotEnoughConformalCalibration { actual, minimum } => write!(
+                f,
+                "conformal casting calibration needs at least {minimum} observations; received {actual}"
+            ),
+            Self::ConformalModelMismatch => {
+                f.write_str("conformal casting calibrator does not match the supplied fitted model")
+            }
+            Self::InvalidPredictionInterval => {
+                f.write_str("casting predictive interval bounds must be finite and positive")
             }
             Self::EmptyValidationSet => {
                 f.write_str("casting holdout evaluation set must not be empty")
@@ -151,6 +177,146 @@ pub struct ChvorinovModel {
     thermal_modulus_max_m: f64,
     fit_r_squared: f64,
     sample_count: usize,
+}
+
+/// A multiplicative prediction interval calibrated from independent log-residuals.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CastingPredictionInterval {
+    /// Central Chvorinov estimate, in seconds.
+    pub estimate_s: f64,
+    /// Lower calibrated prediction bound, in seconds.
+    pub lower_s: f64,
+    /// Upper calibrated prediction bound, in seconds.
+    pub upper_s: f64,
+    /// Nominal marginal coverage target, in [0, 1].
+    pub nominal_coverage: f64,
+    /// Number of observations used to calibrate the residual quantile.
+    pub calibration_sample_count: usize,
+    /// Absolute log-residual order statistic used as the interval radius.
+    pub log_residual_quantile: f64,
+}
+
+/// Split-conformal calibration for Chvorinov predictions in log-time space.
+///
+/// Fit the Chvorinov model on a training set first, then use a disjoint calibration
+/// set here. Do not tune the model or select the miscoverage after looking at the
+/// final test set. Under exchangeability of calibration and future in-domain examples,
+/// the split-conformal order statistic gives finite-sample marginal coverage. It does
+/// not guarantee conditional coverage for every geometry, and process drift, a changed
+/// alloy/mold population, dependent trials, or a new geometry regime can violate
+/// exchangeability. Retain the out-of-domain guard and re-evaluate coverage prospectively.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChvorinovConformalCalibrator {
+    miscoverage: f64,
+    log_residual_quantile: f64,
+    calibration_sample_count: usize,
+    fitted_model_digest: [u8; 32],
+}
+
+impl ChvorinovConformalCalibrator {
+    /// Calibrate an interval using observations not used to fit the supplied model.
+    ///
+    /// A miscoverage of 0.10 targets 90% marginal coverage. The finite-sample quantile
+    /// uses rank ceil((n + 1) * (1 - miscoverage)); if that rank exceeds n, the
+    /// requested nominal level is unsupported by the calibration sample and is rejected.
+    pub fn calibrate(
+        model: &ChvorinovModel,
+        calibration_observations: &[ChvorinovObservation],
+        miscoverage: f64,
+    ) -> Result<Self, CastingModelError> {
+        if !miscoverage.is_finite() || miscoverage <= 0.0 || miscoverage >= 1.0 {
+            return Err(CastingModelError::InvalidMiscoverage);
+        }
+
+        let count = calibration_observations.len();
+        let rank = ((count as f64 + 1.0) * (1.0 - miscoverage)).ceil() as usize;
+        if count == 0 || rank == 0 || rank > count {
+            let minimum = ((1.0 - miscoverage) / miscoverage).ceil().max(1.0) as usize;
+            return Err(CastingModelError::NotEnoughConformalCalibration {
+                actual: count,
+                minimum,
+            });
+        }
+
+        let mut scores = Vec::with_capacity(count);
+        for (index, observation) in calibration_observations.iter().enumerate() {
+            if !observation.thermal_modulus_m.is_finite()
+                || observation.thermal_modulus_m <= 0.0
+                || !observation.solidification_time_s.is_finite()
+                || observation.solidification_time_s <= 0.0
+            {
+                return Err(CastingModelError::InvalidObservation { index });
+            }
+            let predicted = model.estimate_solidification_time_s(observation.thermal_modulus_m)?;
+            let score =
+                (observation.solidification_time_s.ln() - predicted.ln()).abs();
+            if !score.is_finite() {
+                return Err(CastingModelError::NonFinitePrediction);
+            }
+            scores.push(score);
+        }
+        scores.sort_by(f64::total_cmp);
+        let log_residual_quantile = scores[rank - 1];
+
+        Ok(Self {
+            miscoverage,
+            log_residual_quantile,
+            calibration_sample_count: count,
+            fitted_model_digest: model.identity_digest(),
+        })
+    }
+
+    /// Produce a multiplicative prediction interval for one in-domain thermal modulus.
+    ///
+    /// The model identity is checked so a residual calibrator cannot accidentally be
+    /// reused after the fitted model changes. Out-of-domain requests remain abstentions.
+    pub fn predict_interval(
+        &self,
+        model: &ChvorinovModel,
+        thermal_modulus_m: f64,
+    ) -> Result<CastingPredictionInterval, CastingModelError> {
+        if model.identity_digest() != self.fitted_model_digest {
+            return Err(CastingModelError::ConformalModelMismatch);
+        }
+        let estimate_s = model.estimate_solidification_time_s(thermal_modulus_m)?;
+        let lower_s = estimate_s * (-self.log_residual_quantile).exp();
+        let upper_s = estimate_s * self.log_residual_quantile.exp();
+        if !estimate_s.is_finite()
+            || estimate_s <= 0.0
+            || !lower_s.is_finite()
+            || lower_s <= 0.0
+            || !upper_s.is_finite()
+            || upper_s <= 0.0
+            || lower_s > estimate_s
+            || estimate_s > upper_s
+        {
+            return Err(CastingModelError::InvalidPredictionInterval);
+        }
+
+        Ok(CastingPredictionInterval {
+            estimate_s,
+            lower_s,
+            upper_s,
+            nominal_coverage: 1.0 - self.miscoverage,
+            calibration_sample_count: self.calibration_sample_count,
+            log_residual_quantile: self.log_residual_quantile,
+        })
+    }
+
+    /// Return the requested miscoverage probability.
+    pub fn miscoverage(&self) -> f64 {
+        self.miscoverage
+    }
+
+    /// Return the observed absolute log-residual quantile.
+    pub fn log_residual_quantile(&self) -> f64 {
+        self.log_residual_quantile
+    }
+
+    /// Return the number of independent calibration observations supplied by the caller.
+    pub fn calibration_sample_count(&self) -> usize {
+        self.calibration_sample_count
+    }
 }
 
 /// The outcome for one held-out casting in a validation report.
@@ -347,6 +513,22 @@ impl ChvorinovModel {
             fit_r_squared,
             sample_count: observations.len(),
         })
+    }
+
+    fn identity_digest(&self) -> [u8; 32] {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-chvorinov-model-v1\\0");
+        for value in [
+            self.mold_constant_s_per_m_pow_n,
+            self.exponent,
+            self.thermal_modulus_min_m,
+            self.thermal_modulus_max_m,
+            self.fit_r_squared,
+        ] {
+            hasher.update(&value.to_bits().to_le_bytes());
+        }
+        hasher.update(&(self.sample_count as u64).to_le_bytes());
+        *hasher.finalize().as_bytes()
     }
 
     /// Estimate solidification time for a thermal modulus within the calibration range.
@@ -607,6 +789,108 @@ mod tests {
         assert!(matches!(
             ChvorinovModel::calibrate_with_fixed_exponent(&synthetic_observations(), f64::NAN),
             Err(CastingModelError::NonPositiveExponent)
+        ));
+    }
+
+    fn conformal_training_observations() -> Vec<ChvorinovObservation> {
+        [0.001_f64, 0.002, 0.004, 0.008, 0.010]
+            .into_iter()
+            .map(|modulus| ChvorinovObservation::new(modulus, 1.2e6 * modulus.powi(2)))
+            .collect()
+    }
+
+    fn conformal_calibration_observations() -> Vec<ChvorinovObservation> {
+        [
+            (0.003_f64, 0.01_f64),
+            (0.005, 0.02),
+            (0.006, -0.03),
+            (0.007, 0.04),
+            (0.009, -0.05),
+        ]
+        .into_iter()
+        .map(|(modulus, log_error)| {
+            ChvorinovObservation::new(
+                modulus,
+                1.2e6 * modulus.powi(2) * log_error.exp(),
+            )
+        })
+        .collect()
+    }
+
+    #[test]
+    fn split_conformal_interval_uses_finite_sample_log_residual_quantile() {
+        let model = ChvorinovModel::calibrate(&conformal_training_observations()).unwrap();
+        let calibrator = ChvorinovConformalCalibrator::calibrate(
+            &model,
+            &conformal_calibration_observations(),
+            0.4,
+        )
+        .unwrap();
+        let interval = calibrator.predict_interval(&model, 0.0045).unwrap();
+
+        assert_eq!(interval.calibration_sample_count, 5);
+        assert!((interval.nominal_coverage - 0.6).abs() < 1e-12);
+        assert!((interval.log_residual_quantile - 0.04).abs() < 1e-10);
+        assert!((interval.estimate_s - 24.3).abs() < 1e-8);
+        assert!((interval.lower_s - 24.3 * (-0.04_f64).exp()).abs() < 1e-8);
+        assert!((interval.upper_s - 24.3 * 0.04_f64.exp()).abs() < 1e-8);
+    }
+
+    #[test]
+    fn split_conformal_rejects_small_calibration_sets_for_requested_coverage() {
+        let model = ChvorinovModel::calibrate(&conformal_training_observations()).unwrap();
+        assert!(matches!(
+            ChvorinovConformalCalibrator::calibrate(
+                &model,
+                &conformal_calibration_observations()[..5],
+                0.05
+            ),
+            Err(CastingModelError::NotEnoughConformalCalibration {
+                actual: 5,
+                minimum: 19
+            })
+        ));
+    }
+
+    #[test]
+    fn split_conformal_rejects_invalid_alpha_and_out_of_domain_calibration() {
+        let model = ChvorinovModel::calibrate(&conformal_training_observations()).unwrap();
+        let calibration = conformal_calibration_observations();
+        assert!(matches!(
+            ChvorinovConformalCalibrator::calibrate(&model, &calibration, 1.0),
+            Err(CastingModelError::InvalidMiscoverage)
+        ));
+        assert!(matches!(
+            ChvorinovConformalCalibrator::calibrate(
+                &model,
+                &[ChvorinovObservation::new(0.02, 500.0)],
+                0.5
+            ),
+            Err(CastingModelError::NotEnoughConformalCalibration { .. })
+                | Err(CastingModelError::OutsideCalibrationDomain { .. })
+        ));
+    }
+
+    #[test]
+    fn split_conformal_is_bound_to_the_exact_fitted_model_and_domain() {
+        let training = conformal_training_observations();
+        let model = ChvorinovModel::calibrate(&training).unwrap();
+        let calibrator = ChvorinovConformalCalibrator::calibrate(
+            &model,
+            &conformal_calibration_observations(),
+            0.4,
+        )
+        .unwrap();
+        let different_model =
+            ChvorinovModel::calibrate_with_fixed_exponent(&training, 2.5).unwrap();
+
+        assert!(matches!(
+            calibrator.predict_interval(&different_model, 0.0045),
+            Err(CastingModelError::ConformalModelMismatch)
+        ));
+        assert!(matches!(
+            calibrator.predict_interval(&model, 0.02),
+            Err(CastingModelError::OutsideCalibrationDomain { .. })
         ));
     }
 
