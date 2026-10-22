@@ -45,6 +45,9 @@ fn run() -> Result<(), String> {
     if baseline_policy == candidate_policy {
         return Err("baseline and candidate policy must differ".to_owned());
     }
+    if !is_slug(baseline_policy) || !is_slug(candidate_policy) {
+        return Err("policy identifiers must be simple unquoted slugs".to_owned());
+    }
     if bootstrap_replicates < 1_000 {
         return Err("use at least 1000 paired bootstrap replicates".to_owned());
     }
@@ -132,7 +135,7 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("cannot create output CSV {output_path}: {error}"))?;
     writeln!(
         output,
-        "scenario,shielded,metric,baseline_policy,candidate_policy,n_pairs,baseline_mean,candidate_mean,candidate_minus_baseline_mean,median_paired_delta,paired_bootstrap_ci95_low,paired_bootstrap_ci95_high,bootstrap_replicates,baseline_violations,candidate_violations,candidate_only_violations,baseline_only_violations,mcnemar_exact_two_sided_p,baseline_violation_rate,candidate_violation_rate,baseline_violation_upper95_exact,candidate_violation_upper95_exact"
+        "scenario,shielded,metric,baseline_policy,candidate_policy,n_pairs,baseline_mean,candidate_mean,candidate_minus_baseline_mean,median_paired_delta,paired_bootstrap_ci95_low,paired_bootstrap_ci95_high,bootstrap_replicates,bootstrap_seed,baseline_violations,candidate_violations,candidate_only_violations,baseline_only_violations,mcnemar_exact_two_sided_p,baseline_violation_rate,candidate_violation_rate,baseline_violation_upper95_exact,candidate_violation_upper95_exact"
     )
     .map_err(|error| format!("cannot write report header: {error}"))?;
 
@@ -175,6 +178,7 @@ fn run() -> Result<(), String> {
             metric_name,
             baseline_policy,
             candidate_policy,
+            random_seed,
             &summary,
         )?;
     }
@@ -223,13 +227,14 @@ fn write_summary_row(
     metric_name: &str,
     baseline_policy: &str,
     candidate_policy: &str,
+    random_seed: u64,
     summary: &PairedSummary,
 ) -> Result<(), String> {
     let baseline_rate = summary.baseline_violations as f64 / summary.n_pairs as f64;
     let candidate_rate = summary.candidate_violations as f64 / summary.n_pairs as f64;
     writeln!(
         output,
-        "{scenario},{shielded},{metric_name},{baseline_policy},{candidate_policy},{},{:.9},{:.9},{:.9},{:.9},{:.9},{:.9},{},{},{},{},{},{:.9},{:.9},{:.9},{:.9},{:.9}",
+        "{scenario},{shielded},{metric_name},{baseline_policy},{candidate_policy},{},{:.9},{:.9},{:.9},{:.9},{:.9},{:.9},{},{},{},{},{},{},{:.9},{:.9},{:.9},{:.9},{:.9}",
         summary.n_pairs,
         summary.baseline_mean,
         summary.candidate_mean,
@@ -238,6 +243,7 @@ fn write_summary_row(
         summary.bootstrap_ci95_low,
         summary.bootstrap_ci95_high,
         summary.bootstrap_replicates,
+        random_seed,
         summary.baseline_violations,
         summary.candidate_violations,
         summary.candidate_only_violations,
