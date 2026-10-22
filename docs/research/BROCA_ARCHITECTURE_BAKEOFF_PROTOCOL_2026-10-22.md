@@ -25,6 +25,7 @@ A mechanism is not justified by its biological, cognitive, topological, or consc
 | G | F with semantic attraction, gating, and veto ablated individually | Which intervention, if any, helps? |
 | H | Sparse explicit HDC-keyed memory with bounded retrieval, using A as the language substrate | Does explicit associative retrieval outperform compressing all thought through the projection? |
 | I | Budget-matched Transformer and, where practical, Mamba-2/3, RWKV-7, and xLSTM baselines | Is the effect specific to Broca or a general sequence-model property? |
+| J | Context-specific training of a small temporary adapter/state versus spending the same compute on extra generated thought tokens | Is a targeted update a better use of inference compute than more open-ended rehearsal for a given long-context task? |
 
 Do not use only A-vs-all-features-on. Report the individual effects and selected interaction terms. When full factorial evaluation is too expensive, preregister the smaller fractional-factorial design before runs.
 
@@ -35,9 +36,11 @@ For every comparison, disclose checkpoint source, model parameters, trainable pa
 ### Gate 0 — validity of the training signal
 
 - Teacher-forced loss must score the actual target under logits conditioned on the correct prior tokens.
-- Projection gradients must be taken with respect to the actual projected context and the actual previous-token/target-token pair.
+- Projection gradients must use the actual projected context and the full teacher-forced prefix, with the final target scored only after every preceding target token has updated recurrent state.
+- Backpropagate from the SSM output gradient through the actual forward projection graph: HDC bottleneck, LayerNorm, activations, optional deep bottleneck, temporal chunk projection, adapter, attention and positional encoding as applicable. Do not pass target-token hidden states where projection activations are expected.
+- Apply projection updates after scoring the complete teacher-forced target sequence so weights remain fixed while its per-token losses are accumulated.
 - A missing gradient, invalid target, malformed context, or non-finite loss must fail closed; it must not be silently replaced by a zero vector or a success-shaped metric.
-- Before trusting E2E learning, add a real-model gradient check: finite differences or an independently computed reference derivative on a small deterministic case. Contract tests alone do not establish autograd correctness.
+- Add finite-difference or independent-reference tests for both the Mamba context-anchor gradient and each projection Jacobian (including temporal attention where enabled). Contract tests alone do not establish gradient correctness.
 - Empty or invalid evaluation splits must return an error / unavailable result, never a numeric score that looks like success.
 
 ### Gate 1 — held-out language quality
@@ -71,7 +74,21 @@ Record at least:
 
 Specify hardware, power mode, GPU/CPU driver/runtime, compiler flags, Cargo features, quantization, thread count, and thermal conditions. Compare on the same physical machine where possible. Do not combine figures measured on different hardware into a single speedup claim.
 
-## 4. Provisional acceptance thresholds
+## 4. Context-compute allocation experiment
+
+Do not assume that increasing free-form thought tokens is the best way to spend inference compute. Include these alternatives on the same held-out long-context tasks:
+
+1. **Static:** no test-time parameter/state update; answer using the original recurrent state and available context.
+2. **More rehearsal:** spend an explicitly measured additional token/FLOP budget on internal analysis or candidate generation.
+3. **Targeted update:** update only a small temporary adapter or context-local state using unlabeled context or a permitted support prefix; never use the answer key or held-out target in the update.
+4. **Associative retrieval:** use bounded HDC-keyed memory to select relevant records, then answer with the same language backbone.
+5. **Hybrid:** targeted retrieval plus a small context-local update, measured separately from the cost of producing the answer.
+
+Match or report the actual total budget (preprocessing, update, retrieval, answer generation, memory, and latency), rather than comparing only decode tokens. Test on long-context QA, multi-hop retrieval, summarization, conflict resolution and complex instruction following. Include a no-update control and a random/unrelated-context update as negative controls. Any temporary update must be reset between examples unless cross-example learning is the explicit experiment; otherwise leakage invalidates the result.
+
+This experiment is motivated by *Let's (not) just put things in Context: Test-Time Training for Long-context LLMs* (ICLR 2026), which reports substantial gains from targeted context-specific updates in its tested Qwen3-4B settings on subsets of LongBench-v2 and ZeroScrolls. Those results are evidence that the allocation of test-time compute is worth testing; they are not evidence that the same method will work for Liquid Broca. See https://proceedings.iclr.cc/paper_files/paper/2026/hash/b619cd6dcc986856b8a8da2b08d89396-Abstract-Conference.html.
+
+## 5. Provisional acceptance thresholds
 
 Finalize these thresholds before evaluation begins.
 
@@ -83,7 +100,7 @@ Finalize these thresholds before evaluation begins.
 
 Do not change thresholds after seeing outcomes. Any exploratory post-hoc analysis must be labelled separately.
 
-## 5. Evaluation receipt
+## 6. Evaluation receipt
 
 Every run must write a machine-readable receipt including:
 
@@ -97,13 +114,13 @@ Every run must write a machine-readable receipt including:
 
 The receipt should permit an independent person to answer: exactly what code ran, on what data and checkpoint, using what settings, and why is this number the reported result?
 
-## 6. Pareto selection rule
+## 7. Pareto selection rule
 
 Do not choose a single winner from an opaque weighted score. Plot quality versus latency and memory, with uncertainty intervals; identify Pareto-dominated configurations. Select a default only from configurations that clear the quality/reliability gates, then choose according to the actual deployment budget.
 
 A mechanism that increases quality slightly but doubles latency may be useful for a high-value offline task, while being inappropriate for edge generation. Preserve those distinctions.
 
-## 7. Industry and research baselines
+## 8. Industry and research baselines
 
 Use the following papers and evaluation frameworks as comparison references, not as directly transferable score claims:
 
@@ -111,12 +128,13 @@ Use the following papers and evaluation frameworks as comparison references, not
 - RWKV-7 "Goose": https://arxiv.org/abs/2503.14456
 - xLSTM 7B, ICML 2025: https://proceedings.mlr.press/v267/beck25b.html
 - EleutherAI lm-evaluation-harness: https://github.com/EleutherAI/lm-evaluation-harness
-- HELMET long-context benchmark: https://arxiv.org/abs/2410.02694
+- HELMET long-context benchmark: https://arxiv.org/abs/2410.02694 (seven application-centric categories; the ICLR 2025 paper reports weak correlation between simple needle-in-a-haystack performance and downstream long-context quality).
 - HELM Long Context leaderboard and transparent run details: https://crfm.stanford.edu/helm/long-context/latest/
+- Context-specific test-time training (ICLR 2026): https://proceedings.iclr.cc/paper_files/paper/2026/hash/b619cd6dcc986856b8a8da2b08d89396-Abstract-Conference.html
 
 Published claims use different scales, training data, hardware, and inference stacks. The fairest achievable comparison here is against local baselines run under matching budgets; any broader industry comparison must explicitly state incompatibilities.
 
-## 8. What would count as a paradigm-level win?
+## 9. What would count as a paradigm-level win?
 
 The most interesting prospective result is not "all features enabled wins." It is a compact design where:
 
