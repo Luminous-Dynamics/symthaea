@@ -6,11 +6,12 @@
 
 ## What is implemented
 
-The test-only module `physics::casting_optimization_benchmark` implements a deterministic, finite-cost evaluation harness with three non-adaptive sampling designs:
+The test-only module `physics::casting_optimization_benchmark` implements a deterministic, finite-cost evaluation harness with four sampling strategies:
 
 - seeded uniform random sampling;
 - uniform grid sampling;
-- seeded two-dimensional Latin-hypercube sampling with one sample in each stratum per dimension.
+- seeded two-dimensional Latin-hypercube sampling with one sample in each stratum per dimension;
+- an **adaptive nearest-neighbor explore/exploit baseline** with a four-point LHS warm start, followed by a frozen candidate-lattice score: nearest observed objective minus a fixed distance-based exploration bonus.
 
 It defines six synthetic cases with known objective minima:
 
@@ -23,19 +24,21 @@ It defines six synthetic cases with known objective minima:
 
 Every record stores the chosen point, status, fidelity, evaluation-only ground-truth value, observed objective where available, cost units and cumulative cost. A run receipt retains all records and a domain-separated BLAKE3 transcript digest. Failed and infeasible attempts are recorded and charged. Zero budget and cumulative-cost overflow fail closed.
 
-The paired comparison helper runs all three sampling designs over the same ordered seed list and reports per-design run count, median simple regret, target hit rate, median cost-to-target among successful runs, and mean cost units per run. The target hit rate is essential because the conditional cost among successful runs alone would omit strategies that never reached the target.
+The adaptive strategy is **not Bayesian optimization**: it does not fit a Gaussian process or calibrated posterior. It is a transparent sequential baseline for later comparison with a properly specified BO implementation. Its proposer takes the past trial transcript as input and uses prior observed objectives; an authored negative-control test mutates the evaluation-only truth field and verifies that the next proposal remains unchanged.
+
+The paired comparison helper runs all four strategies over the same ordered seed list and reports per-strategy run count, median simple regret, target hit rate, median cost-to-target among successful runs, and mean cost units per run. The target hit rate is essential because the conditional cost among successful runs alone would omit strategies that never reached the target.
 
 ## Important scope limits
 
-This is the **first executable baseline tranche**, not the complete CASTING-002A benchmark. It does not yet implement adaptive Bayesian optimization, multi-fidelity acquisition, a DOE/response-surface solver, or a foundry solver adapter. The fidelity discrepancy exists to stress later method-selection code; no adaptive method currently decides when to purchase a low- or high-fidelity evaluation.
+This is the **first executable baseline tranche**, not the complete CASTING-002A benchmark. It does not yet implement Bayesian optimization, multi-fidelity acquisition, a DOE/response-surface solver, or a foundry solver adapter. The fidelity discrepancy exists to stress later method-selection code; no adaptive method currently decides when to purchase a low- or high-fidelity evaluation.
 
-The synthetic objective is not a casting-physics model. No observed objective, regret score, cost unit, or synthetic failure corresponds to real material, equipment, energy, yield, defect rate, or production cost. The ground-truth objective is retained in evaluation receipts only after each fixed design has selected its query points; samplers do not choose points by inspecting unqueried truth.
+The synthetic objective is not a casting-physics model. No observed objective, regret score, cost unit, or synthetic failure corresponds to real material, equipment, energy, yield, defect rate, or production cost. The ground-truth objective is retained in evaluation receipts for the evaluator; query selection does not use unqueried candidate truth. The adaptive proposer is explicitly checked not to read the evaluation-only truth field from prior records.
 
 The arbitrary cost schedule is deliberately explicit: one unit per low-fidelity call and ten per high-fidelity call. These are normalized experimental design weights, **not currency, compute-energy measurements, or a realistic foundry cost model**. Future work must use a preregistered schedule grounded in the actual comparison.
 
 ## Test inventory
 
-The 11 authored tests cover:
+The 13 authored tests cover:
 - known-answer minima and feasibility at each declared optimum;
 - equal query budgets, complete status counts, cumulative cost accounting and non-negative regret;
 - exact replay of records, metrics and transcript digest at a fixed seed;
@@ -45,7 +48,9 @@ The 11 authored tests cover:
 - low-/high-fidelity cost and intentionally biased low-fidelity observations;
 - repeatable, seed-sensitive heteroscedastic noise;
 - zero-budget refusal;
-- paired-seed summaries and rejection of an empty seed set.
+- paired-seed summaries and rejection of an empty seed set;
+- adaptive proposal independence from the evaluation-only truth field and no repeated candidate points;
+- adaptive determinism and inclusion in paired summaries.
 
 Test command:
 
