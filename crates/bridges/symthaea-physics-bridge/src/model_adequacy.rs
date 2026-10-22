@@ -194,7 +194,13 @@ pub fn next_discovery_action(snapshot: DiscoverySnapshot) -> DiscoveryAction {
     }
 
     if snapshot.live_candidate_count == 0 {
-        return DiscoveryAction::ReportEmptySetWithoutAdequacyEvidence;
+        return if snapshot.termination.can_continue() {
+            // An empty candidate set is not itself a diagnosis. When measurements/model
+            // expansion remain available, reopen search without asserting misspecification.
+            DiscoveryAction::ReopenCandidateSearch
+        } else {
+            DiscoveryAction::ReportEmptySetWithoutAdequacyEvidence
+        };
     }
 
     if snapshot.live_candidate_count > 1 {
@@ -271,13 +277,22 @@ mod tests {
     };
 
     #[test]
-    fn empty_candidate_set_is_not_automatically_misspecification() {
+    fn empty_candidate_set_reopens_search_without_claiming_misspecification() {
         assert_eq!(
             next_discovery_action(snapshot(
                 0,
                 AdequacyAssessment::NotEvaluated,
                 ValidationStatus::NotStarted,
                 TerminationStatus::Active,
+            )),
+            DiscoveryAction::ReopenCandidateSearch
+        );
+        assert_eq!(
+            next_discovery_action(snapshot(
+                0,
+                AdequacyAssessment::NotEvaluated,
+                ValidationStatus::NotStarted,
+                TerminationStatus::CandidatePoolExhausted,
             )),
             DiscoveryAction::ReportEmptySetWithoutAdequacyEvidence
         );
