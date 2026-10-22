@@ -51,6 +51,27 @@ Use the same task, simulation step, action bounds, observation access, episode h
 
 Include a published algorithm such as SODA-MPC or conformalized SLS-MPC in a **headline comparison only** after its method is either reproduced on the same task or adapted with a documented mathematical mapping, pinned implementation, matched information access, and comparable tuning/compute budget. SODA-MPC's published demonstration uses learned pedestrian prediction in autonomous driving; its reported results are not directly comparable to CartPole or Quadrotor. The 2026 conformalized SLS-MPC work uses state/control-dependent uncertainty and volume-optimized reachable sets; it is a key methodological reference, not evidence that this prototype implements or beats it.
 
+## 3A. Active falsification and model-update evaluation
+
+Add a distinct experiment arm for safety-constrained active model discrimination. The candidate action must be certified against a **single conservative hull of all still-plausible models**, with a common safe continuation. Do not union model-specific safe-action sets when their future continuations differ.
+
+Compare passive global/state-action robust shielding with:
+- random selection among certified actions;
+- a task-greedy certified action;
+- maximum worst-pair prediction-box separation among certified actions;
+- a principled information-gain method where a validated observation likelihood is available.
+
+Charge every probe against a predeclared mission/exploration cost budget. For each probe, retain the before/after hypothesis set, observed transition, uncertainty geometry, runtime cost, task reward and safety outcomes. After the measured transition, retain only model hypotheses consistent with the predeclared observation-noise set; recompute the reachable hull and viable-action set from those hypotheses.
+
+Required outcomes:
+- Report the fraction of probes that are actually informative, the posterior hypothesis-count/uncertainty reduction, and the change in certified-action availability. Selecting a probe is not itself evidence that uncertainty fell.
+- Record model-family falsification when the observation is inconsistent with every candidate. The result is an explicit unknown/uncertified state: do not silently reset to the prior, use the closest candidate without justification, or issue a certificate.
+- Separate true-plant membership (known to the evaluator) from membership of the observation's compatibility set (known only from noisy measurement). Compatibility is not proof that a candidate is the true plant.
+- Report false model eliminations caused by noise, unidentifiable model pairs, and cases where a safely informative action does not exist.
+- Compare methods after a fixed probe/interaction budget and at matched violation bounds. The primary benefit metric is the subsequent safety–capability frontier (e.g. false vetoes, viable-action availability and task reward), not the raw count of selected probes.
+
+For the maximum-separation baseline, use its name accurately: a min-over-model-pairs distance between prediction sets is a geometric distinguishability proxy. Do not call it mutual information or Bayesian information gain without specifying and validating a probabilistic observation model.
+
 ## 4. Separation of data and information
 
 Use separate, disjoint episode seeds for model fitting, uncertainty/calibration, threshold selection, and final evaluation. Never tune an envelope, alarm threshold, or controller hyperparameter on evaluation results.
