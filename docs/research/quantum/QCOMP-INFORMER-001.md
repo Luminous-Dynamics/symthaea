@@ -30,6 +30,14 @@ Keep two benchmark cohorts separate:
 
 The official [qReduMIS package README](https://github.com/jpmorganchase/qReduMIS/blob/main/qReduMIS_package/README.md) explicitly notes that its example problem is fully reducible and does not need to call the quantum backend. Therefore, a demo or passing unit test is not backend evidence: instrumentation must confirm whether a backend call actually occurred, count calls/shots, and label no-call runs as classical-only execution.
 
+### Additional contemporary comparator: fixed-angle QAOA-informed greedy
+
+Wybo et al., *A scalable quantum-enhanced greedy algorithm for maximum independent set problems* (preprint https://arxiv.org/abs/2601.21923; accepted by Physical Review Research on 19 October 2026, https://doi.org/10.1103/ds1n-wsdm), is another distinct prior-art architecture. It uses fixed QAOA angles derived from regular-tree neighborhoods to score local vertex inclusion expectations, then chooses among greedy candidates and incrementally updates affected neighborhoods. It is not the same approach as qReduMIS kernelization.
+
+The paper reports random 3-regular graph experiments for N = 50, 100, 200, 500, 1,000, 2,000, and 5,000; 200 graph instances per size for QGreedy analyses; tensor-network local-expectation calculations through p = 4; and a 20-qubit IQM Garnet experiment. Its reported p = 4 improvement against the linear-prioritized-search baseline applies to its stated random-regular cohort and through N <= 2,000. The authors also describe cases where p = 3 light cones exceed the device's 20-qubit capacity. Treat these as paper-reported results, not as Symthaea measurements or as evidence of wins on arbitrary graph families.
+
+A companion reproduction/stress-test workstream is tracked in [QCOMP-QGREEDY-001 / issue #8332](https://github.com/Luminous-Dynamics/symthaea/issues/8332). Keep its random-regular reproduction cohort and greedy algorithm costs separate from the qReduMIS paper cohort and QOBLIB generalization cohort below. For the fixed-reducer informer study in this document, QGreedy is a separate algorithm-family comparator, not a drop-in substitute for one arm of the matched reducer matrix.
+
 ## 3. Paradigm shift: compute the value of information
 
 Do not optimize the quantum subroutine in isolation. Treat the informer as a budgeted signal source and measure its incremental effect on the downstream reducer.
