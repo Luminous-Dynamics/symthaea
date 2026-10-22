@@ -27,6 +27,7 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-risk-eprocess-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-alpha-spending-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-persistent-eprocess-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-dependent-risk-null-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
@@ -38,6 +39,7 @@ source_files=(
   "docs/research/EPROCESS_LIFETIME_ALPHA_SPENDING_V1.md"
   "docs/research/EPROCESS_PERSISTENT_VS_RESET_V1.md"
   "docs/research/EPROCESS_DURABLE_CHECKPOINTS_V1.md"
+  "docs/research/EPROCESS_DEPENDENT_NULL_VALIDATION_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -75,6 +77,8 @@ alpha_spending_out="${out_base}-alpha-spending.csv"
 alpha_spending_summary_out="${out_base}-alpha-spending-summary.csv"
 persistent_eprocess_out="${out_base}-persistent-eprocess.csv"
 persistent_eprocess_summary_out="${out_base}-persistent-eprocess-summary.csv"
+dependent_risk_out="${out_base}-dependent-risk-null.csv"
+dependent_risk_summary_out="${out_base}-dependent-risk-null-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -1306,6 +1310,199 @@ if ! awk -F, '
   exit 1
 fi
 
+# Stress bounded-risk e-processes under a Markov-dependent null whose conditional
+# loss probability is <= epsilon in every latent state, plus a shifted alternative.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-dependent-risk-null-bench -- \
+  "$tmpdir/dependent-risk-a.csv" "$tmpdir/dependent-risk-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-dependent-risk-null-bench -- \
+  "$tmpdir/dependent-risk-b.csv" "$tmpdir/dependent-risk-summary-b.csv"
+if ! cmp -s "$tmpdir/dependent-risk-a.csv" "$tmpdir/dependent-risk-b.csv" ||
+   ! cmp -s "$tmpdir/dependent-risk-summary-a.csv" "$tmpdir/dependent-risk-summary-b.csv"; then
+  printf 'FAIL: repeated dependent-risk outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  function nibble_value(c) {
+    return index("0123456789abcdef", c) - 1
+  }
+  NR == 1 {
+    if (NF != 18 || $1 != "condition" || $7 != "loss_trace_hex" ||
+        $8 != "regime_trace_hex") failed = 1
+    next
+  }
+  {
+    if (NF != 18) failed = 1
+    if ($1 != "conditional_risk_null" && $1 != "shifted_risk") failed = 1
+    if ($2 !~ /^[0-9]+$/ || $2 < 0 || $2 >= 3000) failed = 1
+    if ($3 != 700000 + $2 * 7919) failed = 1
+    if ($4 !~ /^[0-9]+$/ || $4 > 400 ||
+        $5 !~ /^[0-9]+$/ || $5 > 400 ||
+        $6 !~ /^[0-9]+$/ || $6 > 400) failed = 1
+    if (length($7) != 100 || $7 !~ /^[0-9a-f]+$/ ||
+        length($8) != 100 || $8 !~ /^[0-9a-f]+$/) failed = 1
+    for (i = 9; i <= 9; i++) if ($i != "true" && $i != "false") failed = 1
+    for (i = 11; i <= 11; i++) if ($i != "true" && $i != "false") failed = 1
+    for (i = 14; i <= 14; i++) if ($i != "true" && $i != "false") failed = 1
+    if ($16 != "true" && $16 != "false") failed = 1
+    for (i = 10; i <= 17; i += (i == 10 ? 2 : (i == 12 ? 1 : 2))) {
+      if ($i != "NA" && ($i !~ /^[0-9]+$/ || $i >= 400)) failed = 1
+    }
+    if ((($9 == "true") != ($10 != "NA")) ||
+        (($11 == "true") != ($12 != "NA")) ||
+        (($14 == "true") != ($15 != "NA")) ||
+        (($16 == "true") != ($17 != "NA"))) failed = 1
+    if ($13 !~ /^[0-9]+$/ || $13 > 20 ||
+        $18 !~ /^[0-9]+$/ || $18 > 20) failed = 1
+    if (($11 == "true") != ($13 > 0) || ($16 == "true") != ($18 > 0)) failed = 1
+
+    loss_count = 0
+    high_count = 0
+    transition_count = 0
+    previous_regime = 0
+    for (k = 1; k <= 100; k++) {
+      loss_nibble = nibble_value(substr($7, k, 1))
+      regime_nibble = nibble_value(substr($8, k, 1))
+      if (loss_nibble < 0 || regime_nibble < 0) failed = 1
+      for (bit = 3; bit >= 0; bit--) {
+        loss_bit = int(loss_nibble / (2 ^ bit)) % 2
+        regime_bit = int(regime_nibble / (2 ^ bit)) % 2
+        loss_count += loss_bit
+        high_count += regime_bit
+        if (regime_bit != previous_regime) transition_count++
+        previous_regime = regime_bit
+      }
+    }
+    if ($4 != loss_count || $5 != high_count || $6 != transition_count) failed = 1
+
+    key = $2
+    if ($1 == "conditional_risk_null") {
+      null_loss_trace[key] = $7
+      null_regime_trace[key] = $8
+    } else {
+      if (null_regime_trace[key] != $8) failed = 1
+      for (step = 0; step < 133; step++) {
+        nibble_index = int(step / 4) + 1
+        bit_position = 3 - (step % 4)
+        null_nibble = nibble_value(substr(null_loss_trace[key], nibble_index, 1))
+        shifted_nibble = nibble_value(substr($7, nibble_index, 1))
+        null_bit = int(null_nibble / (2 ^ bit_position)) % 2
+        shifted_bit = int(shifted_nibble / (2 ^ bit_position)) % 2
+        if (null_bit != shifted_bit) failed = 1
+      }
+    }
+
+    row_key = $1 SUBSEP $2
+    if (seen[row_key]++) failed = 1
+    rows++
+  }
+  END { if (NR != 6001 || rows != 6000 || failed) exit 1 }
+' "$tmpdir/dependent-risk-a.csv"; then
+  printf 'FAIL: dependent-risk raw schema, trace counts, pair alignment or alarm semantics are invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, -v raw="$tmpdir/dependent-risk-a.csv" '
+  function close_enough(actual, expected, tol) {
+    return actual + 0 >= expected - tol && actual + 0 <= expected + tol
+  }
+  function wilson_low(successes, trials,    p,z,z2,den,center,half) {
+    z = 1.959963984540054
+    z2 = z * z
+    p = successes / trials
+    den = 1 + z2 / trials
+    center = (p + z2 / (2 * trials)) / den
+    half = z / den * sqrt(p * (1 - p) / trials + z2 / (4 * trials * trials))
+    return (center - half < 0 ? 0 : center - half)
+  }
+  function wilson_high(successes, trials,    p,z,z2,den,center,half) {
+    z = 1.959963984540054
+    z2 = z * z
+    p = successes / trials
+    den = 1 + z2 / trials
+    center = (p + z2 / (2 * trials)) / den
+    half = z / den * sqrt(p * (1 - p) / trials + z2 / (4 * trials * trials))
+    return (center + half > 1 ? 1 : center + half)
+  }
+  BEGIN {
+    alarm_col[1] = 9; first_col[1] = 10; episodes_col[1] = 0
+    alarm_col[2] = 11; first_col[2] = 12; episodes_col[2] = 13
+    alarm_col[3] = 14; first_col[3] = 15; episodes_col[3] = 0
+    alarm_col[4] = 16; first_col[4] = 17; episodes_col[4] = 18
+    while ((getline line < raw) > 0) {
+      raw_line++
+      if (raw_line == 1) continue
+      split(line, f, ",")
+      condition = f[1]
+      trials[condition]++
+      loss_sum[condition] += f[4]
+      high_sum[condition] += f[5]
+      transition_sum[condition] += f[6]
+      for (strategy = 1; strategy <= 4; strategy++) {
+        alarmed = (f[alarm_col[strategy]] == "true")
+        alarm_count[condition, strategy] += alarmed
+        false_alarms[condition, strategy] +=
+            (condition == "conditional_risk_null" && alarmed)
+        missed_shifts[condition, strategy] +=
+            (condition == "shifted_risk" && !alarmed)
+        first = f[first_col[strategy]]
+        if (first != "NA") {
+          detection_sum[condition, strategy] += first
+          detection_count[condition, strategy]++
+        }
+        if (episodes_col[strategy] > 0) {
+          reset_alarm_episodes_sum[condition, strategy] += f[episodes_col[strategy]]
+        }
+      }
+    }
+    close(raw)
+  }
+  FNR == 1 {
+    if (NF != 38 || $1 != "condition" || $2 != "trials") failed = 1
+    next
+  }
+  {
+    condition = $1
+    if (condition != "conditional_risk_null" && condition != "shifted_risk") failed = 1
+    if ($2 != 3000 || trials[condition] != 3000) failed = 1
+    if (!close_enough($3, loss_sum[condition] / (3000 * 400), 0.000001)) failed = 1
+    if (!close_enough($4, high_sum[condition] / (3000 * 400), 0.000001)) failed = 1
+    if (!close_enough($5, transition_sum[condition] / 3000, 0.0001)) failed = 1
+
+    starts[1] = 6; starts[2] = 13; starts[3] = 21; starts[4] = 28
+    for (strategy = 1; strategy <= 4; strategy++) {
+      start = starts[strategy]
+      alarms = alarm_count[condition, strategy]
+      rate = alarms / 3000
+      if ($start != alarms ||
+          !close_enough($(start + 1), rate, 0.000001) ||
+          !close_enough($(start + 2), wilson_low(alarms, 3000), 0.000002) ||
+          !close_enough($(start + 3), wilson_high(alarms, 3000), 0.000002) ||
+          $(start + 4) != false_alarms[condition, strategy] ||
+          $(start + 5) != missed_shifts[condition, strategy]) failed = 1
+      if (detection_count[condition, strategy] == 0) {
+        if ($(start + 6) != "NA") failed = 1
+      } else if (!close_enough($(start + 6),
+          detection_sum[condition, strategy] / detection_count[condition, strategy],
+          0.00001)) failed = 1
+      if ((strategy == 2 || strategy == 4) &&
+          !close_enough($(start + 7),
+              reset_alarm_episodes_sum[condition, strategy] / 3000,
+              0.00001)) failed = 1
+      if (condition == "conditional_risk_null" && rate > 0.05) failed = 1
+    }
+    if (condition == "shifted_risk" &&
+        ($(22) < 0.90 || $(7) < 0.75 || $(14) < 0.50)) failed = 1
+    if (!close_enough($36, 0.05, 0.000001) ||
+        !close_enough($37, 0.15, 0.000001) || $38 != 133) failed = 1
+    summary_rows++
+  }
+  END { if (summary_rows != 2 || failed) exit 1 }
+' "$tmpdir/dependent-risk-summary-a.csv"; then
+  printf 'FAIL: dependent-risk summary does not independently match trial records or acceptance gates\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -1342,6 +1539,8 @@ cp "$tmpdir/alpha-spending-a.csv" "$alpha_spending_out"
 cp "$tmpdir/alpha-spending-summary-a.csv" "$alpha_spending_summary_out"
 cp "$tmpdir/persistent-eprocess-a.csv" "$persistent_eprocess_out"
 cp "$tmpdir/persistent-eprocess-summary-a.csv" "$persistent_eprocess_summary_out"
+cp "$tmpdir/dependent-risk-a.csv" "$dependent_risk_out"
+cp "$tmpdir/dependent-risk-summary-a.csv" "$dependent_risk_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -1389,6 +1588,10 @@ cp "$tmpdir/persistent-eprocess-summary-a.csv" "$persistent_eprocess_summary_out
   printf 'persistent_eprocess_rows_excluding_header=%s\n' "$(( $(wc -l < "$persistent_eprocess_out") - 1 ))"
   printf 'persistent_eprocess_summary_sha256=%s\n' "$(sha256sum "$persistent_eprocess_summary_out" | awk '{print $1}')"
   printf 'persistent_eprocess_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$persistent_eprocess_summary_out") - 1 ))"
+  printf 'dependent_risk_sha256=%s\n' "$(sha256sum "$dependent_risk_out" | awk '{print $1}')"
+  printf 'dependent_risk_rows_excluding_header=%s\n' "$(( $(wc -l < "$dependent_risk_out") - 1 ))"
+  printf 'dependent_risk_summary_sha256=%s\n' "$(sha256sum "$dependent_risk_summary_out" | awk '{print $1}')"
+  printf 'dependent_risk_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$dependent_risk_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -1412,4 +1615,6 @@ printf 'Lifetime alpha-spending frontier: %s\n' "$alpha_spending_out"
 printf 'Lifetime alpha-spending summary: %s\n' "$alpha_spending_summary_out"
 printf 'Persistent-vs-reset e-process frontier: %s\n' "$persistent_eprocess_out"
 printf 'Persistent-vs-reset e-process summary: %s\n' "$persistent_eprocess_summary_out"
+printf 'Dependent conditional-risk null frontier: %s\n' "$dependent_risk_out"
+printf 'Dependent conditional-risk null summary: %s\n' "$dependent_risk_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
