@@ -52,15 +52,18 @@ Use more than one evaluation tier:
 
 - **Rust-native regression suite:** fast, repeatable, and suitable for every commit. It measures Symthaea's local mechanics but is not an industry leaderboard.
 - **Private repository-level Rust tasks:** new, held-out bugs and feature requests authored after the evaluated system's training cutoff where possible. Grade against independent tests, hidden regression cases, and reviewer-defined behavioral constraints.
-- **SWE-Bench Pro V2:** a public, repository-level comparator. Its September 22, 2026 release describes 642 tasks across 11 repositories and additional validation controls. Reproduce its stated protocol rather than comparing numbers from different agent scaffolds.
-- **SWE-Bench Live Rust split:** useful for fresh, language-specific issue resolution, but treat leaderboard scores as time- and harness-specific rather than directly interchangeable with Pro V2.
+- **SWE-Bench Pro V2:** a later public, repository-level comparator. Its September 22, 2026 release describes 642 tasks across 11 repositories. Treat it as a candidate comparison set, not automatically valid ground truth; confirm the exact release, task IDs, execution harness, and quality audit before comparing scores.
+- **SWE-Bench Live Rust split:** useful for fresh, language-specific issue resolution, but treat leaderboard scores as time- and harness-specific rather than directly interchangeable with other suites.
+- **Terminal-Bench:** a complementary systems/terminal-agent testbed that covers work beyond editing one patch. Its maintainers recommend repeatedly checking oracle task behavior in the target sandbox, which is an appropriate minimum practice for our own fixtures.
 
-SWE-bench Verified should not be used as the sole frontier claim: OpenAI's February 23, 2026 audit recommended SWE-Bench Pro because Verified's public tasks are increasingly contaminated. Even Pro is not a perfect oracle; the benchmark itself should be independently audited and paired with private tasks.
+**Important benchmark caveat:** OpenAI's July 8, 2026 audit of the 731-task public SWE-Bench Pro split found the automated review flagged 200 tasks (27.4%) and a five-engineer annotation campaign identified 249 (34.1%) as broken/problematic; the article estimates about 30% broken and retracts its earlier recommendation to adopt Pro. This audit does not by itself prove the later 642-task Pro V2 release has the same defect rate. It does mean we must not infer quality from a benchmark name or version number: audit the exact task IDs we use and keep a private, independently validated Rust suite as the primary capability gate. SWE-bench Verified also has contamination risks and should not be the sole frontier claim.
 
 References:
 
+- OpenAI, *Separating signal from noise in coding evaluations* (2026-07-08): https://openai.com/index/separating-signal-from-noise-coding-evaluations/
 - OpenAI, *Why SWE-bench Verified no longer measures frontier coding capabilities* (2026-02-23): https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/
 - Scale AI, *SWE-Bench Pro V2* (2026-09-22): https://labs.scale.com/leaderboard/swe_bench_pro_public_v2
+- Terminal-Bench: https://github.com/harbor-framework/terminal-bench
 - SWE-Bench Live: https://swe-bench-live.github.io/
 - SWE-Bench Pro paper, ICML 2026: https://proceedings.mlr.press/v306/deng26f.html
 
