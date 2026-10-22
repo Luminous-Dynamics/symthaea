@@ -1,0 +1,686 @@
+//! Independent consistency auditor for coding_gcs_ablation_benchmark receipts.
+//!
+//! This checks internal arithmetic, task/run coverage, oracle controls and pairing.
+//! It does not independently execute the compiler or authenticate the runner. Use
+//! externally pinned source and manifest hashes when auditing results for publication.
+
+use serde_json::Value;
+use std::collections::HashMap;
+use std::env;
+use std::fs;
+
+fn is_hex(value: &str, expected_len: usize) -> bool {
+    value.len() == expected_len && value.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+fn str_field<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
+    value.get(key).and_then(Value::as_str)
+}
+
+fn u64_field(value: &Value, key: &str) -> Option<u64> {
+    value.get(key).and_then(Value::as_u64)
+}
+
+fn bool_field(value: &Value, key: &str) -> Option<bool> {
+    value.get(key).and_then(Value::as_bool)
+}
+
+fn nearly_equal(a: f64, b: f64) -> bool {
+    (a - b).abs() <= 1.0e-8_f64.max(a.abs().max(b.abs()) * 1.0e-8)
+}
+
+fn push_check(errors: &mut Vec<String>, condition: bool, message: impl Into<String>) {
+    if !condition {
+        errors.push(message.into());
+    }
+}
+
+fn read_f64(value: &Value, key: &str) -> Option<f64> {
+    value.get(key).and_then(Value::as_f64).filter(|v| v.is_finite())
+}
+
+fn manifest_digest(manifest: &[Value]) -> Option<String> {
+    let mut rows = Vec::with_capacity(manifest.len());
+    for task in manifest {
+        let id = str_field(task, "task_id")?;
+        let digest = str_field(task, "task_digest_blake3")?;
+        if !is_hex(digest, 64) {
+            return None;
+        }
+        rows.push(format!("{id}:{digest}"));
+    }
+    Some(blake3::hash(rows.join("\n").as_bytes()).to_hex().to_string())
+}
+
+fn score_success(run: &Value, expected: u64) -> bool {
+    expected > 0
+        && bool_field(run, "compiled") == Some(true)
+        && bool_field(run, "simulated") == Some(false)
+        && run.get("runtime_error").is_some_and(Value::is_null)
+        && u64_field(run, "tests_passed") == Some(expected)
+        && u64_field(run, "tests_failed") == Some(0)
+        && u64_field(run, "tests_passed").unwrap_or(0)
+            + u64_field(run, "tests_failed").unwrap_or(0)
+            == expected
+}
+
+fn oracle_complete(run: &Value, expected: u64) -> bool {
+    expected > 0
+        && bool_field(run, "compiled") == Some(true)
+        && bool_field(run, "simulated") == Some(false)
+        && run.get("runtime_error").is_some_and(Value::is_null)
+        && u64_field(run, "tests_passed").unwrap_or(0)
+            + u64_field(run, "tests_failed").unwrap_or(0)
+            == expected
+}
+
+fn verify_mode_summary(
+    summary: &Value,
+    selected_runs: &[&Value],
+    enabled: bool,
+    errors: &mut Vec<String>,
+) {
+    let label = if enabled { "gcs_on" } else { "gcs_off" };
+    let passed = selected_runs
+        .iter()
+        .filter(|run| bool_field(run, "behavioral_success") == Some(true))
+        .count() as u64;
+    let compiles = selected_runs
+        .iter()
+        .filter(|run| {
+            bool_field(run, "compiled") == Some(true)
+                && bool_field(run, "simulated") == Some(false)
+        })
+        .count() as u64;
+    let complete = selected_runs
+        .iter()
+        .filter(|run| bool_field(run, "oracle_complete") == Some(true))
+        .count() as u64;
+    let time_total: u64 = selected_runs
+        .iter()
+        .map(|run| u64_field(run, "agent_elapsed_ms").unwrap_or(0))
+        .sum();
+    let energy_total: f64 = selected_runs
+        .iter()
+        .map(|run| read_f64(run, "energy").unwrap_or(0.0))
+        .sum();
+    let count = selected_runs.len() as u64;
+    let checks = [
+        ("runs", count),
+        ("behavioral_successes", passed),
+        ("real_compiles", compiles),
+        ("complete_oracles", complete),
+        ("agent_elapsed_ms_total", time_total),
+    ];
+    for (key, expected) in checks {
+        push_check(
+            errors,
+            u64_field(summary, key) == Some(expected),
+            format!("summary.{label}.{key} must equal {expected}"),
+        );
+    }
+
+    for (key, expected) in [
+        ("pass_rate", if count == 0 { 0.0 } else { passed as f64 / count as f64 }),
+        ("complete_oracle_rate", if count == 0 { 0.0 } else { complete as f64 / count as f64 }),
+        ("agent_elapsed_ms_mean", if count == 0 { 0.0 } else { time_total as f64 / count as f64 }),
+        ("energy_total", energy_total),
+        ("energy_mean", if count == 0 { 0.0 } else { energy_total / count as f64 }),
+    ] {
+        push_check(
+            errors,
+            read_f64(summary, key).is_some_and(|actual| nearly_equal(actual, expected)),
+            format!("summary.{label}.{key} is inconsistent with individual runs"),
+        );
+    }
+}
+
+fn audit(
+    report: &Value,
+    expected_source_sha: Option<&str>,
+    expected_manifest_sha: Option<&str>,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+
+    push_check(
+        &mut errors,
+        u64_field(report, "schema_version") == Some(1),
+        "schema_version must be 1",
+    );
+    push_check(
+        &mut errors,
+        str_field(report, "benchmark") == Some("symthaea-coding-gcs-ablation-v1"),
+        "unexpected benchmark identifier",
+    );
+    let source_sha = str_field(report, "source_revision").unwrap_or("");
+    push_check(
+        &mut errors,
+        is_hex(source_sha, 40),
+        "source_revision must be a 40-character commit SHA; rerun with GIT_COMMIT_SHA set",
+    );
+    if let Some(expected) = expected_source_sha {
+        push_check(
+            &mut errors,
+            source_sha.eq_ignore_ascii_case(expected),
+            "source_revision does not match --expected-source-sha",
+        );
+    }
+
+    let Some(manifest) = report.get("task_manifest").and_then(Value::as_array) else {
+        return vec!["task_manifest must be an array".to_string()];
+    };
+    push_check(&mut errors, !manifest.is_empty(), "task_manifest must not be empty");
+    let computed_manifest_sha = manifest_digest(manifest);
+    push_check(
+        &mut errors,
+        computed_manifest_sha.as_deref() == str_field(report, "task_manifest_blake3"),
+        "task_manifest_blake3 does not match the manifest's ordered task IDs and task digests",
+    );
+    if let Some(expected) = expected_manifest_sha {
+        push_check(
+            &mut errors,
+            str_field(report, "task_manifest_blake3")
+                .is_some_and(|actual| actual.eq_ignore_ascii_case(expected)),
+            "task_manifest_blake3 does not match --expected-manifest-blake3",
+        );
+    }
+
+    let mut expected_counts: HashMap<String, u64> = HashMap::new();
+    let mut task_order: HashMap<String, usize> = HashMap::new();
+    for (index, task) in manifest.iter().enumerate() {
+        let id = str_field(task, "task_id").unwrap_or("");
+        let digest = str_field(task, "task_digest_blake3").unwrap_or("");
+        let reference_digest = str_field(task, "reference_source_blake3").unwrap_or("");
+        let test_digest = str_field(task, "test_source_blake3").unwrap_or("");
+        let expected = u64_field(task, "expected_test_functions").unwrap_or(0);
+        push_check(&mut errors, !id.is_empty(), format!("task_manifest[{index}] has empty task_id"));
+        push_check(
+            &mut errors,
+            is_hex(digest, 64) && is_hex(reference_digest, 64) && is_hex(test_digest, 64),
+            format!("task_manifest[{index}] has malformed BLAKE3 digest"),
+        );
+        push_check(
+            &mut errors,
+            expected > 0,
+            format!("task_manifest[{index}] must declare at least one expected test"),
+        );
+        push_check(
+            &mut errors,
+            !expected_counts.contains_key(id),
+            format!("duplicate task_id {id} in task_manifest"),
+        );
+        expected_counts.insert(id.to_string(), expected);
+        task_order.insert(id.to_string(), index);
+    }
+
+    let task_count = expected_counts.len() as u64;
+    let repeats = u64_field(report, "repeats").unwrap_or(0);
+    push_check(
+        &mut errors,
+        u64_field(report, "task_count") == Some(task_count),
+        "task_count does not match the manifest",
+    );
+    push_check(&mut errors, repeats > 0, "repeats must be positive");
+
+    let runtime = report.get("runtime_configuration").unwrap_or(&Value::Null);
+    push_check(
+        &mut errors,
+        bool_field(runtime, "external_oracle_real_exec") == Some(true),
+        "receipt does not assert real external-oracle execution",
+    );
+    push_check(
+        &mut errors,
+        bool_field(runtime, "compiled_with_geodesic_synthesis") == Some(true),
+        "receipt was not compiled with geodesic_synthesis",
+    );
+    push_check(
+        &mut errors,
+        bool_field(runtime, "agent_internal_real_exec") == Some(false),
+        "unexpected internal real-execution configuration for this benchmark",
+    );
+    push_check(
+        &mut errors,
+        str_field(report, "model_label").is_some_and(|value| !value.trim().is_empty()),
+        "model_label must be present",
+    );
+    push_check(
+        &mut errors,
+        matches!(str_field(report, "model_mode"), Some("native" | "ollama" | "cloud")),
+        "model_mode must be native, ollama, or cloud",
+    );
+
+    // Verify the preflight controls are present and align with the frozen task bank.
+    let controls = report.get("oracle_controls").unwrap_or(&Value::Null);
+    let references = controls.get("reference_controls").and_then(Value::as_array);
+    let empty_patches = controls.get("empty_patch_controls").and_then(Value::as_array);
+    push_check(
+        &mut errors,
+        bool_field(controls, "all_references_pass") == Some(true),
+        "oracle_controls.all_references_pass must be true",
+    );
+    push_check(
+        &mut errors,
+        bool_field(controls, "all_empty_patches_fail") == Some(true),
+        "oracle_controls.all_empty_patches_fail must be true",
+    );
+    push_check(
+        &mut errors,
+        references.is_some_and(|items| items.len() == expected_counts.len()),
+        "reference control count does not match task manifest",
+    );
+    push_check(
+        &mut errors,
+        empty_patches.is_some_and(|items| items.len() == expected_counts.len()),
+        "empty-patch control count does not match task manifest",
+    );
+
+    if let Some(items) = references {
+        let mut seen = HashMap::new();
+        for control in items {
+            let id = str_field(control, "task_id").unwrap_or("");
+            let expected = expected_counts.get(id).copied().unwrap_or(0);
+            push_check(&mut errors, expected > 0, format!("unknown reference-control task {id}"));
+            push_check(
+                &mut errors,
+                seen.insert(id.to_string(), ()).is_none(),
+                format!("duplicate reference-control task {id}"),
+            );
+            push_check(
+                &mut errors,
+                bool_field(control, "reference_passes") == Some(true)
+                    && bool_field(control, "oracle_complete") == Some(true)
+                    && u64_field(control, "tests_expected") == Some(expected)
+                    && u64_field(control, "tests_passed") == Some(expected)
+                    && u64_field(control, "tests_failed") == Some(0),
+                format!("reference control failed or has incomplete counts for task {id}"),
+            );
+            push_check(
+                &mut errors,
+                str_field(control, "reference_blake3").is_some_and(|s| is_hex(s, 64)),
+                format!("bad reference digest for task {id}"),
+            );
+        }
+        for id in expected_counts.keys() {
+            push_check(&mut errors, seen.contains_key(id), format!("missing reference control for task {id}"));
+        }
+    }
+    if let Some(items) = empty_patches {
+        let mut seen = HashMap::new();
+        for control in items {
+            let id = str_field(control, "task_id").unwrap_or("");
+            push_check(
+                &mut errors,
+                expected_counts.contains_key(id),
+                format!("unknown empty-patch control task {id}"),
+            );
+            push_check(
+                &mut errors,
+                seen.insert(id.to_string(), ()).is_none(),
+                format!("duplicate empty-patch control task {id}"),
+            );
+            push_check(
+                &mut errors,
+                bool_field(control, "empty_patch_fails") == Some(true),
+                format!("empty patch did not fail for task {id}"),
+            );
+            push_check(
+                &mut errors,
+                str_field(control, "empty_patch_blake3").is_some_and(|s| is_hex(s, 64)),
+                format!("bad empty-patch digest for task {id}"),
+            );
+        }
+        for id in expected_counts.keys() {
+            push_check(&mut errors, seen.contains_key(id), format!("missing empty-patch control for task {id}"));
+        }
+    }
+
+    let Some(runs) = report.get("runs").and_then(Value::as_array) else {
+        return errors.into_iter().chain(std::iter::once("runs must be an array".to_string())).collect();
+    };
+    let expected_runs = task_count.saturating_mul(repeats).saturating_mul(2);
+    push_check(
+        &mut errors,
+        runs.len() as u64 == expected_runs,
+        format!("runs has {} entries; expected {expected_runs}", runs.len()),
+    );
+
+    let mut pair_slots: HashMap<(String, u64), [Option<&Value>; 2]> = HashMap::new();
+    for (index, run) in runs.iter().enumerate() {
+        let id = str_field(run, "task_id").unwrap_or("");
+        let repeat = u64_field(run, "repeat").unwrap_or(0);
+        let expected = expected_counts.get(id).copied().unwrap_or(0);
+        let enabled = bool_field(run, "gcs_advisories_enabled");
+        push_check(
+            &mut errors,
+            expected > 0,
+            format!("runs[{index}] references unknown task {id}"),
+        );
+        push_check(
+            &mut errors,
+            repeat > 0 && repeat <= repeats,
+            format!("runs[{index}] has out-of-range repeat"),
+        );
+        push_check(
+            &mut errors,
+            u64_field(run, "expected_test_functions") == Some(expected),
+            format!("runs[{index}] expected test count differs from manifest"),
+        );
+        push_check(
+            &mut errors,
+            str_field(run, "generated_source_blake3").is_some_and(|s| is_hex(s, 64)),
+            format!("runs[{index}] has malformed generated-source digest"),
+        );
+
+        let complete = oracle_complete(run, expected);
+        push_check(
+            &mut errors,
+            bool_field(run, "oracle_complete") == Some(complete),
+            format!("runs[{index}] oracle_complete is inconsistent with execution counts"),
+        );
+        push_check(
+            &mut errors,
+            bool_field(run, "behavioral_success") == Some(score_success(run, expected)),
+            format!("runs[{index}] behavioral_success is inconsistent with fail-closed scoring"),
+        );
+        push_check(
+            &mut errors,
+            read_f64(run, "energy").is_some_and(|v| v >= 0.0),
+            format!("runs[{index}] energy must be finite and nonnegative"),
+        );
+        push_check(
+            &mut errors,
+            u64_field(run, "agent_elapsed_ms").is_some(),
+            format!("runs[{index}] missing agent_elapsed_ms"),
+        );
+        push_check(
+            &mut errors,
+            u64_field(run, "verification_elapsed_ms").is_some(),
+            format!("runs[{index}] missing verification_elapsed_ms"),
+        );
+
+        if let Some(enabled) = enabled {
+            let slot = if enabled { 1 } else { 0 };
+            let entry = pair_slots.entry((id.to_string(), repeat)).or_insert([None, None]);
+            push_check(
+                &mut errors,
+                entry[slot].is_none(),
+                format!("duplicate {} run for task {id} repeat {repeat}", if enabled { "GCS-on" } else { "GCS-off" }),
+            );
+            if entry[slot].is_none() {
+                entry[slot] = Some(run);
+            }
+        } else {
+            errors.push(format!("runs[{index}] missing gcs_advisories_enabled"));
+        }
+    }
+
+    let mut on_wins = 0_u64;
+    let mut off_wins = 0_u64;
+    let mut ties = 0_u64;
+    for (id, expected) in &expected_counts {
+        for repeat in 1..=repeats {
+            let Some(slots) = pair_slots.get(&(id.clone(), repeat)) else {
+                errors.push(format!("missing paired runs for task {id} repeat {repeat}"));
+                continue;
+            };
+            let (Some(off), Some(on)) = (slots[0], slots[1]) else {
+                errors.push(format!("pair incomplete for task {id} repeat {repeat}"));
+                continue;
+            };
+            let order = str_field(off, "execution_order").unwrap_or("");
+            push_check(
+                &mut errors,
+                order == str_field(on, "execution_order").unwrap_or(""),
+                format!("off/on execution order differs for task {id} repeat {repeat}"),
+            );
+            let idx = task_order.get(id).copied().unwrap_or(0) as u64;
+            let expected_order = if (idx + repeat - 1) % 2 == 0 {
+                "off_then_on"
+            } else {
+                "on_then_off"
+            };
+            push_check(
+                &mut errors,
+                order == expected_order,
+                format!("unexpected pair order for task {id} repeat {repeat}"),
+            );
+            push_check(
+                &mut errors,
+                u64_field(off, "expected_test_functions") == Some(*expected)
+                    && u64_field(on, "expected_test_functions") == Some(*expected),
+                format!("paired oracle counts disagree with manifest for task {id} repeat {repeat}"),
+            );
+
+            match (
+                bool_field(off, "behavioral_success") == Some(true),
+                bool_field(on, "behavioral_success") == Some(true),
+            ) {
+                (false, true) => on_wins += 1,
+                (true, false) => off_wins += 1,
+                _ => ties += 1,
+            }
+        }
+    }
+
+    let summary = report.get("summary").unwrap_or(&Value::Null);
+    let off_runs: Vec<&Value> = runs.iter().filter(|r| bool_field(r, "gcs_advisories_enabled") == Some(false)).collect();
+    let on_runs: Vec<&Value> = runs.iter().filter(|r| bool_field(r, "gcs_advisories_enabled") == Some(true)).collect();
+    verify_mode_summary(summary.get("gcs_off").unwrap_or(&Value::Null), &off_runs, false, &mut errors);
+    verify_mode_summary(summary.get("gcs_on").unwrap_or(&Value::Null), &on_runs, true, &mut errors);
+
+    let paired = summary.get("paired").unwrap_or(&Value::Null);
+    let pair_count = task_count.saturating_mul(repeats);
+    let expected_delta = if pair_count == 0 {
+        0.0
+    } else {
+        (on_wins as f64 - off_wins as f64) / pair_count as f64 * 100.0
+    };
+    push_check(
+        &mut errors,
+        u64_field(paired, "paired_task_trials") == Some(pair_count),
+        "summary.paired.paired_task_trials is inconsistent",
+    );
+    push_check(
+        &mut errors,
+        u64_field(paired, "gcs_on_wins") == Some(on_wins),
+        "summary.paired.gcs_on_wins is inconsistent with individual pairs",
+    );
+    push_check(
+        &mut errors,
+        u64_field(paired, "gcs_off_wins") == Some(off_wins),
+        "summary.paired.gcs_off_wins is inconsistent with individual pairs",
+    );
+    push_check(
+        &mut errors,
+        u64_field(paired, "ties") == Some(ties),
+        "summary.paired.ties is inconsistent with individual pairs",
+    );
+    push_check(
+        &mut errors,
+        on_wins + off_wins + ties == pair_count,
+        "paired outcomes do not sum to the expected pair count",
+    );
+    push_check(
+        &mut errors,
+        read_f64(paired, "net_pass_delta_percentage_points")
+            .is_some_and(|actual| nearly_equal(actual, expected_delta)),
+        "summary.paired.net_pass_delta_percentage_points is inconsistent",
+    );
+
+    errors
+}
+
+fn print_usage(program: &str) {
+    eprintln!(
+        "Usage: {program} RECEIPT.json [--expected-source-sha <40-hex>] [--expected-manifest-blake3 <64-hex>]\n\
+         Without external pins, this checks receipt consistency only; use both pins for a stronger audit."
+    );
+}
+
+fn main() {
+    let mut args = env::args();
+    let program = args.next().unwrap_or_else(|| "coding_gcs_ablation_verify".into());
+    let Some(path) = args.next() else {
+        print_usage(&program);
+        std::process::exit(2);
+    };
+    if path == "--help" || path == "-h" {
+        print_usage(&program);
+        return;
+    }
+
+    let mut expected_source_sha: Option<String> = None;
+    let mut expected_manifest_sha: Option<String> = None;
+    let rest: Vec<String> = args.collect();
+    let mut index = 0;
+    while index < rest.len() {
+        let option = rest[index].as_str();
+        if index + 1 >= rest.len() {
+            eprintln!("Missing value for {option}");
+            print_usage(&program);
+            std::process::exit(2);
+        }
+        match option {
+            "--expected-source-sha" => expected_source_sha = Some(rest[index + 1].clone()),
+            "--expected-manifest-blake3" => expected_manifest_sha = Some(rest[index + 1].clone()),
+            _ => {
+                eprintln!("Unknown option: {option}");
+                print_usage(&program);
+                std::process::exit(2);
+            }
+        }
+        index += 2;
+    }
+
+    if expected_source_sha.as_deref().is_some_and(|s| !is_hex(s, 40)) {
+        eprintln!("--expected-source-sha must be 40 hexadecimal characters");
+        std::process::exit(2);
+    }
+    if expected_manifest_sha.as_deref().is_some_and(|s| !is_hex(s, 64)) {
+        eprintln!("--expected-manifest-blake3 must be 64 hexadecimal characters");
+        std::process::exit(2);
+    }
+
+    let input = match fs::read_to_string(&path) {
+        Ok(input) => input,
+        Err(error) => {
+            eprintln!("Cannot read receipt {}: {error}", path);
+            std::process::exit(2);
+        }
+    };
+    let report: Value = match serde_json::from_str(&input) {
+        Ok(report) => report,
+        Err(error) => {
+            eprintln!("Invalid JSON receipt: {error}");
+            std::process::exit(2);
+        }
+    };
+
+    let errors = audit(
+        &report,
+        expected_source_sha.as_deref(),
+        expected_manifest_sha.as_deref(),
+    );
+    if errors.is_empty() {
+        println!("RECEIPT CONSISTENT");
+        println!("Tasks: {}", u64_field(&report, "task_count").unwrap_or(0));
+        println!("Repeats: {}", u64_field(&report, "repeats").unwrap_or(0));
+        println!(
+            "Paired trials: {}",
+            report.pointer("/summary/paired/paired_task_trials")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+        );
+        println!(
+            "Task manifest BLAKE3: {}",
+            str_field(&report, "task_manifest_blake3").unwrap_or("<missing>")
+        );
+        println!(
+            "External source pin: {}",
+            if expected_source_sha.is_some() { "matched" } else { "not supplied" }
+        );
+        println!(
+            "External manifest pin: {}",
+            if expected_manifest_sha.is_some() { "matched" } else { "not supplied" }
+        );
+        println!("Caveat: consistency checks are not independent execution or authenticated attestation.");
+    } else {
+        eprintln!("RECEIPT REJECTED: {} problem(s)", errors.len());
+        for (index, error) in errors.iter().enumerate() {
+            eprintln!("{}. {error}", index + 1);
+        }
+        std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn digest_format_is_exact() {
+        assert!(is_hex(&"a".repeat(64), 64));
+        assert!(!is_hex(&"g".repeat(64), 64));
+        assert!(!is_hex(&"a".repeat(63), 64));
+        assert!(!is_hex(&"a".repeat(65), 64));
+    }
+
+    #[test]
+    fn manifest_digest_binds_order_and_identifiers() {
+        let task = |id: &str, digest: &str| {
+            serde_json::json!({"task_id": id, "task_digest_blake3": digest})
+        };
+        let a = task("a", &"a".repeat(64));
+        let b = task("b", &"b".repeat(64));
+        let forward = manifest_digest(&[a.clone(), b.clone()]).unwrap();
+        let reverse = manifest_digest(&[b.clone(), a.clone()]).unwrap();
+        let renamed = manifest_digest(&[task("x", &"a".repeat(64)), b]).unwrap();
+        assert_eq!(forward.len(), 64);
+        assert_ne!(forward, reverse);
+        assert_ne!(forward, renamed);
+    }
+
+    #[test]
+    fn score_requires_complete_real_behavioral_evidence() {
+        let base = serde_json::json!({
+            "compiled": true,
+            "simulated": false,
+            "runtime_error": null,
+            "tests_passed": 3,
+            "tests_failed": 0
+        });
+        assert!(score_success(&base, 3));
+        assert!(!score_success(&base, 4));
+        assert!(!score_success(&base, 0));
+
+        let mut no_compile = base.clone();
+        no_compile["compiled"] = Value::Bool(false);
+        assert!(!score_success(&no_compile, 3));
+
+        let mut simulated = base.clone();
+        simulated["simulated"] = Value::Bool(true);
+        assert!(!score_success(&simulated, 3));
+
+        let mut runtime_error = base.clone();
+        runtime_error["runtime_error"] = Value::String("runner failed".to_string());
+        assert!(!score_success(&runtime_error, 3));
+
+        let mut failed_test = base.clone();
+        failed_test["tests_failed"] = Value::from(1);
+        failed_test["tests_passed"] = Value::from(2);
+        assert!(!score_success(&failed_test, 3));
+    }
+
+    #[test]
+    fn oracle_completeness_is_not_the_same_as_success() {
+        let run = serde_json::json!({
+            "compiled": true,
+            "simulated": false,
+            "runtime_error": null,
+            "tests_passed": 2,
+            "tests_failed": 1
+        });
+        assert!(oracle_complete(&run, 3));
+        assert!(!score_success(&run, 3));
+    }
+}
