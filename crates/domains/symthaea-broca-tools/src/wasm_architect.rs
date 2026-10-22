@@ -53,7 +53,7 @@ fn signed_artifact_message_v2(
     precompiled_bytes: &[u8],
     compat_hash: u64,
 ) -> Vec<u8> {
-    const DOMAIN: &[u8] = b"SYMTHAEA-WASM-AOT-ARTIFACT/v2\\0";
+    const DOMAIN: &[u8] = b"SYMTHAEA-WASM-AOT-ARTIFACT/v2\0";
 
     let mut message = Vec::with_capacity(
         DOMAIN.len() + 2 + 8 + wasm_bytes.len() + 8 + precompiled_bytes.len() + 8,
