@@ -711,6 +711,13 @@ fn mean_on_off(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adequacy_calibration::{
+        ConformalAdequacyCalibrator, standardized_rms_residual,
+    };
+    use crate::model_adequacy::{
+        DiscoveryAction, DiscoverySnapshot, TerminationStatus, ValidationStatus,
+        next_discovery_action,
+    };
 
     type SelectorPair = (bool, bool, usize, usize, bool);
 
@@ -736,6 +743,63 @@ mod tests {
         misspec_robust_selection_failed: bool,
         misspec_nominal_rounds: usize,
         misspec_robust_rounds: usize,
+    }
+
+    /// Generate a batch-level predictive residual score without exposing the hidden
+    /// discrepancy amplitude to the detector. Each batch uses its own deterministic seed.
+    fn conformal_audit_batch_score(seed: u64, discrepancy_amplitude: f64) -> f64 {
+        const BATCH_SIZE: usize = 12;
+        let mut setup_rng = seed ^ 0x5EED_0000_0000_0001;
+        let probes: Vec<Experiment> = (0..GT_SANITY_PROBES)
+            .map(|_| random_experiment(&mut setup_rng))
+            .collect();
+        let ground_truth = nontrivial_ground_truth(&mut setup_rng, &probes);
+        let mut point_rng = seed ^ 0xCA11_BA7C_0000_0001;
+        let mut noise_rng = seed ^ 0xA11D_1700_0000_0002;
+        let mut observed = Vec::with_capacity(BATCH_SIZE);
+        let mut predicted = Vec::with_capacity(BATCH_SIZE);
+        let mut scales = Vec::with_capacity(BATCH_SIZE);
+
+        for _ in 0..GEN_ATTEMPT_CAP {
+            if observed.len() == BATCH_SIZE {
+                break;
+            }
+            let point = random_experiment(&mut point_rng);
+            let Some(prediction) = eval_at(&ground_truth, &point) else {
+                continue;
+            };
+            if prediction.abs() > 1.0e6 {
+                continue;
+            }
+
+            let coordinates: Vec<f64> = point.iter().map(|(_, value)| *value).collect();
+            let discrepancy_wave = coordinates
+                .iter()
+                .enumerate()
+                .map(|(index, value)| (value * (3.0 + index as f64)).sin())
+                .sum::<f64>()
+                / coordinates.len().max(1) as f64;
+            let simulated_observation = prediction
+                + discrepancy_amplitude * (1.0 + prediction.abs()) * discrepancy_wave;
+            let actual_noise_scale =
+                NOISE_SIGMA_FRACTION * (1.0 + simulated_observation.abs());
+            let measurement =
+                simulated_observation + rand_gaussian(&mut noise_rng, actual_noise_scale);
+            let predictive_scale = NOISE_SIGMA_FRACTION * (1.0 + prediction.abs());
+            if measurement.is_finite() && predictive_scale.is_finite() && predictive_scale > 0.0 {
+                observed.push(measurement);
+                predicted.push(prediction);
+                scales.push(predictive_scale);
+            }
+        }
+
+        assert_eq!(
+            observed.len(),
+            BATCH_SIZE,
+            "fixed seed should yield a complete finite audit batch"
+        );
+        standardized_rms_residual(&observed, &predicted, &scales)
+            .expect("generated residual batch must have a finite score")
     }
 
     /// Paired percentile bootstrap over seed/world outcomes. Every resample carries the raw
@@ -1168,6 +1232,80 @@ mod tests {
         assert!(clean_ci_low.is_finite() && clean_ci_high.is_finite());
         assert!(clean_eig_successes <= SEEDS as usize);
         assert!(clean_audit_successes <= SEEDS as usize);
+    }
+
+    /// Diagnostic pilot: calibrate on clean batches, then report false alarms and
+    /// misspecification detections on disjoint clean/perturbed audit seeds. This test deliberately
+    /// does not assert that the detector wins; it asserts only valid probability accounting and a
+    /// loose upper bound against gross false-alarm regressions.
+    #[test]
+    fn conformal_adequacy_calibration_reports_clean_and_perturbed_audit_rates() {
+        const CALIBRATION_BATCHES: usize = 80;
+        const AUDIT_BATCHES: usize = 50;
+        const ALPHA: f64 = 0.05;
+        const DISCREPANCY_AMPLITUDE: f64 = 0.12;
+
+        let calibration_scores: Vec<f64> = (0..CALIBRATION_BATCHES)
+            .map(|index| conformal_audit_batch_score(10_000 + index as u64, 0.0))
+            .collect();
+        let calibrator = ConformalAdequacyCalibrator::new(&calibration_scores, ALPHA)
+            .expect("enough independent clean calibration batches");
+
+        let mut clean_false_alarms = 0usize;
+        let mut misspecified_detections = 0usize;
+        let mut clean_non_alarm_actions = 0usize;
+        for index in 0..AUDIT_BATCHES {
+            let clean = calibrator
+                .assess_audit_score(
+                    conformal_audit_batch_score(20_000 + index as u64, 0.0),
+                    true,
+                )
+                .expect("clean audit batch is independent");
+            let clean_action = next_discovery_action(DiscoverySnapshot {
+                live_candidate_count: 1,
+                adequacy: clean.assessment,
+                validation: ValidationStatus::InProgress,
+                termination: TerminationStatus::Active,
+            });
+            if clean_action == DiscoveryAction::ReportModelSpaceInadequate {
+                clean_false_alarms += 1;
+            } else if clean_action == DiscoveryAction::ValidateProvisionalSingleton {
+                clean_non_alarm_actions += 1;
+            }
+
+            let perturbed = calibrator
+                .assess_audit_score(
+                    conformal_audit_batch_score(
+                        30_000 + index as u64,
+                        DISCREPANCY_AMPLITUDE,
+                    ),
+                    true,
+                )
+                .expect("perturbed audit batch is independent of calibration");
+            let action = next_discovery_action(DiscoverySnapshot {
+                live_candidate_count: 1,
+                adequacy: perturbed.assessment,
+                validation: ValidationStatus::InProgress,
+                termination: TerminationStatus::Active,
+            });
+            if action == DiscoveryAction::ReportModelSpaceInadequate {
+                misspecified_detections += 1;
+            }
+        }
+
+        let clean_false_alarm_rate = clean_false_alarms as f64 / AUDIT_BATCHES as f64;
+        let detection_rate = misspecified_detections as f64 / AUDIT_BATCHES as f64;
+        println!(
+            "conformal_adequacy_pilot,calibration_batches={CALIBRATION_BATCHES},audit_batches={AUDIT_BATCHES},alpha={ALPHA},discrepancy={DISCREPANCY_AMPLITUDE},clean_false_alarm_rate={clean_false_alarm_rate:.3},misspecification_detection_rate={detection_rate:.3},clean_non_alarm_actions={clean_non_alarm_actions}"
+        );
+
+        assert_eq!(clean_false_alarms + clean_non_alarm_actions, AUDIT_BATCHES);
+        assert!((0.0..=1.0).contains(&clean_false_alarm_rate));
+        assert!((0.0..=1.0).contains(&detection_rate));
+        assert!(
+            clean_false_alarm_rate <= 0.20,
+            "clean false-alarm rate indicates a gross calibration failure: {clean_false_alarm_rate}"
+        );
     }
 
     /// Landscape audit (run before trusting the frozen comparison, per this arc's established
