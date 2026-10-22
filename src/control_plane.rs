@@ -3,6 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Shared control-plane policy and audit helpers.
 
+pub mod attestation;
+pub mod attestation_profile;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
