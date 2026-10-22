@@ -774,6 +774,61 @@ impl IntelligentDispatcher {
 mod tests {
     use super::*;
 
+    struct FailingBackend {
+        backend_name: &'static str,
+    }
+
+    #[async_trait::async_trait]
+    impl LLMBackend for FailingBackend {
+        async fn generate(&self, _prompt: &str, _params: &GenerationParams) -> anyhow::Result<String> {
+            anyhow::bail!("intentional test backend failure")
+        }
+
+        async fn is_available(&self) -> bool {
+            true
+        }
+
+        fn name(&self) -> &str {
+            self.backend_name
+        }
+    }
+
+    #[tokio::test]
+    async fn backend_attempts_report_simulated_implementation_under_local_selection() {
+        let mut dispatcher = IntelligentDispatcher::new(Arc::new(SimulatedBackend), None);
+        dispatcher.force_next_tier(BackendTier::LocalLlm);
+        let result = dispatcher
+            .generate("test", &GenerationParams::default(), EpistemicStatus::Probable, 0.4, 0.8)
+            .await;
+
+        assert_eq!(result.tier, BackendTier::LocalLlm, "selected tier remains visible");
+        assert_eq!(result.backend_attempts.len(), 1);
+        assert_eq!(result.backend_attempts[0].tier, BackendTier::Simulated);
+        assert_eq!(result.backend_attempts[0].backend_name, "Simulated");
+        assert!(result.backend_attempts[0].success);
+    }
+
+    #[tokio::test]
+    async fn cloud_failure_records_cloud_then_actual_fallback_backend() {
+        let mut dispatcher = IntelligentDispatcher::new(
+            Arc::new(SimulatedBackend),
+            Some(Arc::new(FailingBackend { backend_name: "Anthropic" })),
+        );
+        dispatcher.force_next_tier(BackendTier::CloudLlm);
+        let result = dispatcher
+            .generate("test", &GenerationParams::default(), EpistemicStatus::Uncertain, 0.8, 0.8)
+            .await;
+
+        assert_eq!(result.tier, BackendTier::CloudLlm);
+        assert_eq!(result.backend_attempts.len(), 2);
+        assert_eq!(result.backend_attempts[0].backend_name, "Anthropic");
+        assert_eq!(result.backend_attempts[0].tier, BackendTier::CloudLlm);
+        assert!(!result.backend_attempts[0].success);
+        assert_eq!(result.backend_attempts[1].backend_name, "Simulated");
+        assert_eq!(result.backend_attempts[1].tier, BackendTier::Simulated);
+        assert!(result.backend_attempts[1].success);
+    }
+
     #[test]
     fn test_tier_display() {
         assert_eq!(format!("{}", BackendTier::Native), "Native");
