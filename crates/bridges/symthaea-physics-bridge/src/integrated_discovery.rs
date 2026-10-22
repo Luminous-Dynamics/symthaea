@@ -66,7 +66,8 @@
 use std::collections::{HashMap, HashSet};
 
 use symthaea_core::hdc::conjecture_engine::{
-    BinOp, CfcSmoother, Expr, UnaryFn, select_most_informative_experiment,
+    BinOp, CfcSmoother, Expr, UnaryFn, select_experiment_by_information_gain_per_cost,
+    select_most_informative_experiment,
 };
 
 use crate::dimensional_inference::UnitMap;
@@ -284,10 +285,21 @@ impl PipelineConfig {
     };
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ActiveSelector {
+    RawVariance,
+    ExpectedInformationGain,
+    InformationGainWithAudits,
+}
+
 struct TrialOutcome {
     rounds_used: usize,
     success: bool,
     final_live: usize,
+    selection_failed: bool,
+    audit_queries: usize,
+    model_discrepancy_detected: bool,
+    overconfident_under_misspecification: bool,
 }
 
 const POOL_SIZE: usize = 6;
@@ -347,6 +359,49 @@ fn near_miss_distractors(rng: &mut u64, ground_truth: &Expr, count: usize) -> Ve
 }
 
 fn run_trial(seed: u64, config: PipelineConfig, max_rounds: usize) -> TrialOutcome {
+    run_trial_with_selector(seed, config, max_rounds, ActiveSelector::RawVariance)
+}
+
+/// Estimate a common observation-noise scale from live predictions alone.
+/// The simulator uses truth-scaled noise; the median proxy avoids leakage from the
+/// hidden law and makes the EIG selector's homoscedastic approximation explicit.
+fn selection_noise_std_dev(
+    remaining: &[Experiment],
+    live: &[usize],
+    hypotheses: &[Expr],
+) -> f64 {
+    let mut magnitudes = Vec::new();
+    for experiment in remaining {
+        for index in live {
+            if let Some(prediction) = eval_at(&hypotheses[*index], experiment) {
+                magnitudes.push(prediction.abs());
+            }
+        }
+    }
+    magnitudes.retain(|magnitude: &f64| magnitude.is_finite());
+    if magnitudes.is_empty() {
+        return NOISE_SIGMA_FRACTION;
+    }
+    magnitudes.sort_by(f64::total_cmp);
+    NOISE_SIGMA_FRACTION * (1.0 + magnitudes[magnitudes.len() / 2])
+}
+
+fn run_trial_with_selector(
+    seed: u64,
+    config: PipelineConfig,
+    max_rounds: usize,
+    active_selector: ActiveSelector,
+) -> TrialOutcome {
+    run_trial_with_discrepancy(seed, config, max_rounds, active_selector, 0.0)
+}
+
+fn run_trial_with_discrepancy(
+    seed: u64,
+    config: PipelineConfig,
+    max_rounds: usize,
+    active_selector: ActiveSelector,
+    systematic_discrepancy: f64,
+) -> TrialOutcome {
     let mut setup_rng = seed ^ 0x5EED_0000_0000_0001;
     let probes: Vec<Experiment> = (0..GT_SANITY_PROBES)
         .map(|_| random_experiment(&mut setup_rng))
@@ -402,9 +457,17 @@ fn run_trial(seed: u64, config: PipelineConfig, max_rounds: usize) -> TrialOutco
     let mut used: Vec<Experiment> = Vec::new();
     let mut noise_rng = seed ^ 0xAAAA_BBBB_CCCC_DDDD;
     let mut dt_rng = seed ^ 0xDDDD_CCCC_BBBB_AAAA;
+    let mut audit_rng = seed ^ 0xA0D1_7000_51E1_0001;
+    let mut selection_failed = false;
+    let mut audit_queries = 0usize;
 
     let mut round = 0usize;
-    while round < max_rounds && live.len() > 1 {
+    while round < max_rounds
+        && (live.len() > 1
+            || (config.active_selection
+                && active_selector == ActiveSelector::InformationGainWithAudits
+                && live.len() == 1))
+    {
         let predict = |idx: &usize, e: &Experiment| eval_at(&hypotheses[*idx], e);
         let chosen = if config.active_selection {
             let remaining: Vec<Experiment> = candidate_pool
@@ -413,18 +476,42 @@ fn run_trial(seed: u64, config: PipelineConfig, max_rounds: usize) -> TrialOutco
                 .cloned()
                 .collect();
             if remaining.is_empty() {
+                selection_failed = true;
                 break;
             }
-            let Some((chosen, _score)) =
-                select_most_informative_experiment(&remaining, &live, predict)
-            else {
-                // A nonempty pool can still have no candidate with positive,
-                // finite disagreement across two valid live hypotheses. Preserve
-                // that epistemic limit as unresolved; do not panic or pretend a
-                // zero-information query is active selection.
+            // A singleton is provisional under the audit policy: use every remaining
+            // query as a validation audit. Before a singleton, schedule an audit every
+            // second round to reduce greedy over-exploitation.
+            let scheduled_audit = active_selector == ActiveSelector::InformationGainWithAudits
+                && (live.len() == 1 || (round + 1) % 2 == 0);
+            let selected = if scheduled_audit {
+                audit_queries += 1;
+                Some(remaining[rand_index(&mut audit_rng, remaining.len())].clone())
+            } else {
+                match active_selector {
+                    ActiveSelector::RawVariance => {
+                        select_most_informative_experiment(&remaining, &live, predict)
+                            .map(|(experiment, _)| experiment.clone())
+                    }
+                    ActiveSelector::ExpectedInformationGain
+                    | ActiveSelector::InformationGainWithAudits => {
+                        let noise_std_dev = selection_noise_std_dev(&remaining, &live, &hypotheses);
+                        select_experiment_by_information_gain_per_cost(
+                            &remaining,
+                            &live,
+                            noise_std_dev,
+                            predict,
+                            |_: &Experiment| 1.0,
+                        )
+                        .map(|(experiment, _)| experiment.clone())
+                    }
+                }
+            };
+            let Some(selected) = selected else {
+                selection_failed = true;
                 break;
             };
-            chosen.clone()
+            selected
         } else {
             if round >= fixed_order.len() {
                 break;
@@ -433,8 +520,20 @@ fn run_trial(seed: u64, config: PipelineConfig, max_rounds: usize) -> TrialOutco
         };
         used.push(chosen.clone());
 
-        let true_val =
+        let base_true_val =
             eval_at(&ground_truth, &chosen).expect("filtered pool guarantees finiteness");
+        // This controlled additive term is hidden from every candidate and selector.
+        // A nonzero amplitude perturbs observations relative to the finite candidate
+        // pool; selectors must not read this term.
+        let coordinates: Vec<f64> = chosen.iter().map(|(_, value)| *value).collect();
+        let discrepancy_wave = coordinates
+            .iter()
+            .enumerate()
+            .map(|(index, value)| (value * (3.0 + index as f64)).sin())
+            .sum::<f64>()
+            / coordinates.len().max(1) as f64;
+        let true_val = base_true_val
+            + systematic_discrepancy * (1.0 + base_true_val.abs()) * discrepancy_wave;
         // `smoothing`'s real question: is it worth taking K_REPEATS repeated noisy readings at
         // this SAME chosen point and blending them (CfC, dt-aware, irregular gaps between
         // readings), vs. a single one-shot reading? Deliberately NOT smoothing across
@@ -479,8 +578,12 @@ fn run_trial(seed: u64, config: PipelineConfig, max_rounds: usize) -> TrialOutco
 
     TrialOutcome {
         rounds_used: round,
-        success: live.len() == 1 && live[0] == 0,
+        success: systematic_discrepancy == 0.0 && live.len() == 1 && live[0] == 0,
         final_live: live.len(),
+        selection_failed,
+        audit_queries,
+        model_discrepancy_detected: systematic_discrepancy != 0.0 && live.is_empty(),
+        overconfident_under_misspecification: systematic_discrepancy != 0.0 && live.len() == 1,
     }
 }
 
@@ -550,6 +653,276 @@ fn mean_on_off(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    type SelectorPair = (bool, bool, usize, usize, bool);
+
+    struct MisspecSelectorPair {
+        eig_detected: bool,
+        eig_false_singleton: bool,
+        audit_detected: bool,
+        audit_false_singleton: bool,
+        clean_eig_success: bool,
+        clean_audit_success: bool,
+    }
+
+    /// Paired percentile bootstrap over seed/world outcomes. Every resample carries the raw
+    /// and EIG result together, preserving pairing. This small pilot interval is diagnostic;
+    /// it does not replace world-clustered confirmatory inference on a larger held-out corpus.
+    fn paired_bootstrap_mean_ci<T>(
+        samples: &[T],
+        metric: impl Fn(&T) -> f64,
+        seed: u64,
+    ) -> (f64, f64, f64) {
+        const BOOTSTRAP_REPLICATES: usize = 2_000;
+        assert!(!samples.is_empty());
+        let observed = samples.iter().map(&metric).sum::<f64>() / samples.len() as f64;
+        let mut rng = seed;
+        let mut means = Vec::with_capacity(BOOTSTRAP_REPLICATES);
+        for _ in 0..BOOTSTRAP_REPLICATES {
+            let sum = (0..samples.len())
+                .map(|_| metric(&samples[rand_index(&mut rng, samples.len())]))
+                .sum::<f64>();
+            means.push(sum / samples.len() as f64);
+        }
+        means.sort_by(f64::total_cmp);
+        let last = means.len() - 1;
+        let low_index = (last * 25) / 1_000;
+        let high_index = (last * 975 + 999) / 1_000;
+        (observed, means[low_index], means[high_index])
+    }
+
+    /// Paired-seed pilot comparing raw variance with expected information gain in the
+    /// real multi-round equation-discovery loop. This reports evidence; it does not assume EIG
+    /// wins. EIG uses an explicit common-noise proxy and rejects incomplete predictions.
+    #[test]
+    fn expected_information_gain_vs_variance_on_paired_seeds() {
+        const SEEDS: u64 = 40;
+        const ROUND_BUDGET: usize = 4;
+        let config = PipelineConfig {
+            typed_candidates: true,
+            active_selection: true,
+            smoothing: false,
+        };
+        let mut raw_successes = 0usize;
+        let mut eig_successes = 0usize;
+        let mut raw_rounds = 0usize;
+        let mut eig_rounds = 0usize;
+        let mut eig_selection_failures = 0usize;
+        let mut eig_only_wins = 0usize;
+        let mut raw_only_wins = 0usize;
+        let mut ties = 0usize;
+        let mut paired_outcomes: Vec<SelectorPair> = Vec::with_capacity(SEEDS as usize);
+
+        for seed in 1..=SEEDS {
+            let raw = run_trial_with_selector(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::RawVariance,
+            );
+            let eig = run_trial_with_selector(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::ExpectedInformationGain,
+            );
+            raw_successes += if raw.success { 1 } else { 0 };
+            eig_successes += if eig.success { 1 } else { 0 };
+            raw_rounds += raw.rounds_used;
+            eig_rounds += eig.rounds_used;
+            eig_selection_failures += if eig.selection_failed { 1 } else { 0 };
+            paired_outcomes.push((
+                raw.success,
+                eig.success,
+                raw.rounds_used,
+                eig.rounds_used,
+                eig.selection_failed,
+            ));
+            match (raw.success, eig.success) {
+                (true, false) => raw_only_wins += 1,
+                (false, true) => eig_only_wins += 1,
+                _ => ties += 1,
+            }
+        }
+
+        let (success_delta, success_ci_low, success_ci_high) = paired_bootstrap_mean_ci(
+            &paired_outcomes,
+            |pair| {
+                (if pair.eig_false_singleton { 1.0 } else { 0.0 }) - (if pair.eig_detected { 1.0 } else { 0.0 })
+            },
+            0x4549_475f_5355_4343,
+        );
+        let (round_delta, round_ci_low, round_ci_high) = paired_bootstrap_mean_ci(
+            &paired_outcomes,
+            |pair| pair.audit_false_singleton as f64 - pair.audit_detected as f64,
+            0x4549_475f_524f_554e,
+        );
+        println!(
+            "selector_ablation,seeds={SEEDS},round_budget={ROUND_BUDGET},raw_success_rate={:.3},eig_success_rate={:.3},raw_mean_rounds={:.3},eig_mean_rounds={:.3},paired_success_delta_eig_minus_raw={success_delta:.3},success_delta_ci95=[{success_ci_low:.3},{success_ci_high:.3}],paired_round_delta_eig_minus_raw={round_delta:.3},round_delta_ci95=[{round_ci_low:.3},{round_ci_high:.3}],eig_selection_failures={eig_selection_failures},raw_only_wins={raw_only_wins},eig_only_wins={eig_only_wins},ties={ties}",
+            raw_successes as f64 / SEEDS as f64,
+            eig_successes as f64 / SEEDS as f64,
+            raw_rounds as f64 / SEEDS as f64,
+            eig_rounds as f64 / SEEDS as f64,
+        );
+        assert_eq!(raw_only_wins + eig_only_wins + ties, SEEDS as usize);
+        assert_eq!(paired_outcomes.len(), SEEDS as usize);
+        assert!(success_ci_low <= success_ci_high);
+        assert!(round_ci_low <= round_ci_high);
+        assert!(success_ci_low.is_finite() && success_ci_high.is_finite());
+        assert!(round_ci_low.is_finite() && round_ci_high.is_finite());
+        assert!((0.0..=1.0).contains(&(raw_successes as f64 / SEEDS as f64)));
+        assert!((0.0..=1.0).contains(&(eig_successes as f64 / SEEDS as f64)));
+    }
+
+    /// Pilot testing whether scheduled, seeded audit experiments reduce false confidence
+    /// when the candidate class is deliberately misspecified. Audit queries consume the same
+    /// round budget and use only the existing admissible pool; the selector does not see the
+    /// hidden discrepancy. This is a diagnostic, not a claim that periodic random exploration
+    /// is universally optimal.
+    #[test]
+    fn scheduled_audits_measure_false_confidence_under_model_misspecification() {
+        const SEEDS: u64 = 40;
+        const ROUND_BUDGET: usize = 4;
+        const SYSTEMATIC_DISCREPANCY: f64 = 0.12;
+        let config = PipelineConfig {
+            typed_candidates: true,
+            active_selection: true,
+            smoothing: false,
+        };
+
+        let mut clean_eig_successes = 0usize;
+        let mut clean_audit_successes = 0usize;
+        let mut misspecified_eig_false_singletons = 0usize;
+        let mut misspecified_audit_false_singletons = 0usize;
+        let mut misspecified_eig_detections = 0usize;
+        let mut misspecified_audit_detections = 0usize;
+        let mut misspecified_eig_unresolved = 0usize;
+        let mut misspecified_audit_unresolved = 0usize;
+        let mut audit_query_total = 0usize;
+        let mut eig_selection_failures = 0usize;
+        let mut audit_selection_failures = 0usize;
+        let mut eig_total_rounds = 0usize;
+        let mut audit_total_rounds = 0usize;
+        let mut paired: Vec<MisspecSelectorPair> = Vec::with_capacity(SEEDS as usize);
+
+        for seed in 1..=SEEDS {
+            let clean_eig = run_trial_with_discrepancy(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::ExpectedInformationGain,
+                0.0,
+            );
+            let clean_audit = run_trial_with_discrepancy(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::InformationGainWithAudits,
+                0.0,
+            );
+            let misspec_eig = run_trial_with_discrepancy(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::ExpectedInformationGain,
+                SYSTEMATIC_DISCREPANCY,
+            );
+            let misspec_audit = run_trial_with_discrepancy(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::InformationGainWithAudits,
+                SYSTEMATIC_DISCREPANCY,
+            );
+
+            clean_eig_successes += if clean_eig.success { 1 } else { 0 };
+            clean_audit_successes += if clean_audit.success { 1 } else { 0 };
+            misspecified_eig_false_singletons +=
+                if misspec_eig.overconfident_under_misspecification { 1 } else { 0 };
+            misspecified_audit_false_singletons +=
+                if misspec_audit.overconfident_under_misspecification { 1 } else { 0 };
+            misspecified_eig_detections +=
+                if misspec_eig.model_discrepancy_detected { 1 } else { 0 };
+            misspecified_audit_detections +=
+                if misspec_audit.model_discrepancy_detected { 1 } else { 0 };
+            misspecified_eig_unresolved += if misspec_eig.final_live > 1 { 1 } else { 0 };
+            misspecified_audit_unresolved += if misspec_audit.final_live > 1 { 1 } else { 0 };
+            audit_query_total += misspec_audit.audit_queries;
+            eig_selection_failures += if misspec_eig.selection_failed { 1 } else { 0 };
+            audit_selection_failures += if misspec_audit.selection_failed { 1 } else { 0 };
+            eig_total_rounds += misspec_eig.rounds_used;
+            audit_total_rounds += misspec_audit.rounds_used;
+
+            paired.push(MisspecSelectorPair {
+                eig_detected: misspec_eig.model_discrepancy_detected,
+                eig_false_singleton: misspec_eig.overconfident_under_misspecification,
+                audit_detected: misspec_audit.model_discrepancy_detected,
+                audit_false_singleton: misspec_audit.overconfident_under_misspecification,
+                clean_eig_success: clean_eig.success,
+                clean_audit_success: clean_audit.success,
+            });
+        }
+
+        let (false_singleton_delta, false_ci_low, false_ci_high) = paired_bootstrap_mean_ci(
+            &paired,
+            |pair| {
+                (if pair.audit_false_singleton { 1.0 } else { 0.0 })
+                    - (if pair.eig_false_singleton { 1.0 } else { 0.0 })
+            },
+            0x4155_4449_545f_4643,
+        );
+        let (detection_delta, detection_ci_low, detection_ci_high) = paired_bootstrap_mean_ci(
+            &paired,
+            |pair| {
+                (if pair.audit_detected { 1.0 } else { 0.0 })
+                    - (if pair.eig_detected { 1.0 } else { 0.0 })
+            },
+            0x4155_4449_545f_4445,
+        );
+        let (clean_delta, clean_ci_low, clean_ci_high) = paired_bootstrap_mean_ci(
+            &paired,
+            |pair| {
+                (if pair.clean_audit_success { 1.0 } else { 0.0 })
+                    - (if pair.clean_eig_success { 1.0 } else { 0.0 })
+            },
+            0x4155_4449_545f_434c,
+        );
+
+        println!(
+            "misspec_audit,seeds={SEEDS},round_budget={ROUND_BUDGET},discrepancy={SYSTEMATIC_DISCREPANCY},clean_eig_recovery={:.3},clean_audit_recovery={:.3},misspec_eig_false_singleton={:.3},misspec_audit_false_singleton={:.3},false_singleton_delta_audit_minus_eig={false_singleton_delta:.3},false_singleton_ci95=[{false_ci_low:.3},{false_ci_high:.3}],misspec_eig_detected={:.3},misspec_audit_detected={:.3},misspec_eig_unresolved={:.3},misspec_audit_unresolved={:.3},detection_delta_audit_minus_eig={detection_delta:.3},detection_ci95=[{detection_ci_low:.3},{detection_ci_high:.3}],clean_recovery_delta_audit_minus_eig={clean_delta:.3},clean_recovery_ci95=[{clean_ci_low:.3},{clean_ci_high:.3}],eig_selection_failures={eig_selection_failures},audit_selection_failures={audit_selection_failures},eig_mean_rounds={:.2},audit_mean_rounds={:.2},scheduled_audit_queries={audit_query_total}",
+            clean_eig_successes as f64 / SEEDS as f64,
+            clean_audit_successes as f64 / SEEDS as f64,
+            misspecified_eig_false_singletons as f64 / SEEDS as f64,
+            misspecified_audit_false_singletons as f64 / SEEDS as f64,
+            misspecified_eig_detections as f64 / SEEDS as f64,
+            misspecified_audit_detections as f64 / SEEDS as f64,
+            misspecified_eig_unresolved as f64 / SEEDS as f64,
+            misspecified_audit_unresolved as f64 / SEEDS as f64,
+            eig_total_rounds as f64 / SEEDS as f64,
+            audit_total_rounds as f64 / SEEDS as f64,
+        );
+        assert_eq!(paired.len(), SEEDS as usize);
+        assert_eq!(
+            misspecified_eig_false_singletons
+                + misspecified_eig_detections
+                + misspecified_eig_unresolved,
+            SEEDS as usize
+        );
+        assert_eq!(
+            misspecified_audit_false_singletons
+                + misspecified_audit_detections
+                + misspecified_audit_unresolved,
+            SEEDS as usize
+        );
+        assert!(false_ci_low <= false_ci_high);
+        assert!(detection_ci_low <= detection_ci_high);
+        assert!(clean_ci_low <= clean_ci_high);
+        assert!(false_ci_low.is_finite() && false_ci_high.is_finite());
+        assert!(detection_ci_low.is_finite() && detection_ci_high.is_finite());
+        assert!(clean_ci_low.is_finite() && clean_ci_high.is_finite());
+        assert!(clean_eig_successes <= SEEDS as usize);
+        assert!(clean_audit_successes <= SEEDS as usize);
+    }
 
     /// Landscape audit (run before trusting the frozen comparison, per this arc's established
     /// discipline): with the "everything on" configuration, does the task actually converge at
