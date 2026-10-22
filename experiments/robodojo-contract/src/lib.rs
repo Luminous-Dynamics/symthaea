@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 pub mod active_sensing;
+pub mod sensing_benchmark;
 pub mod calibration;
 pub mod shift;
 
