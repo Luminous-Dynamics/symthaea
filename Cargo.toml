@@ -2367,6 +2367,7 @@ required-features = ["code_generation"]
 [[example]]
 name = "coding_agent_benchmark"
 required-features = ["code_generation"]
+test = true
 
 [[example]]
 name = "benchmark_coding_backends"
