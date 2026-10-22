@@ -398,11 +398,12 @@
       "expected": {
         "outcome": "evaluate",
         "violation_codes": [
-          "invalid_bundle_verification"
+          "invalid_bundle_verification",
+          "render_without_verified_bundle"
         ]
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in failed_digest_verification_blocks_rendering. Exact-head workflow validation is pending.",
+      "note": "A failed verification is recorded, and the subsequent render is separately recorded as missing a verified bundle. Exact-head run pending.",
       "test_name": "failed_digest_verification_blocks_rendering"
     },
     {
@@ -414,11 +415,12 @@
       "expected": {
         "outcome": "evaluate",
         "violation_codes": [
-          "invalid_bundle_verification"
+          "invalid_bundle_verification",
+          "render_without_verified_bundle"
         ]
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in expired_bundle_cannot_be_verified_or_rendered. Exact-head workflow validation is pending.",
+      "note": "A failed verification is recorded, and the subsequent render is separately recorded as missing a verified bundle. Exact-head run pending.",
       "test_name": "expired_bundle_cannot_be_verified_or_rendered"
     },
     {
