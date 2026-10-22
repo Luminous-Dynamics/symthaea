@@ -7,6 +7,9 @@ This directory defines a proposed benchmark format. **It currently contains no d
 - `insight-record.schema.json` — JSON Schema Draft 2020-12 for one provenance-linked insight record, including semantic-validation evidence and a constructive-solving track for unknown witnesses, proof obligations, and answer equivalence (RPE or formal/expert checking).
 - `proof-progress-trace.schema.json` — strict trace contract for content-addressed proof-state snapshots, per-instance obligation lineage, resource counters, and terminal checker/semantic-gate receipts. Its synthetic fixture is validated against relational invariants in CI; splitting a goal is not counted as a verified closure, and this format is not a trace collector or a measured result.
 - `counterfactual-precondition-suite.schema.json` plus `fixtures/counterfactual-precondition-suite.synthetic.json` — paired base/counterfactual targets with typed mutation class, distinct target statement digests, dual-review adjudications and outcome-row IDs for future evaluation joins. CI validates seven synthetic contrasts and rejects 13 malformed/leakage/adjudication mutations. The fixture is contract-only, not mathematics or measured model behavior.
+- `counterfactual-sensitivity-report.schema.json` — strict analysis-report contract for paired counterfactual metrics, component-cluster bootstrap intervals, mutation-class slices, and an always-unassessed confirmatory decision.
+- `crates/bridges/symthaea-proof-insights/src/bin/analyze_counterfactual_sensitivity.rs` — deterministic Rust analyzer that joins suite contrast IDs to outcome JSONL, checks source/target/statement digests and per-reviewer adjudication receipts, enforces single-split/component isolation and budgets, and reports paired adherence, false acceptance, semantics-preserving stability, Brier score, and component-clustered 95% intervals. It never declares a confirmatory pass.
+- `fixtures/counterfactual-outcomes.synthetic.jsonl` — 14 synthetic outcome rows for the seven-pair contract fixture. These rows exercise joins and report generation only and are not scored theorem-prover behavior.
 - `transfer-selectivity-outcome.schema.json` — JSON Schema Draft 2020-12 for one source-insight/target-obligation compatibility outcome. It separates expert adjudication from system prediction, requires provenance and run receipts, records abstention and precondition checks, and supports false-accept/false-reject/recall/selective-risk analysis. It validates structure, not mathematical truth or family-disjointness.
 - `crates/bridges/symthaea-proof-insights/src/bin/analyze_transfer_selectivity.rs` — deterministic Rust JSONL analyzer for the transfer-selectivity track. Before scoring, it independently checks the complete content-addressed source/target/adjudication/prediction/run envelope, required nullable probability fields, digest syntax, safe paths, declared budget caps, one requested split, unique pairs, dual-review consistency, and family-connected component IDs. It reports class-conditioned accept/reject/abstain rates, component-clustered bootstrap intervals, probability coverage, Brier score, and ten-bin reliability data. It never declares the overall confirmatory gate passed because the finite mutation-suite receipt is external to this binary.
 - `transfer-selectivity-analysis-report.schema.json` — Draft 2020-12 schema for the Rust aggregate report, including raw denominators, component-clustered intervals, calibration coverage and reliability, and fail-closed confirmatory decision fields. The CI contract rejects reports that assert an overall pass without an independently evaluated mutation-suite receipt.
@@ -51,6 +54,21 @@ Use `external_challenge` for a separately maintained external set. Do not mix tr
 `prediction.compatibility_probability` is distinct from action confidence: it means the estimated probability that the proposed transfer is compatible, regardless of whether the action is accept, reject, or abstain. The analyzer reports its scored coverage, Brier score, and ten equal-width reliability bins without imputing missing values. Probability metrics are descriptive until the rubric, calibration coverage, sample size, and independent cluster-level uncertainty are reviewed; missing calibration values do not count as a model failure or a success.
 
 The analyzer deliberately emits `overall_confirmatory_decision = not_evaluated_...`: pair metrics alone cannot satisfy the preregistered finite mutation-suite gate or the primary exact-target proof-utility gate. The pair-track thresholds are diagnostics, not an overall SOTA or mathematical-correctness verdict.
+
+
+## Counterfactual sensitivity analysis
+
+The Rust `analyze_counterfactual_sensitivity` binary joins the suite's stable base/variant outcome IDs to the transfer-selectivity JSONL rows. For example, after both files have been checked against their JSON Schemas:
+
+```bash
+cargo run --locked --bin analyze_counterfactual_sensitivity -- \
+  counterfactual-suite.json counterfactual-outcomes.jsonl test \
+  counterfactual-sensitivity-report.json 10000 20261022
+```
+
+It checks source and target provenance, exact base/counterfactual statement digests, component IDs, labels/statuses, independent reviewer identities/evidence/reason codes, the budget caps and outcome-row uniqueness. The report separates compatible-base recall, counterfactual compatibility recall, sensitivity and false acceptance on incompatible variants, paired contract adherence, decision stability on semantics-preserving pairs, probability Brier score and the mean absolute probability shift for no-op variants. It reports per-mutation-kind sensitivity / false acceptance and component-bootstrap percentile intervals for the aggregate metrics.
+
+The report calls rates `ratio` and Brier / probability-delta metrics `mean`; it includes hashes of exact suite and outcome bytes. It always emits an unassessed confirmatory decision. This is intentional: a well-formed synthetic join does not establish expert-adjudicated compatibility, checker-backed transfer utility, or a SOTA result. CI uses the seven-pair, fourteen-row synthetic fixture to exercise the end-to-end path and mutates missing-row, provenance, reviewer-evidence and over-budget cases. The primary exact-target proof-utility endpoint remains unchanged.
 
 ## Required discipline
 
