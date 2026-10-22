@@ -16,7 +16,7 @@ use symthaea::coding_agent::{CodingAgent, CodingAgentConfig};
 use symthaea::language::code_executor::CodeExecutor;
 
 const BENCHMARK_ID: &str = "symthaea_gcs_runtime_ablation";
-const SCHEMA_VERSION: u32 = 5;
+const SCHEMA_VERSION: u32 = 6;
 
 struct TaskCase {
     id: &'static str,
@@ -72,6 +72,7 @@ struct BackendAttemptRecord {
     tier: String,
     backend_name: String,
     success: bool,
+    usable_generation: bool,
     verification_passed: Option<bool>,
     elapsed_ms: u128,
     estimated_energy_cost: f64,
@@ -343,6 +344,7 @@ fn run_candidate(
             tier: attempt.tier.to_string(),
             backend_name: attempt.backend_name.clone(),
             success: attempt.success,
+            usable_generation: attempt.usable_generation,
             verification_passed: attempt.verification_passed,
             elapsed_ms: attempt.elapsed_ms,
             estimated_energy_cost: attempt.estimated_energy_cost,
@@ -378,6 +380,7 @@ fn eval_json(result: &EvalResult) -> serde_json::Value {
             "tier": attempt.tier,
             "backend_name": attempt.backend_name,
             "success": attempt.success,
+            "usable_generation": attempt.usable_generation,
             "verification_passed": attempt.verification_passed,
             "elapsed_ms": attempt.elapsed_ms,
             "estimated_energy_cost": attempt.estimated_energy_cost
@@ -449,6 +452,16 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
         .flat_map(|run| run.backend_attempts.iter())
         .filter(|attempt| !attempt.success)
         .count();
+    let backend_attempts_usable_generations = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| attempt.usable_generation)
+        .count();
+    let backend_attempts_nonempty_unusable_outputs = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| attempt.success && !attempt.usable_generation)
+        .count();
     let backend_attempts_verifier_accepted = mode
         .iter()
         .flat_map(|run| run.backend_attempts.iter())
@@ -504,6 +517,8 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
         "backend_attempts_by_name": backend_attempts_by_name,
         "backend_attempts_succeeded": backend_attempts_succeeded,
         "backend_attempts_failed": backend_attempts_failed,
+        "backend_attempts_usable_generations": backend_attempts_usable_generations,
+        "backend_attempts_nonempty_unusable_outputs": backend_attempts_nonempty_unusable_outputs,
         "backend_attempts_verifier_accepted": backend_attempts_verifier_accepted,
         "backend_attempts_verifier_rejected": backend_attempts_verifier_rejected,
         "backend_attempts_without_verifier_result": backend_attempts_without_verifier_result,
@@ -682,7 +697,7 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
             use_llm: false,
             use_cloud: false,
             repeats: 3,
-            output_path: std::env::temp_dir().join("symthaea_gcs_ablation_v5.json"),
+            output_path: std::env::temp_dir().join("symthaea_gcs_ablation_v6.json"),
             print_manifest: true,
         }));
     }
@@ -1047,6 +1062,7 @@ mod provenance_tests {
                     tier: "Simulated".to_string(),
                     backend_name: "Simulated".to_string(),
                     success: true,
+                    usable_generation: false,
                     verification_passed: None,
                     elapsed_ms: 7,
                     estimated_energy_cost: 0.0,
@@ -1055,6 +1071,7 @@ mod provenance_tests {
                     tier: "LocalLLM".to_string(),
                     backend_name: "Ollama".to_string(),
                     success: false,
+                    usable_generation: false,
                     verification_passed: None,
                     elapsed_ms: 11,
                     estimated_energy_cost: 10.0,
@@ -1070,6 +1087,8 @@ mod provenance_tests {
         assert_eq!(summary["backend_attempts_by_name"]["Simulated"], 1);
         assert_eq!(summary["backend_attempts_succeeded"], 1);
         assert_eq!(summary["backend_attempts_failed"], 1);
+        assert_eq!(summary["backend_attempts_usable_generations"], 0);
+        assert_eq!(summary["backend_attempts_nonempty_unusable_outputs"], 1);
         assert_eq!(summary["backend_attempts_verifier_accepted"], 0);
         assert_eq!(summary["backend_attempts_verifier_rejected"], 0);
         assert_eq!(summary["backend_attempts_without_verifier_result"], 2);
