@@ -494,7 +494,8 @@ impl PairingManager {
         initiator_pubkey: &[u8],
     ) -> Option<Vec<u8>> {
         let shared = self.derive_shared_mac_key(initiator_pubkey)?;
-        let mac = blake3::keyed_hash(&shared, transcript);
+        let mac_key = derive_pairing_mac_key(&shared, transcript);
+        let mac = blake3::keyed_hash(&mac_key, transcript);
         Some(mac.as_bytes().to_vec())
     }
 
@@ -534,7 +535,8 @@ impl PairingManager {
             Some(s) => s,
             None => return false,
         };
-        let mac = blake3::keyed_hash(&shared, transcript);
+        let mac_key = derive_pairing_mac_key(&shared, transcript);
+        let mac = blake3::keyed_hash(&mac_key, transcript);
         // Constant-time comparison
         let mut diff = 0u8;
         for (a, b) in signature.iter().zip(mac.as_bytes().iter()) {
@@ -542,6 +544,21 @@ impl PairingManager {
         }
         diff == 0
     }
+}
+
+/// Derive the fallback MAC key from both the X25519 output and the canonical
+/// transcript. The transcript supplies the fresh nonce and both role-labelled
+/// public keys; the BLAKE3 context separates this key schedule from other
+/// protocol uses. This follows RFC 7748's recommendation to use a KDF whose
+/// inputs include the DH secret and public-key context.
+///
+/// The returned key is derived material, not the raw X25519 output.
+#[cfg(not(feature = "pairing"))]
+fn derive_pairing_mac_key(shared_secret: &[u8; 32], transcript: &[u8]) -> [u8; 32] {
+    let mut key_material = Vec::with_capacity(shared_secret.len() + transcript.len());
+    key_material.extend_from_slice(shared_secret);
+    key_material.extend_from_slice(transcript);
+    blake3::derive_key("SYMTHAEA-SPORE-PAIRING-MAC-KEY/v2", &key_material)
 }
 
 /// Canonical pairing transcript. Every field is role-labelled and
@@ -627,6 +644,19 @@ mod tests {
         assert_eq!(nonces[0].len(), 32);
         assert_eq!(nonces[1].len(), 32);
         assert_ne!(nonces[0], nonces[1], "same-cycle challenges must not repeat");
+    }
+
+    #[cfg(not(feature = "pairing"))]
+    #[test]
+    fn test_pairing_mac_key_derivation_binds_transcript_context() {
+        let shared = [0xA5; 32];
+        let original = pairing_transcript(&[1; 32], &[2; 32], &[3; 32]).unwrap();
+        let altered = pairing_transcript(&[1; 32], &[2; 32], &[4; 32]).unwrap();
+        let derived = derive_pairing_mac_key(&shared, &original);
+        let changed = derive_pairing_mac_key(&shared, &altered);
+
+        assert_ne!(derived, shared, "the raw DH output must not be used directly");
+        assert_ne!(derived, changed, "public-key/transcript changes must change key material");
     }
 
     #[cfg(not(feature = "pairing"))]
