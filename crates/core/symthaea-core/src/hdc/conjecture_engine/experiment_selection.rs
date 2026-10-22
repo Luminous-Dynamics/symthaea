@@ -219,6 +219,11 @@ fn noiseless_information_gain(predictions: &[f64]) -> f64 {
 ///
 /// I(H; Y | experiment) = E[log(p(Y | H, experiment) / p(Y | experiment))].
 ///
+/// This API preserves the uniform prior over candidate instances. Call
+/// [`expected_information_gain_with_prior_nats`] when prior mass must be allocated by
+/// structural family or another externally justified prior policy. Duplicated expressions
+/// can otherwise change the implied prior over scientific laws.
+///
 /// A deterministic midpoint quadrature integrates standard-normal noise over ±8
 /// standard deviations. Candidate scoring is comparable only when the supplied
 /// observation_std_dev represents the same measurement process for all candidates.
@@ -371,7 +376,10 @@ pub fn expected_information_gain_with_prior_nats<H, E>(
     let prior_entropy = prior_probabilities
         .iter()
         .filter(|probability| **probability > 0.0)
-        .map(|probability| -probability * probability.ln())
+        .map(|probability| {
+            let probability = *probability;
+            -probability * probability.ln()
+        })
         .sum::<f64>();
 
     let predictions: Vec<f64> = hypotheses
@@ -470,7 +478,10 @@ fn noiseless_information_gain_with_priors(predictions: &[f64], priors: &[f64]) -
     }
     groups
         .iter()
-        .map(|(_, probability)| -probability * probability.ln())
+        .map(|(_, probability)| {
+            let probability = *probability;
+            -probability * probability.ln()
+        })
         .sum()
 }
 
