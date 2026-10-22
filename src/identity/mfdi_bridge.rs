@@ -10,7 +10,7 @@ use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Assurance levels aligned with Epistemic Charter v2.0
 #[derive(
@@ -222,12 +222,16 @@ impl SignedRequest {
     }
 }
 
-/// Signed output from the cognitive loop
+/// Signed output from the cognitive loop.
+///
+/// Version 2 signs a canonical transcript of output values, signer DID,
+/// timestamp, and cycle ID. A valid signature is not accepted if the DID
+/// does not correspond to the supplied verification key.
 #[derive(Debug, Clone)]
 pub struct SignedOutput {
     /// Output vector (compressed CfC state)
     pub output: Vec<f32>,
-    /// Ed25519 signature of the output hash
+    /// Ed25519 signature over the domain-separated v2 transcript digest
     pub signature: Signature,
     /// Agent DID that produced this output
     pub agent_id: String,
@@ -238,40 +242,61 @@ pub struct SignedOutput {
 }
 
 impl SignedOutput {
-    /// Create a new signed output
-    pub fn new(
-        output: Vec<f32>,
-        signing_key: &SigningKey,
-        agent_id: impl Into<String>,
+    /// Canonical v2 digest, binding every field used for output attribution.
+    fn signing_digest(
+        output: &[f32],
+        agent_id: &str,
+        timestamp: SystemTime,
         cycle_id: u64,
-    ) -> Self {
-        // Hash the output for signing
-        let output_hash = Self::hash_output(&output, cycle_id);
-        let signature = signing_key.sign(&output_hash);
+    ) -> Vec<u8> {
+        const DOMAIN: &[u8] = b"SYMTHAEA-MFDI-SIGNED-OUTPUT/v2\0";
+        let timestamp_nanos = timestamp
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
+
+        let mut hasher = Sha256::new();
+        hasher.update(DOMAIN);
+        hasher.update(&(agent_id.len() as u64).to_le_bytes());
+        hasher.update(agent_id.as_bytes());
+        hasher.update(&timestamp_nanos.to_le_bytes());
+        hasher.update(&cycle_id.to_le_bytes());
+        hasher.update(&(output.len() as u64).to_le_bytes());
+        for value in output {
+            hasher.update(value.to_bits().to_le_bytes());
+        }
+        hasher.finalize().to_vec()
+    }
+
+    /// Create a new signed output, binding its identity, timestamp, and cycle.
+    pub fn new(output: Vec<f32>, signing_key: &SigningKey, cycle_id: u64) -> Self {
+        // Derive attribution from the key doing the signing; a caller-supplied
+        // DID could otherwise mislabel the producer.
+        let agent_id = MfdiIdentity::derive_did(&signing_key.verifying_key());
+        let timestamp = SystemTime::now();
+        let output_digest = Self::signing_digest(&output, &agent_id, timestamp, cycle_id);
+        let signature = signing_key.sign(&output_digest);
 
         Self {
             output,
             signature,
-            agent_id: agent_id.into(),
-            timestamp: SystemTime::now(),
+            agent_id,
+            timestamp,
             cycle_id,
         }
     }
 
-    /// Hash output vector for signing
-    fn hash_output(output: &[f32], cycle_id: u64) -> Vec<u8> {
-        let mut hasher = Sha256::new();
-        for val in output {
-            hasher.update(val.to_le_bytes());
-        }
-        hasher.update(cycle_id.to_le_bytes());
-        hasher.finalize().to_vec()
-    }
-
-    /// Verify the output signature
+    /// Verify integrity and ensure the claimed DID matches the trusted key.
     pub fn verify(&self, public_key: &VerifyingKey) -> bool {
-        let output_hash = Self::hash_output(&self.output, self.cycle_id);
-        public_key.verify(&output_hash, &self.signature).is_ok()
+        if self.timestamp.duration_since(UNIX_EPOCH).is_err()
+            || self.agent_id != MfdiIdentity::derive_did(public_key)
+        {
+            return false;
+        }
+
+        let output_digest =
+            Self::signing_digest(&self.output, &self.agent_id, self.timestamp, self.cycle_id);
+        public_key.verify(&output_digest, &self.signature).is_ok()
     }
 }
 
@@ -444,13 +469,14 @@ impl MfdiBridge {
     /// Sign an output
     pub fn sign_output(&mut self, output: &[f32]) -> Result<SignedOutput, MfdiError> {
         let signing_key = self.signing_key.as_ref().ok_or(MfdiError::NoSigningKey)?;
-        let agent_id = self.agent_id().ok_or(MfdiError::NoIdentity)?.to_string();
+        // Preserve the explicit identity gate, while deriving output attribution
+        // from the actual signing key rather than a possibly different current identity.
+        self.current_identity.as_ref().ok_or(MfdiError::NoIdentity)?;
 
         self.cycle_counter += 1;
         Ok(SignedOutput::new(
             output.to_vec(),
             signing_key,
-            agent_id,
             self.cycle_counter,
         ))
     }
@@ -642,10 +668,37 @@ mod tests {
     fn test_signed_output() {
         let signing_key = MfdiBridge::generate_key();
         let output = vec![0.1, 0.2, 0.3, 0.4];
-        let signed = SignedOutput::new(output.clone(), &signing_key, "test-agent", 1);
+        let agent_id = MfdiIdentity::derive_did(&signing_key.verifying_key());
+        let signed = SignedOutput::new(output.clone(), &signing_key, 1);
 
         assert!(signed.verify(&signing_key.verifying_key()));
         assert_eq!(signed.output, output);
+        assert_eq!(signed.agent_id, agent_id);
+    }
+
+    #[test]
+    fn test_signed_output_rejects_mutated_attribution_fields() {
+        let signing_key = MfdiBridge::generate_key();
+        let public_key = signing_key.verifying_key();
+        let output = vec![0.1, 0.2, 0.3, 0.4];
+        let signed = SignedOutput::new(output, &signing_key, 7);
+        assert!(signed.verify(&public_key));
+
+        let mut changed_agent = signed.clone();
+        changed_agent.agent_id = "did:mycelix:attacker".to_string();
+        assert!(!changed_agent.verify(&public_key));
+
+        let mut changed_timestamp = signed.clone();
+        changed_timestamp.timestamp += Duration::from_secs(1);
+        assert!(!changed_timestamp.verify(&public_key));
+
+        let mut changed_cycle = signed.clone();
+        changed_cycle.cycle_id += 1;
+        assert!(!changed_cycle.verify(&public_key));
+
+        let mut changed_output = signed;
+        changed_output.output[0] += 1.0;
+        assert!(!changed_output.verify(&public_key));
     }
 
     #[test]
