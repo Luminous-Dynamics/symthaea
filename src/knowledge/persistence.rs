@@ -1086,14 +1086,48 @@ mod tests {
 
     #[test]
     fn save_load_round_trips_typed_evidence_links() {
-        let dir = std::env::temp_dir().join(format!("symthaea_evidence_links_test_{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_evidence_links_test_{}",
+            std::process::id()
+        ));
         let db_path = dir.join("knowledge.db");
         let _ = std::fs::create_dir_all(&dir);
+        let context = |witness: &str, family: &str, evidence: &str| ClaimContext {
+            subject: "subject".into(),
+            predicate: "predicate".into(),
+            object: "object".into(),
+            witness_id: witness.into(),
+            source_family_id: family.into(),
+            context_id: "shared-context".into(),
+            temporal_scope: Some("period-a".into()),
+            event_time: Some(1),
+            claim_kind: super::super::claim_provenance::ClaimKind::SourceAttested,
+            polarity: super::super::claim_provenance::ClaimPolarity::Positive,
+            evidence_ids: vec![evidence.into()],
+        };
+        let make_fact = |id, source_text: &str, witness: &str, family: &str, evidence: &str| {
+            GraphFactRecord {
+                fact_id: Some(id),
+                fact: FactRecord {
+                    vector_bytes: vec![id as u8; 2048],
+                    source_text: source_text.into(),
+                    confidence: 0.5,
+                    domain: None,
+                    cycle: id,
+                    is_causal: false,
+                },
+                claim_context: Some(context(witness, family, evidence)),
+            }
+        };
+        let facts = vec![
+            make_fact(10, "claim from witness A", "witness-a", "family-a", "evidence-a"),
+            make_fact(20, "claim from witness B", "witness-b", "family-b", "evidence-b"),
+        ];
         let link = EvidenceLink {
             from_fact_id: 10,
             to_fact_id: 20,
-            relation: super::super::claim_provenance::EvidenceRelation::Corroborates,
-            status: super::super::claim_provenance::EvidenceLinkStatus::Adjudicated,
+            relation: EvidenceRelation::Corroborates,
+            status: EvidenceLinkStatus::Adjudicated,
             evidence_ids: vec!["evidence-a".into(), "evidence-b".into()],
             rationale: Some("Independent source witnesses support the same scoped claim".into()),
             causal_argument: None,
@@ -1101,7 +1135,11 @@ mod tests {
             detected_at_cycle: 12,
         };
         let mut persistence = KnowledgePersistence::new(&db_path);
-        persistence.save_evidence_links(&[link.clone()]).unwrap();
+        persistence.save_graph_facts(&facts).unwrap();
+        persistence.save_evidence_links(std::slice::from_ref(&link)).unwrap();
+        let (loaded_facts, loaded_links) = persistence.load_graph_snapshot().unwrap();
+        assert_eq!(loaded_facts.len(), 2);
+        assert_eq!(loaded_links, vec![link.clone()]);
         assert_eq!(persistence.load_evidence_links().unwrap(), vec![link]);
 
         let _ = std::fs::remove_dir_all(&dir);
