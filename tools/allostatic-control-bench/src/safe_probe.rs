@@ -22,6 +22,7 @@ pub struct SafeProbeRecommendation {
     safe_actions: HorizonViableActionSet,
     candidate_hypotheses: usize,
     minimum_discrimination: f64,
+    measurement_radius: f64,
     action_scores: [f64; 3],
     selected_action: Option<Action>,
     selected_score: f64,
@@ -42,6 +43,18 @@ impl SafeProbeRecommendation {
 
     pub const fn minimum_discrimination(self) -> f64 {
         self.minimum_discrimination
+    }
+
+    /// Per-coordinate bound on observation error. Pairwise score gaps are
+    /// reduced by twice this radius before a probe can claim distinguishability.
+    pub const fn measurement_radius(self) -> f64 {
+        self.measurement_radius
+    }
+
+    /// True only when every pair of candidate effect boxes remains disjoint
+    /// after expansion by the declared measurement uncertainty.
+    pub const fn selected_action_guarantees_pairwise_distinguishability(self) -> bool {
+        self.selected_action.is_some() && self.selected_score > 0.0
     }
 
     /// Scores are ordered Push, Maintain, EmergencyRecover. A score measures the
@@ -86,9 +99,19 @@ fn interval_gap(first: Interval, second: Interval) -> f64 {
     }
 }
 
-fn pairwise_effect_separation(first: ActionEffectBounds, second: ActionEffectBounds) -> f64 {
-    let reserve_gap = interval_gap(first.reserve_delta(), second.reserve_delta());
-    let load_gap = interval_gap(first.load_delta(), second.load_delta());
+fn pairwise_effect_separation(
+    first: ActionEffectBounds,
+    second: ActionEffectBounds,
+    measurement_radius: f64,
+) -> f64 {
+    // Expanding each prediction interval by +/- radius makes their separation
+    // shrink by 2*radius. Clamp overlapping noisy observation sets to zero.
+    let reserve_gap =
+        (interval_gap(first.reserve_delta(), second.reserve_delta()) - 2.0 * measurement_radius)
+            .max(0.0);
+    let load_gap =
+        (interval_gap(first.load_delta(), second.load_delta()) - 2.0 * measurement_radius)
+            .max(0.0);
     reserve_gap.hypot(load_gap)
 }
 
@@ -96,13 +119,17 @@ fn pairwise_effect_separation(first: ActionEffectBounds, second: ActionEffectBou
 /// A value of zero means at least one model pair has overlapping prediction
 /// boxes for this action, so that action cannot distinguish every hypothesis pair
 /// under the present interval information.
-fn maximin_discrimination(hypotheses: &[DynamicsBounds], action: Action) -> f64 {
+fn maximin_discrimination(
+    hypotheses: &[DynamicsBounds],
+    action: Action,
+    measurement_radius: f64,
+) -> f64 {
     let mut minimum = f64::INFINITY;
     for first_index in 0..hypotheses.len() {
         for second_index in (first_index + 1)..hypotheses.len() {
             let first = hypotheses[first_index].effect_for_action(action);
             let second = hypotheses[second_index].effect_for_action(action);
-            minimum = minimum.min(pairwise_effect_separation(first, second));
+            minimum = minimum.min(pairwise_effect_separation(first, second, measurement_radius));
         }
     }
     if minimum.is_finite() { minimum } else { 0.0 }
@@ -239,9 +266,39 @@ pub fn recommend_safe_probe(
     preferred_action: Action,
     minimum_discrimination: f64,
 ) -> Option<SafeProbeRecommendation> {
+    recommend_safe_probe_with_noise(
+        state,
+        hypotheses,
+        limits,
+        shield_can_recover,
+        horizon,
+        preferred_action,
+        minimum_discrimination,
+        0.0,
+    )
+}
+
+/// As `recommend_safe_probe`, but discount model separation by a declared
+/// per-coordinate measurement error bound. A positive score means every pair of
+/// candidate observation boxes remains disjoint after noise expansion. A score
+/// of zero means at least one pair could produce overlapping observations, so
+/// guaranteed identification of the full hypothesis family is not claimed.
+#[allow(clippy::too_many_arguments)]
+pub fn recommend_safe_probe_with_noise(
+    state: StateEnvelope,
+    hypotheses: &[DynamicsBounds],
+    limits: ViabilityLimits,
+    shield_can_recover: bool,
+    horizon: usize,
+    preferred_action: Action,
+    minimum_discrimination: f64,
+    measurement_radius: f64,
+) -> Option<SafeProbeRecommendation> {
     if hypotheses.len() < 2
         || !minimum_discrimination.is_finite()
         || minimum_discrimination < 0.0
+        || !measurement_radius.is_finite()
+        || measurement_radius < 0.0
     {
         return None;
     }
@@ -249,7 +306,8 @@ pub fn recommend_safe_probe(
     let hull = dynamics_hull(hypotheses)?;
     let safe_actions =
         evaluate_horizon_action_set(state, hull, limits, shield_can_recover, horizon)?;
-    let action_scores = ACTIONS.map(|action| maximin_discrimination(hypotheses, action));
+    let action_scores =
+        ACTIONS.map(|action| maximin_discrimination(hypotheses, action, measurement_radius));
 
     let mut selected_action = None;
     let mut selected_score = 0.0_f64;
@@ -281,6 +339,7 @@ pub fn recommend_safe_probe(
         safe_actions,
         candidate_hypotheses: hypotheses.len(),
         minimum_discrimination,
+        measurement_radius,
         action_scores,
         selected_action,
         selected_score,
@@ -376,6 +435,38 @@ mod tests {
         assert_ne!(recommendation.selected_action(), Some(Action::Push));
         assert_eq!(recommendation.selected_action(), None);
         assert!(!recommendation.selected_action_is_certified());
+    }
+
+    #[test]
+    fn observation_noise_can_remove_apparent_discriminability() {
+        let models = informative_models();
+        let current = state((0.50, 0.50), (0.50, 0.50));
+        let low_noise = recommend_safe_probe_with_noise(
+            current, &models, limits(), true, 3, Action::Maintain, 0.02, 0.005,
+        ).expect("well-formed low-noise request");
+        assert_eq!(low_noise.selected_action(), Some(Action::Push));
+        assert!(low_noise.selected_action_guarantees_pairwise_distinguishability());
+
+        let high_noise = recommend_safe_probe_with_noise(
+            current, &models, limits(), true, 3, Action::Maintain, 0.0, 0.04,
+        ).expect("well-formed high-noise request");
+        assert!(high_noise.safe_actions().count() > 0);
+        assert_eq!(high_noise.selected_action(), None);
+        assert!(!high_noise.selected_action_guarantees_pairwise_distinguishability());
+        assert_eq!(high_noise.measurement_radius(), 0.04);
+    }
+
+    #[test]
+    fn invalid_measurement_noise_fails_closed() {
+        let models = informative_models();
+        assert!(recommend_safe_probe_with_noise(
+            state((0.50, 0.50), (0.50, 0.50)), &models, limits(), true, 3,
+            Action::Maintain, 0.0, f64::NAN,
+        ).is_none());
+        assert!(recommend_safe_probe_with_noise(
+            state((0.50, 0.50), (0.50, 0.50)), &models, limits(), true, 3,
+            Action::Maintain, 0.0, -0.1,
+        ).is_none());
     }
 
     #[test]
