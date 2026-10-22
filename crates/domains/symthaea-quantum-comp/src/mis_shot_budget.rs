@@ -265,8 +265,11 @@ fn preferred(
 /// candidate set; this is conservative but prevents repeated fixed-sample checks from
 /// silently reusing the full error budget. Device drift, correlated observations, or
 /// calibration changes can invalidate the sampling model; this planner cannot detect
-/// such violations. It plans shot counts only: no quantum execution, provenance, or
-/// maximum-set certificate is produced.
+/// such violations. Counts are conservatively summed per candidate; the planner
+/// does not coalesce identical rooted-topology circuits or account for shared cached
+/// measurements, which must be handled by a separate scheduler with explicit cache
+/// identity/invalidation. It plans allocations only: no quantum execution, provenance,
+/// or maximum-set certificate is produced.
 pub fn plan_mis_shots(
     estimates: &[MisCandidateEstimate],
     mode: MisSelectionMode,
@@ -512,6 +515,33 @@ mod tests {
                 inclusion_count: 4,
                 shots: 3,
             }
+        );
+    }
+
+    #[test]
+    fn rejects_zero_initial_budget_parameters() {
+        assert_eq!(
+            MisShotBudgetConfig::new(0, 8, 100, 0.05).expect_err("initial batch must be positive"),
+            MisShotBudgetError::ZeroInitialShots
+        );
+        assert_eq!(
+            MisShotBudgetConfig::new(8, 0, 100, 0.05).expect_err("incremental batch must be positive"),
+            MisShotBudgetError::ZeroBatchShots
+        );
+    }
+
+    #[test]
+    fn rejects_sample_count_overflow_instead_of_wrapping_budget() {
+        assert_eq!(
+            plan_mis_shots(
+                &[
+                    MisCandidateEstimate::new(0, u64::MAX, 0).expect("valid maximum count"),
+                    MisCandidateEstimate::new(1, 1, 0).expect("valid estimate"),
+                ],
+                MisSelectionMode::PreferInSet,
+                config(u64::MAX),
+            ).expect_err("sum of per-candidate counts overflows"),
+            MisShotBudgetError::TotalShotsOverflow
         );
     }
 
