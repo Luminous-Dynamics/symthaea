@@ -220,6 +220,7 @@ fn audit(
 
     let mut expected_counts: HashMap<String, u64> = HashMap::new();
     let mut reference_hashes: HashMap<String, String> = HashMap::new();
+    let mut mutant_hashes: HashMap<String, Vec<String>> = HashMap::new();
     let mut task_order: HashMap<String, usize> = HashMap::new();
     for (index, task) in manifest.iter().enumerate() {
         let id = str_field(task, "task_id").unwrap_or("");
@@ -228,6 +229,17 @@ fn audit(
         let test_digest = str_field(task, "test_source_blake3").unwrap_or("");
         let reference_source = str_field(task, "reference_source").unwrap_or("");
         let test_source = str_field(task, "test_source").unwrap_or("");
+        let mutant_sources = task.get("mutant_sources").and_then(Value::as_array);
+        let mut current_mutant_hashes = Vec::new();
+        if let Some(mutants) = mutant_sources {
+            for mutant in mutants {
+                if let Some(source) = mutant.as_str() {
+                    current_mutant_hashes.push(blake3::hash(source.as_bytes()).to_hex().to_string());
+                } else {
+                    errors.push(format!("task_manifest[{index}] contains a non-string mutant source"));
+                }
+            }
+        }
         let expected = u64_field(task, "expected_test_functions").unwrap_or(0);
         let recomputed_task_digest = task_digest_from_manifest(task);
         push_check(&mut errors, !id.is_empty(), format!("task_manifest[{index}] has empty task_id"));
@@ -265,11 +277,17 @@ fn audit(
         );
         push_check(
             &mut errors,
+            !current_mutant_hashes.is_empty(),
+            format!("task_manifest[{index}] must include at least one semantic mutant"),
+        );
+        push_check(
+            &mut errors,
             !expected_counts.contains_key(id),
             format!("duplicate task_id {id} in task_manifest"),
         );
         expected_counts.insert(id.to_string(), expected);
         reference_hashes.insert(id.to_string(), reference_digest.to_string());
+        mutant_hashes.insert(id.to_string(), current_mutant_hashes);
         task_order.insert(id.to_string(), index);
     }
 
@@ -399,6 +417,80 @@ fn audit(
         }
         for id in expected_counts.keys() {
             push_check(&mut errors, seen.contains_key(id), format!("missing empty-patch control for task {id}"));
+        }
+    }
+
+    let expected_mutation_count: usize = mutant_hashes.values().map(Vec::len).sum();
+    let mutation_controls = controls.get("mutation_controls").and_then(Value::as_array);
+    push_check(
+        &mut errors,
+        bool_field(controls, "all_mutants_killed") == Some(true),
+        "oracle_controls.all_mutants_killed must be true",
+    );
+    push_check(
+        &mut errors,
+        mutation_controls.is_some_and(|items| items.len() == expected_mutation_count),
+        "mutation control count does not match manifest mutant count",
+    );
+
+    if let Some(items) = mutation_controls {
+        let mut seen: HashMap<(String, usize), ()> = HashMap::new();
+        for (index, control) in items.iter().enumerate() {
+            let id = str_field(control, "task_id").unwrap_or("");
+            let mutation_index = u64_field(control, "mutation_index").and_then(|value| usize::try_from(value).ok());
+            let expected_count = expected_counts.get(id).copied().unwrap_or(0);
+            let expected_hash = mutation_index
+                .and_then(|mutation_index| mutant_hashes.get(id).and_then(|hashes| hashes.get(mutation_index)));
+            push_check(
+                &mut errors,
+                expected_hash.is_some(),
+                format!("mutation_controls[{index}] references an unknown task/mutant"),
+            );
+            if let Some(mutation_index) = mutation_index {
+                push_check(
+                    &mut errors,
+                    seen.insert((id.to_string(), mutation_index), ()).is_none(),
+                    format!("duplicate mutation control for task {id} mutant {mutation_index}"),
+                );
+            }
+            let source_hash = str_field(control, "mutation_source_blake3").unwrap_or("");
+            push_check(
+                &mut errors,
+                expected_hash.is_some_and(|digest| digest == source_hash) && is_hex(source_hash, 64),
+                format!("mutation control source digest mismatch for task {id}"),
+            );
+            let passed = u64_field(control, "tests_passed").unwrap_or(0);
+            let failed = u64_field(control, "tests_failed").unwrap_or(0);
+            let complete = expected_count > 0
+                && bool_field(control, "compiled") == Some(true)
+                && bool_field(control, "simulated") == Some(false)
+                && control.get("runtime_error").is_some_and(Value::is_null)
+                && passed.saturating_add(failed) == expected_count;
+            let killed = complete && failed > 0;
+            push_check(
+                &mut errors,
+                u64_field(control, "tests_expected") == Some(expected_count),
+                format!("mutation control expected test count mismatch for task {id}"),
+            );
+            push_check(
+                &mut errors,
+                bool_field(control, "oracle_complete") == Some(complete),
+                format!("mutation control oracle completeness mismatch for task {id}"),
+            );
+            push_check(
+                &mut errors,
+                bool_field(control, "mutant_killed") == Some(killed) && killed,
+                format!("semantic mutant was not behaviorally killed for task {id} mutant {:?}", mutation_index),
+            );
+        }
+        for (id, hashes) in &mutant_hashes {
+            for mutation_index in 0..hashes.len() {
+                push_check(
+                    &mut errors,
+                    seen.contains_key(&(id.clone(), mutation_index)),
+                    format!("missing mutation control for task {id} mutant {mutation_index}"),
+                );
+            }
         }
     }
 
