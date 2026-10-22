@@ -91,7 +91,7 @@ struct DeclaredSummary {
 struct Ledger {
     schema_version: String,
     status: String,
-    corpus_sha256: String,
+    case_id_inventory_sha256: String,
     rubric_sha256: String,
     protocol_sha256: String,
     reviewers: Vec<Reviewer>,
@@ -105,6 +105,7 @@ struct Ledger {
 struct OracleEvidenceSummary {
     status: String,
     ledger_sha256: String,
+    case_id_inventory_sha256: String,
     protocol_sha256: String,
     rubric_sha256: String,
     reviewer_count: usize,
@@ -154,7 +155,7 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
         "ledger must declare at least one limitation"
     );
     ensure!(
-        is_lower_hex(&ledger.corpus_sha256, 64)
+        is_lower_hex(&ledger.case_id_inventory_sha256, 64)
             && is_lower_hex(&ledger.rubric_sha256, 64)
             && is_lower_hex(&ledger.protocol_sha256, 64),
         "corpus, rubric, and protocol digests must be lowercase SHA-256"
@@ -174,8 +175,8 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
     let canonical_inventory = serde_json::to_vec(&expected)?;
     let inventory_digest = sha256_hex(&canonical_inventory);
     ensure!(
-        inventory_digest == ledger.corpus_sha256,
-        "ledger corpus_sha256 does not match canonical sorted case-ID inventory"
+        inventory_digest == ledger.case_id_inventory_sha256,
+        "ledger case_id_inventory_sha256 does not match canonical sorted case-ID inventory"
     );
 
     let mut reviewers = BTreeMap::new();
@@ -426,6 +427,7 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
     Ok(OracleEvidenceSummary {
         status: "COMPLETE".to_owned(),
         ledger_sha256: sha256_hex(ledger_bytes),
+        case_id_inventory_sha256: inventory_digest,
         protocol_sha256: ledger.protocol_sha256.clone(),
         rubric_sha256: ledger.rubric_sha256.clone(),
         reviewer_count: reviewers.len(),
@@ -552,7 +554,7 @@ mod tests {
         let ledger = Ledger {
             schema_version: LEDGER_SCHEMA_VERSION.to_string(),
             status: "COMPLETE".to_string(),
-            corpus_sha256: corpus_digest,
+            case_id_inventory_sha256: corpus_digest,
             rubric_sha256: "a".repeat(64),
             protocol_sha256: "b".repeat(64),
             reviewers,
