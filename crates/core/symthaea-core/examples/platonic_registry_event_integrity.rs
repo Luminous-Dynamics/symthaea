@@ -1071,7 +1071,7 @@ mod tests {
                 authorities
                     .iter()
                     .copied()
-                    .map(move |authority| (authority, action.clone()))
+                    .map(move |authority| (authority, (*action).clone()))
             })
             .collect::<Vec<_>>();
         assert_eq!(templates.len(), 48);
@@ -1088,12 +1088,7 @@ mod tests {
                 for current_event in &events {
                     let before = state.records.clone();
                     let decision = state.apply(current_event);
-                    assert_transition_contract(
-                        &before,
-                        &state,
-                        decision,
-                        current_event,
-                    );
+                    assert_transition_contract(&before, &state, decision, current_event);
                     event_applications += 1;
                 }
                 traces += 1;
