@@ -563,8 +563,16 @@ fn join_pairs(
         }
         let source_record = required_string(source, "record_id", &format!("{ctx}.source_insight"))?;
         let source_family = required_string(source, "family_id", &format!("{ctx}.source_insight"))?;
-        let source_commit = required_string(source, "source_commit", &format!("{ctx}.source_insight"))?;
-        let source_digest = required_string(source, "insight_sha256", &format!("{ctx}.source_insight"))?;
+        let source_commit = required_string(
+            source,
+            "source_commit",
+            &format!("{ctx}.source_insight"),
+        )?;
+        let source_digest = required_string(
+            source,
+            "insight_sha256",
+            &format!("{ctx}.source_insight"),
+        )?;
         let target_id = required_string(target, "target_id", &format!("{ctx}.target"))?;
         let target_family = required_string(target, "family_id", &format!("{ctx}.target"))?;
         let target_commit = required_string(target, "source_commit", &format!("{ctx}.target"))?;
@@ -574,19 +582,37 @@ fn join_pairs(
             bail!("{ctx}.target.artifact_path must be a safe repository-relative path");
         }
         let artifact_digest = required_string(target, "artifact_sha256", &format!("{ctx}.target"))?;
-        let base_statement_digest = required_string(target, "base_statement_sha256", &format!("{ctx}.target"))?;
-        let variant_statement_digest = required_string(target, "counterfactual_statement_sha256", &format!("{ctx}.target"))?;
+        let base_statement_digest = required_string(
+            target,
+            "base_statement_sha256",
+            &format!("{ctx}.target"),
+        )?;
+        let variant_statement_digest = required_string(
+            target,
+            "counterfactual_statement_sha256",
+            &format!("{ctx}.target"),
+        )?;
         let base_status = required_string(base_adj, "status", &format!("{ctx}.base_adjudication"))?;
         let base_label = required_string(base_adj, "label", &format!("{ctx}.base_adjudication"))?;
-        let variant_status = required_string(variant_adj, "status", &format!("{ctx}.counterfactual_adjudication"))?;
-        let variant_label = required_string(variant_adj, "label", &format!("{ctx}.counterfactual_adjudication"))?;
+        let variant_status = required_string(
+            variant_adj,
+            "status",
+            &format!("{ctx}.counterfactual_adjudication"),
+        )?;
+        let variant_label = required_string(
+            variant_adj,
+            "label",
+            &format!("{ctx}.counterfactual_adjudication"),
+        )?;
         for (family, split) in [(source_family, split), (target_family, split)] {
             if let Some(previous) = family_split.insert(family.to_owned(), split.to_owned()) {
                 if previous != split {
                     bail!("family {family} crosses suite splits");
                 }
             }
-            if let Some(previous) = family_component.insert(family.to_owned(), component_id.clone()) {
+            if let Some(previous) = family_component
+                .insert(family.to_owned(), component_id.clone())
+            {
                 if previous != component_id {
                     bail!("family {family} crosses pair components");
                 }
@@ -598,12 +624,23 @@ fn join_pairs(
             }
         }
 
-        let base = outcomes.get(&base_id).with_context(|| format!("{ctx} missing base outcome {base_id}"))?;
-        let variant = outcomes.get(&variant_id).with_context(|| format!("{ctx} missing counterfactual outcome {variant_id}"))?;
+        let base = outcomes
+            .get(&base_id)
+            .with_context(|| format!("{ctx} missing base outcome {base_id}"))?;
+        let variant = outcomes
+            .get(&variant_id)
+            .with_context(|| format!("{ctx} missing counterfactual outcome {variant_id}"))?;
         validate_matched_arm(base, variant, &ctx)?;
         for (row, expected_id, label, status, statement_digest, side) in [
             (base, &base_id, base_label, base_status, base_statement_digest, "base"),
-            (variant, &variant_id, variant_label, variant_status, variant_statement_digest, "counterfactual"),
+            (
+                variant,
+                &variant_id,
+                variant_label,
+                variant_status,
+                variant_statement_digest,
+                "counterfactual",
+            ),
         ] {
             let row_ctx = format!("{ctx}.{side} outcome {expected_id}");
             if required_string(row, "pair_id", &row_ctx)? != expected_id {
@@ -615,15 +652,20 @@ fn join_pairs(
             if required_string_at(row, &["source", "record_id"], &row_ctx)? != source_record
                 || required_string_at(row, &["source", "family_id"], &row_ctx)? != source_family
                 || required_string_at(row, &["source", "source_commit"], &row_ctx)? != source_commit
-                || required_string_at(row, &["source", "insight_sha256"], &row_ctx)? != source_digest {
+                || required_string_at(row, &["source", "insight_sha256"], &row_ctx)?
+                    != source_digest
+            {
                 bail!("{row_ctx} source insight provenance mismatch");
             }
             if required_string_at(row, &["target", "theorem_id"], &row_ctx)? != target_id
                 || required_string_at(row, &["target", "family_id"], &row_ctx)? != target_family
                 || required_string_at(row, &["target", "source_commit"], &row_ctx)? != target_commit
                 || required_string_at(row, &["target", "artifact_path"], &row_ctx)? != artifact_path
-                || required_string_at(row, &["target", "artifact_sha256"], &row_ctx)? != artifact_digest
-                || required_string_at(row, &["target", "statement_sha256"], &row_ctx)? != statement_digest {
+                || required_string_at(row, &["target", "artifact_sha256"], &row_ctx)?
+                    != artifact_digest
+                || required_string_at(row, &["target", "statement_sha256"], &row_ctx)?
+                    != statement_digest
+            {
                 bail!("{row_ctx} target/statement provenance mismatch");
             }
             if required_string(row, "split", &row_ctx)? != requested_split
@@ -641,9 +683,12 @@ fn join_pairs(
             continue;
         }
         if base_label != "compatible" {
-            bail!("{ctx}: paired counterfactual analysis requires an independently adjudicated compatible base");
+            bail!(
+                "{ctx}: paired counterfactual analysis requires an independently adjudicated compatible base"
+            );
         }
-        let noop = required_string(mutation, "kind", &format!("{ctx}.mutation"))? == "no_semantic_change";
+        let noop = required_string(mutation, "kind", &format!("{ctx}.mutation"))?
+            == "no_semantic_change";
         if noop && variant_label != "compatible" {
             bail!("{ctx}: semantics-preserving pair has incompatible gold label");
         }
@@ -651,7 +696,8 @@ fn join_pairs(
         let variant_decision = required_string_at(variant, &["prediction", "decision"], &ctx)?;
         observations.push(PairObservation {
             component_id,
-            mutation_kind: required_string(mutation, "kind", &format!("{ctx}.mutation"))?.to_owned(),
+            mutation_kind: required_string(mutation, "kind", &format!("{ctx}.mutation"))?
+                .to_owned(),
             base_compatible: base_label == "compatible",
             base_accept: base_decision == "accept",
             base_decision: base_decision.to_owned(),
@@ -727,7 +773,14 @@ fn aggregate(observations: &[PairObservation]) -> Counts {
 }
 
 fn metric_json(numerator: usize, denominator: usize, estimate: Option<f64>) -> Value {
-    json!({"statistic":"ratio","numerator":numerator,"denominator":denominator,"estimate":estimate,"ci_95":null,"defined_bootstrap_replicates":0})
+    json!({
+        "statistic": "ratio",
+        "numerator": numerator,
+        "denominator": denominator,
+        "estimate": estimate,
+        "ci_95": null,
+        "defined_bootstrap_replicates": 0
+    })
 }
 
 fn metric_json_value(metric: &Metric, name: &str) -> Value {
@@ -838,9 +891,14 @@ fn validate_run_budgets(row: &Value, context: &str) -> Result<()> {
         ("actual_wall_ms", "max_wall_ms"),
         ("actual_cost_microusd", "max_cost_microusd"),
     ] {
-        let cap = budget.get(limit).and_then(Value::as_u64).with_context(|| format!("{context}.run.budget.{limit} must be non-negative integer"))?;
+        let cap = budget
+            .get(limit)
+            .and_then(Value::as_u64)
+            .with_context(|| format!("{context}.run.budget.{limit} must be non-negative integer"))?;
         if let Some(actual_value) = run.get(actual) {
-            let amount = actual_value.as_u64().with_context(|| format!("{context}.run.{actual} must be non-negative integer"))?;
+            let amount = actual_value
+                .as_u64()
+                .with_context(|| format!("{context}.run.{actual} must be non-negative integer"))?;
             if amount > cap {
                 bail!("{context}.run.{actual} exceeds {limit}");
             }
@@ -849,7 +907,12 @@ fn validate_run_budgets(row: &Value, context: &str) -> Result<()> {
     Ok(())
 }
 
-fn require_exact_keys(value: &Value, required: &[&str], optional: &[&str], context: &str) -> Result<()> {
+fn require_exact_keys(
+    value: &Value,
+    required: &[&str],
+    optional: &[&str],
+    context: &str,
+) -> Result<()> {
     let object = value.as_object().with_context(|| format!("{context} must be an object"))?;
     for key in required {
         if !object.contains_key(*key) {
@@ -868,9 +931,15 @@ fn validate_prediction_consistency(row: &Value, context: &str) -> Result<()> {
     let decision = required_string_at(row, &["prediction", "decision"], context)?;
     let label = required_string_at(row, &["prediction", "predicted_label"], context)?;
     match decision {
-        "accept" if label != "compatible" => bail!("{context}: accept decision must predict compatible"),
-        "reject" if !matches!(label, "incompatible" | "partial") => bail!("{context}: reject decision must predict incompatible or partial"),
-        "abstain" if label != "unknown" => bail!("{context}: abstain decision must predict unknown"),
+        "accept" if label != "compatible" => {
+            bail!("{context}: accept decision must predict compatible")
+        }
+        "reject" if !matches!(label, "incompatible" | "partial") => {
+            bail!("{context}: reject decision must predict incompatible or partial")
+        }
+        "abstain" if label != "unknown" => {
+            bail!("{context}: abstain decision must predict unknown")
+        }
         _ => {}
     }
     Ok(())
@@ -883,7 +952,9 @@ fn validate_probability(value: Option<&Value>, context: &str) -> Result<()> {
     if value.is_null() {
         return Ok(());
     }
-    let p = value.as_f64().with_context(|| format!("{context}.prediction.compatibility_probability must be null or numeric"))?;
+    let p = value.as_f64().with_context(|| {
+        format!("{context}.prediction.compatibility_probability must be null or numeric")
+    })?;
     if !p.is_finite() || !(0.0..=1.0).contains(&p) {
         bail!("{context}.prediction.compatibility_probability outside [0, 1]");
     }
@@ -902,14 +973,20 @@ fn required_string<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a
 fn required_string_at<'a>(value: &'a Value, path: &[&str], context: &str) -> Result<&'a str> {
     let mut current = value;
     for segment in path {
-        current = current.get(*segment).with_context(|| format!("{context}.{} missing", path.join(".")))?;
+        current = current
+            .get(*segment)
+            .with_context(|| format!("{context}.{} missing", path.join(".")))?;
     }
     current.as_str().filter(|s| !s.trim().is_empty())
         .with_context(|| format!("{context}.{} must be a non-empty string", path.join(".")))
 }
 
 fn validate_digest(value: &str, length: usize, context: &str) -> Result<()> {
-    if value.len() != length || !value.bytes().all(|x| x.is_ascii_hexdigit() && !x.is_ascii_uppercase()) {
+    if value.len() != length
+        || !value
+            .bytes()
+            .all(|x| x.is_ascii_hexdigit() && !x.is_ascii_uppercase())
+    {
         bail!("{context} must be lowercase hex with length {length}");
     }
     Ok(())
@@ -971,19 +1048,28 @@ mod tests {
             PairObservation {
                 component_id: "c1".into(), mutation_kind: "precondition_removed".into(),
                 base_compatible: true, base_accept: true, base_decision: "accept".into(),
-                variant_compatible: false, variant_accept: false, variant_decision: "reject".into(), noop: false,
+                variant_compatible: false,
+                variant_accept: false,
+                variant_decision: "reject".into(),
+                noop: false,
                 base_probability: Some(0.9), variant_probability: Some(0.1),
             },
             PairObservation {
                 component_id: "c2".into(), mutation_kind: "precondition_removed".into(),
                 base_compatible: true, base_accept: false, base_decision: "reject".into(),
-                variant_compatible: false, variant_accept: false, variant_decision: "reject".into(), noop: false,
+                variant_compatible: false,
+                variant_accept: false,
+                variant_decision: "reject".into(),
+                noop: false,
                 base_probability: Some(0.7), variant_probability: Some(0.2),
             },
             PairObservation {
                 component_id: "c3".into(), mutation_kind: "no_semantic_change".into(),
                 base_compatible: true, base_accept: true, base_decision: "accept".into(),
-                variant_compatible: true, variant_accept: false, variant_decision: "reject".into(), noop: true,
+                variant_compatible: true,
+                variant_accept: false,
+                variant_decision: "reject".into(),
+                noop: true,
                 base_probability: Some(0.8), variant_probability: Some(0.4),
             },
         ];
