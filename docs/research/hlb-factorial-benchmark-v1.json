@@ -1,0 +1,119 @@
+{
+  "schema_version": "hlb-factorial-benchmark-v1",
+  "status": "protocol_only",
+  "claim_ceiling": "Design-contract consistency only. No runtime component activation, capability, efficiency, SOTA, or consciousness claim is supported.",
+  "source_binding": {
+    "required_run_environment_variable": "SYMTHAEA_SOURCE_SHA",
+    "required_format": "40-character hexadecimal Git commit SHA",
+    "checkout_policy": "The benchmark workflow must check out exactly the PR head SHA or dispatched commit SHA."
+  },
+  "factors": [
+    {
+      "id": "native_hdc",
+      "enabled_mechanism": "Symthaea native HDC/VSA representation and native associative operations",
+      "disabled_control": "Fixed-seed random projection with the same downstream interface and declared representation width",
+      "adapter_status": "not_implemented_or_verified_by_this_contract"
+    },
+    {
+      "id": "cfc_ltc",
+      "enabled_mechanism": "The nominated active-core CfC/LTC temporal model with explicit time intervals",
+      "disabled_control": "Parameter-matched GRU temporal comparator; also run memoryless and simple leaky-state controls in the temporal study",
+      "adapter_status": "not_implemented_or_verified_by_this_contract"
+    },
+    {
+      "id": "fep_epistemic_policy",
+      "enabled_mechanism": "FEP-style policy selection with an explicit epistemic/information-seeking term",
+      "disabled_control": "Pragmatic-greedy action selection using the same environment, observation interface, and world-model interface",
+      "adapter_status": "not_implemented_or_verified_by_this_contract"
+    }
+  ],
+  "profiles": [
+    {"id": "H0-C0-F0", "native_hdc": false, "cfc_ltc": false, "fep_epistemic_policy": false, "execution_status": "planned_not_executed"},
+    {"id": "H0-C0-F1", "native_hdc": false, "cfc_ltc": false, "fep_epistemic_policy": true, "execution_status": "planned_not_executed"},
+    {"id": "H0-C1-F0", "native_hdc": false, "cfc_ltc": true, "fep_epistemic_policy": false, "execution_status": "planned_not_executed"},
+    {"id": "H0-C1-F1", "native_hdc": false, "cfc_ltc": true, "fep_epistemic_policy": true, "execution_status": "planned_not_executed"},
+    {"id": "H1-C0-F0", "native_hdc": true, "cfc_ltc": false, "fep_epistemic_policy": false, "execution_status": "planned_not_executed"},
+    {"id": "H1-C0-F1", "native_hdc": true, "cfc_ltc": false, "fep_epistemic_policy": true, "execution_status": "planned_not_executed"},
+    {"id": "H1-C1-F0", "native_hdc": true, "cfc_ltc": true, "fep_epistemic_policy": false, "execution_status": "planned_not_executed"},
+    {"id": "H1-C1-F1", "native_hdc": true, "cfc_ltc": true, "fep_epistemic_policy": true, "execution_status": "planned_not_executed"}
+  ],
+  "tasks": [
+    {
+      "id": "partial_observability_information_choice",
+      "environment": "Seeded partially observable T-maze or cue-conflict task with a costly information-gathering action",
+      "primary_outcomes": ["task_success_rate", "normalized_regret"],
+      "diagnostics": ["information_gain_per_action", "observation_cost", "decision_change_after_observation"]
+    },
+    {
+      "id": "nonstationary_delayed_effect_control",
+      "environment": "Seeded environment with a stable phase followed by a declared dynamics or reward change",
+      "primary_outcomes": ["cumulative_regret", "constraint_violation_rate"],
+      "diagnostics": ["prospective_prediction_error", "recovery_steps", "uncertainty_calibration"]
+    },
+    {
+      "id": "noisy_compositional_generalization",
+      "environment": "Role-filler or sequence task with held-out compositions and declared corruption levels",
+      "primary_outcomes": ["held_out_compositional_success"],
+      "diagnostics": ["selective_risk_at_common_coverage", "false_acceptance_rate", "memory_bytes"]
+    },
+    {
+      "id": "irregularly_sampled_forecasting",
+      "environment": "Frozen time-series task with controlled missing observations and irregular elapsed-time intervals",
+      "primary_outcomes": ["forecast_error"],
+      "diagnostics": ["error_by_elapsed_interval", "uncertainty_calibration", "end_to_end_latency"]
+    }
+  ],
+  "baselines": [
+    {"id": "hdc_prototype_or_online", "scope": "associative representation / classification"},
+    {"id": "fixed_seed_random_projection", "scope": "representation control"},
+    {"id": "svm_shared_input_features", "scope": "classification where applicable"},
+    {"id": "rvfl_shared_input_features", "scope": "classification where applicable"},
+    {"id": "parameter_matched_gru", "scope": "temporal architecture comparison"},
+    {"id": "simple_leaky_state", "scope": "temporal memory control"},
+    {"id": "memoryless_model", "scope": "non-temporal control"},
+    {"id": "pragmatic_greedy_policy", "scope": "policy ablation with shared world-model interface"},
+    {"id": "random_exploration_policy", "scope": "exploration baseline"},
+    {"id": "bounded_information_gain_policy", "scope": "epistemic value baseline"},
+    {"id": "perfect_information_oracle", "scope": "labelled upper bound only; never a deployable comparator or tuning signal"}
+  ],
+  "seeds": {
+    "development": [11, 23, 37, 53, 71, 89, 107, 131, 151, 173],
+    "held_out": [211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307, 311, 313, 317]
+  },
+  "tuning_budget": {
+    "max_candidate_configs_per_profile_task": 40,
+    "same_candidate_count_for_all_profiles": true,
+    "aggregate_validation_compute_must_be_recorded": true,
+    "deviations_require_explicit_receipt_field": true
+  },
+  "metrics": {
+    "primary": ["task_success_rate", "normalized_regret", "held_out_compositional_success", "forecast_error"],
+    "guardrails": ["constraint_violation_rate", "brier_score_when_probabilities_are_valid", "selective_risk_at_common_coverage", "false_acceptance_rate"],
+    "efficiency": ["p50_decision_latency_ns", "p95_decision_latency_ns", "peak_memory_bytes", "state_bytes", "measured_operation_count"],
+    "energy": "Report only when measurement method, device, power limits, and aggregation are documented and reproducible."
+  },
+  "analysis_plan": {
+    "pairing": "Pair environment seeds and scenarios across all factorial profiles and comparators.",
+    "uncertainty": "Report per-task effect sizes, variance across seeds, and 95% confidence intervals.",
+    "multiplicity": "Predeclare primary contrasts and apply Holm correction across registered primary tests.",
+    "synergy": "Do not infer synergy from the full profile alone; estimate preregistered factor interaction effects on held-out results.",
+    "guardrails": "A primary-score gain cannot compensate for a material increase in constraint violations, miscalibration, or false acceptance.",
+    "internal_metrics": "Phi-like and other internal measurements are exploratory secondary outcomes, not proxies for task competence or proof of consciousness."
+  },
+  "hard_gates": [
+    "All eight distinct profiles must be present exactly once.",
+    "Each disabled factor must have a named control adapter; runtime logs must prove the adapter actually ran.",
+    "A label or learning threshold alone is not evidence that computation or state evolution was disabled.",
+    "Exact source SHA, profile identity, task revision, seed/split, baseline identity, budget use, and result artifact digests must be recorded.",
+    "No test, hidden oracle, or held-out label may leak into the tested policy or its tuning process.",
+    "Incomplete execution, unmatched budgets, missing baselines, failed integrity checks, and invalid outputs are non-qualification states.",
+    "No SOTA or production-readiness claim can be emitted by the protocol validator."
+  ],
+  "research_references": [
+    {"id": "hdc_comparative_2025", "url": "https://doi.org/10.1007/s10462-025-11181-2"},
+    {"id": "cfc_nature_2022", "url": "https://doi.org/10.1038/s42256-022-00556-7"},
+    {"id": "cfc_rederived_2026", "url": "https://doi.org/10.1109/TNNLS.2026.3669345"},
+    {"id": "active_inference_artificial_reasoning_2026", "url": "https://www.nature.com/articles/s41467-026-77209-5"},
+    {"id": "active_inference_vs_rl_2026", "url": "https://doi.org/10.1016/j.jmp.2026.103011"}
+  ]
+}
