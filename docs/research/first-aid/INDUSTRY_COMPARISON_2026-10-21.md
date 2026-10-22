@@ -27,6 +27,17 @@ Source: https://hai.stanford.edu/news/measuring-what-medical-ai-can-actually-do 
 - *State of clinical AI in 2026*, BMJ Digital Health & AI, reports persistent weaknesses in uncertainty calibration, robustness to distribution shift and real-world workflow performance: https://bmjdigitalhealth.bmj.com/content/2/1/e000113
 - CSEDB uses 30 metrics and 2,069 expert-developed open-ended items; its authors report an average performance drop in high-risk scenarios. It is a complementary clinical response benchmark, not a direct comparator for a state-machine checker: https://www.nature.com/articles/s41746-025-02277-8
 
+## Snapshot refresh: 2026-10-22
+
+The [Clinical Benchmarks index](https://clinicalbenchmarks.ai/benchmarks), which reports data current to **October 12, 2026**, tracks ten benchmark boards with multiple model results. Its [PhysicianBench board](https://clinicalbenchmarks.ai/benchmarks/physicianbench) lists 28 result rows across 20 models, based on 100 long-horizon tasks, 21 specialties and 670 structured checkpoints. The latest listed row at this snapshot is a vendor-reported 68.4% Pass@1 for Claude Opus 5.5 (max, Anthropic harness; measured September 2026).
+
+That number differs from the 46% headline in Stanford HAI's October 19 synthesis because the model set, harness, timing, grading and aggregation differ. **Do not average or directly compare these figures.** The correct research conclusion is that results depend materially on the evaluated agent configuration and benchmark conditions; leaderboard snapshots should name source, model version, harness, date, metric, and uncertainty.
+
+The index also lists separate boards for workflow agents, safety and clinical reasoning; high scores on near-saturated exam benchmarks are not evidence of robust long-horizon workflow execution. Relevant sources:
+- Stanford HAI, 2026-10-19: https://hai.stanford.edu/news/measuring-what-medical-ai-can-actually-do
+- Clinical Benchmarks index, last updated 2026-10-12: https://clinicalbenchmarks.ai/benchmarks
+- PhysicianBench result rows and methodology: https://clinicalbenchmarks.ai/benchmarks/physicianbench
+
 ## How this project should compare
 
 Treat external benchmarks as design references. A like-for-like comparison requires shared task definitions, a common dataset, the same execution environment, pre-registered metrics, and reference outcomes adjudicated independently of the system being tested.
