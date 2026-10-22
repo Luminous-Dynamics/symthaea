@@ -27,6 +27,9 @@ pub enum AuthorityContract {
     ReplayResistance,
     IndependentRecoveryQuorum,
     HazardBlocksResume,
+    RestrictionMonotonicity,
+    RecoveryApprovalInvalidation,
+    CheckpointPreservesRestriction,
     AuditChainContinuity,
     UpdateRollback,
     WatchdogRecoveryLock,
@@ -34,10 +37,13 @@ pub enum AuthorityContract {
 }
 
 impl AuthorityContract {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 10] = [
         Self::ReplayResistance,
         Self::IndependentRecoveryQuorum,
         Self::HazardBlocksResume,
+        Self::RestrictionMonotonicity,
+        Self::RecoveryApprovalInvalidation,
+        Self::CheckpointPreservesRestriction,
         Self::AuditChainContinuity,
         Self::UpdateRollback,
         Self::WatchdogRecoveryLock,
@@ -49,6 +55,9 @@ impl AuthorityContract {
             Self::ReplayResistance => "replay_resistance",
             Self::IndependentRecoveryQuorum => "independent_recovery_quorum",
             Self::HazardBlocksResume => "hazard_blocks_resume",
+            Self::RestrictionMonotonicity => "restriction_monotonicity",
+            Self::RecoveryApprovalInvalidation => "recovery_approval_invalidation",
+            Self::CheckpointPreservesRestriction => "checkpoint_preserves_restriction",
             Self::AuditChainContinuity => "audit_chain_continuity",
             Self::UpdateRollback => "update_rollback",
             Self::WatchdogRecoveryLock => "watchdog_recovery_lock",
@@ -186,6 +195,104 @@ impl AuthorityValidator {
                 );
                 if result != Err(OperatorAuthorityRejection::PhysicalHazardActive) {
                     return Err("physical hazard did not block resume".to_string());
+                }
+                Ok(())
+            }
+            AuthorityContract::RestrictionMonotonicity => {
+                let mut authority = OperatorAuthority::default();
+                authority
+                    .ingest(
+                        Self::envelope(1, 1, 1, OperatorCommand::EmergencyStop),
+                        20,
+                        true,
+                    )
+                    .map_err(|error| format!("stop rejected: {error:?}"))?;
+                let result = authority.ingest(
+                    Self::envelope(1, 2, 2, OperatorCommand::ReturnHome),
+                    21,
+                    true,
+                );
+                if result != Err(OperatorAuthorityRejection::WouldWeakenActiveConstraint)
+                    || authority.constraint() != OperatorConstraint::EmergencyStop
+                {
+                    return Err(
+                        "ordinary operator command weakened an active emergency stop".to_string(),
+                    );
+                }
+                Ok(())
+            }
+            AuthorityContract::RecoveryApprovalInvalidation => {
+                let mut authority = OperatorAuthority::default();
+                authority
+                    .ingest(
+                        Self::envelope(1, 1, 1, OperatorCommand::HoldPosition),
+                        20,
+                        true,
+                    )
+                    .map_err(|error| format!("hold rejected: {error:?}"))?;
+                let first = authority
+                    .ingest(
+                        Self::envelope(1, 2, 9, OperatorCommand::ResumeNominal),
+                        21,
+                        true,
+                    )
+                    .map_err(|error| format!("first approval rejected: {error:?}"))?;
+                if !matches!(first, OperatorDecision::PendingQuorum { approvals: 1, .. })
+                    || authority.pending_approvals(9) != 1
+                {
+                    return Err("first recovery approval was not retained".to_string());
+                }
+
+                authority
+                    .ingest(
+                        Self::envelope(2, 1, 2, OperatorCommand::EmergencyStop),
+                        22,
+                        true,
+                    )
+                    .map_err(|error| format!("new stop rejected: {error:?}"))?;
+                if authority.pending_approvals(9) != 0 {
+                    return Err("new restriction retained stale recovery approvals".to_string());
+                }
+
+                let second = authority
+                    .ingest(
+                        Self::envelope(2, 2, 9, OperatorCommand::ResumeNominal),
+                        23,
+                        true,
+                    )
+                    .map_err(|error| format!("fresh approval rejected: {error:?}"))?;
+                if !matches!(second, OperatorDecision::PendingQuorum { approvals: 1, .. })
+                    || authority.constraint() != OperatorConstraint::EmergencyStop
+                {
+                    return Err(
+                        "approval collected before a new restriction contributed to clearing it"
+                            .to_string(),
+                    );
+                }
+                Ok(())
+            }
+            AuthorityContract::CheckpointPreservesRestriction => {
+                let genesis = GenesisSeed::from_phrase("authority restriction checkpoint");
+                let mut source = SubterraneanEmbodiment::new(&genesis);
+                source
+                    .ingest_operator_command(Self::envelope(
+                        1,
+                        1,
+                        1,
+                        OperatorCommand::HoldPosition,
+                    ))
+                    .map_err(|error| format!("source hold rejected: {error:?}"))?;
+                if source.operator_constraint() != OperatorConstraint::HoldPosition {
+                    return Err("source did not retain hold before checkpoint".to_string());
+                }
+
+                let checkpoint = source.operational_checkpoint();
+                let mut restored = SubterraneanEmbodiment::new(&genesis);
+                restored
+                    .load_operational_checkpoint(&checkpoint)
+                    .map_err(|error| format!("checkpoint restore failed: {error:?}"))?;
+                if restored.operator_constraint() != OperatorConstraint::HoldPosition {
+                    return Err("checkpoint restore widened operator authority".to_string());
                 }
                 Ok(())
             }
