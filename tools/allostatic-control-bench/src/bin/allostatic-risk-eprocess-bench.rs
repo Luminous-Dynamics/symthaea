@@ -236,6 +236,17 @@ fn process_episode(
         episode_rows.push((row, bounded_loss, monitor.log_e_value(), alarm));
     }
 
+    if rows
+        .iter()
+        .any(|row| row.all_scores_below_pointwise != all_scores_below_pointwise)
+    {
+        return Err(IoError::new(
+            ErrorKind::InvalidData,
+            "input full-episode pointwise flag disagrees with reconstructed residual trace",
+        )
+        .into());
+    }
+
     for (row, bounded_loss, log_e_value, alarm) in &episode_rows {
         let mut fields = row.fields.clone();
         fields.push(format!("{bounded_loss:.9}"));
