@@ -521,6 +521,86 @@ pub fn select_experiment_by_weighted_information_gain_per_cost<'a, H, E>(
     best
 }
 
+/// Select an experiment by maximizing its worst-case weighted EIG per unit cost
+/// across a predeclared set of plausible prior distributions.
+///
+/// This is a finite scenario-robust heuristic, not the maximin robust Bayesian design method
+/// based on Sibson mutual information. Each prior scenario must be a defensible, policy-visible
+/// prior over the same candidate representation. The selector chooses the experiment with the
+/// best minimum score across all scenarios, avoiding a design that is informative only under
+/// one chosen prior. It is intentionally conservative and can select a less informative design
+/// under the nominal prior; callers should report per-scenario scores and include a nominal
+/// weighted-EIG arm.
+///
+/// Every scenario must be valid and score every candidate completely. If the scenario set is
+/// empty, has a malformed prior, or cannot score a candidate, the robust selector fails closed
+/// rather than silently dropping the adverse scenario. Ties preserve input order.
+pub fn select_experiment_by_minimum_weighted_information_gain_per_cost<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prior_scenarios: &[Vec<f64>],
+    observation_std_dev: f64,
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if candidates.is_empty() || prior_scenarios.is_empty() || hypotheses.len() < 2 {
+        return None;
+    }
+
+    // Validate every scenario before scoring any candidate. In particular, do not turn an
+    // invalid/adversarial scenario into a silent omission that improves the minimum.
+    for prior_weights in prior_scenarios {
+        if prior_weights.len() != hypotheses.len()
+            || prior_weights
+                .iter()
+                .any(|weight| !weight.is_finite() || *weight < 0.0)
+        {
+            return None;
+        }
+        if prior_weights.iter().all(|weight| *weight == 0.0) {
+            return None;
+        }
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+
+        let mut worst_case_score = f64::INFINITY;
+        let mut valid_for_all_scenarios = true;
+        for prior_weights in prior_scenarios {
+            let Some(information_gain) = expected_information_gain_with_prior_nats(
+                experiment,
+                hypotheses,
+                prior_weights,
+                observation_std_dev,
+                predict,
+            ) else {
+                valid_for_all_scenarios = false;
+                break;
+            };
+            let score = information_gain / experiment_cost;
+            if !score.is_finite() || score < 0.0 {
+                valid_for_all_scenarios = false;
+                break;
+            }
+            worst_case_score = worst_case_score.min(score);
+        }
+
+        if valid_for_all_scenarios
+            && worst_case_score > 0.0
+            && best.is_none_or(|(_, best_score)| worst_case_score > best_score)
+        {
+            best = Some((experiment, worst_case_score));
+        }
+    }
+
+    best
+}
+
 /// Select the candidate maximizing expected information gain per unit cost.
 ///
 /// Candidates with non-positive/non-finite costs, incomplete predictions, or zero
@@ -974,6 +1054,90 @@ mod tests {
                 |h, _| Some(*h as f64),
             ),
             Some(0.0)
+        );
+    }
+
+    #[test]
+    fn scenario_robust_selector_avoids_prior_fragile_partition() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let scenarios = vec![
+            vec![0.49, 0.49, 0.01, 0.01],
+            vec![0.01, 0.01, 0.49, 0.49],
+        ];
+        let experiments = [0_usize, 1_usize];
+        let prediction_table = [[0.0_f64, 0.0, 10.0, 10.0], [0.0, 10.0, 0.0, 10.0]];
+        let predict = |hypothesis: &usize, experiment: &usize| {
+            Some(prediction_table[*experiment][*hypothesis])
+        };
+
+        let nominal = select_experiment_by_weighted_information_gain_per_cost(
+            &experiments,
+            &hypotheses,
+            &scenarios[0],
+            1.0,
+            predict,
+            |_| 1.0,
+        )
+        .expect("nominal scenario contains informative experiments")
+        .0;
+        let robust = select_experiment_by_minimum_weighted_information_gain_per_cost(
+            &experiments,
+            &hypotheses,
+            &scenarios,
+            1.0,
+            predict,
+            |_| 1.0,
+        )
+        .expect("both scenarios score every experiment")
+        .0;
+
+        assert_eq!(*nominal, 0, "nominal prior prefers its balanced partition");
+        assert_eq!(
+            *robust, 1,
+            "the orthogonal partition remains informative when prior mass shifts between pairs"
+        );
+    }
+
+    #[test]
+    fn scenario_robust_selector_fails_closed_on_invalid_prior_scenario() {
+        let hypotheses = [0_usize, 1, 2];
+        let experiments = [0_usize, 1_usize];
+        let predict = |hypothesis: &usize, experiment: &usize| {
+            Some((*hypothesis * (*experiment + 1)) as f64)
+        };
+
+        assert!(
+            select_experiment_by_minimum_weighted_information_gain_per_cost(
+                &experiments,
+                &hypotheses,
+                &[],
+                1.0,
+                predict,
+                |_| 1.0,
+            )
+            .is_none()
+        );
+        assert!(
+            select_experiment_by_minimum_weighted_information_gain_per_cost(
+                &experiments,
+                &hypotheses,
+                &[vec![1.0, 1.0, 1.0], vec![1.0, f64::NAN, 1.0]],
+                1.0,
+                predict,
+                |_| 1.0,
+            )
+            .is_none()
+        );
+        assert!(
+            select_experiment_by_minimum_weighted_information_gain_per_cost(
+                &experiments,
+                &hypotheses,
+                &[vec![1.0, 1.0, 1.0], vec![0.0, 0.0, 0.0]],
+                1.0,
+                predict,
+                |_| 1.0,
+            )
+            .is_none()
         );
     }
 
