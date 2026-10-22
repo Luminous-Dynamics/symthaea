@@ -24,9 +24,17 @@ pub struct MisGraphIdentity {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MisGraphIdentityError {
     /// An edge references a vertex outside the declared graph.
-    VertexOutOfRange { vertex: usize, vertex_count: usize },
+    VertexOutOfRange {
+        /// Out-of-range endpoint value.
+        vertex: usize,
+        /// Number of vertices declared for the graph.
+        vertex_count: usize,
+    },
     /// A simple graph cannot contain an edge from a vertex to itself.
-    SelfLoop { vertex: usize },
+    SelfLoop {
+        /// Vertex with a self-loop.
+        vertex: usize,
+    },
     /// The vertex count cannot be represented by the canonical encoding.
     VertexCountTooLarge,
     /// The edge count cannot be represented by the canonical encoding.
