@@ -3372,6 +3372,41 @@ mod tests {
     }
 
     #[test]
+    fn rk45_failure_receipt_preserves_minimum_step_rejections() {
+        let oscillator = HarmonicOscillator::simple(1.0);
+        let integrator = Rk45Integrator {
+            tol: 1.0e-14,
+            dt_min: 0.1,
+            dt_max: 0.1,
+        };
+        let tolerances = Rk45Tolerances::new(1.0e-14, vec![1.0e-16; 2]);
+        let mut controller = Rk45Controller::new(0.1).unwrap();
+
+        let outcome = controller.try_step_with_receipt(
+            &integrator,
+            &oscillator,
+            &[1.0, 0.0],
+            0.0,
+            0.1,
+            &tolerances,
+            10,
+        );
+        let Rk45StepOutcome::Failed(receipt) = outcome else {
+            panic!("the fixed minimum timestep cannot satisfy this tolerance");
+        };
+
+        assert_eq!(receipt.error, SimulationError::AdaptiveToleranceNotMet);
+        assert_eq!(receipt.attempted_steps, 1);
+        assert_eq!(receipt.rejected_steps, 1);
+        assert_eq!(receipt.derivative_evaluations, 6);
+        assert_eq!(receipt.last_accepted_state, vec![1.0, 0.0]);
+        assert_eq!(receipt.last_accepted_time, 0.0);
+        assert_eq!(receipt.last_attempted_dt, Some(0.1));
+        assert_eq!(receipt.min_attempted_dt, Some(0.1));
+        assert_eq!(controller.next_step_size(), Some(0.1));
+    }
+
+    #[test]
     fn rk45_failure_receipt_allows_a_zero_attempt_budget_without_rhs_calls() {
         let oscillator = HarmonicOscillator::simple(1.0);
         let integrator = Rk45Integrator::new(1.0e-8);
