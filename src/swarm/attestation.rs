@@ -205,11 +205,24 @@ impl AttestationManager {
     ) -> SwarmResult<ConsciousnessVector> {
         let trusted = self.verify(attested)?;
         if !trusted {
+            // Signer input is untrusted and may be arbitrary UTF-8. Never slice
+            // it by byte offset: the offset can fall inside a multi-byte code
+            // point and panic the inbound verification path. Only display
+            // ASCII hex characters so control characters cannot forge logs.
+            let signer_prefix: String = attested
+                .signer_key
+                .bytes()
+                .take(16)
+                .map(|byte| {
+                    if byte.is_ascii_hexdigit() {
+                        byte as char
+                    } else {
+                        '?'
+                    }
+                })
+                .collect();
             return Err(SwarmError::TrustVerificationError {
-                reason: format!(
-                    "CV signer '{}' is not in trusted set",
-                    &attested.signer_key[..16.min(attested.signer_key.len())]
-                ),
+                reason: format!("CV signer '{signer_prefix}' is not in trusted set"),
             });
         }
         Ok(attested.vector.clone())
@@ -415,6 +428,25 @@ mod tests {
         assert!(
             result.is_err(),
             "verify_and_extract should error for untrusted signer"
+        );
+    }
+
+    #[test]
+    fn test_untrusted_non_ascii_signer_key_returns_error_without_panicking() {
+        let (key, _) = test_keypair();
+        let manager = AttestationManager::new(key);
+        // 15 ASCII bytes followed by a two-byte UTF-8 character: a fixed
+        // byte slice ending at offset 16 would cut the code point in half.
+        let attested = AttestedConsciousnessVector {
+            vector: test_cv(),
+            signature: Vec::new(),
+            signer_key: format!("{}é", "a".repeat(15)),
+        };
+
+        let result = manager.verify_and_extract(&attested);
+        assert!(
+            result.is_err(),
+            "malformed untrusted signer must return a verification error"
         );
     }
 }
