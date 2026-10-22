@@ -342,12 +342,16 @@ fn mix64(mut value: u64) -> u64 {
     value ^ (value >> 31)
 }
 
+const REFERENCE_FULL_FIDELITY_COST_UNITS_PER_TRIAL: u64 = 4;
+
 fn budget_capacity(trials: &[EvaluatorTrial], percentage: u64) -> u64 {
-    let full_cost = trials
-        .iter()
-        .map(|trial| trial.actual_cost_units as u128)
-        .sum::<u128>();
-    ((full_cost * percentage as u128) / 100).min(u64::MAX as u128) as u64
+    // Public budget ladder is fixed before hidden actual costs are scored.
+    let full_reference_cost = (trials.len() as u128)
+        .saturating_mul(REFERENCE_FULL_FIDELITY_COST_UNITS_PER_TRIAL as u128);
+    (full_reference_cost
+        .saturating_mul(percentage as u128)
+        / 100)
+        .min(u64::MAX as u128) as u64
 }
 
 /// Exact 0/1 knapsack oracle. It uses hidden paired values and actual costs and must
@@ -567,6 +571,7 @@ fn render_report() -> String {
     report.push_str("META\tproducer_boundary\tpre_escalation_estimate_uncertainty_declared_cost_and_weak_observable_cue_only\n");
     report.push_str("META\toracle_boundary\tevaluator_only_exact_knapsack_from_hidden_paired_values_and_actual_costs\n");
     report.push_str("META\tresource_units\tabstract_integer_cost_units_not_latency_flops_watts_or_energy\n");
+    report.push_str("META\tbudget_reference\t4_fixed_full_fidelity_units_per_trial_not_actual_costs\n");
     report.push_str("META\tseed_count\t8\n");
     report.push_str("META\tweak_cue_sensitivity\t0.55_on_critical_tail\n");
     report.push_str("META\tregret_validity\tINVALID_BUDGET_when_actual_run_budget_is_exceeded\n");
@@ -700,7 +705,7 @@ mod tests {
                 is_critical_tail: false,
             },
         ];
-        let row = run_policy(Regime::CostUnderestimate, Policy::AlwaysIfAffordable, 60, 1, &trials);
+        let row = run_policy(Regime::CostUnderestimate, Policy::AlwaysIfAffordable, 30, 1, &trials);
         assert_eq!(row.escalations, 1);
         assert_eq!(row.reservation_overruns, 1);
         assert_eq!(row.run_budget_overruns, 1);
