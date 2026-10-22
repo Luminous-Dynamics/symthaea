@@ -16,7 +16,7 @@ This design borrows the useful idea of a two-sided reference/empty-patch gate de
 
 ## Current fixture tranche
 
-The executable includes 16 deterministic reference/mutant pairs (native Rust functions/data structures), with 47 assertion tests in the shared fixtures.
+The executable includes 16 deterministic reference/mutant pairs (native Rust functions/data structures), with 47 Rust test-annotated fixture functions in the shared fixtures.
 
 | Task family | Defect the oracle must detect |
 |---|---|
