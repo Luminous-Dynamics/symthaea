@@ -65,22 +65,43 @@ use std::collections::HashMap;
 /// This type is deliberately called a candidate: it is not an established
 /// session key until a reviewed protocol completes transcript binding and
 /// explicit key confirmation. See the module-level claim boundary.
-#[derive(Clone)]
-pub struct PqcCandidateKey {
-    /// 32-byte session key derived from ML-KEM secret plus public challenge context.
-    /// Suitable for ChaCha20-Poly1305; this field alone does not imply hybrid security.
+pub struct PqcSessionKey {
+    /// 32-byte key usable only after a reviewed handshake confirms the session.
     session_key: [u8; 32],
-    /// When the pending candidate was derived (not a session establishment time).
-    created_at: std::time::SystemTime,
+    /// When the authenticated session was established.
+    established_at: std::time::SystemTime,
 }
 
-impl PqcCandidateKey {
-    /// Get the 32-byte session key.
+impl PqcSessionKey {
     pub fn key(&self) -> &[u8; 32] {
         &self.session_key
     }
 
-    /// When the pending candidate key was derived.
+    pub fn established_at(&self) -> std::time::SystemTime {
+        self.established_at
+    }
+}
+
+impl Drop for PqcSessionKey {
+    fn drop(&mut self) {
+        self.session_key = [0u8; 32];
+    }
+}
+
+/// Unconfirmed key material derived from KEM output and public context.
+///
+/// This is not an established session key. It remains in the pending map until
+/// a reviewed protocol implements transcript binding and explicit key confirmation.
+pub struct PqcCandidateKey {
+    candidate_key: [u8; 32],
+    created_at: std::time::SystemTime,
+}
+
+impl PqcCandidateKey {
+    pub fn key(&self) -> &[u8; 32] {
+        &self.candidate_key
+    }
+
     pub fn created_at(&self) -> std::time::SystemTime {
         self.created_at
     }
@@ -88,8 +109,7 @@ impl PqcCandidateKey {
 
 impl Drop for PqcCandidateKey {
     fn drop(&mut self) {
-        // Zeroize session key on drop
-        self.session_key = [0u8; 32];
+        self.candidate_key = [0u8; 32];
     }
 }
 
@@ -122,8 +142,8 @@ pub struct PqcHandshakeManager {
     classical: crate::swarm::handshake::HybridHandshake,
     /// This node's ML-KEM-768 keypair.
     kem_keypair: MlKem768KeyPair,
-    /// Session keys usable by callers only after a future key-confirmation protocol.
-    session_keys: HashMap<String, PqcCandidateKey>,
+    /// Established session keys; no current code inserts before confirmation.
+    session_keys: HashMap<String, PqcSessionKey>,
     /// Candidate keys derived from KEM but not yet transcript-confirmed.
     pending_session_keys: HashMap<String, PqcCandidateKey>,
     /// Pending KEM exchanges (peer_id → their KEM public key).
@@ -242,7 +262,7 @@ impl PqcHandshakeManager {
         self.pending_session_keys.insert(
             peer_id.to_string(),
             PqcCandidateKey {
-                session_key,
+                candidate_key: session_key,
                 created_at: std::time::SystemTime::now(),
             },
         );
@@ -279,7 +299,7 @@ impl PqcHandshakeManager {
         self.pending_session_keys.insert(
             peer_id.to_string(),
             PqcCandidateKey {
-                session_key,
+                candidate_key: session_key,
                 created_at: std::time::SystemTime::now(),
             },
         );
@@ -360,18 +380,18 @@ mod tests {
     }
 
     #[test]
-    fn test_pqc_session_key_different_per_peer() {
+    fn test_pqc_candidate_key_different_per_peer() {
         let mut manager = PqcHandshakeManager::new(test_config());
         let responder_a = PqcHandshakeManager::new(test_config());
         let responder_b = PqcHandshakeManager::new(test_config());
 
         let nonce = vec![0x42u8; 32];
 
-        // Establish session with peer A
+        // Derive an unconfirmed candidate for peer A
         manager.receive_kem_public_key("peer-A", &responder_a.kem_public_key_bytes());
         let _ = manager.encapsulate_for_peer("peer-A", &nonce).unwrap();
 
-        // Establish session with peer B
+        // Derive an unconfirmed candidate for peer B
         manager.receive_kem_public_key("peer-B", &responder_b.kem_public_key_bytes());
         let _ = manager.encapsulate_for_peer("peer-B", &nonce).unwrap();
 
@@ -384,7 +404,7 @@ mod tests {
     }
 
     #[test]
-    fn test_public_challenge_context_affects_derived_session_key() {
+    fn test_public_challenge_context_affects_candidate_key() {
         let mut initiator1 = PqcHandshakeManager::new(test_config());
         let mut initiator2 = PqcHandshakeManager::new(test_config());
         let responder = PqcHandshakeManager::new(test_config());
@@ -471,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_session() {
+    fn test_remove_session_clears_pending_candidate() {
         let mut manager = PqcHandshakeManager::new(test_config());
         let responder = PqcHandshakeManager::new(test_config());
         let nonce = vec![0x42u8; 32];
@@ -499,7 +519,7 @@ mod tests {
     }
 
     #[test]
-    fn test_session_key_is_32_bytes() {
+    fn test_candidate_key_is_32_bytes() {
         let mut initiator = PqcHandshakeManager::new(test_config());
         let responder = PqcHandshakeManager::new(test_config());
         let nonce = vec![0x42u8; 32];
