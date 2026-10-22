@@ -501,8 +501,12 @@ fn longitudinal_trajectory_contract_checks_horizon_and_event_order() {
     let errors = validate_trajectory_corpus(&corpus);
     assert!(errors.is_empty(), "trajectory corpus invalid: {errors:#?}");
     let cases = corpus["cases"].as_array().expect("trajectory cases");
-    assert_eq!(cases.len(), 8);
+    assert_eq!(cases.len(), 9);
     assert!(cases.iter().any(|case| case["horizon_turns"] == 100));
+    assert!(
+        cases.iter().any(|case| case["case_id"] == "SLD-TRAJ-LNG-001" && case["family"] == "LONG_CONTEXT"),
+        "long-context decay probe must remain part of the candidate suite"
+    );
     let allowed_families = schema["$defs"]["case"]["properties"]["family"]["enum"]
         .as_array().expect("trajectory family enum");
     for case in cases {
