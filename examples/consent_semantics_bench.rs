@@ -118,11 +118,19 @@ fn strip_quotes(text: &str) -> String {
                 closing_quote = Some('"');
                 result.push(' ');
             }
+            '`' => {
+                closing_quote = Some('`');
+                result.push(' ');
+            }
             '“' => {
                 closing_quote = Some('”');
                 result.push(' ');
             }
-            '”' => result.push(' '),
+            '‘' => {
+                closing_quote = Some('’');
+                result.push(' ');
+            }
+            '”' | '’' => result.push(' '),
             _ => result.push(ch),
         }
     }
