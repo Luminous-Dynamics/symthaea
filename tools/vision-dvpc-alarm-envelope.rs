@@ -471,6 +471,7 @@ fn run_policy(
         if candidate == Choice::KeepCheap
             && lcb_candidate
             && would_fit_budget
+            && current_alarm.is_some()
             && policy != Policy::LcbOnly
         {
             let guard_blocked = match policy {
@@ -556,16 +557,13 @@ fn run_policy(
     let mut undetected_shift_episodes = 0;
     let mut detection_delays = Vec::new();
     let mut episode_start: Option<usize> = None;
-    let mut active_episode_id: Option<u64> = None;
     for index in 0..=trials.len() {
         let in_shift = index < trials.len() && trials[index].is_shifted;
         if in_shift {
             if episode_start.is_none() {
                 episode_start = Some(index);
-                active_episode_id = trials[index].shift_episode_id;
             }
         } else if let Some(start) = episode_start.take() {
-            let _completed_episode_id = active_episode_id.take();
             shift_episodes += 1;
             if let Some(detected_at) = (start..index).find(|&at| gate_trigger_timeline[at]) {
                 detected_shift_episodes += 1;
