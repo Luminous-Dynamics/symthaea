@@ -26,6 +26,7 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-sequential-scope-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-risk-eprocess-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-alpha-spending-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-persistent-eprocess-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
@@ -35,6 +36,7 @@ source_files=(
   "docs/research/SEQUENTIAL_SCOPE_CUSUM_V1.md"
   "docs/research/BOUNDED_RISK_EPROCESS_V1.md"
   "docs/research/EPROCESS_LIFETIME_ALPHA_SPENDING_V1.md"
+  "docs/research/EPROCESS_PERSISTENT_VS_RESET_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -70,6 +72,8 @@ eprocess_out="${out_base}-risk-eprocess.csv"
 eprocess_summary_out="${out_base}-risk-eprocess-summary.csv"
 alpha_spending_out="${out_base}-alpha-spending.csv"
 alpha_spending_summary_out="${out_base}-alpha-spending-summary.csv"
+persistent_eprocess_out="${out_base}-persistent-eprocess.csv"
+persistent_eprocess_summary_out="${out_base}-persistent-eprocess-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -1088,6 +1092,210 @@ if ! awk -F, '
   exit 1
 fi
 
+# Compare a continuous per-stream e-process with summably alpha-spent episode resets.
+# Each of the 20 state/condition streams is a separate test stream (K=20); the
+# persistent monitor does not reset at episode boundaries.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-persistent-eprocess-bench -- \
+  "$tmpdir/sequential-a.csv" "$tmpdir/persistent-eprocess-a.csv" "$tmpdir/persistent-eprocess-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-persistent-eprocess-bench -- \
+  "$tmpdir/sequential-a.csv" "$tmpdir/persistent-eprocess-b.csv" "$tmpdir/persistent-eprocess-summary-b.csv"
+if ! cmp -s "$tmpdir/persistent-eprocess-a.csv" "$tmpdir/persistent-eprocess-b.csv" ||
+   ! cmp -s "$tmpdir/persistent-eprocess-summary-a.csv" "$tmpdir/persistent-eprocess-summary-b.csv"; then
+  printf 'FAIL: repeated persistent-e-process outputs are not byte-identical\n' >&2
+  exit 1
+fi
+if ! cmp -s "$tmpdir/sequential-a.csv" <(cut -d, -f1-14 "$tmpdir/persistent-eprocess-a.csv"); then
+  printf 'FAIL: persistent-e-process output is not paired to the exact CUSUM trace\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 31) failed = 1; next }
+  {
+    if (NF != 31) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "gradual_shift" &&
+        $2 != "abrupt_shift" && $2 != "stealth_shift") failed = 1
+    if ($3 < 50000 || $3 >= 50300 || $3 !~ /^[0-9]+$/ ||
+        $4 !~ /^[0-7]$/) failed = 1
+    if ($5 !~ /^[0-9]*[.]?[0-9]+$/ || $5 < 0 || $5 > 1 ||
+        $6 !~ /^[0-9]*[.]?[0-9]+$/ || $6 < 0) failed = 1
+    if ($7 != "true" && $7 != "false") failed = 1
+    if ($8 !~ /^[0-8]$/ || $9 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        $10 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($11 != "true" && $11 != "false") failed = 1
+    if ($12 !~ /^[0-8]$/ || ($13 != "true" && $13 != "false") ||
+        ($14 != "true" && $14 != "false")) failed = 1
+    expected_loss = $5 / 0.05
+    if (expected_loss > 1) expected_loss = 1
+    if (($15 - expected_loss > 0.000001) || (expected_loss - $15 > 0.000001)) failed = 1
+    if ($16 != ($3 - 49999) || $16 < 1 || $16 > 300) failed = 1
+    if (($18 - log(20 / 0.05) > 0.000001) ||
+        (log(20 / 0.05) - $18 > 0.000001)) failed = 1
+    if ($19 != "true" && $19 != "false") failed = 1
+    if ($20 != "NA" && $20 !~ /^[0-9]+$/) failed = 1
+    if ($24 !~ /^-?[0-9]*[.]?[0-9]+$/ ||
+        $25 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        ($26 != "true" && $26 != "false") ||
+        $27 !~ /^[0-8]$/ ||
+        $28 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    for (i = 21; i <= 23; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    for (i = 29; i <= 31; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+
+    cell = $1 SUBSEP $2
+    episode = $3 SUBSEP cell
+    stream_step = ($16 - 1) * 8 + $4
+    if ($4 == 0 && $16 == 1) {
+      next_stream[cell] = 0
+      pprev_1[cell] = 0
+      pprev_2[cell] = 0
+      pprev_3[cell] = 0
+      first_persistent[cell] = 2400
+      recorded_persistent_first[cell] = $20
+      persistent_latched[cell] = "false"
+    }
+    if (stream_step != next_stream[cell]) failed = 1
+    next_stream[cell] = stream_step + 1
+
+    pf1 = 1 + (0.25 / 0.15) * ($15 - 0.15)
+    pf2 = 1 + (0.50 / 0.15) * ($15 - 0.15)
+    pf3 = 1 + (0.75 / 0.15) * ($15 - 0.15)
+    if (pf1 <= 0 || pf2 <= 0 || pf3 <= 0) failed = 1
+    pexp1 = pprev_1[cell] + log(pf1)
+    pexp2 = pprev_2[cell] + log(pf2)
+    pexp3 = pprev_3[cell] + log(pf3)
+    if (($21 - pexp1 > 0.000001) || (pexp1 - $21 > 0.000001) ||
+        ($22 - pexp2 > 0.000001) || (pexp2 - $22 > 0.000001) ||
+        ($23 - pexp3 > 0.000001) || (pexp3 - $23 > 0.000001)) failed = 1
+    pprev_1[cell] = $21
+    pprev_2[cell] = $22
+    pprev_3[cell] = $23
+    pmax = $21
+    if ($22 > pmax) pmax = $22
+    if ($23 > pmax) pmax = $23
+    pmix = pmax + log((exp($21 - pmax) + exp($22 - pmax) + exp($23 - pmax)) / 3)
+    if (($17 - pmix > 0.000002) || (pmix - $17 > 0.000002)) failed = 1
+    palarm = (persistent_latched[cell] == "true" || $17 >= $18) ? "true" : "false"
+    if ($19 != palarm) failed = 1
+    if ($19 == "true" && first_persistent[cell] == 2400) first_persistent[cell] = stream_step
+    persistent_latched[cell] = palarm
+    if ($20 != recorded_persistent_first[cell]) failed = 1
+
+    if ($4 == 0) {
+      rprev_1[episode] = 0
+      rprev_2[episode] = 0
+      rprev_3[episode] = 0
+      first_reset[episode] = 8
+      recorded_reset_first[episode] = $27
+      reset_latched[episode] = "false"
+      below_episode[episode] = "true"
+      reset_budget[episode] = $28
+    }
+    if ($28 != reset_budget[episode]) failed = 1
+    rfx1 = 1 + (0.25 / 0.15) * ($15 - 0.15)
+    rfx2 = 1 + (0.50 / 0.15) * ($15 - 0.15)
+    rfx3 = 1 + (0.75 / 0.15) * ($15 - 0.15)
+    rexp1 = rprev_1[episode] + log(rfx1)
+    rexp2 = rprev_2[episode] + log(rfx2)
+    rexp3 = rprev_3[episode] + log(rfx3)
+    if (($29 - rexp1 > 0.000001) || (rexp1 - $29 > 0.000001) ||
+        ($30 - rexp2 > 0.000001) || (rexp2 - $30 > 0.000001) ||
+        ($31 - rexp3 > 0.000001) || (rexp3 - $31 > 0.000001)) failed = 1
+    rprev_1[episode] = $29
+    rprev_2[episode] = $30
+    rprev_3[episode] = $31
+    rmax = $29
+    if ($30 > rmax) rmax = $30
+    if ($31 > rmax) rmax = $31
+    rmix = rmax + log((exp($29 - rmax) + exp($30 - rmax) + exp($31 - rmax)) / 3)
+    if (($24 - rmix > 0.000002) || (rmix - $24 > 0.000002)) failed = 1
+    rexp_alarm = (reset_latched[episode] == "true" || $24 >= $25) ? "true" : "false"
+    if ($26 != rexp_alarm || $27 != recorded_reset_first[episode]) failed = 1
+    if ($26 == "true" && first_reset[episode] == 8) first_reset[episode] = $4
+    reset_latched[episode] = rexp_alarm
+    if ($5 > $6) below_episode[episode] = "false"
+    pair_key = $1 SUBSEP $3 SUBSEP $4
+    if ($2 == "nominal") {
+      nominal_score[pair_key] = $5
+      nominal_persistent[pair_key] = $17
+      nominal_persistent_alarm[pair_key] = $19
+      nominal_persistent_first[pair_key] = $20
+      nominal_reset[pair_key] = $24
+      nominal_reset_alarm[pair_key] = $26
+      nominal_reset_first[pair_key] = $27
+    }
+    if ($2 == "stealth_shift" &&
+        (nominal_score[pair_key] != $5 ||
+         nominal_persistent[pair_key] != $17 ||
+         nominal_persistent_alarm[pair_key] != $19 ||
+         nominal_persistent_first[pair_key] != $20 ||
+         nominal_reset[pair_key] != $24 ||
+         nominal_reset_alarm[pair_key] != $26 ||
+         nominal_reset_first[pair_key] != $27)) failed = 1
+
+    row_key = episode SUBSEP $4
+    if (seen[row_key]++) failed = 1
+    rows++
+  }
+  END {
+    if (NR != 48001 || rows != 48000 || failed) exit 1
+    for (cell in next_stream) {
+      if (next_stream[cell] != 2400 || first_persistent[cell] != recorded_persistent_first[cell]) exit 1
+    }
+    for (episode in first_reset) {
+      if (first_reset[episode] != recorded_reset_first[episode]) exit 1
+    }
+  }
+' "$tmpdir/persistent-eprocess-a.csv"; then
+  printf 'FAIL: persistent/reset raw recurrence, threshold, latch or paired-control gates are invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 20) failed = 1; next }
+  {
+    if (NF != 20 || $3 != 300) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "gradual_shift" &&
+        $2 != "abrupt_shift" && $2 != "stealth_shift") failed = 1
+    if ($4 != "true" && $4 != "false") failed = 1
+    if ($5 != "true" && $5 != "false") failed = 1
+    if ($6 != "true" && $6 != "false") failed = 1
+    if (($2 == "nominal" && ($5 != $4 || $6 != "false")) ||
+        ($2 != "nominal" && ($5 != "false" || ($6 == "true") == ($4 == "true")))) failed = 1
+    if ($7 != "NA" && ($7 !~ /^[0-9]+$/ || $7 >= 300)) failed = 1
+    if ($8 != "NA" && ($8 !~ /^[0-7]$/)) failed = 1
+    if (($4 == "true") != ($7 != "NA") || ($4 == "true") != ($8 != "NA")) failed = 1
+    for (i = 9; i <= 11; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($12 < 0 || $12 > 300 || $13 < 0 || $13 > 300 || $14 < 0 || $14 > 300) failed = 1
+    if ($13 > $12 || $14 > $12 || $13 + $14 > 300) failed = 1
+    if ($15 != "NA" && $15 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($12 == 0 && $15 != "NA") failed = 1
+    if ($12 > 0 && $15 == "NA") failed = 1
+    if ($16 < 0 || $16 > 300 || $17 < 0 || $17 > $16) failed = 1
+    if (($18 - (0.05 / 20 * (1 - 1 / 301)) > 0.0000001) ||
+        ((0.05 / 20 * (1 - 1 / 301)) - $18 > 0.0000001)) failed = 1
+    if ($19 != 300 || $20 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($2 == "nominal" && ($12 != $13 || $14 != 0)) failed = 1
+    if ($2 != "nominal" && ($13 != 0 || $12 + $14 != 300)) failed = 1
+    key = $1 SUBSEP $2
+    if (seen[key]++) failed = 1
+    if ($2 == "nominal") {
+      nominal_persistent[$1] = $4
+      nominal_reset[$1] = $12
+    }
+    if ($2 == "stealth_shift" &&
+        ($4 != nominal_persistent[$1] || $12 != nominal_reset[$1])) failed = 1
+    rows++
+  }
+  END { if (NR != 21 || rows != 20 || failed) exit 1 }
+' "$tmpdir/persistent-eprocess-summary-a.csv"; then
+  printf 'FAIL: persistent/reset summary familywise-budget or paired-control contract is invalid\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -1122,6 +1330,8 @@ cp "$tmpdir/eprocess-a.csv" "$eprocess_out"
 cp "$tmpdir/eprocess-summary-a.csv" "$eprocess_summary_out"
 cp "$tmpdir/alpha-spending-a.csv" "$alpha_spending_out"
 cp "$tmpdir/alpha-spending-summary-a.csv" "$alpha_spending_summary_out"
+cp "$tmpdir/persistent-eprocess-a.csv" "$persistent_eprocess_out"
+cp "$tmpdir/persistent-eprocess-summary-a.csv" "$persistent_eprocess_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -1165,6 +1375,10 @@ cp "$tmpdir/alpha-spending-summary-a.csv" "$alpha_spending_summary_out"
   printf 'alpha_spending_rows_excluding_header=%s\n' "$(( $(wc -l < "$alpha_spending_out") - 1 ))"
   printf 'alpha_spending_summary_sha256=%s\n' "$(sha256sum "$alpha_spending_summary_out" | awk '{print $1}')"
   printf 'alpha_spending_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$alpha_spending_summary_out") - 1 ))"
+  printf 'persistent_eprocess_sha256=%s\n' "$(sha256sum "$persistent_eprocess_out" | awk '{print $1}')"
+  printf 'persistent_eprocess_rows_excluding_header=%s\n' "$(( $(wc -l < "$persistent_eprocess_out") - 1 ))"
+  printf 'persistent_eprocess_summary_sha256=%s\n' "$(sha256sum "$persistent_eprocess_summary_out" | awk '{print $1}')"
+  printf 'persistent_eprocess_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$persistent_eprocess_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -1186,4 +1400,6 @@ printf 'Bounded-risk e-process frontier: %s\n' "$eprocess_out"
 printf 'Bounded-risk e-process summary: %s\n' "$eprocess_summary_out"
 printf 'Lifetime alpha-spending frontier: %s\n' "$alpha_spending_out"
 printf 'Lifetime alpha-spending summary: %s\n' "$alpha_spending_summary_out"
+printf 'Persistent-vs-reset e-process frontier: %s\n' "$persistent_eprocess_out"
+printf 'Persistent-vs-reset e-process summary: %s\n' "$persistent_eprocess_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
