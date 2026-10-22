@@ -68,7 +68,7 @@ struct Condition {
     shifted: bool,
 }
 
-const CONDITIONS: [Condition; 3] = [
+const CONDITIONS: [Condition; 4] = [
     Condition {
         name: "nominal",
         shifted: false,
@@ -79,6 +79,10 @@ const CONDITIONS: [Condition; 3] = [
     },
     Condition {
         name: "strong_shift",
+        shifted: true,
+    },
+    Condition {
+        name: "stealth_shift",
         shifted: true,
     },
 ];
@@ -202,6 +206,7 @@ fn score_for(condition: Condition, seed: u64) -> f64 {
         "nominal" => unit * 0.25,
         "moderate_shift" => 0.15 + unit * 0.40,
         "strong_shift" => 0.50 + unit * 0.50,
+        "stealth_shift" => unit * 0.25,
         _ => f64::NAN,
     }
 }
@@ -267,7 +272,7 @@ fn actual_dynamics_for(seed: u64, condition: Condition) -> Result<DynamicsBounds
     let offsets = match condition.name {
         "nominal" => [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
         "moderate_shift" => [(-0.025, 0.050), (-0.020, 0.035), (-0.030, 0.060)],
-        "strong_shift" => [(-0.055, 0.100), (-0.025, 0.070), (-0.035, 0.080)],
+        "strong_shift" | "stealth_shift" => [(-0.055, 0.100), (-0.025, 0.070), (-0.035, 0.080)],
         _ => return Err(IoError::new(ErrorKind::InvalidInput, "unknown shift condition").into()),
     };
     let (push_r, push_l) = center(estimate.effect_for_action(Action::Push));
@@ -582,10 +587,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let expected_rows = OPERATING_POINTS.len() * CONDITIONS.len() * EVALUATION_EPISODES as usize;
-    if row_count != expected_rows || row_count != 4_500 {
+    if row_count != expected_rows || row_count != 6_000 {
         return Err(IoError::new(
             ErrorKind::InvalidData,
-            format!("expected 4,500 episode rows, generated {row_count}"),
+            format!("expected 6,000 episode rows, generated {row_count}"),
         )
         .into());
     }
