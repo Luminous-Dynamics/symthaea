@@ -1,0 +1,10 @@
+[package]
+name = "broca-mire-reference"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Dependency-free deterministic reference harness for Liquid Broca MIRE"
+
+# Keep this research harness independently runnable without inheriting the
+# large Symthaea workspace or requiring model checkpoints/CUDA.
+[workspace]
