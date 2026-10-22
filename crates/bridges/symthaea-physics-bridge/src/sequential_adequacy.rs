@@ -419,7 +419,7 @@ mod tests {
             );
         }
         let late_result = late.observe(989.0, true).unwrap();
-        assert_eq!(late_result.per_audit_alpha, 0.005);
+        assert!((late_result.per_audit_alpha - 0.005).abs() < 1e-12);
         assert_eq!(late_result.decision, SequentialAuditDecision::NoAlarmAtHorizon);
         assert!(late_result.cumulative_familywise_alpha_bound <= 0.05);
         assert!((late_result.cumulative_familywise_alpha_bound - 0.05).abs() < 1e-12);
