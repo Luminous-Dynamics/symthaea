@@ -455,8 +455,8 @@ mod tests {
 
     #[test]
     fn predictable_adaptive_bet_uses_only_prior_losses_and_resets_history() {
-        let mut process =
-            PredictableRiskEProcess::new(0.05, 0.50, 0.05, 5, 2).expect("valid adaptive e-process");
+        let mut process = PredictableRiskEProcess::new(0.05, 0.50, 0.05, 5, 2)
+            .expect("valid adaptive e-process");
         assert_eq!(process.last_bet(), 0.0);
         process.observe(1.0).expect("valid loss");
         assert_eq!(process.last_bet(), 0.0);
@@ -476,8 +476,8 @@ mod tests {
         assert!(PredictableRiskEProcess::new(0.05, 0.0, 0.05, 5, 20).is_none());
         assert!(PredictableRiskEProcess::new(0.05, 1.0, 0.05, 5, 20).is_none());
         assert!(PredictableRiskEProcess::new(0.05, 0.50, 0.05, 5, 0).is_none());
-        let mut process =
-            PredictableRiskEProcess::new(0.05, 0.50, 0.05, 5, 20).expect("valid adaptive e-process");
+        let mut process = PredictableRiskEProcess::new(0.05, 0.50, 0.05, 5, 20)
+            .expect("valid adaptive e-process");
         assert!(process.observe(f64::NAN).is_none());
         assert_eq!(process.observations(), 0);
         assert_eq!(process.log_e_value(), 0.0);
