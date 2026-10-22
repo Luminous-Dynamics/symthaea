@@ -4,6 +4,7 @@
 **Corpus:** SLD-CORE-0.1 (52 synthetic candidate cases / 26 A/B contrast groups, currently DRAFT_CANDIDATE).  
 **Mode:** MeasurementOnly. No runtime policy changes or action authority.
 **Paired model comparison:** use `PAIRED_COMPARISON_PROTOCOL.md` and `xtask/src/bin/sld-compare.rs`; no run is eligible for a comparative claim unless both exact-head receipts and the frozen cluster map pass the fail-closed comparator.
+**Oracle prerequisite:** no SOTA comparison is eligible until `oracle-case-inventory.json` and the reviewer ledger pass `cargo run -p xtask --bin sld-oracle-audit -- ...`, and both model receipts pin the same completed adjudication digest. A complete output census with unreviewed expected labels remains `NOT_COMPARABLE`.
 
 ## 1. Question and scope
 
