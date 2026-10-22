@@ -2805,29 +2805,34 @@ mod language_model_gradient_tests {
             .expect("valid projection gradient should accumulate");
 
         let epsilon = 1e-3f32;
-        for (label, parameter_index, analytic) in [
-            ("w_up", 0usize, projection.grad_up[0]),
-            ("w_down", 0usize, projection.grad_down[0]),
-        ] {
-            let parameter = if label == "w_up" {
-                &mut projection.w_up
-            } else {
-                &mut projection.w_down
-            };
-            let original = parameter[parameter_index];
-            parameter[parameter_index] = original + epsilon;
-            let plus = objective(&projection, &input, &d_ssm);
-            parameter[parameter_index] = original - epsilon;
-            let minus = objective(&projection, &input, &d_ssm);
-            parameter[parameter_index] = original;
 
-            let numeric = (plus - minus) / (2.0 * epsilon);
-            let tolerance = 2e-2 + numeric.abs() * 0.08;
-            assert!(
-                (analytic - numeric).abs() <= tolerance,
-                "{label} gradient mismatch: analytic={analytic}, finite_difference={numeric}, tolerance={tolerance}"
-            );
-        }
+        let original_up = projection.w_up[0];
+        projection.w_up[0] = original_up + epsilon;
+        let plus_up = objective(&projection, &input, &d_ssm);
+        projection.w_up[0] = original_up - epsilon;
+        let minus_up = objective(&projection, &input, &d_ssm);
+        projection.w_up[0] = original_up;
+        let numeric_up = (plus_up - minus_up) / (2.0 * epsilon);
+        let analytic_up = projection.grad_up[0];
+        let tolerance_up = 2e-2 + numeric_up.abs() * 0.08;
+        assert!(
+            (analytic_up - numeric_up).abs() <= tolerance_up,
+            "w_up gradient mismatch: analytic={analytic_up}, finite_difference={numeric_up}"
+        );
+
+        let original_down = projection.w_down[0];
+        projection.w_down[0] = original_down + epsilon;
+        let plus_down = objective(&projection, &input, &d_ssm);
+        projection.w_down[0] = original_down - epsilon;
+        let minus_down = objective(&projection, &input, &d_ssm);
+        projection.w_down[0] = original_down;
+        let numeric_down = (plus_down - minus_down) / (2.0 * epsilon);
+        let analytic_down = projection.grad_down[0];
+        let tolerance_down = 2e-2 + numeric_down.abs() * 0.08;
+        assert!(
+            (analytic_down - numeric_down).abs() <= tolerance_down,
+            "w_down gradient mismatch: analytic={analytic_down}, finite_difference={numeric_down}"
+        );
     }
 
     #[test]
