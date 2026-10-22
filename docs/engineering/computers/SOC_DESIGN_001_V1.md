@@ -211,12 +211,12 @@ The existing [COMPUTE-MFG-001E #5800](https://github.com/Luminous-Dynamics/symth
 
 - [ ] Freeze CPU/GPU/HDC workload matrix and software baselines, reusing #5805, #6530, #7905, #8413 and #8446.
 - [ ] Version the candidate matrix in `soc_design_candidate_matrix_v1.json`.
-- [ ] Audit the current `symthaea-silicon` generator and #5808 HDC RTL status before writing parallel RTL.
+- [x] Audit the current `symthaea-silicon` generator; found the RTL/PPA stub gap tracked in #8462. Complete the HDC RTL status audit before writing parallel RTL.
 - [ ] Establish a Nix-pinned tool manifest and capability probes for simulator, formal tool, synthesis, FPGA target, KiCad and ASIC flow; missing tools produce a clear unqualified result.
 - [ ] Prototype the existing HDC reference/RTL path first, sweep datapath width and local buffering, and count host transfer cost.
 - [ ] Add Symtropy workload-to-thermal model only after trace schema and physical measurements are available.
 - [ ] Keep phone and laptop Pareto frontiers separate; retain negative results.
 
-## Claim ceiling
+## 12. Claim ceiling
 
 This is an architecture and toolchain plan plus candidate fixture only. It does not assert that Symthaea already has a custom CPU/GPU, that a given open core is a shipping-ready product, that a candidate wins, that the RTL is tapeout-ready, or that custom silicon has been fabricated.
