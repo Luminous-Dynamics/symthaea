@@ -2036,3 +2036,77 @@ fn legacy_nonce_source_id_truncation_reveals_plaintext_xor() {
         "reused ChaCha20 stream reveals plaintext_a XOR plaintext_b"
     );
 }
+
+
+/// Intentional legacy vulnerability witness: fragment nonce construction uses
+/// only the low 16 bits of sequence via thought_id(), and no epoch. This test
+/// demonstrates ciphertext leakage when the same key/source/fragment index is
+/// reused after thought_id wraps. It is not a passing security invariant.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn legacy_fragment_nonce_reuses_after_16_bit_sequence_wrap() {
+    let key = [0xA5u8; 32];
+    let source_id = [0x31, 0x42, 0x53, 0x64, 0x75, 0x86, 0x97, 0xA8];
+    let packet_a = WisdomPacket {
+        source_id,
+        sequence: 7,
+        phi: 0.5,
+        urgency: MeshUrgency::Normal,
+        timestamp_s: 1_700_000_000,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: [0; 32],
+        ttl: 0,
+        wisdom: test_hv(1),
+    };
+    let packet_b = WisdomPacket {
+        sequence: 7 + (1 << 16),
+        wisdom: test_hv(2),
+        ..packet_a.clone()
+    };
+    let plaintext_a = *b"fragment-one-000";
+    let plaintext_b = *b"fragment-two-000";
+
+    assert_ne!(packet_a.sequence, packet_b.sequence);
+    assert_eq!(packet_a.thought_id(), packet_b.thought_id());
+
+    let encrypted_a = encrypt_fragment(
+        &plaintext_a,
+        &key,
+        &source_id,
+        packet_a.thought_id(),
+        0,
+    );
+    let encrypted_b = encrypt_fragment(
+        &plaintext_b,
+        &key,
+        &source_id,
+        packet_b.thought_id(),
+        0,
+    );
+
+    assert_eq!(
+        &encrypted_a[..AEAD_NONCE_SIZE],
+        &encrypted_b[..AEAD_NONCE_SIZE],
+        "fragment nonce repeats when the 16-bit thought ID repeats"
+    );
+
+    let ciphertext_a =
+        &encrypted_a[AEAD_NONCE_SIZE..encrypted_a.len() - AEAD_TAG_SIZE];
+    let ciphertext_b =
+        &encrypted_b[AEAD_NONCE_SIZE..encrypted_b.len() - AEAD_TAG_SIZE];
+    let leaked_relation: Vec<u8> = ciphertext_a
+        .iter()
+        .zip(ciphertext_b.iter())
+        .map(|(a, b)| *a ^ *b)
+        .collect();
+    let expected_relation: Vec<u8> = plaintext_a
+        .iter()
+        .zip(plaintext_b.iter())
+        .map(|(a, b)| *a ^ *b)
+        .collect();
+
+    assert_eq!(
+        leaked_relation, expected_relation,
+        "reused fragment nonce reveals plaintext_a XOR plaintext_b"
+    );
+}
