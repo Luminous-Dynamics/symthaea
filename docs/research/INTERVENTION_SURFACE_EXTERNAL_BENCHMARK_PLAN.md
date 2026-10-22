@@ -13,6 +13,8 @@ The research programme should produce one **intervention surface** per model and
 1. **PEID — Partial Effective Information Decomposition for Synergistic Causality** (Yang, Wang, Zhang; arXiv preprint, 5 May 2026): https://arxiv.org/abs/2605.03267. This explicitly targets unique and synergistic causal information under maximum-entropy interventions, and reports an application to air-quality forecasting. We must compare against it when its definitions, code, and assumptions are reproducibly available. A task-utility finite difference is not a substitute for PEID.
 2. **CausalVerse** (NeurIPS 2025 Datasets and Benchmarks): https://causal-verse.github.io/ and https://papers.neurips.cc/paper_files/paper/2025/hash/05962abf920ebddac275d26f83fe118a-Abstract-Datasets_and_Benchmarks_Track.html. Its project page reports about 200k images, 140k videos / 300M+ frames, 24 scenes across four domains, plus access to ground-truth causal variables, structures, and generation processes. It offers a possible bridge from exact toy systems to physical, robotic-manipulation, and traffic settings. It is a causal-representation benchmark, not directly a TCCIP leaderboard; adapters must define a comparable task and intervention estimand.
 3. **Integrated information in integrate-and-fire networks** (Danilczuk et al., PLOS Computational Biology, 9 March 2026): https://doi.org/10.1371/journal.pcbi.1014085. The IIT 3.0 study reports that dynamics complexity need not track its Φ values, time constants can matter, and noise can affect the result. This motivates explicitly testing noise, time scale, temporal memory, and task utility rather than assuming a single architecture score captures all of them.
+4. **Active Causal Discovery Benchmark (ACDB)** (Deb, Shah, Krishnan; arXiv:2609.31675, posted 16 September 2026): https://arxiv.org/abs/2609.31675. This is especially relevant to the new Symthaea active-probe direction: it evaluates graph recovery under a budgeted hard-intervention API and separates skeleton recovery, directed-graph recovery, and intervention efficiency. Its reported six-level ladder and baseline analysis warn that structure-blind/random baselines and calibration can materially change interpretation. We should adapt the same reporting discipline and, if the contract/code is accessible, reproduce a directly comparable subset rather than claim a competing result from a different estimand.
+5. **TCD-Arena** (ICLR 2026): https://tcd-arena.github.io/. This evaluates time-series causal-discovery robustness under many assumption violations and studies method ensembles. Use it as a stress-test design reference for later SCM/time-series stages; do not imply the current static two-input probe pilot has TCD-Arena coverage.
 
 The benchmark must not combine results reported under different estimands/units into one leaderboard. For each baseline, state exactly which outcome it predicts or decomposes.
 
@@ -28,7 +30,21 @@ The benchmark must not combine results reported under different estimands/units 
 
 **Qualification limitation:** Rust and committed Python tests still need execution. The independent audit performed during this work was a separate, one-off exhaustive checker, not a compilation or execution of either committed test suite.
 
-### Track 1 — generated structural causal models (SCMs)
+### New Track 0.5 — exact active probe selection (implemented pilot)
+
+Committed implementation: `validation/active_probe_design.py`; tests: `validation/test_active_probe_design.py`; preliminary receipt: `docs/research/ACTIVE_PROBE_DESIGN_PRELIMINARY_RESULTS_2026-10-22.md`.
+
+The pilot samples 100 seeded instances of finite hypotheses drawn from all 16 two-input Boolean functions, with integer prior weights and four candidate input-setting probes. It exactly evaluates five policies under a small intervention-cost budget: fixed order, cost first, greedy expected information gain, greedy information-per-(cost + 0.25 × synthetic damage), and a dynamic-programming oracle that minimizes expected residual entropy then damage and cost. Its purpose is to test the benchmark/evaluation harness, not to measure a real causal system.
+
+Exact local validation of the committed files:
+- source blob: `fd316114018565e4f5398f9b5732d0ecac8f8ebd`; source SHA-256: `e835933859e0fdfbebef8fa9b8fc061d5744e50fc198297e83a600378f4aec99`;
+- test blob: `ec82cb202f935beaf9256ea60e4429414f877dd3`;
+- embedded self-test passed and all eight committed unittest definitions passed locally;
+- 100-instance output digest: `47ed95d74beff046c544a283fc6a159253b2fc34c1a4c36025661eb9e09fe737`, with run source SHA `687f74d2253850eb0e2045d07f8404cf07fb771c`.
+
+Mean expected posterior entropy was 0.9336 bits for the exact oracle, 0.9681 for greedy information-per-cost-plus-damage, 1.0595 for greedy information gain, 1.0486 for cost-first, and 1.2501 for fixed-order selection. The oracle had higher expected cost/damage than some heuristics because its lexicographic objective prioritizes residual entropy first. This is a small synthetic trade-off demonstration, not SOTA evidence. The 16 Boolean mechanism family, synthetic costs/damage, and noiseless observations are major limitations; the next step is seeded multi-node SCMs, noisy outcomes, and held-out mechanism-family splits.
+
+## Track 1 — generated structural causal models (SCMs)
 
 Generate held-out model families rather than randomly splitting near-duplicates. Include XOR/parity, AND/OR, common causes, colliders, redundant paths, delayed paths, noisy gates, feedback converted to finite-horizon rollouts, harmful coupling, and sparse/dense mechanisms. For every model, save ground-truth graph/mechanisms, observational samples, permitted intervention set, target utility, prior, and expected counterfactuals.
 
@@ -117,4 +133,4 @@ A reusable checker has now been committed at `validation/tccip_independent_check
 
 ## Evidence status
 
-This document is a research plan. CausalVerse and PEID are prior art to evaluate; no benchmark adaptation has been implemented yet. The exact toy manifest and pairwise oracle are authored. The independent finite-state audit run during the current session matched the six task-summary and partition oracles and the XOR pair-contrast expectation. The committed Rust tests have not been compiled, and the committed Python tests have not been run. No SOTA or novelty claim is made.
+This document is a research plan. PEID, CausalVerse, ACDB and TCD-Arena are prior art/benchmark references; no external benchmark adapter or direct external-baseline reproduction has been implemented. The TCCIP toy manifests and pairwise oracle are authored, and a separate one-off exhaustive audit matched their expectations, but the committed TCCIP Rust/Python suites and reusable TCCIP oracle have not been executed/compiled. In contrast, the new active-probe Python source and its eight-test suite were copied from the exact committed blobs and run locally; see the linked receipt. No SOTA or novelty claim is made.
