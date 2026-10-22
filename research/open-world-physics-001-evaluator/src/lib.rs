@@ -29,6 +29,9 @@ const CANDIDATES_PER_FAMILY: &[usize] = &[1, 3, 10, 30];
 const SELECTION_REPLICATION_COUNT: usize = 5;
 const SELECTION_SEED_SCHEDULE: &str = "splitmix64(world_seed ^ 0x53454c4543540001 ^ (replication_index * 0x9e3779b97f4a7c15))";
 const SELECTION_SEED_SALT: u64 = 0x5345_4c45_4354_0001;
+/// Bootstrap repetitions for paired candidate-budget deltas.
+const SELECTION_BOOTSTRAP_REPLICATES: usize = 2_000;
+const SELECTION_BOOTSTRAP_METHOD: &str = "paired_hierarchical_world_then_seed_resampling_percentile_95_v1";
 
 const AMPLITUDES: &[f64] = &[0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
 const EXPONENTS: &[f64] = &[1.0, 1.5, 2.0, 2.5, 3.0];
@@ -194,6 +197,26 @@ pub struct SelectionBottleneckSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SelectionBudgetComparison {
+    pub policy: QueryPolicy,
+    pub from_candidates_per_family: usize,
+    pub to_candidates_per_family: usize,
+    pub paired_case_count: usize,
+    /// Positive means the larger proposal budget has worse selected held-out NRMSE.
+    pub mean_selected_heldout_delta_larger_minus_smaller: f64,
+    pub selected_heldout_delta_ci95_low: f64,
+    pub selected_heldout_delta_ci95_high: f64,
+    /// Nested-pool oracle error should never rise; values near zero mean no gain from extra proposals.
+    pub mean_oracle_heldout_delta_larger_minus_smaller: f64,
+    pub oracle_heldout_delta_ci95_low: f64,
+    pub oracle_heldout_delta_ci95_high: f64,
+    /// Positive means the selected candidate loses ground versus the pool oracle at larger N.
+    pub mean_selection_regret_delta_larger_minus_smaller: f64,
+    pub selection_regret_delta_ci95_low: f64,
+    pub selection_regret_delta_ci95_high: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReportBody {
     pub schema: String,
     /// False by design: this first reference corpus is open source and source-visible.
@@ -204,6 +227,8 @@ pub struct ReportBody {
     /// Frozen seed protocol for repeated candidate-selection measurements.
     pub selection_replication_count: usize,
     pub selection_seed_schedule: String,
+    pub selection_bootstrap_replicates: usize,
+    pub selection_bootstrap_method: String,
     /// Compiler identity captured by the build script.
     pub rustc_identity: String,
     /// Cargo identity captured by the build script.
@@ -222,6 +247,7 @@ pub struct ReportBody {
     /// Controlled candidate-pool-size sweep. The oracle metric is evaluator-only.
     pub selection_bottleneck_cases: Vec<SelectionBottleneckCase>,
     pub selection_bottleneck_summaries: Vec<SelectionBottleneckSummary>,
+    pub selection_budget_comparisons: Vec<SelectionBudgetComparison>,
     pub claim_boundary: String,
 }
 
@@ -242,6 +268,8 @@ impl BenchmarkReport {
             && self.body.selection_diagnostic_corpus_sha256 == selection_diagnostic_corpus_sha256()
             && self.body.selection_replication_count == SELECTION_REPLICATION_COUNT
             && self.body.selection_seed_schedule == SELECTION_SEED_SCHEDULE
+            && self.body.selection_bootstrap_replicates == SELECTION_BOOTSTRAP_REPLICATES
+            && self.body.selection_bootstrap_method == SELECTION_BOOTSTRAP_METHOD
     }
 }
 
@@ -923,6 +951,145 @@ fn summarize_selection_bottleneck(
     })
 }
 
+
+#[derive(Clone, Copy)]
+struct BudgetDelta {
+    selected_heldout: f64,
+    oracle_heldout: f64,
+    selection_regret: f64,
+}
+
+fn bootstrap_percentile(sorted: &[f64], quantile: f64) -> Option<f64> {
+    if sorted.is_empty()
+        || !quantile.is_finite()
+        || !(0.0..=1.0).contains(&quantile)
+        || sorted.iter().any(|value| !value.is_finite())
+    {
+        return None;
+    }
+    let index = ((sorted.len() - 1) as f64 * quantile).floor() as usize;
+    sorted.get(index).copied()
+}
+
+/// A paired hierarchical bootstrap: resample worlds first, then replications
+/// within each selected world. This avoids pretending the five repeats of one
+/// world are five independent physical systems.
+fn hierarchical_bootstrap_ci(
+    deltas: &[BudgetDelta],
+    metric: fn(&BudgetDelta) -> f64,
+    seed: u64,
+) -> Option<(f64, f64)> {
+    let world_count = selection_diagnostic_worlds().len();
+    let expected = world_count.checked_mul(SELECTION_REPLICATION_COUNT)?;
+    if deltas.len() != expected || expected == 0 {
+        return None;
+    }
+
+    let mut estimates = Vec::with_capacity(SELECTION_BOOTSTRAP_REPLICATES);
+    let mut state = seed;
+    for _ in 0..SELECTION_BOOTSTRAP_REPLICATES {
+        let mut sum = 0.0;
+        let mut sample_count = 0usize;
+        for _ in 0..world_count {
+            let world_index = (splitmix64(&mut state) % world_count as u64) as usize;
+            for _ in 0..SELECTION_REPLICATION_COUNT {
+                let replication_index =
+                    (splitmix64(&mut state) % SELECTION_REPLICATION_COUNT as u64) as usize;
+                let row = &deltas[world_index * SELECTION_REPLICATION_COUNT + replication_index];
+                let value = metric(row);
+                if !value.is_finite() {
+                    return None;
+                }
+                sum += value;
+                sample_count += 1;
+            }
+        }
+        if sample_count == 0 || !sum.is_finite() {
+            return None;
+        }
+        estimates.push(sum / sample_count as f64);
+    }
+    estimates.sort_by(f64::total_cmp);
+    Some((
+        bootstrap_percentile(&estimates, 0.025)?,
+        bootstrap_percentile(&estimates, 0.975)?,
+    ))
+}
+
+fn build_budget_comparison(
+    policy: QueryPolicy,
+    smaller_budget: usize,
+    larger_budget: usize,
+    rows: &[SelectionBottleneckCase],
+) -> Option<SelectionBudgetComparison> {
+    let mut deltas = Vec::new();
+    for world in selection_diagnostic_worlds() {
+        for replication_index in 0..SELECTION_REPLICATION_COUNT {
+            let smaller = rows.iter().find(|row| {
+                row.world_id == world.id
+                    && row.replication_index == replication_index
+                    && row.policy == policy
+                    && row.candidates_per_family == smaller_budget
+            })?;
+            let larger = rows.iter().find(|row| {
+                row.world_id == world.id
+                    && row.replication_index == replication_index
+                    && row.policy == policy
+                    && row.candidates_per_family == larger_budget
+            })?;
+            deltas.push(BudgetDelta {
+                selected_heldout: larger.selected_heldout_nrmse - smaller.selected_heldout_nrmse,
+                oracle_heldout: larger.oracle_pool_heldout_nrmse
+                    - smaller.oracle_pool_heldout_nrmse,
+                selection_regret: larger.selection_regret_nrmse - smaller.selection_regret_nrmse,
+            });
+        }
+    }
+
+    let count = deltas.len() as f64;
+    let mean = |metric: fn(&BudgetDelta) -> f64| {
+        deltas.iter().map(metric).sum::<f64>() / count
+    };
+    let seed_base = SELECTION_SEED_SALT
+        ^ (smaller_budget as u64).rotate_left(11)
+        ^ (larger_budget as u64).rotate_left(29)
+        ^ match policy {
+            QueryPolicy::FixedGrid => 0x4649_5845_4400_0001,
+            QueryPolicy::SeededRandom => 0x5241_4e44_0000_0002,
+        };
+    let selected_ci = hierarchical_bootstrap_ci(
+        &deltas,
+        |delta| delta.selected_heldout,
+        seed_base ^ 0x5345_4c45_4354_0001,
+    )?;
+    let oracle_ci = hierarchical_bootstrap_ci(
+        &deltas,
+        |delta| delta.oracle_heldout,
+        seed_base ^ 0x4f52_4143_4c45_0002,
+    )?;
+    let regret_ci = hierarchical_bootstrap_ci(
+        &deltas,
+        |delta| delta.selection_regret,
+        seed_base ^ 0x5245_4752_4554_0003,
+    )?;
+
+    Some(SelectionBudgetComparison {
+        policy,
+        from_candidates_per_family: smaller_budget,
+        to_candidates_per_family: larger_budget,
+        paired_case_count: deltas.len(),
+        mean_selected_heldout_delta_larger_minus_smaller: mean(|delta| delta.selected_heldout),
+        selected_heldout_delta_ci95_low: selected_ci.0,
+        selected_heldout_delta_ci95_high: selected_ci.1,
+        mean_oracle_heldout_delta_larger_minus_smaller: mean(|delta| delta.oracle_heldout),
+        oracle_heldout_delta_ci95_low: oracle_ci.0,
+        oracle_heldout_delta_ci95_high: oracle_ci.1,
+        mean_selection_regret_delta_larger_minus_smaller: mean(|delta| delta.selection_regret),
+        selection_regret_delta_ci95_low: regret_ci.0,
+        selection_regret_delta_ci95_high: regret_ci.1,
+    })
+}
+
 pub fn run_reference_benchmark() -> BenchmarkReport {
     let worlds = reference_worlds();
     let mut rows = Vec::new();
@@ -970,6 +1137,21 @@ pub fn run_reference_benchmark() -> BenchmarkReport {
         }
     }
 
+    let mut selection_budget_comparisons = Vec::new();
+    for policy in [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom] {
+        for budgets in CANDIDATES_PER_FAMILY.windows(2) {
+            selection_budget_comparisons.push(
+                build_budget_comparison(
+                    policy,
+                    budgets[0],
+                    budgets[1],
+                    &selection_bottleneck_cases,
+                )
+                .expect("paired candidate-budget bootstrap must have complete world/seed pairs"),
+            );
+        }
+    }
+
     let body = ReportBody {
         schema: REPORT_SCHEMA.to_owned(),
         blind_evaluation: false,
@@ -977,6 +1159,8 @@ pub fn run_reference_benchmark() -> BenchmarkReport {
         selection_diagnostic_corpus_sha256: selection_diagnostic_corpus_sha256(),
         selection_replication_count: SELECTION_REPLICATION_COUNT,
         selection_seed_schedule: SELECTION_SEED_SCHEDULE.to_owned(),
+        selection_bootstrap_replicates: SELECTION_BOOTSTRAP_REPLICATES,
+        selection_bootstrap_method: SELECTION_BOOTSTRAP_METHOD.to_owned(),
         rustc_identity: option_env!("OPEN_WORLD_RUSTC_ID")
             .unwrap_or("unavailable")
             .to_owned(),
@@ -1001,6 +1185,7 @@ pub fn run_reference_benchmark() -> BenchmarkReport {
         cases: rows,
         selection_bottleneck_cases,
         selection_bottleneck_summaries,
+        selection_budget_comparisons,
         claim_boundary: "Open, source-visible synthetic reference suite and bounded grid-search baseline only; not a blind SOTA result, not evidence of new real-world physics, and not production solver qualification.".to_owned(),
     };
     let bytes = serde_json::to_vec(&body).expect("report body must serialize deterministically");
@@ -1254,6 +1439,9 @@ mod tests {
         assert_eq!(first.body.selection_replication_count, SELECTION_REPLICATION_COUNT);
         assert_eq!(first.body.selection_seed_schedule, SELECTION_SEED_SCHEDULE);
         assert_eq!(first.body.selection_bottleneck_summaries.len(), 8);
+        assert_eq!(first.body.selection_budget_comparisons.len(), 6);
+        assert_eq!(first.body.selection_bootstrap_replicates, SELECTION_BOOTSTRAP_REPLICATES);
+        assert_eq!(first.body.selection_bootstrap_method, SELECTION_BOOTSTRAP_METHOD);
         assert_eq!(
             first.body.selection_diagnostic_corpus_sha256,
             selection_diagnostic_corpus_sha256()
@@ -1310,6 +1498,41 @@ mod tests {
                     }
                 }
             }
+        }
+
+        for comparison in &first.body.selection_budget_comparisons {
+            assert_eq!(comparison.paired_case_count, 9 * SELECTION_REPLICATION_COUNT);
+            assert!(
+                comparison.to_candidates_per_family > comparison.from_candidates_per_family
+            );
+            for value in [
+                comparison.mean_selected_heldout_delta_larger_minus_smaller,
+                comparison.selected_heldout_delta_ci95_low,
+                comparison.selected_heldout_delta_ci95_high,
+                comparison.mean_oracle_heldout_delta_larger_minus_smaller,
+                comparison.oracle_heldout_delta_ci95_low,
+                comparison.oracle_heldout_delta_ci95_high,
+                comparison.mean_selection_regret_delta_larger_minus_smaller,
+                comparison.selection_regret_delta_ci95_low,
+                comparison.selection_regret_delta_ci95_high,
+            ] {
+                assert!(value.is_finite());
+            }
+            assert!(
+                comparison.selected_heldout_delta_ci95_low
+                    <= comparison.selected_heldout_delta_ci95_high
+            );
+            assert!(
+                comparison.oracle_heldout_delta_ci95_low
+                    <= comparison.oracle_heldout_delta_ci95_high
+            );
+            assert!(
+                comparison.selection_regret_delta_ci95_low
+                    <= comparison.selection_regret_delta_ci95_high
+            );
+            // Every larger nested pool's oracle is at least as good, sample by sample.
+            assert!(comparison.mean_oracle_heldout_delta_larger_minus_smaller <= 1.0e-12);
+            assert!(comparison.oracle_heldout_delta_ci95_high <= 1.0e-12);
         }
 
         for summary in &first.body.selection_bottleneck_summaries {
