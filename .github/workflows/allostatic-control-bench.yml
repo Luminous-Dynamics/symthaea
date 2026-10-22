@@ -51,3 +51,4 @@ jobs:
             allostatic-control-v1-paired-deltas.csv
             allostatic-control-v1-mismatch-frontier.csv
             allostatic-control-v1-mismatch-frontier-summary.csv
+            allostatic-control-v1-paired-eval-selftest-summary.csv
