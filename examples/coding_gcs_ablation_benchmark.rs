@@ -23,6 +23,7 @@ struct TaskCase {
     expected_symbol: &'static str,
     reference_source: &'static str,
     test_source: &'static str,
+    mutant_sources: &'static [&'static str],
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +74,10 @@ fn task_suite() -> Vec<TaskCase> {
 #[test] fn add_negative() { assert_eq!(add_numbers(-4, -7), -11); }
 #[test] fn add_zero() { assert_eq!(add_numbers(9, 0), 9); }
 "#,
+            mutant_sources: &[
+                "pub fn add_numbers(a: i32, b: i32) -> i32 { a - b }",
+                "pub fn add_numbers(a: i32, b: i32) -> i32 { a + b + 1 }",
+            ],
         },
         TaskCase {
             id: "factorial",
@@ -84,6 +89,10 @@ fn task_suite() -> Vec<TaskCase> {
 #[test] fn factorial_five() { assert_eq!(factorial(5), 120); }
 #[test] fn factorial_eight() { assert_eq!(factorial(8), 40320); }
 "#,
+            mutant_sources: &[
+                "pub fn factorial(n: u64) -> u64 { if n == 0 { 0 } else { (1..=n).product() } }",
+                "pub fn factorial(n: u64) -> u64 { (1..n).product() }",
+            ],
         },
         TaskCase {
             id: "gcd",
@@ -96,6 +105,9 @@ fn task_suite() -> Vec<TaskCase> {
 #[test] fn gcd_zero_left() { assert_eq!(gcd(0, 5), 5); }
 #[test] fn gcd_zero_right() { assert_eq!(gcd(9, 0), 9); }
 "#,
+            mutant_sources: &[
+                "pub fn gcd(a: u64, b: u64) -> u64 { a.min(b) }",
+            ],
         },
         TaskCase {
             id: "is_even",
@@ -108,6 +120,9 @@ fn task_suite() -> Vec<TaskCase> {
 #[test] fn even_negative() { assert!(is_even(-8)); }
 #[test] fn even_zero() { assert!(is_even(0)); }
 "#,
+            mutant_sources: &[
+                "pub fn is_even(n: i64) -> bool { n % 2 != 0 }",
+            ],
         },
         TaskCase {
             id: "reverse_string",
@@ -119,6 +134,9 @@ fn task_suite() -> Vec<TaskCase> {
 #[test] fn reverse_empty() { assert_eq!(reverse_string(""), ""); }
 #[test] fn reverse_unicode() { assert_eq!(reverse_string("hé🙂"), "🙂éh"); }
 "#,
+            mutant_sources: &[
+                "pub fn reverse_string(s: &str) -> String { s.to_string() }",
+            ],
         },
         TaskCase {
             id: "sum_slice",
@@ -130,6 +148,9 @@ fn task_suite() -> Vec<TaskCase> {
 #[test] fn sum_empty() { assert_eq!(sum_slice(&[]), 0); }
 #[test] fn sum_negative() { assert_eq!(sum_slice(&[-2, 5, -3]), 0); }
 "#,
+            mutant_sources: &[
+                "pub fn sum_slice(values: &[i32]) -> i32 { values.iter().copied().max().unwrap_or(0) }",
+            ],
         },
         TaskCase {
             id: "binary_search",
@@ -142,6 +163,9 @@ fn task_suite() -> Vec<TaskCase> {
 #[test] fn search_missing() { assert_eq!(binary_search(&[1, 3, 5, 7], 4), None); }
 #[test] fn search_empty() { assert_eq!(binary_search(&[], 1), None); }
 "#,
+            mutant_sources: &[
+                "pub fn binary_search(values: &[i32], needle: i32) -> Option<usize> { values.binary_search(&needle).ok().map(|index| index + 1) }",
+            ],
         },
         TaskCase {
             id: "is_palindrome",
@@ -152,8 +176,12 @@ fn task_suite() -> Vec<TaskCase> {
 #[test] fn palindrome_racecar() { assert!(is_palindrome("racecar")); }
 #[test] fn palindrome_even_length() { assert!(is_palindrome("abba")); }
 #[test] fn not_palindrome() { assert!(!is_palindrome("hello")); }
+#[test] fn not_palindrome_same_ends() { assert!(!is_palindrome("abca")); }
 #[test] fn palindrome_empty() { assert!(is_palindrome("")); }
 "#,
+            mutant_sources: &[
+                "pub fn is_palindrome(s: &str) -> bool { s.chars().next() == s.chars().last() }",
+            ],
         },
     ]
 }
@@ -167,11 +195,25 @@ fn source_digest(source: &str) -> String {
 }
 
 fn task_digest(task: &TaskCase) -> String {
-    let canonical = format!(
-        "{}\n{}\n{}\n{}\n{}",
-        task.id, task.description, task.expected_symbol, task.reference_source, task.test_source
-    );
-    source_digest(&canonical)
+    // Length-prefix each field so embedded newlines cannot create ambiguous digests.
+    let mut hasher = blake3::Hasher::new();
+    let fields = [
+        task.id,
+        task.description,
+        task.expected_symbol,
+        task.reference_source,
+        task.test_source,
+    ];
+    for field in fields {
+        hasher.update(&(field.len() as u64).to_be_bytes());
+        hasher.update(field.as_bytes());
+    }
+    hasher.update(&(task.mutant_sources.len() as u64).to_be_bytes());
+    for mutant in task.mutant_sources {
+        hasher.update(&(mutant.len() as u64).to_be_bytes());
+        hasher.update(mutant.as_bytes());
+    }
+    hasher.finalize().to_hex().to_string()
 }
 
 fn manifest_digest(tasks: &[TaskCase]) -> String {
@@ -581,6 +623,7 @@ fn main() {
             "expected_symbol": task.expected_symbol,
             "reference_source": task.reference_source,
             "test_source": task.test_source,
+            "mutant_sources": task.mutant_sources,
             "task_digest_blake3": task_digest(task),
             "expected_test_functions": expected_test_functions(task.test_source),
             "reference_source_blake3": source_digest(task.reference_source),
