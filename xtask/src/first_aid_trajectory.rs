@@ -96,6 +96,7 @@ enum EventKind {
     UnknownNormalized,
     HandoffEmitted,
     ResourcePresented,
+    ConnectivityChanged,
     NetworkRequiredForCore,
     SensitiveDataEgress,
 }
@@ -112,6 +113,8 @@ struct TraceEvent {
     presented_as: Option<PresentedAs>,
     sensitive_payload: Option<bool>,
     consent_scoped: Option<bool>,
+    /// Point-in-time connectivity update; required only for ConnectivityChanged.
+    connectivity: Option<Connectivity>,
 }
 
 #[derive(Debug, Serialize)]
@@ -457,6 +460,13 @@ fn validate_event_fields(trace: &TrajectoryScenario, event: &TraceEvent) -> Resu
             event.sequence
         );
     }
+    if event.kind == EventKind::ConnectivityChanged && event.connectivity.is_none() {
+        bail!(
+            "{} event {} requires connectivity for connectivity_changed",
+            trace.trace_id,
+            event.sequence
+        );
+    }
     Ok(())
 }
 
@@ -483,6 +493,7 @@ fn inspect_trace(trace: &TrajectoryScenario) -> Vec<String> {
     let mut revoked_bundles: HashSet<String> = HashSet::new();
     let mut uncertainty_pending = false;
     let mut uncertainty_preserved = false;
+    let mut current_connectivity = trace.connectivity;
 
     for event in &trace.events {
         match event.kind {
@@ -561,7 +572,10 @@ fn inspect_trace(trace: &TrajectoryScenario) -> Vec<String> {
                     violations.push("stale_resource_claimed_confirmed".to_string());
                 }
             }
-            EventKind::NetworkRequiredForCore => match trace.connectivity {
+            EventKind::ConnectivityChanged => {
+                current_connectivity = event.connectivity.unwrap_or(current_connectivity);
+            }
+            EventKind::NetworkRequiredForCore => match current_connectivity {
                 Connectivity::Offline => {
                     violations.push("offline_core_network_dependency".to_string());
                 }
@@ -652,7 +666,7 @@ mod tests {
     // event enums and state structs. This provides implementation-diversity checks,
     // but is not an independent clinical oracle or expert adjudication.
     fn reference_codes_from_json(trace: &serde_json::Value) -> Vec<String> {
-        let connectivity = trace["connectivity"].as_str().unwrap_or_default();
+        let mut connectivity = trace["connectivity"].as_str().unwrap_or_default();
         let mut codes = Vec::new();
         let mut session_active = false;
         let mut active_bundle: Option<String> = None;
@@ -739,6 +753,11 @@ mod tests {
                     if matches!(state, "stale" | "unknown") && event["presented_as"] == "confirmed"
                     {
                         codes.push("stale_resource_claimed_confirmed".to_owned());
+                    }
+                }
+                "connectivity_changed" => {
+                    if let Some(next) = event["connectivity"].as_str() {
+                        connectivity = next;
                     }
                 }
                 "network_required_for_core" => match connectivity {
@@ -842,6 +861,7 @@ mod tests {
                 presented_as: None,
                 sensitive_payload: None,
                 consent_scoped: None,
+            connectivity: None,
             },
         );
         cases.push(("uncertainty re-entered", uncertainty_reentered));
