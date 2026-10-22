@@ -213,7 +213,8 @@ The existing [COMPUTE-MFG-001E #5800](https://github.com/Luminous-Dynamics/symth
 - [ ] Version the candidate matrix in `soc_design_candidate_matrix_v1.json`.
 - [x] Audit the current `symthaea-silicon` generator; found the RTL/PPA stub gap tracked in #8462. Complete the HDC RTL status audit before writing parallel RTL.
 - [ ] Establish a Nix-pinned tool manifest and capability probes for simulator, formal tool, synthesis, FPGA target, KiCad and ASIC flow; missing tools produce a clear unqualified result.
-- [ ] Prototype the existing HDC reference/RTL path first, sweep datapath width and local buffering, and count host transfer cost.
+- [x] Start the first word-level HDC XOR RTL prototype in [draft PR #8463](https://github.com/Luminous-Dynamics/symthaea/pull/8463); compilation, simulation and differential equivalence remain pending.
+- [ ] After equivalence, sweep datapath width/local buffering and count host-transfer cost.
 - [ ] Add Symtropy workload-to-thermal model only after trace schema and physical measurements are available.
 - [ ] Keep phone and laptop Pareto frontiers separate; retain negative results.
 
