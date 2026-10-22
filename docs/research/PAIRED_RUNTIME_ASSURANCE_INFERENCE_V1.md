@@ -40,6 +40,8 @@ Each report row is a distinct `scenario × shielded` condition. The utility neve
 
 ## Experimental rules
 
+For a useful scale check, zero observed violations in 300 independent episodes gives a one-sided 95% exact upper bound of about 0.994%, not 0%. Bounding that same rate below 0.1% requires about 2,995 zero-violation episodes under the independent Bernoulli episode assumption. More runs cannot repair an unrepresentative perturbation panel, correlated samples, a wrong plant model, or an incomplete safety case.
+
 - Choose the primary metric, baseline, candidate, condition panel, and decision threshold before inspecting final-test outcomes.
 - Keep calibration, tuning, model selection, and final evaluation episodes disjoint.
 - For a final external evaluation, retain at least the protocol's predeclared 300 episode seeds per task/condition/policy, and increase sample size when the risk bound is too wide or the target effect is modest. The CLI enforces matched seeds, not sample adequacy on its own.
