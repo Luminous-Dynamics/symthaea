@@ -254,15 +254,169 @@ impl EnhancedKnowledgeGraph {
         &self.evidence_links
     }
 
-    /// Import persisted links after facts have been restored; drop stale endpoints.
-    pub fn import_evidence_links(&mut self, links: &[EvidenceLink]) {
+    fn validate_imported_evidence_link(&self, link: &EvidenceLink) -> Result<(), String> {
+        if link.from_fact_id == link.to_fact_id {
+            return Err("evidence links must connect two distinct facts".into());
+        }
+        let from = self
+            .facts
+            .get(&link.from_fact_id)
+            .ok_or_else(|| format!("evidence link source {} is missing", link.from_fact_id))?;
+        let to = self
+            .facts
+            .get(&link.to_fact_id)
+            .ok_or_else(|| format!("evidence link target {} is missing", link.to_fact_id))?;
+
+        if link.status == EvidenceLinkStatus::Rejected
+            && link.rationale.as_deref().is_none_or(str::is_empty)
+        {
+            return Err("rejected evidence links require a rationale".into());
+        }
+        if link.status != EvidenceLinkStatus::Adjudicated {
+            return Ok(());
+        }
+
+        let supplied: HashSet<&str> = link.evidence_ids.iter().map(String::as_str).collect();
+        if supplied.is_empty()
+            || supplied.len() != link.evidence_ids.len()
+            || link.evidence_ids.iter().any(|id| id.trim().is_empty())
+            || link.rationale.as_deref().is_none_or(str::is_empty)
+        {
+            return Err("adjudicated evidence links require a rationale and unique evidence IDs".into());
+        }
+        let from_context = from
+            .claim_context
+            .as_ref()
+            .ok_or_else(|| format!("adjudicated link source {} has no claim context", link.from_fact_id))?;
+        let to_context = to
+            .claim_context
+            .as_ref()
+            .ok_or_else(|| format!("adjudicated link target {} has no claim context", link.to_fact_id))?;
+        if !from_context.evidence_ids.iter().any(|id| supplied.contains(id.as_str()))
+            || !to_context.evidence_ids.iter().any(|id| supplied.contains(id.as_str()))
+        {
+            return Err("adjudicated link evidence must reference both claim contexts".into());
+        }
+        let context_evidence: HashSet<&str> = from_context
+            .evidence_ids
+            .iter()
+            .chain(to_context.evidence_ids.iter())
+            .map(String::as_str)
+            .collect();
+        if !supplied.is_subset(&context_evidence) {
+            return Err(
+                "adjudicated link evidence contains IDs not declared by either claim context"
+                    .into(),
+            );
+        }
+        match link.relation {
+            EvidenceRelation::SemanticNeighbor | EvidenceRelation::SameWitnessVariant => {
+                return Err("candidate-only relations cannot be adjudicated".into());
+            }
+            EvidenceRelation::Corroborates => {
+                if !from_context.same_claim(to_context)
+                    || !from_context.admissibly_independent_from(to_context)
+                {
+                    return Err("adjudicated corroboration violates claim identity or source independence".into());
+                }
+            }
+            EvidenceRelation::Contradicts => {
+                if !from_context.same_conflict_scope(to_context)
+                    || from_context.same_claim(to_context)
+                {
+                    return Err("adjudicated contradiction violates scoped-claim invariants".into());
+                }
+            }
+            EvidenceRelation::Precedes => {
+                if !strictly_precedes(from_context, to_context) {
+                    return Err("adjudicated precedes relation requires explicit increasing event times".into());
+                }
+            }
+            EvidenceRelation::Causes => {
+                if !strictly_precedes(from_context, to_context)
+                    || link.causal_argument.as_deref().is_none_or(str::is_empty)
+                {
+                    return Err("adjudicated causes relation requires temporal precedence and a causal argument".into());
+                }
+            }
+            EvidenceRelation::HistoricallyInfluences => {
+                if !strictly_precedes(from_context, to_context)
+                    || link.transmission_chain.as_deref().is_none_or(str::is_empty)
+                {
+                    return Err("adjudicated historical influence requires temporal precedence and a transmission chain".into());
+                }
+            }
+            EvidenceRelation::Resembles => {}
+        }
+        Ok(())
+    }
+
+    /// Import persisted links only after validating all endpoint, evidence and
+    /// relation invariants. No partial imports occur on validation failure.
+    pub fn import_evidence_links(&mut self, links: &[EvidenceLink]) -> Result<usize, String> {
+        let mut unique_incoming: Vec<EvidenceLink> = Vec::new();
         for link in links {
-            if self.facts.contains_key(&link.from_fact_id)
-                && self.facts.contains_key(&link.to_fact_id)
-            {
-                self.evidence_links.push(link.clone());
+            self.validate_imported_evidence_link(link)?;
+            if unique_incoming.contains(link) {
+                continue;
+            }
+            let symmetric = matches!(
+                link.relation,
+                EvidenceRelation::Corroborates
+                    | EvidenceRelation::Contradicts
+                    | EvidenceRelation::Resembles
+                    | EvidenceRelation::SemanticNeighbor
+                    | EvidenceRelation::SameWitnessVariant
+            );
+            for existing in self.evidence_links.iter().chain(unique_incoming.iter()) {
+                let same_direction = existing.from_fact_id == link.from_fact_id
+                    && existing.to_fact_id == link.to_fact_id;
+                let reverse_direction = symmetric
+                    && existing.from_fact_id == link.to_fact_id
+                    && existing.to_fact_id == link.from_fact_id;
+                if (same_direction || reverse_direction)
+                    && existing.relation == link.relation
+                    && existing.status == EvidenceLinkStatus::Adjudicated
+                    && link.status == EvidenceLinkStatus::Adjudicated
+                {
+                    if existing.evidence_ids == link.evidence_ids {
+                        // Idempotent re-import of the exact adjudication.
+                        continue;
+                    }
+                    return Err(
+                        "fact pair/relation already has an adjudication with different evidence"
+                            .into(),
+                    );
+                }
+            }
+            unique_incoming.push(link.clone());
+        }
+
+        for link in &unique_incoming {
+            if link.status == EvidenceLinkStatus::Adjudicated {
+                match link.relation {
+                    EvidenceRelation::Corroborates => {
+                        for fact_id in [link.from_fact_id, link.to_fact_id] {
+                            if let Some(fact) = self.facts.get_mut(&fact_id) {
+                                fact.corroboration_count = fact.corroboration_count.saturating_add(1);
+                            }
+                        }
+                    }
+                    EvidenceRelation::Contradicts => {
+                        for fact_id in [link.from_fact_id, link.to_fact_id] {
+                            if let Some(fact) = self.facts.get_mut(&fact_id) {
+                                fact.contradiction_count = fact.contradiction_count.saturating_add(1);
+                            }
+                        }
+                        self.total_contradictions = self.total_contradictions.saturating_add(1);
+                    }
+                    _ => {}
+                }
             }
         }
+        let count = unique_incoming.len();
+        self.evidence_links.extend(unique_incoming);
+        Ok(count)
     }
 
     /// Reject a generated candidate without changing either fact's confidence.
