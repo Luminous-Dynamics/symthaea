@@ -155,8 +155,6 @@ mod authenticated_sequence_window_tests {
 }
 
 /// Maximum age of a mesh packet (seconds) before it's rejected as stale.
-#[cfg(feature = "mesh")]
-pub(super) const MESH_MAX_PACKET_AGE_S: u32 = 60;
 
 /// Duration of the bandwidth budget window.
 #[cfg(feature = "mesh")]
