@@ -56,6 +56,9 @@ struct Receipt {
     warmup_rounds: usize,
     measured_rounds: usize,
     build_mode: &'static str,
+    operating_system: &'static str,
+    architecture: &'static str,
+    logical_cpu_count: Option<usize>,
     scoring_backend_mode: &'static str,
     rayon_parallel_feature_enabled: bool,
     candle_logits_feature_enabled: bool,
@@ -143,7 +146,7 @@ fn build_mode() -> &'static str {
 
 fn scoring_backend_mode() -> &'static str {
     if cfg!(any(feature = "mamba-cpu", feature = "gpu-logits")) {
-        "candle-cache-attempt-with-cpu-fallback"
+        "candle-enabled; active device/fallback is not exposed by this receipt"
     } else if cfg!(feature = "parallel") {
         "rayon-cpu-above-parallel-threshold-otherwise-scalar"
     } else {
@@ -203,6 +206,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         warmup_rounds: WARMUP_ROUNDS,
         measured_rounds: MEASURED_ROUNDS,
         build_mode: build_mode(),
+        operating_system: std::env::consts::OS,
+        architecture: std::env::consts::ARCH,
+        logical_cpu_count: std::thread::available_parallelism().ok().map(usize::from),
         scoring_backend_mode: scoring_backend_mode(),
         rayon_parallel_feature_enabled: cfg!(feature = "parallel"),
         candle_logits_feature_enabled: cfg!(any(feature = "mamba-cpu", feature = "gpu-logits")),
