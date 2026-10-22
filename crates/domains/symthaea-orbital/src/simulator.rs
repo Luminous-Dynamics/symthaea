@@ -1,4 +1,8 @@
 use crate::types::*;
+use crate::perturbations::{
+    OrbitalPerturbation, PerturbationError, PerturbationReceipt, PerturbationSchedule,
+    PerturbationStepReport,
+};
 use orbital_mechanics::atmosphere::{DragConfig, drag_acceleration};
 use orbital_mechanics::coordinates::wgs84::{A as EARTH_RADIUS_KM, MU};
 use orbital_mechanics::state::StateVector;
@@ -32,6 +36,10 @@ pub struct SimpleOrbitalSimulator {
     jd: [f64; NUM_JOINTS],
     links: [f64; NUM_JOINTS],
     rwm: [f64; 3],
+    /// Number of completed physics steps; used to reject skipped/repeated fault steps.
+    elapsed_steps: usize,
+    /// Frozen schedule for an active synthetic fault campaign.
+    campaign_schedule: Option<PerturbationSchedule>,
 }
 impl SimpleOrbitalSimulator {
     pub fn new() -> Self {
@@ -49,6 +57,8 @@ impl SimpleOrbitalSimulator {
             jd: [1.0, 1.0, 0.8, 0.5, 0.3, 0.2, 0.1],
             links: [1.5, 1.5, 1.0, 0.8, 0.5, 0.3, 0.2],
             rwm: [0.0; 3],
+            elapsed_steps: 0,
+            campaign_schedule: None,
         }
     }
 
@@ -139,6 +149,121 @@ impl SimpleOrbitalSimulator {
             0.0
         }
     }
+
+    /// Advance one simulator step and apply scheduled synthetic perturbations.
+    ///
+    /// `step_index` is the zero-based index of the step about to be advanced
+    /// and must equal the simulator's completed-step count. Events trigger
+    /// after ordinary physics propagation for that step; an impact delta-v
+    /// therefore affects the next integration step. Supply the same immutable
+    /// schedule for each step of a campaign.
+    ///
+    /// This is test infrastructure only. It does not model detailed impact
+    /// contact physics or spacecraft power/thermal response.
+    pub fn step_with_perturbations(
+        &mut self,
+        cmd: &OrbitalCommand,
+        dt: f64,
+        step_index: usize,
+        schedule: &PerturbationSchedule,
+    ) -> Result<PerturbationStepReport, PerturbationError> {
+        if !dt.is_finite() || dt <= 0.0 {
+            return Err(PerturbationError::InvalidTimeStep);
+        }
+        schedule.validate()?;
+        if step_index != self.elapsed_steps {
+            return Err(PerturbationError::UnexpectedStepIndex {
+                expected: self.elapsed_steps,
+                actual: step_index,
+            });
+        }
+        match &self.campaign_schedule {
+            Some(frozen) if frozen != schedule => {
+                return Err(PerturbationError::ChangedScheduleRequiresReset);
+            }
+            None => {
+                for (event_index, perturbation) in schedule.perturbations.iter().enumerate() {
+                    let scheduled_step = match perturbation {
+                        OrbitalPerturbation::DebrisImpact { at_step, .. }
+                        | OrbitalPerturbation::CommBlackout { at_step, .. }
+                        | OrbitalPerturbation::SolarFlare { at_step, .. } => *at_step,
+                    };
+                    if scheduled_step < step_index {
+                        return Err(PerturbationError::MissedScheduledEvent {
+                            event_index,
+                            scheduled_step,
+                            actual_step: step_index,
+                        });
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        // Freeze the schedule only after all preconditions pass.
+        if self.campaign_schedule.is_none() {
+            self.campaign_schedule = Some(schedule.clone());
+        }
+
+        // All schedule/time preconditions are checked before physics advances.
+        self.step(cmd, dt);
+
+        let mut receipts = Vec::new();
+        let mut communication_suppressed = false;
+        for perturbation in &schedule.perturbations {
+            match perturbation {
+                OrbitalPerturbation::DebrisImpact { delta_v_m_s, at_step }
+                    if *at_step == step_index =>
+                {
+                    let next_velocity_km_s: [f64; 3] = std::array::from_fn(|axis| {
+                        self.state.velocity_km_s[axis] + delta_v_m_s[axis] / 1000.0
+                    });
+                    if next_velocity_km_s.iter().any(|value| !value.is_finite()) {
+                        // The normal physics step has completed, but this
+                        // invalid exogenous state change itself is not applied.
+                        return Err(PerturbationError::NonFinitePostImpactVelocity {
+                            at_step: *at_step,
+                        });
+                    }
+                    self.state.velocity_km_s = next_velocity_km_s;
+                    receipts.push(PerturbationReceipt::DebrisImpactApplied {
+                        at_step: *at_step,
+                        requested_delta_v_m_s: *delta_v_m_s,
+                        applied_delta_v_m_s: *delta_v_m_s,
+                    });
+                }
+                OrbitalPerturbation::CommBlackout { duration, at_step }
+                    if step_index >= *at_step && step_index < *at_step + *duration =>
+                {
+                    communication_suppressed = true;
+                    if step_index == *at_step {
+                        receipts.push(PerturbationReceipt::CommBlackoutStarted {
+                            at_step: *at_step,
+                            duration_steps: *duration,
+                        });
+                    }
+                }
+                OrbitalPerturbation::DebrisImpact { .. }
+                | OrbitalPerturbation::CommBlackout { .. } => {}
+                OrbitalPerturbation::SolarFlare { at_step, .. } => {
+                    // validate() normally rejects this before propagation.
+                    return Err(PerturbationError::UnsupportedSolarFlare {
+                        at_step: *at_step,
+                    });
+                }
+            }
+        }
+        if communication_suppressed {
+            self.state.comm_window = 0.0;
+        }
+
+        Ok(PerturbationStepReport {
+            step_index,
+            receipts,
+            communication_suppressed,
+        })
+    }
+
 }
 impl Default for SimpleOrbitalSimulator {
     fn default() -> Self {
@@ -255,6 +380,7 @@ impl OrbitalPhysicsSimulator for SimpleOrbitalSimulator {
 
         self.state.solar_exposure = self.solar_exposure();
         self.state.comm_window = self.comm_window();
+        self.elapsed_steps = self.elapsed_steps.saturating_add(1);
     }
     fn state(&self) -> &OrbitalState {
         &self.state
@@ -262,6 +388,8 @@ impl OrbitalPhysicsSimulator for SimpleOrbitalSimulator {
     fn reset(&mut self) {
         self.state = OrbitalState::circular_orbit(self.config.initial_altitude_km);
         self.rwm = [0.0; 3];
+        self.elapsed_steps = 0;
+        self.campaign_schedule = None;
     }
 }
 
@@ -537,6 +665,236 @@ mod tests {
             s.step(&OrbitalCommand::zero(), 0.01);
         }
         assert_eq!(s.state().delta_v_used_m_s, 0.0);
+    }
+
+    #[test]
+    fn test_scheduled_impact_is_post_step_exogenous_delta_v() {
+        let mut baseline = SimpleOrbitalSimulator::new();
+        baseline.step(&OrbitalCommand::zero(), 0.01);
+
+        let mut affected = SimpleOrbitalSimulator::new();
+        let initial_delta_v_used = affected.state().delta_v_used_m_s;
+        let schedule = PerturbationSchedule {
+            perturbations: vec![OrbitalPerturbation::DebrisImpact {
+                delta_v_m_s: [12.0, -5.0, 0.25],
+                at_step: 0,
+            }],
+        };
+        let report = affected
+            .step_with_perturbations(&OrbitalCommand::zero(), 0.01, 0, &schedule)
+            .expect("valid impact schedule should apply");
+
+        for (axis, expected_delta) in [0.012, -0.005, 0.00025].iter().enumerate() {
+            let expected = baseline.state().velocity_km_s[axis] + *expected_delta;
+            assert!(
+                (affected.state().velocity_km_s[axis] - expected).abs() < 1e-12,
+                "velocity axis {axis} did not receive expected post-step delta-v"
+            );
+        }
+        assert_eq!(affected.state().position_km, baseline.state().position_km);
+        assert_eq!(affected.state().delta_v_used_m_s, initial_delta_v_used);
+        assert!(matches!(
+            report.receipts.as_slice(),
+            [PerturbationReceipt::DebrisImpactApplied { at_step: 0, .. }]
+        ));
+        assert!(!report.communication_suppressed);
+
+        let second = affected
+            .step_with_perturbations(&OrbitalCommand::zero(), 0.01, 1, &schedule)
+            .expect("next step should advance with same schedule");
+        assert!(second.receipts.is_empty(), "impact must not replay on step 1");
+    }
+
+    #[test]
+    fn test_blackout_suppresses_link_not_geometry_and_expires() {
+        let mut baseline = SimpleOrbitalSimulator::new();
+        baseline.step(&OrbitalCommand::zero(), 0.01);
+
+        let schedule = PerturbationSchedule {
+            perturbations: vec![OrbitalPerturbation::CommBlackout {
+                duration: 1,
+                at_step: 0,
+            }],
+        };
+        let mut affected = SimpleOrbitalSimulator::new();
+        let report = affected
+            .step_with_perturbations(&OrbitalCommand::zero(), 0.01, 0, &schedule)
+            .expect("valid blackout schedule should apply");
+        assert!(report.communication_suppressed);
+        assert_eq!(affected.state().comm_window, 0.0);
+        assert_eq!(affected.state().position_km, baseline.state().position_km);
+        assert_eq!(affected.state().velocity_km_s, baseline.state().velocity_km_s);
+        assert!(matches!(
+            report.receipts.as_slice(),
+            [PerturbationReceipt::CommBlackoutStarted { at_step: 0, duration_steps: 1 }]
+        ));
+
+        baseline.step(&OrbitalCommand::zero(), 0.01);
+        let recovery = affected
+            .step_with_perturbations(&OrbitalCommand::zero(), 0.01, 1, &schedule)
+            .expect("blackout should have ended");
+        assert!(!recovery.communication_suppressed);
+        assert_eq!(affected.state().comm_window, baseline.state().comm_window);
+        assert_eq!(affected.state().position_km, baseline.state().position_km);
+    }
+
+    #[test]
+    fn test_unsupported_solar_flare_fails_before_mutation() {
+        let mut sim = SimpleOrbitalSimulator::new();
+        let before_position = sim.state().position_km;
+        let before_velocity = sim.state().velocity_km_s;
+        let schedule = PerturbationSchedule {
+            perturbations: vec![OrbitalPerturbation::SolarFlare {
+                power_reduction: 0.5,
+                at_step: 0,
+            }],
+        };
+        let error = sim
+            .step_with_perturbations(&OrbitalCommand::zero(), 0.01, 0, &schedule)
+            .expect_err("solar flare must fail closed without a power model");
+        assert_eq!(error, PerturbationError::UnsupportedSolarFlare { at_step: 0 });
+        assert_eq!(sim.state().position_km, before_position);
+        assert_eq!(sim.state().velocity_km_s, before_velocity);
+    }
+
+    #[test]
+    fn test_invalid_schedule_and_step_index_fail_before_mutation() {
+        let mut sim = SimpleOrbitalSimulator::new();
+        let before_position = sim.state().position_km;
+        let bad_duration = PerturbationSchedule {
+            perturbations: vec![OrbitalPerturbation::CommBlackout {
+                duration: 0,
+                at_step: 0,
+            }],
+        };
+        assert_eq!(
+            sim.step_with_perturbations(&OrbitalCommand::zero(), 0.01, 0, &bad_duration),
+            Err(PerturbationError::ZeroDurationBlackout { at_step: 0 })
+        );
+        assert_eq!(sim.state().position_km, before_position);
+
+        let non_finite_impact = PerturbationSchedule {
+            perturbations: vec![OrbitalPerturbation::DebrisImpact {
+                delta_v_m_s: [f64::NAN, 0.0, 0.0],
+                at_step: 0,
+            }],
+        };
+        assert_eq!(
+            sim.step_with_perturbations(
+                &OrbitalCommand::zero(),
+                0.01,
+                0,
+                &non_finite_impact
+            ),
+            Err(PerturbationError::NonFiniteImpactDeltaV { at_step: 0 })
+        );
+        assert_eq!(sim.state().position_km, before_position);
+
+        let overflowing_blackout = PerturbationSchedule {
+            perturbations: vec![OrbitalPerturbation::CommBlackout {
+                duration: 1,
+                at_step: usize::MAX,
+            }],
+        };
+        assert_eq!(
+            sim.step_with_perturbations(
+                &OrbitalCommand::zero(),
+                0.01,
+                0,
+                &overflowing_blackout
+            ),
+            Err(PerturbationError::BlackoutEndOverflow {
+                at_step: usize::MAX,
+                duration: 1,
+            })
+        );
+        assert_eq!(sim.state().position_km, before_position);
+
+        let empty = PerturbationSchedule::default();
+        assert_eq!(
+            sim.step_with_perturbations(&OrbitalCommand::zero(), 0.01, 1, &empty),
+            Err(PerturbationError::UnexpectedStepIndex { expected: 0, actual: 1 })
+        );
+        assert_eq!(sim.state().position_km, before_position);
+        assert_eq!(
+            sim.step_with_perturbations(&OrbitalCommand::zero(), f64::NAN, 0, &empty),
+            Err(PerturbationError::InvalidTimeStep)
+        );
+        assert_eq!(sim.state().position_km, before_position);
+    }
+
+    #[test]
+    fn test_campaign_rejects_changed_or_missed_schedule() {
+        let mut sim = SimpleOrbitalSimulator::new();
+        let empty = PerturbationSchedule::default();
+        sim.step_with_perturbations(&OrbitalCommand::zero(), 0.01, 0, &empty)
+            .expect("initial empty schedule should be accepted");
+        let before_position = sim.state().position_km;
+        let changed = PerturbationSchedule {
+            perturbations: vec![OrbitalPerturbation::CommBlackout {
+                duration: 1,
+                at_step: 1,
+            }],
+        };
+        assert_eq!(
+            sim.step_with_perturbations(&OrbitalCommand::zero(), 0.01, 1, &changed),
+            Err(PerturbationError::ChangedScheduleRequiresReset)
+        );
+        assert_eq!(sim.state().position_km, before_position);
+
+        let mut skipped = SimpleOrbitalSimulator::new();
+        skipped.step(&OrbitalCommand::zero(), 0.01);
+        let stale_event = PerturbationSchedule {
+            perturbations: vec![OrbitalPerturbation::DebrisImpact {
+                delta_v_m_s: [1.0, 0.0, 0.0],
+                at_step: 0,
+            }],
+        };
+        let before_skipped_position = skipped.state().position_km;
+        assert_eq!(
+            skipped.step_with_perturbations(&OrbitalCommand::zero(), 0.01, 1, &stale_event),
+            Err(PerturbationError::MissedScheduledEvent {
+                event_index: 0,
+                scheduled_step: 0,
+                actual_step: 1,
+            })
+        );
+        assert_eq!(skipped.state().position_km, before_skipped_position);
+    }
+
+    #[test]
+    fn test_fault_campaign_replays_deterministically() {
+        let schedule = PerturbationSchedule {
+            perturbations: vec![
+                OrbitalPerturbation::DebrisImpact {
+                    delta_v_m_s: [1.0, -0.2, 0.0],
+                    at_step: 3,
+                },
+                OrbitalPerturbation::CommBlackout {
+                    duration: 2,
+                    at_step: 4,
+                },
+            ],
+        };
+        let mut a = SimpleOrbitalSimulator::new();
+        let mut b = SimpleOrbitalSimulator::new();
+        let mut reports_a = Vec::new();
+        let mut reports_b = Vec::new();
+        for step in 0..8 {
+            reports_a.push(
+                a.step_with_perturbations(&OrbitalCommand::zero(), 0.01, step, &schedule)
+                    .expect("campaign A should be valid"),
+            );
+            reports_b.push(
+                b.step_with_perturbations(&OrbitalCommand::zero(), 0.01, step, &schedule)
+                    .expect("campaign B should be valid"),
+            );
+        }
+        assert_eq!(reports_a, reports_b);
+        assert_eq!(a.state().position_km, b.state().position_km);
+        assert_eq!(a.state().velocity_km_s, b.state().velocity_km_s);
+        assert_eq!(a.state().comm_window, b.state().comm_window);
+        assert_eq!(a.state().delta_v_used_m_s, b.state().delta_v_used_m_s);
     }
 
     mod proptest_physics {

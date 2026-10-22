@@ -2,8 +2,11 @@
 
 On-orbit servicing arm platform (`EmbodimentBridge` impl), now with real
 propagated orbital dynamics. ~1,100 LOC (arm) + ~1,000 LOC (orbit +
-scenarios + trajectory planning), 69 tests (verified via
-`cargo test -p symthaea-orbital --lib`).
+scenarios + trajectory planning). The pre-campaign mainline README recorded
+69 library tests; this branch adds six orbital fault-campaign tests plus
+additional invalid-input assertions. The changed crate has not yet been
+compiled or run on this branch, so its test status must be re-established
+with `cargo test -p symthaea-orbital --lib` at the exact commit.
 
 Part of the Symthaea robotics platform roster. Identity decision (Phase 0 of
 `symthaea/SPACE_AUTOMATION_PLAN_2026-07-06.md`, confirmed in Phase 1): this
@@ -72,9 +75,18 @@ spacecraft bus; the two are not separable concerns.
   introduced in Phase 1. Explicitly does NOT model an actuator-level fault
   (a valve that ignores a zero-command) — that needs hardware redundancy,
   not a control-loop gate, and would defeat any software fix by construction.
-- **Perturbation types** (`perturbations.rs`): `DebrisImpact`, `CommBlackout`,
-  `SolarFlare` are defined as data but still have no consumer — the stuck-
-  thruster fault above is a new, separate mechanism, not built on these.
+- **Scheduled perturbations** (`perturbations.rs`, `SimpleOrbitalSimulator::step_with_perturbations`):
+  the deterministic campaign adapter now consumes the first two event types.
+  `DebrisImpact` is explicitly a post-step exogenous delta-v proxy (m/s), not
+  a contact/fragmentation model, and it does not spend the spacecraft's
+  commanded propellant budget. `CommBlackout` suppresses link availability
+  independently of geometric line-of-sight and lasts for its declared number
+  of zero-based steps. `SolarFlare` fails closed until a separate power/thermal
+  state exists; it does not alter eclipse geometry. The adapter validates the
+  full schedule before advancing state, requires consecutive step indices and
+  an unchanged schedule, emits typed start/application receipts, and includes
+  replay/negative tests. These are synthetic test semantics only, not flight
+  qualification.
 - **Station-keeping under drag** (`scenarios.rs`, Phase 2, 2026-07-07):
   `run_station_keeping()` runs a scripted bang-bang baseline (burn prograde
   when altitude drops below a tolerance band, coast otherwise) against
