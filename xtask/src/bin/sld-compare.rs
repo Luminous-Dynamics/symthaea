@@ -257,6 +257,11 @@ struct ClusterAccumulator {
     critical_b: usize,
 }
 
+fn is_lower_hex(value: &str, length: usize) -> bool {
+    value.len() == length
+        && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
 fn read_json<T: for<'de> Deserialize<'de>>(path: &PathBuf) -> Result<T> {
     let bytes = fs::read(path).with_context(|| format!("read {}", path.display()))?;
     serde_json::from_slice(&bytes).with_context(|| format!("parse JSON in {}", path.display()))
@@ -287,6 +292,37 @@ fn validate_receipt<'r>(
         !receipt.source.commit_sha.is_empty() && !receipt.source.toolchain.trim().is_empty(),
         "{label}: missing source commit or toolchain identity"
     );
+    ensure!(is_lower_hex(&receipt.source.commit_sha, 40), "{label}: source commit must be 40 lowercase hex characters");
+    ensure!(!receipt.receipt_id.trim().is_empty(), "{label}: receipt_id is blank");
+    ensure!(
+        !receipt.subject.provider.trim().is_empty()
+            && !receipt.subject.model_id.trim().is_empty()
+            && !receipt.subject.model_snapshot.trim().is_empty(),
+        "{label}: subject identity is incomplete"
+    );
+    if let Some(weights_sha256) = &receipt.subject.weights_sha256 {
+        ensure!(is_lower_hex(weights_sha256, 64), "{label}: invalid weights SHA-256");
+    }
+    ensure!(
+        is_lower_hex(&receipt.case_set.schema_sha256, 64)
+            && is_lower_hex(&receipt.case_set.corpus_sha256, 64)
+            && is_lower_hex(&receipt.case_set.inventory_sha256, 64),
+        "{label}: one or more case-set digests are malformed"
+    );
+    ensure!(
+        is_lower_hex(&receipt.generation.system_prompt_sha256, 64)
+            && is_lower_hex(&receipt.generation.prompt_bundle_sha256, 64)
+            && is_lower_hex(&receipt.generation.decoding_config_sha256, 64)
+            && is_lower_hex(&receipt.generation.tool_policy_sha256, 64),
+        "{label}: one or more generation/configuration digests are malformed"
+    );
+    ensure!(
+        is_lower_hex(&receipt.evaluator.rubric_sha256, 64),
+        "{label}: rubric digest is malformed"
+    );
+    if let Some(tool_digest) = &receipt.generation.tool_versions_sha256 {
+        ensure!(is_lower_hex(tool_digest, 64), "{label}: tool_versions_sha256 is malformed");
+    }
     ensure!(
         receipt.case_set.expected_case_count > 0,
         "{label}: expected_case_count must be positive"
