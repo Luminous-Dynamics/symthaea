@@ -15,7 +15,7 @@ use symthaea::coding_agent::{CodingAgent, CodingAgentConfig};
 use symthaea::language::code_executor::CodeExecutor;
 
 const BENCHMARK_ID: &str = "symthaea_gcs_runtime_ablation";
-const SCHEMA_VERSION: u32 = 2;
+const SCHEMA_VERSION: u32 = 3;
 
 struct TaskCase {
     id: &'static str,
@@ -62,6 +62,7 @@ struct EvalResult {
     iterations: usize,
     energy: f64,
     final_phase: String,
+    generation_tiers: Vec<String>,
 }
 
 fn task_suite() -> Vec<TaskCase> {
@@ -316,6 +317,7 @@ fn run_candidate(
         compile_errors: oracle.compile_errors, agent_elapsed_ms, verification_elapsed_ms,
         iterations: result.iterations_used, energy: result.total_energy,
         final_phase: format!("{}", result.final_phase),
+        generation_tiers: result.generation_tiers.iter().map(ToString::to_string).collect(),
     }
 }
 
@@ -341,7 +343,8 @@ fn eval_json(result: &EvalResult) -> serde_json::Value {
         "verification_elapsed_ms": result.verification_elapsed_ms,
         "iterations": result.iterations,
         "energy": result.energy,
-        "final_phase": result.final_phase
+        "final_phase": result.final_phase,
+        "generation_tiers": result.generation_tiers
     })
 }
 
@@ -397,6 +400,41 @@ fn paired_summary(pairs: &[(EvalResult, EvalResult)]) -> serde_json::Value {
         "net_pass_delta_percentage_points": if comparable_pairs == 0 { 0.0 } else { (on_wins as f64 - off_wins as f64) / comparable_pairs as f64 * 100.0 },
         "interpretation": "Descriptive pilot only; win/loss/tie and pass delta include only pairs with complete behavioral oracles. Unresolved pairs are excluded, not treated as ties. Do not claim statistical significance from this small fixed task suite."
     })
+}
+
+fn resolve_model_identity(
+    use_llm: bool,
+    use_cloud: bool,
+    local_model: Option<&str>,
+    cloud_model: Option<&str>,
+    cloud_api_key_present: bool,
+) -> Result<(String, String), String> {
+    if use_llm && use_cloud {
+        return Err("choose at most one backend: --llm or --cloud".to_string());
+    }
+    if use_cloud {
+        if !cloud_api_key_present {
+            return Err("--cloud requires a non-empty ANTHROPIC_API_KEY; refusing to silently benchmark a missing/simulated cloud backend".to_string());
+        }
+        let model = configured_model("ANTHROPIC_MODEL", cloud_model, "claude-sonnet-4-20250514")?;
+        return Ok(("cloud".to_string(), model));
+    }
+    if use_llm {
+        // Keep this default aligned with OllamaBackend::new() in llm_backend.rs.
+        let model = configured_model("SYMTHAEA_LLM_MODEL", local_model, "gemma4:e2b")?;
+        return Ok(("ollama".to_string(), model));
+    }
+    Ok(("native".to_string(), "native dispatcher / no external LLM requested".to_string()))
+}
+
+fn configured_model(env_name: &str, value: Option<&str>, default: &str) -> Result<String, String> {
+    match value {
+        Some(value) if value.trim().is_empty() => {
+            Err(format!("{env_name} is set but empty; refusing an ambiguous model identity"))
+        }
+        Some(value) => Ok(value.trim().to_string()),
+        None => Ok(default.to_string()),
+    }
 }
 
 fn validate_source_revision(supplied: &str, actual_head: &str) -> Result<(), &'static str> {
@@ -483,7 +521,7 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
             use_llm: false,
             use_cloud: false,
             repeats: 3,
-            output_path: std::env::temp_dir().join("symthaea_gcs_ablation_v2.json"),
+            output_path: std::env::temp_dir().join("symthaea_gcs_ablation_v3.json"),
             print_manifest: true,
         }));
     }
@@ -501,7 +539,7 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
     let mut use_cloud = false;
     let mut repeats = 3_usize;
     let mut repeats_seen = false;
-    let mut output_path = std::env::temp_dir().join("symthaea_gcs_ablation_v2.json");
+    let mut output_path = std::env::temp_dir().join("symthaea_gcs_ablation_v3.json");
     let mut output_seen = false;
     let mut index = 0;
 
@@ -587,6 +625,23 @@ fn main() {
         println!("This command did not execute oracle controls or coding-agent trials.");
         return;
     }
+
+    // Resolve model identity before any trials. The cloud backend is optional in
+    // CodingAgent::new, so --cloud without credentials can otherwise silently run
+    // without a real cloud backend. Never label such trials as a cloud evaluation.
+    let (model_mode, model_label) = match resolve_model_identity(
+        use_llm,
+        use_cloud,
+        std::env::var("SYMTHAEA_LLM_MODEL").ok().as_deref(),
+        std::env::var("ANTHROPIC_MODEL").ok().as_deref(),
+        std::env::var("ANTHROPIC_API_KEY").is_ok_and(|key| !key.trim().is_empty()),
+    ) {
+        Ok(identity) => identity,
+        Err(error) => {
+            eprintln!("Invalid benchmark backend configuration: {error}");
+            std::process::exit(2);
+        }
+    };
 
     // Two-sided oracle controls run before any agent trials.
     let mut reference_controls = Vec::new();
@@ -689,14 +744,6 @@ fn main() {
         }
     }
 
-    let model_mode = if use_cloud { "cloud" } else if use_llm { "ollama" } else { "native" };
-    let model_label = if use_cloud {
-        std::env::var("ANTHROPIC_MODEL").unwrap_or_else(|_| "claude-sonnet-4-20250514 (repository default)".to_string())
-    } else if use_llm {
-        std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "qwen2.5-coder:7b (repository default)".to_string())
-    } else {
-        "native dispatcher / no external LLM requested".to_string()
-    };
     let report = serde_json::json!({
         "schema_version": SCHEMA_VERSION,
         "benchmark": BENCHMARK_ID,
@@ -707,7 +754,9 @@ fn main() {
             "compiled_with_geodesic_synthesis": cfg!(feature = "geodesic_synthesis"),
             "gcs_toggle": "CodingAgentConfig.enable_gcs_advisories",
             "agent_internal_real_exec": false,
-            "external_oracle_real_exec": true
+            "external_oracle_real_exec": true,
+            "requested_backend": model_mode,
+            "requested_model": model_label
         },
         "task_count": tasks.len(),
         "repeats": repeats,
@@ -777,7 +826,7 @@ mod provenance_tests {
         assert!(!parsed.use_llm);
         assert!(!parsed.use_cloud);
         assert_eq!(parsed.repeats, 3);
-        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v2.json"));
+        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v3.json"));
     }
 
     #[test]
@@ -805,6 +854,39 @@ mod provenance_tests {
         assert!(parse_cli(&args(&["--unknown"])).is_err());
         assert!(parse_cli(&args(&["--help", "--cloud"])).is_err());
         assert!(parse_cli(&args(&["--help"])).unwrap().is_none());
+    }
+
+    #[test]
+    fn model_identity_matches_actual_local_backend_default() {
+        assert_eq!(
+            resolve_model_identity(true, false, None, None, false).unwrap(),
+            ("ollama".to_string(), "gemma4:e2b".to_string())
+        );
+        assert_eq!(
+            resolve_model_identity(true, false, Some("qwen3-coder:30b"), None, false).unwrap(),
+            ("ollama".to_string(), "qwen3-coder:30b".to_string())
+        );
+    }
+
+    #[test]
+    fn cloud_backend_requires_real_credentials_and_resolves_actual_default() {
+        assert!(resolve_model_identity(false, true, None, None, false).is_err());
+        assert!(resolve_model_identity(false, true, None, Some("claude-test"), true).is_ok());
+        assert_eq!(
+            resolve_model_identity(false, true, None, None, true).unwrap(),
+            ("cloud".to_string(), "claude-sonnet-4-20250514".to_string())
+        );
+    }
+
+    #[test]
+    fn backend_identity_rejects_empty_or_conflicting_configuration() {
+        assert!(resolve_model_identity(true, true, None, None, true).is_err());
+        assert!(resolve_model_identity(true, false, Some("  "), None, false).is_err());
+        assert!(resolve_model_identity(false, true, None, Some(""), true).is_err());
+        assert_eq!(
+            resolve_model_identity(false, false, None, None, false).unwrap().0,
+            "native"
+        );
     }
 
     #[test]

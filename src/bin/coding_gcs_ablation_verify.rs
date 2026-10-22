@@ -179,13 +179,32 @@ fn audit(
 
     push_check(
         &mut errors,
-        u64_field(report, "schema_version") == Some(2),
-        "schema_version must be 2",
+        u64_field(report, "schema_version") == Some(3),
+        "schema_version must be 3",
     );
     push_check(
         &mut errors,
         str_field(report, "benchmark") == Some("symthaea_gcs_runtime_ablation"),
         "unexpected benchmark identifier",
+    );
+    let model_mode = str_field(report, "model_mode").unwrap_or("");
+    let model_label = str_field(report, "model_label").unwrap_or("");
+    push_check(
+        &mut errors,
+        matches!(model_mode, "native" | "ollama" | "cloud"),
+        "model_mode must be native, ollama, or cloud",
+    );
+    push_check(&mut errors, !model_label.trim().is_empty(), "model_label must be non-empty");
+    let runtime_configuration = report.get("runtime_configuration");
+    push_check(
+        &mut errors,
+        runtime_configuration.and_then(|v| str_field(v, "requested_backend")) == Some(model_mode),
+        "runtime_configuration.requested_backend must match model_mode",
+    );
+    push_check(
+        &mut errors,
+        runtime_configuration.and_then(|v| str_field(v, "requested_model")) == Some(model_label),
+        "runtime_configuration.requested_model must match model_label",
     );
     let source_sha = str_field(report, "source_revision").unwrap_or("");
     push_check(
@@ -540,6 +559,22 @@ fn audit(
             u64_field(run, "expected_test_functions") == Some(expected),
             format!("runs[{index}] expected test count differs from manifest"),
         );
+        let valid_generation_tiers = run
+            .get("generation_tiers")
+            .and_then(Value::as_array)
+            .is_some_and(|tiers| {
+                tiers.iter().all(|tier| {
+                    tier.as_str().is_some_and(|name| {
+                        matches!(name, "Native" | "Hardware" | "LocalLLM" | "CloudLLM" | "Simulated")
+                    })
+                })
+            });
+        push_check(
+            &mut errors,
+            valid_generation_tiers,
+            format!("runs[{index}] has missing or invalid observed generation_tiers"),
+        );
+
         push_check(
             &mut errors,
             str_field(run, "generated_source_blake3").is_some_and(|s| is_hex(s, 64)),
@@ -1037,7 +1072,8 @@ mod tests {
             "verification_elapsed_ms": 20,
             "iterations": 1,
             "energy": energy,
-            "final_phase": "Testing"
+            "final_phase": "Testing",
+            "generation_tiers": vec!["Native"]
         })
     }
 
@@ -1077,7 +1113,7 @@ mod tests {
         })];
         let manifest_sha = manifest_digest(&manifest).unwrap();
         serde_json::json!({
-            "schema_version": 2,
+            "schema_version": 3,
             "benchmark": "symthaea_gcs_runtime_ablation",
             "source_revision": "1".repeat(40),
             "model_mode": "native",
@@ -1086,7 +1122,9 @@ mod tests {
                 "compiled_with_geodesic_synthesis": true,
                 "gcs_toggle": "CodingAgentConfig.enable_gcs_advisories",
                 "agent_internal_real_exec": false,
-                "external_oracle_real_exec": true
+                "external_oracle_real_exec": true,
+                "requested_backend": "native",
+                "requested_model": "unit-test model"
             },
             "task_count": 1,
             "repeats": 1,
@@ -1307,6 +1345,38 @@ mod tests {
         assert_eq!(read_f64(&summary, "ci95_lower_percentage_points"), Some(-100.0));
         assert_eq!(read_f64(&summary, "ci95_upper_percentage_points"), Some(-100.0));
         assert!(str_field(&summary, "warning").unwrap().contains("Small number of task clusters"));
+    }
+
+    #[test]
+    fn inconsistent_model_identity_metadata_is_rejected() {
+        let mut report = valid_fixture();
+        report["runtime_configuration"]["requested_model"] = Value::String("different-model".to_string());
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("requested_model")));
+    }
+
+    #[test]
+    fn unknown_model_mode_is_rejected() {
+        let mut report = valid_fixture();
+        report["model_mode"] = Value::String("mystery".to_string());
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("model_mode")));
+    }
+
+    #[test]
+    fn missing_generation_tiers_are_rejected() {
+        let mut report = valid_fixture();
+        report["runs"][0].as_object_mut().unwrap().remove("generation_tiers");
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+    }
+
+    #[test]
+    fn unknown_generation_tier_is_rejected() {
+        let mut report = valid_fixture();
+        report["runs"][0]["generation_tiers"] = serde_json::json!(["ImaginaryLLM"]);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("generation_tiers")));
     }
 
     #[test]
