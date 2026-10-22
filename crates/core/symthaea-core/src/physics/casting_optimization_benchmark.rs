@@ -29,10 +29,11 @@ enum SyntheticCase {
     FidelityDiscrepancy = 4,
     FailedCorner = 5,
     RastriginMultimodal = 6,
+    Beale = 7,
 }
 
 impl SyntheticCase {
-    const ALL: [Self; 7] = [
+    const ALL: [Self; 8] = [
         Self::SmoothBowl,
         Self::CoupledFactors,
         Self::FeasibleIsland,
@@ -40,6 +41,7 @@ impl SyntheticCase {
         Self::FidelityDiscrepancy,
         Self::FailedCorner,
         Self::RastriginMultimodal,
+        Self::Beale,
     ];
 
     fn name(self) -> &'static str {
@@ -51,6 +53,7 @@ impl SyntheticCase {
             Self::FidelityDiscrepancy => "fidelity-discrepancy",
             Self::FailedCorner => "failed-corner",
             Self::RastriginMultimodal => "rastrigin-multimodal",
+            Self::Beale => "beale",
         }
     }
 
@@ -63,6 +66,11 @@ impl SyntheticCase {
             Self::CoupledFactors => Point { x: 0.20, y: 0.29 },
             Self::FeasibleIsland => Point { x: 0.72, y: 0.31 },
             Self::RastriginMultimodal => Point { x: 0.5, y: 0.5 },
+            // Standard Beale optimum (x=3, y=0.5) mapped from [-4.5, 4.5]^2.
+            Self::Beale => Point {
+                x: 5.0 / 6.0,
+                y: 5.0 / 9.0,
+            },
         }
     }
 
@@ -86,6 +94,16 @@ impl SyntheticCase {
                 20.0
                     + x * x - 10.0 * (2.0 * std::f64::consts::PI * x).cos()
                     + y * y - 10.0 * (2.0 * std::f64::consts::PI * y).cos()
+            }
+            Self::Beale => {
+                // Standard Beale analytical benchmark over [-4.5, 4.5]^2.
+                // The normalized point (5/6, 5/9) maps to its global minimizer
+                // (3, 0.5), where all three squared terms are zero.
+                let x = 9.0 * point.x - 4.5;
+                let y = 9.0 * point.y - 4.5;
+                (1.5 - x + x * y).powi(2)
+                    + (2.25 - x + x * y.powi(2)).powi(2)
+                    + (2.625 - x + x * y.powi(3)).powi(2)
             }
             _ => (point.x - 0.37).powi(2) + (point.y - 0.62).powi(2),
         }
@@ -1150,6 +1168,16 @@ mod tests {
         assert_abs_close(case.objective(Point { x: 0.5, y: 0.5 }), 0.0, 1e-12);
         assert!(case.objective(Point { x: 0.6, y: 0.5 }) > 0.0);
         assert_abs_close(case.known_optimum_value(), 0.0, 1e-12);
+    }
+
+    #[test]
+    fn beale_analytical_fixture_has_known_global_minimum() {
+        let case = SyntheticCase::Beale;
+        let optimum = case.optimum();
+        assert_abs_close(optimum.x, 5.0 / 6.0, 1e-15);
+        assert_abs_close(optimum.y, 5.0 / 9.0, 1e-15);
+        assert_abs_close(case.objective(optimum), 0.0, 1e-24);
+        assert!(case.objective(Point { x: 0.5, y: 0.5 }) > 1.0);
     }
 
     #[test]
