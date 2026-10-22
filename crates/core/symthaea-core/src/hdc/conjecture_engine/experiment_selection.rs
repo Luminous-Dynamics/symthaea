@@ -814,6 +814,43 @@ mod tests {
     }
 
     #[test]
+    fn weighted_selector_respects_prior_mass_when_uniform_partitions_tie() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let candidates = [0_u8, 1_u8];
+        let predict = |hypothesis: &usize, candidate: &u8| {
+            let values = match candidate {
+                // Under the weighted prior, this partitions mass 0.8 versus 0.2.
+                0 => [0.0_f64, 10.0, 0.0, 10.0],
+                // This partitions the same hypotheses 0.5 versus 0.5.
+                1 => [0.0_f64, 0.0, 10.0, 10.0],
+                _ => return None,
+            };
+            Some(values[*hypothesis])
+        };
+        let uniform = select_experiment_by_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            0.05,
+            predict,
+            |_| 1.0,
+        )
+        .expect("both partitions are informative");
+        assert_eq!(*uniform.0, 0, "uniform-prior ties retain first-candidate order");
+
+        let weighted = select_experiment_by_weighted_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[0.4, 0.1, 0.4, 0.1],
+            0.05,
+            predict,
+            |_| 1.0,
+        )
+        .expect("both weighted partitions retain positive information");
+        assert_eq!(*weighted.0, 1, "weighted selector should prefer balanced prior mass");
+        assert!(weighted.1 > 0.0 && weighted.1.is_finite());
+    }
+
+    #[test]
     fn weighted_cost_selector_fails_closed_on_invalid_prior_and_cost() {
         let hypotheses = [0_i32, 1];
         let candidates = [0_u8, 1_u8];
