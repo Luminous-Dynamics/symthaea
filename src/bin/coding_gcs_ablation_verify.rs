@@ -224,6 +224,17 @@ fn verify_mode_summary(
         .iter()
         .filter(|attempt| bool_field(attempt, "success") == Some(false))
         .count() as u64;
+    let backend_attempts_usable_generations = backend_attempts
+        .iter()
+        .filter(|attempt| bool_field(attempt, "usable_generation") == Some(true))
+        .count() as u64;
+    let backend_attempts_nonempty_unusable_outputs = backend_attempts
+        .iter()
+        .filter(|attempt| {
+            bool_field(attempt, "success") == Some(true)
+                && bool_field(attempt, "usable_generation") == Some(false)
+        })
+        .count() as u64;
     let backend_attempts_verifier_accepted = backend_attempts
         .iter()
         .filter(|attempt| bool_field(attempt, "verification_passed") == Some(true))
@@ -311,6 +322,8 @@ fn verify_mode_summary(
         ("verification_elapsed_ms_p95", verification_elapsed_ms_p95),
         ("backend_attempts_succeeded", backend_attempts_succeeded),
         ("backend_attempts_failed", backend_attempts_failed),
+        ("backend_attempts_usable_generations", backend_attempts_usable_generations),
+        ("backend_attempts_nonempty_unusable_outputs", backend_attempts_nonempty_unusable_outputs),
         ("backend_attempts_verifier_accepted", backend_attempts_verifier_accepted),
         ("backend_attempts_verifier_rejected", backend_attempts_verifier_rejected),
         ("backend_attempts_without_verifier_result", backend_attempts_without_verifier_result),
@@ -354,8 +367,8 @@ fn audit(
 
     push_check(
         &mut errors,
-        u64_field(report, "schema_version") == Some(5),
-        "schema_version must be 5",
+        u64_field(report, "schema_version") == Some(6),
+        "schema_version must be 6",
     );
     push_check(
         &mut errors,
@@ -756,12 +769,16 @@ fn audit(
                 let tier = str_field(attempt, "tier");
                 let backend_name = str_field(attempt, "backend_name").unwrap_or("");
                 let success = bool_field(attempt, "success");
+                let usable_generation = bool_field(attempt, "usable_generation");
                 let verification_valid = attempt.get("verification_passed").is_some_and(|value| value.is_null() || value.is_boolean());
                 let tier_valid = tier.is_some_and(|name| {
                     matches!(name, "Native" | "Hardware" | "LocalLLM" | "CloudLLM" | "Simulated")
                 });
                 let backend_name_valid = !backend_name.trim().is_empty();
                 let success_valid = success.is_some();
+                let usable_generation_valid = usable_generation.is_some()
+                    && !(success == Some(false) && usable_generation == Some(true))
+                    && !(tier == Some("Simulated") && usable_generation == Some(true));
                 let elapsed_valid = u64_field(attempt, "elapsed_ms").is_some();
                 let energy_valid = read_f64(attempt, "estimated_energy_cost").is_some_and(|cost| cost >= 0.0);
                 let identity_consistent = match backend_name.to_ascii_lowercase().as_str() {
@@ -770,7 +787,7 @@ fn audit(
                     "anthropic" => tier == Some("CloudLLM"),
                     _ => true,
                 };
-                tier_valid && backend_name_valid && success_valid && verification_valid && elapsed_valid && energy_valid && identity_consistent
+                tier_valid && backend_name_valid && success_valid && usable_generation_valid && verification_valid && elapsed_valid && energy_valid && identity_consistent
             })
         });
         push_check(
@@ -1343,7 +1360,7 @@ mod tests {
         })];
         let manifest_sha = manifest_digest(&manifest).unwrap();
         serde_json::json!({
-            "schema_version": 5,
+            "schema_version": 6,
             "benchmark": "symthaea_gcs_runtime_ablation",
             "source_revision": "1".repeat(40),
             "model_mode": "native",
@@ -1408,6 +1425,8 @@ mod tests {
                     "backend_attempts_by_name": {},
                     "backend_attempts_succeeded": 0,
                     "backend_attempts_failed": 0,
+                    "backend_attempts_usable_generations": 0,
+                    "backend_attempts_nonempty_unusable_outputs": 0,
                     "backend_attempts_verifier_accepted": 0,
                     "backend_attempts_verifier_rejected": 0,
                     "backend_attempts_without_verifier_result": 0,
@@ -1441,6 +1460,8 @@ mod tests {
                     "backend_attempts_by_name": {},
                     "backend_attempts_succeeded": 0,
                     "backend_attempts_failed": 0,
+                    "backend_attempts_usable_generations": 0,
+                    "backend_attempts_nonempty_unusable_outputs": 0,
                     "backend_attempts_verifier_accepted": 0,
                     "backend_attempts_verifier_rejected": 0,
                     "backend_attempts_without_verifier_result": 0,
