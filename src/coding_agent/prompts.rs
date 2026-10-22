@@ -167,16 +167,7 @@ impl CodingAgent {
             prompt.push('\n');
         }
 
-        // Inject GCS topological/structural violations as hard constraints.
-        // These come from the previous generation's GCS verification pass and
-        // MUST be addressed by the next generation attempt.
-        if !self.gcs_violations.is_empty() {
-            prompt.push_str("## Topological/Structural Violations (MUST FIX)\n");
-            for v in &self.gcs_violations {
-                prompt.push_str(&format!("- {}\n", v));
-            }
-            prompt.push('\n');
-        }
+        append_gcs_advisories(&mut prompt, &self.gcs_advisories);
 
         // Inject experience hints from persistent store (cross-session learning)
         let hints = self.retrieve_experience_hints();
@@ -837,5 +828,46 @@ impl CodingAgent {
             "nix" => "You are a Nix code generator. Output ONLY valid Nix expressions.".into(),
             _ => "You are a code generator. Output ONLY valid source code, no explanations.".into(),
         }
+    }
+}
+
+/// Adds GCS topology diagnostics as hypotheses, never mandatory correctness constraints.
+fn append_gcs_advisories(prompt: &mut String, advisories: &[String]) {
+    if advisories.is_empty() {
+        return;
+    }
+
+    prompt.push_str("## GCS Topology Hypotheses (ADVISORY, NOT VERIFIED DEFECTS)\n");
+    prompt.push_str(
+        "These signals are heuristic prompts for inspection, not proof of a semantic defect. ",
+    );
+    prompt.push_str(
+        "Do not change otherwise-correct behavior solely to satisfy them; compiler diagnostics ",
+    );
+    prompt.push_str("and behavioral tests take precedence.\n");
+    for advisory in advisories {
+        prompt.push_str(&format!("- {}\n", advisory));
+    }
+    prompt.push('\n');
+}
+
+#[cfg(test)]
+mod gcs_advisory_tests {
+    use super::append_gcs_advisories;
+
+    #[test]
+    fn topology_hypotheses_are_explicitly_advisory_not_must_fix() {
+        let mut prompt = String::new();
+        append_gcs_advisories(&mut prompt, &["nonzero beta_2".to_string()]);
+        assert!(prompt.contains("ADVISORY, NOT VERIFIED DEFECTS"));
+        assert!(prompt.contains("behavioral tests take precedence"));
+        assert!(!prompt.contains("MUST FIX"));
+    }
+
+    #[test]
+    fn empty_advisory_set_does_not_change_prompt() {
+        let mut prompt = "seed prompt".to_string();
+        append_gcs_advisories(&mut prompt, &[]);
+        assert_eq!(prompt, "seed prompt");
     }
 }

@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Geodesic Code Synthesis (GCS) verification gate for the CodingAgent.
+//! Geodesic Code Synthesis (GCS) advisory diagnostics for the CodingAgent.
 //!
 //! After code generation succeeds (compilation passes), the GCS gate analyzes
 //! the generated source via:
@@ -9,24 +9,25 @@
 //! 2. **Topology**: Compute Betti numbers (connected components, loops, voids)
 //! 3. **Oracle**: Predict execution dynamics and check convergence
 //!
-//! Violations are returned as human-readable strings that get injected into the
-//! next generation prompt as hard constraints ("MUST FIX").
+//! Topology-derived findings are advisory hypotheses, not semantic proofs. They may
+//! be shown to the agent as inspection prompts but must not veto compiler or test results.
 
 use super::CodingAgent;
 
 impl CodingAgent {
-    /// Verify generated source code using Geodesic Code Synthesis analysis.
+    /// Collect topology-derived hypotheses about generated source code.
     ///
-    /// Builds a PDG, computes topological fingerprints, and runs the execution
-    /// oracle. Returns a list of violation descriptions (empty = all checks passed).
+    /// Builds a PDG, computes topological fingerprints, and runs an abstract
+    /// convergence heuristic. Empty output means no heuristic advisory fired;
+    /// it does not certify semantic correctness, reachability, or termination.
     #[cfg(feature = "geodesic_synthesis")]
-    pub(super) fn verify_with_gcs(&self, source: &str, function_name: &str) -> Vec<String> {
+    pub(super) fn collect_gcs_advisories(&self, source: &str, function_name: &str) -> Vec<String> {
         use symthaea_geodesic::{
             ExecutionOracle, ProgramDependenceGraph, TopologicalFingerprint,
             execution_oracle::OperationType,
         };
 
-        let mut violations = Vec::new();
+        let mut advisories = Vec::new();
 
         // Build PDG from source
         let pdg = ProgramDependenceGraph::from_rust_source(source, function_name);
@@ -35,15 +36,15 @@ impl CodingAgent {
         let complex = pdg.to_simplicial_complex();
         let fingerprint = TopologicalFingerprint::from_complex(&complex);
 
-        // Basic topological checks: beta_2 > 0 indicates unreachable code regions (voids)
+        // A nonzero beta_2 is a topological signal, not a proof of unreachable code.
         if fingerprint.betti.beta_2 > 0 {
-            violations.push(format!(
-                "TOPOLOGY: {} unreachable code region(s) detected (beta_2={}). Remove dead code.",
-                fingerprint.betti.beta_2, fingerprint.betti.beta_2
+            advisories.push(format!(
+                "ADVISORY: nonzero second Betti number (beta_2={}); topology alone does not prove unreachable code. Confirm any dead-code claim with a control-flow reachability analysis.",
+                fingerprint.betti.beta_2
             ));
         }
 
-        // Execution oracle: check convergence for loops (beta_1 > 0 means cycles exist)
+        // beta_1 suggests a cycle in the encoded complex; it does not prove a runtime loop.
         if fingerprint.betti.beta_1 > 0 {
             let mut oracle = ExecutionOracle::new();
             let statements: Vec<_> = source
@@ -61,30 +62,30 @@ impl CodingAgent {
 
             let prediction = oracle.predict_sequence(&statements);
             if !prediction.converged {
-                violations.push(
-                    "ORACLE: Execution dynamics did not converge — potential infinite loop or non-terminating recursion.".to_string()
+                advisories.push(
+                    "ADVISORY: abstract operation-sequence convergence heuristic did not converge; this is not a proof of nontermination. Confirm using explicit termination reasoning and behavioral tests.".to_string()
                 );
             }
         }
 
-        // Report structural info even when no violations
-        if violations.is_empty() {
+        // Report structural info when no heuristic advisory is emitted.
+        if advisories.is_empty() {
             tracing::info!(
                 target: "symthaea::coding_agent::gcs",
                 beta_0 = fingerprint.betti.beta_0,
                 beta_1 = fingerprint.betti.beta_1,
                 beta_2 = fingerprint.betti.beta_2,
                 euler = fingerprint.euler_characteristic,
-                "GCS verification passed"
+                "GCS topology analysis completed without heuristic findings"
             );
         }
 
-        violations
+        advisories
     }
 
     /// No-op when geodesic_synthesis feature is disabled.
     #[cfg(not(feature = "geodesic_synthesis"))]
-    pub(super) fn verify_with_gcs(&self, _source: &str, _function_name: &str) -> Vec<String> {
+    pub(super) fn collect_gcs_advisories(&self, _source: &str, _function_name: &str) -> Vec<String> {
         Vec::new()
     }
 }

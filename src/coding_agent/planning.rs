@@ -494,32 +494,27 @@ impl CodingAgent {
                 let check_passed = motor_result.as_ref().map_or(false, |r| r.success);
 
                 if code_written && check_passed {
-                    // Run GCS verification on compiled code before advancing
+                    // GCS output is a topology-derived heuristic, not a semantic proof.
+                    // Record it as context, but always reach the independent behavioral-test phase.
                     if let Some(ref code) = self.generated_code {
-                        let violations = self.verify_with_gcs(code, &self.task);
-                        if !violations.is_empty() {
-                            tracing::warn!(
+                        let advisories = self.collect_gcs_advisories(code, &self.task);
+                        if !advisories.is_empty() {
+                            tracing::info!(
                                 target: "symthaea::coding_agent::gcs",
-                                count = violations.len(),
-                                "GCS verification found violations — routing to Fixing"
+                                count = advisories.len(),
+                                "GCS diagnostics are advisory; proceeding to behavioral tests"
                             );
-                            for v in &violations {
-                                self.observations.push(format!("GCS: {}", v));
+                            for advisory in &advisories {
+                                self.observations.push(format!("GCS advisory: {}", advisory));
                             }
-                            self.gcs_violations = violations;
-                            self.phase = TaskPhase::Fixing;
-                            self.phase_failures = 0;
-                        } else {
-                            self.gcs_violations.clear();
-                            self.phase = TaskPhase::Testing;
-                            self.phase_failures = 0;
-                            tracing::info!(target: "symthaea::coding_agent", "-> Testing");
                         }
+                        self.gcs_advisories = advisories;
                     } else {
-                        self.phase = TaskPhase::Testing;
-                        self.phase_failures = 0;
-                        tracing::info!(target: "symthaea::coding_agent", "-> Testing");
+                        self.gcs_advisories.clear();
                     }
+                    self.phase = TaskPhase::Testing;
+                    self.phase_failures = 0;
+                    tracing::info!(target: "symthaea::coding_agent", "-> Testing");
                 } else if code_written {
                     self.phase = TaskPhase::Testing;
                     self.phase_failures = 0;
