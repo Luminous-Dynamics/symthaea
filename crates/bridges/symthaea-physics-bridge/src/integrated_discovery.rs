@@ -650,13 +650,14 @@ mod tests {
     use super::*;
 
     type SelectorPair = (bool, bool, usize, usize, bool);
+    type MisspecSelectorPair = (bool, bool, bool, bool, usize, usize, bool, bool, usize, bool, bool);
 
     /// Paired percentile bootstrap over seed/world outcomes. Every resample carries the raw
     /// and EIG result together, preserving pairing. This small pilot interval is diagnostic;
     /// it does not replace world-clustered confirmatory inference on a larger held-out corpus.
-    fn paired_bootstrap_mean_ci(
-        samples: &[SelectorPair],
-        metric: impl Fn(&SelectorPair) -> f64,
+    fn paired_bootstrap_mean_ci<T>(
+        samples: &[T],
+        metric: impl Fn(&T) -> f64,
         seed: u64,
     ) -> (f64, f64, f64) {
         const BOOTSTRAP_REPLICATES: usize = 2_000;
@@ -758,6 +759,123 @@ mod tests {
         assert!(round_ci_low.is_finite() && round_ci_high.is_finite());
         assert!((0.0..=1.0).contains(&(raw_successes as f64 / SEEDS as f64)));
         assert!((0.0..=1.0).contains(&(eig_successes as f64 / SEEDS as f64)));
+    }
+
+    /// Pilot testing whether scheduled, seeded audit experiments reduce false confidence
+    /// when the candidate class is deliberately misspecified. Audit queries consume the same
+    /// round budget and use only the existing admissible pool; the selector does not see the
+    /// hidden discrepancy. This is a diagnostic, not a claim that periodic random exploration
+    /// is universally optimal.
+    #[test]
+    fn scheduled_audits_measure_false_confidence_under_model_misspecification() {
+        const SEEDS: u64 = 40;
+        const ROUND_BUDGET: usize = 4;
+        const SYSTEMATIC_DISCREPANCY: f64 = 0.12;
+        let config = PipelineConfig {
+            typed_candidates: true,
+            active_selection: true,
+            smoothing: false,
+        };
+
+        let mut clean_eig_successes = 0usize;
+        let mut clean_audit_successes = 0usize;
+        let mut misspecified_eig_false_singletons = 0usize;
+        let mut misspecified_audit_false_singletons = 0usize;
+        let mut misspecified_eig_detections = 0usize;
+        let mut misspecified_audit_detections = 0usize;
+        let mut audit_query_total = 0usize;
+        let mut paired: Vec<MisspecSelectorPair> = Vec::with_capacity(SEEDS as usize);
+
+        for seed in 1..=SEEDS {
+            let clean_eig = run_trial_with_discrepancy(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::ExpectedInformationGain,
+                0.0,
+            );
+            let clean_audit = run_trial_with_discrepancy(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::InformationGainWithAudits,
+                0.0,
+            );
+            let misspec_eig = run_trial_with_discrepancy(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::ExpectedInformationGain,
+                SYSTEMATIC_DISCREPANCY,
+            );
+            let misspec_audit = run_trial_with_discrepancy(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::InformationGainWithAudits,
+                SYSTEMATIC_DISCREPANCY,
+            );
+
+            clean_eig_successes += if clean_eig.success { 1 } else { 0 };
+            clean_audit_successes += if clean_audit.success { 1 } else { 0 };
+            misspecified_eig_false_singletons +=
+                if misspec_eig.overconfident_under_misspecification { 1 } else { 0 };
+            misspecified_audit_false_singletons +=
+                if misspec_audit.overconfident_under_misspecification { 1 } else { 0 };
+            misspecified_eig_detections += if misspec_eig.model_discrepancy_detected { 1 } else { 0 };
+            misspecified_audit_detections +=
+                if misspec_audit.model_discrepancy_detected { 1 } else { 0 };
+            audit_query_total += misspec_audit.audit_queries;
+
+            paired.push((
+                misspec_eig.model_discrepancy_detected,
+                misspec_eig.overconfident_under_misspecification,
+                misspec_audit.model_discrepancy_detected,
+                misspec_audit.overconfident_under_misspecification,
+                misspec_eig.rounds_used,
+                misspec_audit.rounds_used,
+                misspec_eig.selection_failed,
+                misspec_audit.selection_failed,
+                misspec_audit.audit_queries,
+                clean_eig.success,
+                clean_audit.success,
+            ));
+        }
+
+        let (false_singleton_delta, false_ci_low, false_ci_high) = paired_bootstrap_mean_ci(
+            &paired,
+            |pair| (if pair.3 { 1.0 } else { 0.0 }) - (if pair.1 { 1.0 } else { 0.0 }),
+            0x4155_4449_545f_4643,
+        );
+        let (detection_delta, detection_ci_low, detection_ci_high) = paired_bootstrap_mean_ci(
+            &paired,
+            |pair| (if pair.2 { 1.0 } else { 0.0 }) - (if pair.0 { 1.0 } else { 0.0 }),
+            0x4155_4449_545f_4445,
+        );
+        let (clean_delta, clean_ci_low, clean_ci_high) = paired_bootstrap_mean_ci(
+            &paired,
+            |pair| (if pair.10 { 1.0 } else { 0.0 }) - (if pair.9 { 1.0 } else { 0.0 }),
+            0x4155_4449_545f_434c,
+        );
+
+        println!(
+            "misspec_audit,seeds={SEEDS},round_budget={ROUND_BUDGET},discrepancy={SYSTEMATIC_DISCREPANCY},clean_eig_recovery={:.3},clean_audit_recovery={:.3},misspec_eig_false_singleton={:.3},misspec_audit_false_singleton={:.3},false_singleton_delta_audit_minus_eig={false_singleton_delta:.3},false_singleton_ci95=[{false_ci_low:.3},{false_ci_high:.3}],misspec_eig_detected={:.3},misspec_audit_detected={:.3},detection_delta_audit_minus_eig={detection_delta:.3},detection_ci95=[{detection_ci_low:.3},{detection_ci_high:.3}],clean_recovery_delta_audit_minus_eig={clean_delta:.3},clean_recovery_ci95=[{clean_ci_low:.3},{clean_ci_high:.3}],scheduled_audit_queries={audit_query_total}",
+            clean_eig_successes as f64 / SEEDS as f64,
+            clean_audit_successes as f64 / SEEDS as f64,
+            misspecified_eig_false_singletons as f64 / SEEDS as f64,
+            misspecified_audit_false_singletons as f64 / SEEDS as f64,
+            misspecified_eig_detections as f64 / SEEDS as f64,
+            misspecified_audit_detections as f64 / SEEDS as f64,
+        );
+        assert_eq!(paired.len(), SEEDS as usize);
+        assert!(false_ci_low <= false_ci_high);
+        assert!(detection_ci_low <= detection_ci_high);
+        assert!(clean_ci_low <= clean_ci_high);
+        assert!(false_ci_low.is_finite() && false_ci_high.is_finite());
+        assert!(detection_ci_low.is_finite() && detection_ci_high.is_finite());
+        assert!(clean_ci_low.is_finite() && clean_ci_high.is_finite());
+        assert!(clean_eig_successes <= SEEDS as usize);
+        assert!(clean_audit_successes <= SEEDS as usize);
     }
 
     /// Landscape audit (run before trusting the frozen comparison, per this arc's established
