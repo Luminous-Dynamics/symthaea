@@ -34,14 +34,28 @@
     "regimes": 4,
     "policies": 6,
     "heldout_worlds": 2,
-    "designs": ["distinct_only", "repeatable"],
+    "designs": [
+      "distinct_only",
+      "repeatable"
+    ],
     "matched_action_budget": 2
   },
   "validation": {
     "embedded_self_test": "PASS_LOCAL",
     "unit_tests": "4/4_PASS_LOCAL",
     "source_and_test_git_blobs_match_executed_bytes": true,
-    "remote_ci": "not claimed as passing"
+    "remote_ci": "not claimed as passing",
+    "combined_compatibility_suite": {
+      "count": 26,
+      "result": "26/26_PASS_LOCAL",
+      "suites": [
+        "validation/test_off_target_kernel_inference.py",
+        "validation/test_off_target_replicate_design.py",
+        "validation/test_causal_probe_pareto_benchmark.py",
+        "validation/test_open_world_reference_stress.py"
+      ],
+      "note": "Executed locally after source/test blob verification; independent of remote GitHub Actions."
+    }
   },
   "conclusion": "With the same two-probe budget, repeatable probes increase expected graph and off-target information in the joint graph-EIG policy across the four tested regimes, but reduce OOD-surprise AUC. The naive q=1/r=0 policy can become less valid when repeating under actual partial/off-target actuation. This is a tiny synthetic result, not a general optimality claim."
 }
