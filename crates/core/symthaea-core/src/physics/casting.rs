@@ -593,23 +593,28 @@ mod tests {
         let model = ChvorinovModel::calibrate(&synthetic_observations()).unwrap();
         let holdout = [
             ChvorinovObservation::new(0.005, 33.0),
+            ChvorinovObservation::new(0.006, 44.2),
             ChvorinovObservation::new(0.020, 500.0),
             ChvorinovObservation::new(0.0005, 0.5),
         ];
 
         let report = model.evaluate_holdout(&holdout).unwrap();
-        assert_eq!(report.total_count, 3);
-        assert_eq!(report.prediction_count, 1);
+        assert_eq!(report.total_count, 4);
+        assert_eq!(report.prediction_count, 2);
         assert_eq!(report.abstained_out_of_domain_count, 2);
-        assert!((report.coverage_fraction - (1.0 / 3.0)).abs() < 1e-12);
-        assert!((report.mae_s.unwrap() - 3.0).abs() < 1e-8);
-        assert!((report.rmse_s.unwrap() - 3.0).abs() < 1e-8);
-        assert!((report.mean_absolute_relative_error.unwrap() - (3.0 / 33.0)).abs() < 1e-8);
+        assert!((report.coverage_fraction - 0.5).abs() < 1e-12);
+        assert!((report.mae_s.unwrap() - 2.0).abs() < 1e-6);
+        assert!((report.rmse_s.unwrap() - 5.0_f64.sqrt()).abs() < 1e-6);
+        let expected_relative_errors = [3.0 / 33.0, 1.0 / 44.2];
+        let expected_median_relative_error =
+            (expected_relative_errors[0] + expected_relative_errors[1]) / 2.0;
+        assert!((report.median_absolute_relative_error.unwrap() - expected_median_relative_error).abs() < 1e-6);
+        assert!((report.mean_absolute_relative_error.unwrap() - expected_median_relative_error).abs() < 1e-6);
         assert_eq!(
-            report.points[1].status,
+            report.points[2].status,
             CastingValidationStatus::AbstainedOutsideCalibrationDomain
         );
-        assert_eq!(report.points[1].predicted_time_s, None);
+        assert_eq!(report.points[2].predicted_time_s, None);
     }
 
     #[test]
