@@ -1,0 +1,68 @@
+{
+  "schema_version": "first-aid-clinical-evidence-registry-v0",
+  "registry_version": "0.1.0",
+  "checked_at": "2026-10-22",
+  "evidence_class": "source_metadata_only",
+  "clinical_use_authorized": false,
+  "south_africa_localization_status": "not_verified_no_clinical_claim_admitted",
+  "claim_admission_policy": {
+    "zero_approved_claims_disposition": "BLOCKED_NO_ADJUDICATED_CLAIMS",
+    "approved_claim_status": "approved_for_reference_evaluation_only",
+    "minimum_independent_reviewers": 2,
+    "separate_qualified_adjudicator_required": true,
+    "exact_source_locator_required": true,
+    "population_setting_jurisdiction_required": true,
+    "localization_review_required": true,
+    "review_date_and_source_update_trigger_required": true,
+    "patient_data_allowed": false,
+    "source_text_reproduction_authorized": false
+  },
+  "sources": [
+    {
+      "source_id": "IFRC-IFA-2025",
+      "publisher": "International Federation of Red Cross and Red Crescent Societies",
+      "title": "International First Aid, Resuscitation and Education Guidelines 2025",
+      "edition": "2025",
+      "publication_or_update_date": "2026-03-18",
+      "url": "https://www.ifrc.org/document/ifrc-international-first-aid-resuscitation-and-education-guidelines-2025",
+      "scope": "Global first aid, resuscitation, and first-aid education evidence framework",
+      "source_role": "global_foundation",
+      "jurisdiction_relevance": "international",
+      "localization_status": "local_adaptation_required",
+      "claim_use_status": "source_metadata_only_not_adjudicated",
+      "text_reproduced": false,
+      "notes": "Publisher guidance calls for contextual adaptation; this metadata entry does not establish South African localization or approve any treatment claim."
+    },
+    {
+      "source_id": "ERC-FA-2025",
+      "publisher": "European Resuscitation Council; page hosted by Resuscitation Council UK",
+      "title": "European Resuscitation Council Guidelines 2025: First Aid",
+      "edition": "2025",
+      "publication_or_update_date": "2025-10-27",
+      "url": "https://www.resus.org.uk/professional-library/2025-resuscitation-guidelines/first-aid-guidelines",
+      "scope": "Regional first-aid guideline recommendations",
+      "source_role": "regional_guideline",
+      "jurisdiction_relevance": "european_context",
+      "localization_status": "local_adaptation_required",
+      "claim_use_status": "source_metadata_only_not_adjudicated",
+      "text_reproduced": false,
+      "notes": "A regional reference is not a substitute for target-jurisdiction review."
+    },
+    {
+      "source_id": "AHA-CPR-ECC-2025",
+      "publisher": "American Heart Association",
+      "title": "2025 Guidelines for Cardiopulmonary Resuscitation and Emergency Cardiovascular Care",
+      "edition": "2025",
+      "publication_or_update_date": "2025-10-22",
+      "url": "https://professional.heart.org/en/science-news/2025-aha-guidelines-for-cpr-and-ecc",
+      "scope": "CPR, resuscitation, and emergency cardiovascular care; not all first-aid domains",
+      "source_role": "topic_specific_guideline",
+      "jurisdiction_relevance": "united_states_context",
+      "localization_status": "local_adaptation_required",
+      "claim_use_status": "source_metadata_only_not_adjudicated",
+      "text_reproduced": false,
+      "notes": "Scope is deliberately constrained; no recommendation is encoded by this registry entry."
+    }
+  ],
+  "claims": []
+}
