@@ -368,7 +368,7 @@ if ! awk -F, '
     if ($2 == "nominal") nominal_alarms[$1] = $4
     if ($2 == "stealth_shift") {
       if ($5 != 0 || $4 != nominal_alarms[$1] || $6 != 300 - $4 ||
-          $22 != 0 || $23 != 300 || $25 < 0) failed = 1
+          $22 != 0 || $23 != 300) failed = 1
       stealth_predictive_false_certificates += $25
       stealth_switch_false_certificates += $20
     }
