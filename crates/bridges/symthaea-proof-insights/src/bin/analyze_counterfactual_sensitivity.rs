@@ -28,8 +28,10 @@ struct PairObservation {
     mutation_kind: String,
     base_compatible: bool,
     base_accept: bool,
+    base_decision: String,
     variant_compatible: bool,
     variant_accept: bool,
+    variant_decision: String,
     noop: bool,
     base_probability: Option<f64>,
     variant_probability: Option<f64>,
@@ -80,7 +82,7 @@ impl Counts {
         }
         if observation.noop && observation.base_compatible && observation.variant_compatible {
             self.noop_eligible += 1;
-            if observation.base_accept == observation.variant_accept {
+            if observation.base_decision == observation.variant_decision {
                 self.noop_stable += 1;
             }
             if let (Some(base), Some(variant)) =
@@ -95,7 +97,7 @@ impl Counts {
             (observation.variant_probability, observation.variant_compatible),
         ] {
             if let Some(probability) = probability {
-                self.brier_sum += (probability - f64::from(truth)).powi(2);
+                self.brier_sum += (probability - if truth { 1.0 } else { 0.0 }).powi(2);
                 self.brier_count += 1;
             }
         }
@@ -464,8 +466,10 @@ fn join_pairs(pairs: &[Value], outcomes: &BTreeMap<String, Value>, requested_spl
             mutation_kind: required_string(mutation, "kind", &format!("{ctx}.mutation"))?.to_owned(),
             base_compatible: base_label == "compatible",
             base_accept: base_decision == "accept",
+            base_decision: base_decision.to_owned(),
             variant_compatible: variant_label == "compatible",
             variant_accept: variant_decision == "accept",
+            variant_decision: variant_decision.to_owned(),
             noop,
             base_probability: probability(base),
             variant_probability: probability(variant),
@@ -674,14 +678,14 @@ mod tests {
         let pairs = vec![
             PairObservation {
                 component_id: "c1".into(), mutation_kind: "precondition_removed".into(),
-                base_compatible: true, base_accept: true,
-                variant_compatible: false, variant_accept: false, noop: false,
+                base_compatible: true, base_accept: true, base_decision: "accept".into(),
+                variant_compatible: false, variant_accept: false, variant_decision: "reject".into(), noop: false,
                 base_probability: Some(0.9), variant_probability: Some(0.1),
             },
             PairObservation {
                 component_id: "c2".into(), mutation_kind: "precondition_removed".into(),
-                base_compatible: true, base_accept: false,
-                variant_compatible: false, variant_accept: false, noop: false,
+                base_compatible: true, base_accept: false, base_decision: "reject".into(),
+                variant_compatible: false, variant_accept: false, variant_decision: "reject".into(), noop: false,
                 base_probability: Some(0.7), variant_probability: Some(0.2),
             },
             PairObservation {
@@ -705,8 +709,8 @@ mod tests {
     fn goal_noise_or_reject_everything_cannot_pass_paired_adherence() {
         let reject_all = PairObservation {
             component_id: "c1".into(), mutation_kind: "precondition_removed".into(),
-            base_compatible: true, base_accept: false,
-            variant_compatible: false, variant_accept: false, noop: false,
+            base_compatible: true, base_accept: false, base_decision: "reject".into(),
+            variant_compatible: false, variant_accept: false, variant_decision: "reject".into(), noop: false,
             base_probability: None, variant_probability: None,
         };
         let counts = aggregate(&[reject_all]);
@@ -718,8 +722,8 @@ mod tests {
     #[test]
     fn component_bootstrap_is_deterministic_and_seeded() {
         let pairs = vec![
-            PairObservation { component_id:"a".into(), mutation_kind:"x".into(), base_compatible:true, base_accept:true, variant_compatible:false, variant_accept:false, noop:false, base_probability:None, variant_probability:None },
-            PairObservation { component_id:"b".into(), mutation_kind:"x".into(), base_compatible:true, base_accept:true, variant_compatible:false, variant_accept:true, noop:false, base_probability:None, variant_probability:None },
+            PairObservation { component_id:"a".into(), mutation_kind:"x".into(), base_compatible:true, base_accept:true, base_decision:"accept".into(), variant_compatible:false, variant_accept:false, variant_decision:"reject".into(), noop:false, base_probability:None, variant_probability:None },
+            PairObservation { component_id:"b".into(), mutation_kind:"x".into(), base_compatible:true, base_accept:true, base_decision:"accept".into(), variant_compatible:false, variant_accept:true, variant_decision:"accept".into(), noop:false, base_probability:None, variant_probability:None },
         ];
         let first = calculate_metrics(&pairs, 1_000, 9);
         let second = calculate_metrics(&pairs, 1_000, 9);
