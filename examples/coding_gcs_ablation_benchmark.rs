@@ -72,6 +72,7 @@ struct BackendAttemptRecord {
     tier: String,
     backend_name: String,
     success: bool,
+    elapsed_ms: u128,
 }
 
 fn task_suite() -> Vec<TaskCase> {
@@ -331,6 +332,7 @@ fn run_candidate(
             tier: attempt.tier.to_string(),
             backend_name: attempt.backend_name.clone(),
             success: attempt.success,
+            elapsed_ms: attempt.elapsed_ms,
         }).collect(),
     }
 }
@@ -362,7 +364,8 @@ fn eval_json(result: &EvalResult) -> serde_json::Value {
         "backend_attempts": result.backend_attempts.iter().map(|attempt| serde_json::json!({
             "tier": attempt.tier,
             "backend_name": attempt.backend_name,
-            "success": attempt.success
+            "success": attempt.success,
+            "elapsed_ms": attempt.elapsed_ms
         })).collect::<Vec<_>>()
     })
 }
@@ -389,6 +392,13 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
     let agent_elapsed_ms_p95 = nearest_rank_percentile(&mut agent_elapsed_values.clone(), 0.95).unwrap_or(0);
     let verification_elapsed_ms_p50 = nearest_rank_percentile(&mut verification_elapsed_values.clone(), 0.50).unwrap_or(0);
     let verification_elapsed_ms_p95 = nearest_rank_percentile(&mut verification_elapsed_values.clone(), 0.95).unwrap_or(0);
+    let backend_attempt_elapsed_values: Vec<u128> = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter().map(|attempt| attempt.elapsed_ms))
+        .collect();
+    let backend_attempt_elapsed_ms_total: u128 = backend_attempt_elapsed_values.iter().sum();
+    let backend_attempt_elapsed_ms_p50 = nearest_rank_percentile(&mut backend_attempt_elapsed_values.clone(), 0.50).unwrap_or(0);
+    let backend_attempt_elapsed_ms_p95 = nearest_rank_percentile(&mut backend_attempt_elapsed_values.clone(), 0.95).unwrap_or(0);
     let energy: f64 = mode.iter().map(|r| r.energy).sum();
     let selected_tier_count = |target: &str| -> usize {
         mode.iter()
@@ -465,6 +475,9 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
         "agent_elapsed_ms_p95": agent_elapsed_ms_p95,
         "verification_elapsed_ms_p50": verification_elapsed_ms_p50,
         "verification_elapsed_ms_p95": verification_elapsed_ms_p95,
+        "backend_attempt_elapsed_ms_total": backend_attempt_elapsed_ms_total,
+        "backend_attempt_elapsed_ms_p50": backend_attempt_elapsed_ms_p50,
+        "backend_attempt_elapsed_ms_p95": backend_attempt_elapsed_ms_p95,
         "energy_total": energy,
         "energy_mean": if total == 0 { 0.0 } else { energy / total as f64 }
     })
@@ -985,11 +998,13 @@ mod provenance_tests {
                     tier: "Simulated".to_string(),
                     backend_name: "Simulated".to_string(),
                     success: true,
+                    elapsed_ms: 7,
                 },
                 BackendAttemptRecord {
                     tier: "LocalLLM".to_string(),
                     backend_name: "Ollama".to_string(),
                     success: false,
+                    elapsed_ms: 11,
                 },
             ],
         };
@@ -1002,6 +1017,9 @@ mod provenance_tests {
         assert_eq!(summary["backend_attempts_by_name"]["Simulated"], 1);
         assert_eq!(summary["backend_attempts_succeeded"], 1);
         assert_eq!(summary["backend_attempts_failed"], 1);
+        assert_eq!(summary["backend_attempt_elapsed_ms_total"], 18);
+        assert_eq!(summary["backend_attempt_elapsed_ms_p50"], 7);
+        assert_eq!(summary["backend_attempt_elapsed_ms_p95"], 11);
         assert_eq!(summary["runs_with_external_backend_attempts"], 1);
         assert_eq!(summary["runs_with_simulated_backend_attempts"], 1);
         assert_eq!(summary["runs_with_no_backend_attempts"], 0);
