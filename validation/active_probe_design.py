@@ -4,8 +4,9 @@
 Standard-library only. This is an experiment-selection benchmark, not a Phi,
 PID, PEID, or consciousness metric. It evaluates policies on a finite hypothesis
 set where probe outcomes are known exactly and intervention costs/damage are
-explicit. Run python validation/active_probe_design.py --self-test for checks, or pass
---instances 40 --budget 3 --source-sha <exact-git-sha> for a reproducible report.
+explicit. Run python validation/active_probe_design.py --self-test for checks,
+or pass --instances 40 --budget 3 --source-sha <exact-git-sha> for a reproducible
+benchmark report.
 """
 from __future__ import annotations
 import argparse, hashlib, json, math, random, sys
@@ -109,7 +110,8 @@ def evaluate_policy(case: Case, strategy: str, damage_multiplier: float = 0.25) 
         if not available:
             return entropy(weights), float(len(posterior) == 1), 0.0, 0.0
 
-        # Exact oracle minimizes expected residual entropy, then expected damage, then cost.
+        # The exact oracle searches every affordable next intervention and chooses
+        # the lexicographically best expected residual entropy, damage, then cost.
         if strategy == "exact_oracle":
             stop = (entropy(weights), float(len(posterior) == 1), 0.0, 0.0)
             candidates = [(stop[0], stop[3], stop[2], -1, stop)]
@@ -134,6 +136,7 @@ def evaluate_policy(case: Case, strategy: str, damage_multiplier: float = 0.25) 
         return _branch_values(case, posterior, chosen, budget_left, used_mask, recurse)
 
     result = recurse(all_hypotheses, case.budget, 0)
+    # Expected exact identification must be in [0,1], entropy in [0, prior entropy].
     if not (-1e-12 <= result[1] <= 1.0 + 1e-12):
         raise AssertionError("invalid identification probability")
     if not (-1e-12 <= result[0] <= prior_entropy + 1e-12):
@@ -195,6 +198,7 @@ def run_benchmark(instances: int, budget: int, source_sha: str) -> dict:
 
 
 def self_test() -> None:
+    # A 4-bit truth table uniquely names every Boolean mechanism on two inputs.
     for mechanism in range(16):
         values = tuple((mechanism >> state) & 1 for state in range(4))
         assert len(set(values)) <= 2 and all(value in (0, 1) for value in values)
@@ -208,11 +212,12 @@ def self_test() -> None:
     oracle = results["exact_oracle"]
     assert all(r.expected_posterior_entropy_bits + 1e-10 >= oracle.expected_posterior_entropy_bits for r in results.values())
     assert all(0.0 <= r.probability_exact_identification <= 1.0 for r in results.values())
+    # Repeatability: same seed/configuration produces the same whole output.
     assert run_benchmark(4, 3, "self-test") == run_benchmark(4, 3, "self-test")
+    # No observation should have information when all hypotheses predict the same output.
     all_zero = Case(0, tuple(Hypothesis(i, 1, (0, 0, 0, 0)) for i in range(4)),
                     tuple(Probe(i, i, 1, 0) for i in range(4)), 2)
     assert all(expected_information_gain(all_zero, (0, 1, 2, 3), probe) == 0.0 for probe in all_zero.probes)
-    assert evaluate_policy(all_zero, "exact_oracle").expected_cost == 0.0
     assert evaluate_policy(all_zero, "exact_oracle").expected_cost == 0.0
 
 
