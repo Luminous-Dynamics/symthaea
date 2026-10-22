@@ -73,7 +73,9 @@
         ],
         "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "note": "Synthetic structural fixture only for p0-noop; reviewer labels are placeholders, not expert judgments."
-      }
+      },
+      "base_outcome_pair_id": "outcome-cf-p0-noop-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p0-noop-cf"
     },
     {
       "pair_id": "cf-p1-precondition",
@@ -144,7 +146,9 @@
         ],
         "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "note": "Synthetic structural fixture only for p1-precondition; reviewer labels are placeholders, not expert judgments."
-      }
+      },
+      "base_outcome_pair_id": "outcome-cf-p1-precondition-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p1-precondition-cf"
     },
     {
       "pair_id": "cf-p2-ineq",
@@ -215,7 +219,9 @@
         ],
         "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "note": "Synthetic structural fixture only for p2-ineq; reviewer labels are placeholders, not expert judgments."
-      }
+      },
+      "base_outcome_pair_id": "outcome-cf-p2-ineq-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p2-ineq-cf"
     },
     {
       "pair_id": "cf-p3-type",
@@ -286,7 +292,9 @@
         ],
         "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "note": "Synthetic structural fixture only for p3-type; reviewer labels are placeholders, not expert judgments."
-      }
+      },
+      "base_outcome_pair_id": "outcome-cf-p3-type-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p3-type-cf"
     },
     {
       "pair_id": "cf-p4-quantifier",
@@ -357,7 +365,9 @@
         ],
         "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "note": "Synthetic structural fixture only for p4-quantifier; reviewer labels are placeholders, not expert judgments."
-      }
+      },
+      "base_outcome_pair_id": "outcome-cf-p4-quantifier-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p4-quantifier-cf"
     },
     {
       "pair_id": "cf-p5-premise",
@@ -428,7 +438,9 @@
         ],
         "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "note": "Synthetic structural fixture only for p5-premise; reviewer labels are placeholders, not expert judgments."
-      }
+      },
+      "base_outcome_pair_id": "outcome-cf-p5-premise-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p5-premise-cf"
     },
     {
       "pair_id": "cf-p6-predicate",
@@ -499,7 +511,9 @@
         ],
         "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "note": "Synthetic structural fixture only for p6-predicate; reviewer labels are placeholders, not expert judgments."
-      }
+      },
+      "base_outcome_pair_id": "outcome-cf-p6-predicate-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p6-predicate-cf"
     }
   ]
 }
