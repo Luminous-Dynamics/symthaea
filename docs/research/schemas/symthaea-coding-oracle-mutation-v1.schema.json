@@ -76,7 +76,7 @@
       "additionalProperties": false,
       "required": [
         "task_count",
-        "expected_assertion_tests",
+        "expected_test_functions",
         "reference_controls_passed",
         "mutants_killed",
         "mutation_kill_rate",
@@ -89,7 +89,7 @@
           "type": "integer",
           "minimum": 1
         },
-        "expected_assertion_tests": {
+        "expected_test_functions": {
           "type": "integer",
           "minimum": 1
         },
