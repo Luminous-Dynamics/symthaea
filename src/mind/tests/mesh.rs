@@ -3498,3 +3498,108 @@ fn test_process_mesh_dispatches_moral_topology() {
         "moral_topology_received counter should be 1"
     );
 }
+
+
+#[cfg(feature = "mesh")]
+fn signed_replay_test_packet(
+    source_id: [u8; 8],
+    sequence: u32,
+    timestamp_s: u32,
+    key: [u8; 32],
+) -> crate::swarm::mesh::WisdomPacket {
+    use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+    use symthaea_core::hdc::BinaryHV;
+
+    let mut packet = WisdomPacket {
+        source_id,
+        sequence,
+        phi: 0.4,
+        urgency: MeshUrgency::Normal,
+        timestamp_s,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: [0; 32],
+        ttl: 0,
+        wisdom: BinaryHV([0x5A; 2048]),
+    };
+    let mut signer = ContinuousMind::default();
+    signer.set_mesh_auth_key(Some(key));
+    signer.sign_mesh_packet(&mut packet);
+    packet
+}
+
+#[cfg(feature = "mesh")]
+#[test]
+fn authenticated_mesh_replay_is_rejected_without_second_delivery() {
+    let key = [0x6C; 32];
+    let now_s = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as u32;
+    let packet = signed_replay_test_packet([0x81; 8], 12, now_s, key);
+
+    let mut receiver = ContinuousMind::default();
+    receiver.set_mesh_auth_key(Some(key));
+    receiver.mesh_inbox.push(packet.clone());
+    receiver.tick();
+
+    assert_eq!(receiver.mesh_stats.wisdom_received, 1);
+    assert_eq!(receiver.mesh_stats.packets_replay_rejected, 0);
+
+    receiver.mesh_inbox.push(packet);
+    receiver.tick();
+
+    assert_eq!(
+        receiver.mesh_stats.wisdom_received, 1,
+        "a byte-for-byte replay must not be delivered twice"
+    );
+    assert_eq!(receiver.mesh_stats.packets_replay_rejected, 1);
+}
+
+#[cfg(feature = "mesh")]
+#[test]
+fn unauthenticated_duplicate_cannot_poison_authenticated_replay_state() {
+    let key = [0x7D; 32];
+    let now_s = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as u32;
+    let valid = signed_replay_test_packet([0x82; 8], 44, now_s, key);
+    let mut forged = valid.clone();
+    forged.auth_mac = [0; 32];
+
+    let mut receiver = ContinuousMind::default();
+    receiver.set_mesh_auth_key(Some(key));
+
+    // Ordinary telemetry keeps the intentional fail-open/untrusted policy,
+    // but must not reserve the authenticated sequence tuple.
+    receiver.mesh_inbox.push(forged);
+    receiver.tick();
+    assert_eq!(receiver.mesh_stats.packets_auth_failed, 1);
+    assert_eq!(receiver.mesh_stats.wisdom_received, 1);
+
+    // The valid packet has the same (source, type, sequence), but a valid MAC.
+    // It must still be delivered because unauthenticated traffic cannot mutate
+    // the authenticated replay window.
+    receiver.mesh_inbox.push(valid);
+    receiver.tick();
+    assert_eq!(
+        receiver.mesh_stats.wisdom_received, 2,
+        "an unauthenticated packet must not suppress a later authentic packet"
+    );
+    assert_eq!(receiver.mesh_stats.packets_replay_rejected, 0);
+}
+
+#[cfg(feature = "mesh")]
+#[test]
+fn authenticated_mesh_packet_without_timestamp_fails_closed() {
+    let key = [0x8E; 32];
+    let packet = signed_replay_test_packet([0x83; 8], 1, 0, key);
+
+    let mut receiver = ContinuousMind::default();
+    receiver.set_mesh_auth_key(Some(key));
+    receiver.mesh_inbox.push(packet);
+    receiver.tick();
+
+    assert_eq!(receiver.mesh_stats.wisdom_received, 0);
+    assert_eq!(receiver.mesh_stats.packets_replay_rejected, 1);
+}
