@@ -99,6 +99,69 @@
               120
             ],
             "nominal_candidate": 90
+          },
+          {
+            "name": "jaw_thickness",
+            "unit": "mm",
+            "candidate_range": [
+              12,
+              30
+            ],
+            "nominal_candidate": 20
+          },
+          {
+            "name": "pad_thickness",
+            "unit": "mm",
+            "candidate_range": [
+              3,
+              8
+            ],
+            "nominal_candidate": 5
+          },
+          {
+            "name": "bridge_depth",
+            "unit": "mm",
+            "candidate_range": [
+              20,
+              60
+            ],
+            "nominal_candidate": 40
+          },
+          {
+            "name": "bridge_thickness",
+            "unit": "mm",
+            "candidate_range": [
+              12,
+              25
+            ],
+            "nominal_candidate": 20
+          },
+          {
+            "name": "bridge_end_margin",
+            "unit": "mm",
+            "candidate_range": [
+              5,
+              30
+            ],
+            "nominal_candidate": 20
+          },
+          {
+            "name": "bridge_to_jaw_overlap",
+            "unit": "mm",
+            "candidate_range": [
+              0.5,
+              4
+            ],
+            "nominal_candidate": 2
+          },
+          {
+            "name": "jaw_center_z",
+            "unit": "mm",
+            "candidate_range": [
+              -8,
+              8
+            ],
+            "nominal_candidate": -2
           }
         ],
         "design_constraints": [
@@ -189,6 +252,78 @@
             "candidate_range": [
               3,
               15
+            ],
+            "nominal_candidate": 8
+          },
+          {
+            "name": "guide_thickness",
+            "unit": "mm",
+            "candidate_range": [
+              6,
+              12
+            ],
+            "nominal_candidate": 8
+          },
+          {
+            "name": "guide_height",
+            "unit": "mm",
+            "candidate_range": [
+              20,
+              50
+            ],
+            "nominal_candidate": 36
+          },
+          {
+            "name": "base_thickness",
+            "unit": "mm",
+            "candidate_range": [
+              5,
+              14
+            ],
+            "nominal_candidate": 8
+          },
+          {
+            "name": "base_edge_margin",
+            "unit": "mm",
+            "candidate_range": [
+              2,
+              20
+            ],
+            "nominal_candidate": 2
+          },
+          {
+            "name": "base_front_margin",
+            "unit": "mm",
+            "candidate_range": [
+              5,
+              25
+            ],
+            "nominal_candidate": 10
+          },
+          {
+            "name": "base_rear_margin",
+            "unit": "mm",
+            "candidate_range": [
+              5,
+              25
+            ],
+            "nominal_candidate": 10
+          },
+          {
+            "name": "guide_base_overlap",
+            "unit": "mm",
+            "candidate_range": [
+              0.25,
+              3
+            ],
+            "nominal_candidate": 0.5
+          },
+          {
+            "name": "end_stop_thickness",
+            "unit": "mm",
+            "candidate_range": [
+              5,
+              12
             ],
             "nominal_candidate": 8
           }
