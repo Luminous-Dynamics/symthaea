@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Geodesic Code Synthesis (GCS) verification gate for the CodingAgent.
+//! Geodesic Code Synthesis (GCS) advisory diagnostics for the CodingAgent.
 //!
 //! After code generation succeeds (compilation passes), the GCS gate analyzes
 //! the generated source via:
@@ -15,10 +15,11 @@
 use super::CodingAgent;
 
 impl CodingAgent {
-    /// Verify generated source code using Geodesic Code Synthesis analysis.
+    /// Collect topology-derived hypotheses about generated source code.
     ///
-    /// Builds a PDG, computes topological fingerprints, and runs the execution
-    /// oracle. Returns a list of violation descriptions (empty = all checks passed).
+    /// Builds a PDG, computes topological fingerprints, and runs an abstract
+    /// convergence heuristic. Empty output means no heuristic advisory fired;
+    /// it does not certify semantic correctness, reachability, or termination.
     #[cfg(feature = "geodesic_synthesis")]
     pub(super) fn collect_gcs_advisories(&self, source: &str, function_name: &str) -> Vec<String> {
         use symthaea_geodesic::{
@@ -67,7 +68,7 @@ impl CodingAgent {
             }
         }
 
-        // Report structural info even when no violations
+        // Report structural info when no heuristic advisory is emitted.
         if advisories.is_empty() {
             tracing::info!(
                 target: "symthaea::coding_agent::gcs",
