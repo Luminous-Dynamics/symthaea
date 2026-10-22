@@ -390,6 +390,55 @@ mod tests {
     }
 
     #[test]
+    fn exact_oracle_matches_independent_brute_force_on_every_graph_up_to_five_vertices() {
+        // Exhaustively cover every labelled simple graph with 0..=5 vertices.
+        // The oracle under test uses branch-and-bound; this test independently
+        // enumerates vertex subsets and checks feasibility directly from the edges.
+        for vertex_count in 0..=5 {
+            let possible_edges: Vec<(usize, usize)> = (0..vertex_count)
+                .flat_map(|u| ((u + 1)..vertex_count).map(move |v| (u, v)))
+                .collect();
+            let graph_variants = 1usize << possible_edges.len();
+
+            for graph_mask in 0..graph_variants {
+                let mut edges = Vec::new();
+                for (edge_index, &(u, v)) in possible_edges.iter().enumerate() {
+                    if graph_mask & (1usize << edge_index) != 0 {
+                        edges.push((u, v));
+                    }
+                }
+
+                let graph = MisGraph::new(vertex_count, edges.clone())
+                    .expect("generated simple graph should be valid");
+                let exact = graph
+                    .exact_maximum_independent_set()
+                    .expect("graphs up to five vertices are within the exact limit");
+
+                let mut independently_computed_optimum = 0usize;
+                for subset_mask in 0..(1usize << vertex_count) {
+                    let feasible = edges.iter().all(|&(u, v)| {
+                        subset_mask & (1usize << u) == 0 || subset_mask & (1usize << v) == 0
+                    });
+                    if feasible {
+                        independently_computed_optimum = independently_computed_optimum
+                            .max(subset_mask.count_ones() as usize);
+                    }
+                }
+
+                assert_eq!(
+                    exact.len(),
+                    independently_computed_optimum,
+                    "mismatch for {vertex_count} vertices and graph edge mask {graph_mask}"
+                );
+                assert!(
+                    graph.verify_solution(&exact, Some(exact.len())).feasible,
+                    "oracle returned an invalid independent set for edge mask {graph_mask}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn exact_oracle_refuses_graphs_above_its_declared_limit() {
         let graph = MisGraph::new(EXACT_ORACLE_MAX_VERTICES + 1, [])
             .expect("large edgeless graph itself is valid");
