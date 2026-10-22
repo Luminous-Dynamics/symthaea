@@ -73,6 +73,7 @@ struct BackendAttemptRecord {
     backend_name: String,
     success: bool,
     elapsed_ms: u128,
+    estimated_energy_cost: f64,
 }
 
 fn task_suite() -> Vec<TaskCase> {
@@ -333,6 +334,7 @@ fn run_candidate(
             backend_name: attempt.backend_name.clone(),
             success: attempt.success,
             elapsed_ms: attempt.elapsed_ms,
+            estimated_energy_cost: attempt.estimated_energy_cost,
         }).collect(),
     }
 }
@@ -365,7 +367,8 @@ fn eval_json(result: &EvalResult) -> serde_json::Value {
             "tier": attempt.tier,
             "backend_name": attempt.backend_name,
             "success": attempt.success,
-            "elapsed_ms": attempt.elapsed_ms
+            "elapsed_ms": attempt.elapsed_ms,
+            "estimated_energy_cost": attempt.estimated_energy_cost
         })).collect::<Vec<_>>()
     })
 }
@@ -399,6 +402,11 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
     let backend_attempt_elapsed_ms_total: u128 = backend_attempt_elapsed_values.iter().sum();
     let backend_attempt_elapsed_ms_p50 = nearest_rank_percentile(&mut backend_attempt_elapsed_values.clone(), 0.50).unwrap_or(0);
     let backend_attempt_elapsed_ms_p95 = nearest_rank_percentile(&mut backend_attempt_elapsed_values.clone(), 0.95).unwrap_or(0);
+    let backend_attempt_estimated_energy_total: f64 = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .map(|attempt| attempt.estimated_energy_cost)
+        .sum();
     let energy: f64 = mode.iter().map(|r| r.energy).sum();
     let selected_tier_count = |target: &str| -> usize {
         mode.iter()
@@ -460,6 +468,7 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
         "backend_attempts_by_name": backend_attempts_by_name,
         "backend_attempts_succeeded": backend_attempts_succeeded,
         "backend_attempts_failed": backend_attempts_failed,
+        "backend_attempt_estimated_energy_total": backend_attempt_estimated_energy_total,
         "runs_with_external_backend_attempts": runs_with_external_backend_attempts,
         "runs_with_simulated_backend_attempts": runs_with_simulated_backend_attempts,
         "runs_with_no_backend_attempts": runs_with_no_backend_attempts,
@@ -999,12 +1008,14 @@ mod provenance_tests {
                     backend_name: "Simulated".to_string(),
                     success: true,
                     elapsed_ms: 7,
+                    estimated_energy_cost: 10.0,
                 },
                 BackendAttemptRecord {
                     tier: "LocalLLM".to_string(),
                     backend_name: "Ollama".to_string(),
                     success: false,
                     elapsed_ms: 11,
+                    estimated_energy_cost: 10.0,
                 },
             ],
         };
@@ -1017,6 +1028,7 @@ mod provenance_tests {
         assert_eq!(summary["backend_attempts_by_name"]["Simulated"], 1);
         assert_eq!(summary["backend_attempts_succeeded"], 1);
         assert_eq!(summary["backend_attempts_failed"], 1);
+        assert_eq!(summary["backend_attempt_estimated_energy_total"], 20.0);
         assert_eq!(summary["backend_attempt_elapsed_ms_total"], 18);
         assert_eq!(summary["backend_attempt_elapsed_ms_p50"], 7);
         assert_eq!(summary["backend_attempt_elapsed_ms_p95"], 11);
