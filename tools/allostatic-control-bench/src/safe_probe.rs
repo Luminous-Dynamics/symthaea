@@ -335,14 +335,14 @@ mod tests {
     fn horizon_filter_rejects_one_step_safe_but_dead_end_probe() {
         let current = state((0.16, 0.16), (0.87, 0.87));
         let dangerous_continuation = model(
-            effects((-0.005, -0.005), (0.005, 0.005)),
-            effects((-0.01, -0.005), (0.005, 0.01)),
-            effects((-0.02, -0.01), (-0.01, 0.01)),
+            effects((-0.005, -0.005), (0.01, 0.01)),
+            effects((0.0, 0.0), (0.005, 0.005)),
+            effects((-0.02, -0.02), (-0.30, -0.25)),
         );
         let alternate = model(
-            effects((-0.005, -0.005), (0.005, 0.005)),
-            effects((-0.01, -0.005), (0.005, 0.01)),
-            effects((-0.02, -0.01), (-0.01, 0.01)),
+            effects((-0.006, -0.006), (0.01, 0.01)),
+            effects((0.0, 0.0), (0.005, 0.005)),
+            effects((-0.02, -0.02), (-0.30, -0.25)),
         );
         let models = [dangerous_continuation, alternate];
         let hull = dynamics_hull(&models).expect("valid hull");
