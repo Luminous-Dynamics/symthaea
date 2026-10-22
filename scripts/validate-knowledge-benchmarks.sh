@@ -62,6 +62,10 @@ run_validator annotation \
   benchmarks/knowledge-annotation/v0/synthetic-fixtures.jsonl \
   "$reports_dir/annotation-fixtures.json"
 
+cargo run --locked --manifest-path "$manifest" --bin score-annotation-agreement -- \
+  --annotations benchmarks/knowledge-annotation/v0/synthetic-fixtures.jsonl \
+  --out "$reports_dir/annotation-agreement.json"
+
 run_validator run \
   benchmarks/benchmark-runs/v0/comparison-plan.schema.json \
   benchmarks/benchmark-runs/v0/synthetic-plans.jsonl \
