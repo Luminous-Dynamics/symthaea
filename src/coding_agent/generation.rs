@@ -126,6 +126,8 @@ impl CodingAgent {
         // Process the dispatch result
         if let Some(result) = dispatch_result {
             self.generation_tiers.push(result.tier);
+            self.selected_generation_tiers.push(result.tier);
+            self.actual_backend_attempts.extend(result.backend_attempts.iter().cloned());
             self.energy_budget -= result.energy_cost as f32;
 
             tracing::debug!(
@@ -178,8 +180,20 @@ impl CodingAgent {
                     "Code generated and written"
                 );
             } else if result.tier == BackendTier::Native {
-                // Native tier — try pattern-aware generation
-                if let Some(code) = self.native_code_template() {
+                // Native tier — try pattern-aware generation and record its actual attempt.
+                let native_started = std::time::Instant::now();
+                let native_candidate = self.native_code_template();
+                let native_elapsed_ms = native_started.elapsed().as_millis();
+                self.actual_backend_attempts.push(BackendAttempt {
+                    tier: BackendTier::Native,
+                    backend_name: "NativeCodeTemplate".to_string(),
+                    success: native_candidate.as_ref().is_some_and(|code| !code.trim().is_empty()),
+                    usable_generation: native_candidate.as_ref().is_some_and(|code| !code.trim().is_empty()),
+                    verification_passed: None,
+                    elapsed_ms: native_elapsed_ms,
+                    estimated_energy_cost: BackendTier::Native.estimated_energy_cost(),
+                });
+                if let Some(code) = native_candidate {
                     let target = self.resolve_target_file();
                     self.write_code_to_disk(&target, &code);
                     self.generated_code = Some(Self::sanitize_generated_code(
@@ -212,6 +226,8 @@ impl CodingAgent {
                             0.5, // bypass consciousness < 0.2 check
                         );
                         self.generation_tiers.push(llm_result.tier);
+                        self.selected_generation_tiers.push(llm_result.tier);
+                        self.actual_backend_attempts.extend(llm_result.backend_attempts.iter().cloned());
                         tracing::info!(
                             target: "symthaea::coding_agent",
                             tier = %llm_result.tier,
@@ -867,11 +883,51 @@ impl CodingAgent {
             bridge.predict_generation(&name, "orchestrator", 0.6, "code will compile and verify")
         });
 
-        let response = self
-            .orchestrator
-            .as_ref()
-            .expect("checked is_none above")
-            .synthesize(&request);
+        let orchestration_started = std::time::Instant::now();
+        let orchestrator = self.orchestrator.as_ref().expect("checked is_none above");
+        let attempt_history_start = orchestrator.attempt_history().len();
+        let response = orchestrator.synthesize(&request);
+        let orchestration_elapsed_ms = orchestration_started.elapsed().as_millis();
+        let attempt_history = orchestrator.attempt_history();
+        let new_attempts = attempt_history
+            .get(attempt_history_start..)
+            .unwrap_or(&[]);
+
+        if new_attempts.is_empty() {
+            // Specialized paths such as the HDL emitter may return a response without
+            // a SynthesisAttempt entry; preserve the observed response as a fallback record.
+            let tier = Self::orchestrator_backend_tier(&response.backend_name);
+            self.generation_tiers.push(tier);
+            self.actual_backend_attempts.push(BackendAttempt {
+                tier,
+                backend_name: response.backend_name.clone(),
+                success: !response.source.trim().is_empty(),
+                usable_generation: !response.source.trim().is_empty() && tier != BackendTier::Simulated,
+                verification_passed: Some(response.accepted),
+                elapsed_ms: orchestration_elapsed_ms,
+                estimated_energy_cost: response.energy_cost as f64,
+            });
+        } else {
+            // Capture the orchestrator's true per-backend audit trail, including
+            // rejected candidates before the eventual accepted/fallback attempt.
+            for attempt in new_attempts {
+                let tier = Self::orchestrator_backend_tier(&attempt.backend);
+                let output_nonempty = attempt
+                    .source_preview
+                    .as_deref()
+                    .is_some_and(|source| !source.trim().is_empty());
+                self.generation_tiers.push(tier);
+                self.actual_backend_attempts.push(BackendAttempt {
+                    tier,
+                    backend_name: attempt.backend.clone(),
+                    success: output_nonempty,
+                    usable_generation: output_nonempty && tier != BackendTier::Simulated,
+                    verification_passed: Some(attempt.verified),
+                    elapsed_ms: attempt.elapsed_ms,
+                    estimated_energy_cost: attempt.energy_cost as f64,
+                });
+            }
+        }
 
         if let Some(id) = prediction_id {
             if let Some(ref mut bridge) = self.magi_bridge {
@@ -887,12 +943,10 @@ impl CodingAgent {
             return false;
         }
 
-        let tier = Self::orchestrator_backend_tier(&response.backend_name);
         self.write_code_to_disk(&target, &response.source);
         self.generated_code = Some(Self::sanitize_generated_code(&Self::strip_code_fences(
             &response.source,
         )));
-        self.generation_tiers.push(tier);
         self.native_exhausted = false;
         self.observations.push(format!(
             "Orchestrator accepted via {} (confidence {:.2})",
@@ -913,13 +967,26 @@ impl CodingAgent {
     /// Map an orchestrator backend name to the existing `BackendTier` telemetry enum.
     #[cfg(feature = "code_generation")]
     pub(super) fn orchestrator_backend_tier(backend_name: &str) -> BackendTier {
-        if backend_name.starts_with("LLM:") {
+        let normalized = backend_name.to_ascii_lowercase();
+        if let Some(provider) = normalized.strip_prefix("llm:") {
+            match provider {
+                // Explicitly local model runtimes.
+                "ollama" | "candle" | "ssm" | "broca" | "mamba" => BackendTier::LocalLlm,
+                // Named cloud endpoints, and unknown LLM providers conservatively
+                // classified as external rather than silently counted as local.
+                _ => BackendTier::CloudLlm,
+            }
+        } else if normalized == "simulated" {
+            BackendTier::Simulated
+        } else if normalized == "ollama" {
             BackendTier::LocalLlm
-        } else if backend_name == "HardwareDriverEmitter" || backend_name == "HdlEmitter" {
+        } else if normalized == "anthropic" || normalized == "openai" || normalized == "deepswe" {
+            BackendTier::CloudLlm
+        } else if normalized == "hardwaredriveremitter" || normalized == "hdlemitter" {
             BackendTier::Hardware
         } else {
-            // CodeGenerator, CodeAlgebra::analogy, GeodesicSkeleton — all native,
-            // compiler-verified, zero-external-call tiers.
+            // CodeGenerator, CodeAlgebra::analogy, GeodesicSkeleton and native
+            // templates are in-process synthesis paths with no external LLM call.
             BackendTier::Native
         }
     }

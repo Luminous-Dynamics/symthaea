@@ -5,7 +5,7 @@
 //! externally pinned source and manifest hashes when auditing results for publication.
 
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fs;
 
@@ -29,6 +29,15 @@ fn nearly_equal(a: f64, b: f64) -> bool {
     a.is_finite()
         && b.is_finite()
         && (a - b).abs() <= 1.0e-8_f64.max(a.abs().max(b.abs()) * 1.0e-8)
+}
+
+fn nearest_rank_percentile(values: &mut [u64], quantile: f64) -> Option<u64> {
+    if values.is_empty() || !quantile.is_finite() || !(0.0..=1.0).contains(&quantile) {
+        return None;
+    }
+    values.sort_unstable();
+    let rank = ((quantile * values.len() as f64).ceil() as usize).clamp(1, values.len());
+    values.get(rank - 1).copied()
 }
 
 fn push_check(errors: &mut Vec<String>, condition: bool, message: impl Into<String>) {
@@ -97,16 +106,31 @@ fn score_success(run: &Value, expected: u64) -> bool {
             == expected
 }
 
-fn oracle_complete(run: &Value, expected: u64) -> bool {
-    // A nonzero test-process exit is expected when assertions fail. If all
-    // declared tests are accounted for, the oracle is complete; runtime_error
-    // still prevents the run from being credited as a behavioral success.
-    expected > 0
-        && bool_field(run, "compiled") == Some(true)
+fn has_real_compile_rejection(run: &Value) -> bool {
+    bool_field(run, "compiled") == Some(false)
         && bool_field(run, "simulated") == Some(false)
-        && u64_field(run, "tests_passed").unwrap_or(0)
-            .saturating_add(u64_field(run, "tests_failed").unwrap_or(0))
-            == expected
+        && run.get("runtime_error").is_some_and(Value::is_null)
+        && run
+            .get("compile_errors")
+            .and_then(Value::as_array)
+            .is_some_and(|errors| {
+                errors.iter().any(|error| {
+                    error.as_str().is_some_and(|message| message.trim_start().starts_with("error"))
+                })
+            })
+}
+
+fn oracle_complete(run: &Value, expected: u64) -> bool {
+    // A decisive negative Rust compiler diagnostic is a completed verdict,
+    // even though the test binary could not be built. Runner/sandbox failures
+    // and simulated execution remain unresolved, not task losses.
+    expected > 0
+        && bool_field(run, "simulated") == Some(false)
+        && ((bool_field(run, "compiled") == Some(true)
+            && u64_field(run, "tests_passed").unwrap_or(0)
+                .saturating_add(u64_field(run, "tests_failed").unwrap_or(0))
+                == expected)
+            || has_real_compile_rejection(run))
 }
 
 fn verify_mode_summary(
@@ -127,6 +151,10 @@ fn verify_mode_summary(
                 && bool_field(run, "simulated") == Some(false)
         })
         .count() as u64;
+    let compile_rejections = selected_runs
+        .iter()
+        .filter(|run| has_real_compile_rejection(run))
+        .count() as u64;
     let complete = selected_runs
         .iter()
         .filter(|run| bool_field(run, "oracle_complete") == Some(true))
@@ -135,17 +163,176 @@ fn verify_mode_summary(
         .iter()
         .map(|run| u64_field(run, "agent_elapsed_ms").unwrap_or(0))
         .fold(0_u64, u64::saturating_add);
+    let agent_times: Vec<u64> = selected_runs
+        .iter()
+        .map(|run| u64_field(run, "agent_elapsed_ms").unwrap_or(0))
+        .collect();
+    let verification_times: Vec<u64> = selected_runs
+        .iter()
+        .map(|run| u64_field(run, "verification_elapsed_ms").unwrap_or(0))
+        .collect();
+    let agent_elapsed_ms_p50 = nearest_rank_percentile(&mut agent_times.clone(), 0.50).unwrap_or(0);
+    let agent_elapsed_ms_p95 = nearest_rank_percentile(&mut agent_times.clone(), 0.95).unwrap_or(0);
+    let verification_elapsed_ms_p50 = nearest_rank_percentile(&mut verification_times.clone(), 0.50).unwrap_or(0);
+    let verification_elapsed_ms_p95 = nearest_rank_percentile(&mut verification_times.clone(), 0.95).unwrap_or(0);
     let energy_total: f64 = selected_runs
         .iter()
         .map(|run| read_f64(run, "energy").unwrap_or(0.0))
         .sum();
     let count = selected_runs.len() as u64;
+    let selected_tier_count = |target: &str| -> u64 {
+        selected_runs
+            .iter()
+            .map(|run| {
+                run.get("selected_generation_tiers")
+                    .and_then(Value::as_array)
+                    .map(|tiers| tiers.iter().filter(|tier| tier.as_str() == Some(target)).count() as u64)
+                    .unwrap_or(0)
+            })
+            .fold(0_u64, u64::saturating_add)
+    };
+    let backend_attempts = selected_runs
+        .iter()
+        .filter_map(|run| run.get("backend_attempts").and_then(Value::as_array))
+        .flatten()
+        .collect::<Vec<_>>();
+    let backend_attempt_elapsed_values: Vec<u64> = backend_attempts
+        .iter()
+        .map(|attempt| u64_field(attempt, "elapsed_ms").unwrap_or(0))
+        .collect();
+    let backend_attempt_elapsed_ms_total = backend_attempt_elapsed_values
+        .iter()
+        .copied()
+        .fold(0_u64, u64::saturating_add);
+    let backend_attempt_elapsed_ms_p50 = nearest_rank_percentile(&mut backend_attempt_elapsed_values.clone(), 0.50).unwrap_or(0);
+    let backend_attempt_elapsed_ms_p95 = nearest_rank_percentile(&mut backend_attempt_elapsed_values.clone(), 0.95).unwrap_or(0);
+    let backend_attempt_estimated_energy_total: f64 = backend_attempts
+        .iter()
+        .map(|attempt| read_f64(attempt, "estimated_energy_cost").unwrap_or(0.0))
+        .sum();
+    let backend_attempt_count = |target: &str| -> u64 {
+        backend_attempts
+            .iter()
+            .filter(|attempt| str_field(attempt, "tier") == Some(target))
+            .count() as u64
+    };
+    let backend_attempts_succeeded = backend_attempts
+        .iter()
+        .filter(|attempt| bool_field(attempt, "success") == Some(true))
+        .count() as u64;
+    let backend_attempts_failed = backend_attempts
+        .iter()
+        .filter(|attempt| bool_field(attempt, "success") == Some(false))
+        .count() as u64;
+    let backend_attempts_usable_generations = backend_attempts
+        .iter()
+        .filter(|attempt| bool_field(attempt, "usable_generation") == Some(true))
+        .count() as u64;
+    let backend_attempts_nonempty_unusable_outputs = backend_attempts
+        .iter()
+        .filter(|attempt| {
+            bool_field(attempt, "success") == Some(true)
+                && bool_field(attempt, "usable_generation") == Some(false)
+        })
+        .count() as u64;
+    let backend_attempts_verifier_accepted = backend_attempts
+        .iter()
+        .filter(|attempt| bool_field(attempt, "verification_passed") == Some(true))
+        .count() as u64;
+    let backend_attempts_verifier_rejected = backend_attempts
+        .iter()
+        .filter(|attempt| bool_field(attempt, "verification_passed") == Some(false))
+        .count() as u64;
+    let backend_attempts_without_verifier_result = backend_attempts
+        .iter()
+        .filter(|attempt| attempt.get("verification_passed").is_some_and(Value::is_null))
+        .count() as u64;
+    let runs_with_external_backend_attempts = selected_runs
+        .iter()
+        .filter(|run| {
+            run.get("backend_attempts")
+                .and_then(Value::as_array)
+                .is_some_and(|attempts| {
+                    attempts.iter().any(|attempt| {
+                        matches!(str_field(attempt, "tier"), Some("LocalLLM" | "CloudLLM"))
+                    })
+                })
+        })
+        .count() as u64;
+    let runs_with_simulated_backend_attempts = selected_runs
+        .iter()
+        .filter(|run| {
+            run.get("backend_attempts")
+                .and_then(Value::as_array)
+                .is_some_and(|attempts| attempts.iter().any(|attempt| str_field(attempt, "tier") == Some("Simulated")))
+        })
+        .count() as u64;
+    let runs_with_no_backend_attempts = selected_runs
+        .iter()
+        .filter(|run| {
+            run.get("backend_attempts")
+                .and_then(Value::as_array)
+                .is_some_and(|attempts| attempts.is_empty())
+        })
+        .count() as u64;
+    let mut backend_name_counts = BTreeMap::<String, u64>::new();
+    for attempt in &backend_attempts {
+        if let Some(name) = str_field(attempt, "backend_name") {
+            *backend_name_counts.entry(name.to_string()).or_insert(0) += 1;
+        }
+    }
+    let expected_backend_attempts_by_name = serde_json::json!(backend_name_counts);
+    push_check(
+        errors,
+        summary.get("selected_tier_decisions") == Some(&serde_json::json!({
+            "Native": selected_tier_count("Native"),
+            "Hardware": selected_tier_count("Hardware"),
+            "LocalLLM": selected_tier_count("LocalLLM"),
+            "CloudLLM": selected_tier_count("CloudLLM"),
+            "Simulated": selected_tier_count("Simulated")
+        })),
+        format!("summary.{label}.selected_tier_decisions is inconsistent with individual runs"),
+    );
+    push_check(
+        errors,
+        summary.get("backend_attempts_by_tier") == Some(&serde_json::json!({
+            "Native": backend_attempt_count("Native"),
+            "Hardware": backend_attempt_count("Hardware"),
+            "LocalLLM": backend_attempt_count("LocalLLM"),
+            "CloudLLM": backend_attempt_count("CloudLLM"),
+            "Simulated": backend_attempt_count("Simulated")
+        })),
+        format!("summary.{label}.backend_attempts_by_tier is inconsistent with individual backend attempts"),
+    );
+    push_check(
+        errors,
+        summary.get("backend_attempts_by_name") == Some(&expected_backend_attempts_by_name),
+        format!("summary.{label}.backend_attempts_by_name is inconsistent with individual backend attempts"),
+    );
     let checks = [
         ("runs", count),
         ("behavioral_successes", passed),
         ("real_compiles", compiles),
+        ("compile_rejections", compile_rejections),
         ("complete_oracles", complete),
         ("agent_elapsed_ms_total", time_total),
+        ("agent_elapsed_ms_p50", agent_elapsed_ms_p50),
+        ("agent_elapsed_ms_p95", agent_elapsed_ms_p95),
+        ("verification_elapsed_ms_p50", verification_elapsed_ms_p50),
+        ("verification_elapsed_ms_p95", verification_elapsed_ms_p95),
+        ("backend_attempts_succeeded", backend_attempts_succeeded),
+        ("backend_attempts_failed", backend_attempts_failed),
+        ("backend_attempts_usable_generations", backend_attempts_usable_generations),
+        ("backend_attempts_nonempty_unusable_outputs", backend_attempts_nonempty_unusable_outputs),
+        ("backend_attempts_verifier_accepted", backend_attempts_verifier_accepted),
+        ("backend_attempts_verifier_rejected", backend_attempts_verifier_rejected),
+        ("backend_attempts_without_verifier_result", backend_attempts_without_verifier_result),
+        ("backend_attempt_elapsed_ms_total", backend_attempt_elapsed_ms_total),
+        ("backend_attempt_elapsed_ms_p50", backend_attempt_elapsed_ms_p50),
+        ("backend_attempt_elapsed_ms_p95", backend_attempt_elapsed_ms_p95),
+        ("runs_with_external_backend_attempts", runs_with_external_backend_attempts),
+        ("runs_with_simulated_backend_attempts", runs_with_simulated_backend_attempts),
+        ("runs_with_no_backend_attempts", runs_with_no_backend_attempts),
     ];
     for (key, expected) in checks {
         push_check(
@@ -161,6 +348,7 @@ fn verify_mode_summary(
         ("agent_elapsed_ms_mean", if count == 0 { 0.0 } else { time_total as f64 / count as f64 }),
         ("energy_total", energy_total),
         ("energy_mean", if count == 0 { 0.0 } else { energy_total / count as f64 }),
+        ("backend_attempt_estimated_energy_total", backend_attempt_estimated_energy_total),
     ] {
         push_check(
             errors,
@@ -179,8 +367,8 @@ fn audit(
 
     push_check(
         &mut errors,
-        u64_field(report, "schema_version") == Some(3),
-        "schema_version must be 3",
+        u64_field(report, "schema_version") == Some(6),
+        "schema_version must be 6",
     );
     push_check(
         &mut errors,
@@ -559,8 +747,8 @@ fn audit(
             u64_field(run, "expected_test_functions") == Some(expected),
             format!("runs[{index}] expected test count differs from manifest"),
         );
-        let valid_generation_tiers = run
-            .get("generation_tiers")
+        let valid_selected_tiers = run
+            .get("selected_generation_tiers")
             .and_then(Value::as_array)
             .is_some_and(|tiers| {
                 tiers.iter().all(|tier| {
@@ -571,8 +759,62 @@ fn audit(
             });
         push_check(
             &mut errors,
-            valid_generation_tiers,
-            format!("runs[{index}] has missing or invalid observed generation_tiers"),
+            valid_selected_tiers,
+            format!("runs[{index}] has missing or invalid selected_generation_tiers"),
+        );
+
+        let backend_attempts = run.get("backend_attempts").and_then(Value::as_array);
+        let valid_backend_attempts = backend_attempts.is_some_and(|attempts| {
+            attempts.iter().all(|attempt| {
+                let tier = str_field(attempt, "tier");
+                let backend_name = str_field(attempt, "backend_name").unwrap_or("");
+                let success = bool_field(attempt, "success");
+                let usable_generation = bool_field(attempt, "usable_generation");
+                let verification_valid = attempt.get("verification_passed").is_some_and(|value| value.is_null() || value.is_boolean());
+                let tier_valid = tier.is_some_and(|name| {
+                    matches!(name, "Native" | "Hardware" | "LocalLLM" | "CloudLLM" | "Simulated")
+                });
+                let backend_name_valid = !backend_name.trim().is_empty();
+                let success_valid = success.is_some();
+                let usable_generation_valid = usable_generation.is_some()
+                    && !(success == Some(false) && usable_generation == Some(true))
+                    && !(tier == Some("Simulated") && usable_generation == Some(true));
+                let elapsed_valid = u64_field(attempt, "elapsed_ms").is_some();
+                let energy_valid = read_f64(attempt, "estimated_energy_cost").is_some_and(|cost| cost >= 0.0);
+                let identity_consistent = match backend_name.to_ascii_lowercase().as_str() {
+                    "simulated" => tier == Some("Simulated"),
+                    "ollama" => tier == Some("LocalLLM"),
+                    "anthropic" => tier == Some("CloudLLM"),
+                    _ => true,
+                };
+                tier_valid && backend_name_valid && success_valid && usable_generation_valid && verification_valid && elapsed_valid && energy_valid && identity_consistent
+            })
+        });
+        push_check(
+            &mut errors,
+            valid_backend_attempts,
+            format!("runs[{index}] has missing or invalid backend_attempts"),
+        );
+
+        let attempts = backend_attempts;
+        let has_attempt = |target: &str| {
+            attempts.is_some_and(|values| {
+                values.iter().any(|attempt| str_field(attempt, "tier") == Some(target))
+            })
+        };
+        let actual_attempts_compatible_with_requested_backend = match model_mode {
+            "native" => !has_attempt("LocalLLM") && !has_attempt("CloudLLM"),
+            "ollama" => !has_attempt("CloudLLM"),
+            // Cloud mode may fall back to LocalLLM after a failed cloud invocation.
+            // The ordered attempt receipt, not the requested mode alone, tells which
+            // backend actually ran and whether the preferred tier failed.
+            "cloud" => true,
+            _ => false,
+        };
+        push_check(
+            &mut errors,
+            actual_attempts_compatible_with_requested_backend,
+            format!("runs[{index}] actual backend attempts conflict with requested model_mode {model_mode}"),
         );
 
         push_check(
@@ -587,8 +829,12 @@ fn audit(
                 && bool_field(run, "simulated").is_some()
                 && u64_field(run, "tests_passed").is_some()
                 && u64_field(run, "tests_failed").is_some()
+                && u64_field(run, "agent_elapsed_ms").is_some()
+                && u64_field(run, "verification_elapsed_ms").is_some()
+                && u64_field(run, "iterations").is_some()
+                && read_f64(run, "energy").is_some_and(|energy| energy >= 0.0)
                 && run.get("runtime_error").is_some(),
-            format!("runs[{index}] is missing compile/oracle status fields"),
+            format!("runs[{index}] is missing compile/oracle/runtime/energy metrics"),
         );
         let complete = oracle_complete(run, expected);
         push_check(
@@ -1073,7 +1319,8 @@ mod tests {
             "iterations": 1,
             "energy": energy,
             "final_phase": "Testing",
-            "generation_tiers": vec!["Native"]
+            "selected_generation_tiers": vec!["Native"],
+            "backend_attempts": vec![]
         })
     }
 
@@ -1113,7 +1360,7 @@ mod tests {
         })];
         let manifest_sha = manifest_digest(&manifest).unwrap();
         serde_json::json!({
-            "schema_version": 3,
+            "schema_version": 6,
             "benchmark": "symthaea_gcs_runtime_ablation",
             "source_revision": "1".repeat(40),
             "model_mode": "native",
@@ -1173,27 +1420,71 @@ mod tests {
             "summary": {
                 "gcs_off": {
                     "gcs_advisories_enabled": false,
+                    "selected_tier_decisions": {"Native": 1, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0},
+                    "backend_attempts_by_tier": {"Native": 0, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0},
+                    "backend_attempts_by_name": {},
+                    "backend_attempts_succeeded": 0,
+                    "backend_attempts_failed": 0,
+                    "backend_attempts_usable_generations": 0,
+                    "backend_attempts_nonempty_unusable_outputs": 0,
+                    "backend_attempts_verifier_accepted": 0,
+                    "backend_attempts_verifier_rejected": 0,
+                    "backend_attempts_without_verifier_result": 0,
+                    "backend_attempt_elapsed_ms_total": 0,
+                    "backend_attempt_elapsed_ms_p50": 0,
+                    "backend_attempt_elapsed_ms_p95": 0,
+                    "backend_attempt_estimated_energy_total": 0.0,
+                    "runs_with_external_backend_attempts": 0,
+                    "runs_with_simulated_backend_attempts": 0,
+                    "runs_with_no_backend_attempts": 1,
                     "runs": 1,
                     "behavioral_successes": 1,
                     "pass_rate": 1.0,
                     "real_compiles": 1,
+                    "compile_rejections": 0,
                     "complete_oracles": 1,
                     "complete_oracle_rate": 1.0,
                     "agent_elapsed_ms_total": 100,
                     "agent_elapsed_ms_mean": 100.0,
+                    "agent_elapsed_ms_p50": 100,
+                    "agent_elapsed_ms_p95": 100,
+                    "verification_elapsed_ms_p50": 20,
+                    "verification_elapsed_ms_p95": 20,
                     "energy_total": 1.0,
                     "energy_mean": 1.0
                 },
                 "gcs_on": {
                     "gcs_advisories_enabled": true,
+                    "selected_tier_decisions": {"Native": 1, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0},
+                    "backend_attempts_by_tier": {"Native": 0, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0},
+                    "backend_attempts_by_name": {},
+                    "backend_attempts_succeeded": 0,
+                    "backend_attempts_failed": 0,
+                    "backend_attempts_usable_generations": 0,
+                    "backend_attempts_nonempty_unusable_outputs": 0,
+                    "backend_attempts_verifier_accepted": 0,
+                    "backend_attempts_verifier_rejected": 0,
+                    "backend_attempts_without_verifier_result": 0,
+                    "backend_attempt_elapsed_ms_total": 0,
+                    "backend_attempt_elapsed_ms_p50": 0,
+                    "backend_attempt_elapsed_ms_p95": 0,
+                    "backend_attempt_estimated_energy_total": 0.0,
+                    "runs_with_external_backend_attempts": 0,
+                    "runs_with_simulated_backend_attempts": 0,
+                    "runs_with_no_backend_attempts": 1,
                     "runs": 1,
                     "behavioral_successes": 0,
                     "pass_rate": 0.0,
                     "real_compiles": 1,
+                    "compile_rejections": 0,
                     "complete_oracles": 1,
                     "complete_oracle_rate": 1.0,
                     "agent_elapsed_ms_total": 120,
                     "agent_elapsed_ms_mean": 120.0,
+                    "agent_elapsed_ms_p50": 120,
+                    "agent_elapsed_ms_p95": 120,
+                    "verification_elapsed_ms_p50": 20,
+                    "verification_elapsed_ms_p95": 20,
                     "energy_total": 1.5,
                     "energy_mean": 1.5
                 },
@@ -1348,6 +1639,67 @@ mod tests {
     }
 
     #[test]
+    fn compile_rejection_is_counted_as_complete_negative_in_treatment_summary() {
+        let mut report = valid_fixture();
+        report["runs"][0]["compiled"] = Value::Bool(false);
+        report["runs"][0]["tests_passed"] = Value::from(0);
+        report["runs"][0]["tests_failed"] = Value::from(0);
+        report["runs"][0]["oracle_complete"] = Value::Bool(true);
+        report["runs"][0]["behavioral_success"] = Value::Bool(false);
+        report["runs"][0]["runtime_error"] = Value::Null;
+        report["runs"][0]["compile_errors"] = serde_json::json!([
+            "error[E0425]: cannot find value missing in this scope"
+        ]);
+        report["summary"]["gcs_off"]["behavioral_successes"] = Value::from(0);
+        report["summary"]["gcs_off"]["pass_rate"] = Value::from(0.0);
+        report["summary"]["gcs_off"]["real_compiles"] = Value::from(0);
+        report["summary"]["gcs_off"]["compile_rejections"] = Value::from(1);
+        report["summary"]["gcs_off"]["complete_oracles"] = Value::from(1);
+        report["summary"]["gcs_off"]["complete_oracle_rate"] = Value::from(1.0);
+        report["summary"]["paired"]["gcs_on_wins"] = Value::from(0);
+        report["summary"]["paired"]["gcs_off_wins"] = Value::from(0);
+        report["summary"]["paired"]["ties"] = Value::from(1);
+        report["summary"]["paired"]["net_pass_delta_percentage_points"] = Value::from(0.0);
+        assert!(audit(&report, None, None).is_empty());
+    }
+
+    #[test]
+    fn real_compiler_rejection_is_decisive_but_runner_failure_is_unresolved() {
+        let compile_rejection = serde_json::json!({
+            "compiled": false,
+            "simulated": false,
+            "tests_passed": 0,
+            "tests_failed": 0,
+            "runtime_error": null,
+            "compile_errors": ["error[E0425]: cannot find value missing in this scope"]
+        });
+        assert!(has_real_compile_rejection(&compile_rejection));
+        assert!(oracle_complete(&compile_rejection, 3));
+        assert!(!score_success(&compile_rejection, 3));
+
+        let launcher_failure = serde_json::json!({
+            "compiled": false,
+            "simulated": false,
+            "tests_passed": 0,
+            "tests_failed": 0,
+            "runtime_error": null,
+            "compile_errors": ["Sandbox error: rustc could not be launched"]
+        });
+        assert!(!has_real_compile_rejection(&launcher_failure));
+        assert!(!oracle_complete(&launcher_failure, 3));
+
+        let simulated_compile_error = serde_json::json!({
+            "compiled": false,
+            "simulated": true,
+            "tests_passed": 0,
+            "tests_failed": 0,
+            "runtime_error": null,
+            "compile_errors": ["error[E0425]: simulated compiler error"]
+        });
+        assert!(!oracle_complete(&simulated_compile_error, 3));
+    }
+
+    #[test]
     fn inconsistent_model_identity_metadata_is_rejected() {
         let mut report = valid_fixture();
         report["runtime_configuration"]["requested_model"] = Value::String("different-model".to_string());
@@ -1364,19 +1716,308 @@ mod tests {
     }
 
     #[test]
-    fn missing_generation_tiers_are_rejected() {
+    fn missing_selected_generation_tiers_are_rejected() {
         let mut report = valid_fixture();
-        report["runs"][0].as_object_mut().unwrap().remove("generation_tiers");
+        report["runs"][0].as_object_mut().unwrap().remove("selected_generation_tiers");
         let errors = audit(&report, None, None);
-        assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+        assert!(errors.iter().any(|error| error.contains("selected_generation_tiers")));
     }
 
     #[test]
-    fn unknown_generation_tier_is_rejected() {
+    fn unknown_selected_tier_is_rejected() {
         let mut report = valid_fixture();
-        report["runs"][0]["generation_tiers"] = serde_json::json!(["ImaginaryLLM"]);
+        report["runs"][0]["selected_generation_tiers"] = serde_json::json!(["ImaginaryLLM"]);
         let errors = audit(&report, None, None);
-        assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+        assert!(errors.iter().any(|error| error.contains("selected_generation_tiers")));
+    }
+
+    #[test]
+    fn missing_backend_attempts_are_rejected() {
+        let mut report = valid_fixture();
+        report["runs"][0].as_object_mut().unwrap().remove("backend_attempts");
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempts")));
+    }
+
+    #[test]
+    fn unknown_backend_attempt_tier_is_rejected() {
+        let mut report = valid_fixture();
+        report["runs"][0]["backend_attempts"] = serde_json::json!([{
+            "tier": "ImaginaryLLM",
+            "backend_name": "SomeBackend",
+            "success": true,
+            "usable_generation": true,
+            "verification_passed": null,
+            "elapsed_ms": 5,
+            "estimated_energy_cost": 10.0
+        }]);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempts")));
+    }
+
+    #[test]
+    fn backend_name_and_effective_tier_must_agree_for_known_implementations() {
+        let mut report = valid_fixture();
+        report["runs"][0]["backend_attempts"] = serde_json::json!([{
+            "tier": "CloudLLM",
+            "backend_name": "Ollama",
+            "success": true,
+            "usable_generation": true,
+            "verification_passed": null,
+            "elapsed_ms": 5,
+            "estimated_energy_cost": 50.0
+        }]);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempts")));
+    }
+
+    #[test]
+    fn simulated_nonempty_output_cannot_claim_usable_generation() {
+        let mut report = valid_fixture();
+        report["runs"][0]["backend_attempts"] = serde_json::json!([{
+            "tier": "Simulated",
+            "backend_name": "Simulated",
+            "success": true,
+            "usable_generation": true,
+            "verification_passed": null,
+            "elapsed_ms": 0,
+            "estimated_energy_cost": 0.0
+        }]);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempts")));
+    }
+
+    #[test]
+    fn tampered_selected_tier_summary_is_rejected() {
+        let mut report = valid_fixture();
+        report["summary"]["gcs_off"]["selected_tier_decisions"]["CloudLLM"] = Value::from(9);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("selected_tier_decisions")));
+    }
+
+    #[test]
+    fn actual_cloud_backend_attempt_is_rejected_for_native_requested_backend() {
+        let mut report = valid_fixture();
+        report["runs"][0]["backend_attempts"] = serde_json::json!([{
+            "tier": "CloudLLM",
+            "backend_name": "Anthropic",
+            "success": true,
+            "usable_generation": true,
+            "verification_passed": null,
+            "elapsed_ms": 5,
+            "estimated_energy_cost": 50.0
+        }]);
+        report["summary"]["gcs_off"]["backend_attempts_by_tier"] = serde_json::json!({
+            "Native": 0, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 1, "Simulated": 0
+        });
+        report["summary"]["gcs_off"]["backend_attempts_by_name"] = serde_json::json!({"Anthropic": 1});
+        report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_usable_generations"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_nonempty_unusable_outputs"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(5);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(5);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(5);
+        report["summary"]["gcs_off"]["backend_attempt_estimated_energy_total"] = Value::from(50.0);
+        report["summary"]["gcs_off"]["runs_with_external_backend_attempts"] = Value::from(1);
+        report["summary"]["gcs_off"]["runs_with_simulated_backend_attempts"] = Value::from(0);
+        report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| {
+            error.contains("actual backend attempts conflict with requested model_mode native")
+        }));
+    }
+
+    #[test]
+    fn selected_tier_and_actual_fallback_attempts_are_distinct_and_auditable() {
+        let mut report = valid_fixture();
+        report["model_mode"] = Value::String("ollama".to_string());
+        report["model_label"] = Value::String("gemma4:e2b".to_string());
+        report["runtime_configuration"]["requested_backend"] = Value::String("ollama".to_string());
+        report["runtime_configuration"]["requested_model"] = Value::String("gemma4:e2b".to_string());
+
+        report["runs"][0]["selected_generation_tiers"] = serde_json::json!(["LocalLLM", "LocalLLM"]);
+        report["runs"][0]["backend_attempts"] = serde_json::json!([
+            {"tier": "Simulated", "backend_name": "Simulated", "success": true, "usable_generation": false, "verification_passed": null, "elapsed_ms": 7, "estimated_energy_cost": 0.0},
+            {"tier": "LocalLLM", "backend_name": "Ollama", "success": true, "usable_generation": true, "verification_passed": null, "elapsed_ms": 11, "estimated_energy_cost": 10.0}
+        ]);
+        report["summary"]["gcs_off"]["selected_tier_decisions"] = serde_json::json!({
+            "Native": 0, "Hardware": 0, "LocalLLM": 2, "CloudLLM": 0, "Simulated": 0
+        });
+        report["summary"]["gcs_off"]["backend_attempts_by_tier"] = serde_json::json!({
+            "Native": 0, "Hardware": 0, "LocalLLM": 1, "CloudLLM": 0, "Simulated": 1
+        });
+        report["summary"]["gcs_off"]["backend_attempts_by_name"] = serde_json::json!({
+            "Ollama": 1, "Simulated": 1
+        });
+        report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(2);
+        report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_usable_generations"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_nonempty_unusable_outputs"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(2);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(18);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(7);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(11);
+        report["summary"]["gcs_off"]["backend_attempt_estimated_energy_total"] = Value::from(10.0);
+        report["summary"]["gcs_off"]["runs_with_external_backend_attempts"] = Value::from(1);
+        report["summary"]["gcs_off"]["runs_with_simulated_backend_attempts"] = Value::from(1);
+        report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
+        assert!(audit(&report, None, None).is_empty());
+    }
+
+    #[test]
+    fn verifier_outcomes_are_recomputed_from_per_attempt_records() {
+        let mut report = valid_fixture();
+        report["runs"][0]["backend_attempts"] = serde_json::json!([
+            {
+                "tier": "Native",
+                "backend_name": "NativeCodeTemplate",
+                "success": true,
+                "usable_generation": true,
+                "verification_passed": true,
+                "elapsed_ms": 4,
+                "estimated_energy_cost": 1.0
+            },
+            {
+                "tier": "Native",
+                "backend_name": "NativeCodeTemplate",
+                "success": false,
+                "usable_generation": false,
+                "verification_passed": false,
+                "elapsed_ms": 7,
+                "estimated_energy_cost": 1.0
+            }
+        ]);
+        report["summary"]["gcs_off"]["backend_attempts_by_tier"] = serde_json::json!({
+            "Native": 2, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0
+        });
+        report["summary"]["gcs_off"]["backend_attempts_by_name"] =
+            serde_json::json!({"NativeCodeTemplate": 2});
+        report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_usable_generations"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_nonempty_unusable_outputs"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(11);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(4);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(7);
+        report["summary"]["gcs_off"]["backend_attempt_estimated_energy_total"] = Value::from(2.0);
+        report["summary"]["gcs_off"]["runs_with_external_backend_attempts"] = Value::from(0);
+        report["summary"]["gcs_off"]["runs_with_simulated_backend_attempts"] = Value::from(0);
+        report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
+        assert!(audit(&report, None, None).is_empty());
+
+        report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempts_verifier_rejected")));
+    }
+
+    #[test]
+    fn cloud_mode_accepts_and_reports_failed_cloud_then_local_fallback() {
+        let mut report = valid_fixture();
+        report["model_mode"] = Value::String("cloud".to_string());
+        report["model_label"] = Value::String("claude-sonnet-4-20250514".to_string());
+        report["runtime_configuration"]["requested_backend"] = Value::String("cloud".to_string());
+        report["runtime_configuration"]["requested_model"] = Value::String("claude-sonnet-4-20250514".to_string());
+        report["runs"][0]["selected_generation_tiers"] = serde_json::json!(["CloudLLM"]);
+        report["runs"][0]["backend_attempts"] = serde_json::json!([
+            {
+                "tier": "CloudLLM", "backend_name": "Anthropic", "success": false, "usable_generation": false,
+                "verification_passed": null, "elapsed_ms": 5, "estimated_energy_cost": 50.0
+            },
+            {
+                "tier": "LocalLLM", "backend_name": "Ollama", "success": true, "usable_generation": true,
+                "verification_passed": null, "elapsed_ms": 11, "estimated_energy_cost": 10.0
+            }
+        ]);
+        report["summary"]["gcs_off"]["selected_tier_decisions"] = serde_json::json!({
+            "Native": 0, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 1, "Simulated": 0
+        });
+        report["summary"]["gcs_off"]["backend_attempts_by_tier"] = serde_json::json!({
+            "Native": 0, "Hardware": 0, "LocalLLM": 1, "CloudLLM": 1, "Simulated": 0
+        });
+        report["summary"]["gcs_off"]["backend_attempts_by_name"] =
+            serde_json::json!({"Anthropic": 1, "Ollama": 1});
+        report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_usable_generations"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_nonempty_unusable_outputs"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(2);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(16);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(5);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(11);
+        report["summary"]["gcs_off"]["backend_attempt_estimated_energy_total"] = Value::from(60.0);
+        report["summary"]["gcs_off"]["runs_with_external_backend_attempts"] = Value::from(1);
+        report["summary"]["gcs_off"]["runs_with_simulated_backend_attempts"] = Value::from(0);
+        report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
+        assert!(audit(&report, None, None).is_empty());
+    }
+
+    #[test]
+    fn latency_percentiles_use_nearest_rank_and_reject_invalid_input() {
+        let values = vec![120_u64, 10, 100, 20];
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.50), Some(20));
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.95), Some(120));
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 1.0), Some(120));
+        assert_eq!(nearest_rank_percentile(&mut [], 0.50), None);
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), f64::NAN), None);
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 1.5), None);
+    }
+
+    #[test]
+    fn tampered_backend_attempt_latency_summary_is_rejected() {
+        let mut report = valid_fixture();
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(999);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempt_elapsed_ms_p95")));
+    }
+
+    #[test]
+    fn tampered_backend_attempt_energy_summary_is_rejected() {
+        let mut report = valid_fixture();
+        report["runs"][0]["backend_attempts"] = serde_json::json!([{
+            "tier": "Native",
+            "backend_name": "NativeCodeTemplate",
+            "success": true,
+            "usable_generation": true,
+            "verification_passed": null,
+            "elapsed_ms": 7,
+            "estimated_energy_cost": 1.0
+        }]);
+        report["summary"]["gcs_off"]["backend_attempts_by_tier"]["Native"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_by_name"] =
+            serde_json::json!({"NativeCodeTemplate": 1});
+        report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_usable_generations"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_nonempty_unusable_outputs"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(7);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(7);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(7);
+        report["summary"]["gcs_off"]["backend_attempt_estimated_energy_total"] = Value::from(99.0);
+        report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempt_estimated_energy_total")));
+    }
+
+    #[test]
+    fn tampered_latency_percentile_is_rejected() {
+        let mut report = valid_fixture();
+        report["summary"]["gcs_off"]["agent_elapsed_ms_p95"] = Value::from(999);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("agent_elapsed_ms_p95")));
     }
 
     #[test]

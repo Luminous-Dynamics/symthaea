@@ -9,13 +9,14 @@
 //!
 //! Run with: cargo run --release --example coding_gcs_ablation_benchmark --features 'code_generation geodesic_synthesis' -- --repeats 3
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::Instant;
 use symthaea::coding_agent::{CodingAgent, CodingAgentConfig};
 use symthaea::language::code_executor::CodeExecutor;
 
 const BENCHMARK_ID: &str = "symthaea_gcs_runtime_ablation";
-const SCHEMA_VERSION: u32 = 3;
+const SCHEMA_VERSION: u32 = 6;
 
 struct TaskCase {
     id: &'static str,
@@ -62,7 +63,19 @@ struct EvalResult {
     iterations: usize,
     energy: f64,
     final_phase: String,
-    generation_tiers: Vec<String>,
+    selected_generation_tiers: Vec<String>,
+    backend_attempts: Vec<BackendAttemptRecord>,
+}
+
+#[derive(Debug, Clone)]
+struct BackendAttemptRecord {
+    tier: String,
+    backend_name: String,
+    success: bool,
+    usable_generation: bool,
+    verification_passed: Option<bool>,
+    elapsed_ms: u128,
+    estimated_energy_cost: f64,
 }
 
 fn task_suite() -> Vec<TaskCase> {
@@ -262,11 +275,20 @@ fn evaluate_source(source: &str, test_source: &str) -> OracleRun {
     }
 }
 
+fn has_real_compile_rejection(run: &OracleRun) -> bool {
+    !run.compiled
+        && !run.simulated
+        && run.runtime_error.is_none()
+        && run.compile_errors
+            .iter()
+            .any(|error| error.trim_start().starts_with("error"))
+}
+
 fn is_oracle_complete(run: &OracleRun, expected: usize) -> bool {
     expected > 0
         && !run.simulated
-        && run.compiled
-        && run.tests_passed + run.tests_failed == expected
+        && ((run.compiled && run.tests_passed + run.tests_failed == expected)
+            || has_real_compile_rejection(run))
 }
 
 fn is_behaviorally_successful(run: &OracleRun, expected: usize) -> bool {
@@ -317,7 +339,16 @@ fn run_candidate(
         compile_errors: oracle.compile_errors, agent_elapsed_ms, verification_elapsed_ms,
         iterations: result.iterations_used, energy: result.total_energy,
         final_phase: format!("{}", result.final_phase),
-        generation_tiers: result.generation_tiers.iter().map(ToString::to_string).collect(),
+        selected_generation_tiers: result.selected_generation_tiers.iter().map(ToString::to_string).collect(),
+        backend_attempts: result.actual_backend_attempts.iter().map(|attempt| BackendAttemptRecord {
+            tier: attempt.tier.to_string(),
+            backend_name: attempt.backend_name.clone(),
+            success: attempt.success,
+            usable_generation: attempt.usable_generation,
+            verification_passed: attempt.verification_passed,
+            elapsed_ms: attempt.elapsed_ms,
+            estimated_energy_cost: attempt.estimated_energy_cost,
+        }).collect(),
     }
 }
 
@@ -344,8 +375,26 @@ fn eval_json(result: &EvalResult) -> serde_json::Value {
         "iterations": result.iterations,
         "energy": result.energy,
         "final_phase": result.final_phase,
-        "generation_tiers": result.generation_tiers
+        "selected_generation_tiers": result.selected_generation_tiers,
+        "backend_attempts": result.backend_attempts.iter().map(|attempt| serde_json::json!({
+            "tier": attempt.tier,
+            "backend_name": attempt.backend_name,
+            "success": attempt.success,
+            "usable_generation": attempt.usable_generation,
+            "verification_passed": attempt.verification_passed,
+            "elapsed_ms": attempt.elapsed_ms,
+            "estimated_energy_cost": attempt.estimated_energy_cost
+        })).collect::<Vec<_>>()
     })
+}
+
+fn nearest_rank_percentile(values: &mut [u128], quantile: f64) -> Option<u128> {
+    if values.is_empty() || !quantile.is_finite() || !(0.0..=1.0).contains(&quantile) {
+        return None;
+    }
+    values.sort_unstable();
+    let rank = ((quantile * values.len() as f64).ceil() as usize).clamp(1, values.len());
+    values.get(rank - 1).copied()
 }
 
 fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
@@ -353,19 +402,146 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
     let total = mode.len();
     let passed = mode.iter().filter(|r| r.behavioral_success).count();
     let compiled = mode.iter().filter(|r| r.compiled && !r.simulated).count();
+    let compile_rejections = mode
+        .iter()
+        .filter(|run| {
+            !run.compiled
+                && !run.simulated
+                && run.runtime_error.is_none()
+                && run.compile_errors.iter().any(|error| error.trim_start().starts_with("error"))
+        })
+        .count();
     let complete = mode.iter().filter(|r| r.oracle_complete).count();
     let agent_ms: u128 = mode.iter().map(|r| r.agent_elapsed_ms).sum();
+    let agent_elapsed_values: Vec<u128> = mode.iter().map(|r| r.agent_elapsed_ms).collect();
+    let verification_elapsed_values: Vec<u128> = mode.iter().map(|r| r.verification_elapsed_ms).collect();
+    let agent_elapsed_ms_p50 = nearest_rank_percentile(&mut agent_elapsed_values.clone(), 0.50).unwrap_or(0);
+    let agent_elapsed_ms_p95 = nearest_rank_percentile(&mut agent_elapsed_values.clone(), 0.95).unwrap_or(0);
+    let verification_elapsed_ms_p50 = nearest_rank_percentile(&mut verification_elapsed_values.clone(), 0.50).unwrap_or(0);
+    let verification_elapsed_ms_p95 = nearest_rank_percentile(&mut verification_elapsed_values.clone(), 0.95).unwrap_or(0);
+    let backend_attempt_elapsed_values: Vec<u128> = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter().map(|attempt| attempt.elapsed_ms))
+        .collect();
+    let backend_attempt_elapsed_ms_total: u128 = backend_attempt_elapsed_values.iter().sum();
+    let backend_attempt_elapsed_ms_p50 = nearest_rank_percentile(&mut backend_attempt_elapsed_values.clone(), 0.50).unwrap_or(0);
+    let backend_attempt_elapsed_ms_p95 = nearest_rank_percentile(&mut backend_attempt_elapsed_values.clone(), 0.95).unwrap_or(0);
+    let backend_attempt_estimated_energy_total: f64 = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .map(|attempt| attempt.estimated_energy_cost)
+        .sum();
     let energy: f64 = mode.iter().map(|r| r.energy).sum();
+    let selected_tier_count = |target: &str| -> usize {
+        mode.iter()
+            .map(|run| run.selected_generation_tiers.iter().filter(|tier| tier.as_str() == target).count())
+            .sum()
+    };
+    let backend_attempt_count = |target: &str| -> usize {
+        mode.iter()
+            .map(|run| run.backend_attempts.iter().filter(|attempt| attempt.tier == target).count())
+            .sum()
+    };
+    let backend_attempts_succeeded = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| attempt.success)
+        .count();
+    let backend_attempts_failed = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| !attempt.success)
+        .count();
+    let backend_attempts_usable_generations = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| attempt.usable_generation)
+        .count();
+    let backend_attempts_nonempty_unusable_outputs = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| attempt.success && !attempt.usable_generation)
+        .count();
+    let backend_attempts_verifier_accepted = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| attempt.verification_passed == Some(true))
+        .count();
+    let backend_attempts_verifier_rejected = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| attempt.verification_passed == Some(false))
+        .count();
+    let backend_attempts_without_verifier_result = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| attempt.verification_passed.is_none())
+        .count();
+    let runs_with_external_backend_attempts = mode
+        .iter()
+        .filter(|run| {
+            run.backend_attempts.iter().any(|attempt| {
+                matches!(attempt.tier.as_str(), "LocalLLM" | "CloudLLM")
+            })
+        })
+        .count();
+    let runs_with_simulated_backend_attempts = mode
+        .iter()
+        .filter(|run| run.backend_attempts.iter().any(|attempt| attempt.tier == "Simulated"))
+        .count();
+    let runs_with_no_backend_attempts = mode
+        .iter()
+        .filter(|run| run.backend_attempts.is_empty())
+        .count();
+    let mut backend_name_counts = BTreeMap::<String, usize>::new();
+    for attempt in mode.iter().flat_map(|run| run.backend_attempts.iter()) {
+        *backend_name_counts.entry(attempt.backend_name.clone()).or_insert(0) += 1;
+    }
+    let backend_attempts_by_name = serde_json::json!(backend_name_counts);
     serde_json::json!({
         "gcs_advisories_enabled": enabled,
+        "selected_tier_decisions": {
+            "Native": selected_tier_count("Native"),
+            "Hardware": selected_tier_count("Hardware"),
+            "LocalLLM": selected_tier_count("LocalLLM"),
+            "CloudLLM": selected_tier_count("CloudLLM"),
+            "Simulated": selected_tier_count("Simulated")
+        },
+        "backend_attempts_by_tier": {
+            "Native": backend_attempt_count("Native"),
+            "Hardware": backend_attempt_count("Hardware"),
+            "LocalLLM": backend_attempt_count("LocalLLM"),
+            "CloudLLM": backend_attempt_count("CloudLLM"),
+            "Simulated": backend_attempt_count("Simulated")
+        },
+        "backend_attempts_by_name": backend_attempts_by_name,
+        "backend_attempts_succeeded": backend_attempts_succeeded,
+        "backend_attempts_failed": backend_attempts_failed,
+        "backend_attempts_usable_generations": backend_attempts_usable_generations,
+        "backend_attempts_nonempty_unusable_outputs": backend_attempts_nonempty_unusable_outputs,
+        "backend_attempts_verifier_accepted": backend_attempts_verifier_accepted,
+        "backend_attempts_verifier_rejected": backend_attempts_verifier_rejected,
+        "backend_attempts_without_verifier_result": backend_attempts_without_verifier_result,
+        "backend_attempt_estimated_energy_total": backend_attempt_estimated_energy_total,
+        "runs_with_external_backend_attempts": runs_with_external_backend_attempts,
+        "runs_with_simulated_backend_attempts": runs_with_simulated_backend_attempts,
+        "runs_with_no_backend_attempts": runs_with_no_backend_attempts,
         "runs": total,
         "behavioral_successes": passed,
         "pass_rate": if total == 0 { 0.0 } else { passed as f64 / total as f64 },
         "real_compiles": compiled,
+        "compile_rejections": compile_rejections,
         "complete_oracles": complete,
         "complete_oracle_rate": if total == 0 { 0.0 } else { complete as f64 / total as f64 },
         "agent_elapsed_ms_total": agent_ms,
         "agent_elapsed_ms_mean": if total == 0 { 0.0 } else { agent_ms as f64 / total as f64 },
+        "agent_elapsed_ms_p50": agent_elapsed_ms_p50,
+        "agent_elapsed_ms_p95": agent_elapsed_ms_p95,
+        "verification_elapsed_ms_p50": verification_elapsed_ms_p50,
+        "verification_elapsed_ms_p95": verification_elapsed_ms_p95,
+        "backend_attempt_elapsed_ms_total": backend_attempt_elapsed_ms_total,
+        "backend_attempt_elapsed_ms_p50": backend_attempt_elapsed_ms_p50,
+        "backend_attempt_elapsed_ms_p95": backend_attempt_elapsed_ms_p95,
         "energy_total": energy,
         "energy_mean": if total == 0 { 0.0 } else { energy / total as f64 }
     })
@@ -521,7 +697,7 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
             use_llm: false,
             use_cloud: false,
             repeats: 3,
-            output_path: std::env::temp_dir().join("symthaea_gcs_ablation_v3.json"),
+            output_path: std::env::temp_dir().join("symthaea_gcs_ablation_v6.json"),
             print_manifest: true,
         }));
     }
@@ -539,7 +715,7 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
     let mut use_cloud = false;
     let mut repeats = 3_usize;
     let mut repeats_seen = false;
-    let mut output_path = std::env::temp_dir().join("symthaea_gcs_ablation_v3.json");
+    let mut output_path = std::env::temp_dir().join("symthaea_gcs_ablation_v6.json");
     let mut output_seen = false;
     let mut index = 0;
 
@@ -826,7 +1002,7 @@ mod provenance_tests {
         assert!(!parsed.use_llm);
         assert!(!parsed.use_cloud);
         assert_eq!(parsed.repeats, 3);
-        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v3.json"));
+        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v6.json"));
     }
 
     #[test]
@@ -854,6 +1030,121 @@ mod provenance_tests {
         assert!(parse_cli(&args(&["--unknown"])).is_err());
         assert!(parse_cli(&args(&["--help", "--cloud"])).is_err());
         assert!(parse_cli(&args(&["--help"])).unwrap().is_none());
+    }
+
+    #[test]
+    fn mode_summary_distinguishes_selected_tier_decisions_from_actual_backend_attempts() {
+        let run = EvalResult {
+            task_id: "fallback".to_string(),
+            repeat: 1,
+            gcs_advisories_enabled: false,
+            execution_order: "off_then_on".to_string(),
+            code_written: true,
+            expected_symbol_found: true,
+            generated_source_blake3: "a".repeat(64),
+            compiled: true,
+            simulated: false,
+            expected_test_functions: 1,
+            tests_passed: 1,
+            tests_failed: 0,
+            oracle_complete: true,
+            behavioral_success: true,
+            runtime_error: None,
+            compile_errors: Vec::new(),
+            agent_elapsed_ms: 100,
+            verification_elapsed_ms: 10,
+            iterations: 1,
+            energy: 1.0,
+            final_phase: "Done".to_string(),
+            selected_generation_tiers: vec!["LocalLLM".to_string(), "LocalLLM".to_string()],
+            backend_attempts: vec![
+                BackendAttemptRecord {
+                    tier: "Simulated".to_string(),
+                    backend_name: "Simulated".to_string(),
+                    success: true,
+                    usable_generation: false,
+                    verification_passed: None,
+                    elapsed_ms: 7,
+                    estimated_energy_cost: 0.0,
+                },
+                BackendAttemptRecord {
+                    tier: "LocalLLM".to_string(),
+                    backend_name: "Ollama".to_string(),
+                    success: false,
+                    usable_generation: false,
+                    verification_passed: None,
+                    elapsed_ms: 11,
+                    estimated_energy_cost: 10.0,
+                },
+            ],
+        };
+
+        let summary = mode_summary(&[run], false);
+        assert_eq!(summary["selected_tier_decisions"]["LocalLLM"], 2);
+        assert_eq!(summary["backend_attempts_by_tier"]["LocalLLM"], 1);
+        assert_eq!(summary["backend_attempts_by_tier"]["Simulated"], 1);
+        assert_eq!(summary["backend_attempts_by_name"]["Ollama"], 1);
+        assert_eq!(summary["backend_attempts_by_name"]["Simulated"], 1);
+        assert_eq!(summary["backend_attempts_succeeded"], 1);
+        assert_eq!(summary["backend_attempts_failed"], 1);
+        assert_eq!(summary["backend_attempts_usable_generations"], 0);
+        assert_eq!(summary["backend_attempts_nonempty_unusable_outputs"], 1);
+        assert_eq!(summary["backend_attempts_verifier_accepted"], 0);
+        assert_eq!(summary["backend_attempts_verifier_rejected"], 0);
+        assert_eq!(summary["backend_attempts_without_verifier_result"], 2);
+        assert_eq!(summary["backend_attempt_estimated_energy_total"], 10.0);
+        assert_eq!(summary["backend_attempt_elapsed_ms_total"], 18);
+        assert_eq!(summary["backend_attempt_elapsed_ms_p50"], 7);
+        assert_eq!(summary["backend_attempt_elapsed_ms_p95"], 11);
+        assert_eq!(summary["runs_with_external_backend_attempts"], 1);
+        assert_eq!(summary["runs_with_simulated_backend_attempts"], 1);
+        assert_eq!(summary["runs_with_no_backend_attempts"], 0);
+    }
+
+    #[test]
+    fn mode_summary_counts_compile_rejection_separately_from_test_failures() {
+        let run = EvalResult {
+            task_id: "compile-reject".to_string(),
+            repeat: 1,
+            gcs_advisories_enabled: false,
+            execution_order: "off_then_on".to_string(),
+            code_written: true,
+            expected_symbol_found: true,
+            generated_source_blake3: "b".repeat(64),
+            compiled: false,
+            simulated: false,
+            expected_test_functions: 3,
+            tests_passed: 0,
+            tests_failed: 0,
+            oracle_complete: true,
+            behavioral_success: false,
+            runtime_error: None,
+            compile_errors: vec!["error[E0425]: missing symbol".to_string()],
+            agent_elapsed_ms: 100,
+            verification_elapsed_ms: 3,
+            iterations: 1,
+            energy: 1.0,
+            final_phase: "Done".to_string(),
+            selected_generation_tiers: vec![],
+            backend_attempts: vec![],
+        };
+        let summary = mode_summary(&[run], false);
+        assert_eq!(summary["compile_rejections"], 1);
+        assert_eq!(summary["real_compiles"], 0);
+        assert_eq!(summary["complete_oracles"], 1);
+        assert_eq!(summary["behavioral_successes"], 0);
+        assert_eq!(summary["pass_rate"], 0.0);
+    }
+
+    #[test]
+    fn latency_percentiles_use_nearest_rank_and_reject_invalid_input() {
+        let values = vec![120_u128, 10, 100, 20];
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.50), Some(20));
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.95), Some(120));
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 1.0), Some(120));
+        assert_eq!(nearest_rank_percentile(&mut [], 0.50), None);
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), f64::NAN), None);
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 1.5), None);
     }
 
     #[test]
@@ -902,6 +1193,49 @@ mod provenance_tests {
         };
         assert!(is_oracle_complete(&run, 3));
         assert!(!is_behaviorally_successful(&run, 3));
+    }
+
+    #[test]
+    fn real_rustc_compile_rejection_is_complete_but_not_success() {
+        let run = OracleRun {
+            compiled: false,
+            simulated: false,
+            tests_passed: 0,
+            tests_failed: 0,
+            runtime_error: None,
+            compile_errors: vec!["error[E0425]: cannot find value missing in this scope".to_string()],
+            elapsed_ms: 10,
+        };
+        assert!(has_real_compile_rejection(&run));
+        assert!(is_oracle_complete(&run, 3));
+        assert!(!is_behaviorally_successful(&run, 3));
+    }
+
+    #[test]
+    fn compiler_launcher_or_simulated_rejection_remains_unresolved() {
+        let launcher = OracleRun {
+            compiled: false,
+            simulated: false,
+            tests_passed: 0,
+            tests_failed: 0,
+            runtime_error: None,
+            compile_errors: vec!["Sandbox error: rustc could not be launched".to_string()],
+            elapsed_ms: 10,
+        };
+        assert!(!has_real_compile_rejection(&launcher));
+        assert!(!is_oracle_complete(&launcher, 3));
+
+        let simulated = OracleRun {
+            compiled: false,
+            simulated: true,
+            tests_passed: 0,
+            tests_failed: 0,
+            runtime_error: None,
+            compile_errors: vec!["error[E0425]: missing symbol".to_string()],
+            elapsed_ms: 10,
+        };
+        assert!(!has_real_compile_rejection(&simulated));
+        assert!(!is_oracle_complete(&simulated, 3));
     }
 
     #[test]

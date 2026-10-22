@@ -8,7 +8,7 @@
 //! | Epistemic Status | Prediction Error | Backend |
 //! |-----------------|-----------------|---------|
 //! | Certain | Low | Native (CodeGenerator via HDC+CfC, 0 latency) |
-//! | Probable | Medium | Local LLM (qwen2.5-coder:7b via Ollama) |
+//! | Probable | Medium | Local LLM via Ollama (default model gemma4:e2b; override with SYMTHAEA_LLM_MODEL) |
 //! | Uncertain/Unknown | High | Cloud LLM (Claude API) |
 //!
 //! Tracks per-backend success rates and respects metabolic budget constraints.
@@ -17,6 +17,7 @@
 use crate::language::llm_backend::{GenerationParams, LLMBackend, SimulatedBackend};
 use crate::mind::structured_thought::EpistemicStatus;
 use std::sync::Arc;
+use std::time::Instant;
 
 /// Metabolic energy cost per backend tier.
 const COST_NATIVE: f64 = 1.0;
@@ -30,7 +31,7 @@ pub enum BackendTier {
     Native,
     /// Specialized Hardware Driver Emitter (I2C/MMIO).
     Hardware,
-    /// Local LLM (e.g., qwen2.5-coder:7b via Ollama).
+    /// Local LLM via Ollama (model defaults to gemma4:e2b and is configurable with SYMTHAEA_LLM_MODEL).
     LocalLlm,
     /// Cloud LLM (e.g., Claude via Anthropic API).
     CloudLlm,
@@ -50,17 +51,88 @@ impl std::fmt::Display for BackendTier {
     }
 }
 
+impl BackendTier {
+    /// Metabolic energy estimate assigned to an effective backend tier.
+    /// This is an internal budget unit, not provider billing or measured joules.
+    pub fn estimated_energy_cost(self) -> f64 {
+        match self {
+            Self::Native | Self::Hardware => COST_NATIVE,
+            Self::LocalLlm => COST_LOCAL_LLM,
+            Self::CloudLlm => COST_CLOUD_LLM,
+            Self::Simulated => 0.0,
+        }
+    }
+}
+
+/// One backend invocation observed during a dispatch, including fallback attempts.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BackendAttempt {
+    /// Effective tier inferred from the backend implementation that was invoked.
+    pub tier: BackendTier,
+    /// Backend-reported name (e.g. Ollama, Anthropic, Simulated).
+    pub backend_name: String,
+    /// Whether the backend returned a non-empty response (not a quality judgment).
+    pub success: bool,
+    /// Whether the response is eligible as generated code rather than a placeholder.
+    /// This is independent of later internal verification and task-level tests.
+    pub usable_generation: bool,
+    /// Whether an internal backend verifier accepted the candidate, when applicable.
+    /// `None` means this backend does not report internal verification.
+    pub verification_passed: Option<bool>,
+    /// Wall-clock time spent in this backend invocation, including failures.
+    pub elapsed_ms: u128,
+    /// Internal metabolic estimate assigned to the invocation's dispatch tier; not billing.
+    pub estimated_energy_cost: f64,
+}
+
 /// Result of an intelligent dispatch decision.
 #[derive(Debug, Clone)]
 pub struct DispatchResult {
-    /// The generated code (or error message).
+    /// Generated code (or error message).
     pub output: String,
-    /// Which backend tier was used.
+    /// Selected routing tier before fallback; this can differ from backend_attempts.
     pub tier: BackendTier,
+    /// Actual backend invocations, in order, including failed calls and fallbacks.
+    pub backend_attempts: Vec<BackendAttempt>,
     /// Energy cost of this generation.
     pub energy_cost: f64,
-    /// Whether the generation succeeded.
+    /// Whether the final generation result was successful.
     pub success: bool,
+}
+
+fn effective_backend_tier(backend_name: &str, selected_tier: BackendTier) -> BackendTier {
+    if backend_name.eq_ignore_ascii_case("simulated") {
+        BackendTier::Simulated
+    } else if backend_name.eq_ignore_ascii_case("ollama") {
+        BackendTier::LocalLlm
+    } else {
+        selected_tier
+    }
+}
+
+fn is_usable_generation_output(backend_name: &str, selected_tier: BackendTier, output: &str) -> bool {
+    !output.trim().is_empty()
+        && effective_backend_tier(backend_name, selected_tier) != BackendTier::Simulated
+}
+
+fn record_backend_attempt(
+    attempts: &mut Vec<BackendAttempt>,
+    backend_name: &str,
+    selected_tier: BackendTier,
+    success: bool,
+    usable_generation: bool,
+    elapsed_ms: u128,
+) {
+    let effective_tier = effective_backend_tier(backend_name, selected_tier);
+    attempts.push(BackendAttempt {
+        tier: effective_tier,
+        backend_name: backend_name.to_string(),
+        success,
+        usable_generation,
+        verification_passed: None,
+        elapsed_ms,
+        estimated_energy_cost: effective_tier.estimated_energy_cost(),
+    });
 }
 
 /// Per-backend success tracking for adaptive routing.
@@ -190,12 +262,13 @@ impl CodeTaskCategory {
 /// Phase 6 additions: per-category success tracking, MAGI-style prediction
 /// confidence, and honest "I don't know" refusal path.
 pub struct IntelligentDispatcher {
-    /// Local LLM backend (Ollama with qwen2.5-coder:7b).
+    /// Local LLM backend (Ollama; defaults to gemma4:e2b unless SYMTHAEA_LLM_MODEL overrides it).
     local_llm: Arc<dyn LLMBackend>,
     /// Cloud LLM backend (Anthropic Claude, if available).
     cloud_llm: Option<Arc<dyn LLMBackend>>,
     /// Per-tier success tracking.
     native_stats: BackendStats,
+    hardware_stats: BackendStats,
     local_stats: BackendStats,
     cloud_stats: BackendStats,
     /// Phase 6: Per-category native success tracking.
@@ -221,6 +294,7 @@ impl IntelligentDispatcher {
             local_llm,
             cloud_llm,
             native_stats: BackendStats::default(),
+            hardware_stats: BackendStats::default(),
             local_stats: BackendStats::default(),
             cloud_stats: BackendStats::default(),
             category_native_stats: std::collections::HashMap::new(),
@@ -237,7 +311,7 @@ impl IntelligentDispatcher {
         Self::new(Arc::new(SimulatedBackend), None)
     }
 
-    /// Create a dispatcher with Ollama (qwen2.5-coder:7b) as the local LLM backend.
+    /// Create a dispatcher with Ollama as the local LLM backend (defaults to gemma4:e2b unless SYMTHAEA_LLM_MODEL overrides it).
     ///
     /// Attempts to connect to Ollama at `localhost:11434`. If Ollama is not available,
     /// the dispatcher still works — generation will fail gracefully and fall back to
@@ -349,79 +423,210 @@ impl IntelligentDispatcher {
             self.select_tier(epistemic, prediction_error, consciousness_level)
         };
 
-        let (output, success, cost) = match tier {
+        let mut backend_attempts = Vec::new();
+        let (output, success, nominal_cost) = match tier {
             BackendTier::Native => {
-                // Native generation is handled externally by CodeGenerator.
-                // Return a signal that the caller should use native path.
-                self.native_stats.record(true);
-                ("[NATIVE: use CodeGenerator]".to_string(), true, COST_NATIVE)
+                // This is a routing signal only: CodeGenerator runs in the caller.
+                // Do not train native success statistics until actual generation
+                // and external verification report an outcome.
+                ("[NATIVE: use CodeGenerator]".to_string(), false, COST_NATIVE)
             }
             BackendTier::Hardware => {
-                // Hardware generation is handled externally by DriverEmitter.
+                // Tier selection is not hardware generation. The specialized
+                // DriverEmitter is wired through CodeOrchestrator, not this
+                // dispatcher. Fail closed rather than write a placeholder as code.
                 (
-                    "[HARDWARE: use DriverEmitter]".to_string(),
-                    true,
-                    COST_NATIVE,
+                    "Hardware generation requires CodeOrchestrator/DriverEmitter; dispatcher-only routing did not invoke a hardware emitter.".to_string(),
+                    false,
+                    0.0,
                 )
             }
-            BackendTier::LocalLlm => match self.local_llm.generate(prompt, params).await {
-                Ok(output) => {
-                    let success = !output.is_empty();
-                    self.local_stats.record(success);
-                    (output, success, COST_LOCAL_LLM)
+            BackendTier::LocalLlm => {
+                let backend_name = self.local_llm.name().to_string();
+                let attempt_started = Instant::now();
+                let generated = self.local_llm.generate(prompt, params).await;
+                let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
+                match generated {
+                    Ok(output) => {
+                        let output_nonempty = !output.is_empty();
+                        let success = is_usable_generation_output(
+                            &backend_name,
+                            BackendTier::LocalLlm,
+                            &output,
+                        );
+                        self.local_stats.record(success);
+                        record_backend_attempt(
+                            &mut backend_attempts,
+                            &backend_name,
+                            BackendTier::LocalLlm,
+                            output_nonempty,
+                            success,
+                            attempt_elapsed_ms,
+                        );
+                        (output, success, COST_LOCAL_LLM)
+                    }
+                    Err(e) => {
+                        self.local_stats.record(false);
+                        record_backend_attempt(
+                            &mut backend_attempts,
+                            &backend_name,
+                            BackendTier::LocalLlm,
+                            false,
+                            false,
+                            attempt_elapsed_ms,
+                        );
+                        (format!("Local LLM error: {e}"), false, COST_LOCAL_LLM)
+                    }
                 }
-                Err(e) => {
-                    self.local_stats.record(false);
-                    (format!("Local LLM error: {e}"), false, COST_LOCAL_LLM)
-                }
-            },
+            }
             BackendTier::CloudLlm => {
                 if let Some(ref cloud) = self.cloud_llm {
-                    match cloud.generate(prompt, params).await {
+                    let cloud_name = cloud.name().to_string();
+                    let attempt_started = Instant::now();
+                    let generated = cloud.generate(prompt, params).await;
+                    let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
+                    match generated {
                         Ok(output) => {
-                            let success = !output.is_empty();
+                            let output_nonempty = !output.is_empty();
+                            let success = is_usable_generation_output(
+                                &cloud_name,
+                                BackendTier::CloudLlm,
+                                &output,
+                            );
                             self.cloud_stats.record(success);
+                            record_backend_attempt(
+                                &mut backend_attempts,
+                                &cloud_name,
+                                BackendTier::CloudLlm,
+                                output_nonempty,
+                                success,
+                                attempt_elapsed_ms,
+                            );
                             (output, success, COST_CLOUD_LLM)
                         }
                         Err(e) => {
                             self.cloud_stats.record(false);
-                            // Fall back to local LLM on cloud failure
+                            record_backend_attempt(
+                                &mut backend_attempts,
+                                &cloud_name,
+                                BackendTier::CloudLlm,
+                                false,
+                                false,
+                                attempt_elapsed_ms,
+                            );
                             tracing::warn!(
                                 target: "symthaea::dispatcher",
                                 error = %e,
                                 "Cloud LLM failed, falling back to local"
                             );
-                            match self.local_llm.generate(prompt, params).await {
+                            let local_name = self.local_llm.name().to_string();
+                            let fallback_started = Instant::now();
+                            let fallback_result = self.local_llm.generate(prompt, params).await;
+                            let fallback_elapsed_ms = fallback_started.elapsed().as_millis();
+                            match fallback_result {
                                 Ok(output) => {
-                                    self.local_stats.record(true);
-                                    (output, true, COST_LOCAL_LLM)
+                                    let output_nonempty = !output.is_empty();
+                                    let success = is_usable_generation_output(
+                                        &local_name,
+                                        BackendTier::LocalLlm,
+                                        &output,
+                                    );
+                                    self.local_stats.record(success);
+                                    record_backend_attempt(
+                                        &mut backend_attempts,
+                                        &local_name,
+                                        BackendTier::LocalLlm,
+                                        output_nonempty,
+                                        success,
+                                        fallback_elapsed_ms,
+                                    );
+                                    (output, success, COST_CLOUD_LLM + COST_LOCAL_LLM)
                                 }
                                 Err(e2) => {
                                     self.local_stats.record(false);
+                                    record_backend_attempt(
+                                        &mut backend_attempts,
+                                        &local_name,
+                                        BackendTier::LocalLlm,
+                                        false,
+                                        false,
+                                        fallback_elapsed_ms,
+                                    );
                                     (
                                         format!("All LLMs failed: cloud={e}, local={e2}"),
                                         false,
-                                        COST_LOCAL_LLM,
+                                        COST_CLOUD_LLM + COST_LOCAL_LLM,
                                     )
                                 }
                             }
                         }
                     }
                 } else {
-                    // No cloud backend configured — use local
-                    match self.local_llm.generate(prompt, params).await {
+                    // A forced CloudLlm tier can reach this branch without a cloud
+                    // backend; record only the backend that is actually invoked.
+                    let local_name = self.local_llm.name().to_string();
+                    let attempt_started = Instant::now();
+                    let generated = self.local_llm.generate(prompt, params).await;
+                    let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
+                    match generated {
                         Ok(output) => {
-                            self.local_stats.record(true);
-                            (output, true, COST_LOCAL_LLM)
+                            let output_nonempty = !output.is_empty();
+                            let success = is_usable_generation_output(
+                                &local_name,
+                                BackendTier::LocalLlm,
+                                &output,
+                            );
+                            self.local_stats.record(success);
+                            record_backend_attempt(
+                                &mut backend_attempts,
+                                &local_name,
+                                BackendTier::LocalLlm,
+                                output_nonempty,
+                                success,
+                                attempt_elapsed_ms,
+                            );
+                            (output, success, COST_LOCAL_LLM)
                         }
                         Err(e) => {
                             self.local_stats.record(false);
+                            record_backend_attempt(
+                                &mut backend_attempts,
+                                &local_name,
+                                BackendTier::LocalLlm,
+                                false,
+                                false,
+                                attempt_elapsed_ms,
+                            );
                             (format!("Local LLM error: {e}"), false, COST_LOCAL_LLM)
                         }
                     }
                 }
             }
-            BackendTier::Simulated => ("// simulated code output".to_string(), true, 0.0),
+            BackendTier::Simulated => {
+                record_backend_attempt(
+                    &mut backend_attempts,
+                    "Simulated",
+                    BackendTier::Simulated,
+                    true,
+                    false,
+                    0,
+                );
+                // The backend did return its placeholder string (recorded as an output),
+                // but that is not successful code generation.
+                ("// simulated code output".to_string(), false, 0.0)
+            }
+        };
+
+        // Charge actual invoked backends (including failed attempts and fallback).
+        // Native/Hardware execution happens in the caller, so retain the nominal
+        // tier estimate when this dispatcher did not invoke an LLM backend.
+        let cost = if backend_attempts.is_empty() {
+            nominal_cost
+        } else {
+            backend_attempts
+                .iter()
+                .map(|attempt| attempt.estimated_energy_cost)
+                .sum()
         };
 
         self.total_energy += cost;
@@ -438,6 +643,7 @@ impl IntelligentDispatcher {
         DispatchResult {
             output,
             tier,
+            backend_attempts,
             energy_cost: cost,
             success,
         }
@@ -447,10 +653,12 @@ impl IntelligentDispatcher {
     pub fn success_rate(&self, tier: BackendTier) -> f64 {
         match tier {
             BackendTier::Native => self.native_stats.success_rate(),
-            BackendTier::Hardware => 1.0, // specialized emitter is deterministic
+            // Until a real emitter reports an outcome, use the neutral prior.
+            BackendTier::Hardware => self.hardware_stats.success_rate(),
             BackendTier::LocalLlm => self.local_stats.success_rate(),
             BackendTier::CloudLlm => self.cloud_stats.success_rate(),
-            BackendTier::Simulated => 1.0,
+            // SimulatedBackend only returns placeholders, never usable code.
+            BackendTier::Simulated => 0.0,
         }
     }
 
@@ -467,7 +675,7 @@ impl IntelligentDispatcher {
     pub fn record_outcome(&mut self, tier: BackendTier, success: bool) {
         match tier {
             BackendTier::Native => self.native_stats.record(success),
-            BackendTier::Hardware => {} // no tracking needed for deterministic emitter
+            BackendTier::Hardware => self.hardware_stats.record(success),
             BackendTier::LocalLlm => self.local_stats.record(success),
             BackendTier::CloudLlm => self.cloud_stats.record(success),
             BackendTier::Simulated => {} // no tracking for simulated
@@ -676,6 +884,153 @@ impl IntelligentDispatcher {
 mod tests {
     use super::*;
 
+    struct FailingBackend {
+        backend_name: &'static str,
+    }
+
+    #[async_trait::async_trait]
+    impl LLMBackend for FailingBackend {
+        async fn generate(&self, _prompt: &str, _params: &GenerationParams) -> anyhow::Result<String> {
+            anyhow::bail!("intentional test backend failure")
+        }
+
+        async fn is_available(&self) -> bool {
+            true
+        }
+
+        fn name(&self) -> &str {
+            self.backend_name
+        }
+    }
+
+    struct SuccessfulBackend {
+        backend_name: &'static str,
+        output: &'static str,
+    }
+
+    #[async_trait::async_trait]
+    impl LLMBackend for SuccessfulBackend {
+        async fn generate(&self, _prompt: &str, _params: &GenerationParams) -> anyhow::Result<String> {
+            Ok(self.output.to_string())
+        }
+
+        async fn is_available(&self) -> bool {
+            true
+        }
+
+        fn name(&self) -> &str {
+            self.backend_name
+        }
+    }
+
+    #[tokio::test]
+    async fn hardware_tier_does_not_claim_driver_emitter_ran() {
+        let mut dispatcher = IntelligentDispatcher::new(Arc::new(SimulatedBackend), None);
+        let result = dispatcher
+            .generate(
+                "Implement an I2C hardware driver that reads a register.",
+                &GenerationParams::default(),
+                EpistemicStatus::Uncertain,
+                0.9,
+                0.8,
+            )
+            .await;
+
+        assert_eq!(result.tier, BackendTier::Hardware);
+        assert!(!result.success, "tier selection must not count as generated driver code");
+        assert!(result.output.contains("CodeOrchestrator/DriverEmitter"));
+        assert!(!result.output.contains("[HARDWARE: use DriverEmitter]"));
+        assert!(result.backend_attempts.is_empty(), "no hardware backend was invoked");
+        assert_eq!(result.energy_cost, 0.0);
+        assert_eq!(dispatcher.total_energy(), 0.0);
+    }
+
+    #[test]
+    fn unobserved_hardware_and_simulated_routes_are_not_assumed_perfect() {
+        let mut dispatcher = IntelligentDispatcher::simulated();
+        assert_eq!(dispatcher.success_rate(BackendTier::Hardware), 0.5);
+        assert_eq!(dispatcher.success_rate(BackendTier::Simulated), 0.0);
+
+        dispatcher.record_outcome(BackendTier::Hardware, false);
+        assert_eq!(dispatcher.success_rate(BackendTier::Hardware), 0.0);
+        dispatcher.record_outcome(BackendTier::Hardware, true);
+        assert_eq!(dispatcher.success_rate(BackendTier::Hardware), 0.5);
+        assert_eq!(dispatcher.success_rate(BackendTier::Simulated), 0.0);
+    }
+
+    #[tokio::test]
+    async fn backend_attempts_report_simulated_implementation_under_local_selection() {
+        let mut dispatcher = IntelligentDispatcher::new(Arc::new(SimulatedBackend), None);
+        dispatcher.force_next_tier(BackendTier::LocalLlm);
+        let result = dispatcher
+            .generate("test", &GenerationParams::default(), EpistemicStatus::Probable, 0.4, 0.8)
+            .await;
+
+        assert_eq!(result.tier, BackendTier::LocalLlm, "selected tier remains visible");
+        assert_eq!(result.backend_attempts.len(), 1);
+        assert_eq!(result.backend_attempts[0].tier, BackendTier::Simulated);
+        assert_eq!(result.backend_attempts[0].backend_name, "Simulated");
+        assert!(result.backend_attempts[0].success, "the simulator did return non-empty placeholder text");
+        assert!(!result.backend_attempts[0].usable_generation, "placeholder text is not usable generation");
+        assert!(!result.success, "placeholder text must not count as usable code generation");
+        assert_eq!(result.energy_cost, 0.0);
+    }
+
+    #[tokio::test]
+    async fn cloud_failure_records_cloud_then_actual_fallback_backend() {
+        let mut dispatcher = IntelligentDispatcher::new(
+            Arc::new(SimulatedBackend),
+            Some(Arc::new(FailingBackend { backend_name: "Anthropic" })),
+        );
+        dispatcher.force_next_tier(BackendTier::CloudLlm);
+        let result = dispatcher
+            .generate("test", &GenerationParams::default(), EpistemicStatus::Uncertain, 0.8, 0.8)
+            .await;
+
+        assert_eq!(result.tier, BackendTier::CloudLlm);
+        assert_eq!(result.backend_attempts.len(), 2);
+        assert_eq!(result.backend_attempts[0].backend_name, "Anthropic");
+        assert_eq!(result.backend_attempts[0].tier, BackendTier::CloudLlm);
+        assert!(!result.backend_attempts[0].success);
+        assert_eq!(result.backend_attempts[1].backend_name, "Simulated");
+        assert_eq!(result.backend_attempts[1].tier, BackendTier::Simulated);
+        assert!(result.backend_attempts[1].success, "simulator returned placeholder text");
+        assert!(!result.backend_attempts[1].usable_generation, "simulated fallback is not usable generation");
+        assert!(!result.success, "simulated fallback must not count as usable generation");
+        assert_eq!(result.backend_attempts[0].estimated_energy_cost, COST_CLOUD_LLM);
+        assert_eq!(result.backend_attempts[1].estimated_energy_cost, 0.0);
+        // The cloud attempt is charged; simulated fallback adds no real-backend cost.
+        assert_eq!(result.energy_cost, COST_CLOUD_LLM);
+        assert_eq!(dispatcher.total_energy(), COST_CLOUD_LLM);
+    }
+
+    #[tokio::test]
+    async fn cloud_failure_charges_both_actual_backends() {
+        let mut dispatcher = IntelligentDispatcher::new(
+            Arc::new(SuccessfulBackend {
+                backend_name: "Ollama",
+                output: "pub fn fallback() -> bool { true }",
+            }),
+            Some(Arc::new(FailingBackend { backend_name: "Anthropic" })),
+        );
+        dispatcher.force_next_tier(BackendTier::CloudLlm);
+        let result = dispatcher
+            .generate("test", &GenerationParams::default(), EpistemicStatus::Uncertain, 0.8, 0.8)
+            .await;
+
+        assert_eq!(result.tier, BackendTier::CloudLlm, "selected tier is still recorded");
+        assert_eq!(result.backend_attempts.len(), 2);
+        assert_eq!(result.backend_attempts[0].tier, BackendTier::CloudLlm);
+        assert_eq!(result.backend_attempts[0].estimated_energy_cost, COST_CLOUD_LLM);
+        assert!(!result.backend_attempts[0].success);
+        assert_eq!(result.backend_attempts[1].tier, BackendTier::LocalLlm);
+        assert_eq!(result.backend_attempts[1].estimated_energy_cost, COST_LOCAL_LLM);
+        assert!(result.backend_attempts[1].success);
+        assert!(result.backend_attempts[1].usable_generation);
+        assert_eq!(result.energy_cost, COST_CLOUD_LLM + COST_LOCAL_LLM);
+        assert_eq!(dispatcher.total_energy(), COST_CLOUD_LLM + COST_LOCAL_LLM);
+    }
+
     #[test]
     fn test_tier_display() {
         assert_eq!(format!("{}", BackendTier::Native), "Native");
@@ -770,8 +1125,10 @@ mod tests {
             .await;
 
         assert_eq!(result.tier, BackendTier::Native);
-        assert!(result.success);
+        assert!(!result.success, "a selected route is not a generated-code success");
+        assert_eq!(result.backend_attempts.len(), 0, "CodeGenerator has not run inside the dispatcher");
         assert_eq!(result.energy_cost, COST_NATIVE);
+        assert_eq!(dispatcher.success_rate(BackendTier::Native), 0.5, "selection must not train native success");
         assert!(result.output.contains("NATIVE"));
     }
 
@@ -785,8 +1142,10 @@ mod tests {
             .await;
 
         assert_eq!(result.tier, BackendTier::LocalLlm);
-        assert!(result.success);
-        assert_eq!(result.energy_cost, COST_LOCAL_LLM);
+        assert!(!result.success, "non-empty simulated output is not usable generation");
+        assert_eq!(result.backend_attempts[0].tier, BackendTier::Simulated);
+        assert_eq!(result.backend_attempts[0].success, true, "attempt success means non-empty output");
+        assert_eq!(result.energy_cost, 0.0, "simulated output must not be charged as an Ollama invocation");
     }
 
     #[tokio::test]
@@ -801,7 +1160,7 @@ mod tests {
             .generate("b", &params, EpistemicStatus::Probable, 0.5, 0.8)
             .await;
 
-        assert_eq!(dispatcher.total_energy(), COST_NATIVE + COST_LOCAL_LLM);
+        assert_eq!(dispatcher.total_energy(), COST_NATIVE, "simulated local fallback has zero estimated backend cost");
     }
 
     #[test]

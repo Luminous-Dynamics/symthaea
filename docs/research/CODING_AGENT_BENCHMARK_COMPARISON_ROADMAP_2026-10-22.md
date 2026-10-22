@@ -22,9 +22,9 @@ Terminal-Bench itself describes version 4 as a protocol change that calibrates t
 
 ### 1. Tests become an experimentally validated oracle
 
-A reference implementation passing and an empty patch failing are necessary, not sufficient. The current pilot now requires every curated mutant to compile and fail at least one assertion under a complete, non-simulated test run. CodeExecutor may record a nonzero test-binary exit in `runtime_error` when an ordinary assertion fails; exact full test counts therefore indicate a completed behavioral failure, while missing counts/simulated runs remain unresolved. For a larger task bank, record the mutation catalogue and report killed, surviving, invalid/compile-failing and unresolved mutants separately. A mutant that cannot compile is not evidence that tests discriminate behavior.
+A reference implementation passing and an empty patch failing are necessary, not sufficient. The current pilot requires every curated semantic mutant to compile and fail at least one assertion under a complete, non-simulated test run. For candidate runs, schema v6 retains the schema-v5 verdict contract: either a full expected test run or a real, non-simulated Rust compiler diagnostic is decisive, while sandbox/launcher failures, simulated execution, and missing test counts remain unresolved. Schema v6 also distinguishes a non-empty backend response from `usable_generation`; a simulated placeholder cannot be credited as usable output. Mutant preflight remains stricter: a compile-failing mutant is invalid and never counts as behaviorally killed. For a larger task bank, record the mutation catalogue and report killed, surviving, invalid/compile-failing and unresolved mutants separately. A mutant that cannot compile is not evidence that tests discriminate behavior.
 
-The fixed eight-task pilot declares expected test counts explicitly and binds them into each task digest (schema v2), removing producer/auditor text scanning. Schema v3 additionally records requested backend/model identity and observed per-run generation tiers, corrects the local model label to the actual `gemma4:e2b` constructor default, and fails closed on cloud mode without a non-empty API key. These tiers are app-reported telemetry, not cryptographic provider attestation. The real preflight and each run must account for exactly the declared count. Before ingesting arbitrary repositories, generalize this into a machine-readable harness contract with independent test-discovery evidence.
+The fixed eight-task pilot declares expected test counts explicitly and binds them into each task digest (schema v2), removing producer/auditor text scanning. Schema v3 corrected requested model identity and failed closed on missing cloud credentials. Schema v4 separates selected tier decisions from actual backend attempts (including failed calls and fallback paths). Schema v5 formalized verdicts so real candidate compile errors count as negative outcomes in paired comparisons, while runner/sandbox failures remain unresolved. Schema v6 separates non-empty response telemetry from usable generation and independently recomputes both counters, along with selected/actual route summaries and oracle verdict arithmetic per treatment arm. This avoids falsely treating a selected CloudLLM tier as evidence that cloud supplied the output. These are application-reported telemetry, not cryptographic provider attestation. Keep routing calibration equally strict: selecting a tier must not update backend success statistics; a hardware emitter starts from a neutral prior until measured outcomes arrive, and simulated placeholders are never counted as usable-generation successes. The real preflight and each run must account for exactly the declared count. Before ingesting arbitrary repositories, generalize this into a machine-readable harness contract with independent test-discovery evidence.
 
 ### 2. Unknown is not failure—and not a tie
 
@@ -32,7 +32,7 @@ Report assessed behavioral failures separately from incomplete compiler/test exe
 
 ### 3. Test intervention effects, not just the final agent
 
-Use the same model revision, prompt budget, tools, compiler, sandbox, task, hidden tests and stopping budget in each arm; change only GCS advisories. Record both requested model identity and per-run observed generation tiers. Alternate/randomize treatment order and repeat tasks to estimate run variance. Include a no-GCS baseline and, later, ablations for advisory type, confidence threshold and repair feedback. Report the agent+model+harness as the unit of comparison.
+Use the same model revision, prompt budget, tools, compiler, sandbox, task, hidden tests and stopping budget in each arm; change only GCS advisories. Record requested model identity, selected tier decisions, and each actual backend invocation in order (including failures/fallback), with per-invocation latency, an explicitly labelled internal energy estimate, and a separate nullable internal-verifier outcome. Do not conflate non-empty model output with a verified code candidate. Compare treatment arms not only for pass rate but also for changes in backend attempts, simulated fallback frequency, end-to-end and per-attempt tail latency, backend energy estimates, measured provider cost when available, and unresolved-oracle rates. Never call Symthaea's internal metabolic units dollars or physical joules. Alternate/randomize treatment order and repeat tasks to estimate run variance. Include a no-GCS baseline and, later, ablations for advisory type, confidence threshold and repair feedback. Report the agent+model+harness as the unit of comparison.
 
 ### 4. Make the held-out tasks harder than memorized function synthesis
 
@@ -42,9 +42,9 @@ Move from toy functions to repository-level fixes: multi-file changes, regressio
 
 For each configuration report:
 - pass@1, repeated pass rate and paired win/loss/tie counts, plus a deterministic task-cluster bootstrap interval for the equal-task paired effect;
-- valid-oracle, mutation-adequacy and unresolved-execution rates;
+- valid-oracle, decisive compiler-rejection, mutation-adequacy and unresolved-execution rates;
 - pass-to-pass regression rate and security-regression rate;
-- cost per verified fix, wall time, p50/p95 latency, tokens, retries and energy/compute estimates;
+- cost per verified fix, wall time, nearest-rank p50/p95 agent and verification latency, tokens, retries, observed generation-tier counts, and energy/compute estimates;
 - result confidence intervals clustered by repository/task family, plus per-category results.
 
 Use a cost/correctness Pareto frontier. A system can beat a more expensive agent on verified fixes per dollar without claiming a higher absolute benchmark score. Do not combine unrelated benchmark scores into one headline number.
@@ -55,7 +55,7 @@ Use a cost/correctness Pareto frontier. A system can beat a more expensive agent
 - Exact-head `cargo fmt --check`, focused tests and example compilation pass in the pinned Rust/Nix environment.
 - All reference controls pass, the empty source is rejected by a real Rust compiler diagnostic, and all ten semantic mutants are behaviorally killed after successful compilation.
 - Receipt auditor accepts a valid producer receipt and rejects fixture edits, missing/duplicated runs, incomplete oracle data, tampered summaries, malformed digests and source/manifest pin mismatches.
-- No claim of improvement until both arms execute with a named model/backend; report unresolved pairs rather than counting them as failures or ties.
+- No claim of improvement until both arms execute with a named model/backend; count decisive compile failures as task failures, and report genuinely unresolved pairs separately rather than converting them into failures or ties.
 
 ### Gate B — demonstrate a mechanism effect
 - Expand to 50–100 carefully reviewed Rust tasks with category and difficulty stratification.
