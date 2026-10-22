@@ -40,7 +40,7 @@ Move from toy functions to repository-level fixes: multi-file changes, regressio
 ### 5. Measure the engineering frontier, not one score
 
 For each configuration report:
-- pass@1, repeated pass rate and paired win/loss/tie counts;
+- pass@1, repeated pass rate and paired win/loss/tie counts, plus a deterministic task-cluster bootstrap interval for the equal-task paired effect;
 - valid-oracle, mutation-adequacy and unresolved-execution rates;
 - pass-to-pass regression rate and security-regression rate;
 - cost per verified fix, wall time, p50/p95 latency, tokens, retries and energy/compute estimates;
@@ -70,7 +70,7 @@ Use a cost/correctness Pareto frontier. A system can beat a more expensive agent
 
 ## Immediate sequence
 
-1. Run exact-head formatting, focused producer/auditor unit tests and compile both targets in a clean pinned environment.
+1. Run exact-head formatting, focused producer/auditor unit tests and compile both targets in a clean pinned environment. The auditor now prints a deterministic 10,000-resample task-cluster bootstrap interval, but the current toy-function pilot's interval is descriptive only; larger studies need repository and task-family identifiers and should resample at the independent unit relevant to the claim.
 2. Inspect the 10 mutation controls; if any fail compilation or survive tests, improve the task fixture rather than weakening the mutation gate.
 3. Capture a real receipt from each available backend (native dispatcher, Ollama and/or cloud) and audit it using externally pinned source and task-manifest digests.
 4. Only then scale task count and invest in a hidden Rust repository-repair set. Fix oracle quality before increasing leaderboard ambition.
