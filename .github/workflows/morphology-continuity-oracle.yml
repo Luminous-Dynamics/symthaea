@@ -1,0 +1,59 @@
+name: Morphology Continuity Oracle
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/morphology-continuity-oracle/**"
+      - ".github/workflows/morphology-continuity-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Standalone Rust oracle
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Formatting
+        run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
+
+      - name: Reference tests
+        run: cargo test --manifest-path tools/morphology-continuity-oracle/Cargo.toml
+
+      - name: Clippy with warnings denied
+        run: cargo clippy --manifest-path tools/morphology-continuity-oracle/Cargo.toml --all-targets -- -D warnings
+
+      - name: Verify deterministic receipt and semantic gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          cargo run --quiet --manifest-path tools/morphology-continuity-oracle/Cargo.toml > "$temp_dir/first.json"
+          cargo run --quiet --manifest-path tools/morphology-continuity-oracle/Cargo.toml > "$temp_dir/second.json"
+          cmp "$temp_dir/first.json" "$temp_dir/second.json"
+          jq -e '
+            .schema == "morphology-continuity-oracle/v0.1"
+            and .fixture == "chair-backrest-removed"
+            and .current_exact_matches == ["table"]
+            and .compatible_histories == ["chair", "table"]
+            and .ground_truth_target == "chair"
+            and .target_evidence == "missing"
+            and .disposition == "AbstainAmbiguousHistory"
+            and .restoration_oracle == false
+          ' "$temp_dir/first.json" > /dev/null
