@@ -21,13 +21,23 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
     steps:
-      - name: Checkout exact source
+      - name: Checkout exact source head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Capture source tree identity
+        id: source
+        shell: bash
+        run: echo "tree_sha=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
+
+      - name: Verify frozen request digest
+        run: echo "9348ff465116c23bacf9dfa5f1ed6ce98bb14bfa042b228800d6406ef542681f  tools/morphology-continuity-oracle/canonical_request_v0_1.txt" | sha256sum --check -
 
       - name: Formatting
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
@@ -40,6 +50,9 @@ jobs:
 
       - name: Verify deterministic receipt and semantic gates
         shell: bash
+        env:
+          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          SOURCE_TREE_SHA: ${{ steps.source.outputs.tree_sha }}
         run: |
           set -euo pipefail
           temp_dir="$(mktemp -d)"
@@ -47,8 +60,11 @@ jobs:
           cargo run --quiet --manifest-path tools/morphology-continuity-oracle/Cargo.toml > "$temp_dir/first.json"
           cargo run --quiet --manifest-path tools/morphology-continuity-oracle/Cargo.toml > "$temp_dir/second.json"
           cmp "$temp_dir/first.json" "$temp_dir/second.json"
-          jq -e '
+          jq -e --arg commit "$SOURCE_COMMIT" --arg tree "$SOURCE_TREE_SHA" '
             .schema == "morphology-continuity-oracle/v0.1"
+            and .source_commit == $commit
+            and .source_tree_sha == $tree
+            and .request_sha256 == "9348ff465116c23bacf9dfa5f1ed6ce98bb14bfa042b228800d6406ef542681f"
             and .fixture == "chair-backrest-removed"
             and .current_exact_matches == ["table"]
             and .compatible_histories == ["chair", "table"]
