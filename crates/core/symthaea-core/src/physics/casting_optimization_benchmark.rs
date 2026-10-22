@@ -30,10 +30,13 @@ enum SyntheticCase {
     FailedCorner = 5,
     RastriginMultimodal = 6,
     Beale = 7,
+    McCormick = 8,
+    Eggholder = 9,
+    HolderTable = 10,
 }
 
 impl SyntheticCase {
-    const ALL: [Self; 8] = [
+    const ALL: [Self; 11] = [
         Self::SmoothBowl,
         Self::CoupledFactors,
         Self::FeasibleIsland,
@@ -42,6 +45,9 @@ impl SyntheticCase {
         Self::FailedCorner,
         Self::RastriginMultimodal,
         Self::Beale,
+        Self::McCormick,
+        Self::Eggholder,
+        Self::HolderTable,
     ];
 
     fn name(self) -> &'static str {
@@ -54,6 +60,9 @@ impl SyntheticCase {
             Self::FailedCorner => "failed-corner",
             Self::RastriginMultimodal => "rastrigin-multimodal",
             Self::Beale => "beale",
+            Self::McCormick => "mccormick",
+            Self::Eggholder => "eggholder",
+            Self::HolderTable => "holder-table",
         }
     }
 
@@ -70,6 +79,21 @@ impl SyntheticCase {
             Self::Beale => Point {
                 x: 5.0 / 6.0,
                 y: 5.0 / 9.0,
+            },
+            // Standard McCormick minimizer, normalized from x in [-1.5, 4], y in [-3, 4].
+            Self::McCormick => Point {
+                x: 0.9528024488034021 / 5.5,
+                y: 1.4528024488034021 / 7.0,
+            },
+            // Eggholder reference minimizer is on the x=512 boundary.
+            Self::Eggholder => Point {
+                x: 1.0,
+                y: (404.2319 + 512.0) / 1024.0,
+            },
+            // One of the four Holder-table global minima, using a frozen approximate point.
+            Self::HolderTable => Point {
+                x: (8.05502 + 10.0) / 20.0,
+                y: (9.66459 + 10.0) / 20.0,
             },
         }
     }
@@ -104,6 +128,43 @@ impl SyntheticCase {
                 (1.5 - x + x * y).powi(2)
                     + (2.25 - x + x * y.powi(2)).powi(2)
                     + (2.625 - x + x * y.powi(3)).powi(2)
+            }
+            Self::McCormick => {
+                let raw = |x: f64, y: f64| {
+                    (x + y).sin() + (x - y).powi(2) - 1.5 * x + 2.5 * y + 1.0
+                };
+                let physical = (-1.5 + 5.5 * point.x, -3.0 + 7.0 * point.y);
+                // Subtract the frozen best-known reference value so the benchmark's
+                // declared approximate minimizer has objective zero; additive shifting
+                // leaves rankings and regret differences unchanged.
+                let reference = Self::McCormick.optimum();
+                let reference_physical =
+                    (-1.5 + 5.5 * reference.x, -3.0 + 7.0 * reference.y);
+                raw(physical.0, physical.1) - raw(reference_physical.0, reference_physical.1)
+            }
+            Self::Eggholder => {
+                let raw = |x: f64, y: f64| {
+                    -(y + 47.0) * (x / 2.0 + y + 47.0).abs().sqrt().sin()
+                        - x * (x - (y + 47.0)).abs().sqrt().sin()
+                };
+                let physical = (1024.0 * point.x - 512.0, 1024.0 * point.y - 512.0);
+                let reference = Self::Eggholder.optimum();
+                let reference_physical =
+                    (1024.0 * reference.x - 512.0, 1024.0 * reference.y - 512.0);
+                raw(physical.0, physical.1) - raw(reference_physical.0, reference_physical.1)
+            }
+            Self::HolderTable => {
+                let raw = |x: f64, y: f64| {
+                    -(x.sin() * y.cos()
+                        * (1.0 - (x * x + y * y).sqrt() / std::f64::consts::PI)
+                            .abs()
+                            .exp())
+                    .abs()
+                };
+                let physical = (20.0 * point.x - 10.0, 20.0 * point.y - 10.0);
+                let reference = Self::HolderTable.optimum();
+                let reference_physical = (20.0 * reference.x - 10.0, 20.0 * reference.y - 10.0);
+                raw(physical.0, physical.1) - raw(reference_physical.0, reference_physical.1)
             }
             _ => (point.x - 0.37).powi(2) + (point.y - 0.62).powi(2),
         }
@@ -977,8 +1038,8 @@ mod tests {
             let optimum = case.optimum();
             assert_abs_close(case.objective(optimum), 0.0, 1e-15);
             assert_abs_close(case.known_optimum_value(), 0.0, 1e-15);
-            assert!((0.0..1.0).contains(&optimum.x));
-            assert!((0.0..1.0).contains(&optimum.y));
+            assert!((0.0..=1.0).contains(&optimum.x));
+            assert!((0.0..=1.0).contains(&optimum.y));
             assert!(case.is_feasible(optimum));
             assert!(!case.can_fail(optimum));
             assert!(!case.name().is_empty());
@@ -1168,6 +1229,23 @@ mod tests {
         assert_abs_close(case.objective(Point { x: 0.5, y: 0.5 }), 0.0, 1e-12);
         assert!(case.objective(Point { x: 0.6, y: 0.5 }) > 0.0);
         assert_abs_close(case.known_optimum_value(), 0.0, 1e-12);
+    }
+
+    #[test]
+    fn casting_adjacent_paper_analytical_functions_have_frozen_reference_minima() {
+        for case in [
+            SyntheticCase::McCormick,
+            SyntheticCase::Eggholder,
+            SyntheticCase::HolderTable,
+        ] {
+            let optimum = case.optimum();
+            assert_abs_close(case.objective(optimum), 0.0, 1e-12);
+            assert_abs_close(case.known_optimum_value(), 0.0, 1e-12);
+            assert!((0.0..=1.0).contains(&optimum.x));
+            assert!((0.0..=1.0).contains(&optimum.y));
+        }
+        // Eggholder is deliberately represented on the full closed x-boundary.
+        assert_eq!(SyntheticCase::Eggholder.optimum().x, 1.0);
     }
 
     #[test]
