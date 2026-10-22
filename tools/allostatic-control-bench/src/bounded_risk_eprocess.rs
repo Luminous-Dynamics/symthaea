@@ -314,6 +314,44 @@ mod tests {
     }
 
     #[test]
+    fn mixture_logsumexp_matches_independent_component_recurrence() {
+        let risk_bound = 0.15;
+        let fractions = [0.25, 0.5, 0.75];
+        let mut process = MixtureBoundedRiskEProcess::new(
+            risk_bound,
+            fractions,
+            0.05,
+            5,
+        )
+        .expect("valid mixture");
+
+        let losses = [0.12, 0.20, 0.24, 0.08, 0.31];
+        let mut expected_components = [0.0_f64; 3];
+        for loss in losses {
+            let _ = process.observe(loss);
+            for (index, fraction) in fractions.iter().copied().enumerate() {
+                let factor = 1.0 + (fraction / risk_bound) * (loss - risk_bound);
+                expected_components[index] += factor.ln();
+            }
+            for (actual, expected) in process
+                .component_log_e_values()
+                .iter()
+                .zip(expected_components.iter())
+            {
+                assert!((actual - expected).abs() < 1e-12);
+            }
+            let max_component = expected_components.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+            let expected_mix = max_component
+                + ((expected_components[0] - max_component).exp()
+                    + (expected_components[1] - max_component).exp()
+                    + (expected_components[2] - max_component).exp())
+                    .div_euclid(3.0)
+                    .ln();
+            assert!((process.log_e_value() - expected_mix).abs() < 1e-12);
+        }
+    }
+
+    #[test]
     fn mixture_rejects_invalid_loss_without_mutating_state_and_can_reset() {
         let mut process = MixtureBoundedRiskEProcess::new(
             0.15,
