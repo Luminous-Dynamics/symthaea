@@ -354,8 +354,6 @@ pub fn select_experiment_by_information_gain_per_cost<'a, H, E>(
     best
 }
 
-
-
 /// Compute conservative expected information gain over a finite set of plausible
 /// observation-noise standard deviations.
 ///
@@ -437,7 +435,6 @@ pub fn select_experiment_by_worst_case_information_gain_per_cost<'a, H, E>(
 mod tests {
     use super::*;
     use crate::hdc::conjecture_engine::Expr;
-
 
     #[test]
     fn worst_case_information_gain_is_bounded_by_every_scenario() {
