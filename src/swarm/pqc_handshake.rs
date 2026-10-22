@@ -420,17 +420,27 @@ mod tests {
     }
 
     #[test]
-    fn test_wrong_ciphertext_fails() {
+    fn test_invalid_ciphertext_uses_implicit_rejection_and_needs_key_confirmation() {
         let mut responder = PqcHandshakeManager::new(test_config());
-        let nonce = vec![0x42u8; 32];
+        let public_challenge = vec![0x42u8; 32];
 
-        // Random garbage ciphertext
+        // Random garbage ciphertext. ML-KEM implicit rejection may intentionally
+        // yield a secret instead of returning a distinguishable decapsulation error.
         let bad_ct = vec![0xFFu8; 1088];
-        let result = responder.decapsulate_and_derive("peer-X", &bad_ct, &nonce);
-        // ML-KEM-768 is IND-CCA2 secure — wrong ciphertext produces a random
-        // shared secret (implicit rejection). It doesn't error, but the keys won't match.
-        // This is by design in Kyber/ML-KEM.
-        assert!(result.is_ok(), "ML-KEM implicit rejection should not error");
+        let result =
+            responder.decapsulate_and_derive("peer-X", &bad_ct, &public_challenge);
+
+        // This proves only that the API can derive/store a candidate key. It does
+        // NOT authenticate the peer or prove both sides derived the same key.
+        assert!(
+            result.is_ok(),
+            "implicit rejection may produce a candidate key for an invalid ciphertext"
+        );
+        assert_eq!(responder.session_count(), 1);
+        assert!(
+            responder.session_key("peer-X").is_some(),
+            "callers need transcript authentication and explicit key confirmation"
+        );
     }
 
     #[test]
