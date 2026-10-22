@@ -439,10 +439,182 @@ pub fn select_experiment_by_worst_case_information_gain_per_cost<'a, H, E>(
     best
 }
 
+/// One finite scenario for robust expected-information-gain evaluation.
+///
+/// `prediction_model` is an opaque, caller-defined scenario identifier passed to
+/// the prediction closure. It can represent an alternative structural model,
+/// omitted-term hypothesis, nuisance setting, or other plausible predictive world.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct InformationGainScenario {
+    /// Standard deviation of the observation noise for this scenario.
+    pub observation_std_dev: f64,
+    /// Caller-defined predictive-model/discrepancy scenario identifier.
+    pub prediction_model: usize,
+}
+
+/// Compute the minimum expected information gain across explicit joint scenarios
+/// of observation noise and plausible predictive-model variants.
+///
+/// Unlike a noise-only envelope, scenarios may produce different predictions
+/// for a given candidate experiment. This allows the acquisition rule to account
+/// for a finite set of structural/discrepancy alternatives rather than only
+/// choosing the largest Gaussian noise scale. The supplied scenario set is not
+/// a guarantee over unlisted worlds, and the caller remains responsible for
+/// defining defensible alternatives. Empty scenarios, invalid noise, or any
+/// incomplete/non-finite scenario predictions fail closed with `None`.
+pub fn expected_information_gain_over_scenarios_nats<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    scenarios: &[InformationGainScenario],
+    predict_under_scenario: impl Fn(&H, &E, &InformationGainScenario) -> Option<f64> + Copy,
+) -> Option<f64> {
+    if scenarios.is_empty()
+        || scenarios.iter().any(|scenario| {
+            !scenario.observation_std_dev.is_finite() || scenario.observation_std_dev <= 0.0
+        })
+    {
+        return None;
+    }
+
+    let mut worst_case = f64::INFINITY;
+    for scenario in scenarios {
+        let information_gain = expected_information_gain_nats(
+            experiment,
+            hypotheses,
+            scenario.observation_std_dev,
+            |hypothesis, experiment| predict_under_scenario(hypothesis, experiment, scenario),
+        )?;
+        worst_case = worst_case.min(information_gain);
+    }
+
+    (worst_case.is_finite() && worst_case >= 0.0).then_some(worst_case)
+}
+
+/// Select the candidate maximizing scenario-robust information gain per cost.
+///
+/// Each candidate is evaluated under every finite joint scenario, using that
+/// scenario's noise scale and predictive model variant. The minimum information
+/// gain is divided by positive finite cost. This is only robust to the supplied
+/// scenario set; it is not a calibrated posterior, a formal uncertainty bound,
+/// or a substitute for open-world audits. Invalid scenario sets fail closed,
+/// invalid candidate costs/predictions are skipped, and input-order tie breaking
+/// is deterministic.
+pub fn select_experiment_by_scenario_robust_information_gain_per_cost<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    scenarios: &[InformationGainScenario],
+    predict_under_scenario: impl Fn(&H, &E, &InformationGainScenario) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if scenarios.is_empty()
+        || scenarios.iter().any(|scenario| {
+            !scenario.observation_std_dev.is_finite() || scenario.observation_std_dev <= 0.0
+        })
+    {
+        return None;
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let Some(worst_case_gain) = expected_information_gain_over_scenarios_nats(
+            experiment,
+            hypotheses,
+            scenarios,
+            predict_under_scenario,
+        ) else {
+            continue;
+        };
+        let score = worst_case_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::hdc::conjecture_engine::Expr;
+
+    #[test]
+    fn scenario_robust_selector_accounts_for_prediction_discrepancy_not_only_noise() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let candidates = [0_u8, 1_u8];
+        let scenarios = [
+            InformationGainScenario { observation_std_dev: 0.1, prediction_model: 0 },
+            InformationGainScenario { observation_std_dev: 1.0, prediction_model: 7 },
+        ];
+        let predict = |hypothesis: &usize, candidate: &u8, scenario: &InformationGainScenario| {
+            match (candidate, scenario.prediction_model) {
+                // Candidate 0 has one outlier in both predictive worlds and remains
+                // somewhat informative under the noisier scenario.
+                (0, 0 | 7) => Some([0.0_f64, 0.0, 0.0, 3.0][*hypothesis]),
+                // Candidate 1 wins nominally, but one defensible alternative model
+                // compresses its predicted outcomes to a near-agreement point.
+                (1, 0) => Some([0.0_f64, 1.0, 2.0, 3.0][*hypothesis]),
+                (1, 7) => Some([0.0_f64, 0.001, -0.001, 0.002][*hypothesis]),
+                _ => None,
+            }
+        };
+
+        let (nominal, _) = select_experiment_by_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            0.1,
+            |hypothesis, candidate| predict(
+                hypothesis,
+                candidate,
+                &InformationGainScenario { observation_std_dev: 0.1, prediction_model: 0 },
+            ),
+            |_| 1.0,
+        )
+        .expect("nominal pool is informative");
+        assert_eq!(*nominal, 1);
+
+        let (robust, robust_score) =
+            select_experiment_by_scenario_robust_information_gain_per_cost(
+                &candidates,
+                &hypotheses,
+                &scenarios,
+                predict,
+                |_| 1.0,
+            )
+            .expect("candidate 0 has positive information under each scenario");
+        assert_eq!(*robust, 0);
+        assert!(robust_score.is_finite() && robust_score > 0.0);
+    }
+
+    #[test]
+    fn scenario_robust_selector_fails_closed_on_invalid_scenarios() {
+        let hypotheses = [0_i32, 1];
+        let candidates = [0_u8, 1_u8];
+        assert!(expected_information_gain_over_scenarios_nats(
+            &0_u8,
+            &hypotheses,
+            &[],
+            |hypothesis, candidate, _| Some(*hypothesis as f64 * *candidate as f64),
+        )
+        .is_none());
+        assert!(select_experiment_by_scenario_robust_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[InformationGainScenario {
+                observation_std_dev: f64::NAN,
+                prediction_model: 0,
+            }],
+            |hypothesis, candidate, _| Some(*hypothesis as f64 * *candidate as f64),
+            |_| 1.0,
+        )
+        .is_none());
+    }
 
     #[test]
     fn worst_case_information_gain_is_bounded_by_every_scenario() {
