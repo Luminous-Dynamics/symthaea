@@ -1571,6 +1571,92 @@ pub(crate) mod tests {
         assert!(logits.len() >= 50257, "vocab too small: {}", logits.len());
     }
 
+    fn mean_teacher_forced_loss(
+        wrapper: &mut MambaWrapper,
+        context: &[Vec<f32>],
+        targets: &[u32],
+    ) -> anyhow::Result<f32> {
+        anyhow::ensure!(!targets.is_empty(), "finite-difference targets must not be empty");
+        wrapper.inject_context_sequence(context)?;
+        let mut previous_token = wrapper.eos_token_id();
+        let mut total_loss = 0.0f32;
+        for &target in targets {
+            let (logits, _) = wrapper.forward_with_state(previous_token)?;
+            anyhow::ensure!(
+                (target as usize) < logits.len(),
+                "finite-difference target is outside logits vocabulary"
+            );
+            total_loss += crate::evaluation::cross_entropy_loss(&logits, target as usize);
+            previous_token = target;
+        }
+        Ok(total_loss / targets.len() as f32)
+    }
+
+    /// Numerical gradient check for the actual Mamba sequence-level context objective.
+    /// Ignored because it downloads and runs Mamba-130M; execute directly when a
+    /// Rust toolchain and model cache are available.
+    #[test]
+    #[ignore = "Requires network access to download mamba-130m (~260MB)"]
+    fn test_mamba_sequence_context_gradient_matches_finite_difference() {
+        let device = best_device();
+        let wrapper = MambaWrapper::load("state-spaces/mamba-130m", device)
+            .expect("Failed to download/load mamba-130m");
+
+        let context: Vec<Vec<f32>> = (0..2)
+            .map(|chunk| {
+                (0..768)
+                    .map(|dim| {
+                        let phase = (chunk * 769 + dim + 1) as f32;
+                        0.1 * (phase * 0.017).sin() + 0.03 * (phase * 0.031).cos()
+                    })
+                    .collect()
+            })
+            .collect();
+        let targets = [7u32, 23u32, 42u32];
+
+        let mut gradient_wrapper = wrapper.clone();
+        let gradients = gradient_wrapper
+            .compute_e2e_sequence_loss_gradients(&context, &targets, &[0, 1])
+            .expect("sequence gradients should be computable");
+        let gradient = &gradients
+            .iter()
+            .find(|(position, _)| *position == 0)
+            .expect("gradient at context position zero is required")
+            .1;
+        assert_eq!(gradient.len(), wrapper.d_model());
+        assert!(gradient.iter().all(|value| value.is_finite()));
+
+        // Choose the largest-magnitude analytic coordinate to avoid testing
+        // a numerically uninformative near-zero component.
+        let coordinate = gradient
+            .iter()
+            .enumerate()
+            .max_by(|(_, left), (_, right)| left.abs().total_cmp(&right.abs()))
+            .map(|(index, _)| index)
+            .expect("gradient should be non-empty");
+        let analytic = gradient[coordinate];
+        let epsilon = 2e-2f32;
+
+        let mut plus_context = context.clone();
+        plus_context[0][coordinate] += epsilon;
+        let mut plus_wrapper = wrapper.clone();
+        let plus = mean_teacher_forced_loss(&mut plus_wrapper, &plus_context, &targets)
+            .expect("positive perturbation loss should compute");
+
+        let mut minus_context = context.clone();
+        minus_context[0][coordinate] -= epsilon;
+        let mut minus_wrapper = wrapper.clone();
+        let minus = mean_teacher_forced_loss(&mut minus_wrapper, &minus_context, &targets)
+            .expect("negative perturbation loss should compute");
+
+        let numeric = (plus - minus) / (2.0 * epsilon);
+        let tolerance = 5e-2 + numeric.abs() * 0.3;
+        assert!(
+            (analytic - numeric).abs() <= tolerance,
+            "sequence context gradient mismatch at coordinate {coordinate}: analytic={analytic}, finite_difference={numeric}, tolerance={tolerance}"
+        );
+    }
+
     #[test]
     #[ignore = "Requires network access to download mamba-130m (~260MB)"]
     fn test_mamba_state_scaling() {
