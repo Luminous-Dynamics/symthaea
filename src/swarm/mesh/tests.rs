@@ -1982,3 +1982,58 @@ fn test_fragment_wrong_key_rejected() {
         "Wrong key must fail"
     );
 }
+
+
+// -- Static X25519 key-agreement claim-integrity witnesses --
+//
+// These tests intentionally reproduce properties of the current static-DH
+// design. Passing reproduces the limitation; it is not a forward-secrecy pass.
+
+#[cfg(feature = "mesh-key-exchange")]
+#[test]
+fn legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse() {
+    let local_secret = [0xA1u8; 32];
+    let remote_secret = [0xB2u8; 32];
+    let peer_id = [0x22u8; 8];
+
+    let store_b = PeerKeyStore::new(remote_secret);
+    let remote_public = store_b.public_key();
+
+    let mut original = PeerKeyStore::new(local_secret);
+    let recorded_key = original.agree(peer_id, &remote_public);
+    drop(original);
+
+    // Simulate later access to the same long-term secret and recorded peer
+    // public key. Static X25519 + fixed HKDF info reproduces the old key.
+    let mut after_compromise = PeerKeyStore::new(local_secret);
+    let recovered_key = after_compromise.agree(peer_id, &remote_public);
+
+    assert_eq!(
+        recorded_key, recovered_key,
+        "unchanged static DH inputs reproduce the historical pairwise key"
+    );
+}
+
+#[cfg(feature = "mesh-key-exchange")]
+#[test]
+fn legacy_static_x25519_derivation_does_not_bind_peer_source_id() {
+    let local_secret = [0xC3u8; 32];
+    let remote_secret = [0xD4u8; 32];
+    let claimed_peer_a = [0x31u8; 8];
+    let claimed_peer_b = [0x42u8; 8];
+
+    let remote = PeerKeyStore::new(remote_secret);
+    let remote_public = remote.public_key();
+    let mut local = PeerKeyStore::new(local_secret);
+
+    let key_a = local.agree(claimed_peer_a, &remote_public);
+    let key_b = local.agree(claimed_peer_b, &remote_public);
+
+    assert_ne!(claimed_peer_a, claimed_peer_b);
+    assert_eq!(
+        key_a, key_b,
+        "peer_source_id changes only the map label, not the derived key"
+    );
+    assert_eq!(local.peer_key(&claimed_peer_a), Some(&key_a));
+    assert_eq!(local.peer_key(&claimed_peer_b), Some(&key_b));
+}
