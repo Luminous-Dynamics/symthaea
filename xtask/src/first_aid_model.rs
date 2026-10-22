@@ -621,6 +621,7 @@ mod tests {
             compared_edges, 1_344,
             "every reachable state/action edge must be differentially checked"
         );
+        println!("model_production_edge_comparisons={compared_edges}");
     }
 
     #[test]
@@ -895,6 +896,7 @@ mod tests {
             compared_cases, 18,
             "all orthogonal policy cases must be compared against production"
         );
+        println!("production_policy_truth_table_cases_compared={compared_cases}");
     }
 
 }
