@@ -1,4 +1,4 @@
-//! Open-world physical-law discovery reference evaluator (v0.1).
+//! Open-world physical-law discovery reference evaluator (v0.3).
 //!
 //! This crate is intentionally a small, dependency-light baseline harness. It
 //! does not claim to be a general discovery agent or a blind benchmark: the
@@ -6,7 +6,7 @@
 //! model-selection/evaluation contract before adapter work begins.
 //!
 //! The candidate generator and the independent scoring boundary must remain
-//! separate in later versions. In v0.1, the grid-search fit is a baseline;
+//! separate in later versions. In v0.3, the grid-search fit is a baseline;
 //! the report explicitly labels the corpus as non-blind.
 
 use serde::Serialize;
