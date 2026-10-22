@@ -655,6 +655,7 @@ fn gp_solve_upper_from_lower_transpose(
 struct GaussianProcessPosterior {
     observed_points: Vec<Point>,
     mean_y: f64,
+    target_scale: f64,
     alpha: Vec<f64>,
     cholesky_lower: Vec<Vec<f64>>,
 }
@@ -684,8 +685,28 @@ impl GaussianProcessPosterior {
         if !mean_y.is_finite() {
             return Err(GaussianProcessError::NonFiniteInput);
         }
+        let target_variance = measured
+            .iter()
+            .map(|(_, value)| (*value - mean_y).powi(2))
+            .sum::<f64>()
+            / n as f64;
+        if !target_variance.is_finite() || target_variance < 0.0 {
+            return Err(GaussianProcessError::NonFiniteInput);
+        }
+        // Standardize objective outputs before GP fitting so fixed kernel/noise
+        // hyperparameters behave consistently across objectives with different units
+        // or magnitudes. Constant-output history uses unit scale to avoid division by 0.
+        let observed_scale = target_variance.sqrt();
+        let target_scale = if observed_scale.is_finite() && observed_scale > 1e-12 {
+            observed_scale
+        } else {
+            1.0
+        };
         let observed_points: Vec<Point> = measured.iter().map(|(point, _)| *point).collect();
-        let centered_y: Vec<f64> = measured.iter().map(|(_, value)| *value - mean_y).collect();
+        let centered_y: Vec<f64> = measured
+            .iter()
+            .map(|(_, value)| (*value - mean_y) / target_scale)
+            .collect();
 
         let mut covariance = vec![vec![0.0; n]; n];
         for row in 0..n {
@@ -705,6 +726,7 @@ impl GaussianProcessPosterior {
         Ok(Self {
             observed_points,
             mean_y,
+            target_scale,
             alpha,
             cholesky_lower,
         })
@@ -724,22 +746,23 @@ impl GaussianProcessPosterior {
             .iter()
             .map(|point| gp_rbf_kernel(*point, candidate))
             .collect();
-        let mean = self.mean_y
-            + cross_covariance
-                .iter()
-                .zip(&self.alpha)
-                .map(|(kernel, weight)| kernel * weight)
-                .sum::<f64>();
+        let normalized_mean = cross_covariance
+            .iter()
+            .zip(&self.alpha)
+            .map(|(kernel, weight)| kernel * weight)
+            .sum::<f64>();
+        let mean = self.mean_y + self.target_scale * normalized_mean;
         let projected = gp_solve_lower(&self.cholesky_lower, &cross_covariance)?;
         let variance_reduction = projected.iter().map(|value| value * value).sum::<f64>();
         let raw_variance = GP_SIGNAL_VARIANCE - variance_reduction;
-        let variance = if raw_variance < 0.0 && raw_variance >= -1e-8 {
+        let normalized_variance = if raw_variance < 0.0 && raw_variance >= -1e-8 {
             0.0
         } else if raw_variance < -1e-8 {
             return Err(GaussianProcessError::NegativePosteriorVariance);
         } else {
             raw_variance
         };
+        let variance = self.target_scale.powi(2) * normalized_variance;
 
         if !mean.is_finite() || !variance.is_finite() || variance < 0.0 {
             return Err(GaussianProcessError::NonFinitePosterior);
@@ -1377,6 +1400,32 @@ mod tests {
         let (mean, variance) = posterior.predict(point).unwrap();
         assert!(mean.is_finite());
         assert!(variance.is_finite() && variance >= 0.0);
+    }
+
+    #[test]
+    fn gp_lcb_proposal_is_invariant_to_positive_affine_objective_scaling() {
+        let initial = run_benchmark(
+            SyntheticCase::SmoothBowl,
+            SamplingDesign::LatinHypercube,
+            Fidelity::High,
+            0x5CA1_E,
+            8,
+        )
+        .unwrap();
+        let history = proposal_history(&initial.transcript);
+        let scaled_history: Vec<ProposalObservation> = history
+            .iter()
+            .map(|entry| ProposalObservation {
+                point: entry.point,
+                status: entry.status,
+                observed_objective: entry.observed_objective.map(|value| 1000.0 * value + 500.0),
+            })
+            .collect();
+
+        assert_eq!(
+            choose_gaussian_process_lcb(&history).unwrap(),
+            choose_gaussian_process_lcb(&scaled_history).unwrap()
+        );
     }
 
     #[test]
