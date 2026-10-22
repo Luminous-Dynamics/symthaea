@@ -948,10 +948,79 @@ fn report_risk_coverage_curve(
         .windows(2)
         .map(|pair| (pair[1].0 - pair[0].0) * pair[1].1)
         .sum::<f64>();
+    // AUGRC integrates generalized risk (accepted errors / all queries), not
+    // selective risk (accepted errors / accepted queries). The confidence score
+    // below induces the same nested acceptance order as the predeclared grid.
+    let (augrc, confidence_levels) = area_under_generalized_risk_coverage(samples, mode);
     println!(
-        "# risk_coverage_summary=seed:{seed},strategy:{strategy},aurc_trapezoid:{trapezoidal_aurc:.6},aurc_step:{step_aurc:.6},curve_points:{}",
+        "# risk_coverage_summary=seed:{seed},strategy:{strategy},aurc_trapezoid:{trapezoidal_aurc:.6},aurc_step:{step_aurc:.6},augrc_trapezoid:{augrc:.6},confidence_levels:{confidence_levels},curve_points:{}",
         points.len()
     );
+}
+
+/// Confidence scalar whose threshold acceptance sets match the corresponding
+/// predeclared fixed-sequence candidate grid.
+fn selective_confidence(sample: &ScoredQuery, mode: CalibrationMode) -> f64 {
+    match mode {
+        CalibrationMode::ScoreOnly => sample.best_similarity,
+        CalibrationMode::MarginOnly => sample.top_two_margin.min(0.80),
+        CalibrationMode::ScoreAndMargin => {
+            // The fixed grid accepts when both normalized rejection costs are
+            // <= p. Thus 1 - max(costs) induces the grid's exact nested sets.
+            1.0 - ((1.0 - sample.best_similarity) / 2.0)
+                .max(1.0 - sample.top_two_margin / 0.80)
+        }
+    }
+}
+
+/// Calculate the area under the empirical generalized-risk/coverage curve.
+/// Generalized risk is accepted errors divided by all queries, rather than
+/// accepted errors divided by accepted queries. Equal confidence scores enter
+/// as a group so arbitrary tie-breaking cannot improve the metric.
+fn area_under_generalized_risk_coverage(
+    samples: &[ScoredQuery],
+    mode: CalibrationMode,
+) -> (f64, usize) {
+    if samples.is_empty() {
+        return (0.0, 0);
+    }
+
+    let mut ranked: Vec<(f64, bool)> = samples
+        .iter()
+        .map(|sample| (selective_confidence(sample, mode), !sample.correct))
+        .collect();
+    ranked.sort_by(|left, right| right.0.total_cmp(&left.0));
+
+    let total = ranked.len() as f64;
+    let mut admitted = 0usize;
+    let mut failures = 0usize;
+    let mut previous_coverage = 0.0;
+    let mut previous_generalized_risk = 0.0;
+    let mut area = 0.0;
+    let mut confidence_levels = 0usize;
+    let mut index = 0usize;
+
+    while index < ranked.len() {
+        let confidence = ranked[index].0;
+        let mut end = index;
+        while end < ranked.len() && ranked[end].0.total_cmp(&confidence).is_eq() {
+            end += 1;
+        }
+        let group = &ranked[index..end];
+        admitted += group.len();
+        failures += group.iter().filter(|(_, is_error)| *is_error).count();
+        let coverage = admitted as f64 / total;
+        let generalized_risk = failures as f64 / total;
+        area += (coverage - previous_coverage)
+            * (previous_generalized_risk + generalized_risk)
+            / 2.0;
+        previous_coverage = coverage;
+        previous_generalized_risk = generalized_risk;
+        confidence_levels += 1;
+        index = end;
+    }
+
+    (area.clamp(0.0, 0.5), confidence_levels)
 }
 
 /// Conformal nonconformity is 1 - similarity to the true target. The
@@ -1496,6 +1565,127 @@ mod tests {
                 + result.rejected_both,
             result.total
         );
+    }
+
+    #[test]
+    fn generalized_risk_area_is_zero_for_always_correct_predictions() {
+        let samples = vec![
+            scored_for_metric(true, 0.9, 0.5),
+            scored_for_metric(true, 0.6, 0.2),
+            scored_for_metric(true, 0.4, 0.1),
+        ];
+        for mode in [
+            CalibrationMode::ScoreOnly,
+            CalibrationMode::MarginOnly,
+            CalibrationMode::ScoreAndMargin,
+        ] {
+            let (area, levels) = area_under_generalized_risk_coverage(&samples, mode);
+            assert_eq!(area, 0.0);
+            assert!(levels > 0);
+        }
+    }
+
+    #[test]
+    fn generalized_risk_area_is_half_for_always_wrong_predictions() {
+        let samples = vec![
+            scored_for_metric(false, 0.9, 0.5),
+            scored_for_metric(false, 0.6, 0.2),
+            scored_for_metric(false, 0.4, 0.1),
+        ];
+        let (area, _) =
+            area_under_generalized_risk_coverage(&samples, CalibrationMode::ScoreOnly);
+        assert!((area - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn generalized_risk_area_rewards_ranking_correct_predictions_above_failures() {
+        let correct_first = vec![
+            scored_for_metric(true, 0.9, 0.3),
+            scored_for_metric(false, 0.4, 0.1),
+        ];
+        let failure_first = vec![
+            scored_for_metric(false, 0.9, 0.3),
+            scored_for_metric(true, 0.4, 0.1),
+        ];
+        let tied = vec![
+            scored_for_metric(true, 0.7, 0.2),
+            scored_for_metric(false, 0.7, 0.2),
+        ];
+        let (good, _) =
+            area_under_generalized_risk_coverage(&correct_first, CalibrationMode::ScoreOnly);
+        let (bad, _) =
+            area_under_generalized_risk_coverage(&failure_first, CalibrationMode::ScoreOnly);
+        let (tie, levels) =
+            area_under_generalized_risk_coverage(&tied, CalibrationMode::ScoreOnly);
+
+        assert!((good - 0.125).abs() < 1e-12, "good ranking area={good}");
+        assert!((bad - 0.375).abs() < 1e-12, "bad ranking area={bad}");
+        assert!((tie - 0.25).abs() < 1e-12, "tie area={tie}");
+        assert_eq!(levels, 1, "equal confidence scores are grouped");
+        assert!(good < tie && tie < bad);
+    }
+
+    #[test]
+    fn selective_confidence_matches_fixed_grid_acceptance_sets() {
+        let samples = vec![
+            scored_for_metric(true, 0.90, 1.20),
+            scored_for_metric(false, 0.70, 0.05),
+            scored_for_metric(true, 0.40, 0.40),
+            scored_for_metric(false, 1.00, 0.90),
+        ];
+        for mode in [
+            CalibrationMode::ScoreOnly,
+            CalibrationMode::MarginOnly,
+            CalibrationMode::ScoreAndMargin,
+        ] {
+            for step in 0..=100 {
+                let fraction = step as f64 / 100.0;
+                let rule = match mode {
+                    CalibrationMode::ScoreOnly => DecisionRule {
+                        min_similarity: 1.0 - 2.0 * fraction,
+                        min_margin: -1.0,
+                    },
+                    CalibrationMode::MarginOnly => DecisionRule {
+                        min_similarity: -1.0,
+                        min_margin: 0.80 * (1.0 - fraction),
+                    },
+                    CalibrationMode::ScoreAndMargin => DecisionRule {
+                        min_similarity: 1.0 - 2.0 * fraction,
+                        min_margin: 0.80 * (1.0 - fraction),
+                    },
+                };
+                for sample in &samples {
+                    let accepted_by_rule = sample.best_similarity >= rule.min_similarity
+                        && sample.top_two_margin >= rule.min_margin;
+                    let confidence_threshold = match mode {
+                        CalibrationMode::ScoreOnly => rule.min_similarity,
+                        CalibrationMode::MarginOnly => rule.min_margin,
+                        CalibrationMode::ScoreAndMargin => 1.0 - fraction,
+                    };
+                    let accepted_by_confidence =
+                        selective_confidence(sample, mode) >= confidence_threshold;
+                    assert_eq!(
+                        accepted_by_rule, accepted_by_confidence,
+                        "mode={mode:?}, step={step}, sample={sample:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    fn scored_for_metric(correct: bool, best_similarity: f64, top_two_margin: f64) -> ScoredQuery {
+        ScoredQuery {
+            best_similarity,
+            top_two_margin,
+            correct,
+            target_similarity: correct.then_some(best_similarity),
+            prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
+            kind: if correct {
+                QueryKind::Known { noise_index: 0 }
+            } else {
+                QueryKind::RandomOod
+            },
+        }
     }
 
     #[test]
