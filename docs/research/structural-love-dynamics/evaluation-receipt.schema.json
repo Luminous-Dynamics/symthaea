@@ -589,7 +589,9 @@
         "case_assignment_randomized",
         "case_authors_excluded_from_adjudication",
         "conflicts_disclosed",
-        "completed_at"
+        "completed_at",
+        "initial_label_pairwise_agreement_rate",
+        "initial_label_unanimous_case_rate"
       ],
       "properties": {
         "status": {
@@ -665,6 +667,22 @@
         "case_id_inventory_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "initial_label_pairwise_agreement_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "initial_label_unanimous_case_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
         }
       }
     }
