@@ -802,15 +802,15 @@ mod tests {
         let process = digest("alloy-mold-tooling-protocol-v1");
         let training = vec![
             record("train-1", 0.001, 1.2, CastingEvidenceClass::Simulated, process, "geom-a"),
-            record("train-2", 0.004, 19.2, CastingEvidenceClass::Simulated, process, "geom-a"),
-            record("train-3", 0.010, 120.0, CastingEvidenceClass::Synthetic, process, "geom-b"),
+            record("train-2", 0.004, 19.2, CastingEvidenceClass::Simulated, process, "geom-b"),
+            record("train-3", 0.010, 120.0, CastingEvidenceClass::Synthetic, process, "geom-c"),
         ];
         let calibration = vec![
-            record("cal-1", 0.003, 10.8, CastingEvidenceClass::MeasuredPhysical, process, "geom-c"),
-            record("cal-2", 0.005, 30.0, CastingEvidenceClass::MeasuredPhysical, process, "geom-d"),
+            record("cal-1", 0.003, 10.8, CastingEvidenceClass::MeasuredPhysical, process, "geom-d"),
+            record("cal-2", 0.005, 30.0, CastingEvidenceClass::MeasuredPhysical, process, "geom-e"),
         ];
         let holdout = vec![
-            record("holdout-1", 0.006, 43.2, CastingEvidenceClass::MeasuredPhysical, process, "geom-e"),
+            record("holdout-1", 0.006, 43.2, CastingEvidenceClass::MeasuredPhysical, process, "geom-f"),
         ];
         (training, calibration, holdout)
     }
