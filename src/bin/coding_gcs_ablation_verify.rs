@@ -1746,6 +1746,7 @@ mod tests {
             "tier": "ImaginaryLLM",
             "backend_name": "SomeBackend",
             "success": true,
+            "usable_generation": true,
             "verification_passed": null,
             "elapsed_ms": 5,
             "estimated_energy_cost": 10.0
@@ -1761,9 +1762,26 @@ mod tests {
             "tier": "CloudLLM",
             "backend_name": "Ollama",
             "success": true,
+            "usable_generation": true,
             "verification_passed": null,
             "elapsed_ms": 5,
             "estimated_energy_cost": 50.0
+        }]);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempts")));
+    }
+
+    #[test]
+    fn simulated_nonempty_output_cannot_claim_usable_generation() {
+        let mut report = valid_fixture();
+        report["runs"][0]["backend_attempts"] = serde_json::json!([{
+            "tier": "Simulated",
+            "backend_name": "Simulated",
+            "success": true,
+            "usable_generation": true,
+            "verification_passed": null,
+            "elapsed_ms": 0,
+            "estimated_energy_cost": 0.0
         }]);
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("backend_attempts")));
@@ -1784,6 +1802,7 @@ mod tests {
             "tier": "CloudLLM",
             "backend_name": "Anthropic",
             "success": true,
+            "usable_generation": true,
             "verification_passed": null,
             "elapsed_ms": 5,
             "estimated_energy_cost": 50.0
@@ -1794,6 +1813,8 @@ mod tests {
         report["summary"]["gcs_off"]["backend_attempts_by_name"] = serde_json::json!({"Anthropic": 1});
         report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
         report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_usable_generations"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_nonempty_unusable_outputs"] = Value::from(0);
         report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(0);
         report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
         report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(1);
@@ -1820,8 +1841,8 @@ mod tests {
 
         report["runs"][0]["selected_generation_tiers"] = serde_json::json!(["LocalLLM", "LocalLLM"]);
         report["runs"][0]["backend_attempts"] = serde_json::json!([
-            {"tier": "Simulated", "backend_name": "Simulated", "success": true, "verification_passed": null, "elapsed_ms": 7, "estimated_energy_cost": 0.0},
-            {"tier": "LocalLLM", "backend_name": "Ollama", "success": true, "verification_passed": null, "elapsed_ms": 11, "estimated_energy_cost": 10.0}
+            {"tier": "Simulated", "backend_name": "Simulated", "success": true, "usable_generation": false, "verification_passed": null, "elapsed_ms": 7, "estimated_energy_cost": 0.0},
+            {"tier": "LocalLLM", "backend_name": "Ollama", "success": true, "usable_generation": true, "verification_passed": null, "elapsed_ms": 11, "estimated_energy_cost": 10.0}
         ]);
         report["summary"]["gcs_off"]["selected_tier_decisions"] = serde_json::json!({
             "Native": 0, "Hardware": 0, "LocalLLM": 2, "CloudLLM": 0, "Simulated": 0
@@ -1834,6 +1855,8 @@ mod tests {
         });
         report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(2);
         report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_usable_generations"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_nonempty_unusable_outputs"] = Value::from(1);
         report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(0);
         report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
         report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(2);
@@ -1855,6 +1878,7 @@ mod tests {
                 "tier": "Native",
                 "backend_name": "NativeCodeTemplate",
                 "success": true,
+                "usable_generation": true,
                 "verification_passed": true,
                 "elapsed_ms": 4,
                 "estimated_energy_cost": 1.0
@@ -1863,6 +1887,7 @@ mod tests {
                 "tier": "Native",
                 "backend_name": "NativeCodeTemplate",
                 "success": false,
+                "usable_generation": false,
                 "verification_passed": false,
                 "elapsed_ms": 7,
                 "estimated_energy_cost": 1.0
@@ -1875,6 +1900,8 @@ mod tests {
             serde_json::json!({"NativeCodeTemplate": 2});
         report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
         report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_usable_generations"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_nonempty_unusable_outputs"] = Value::from(0);
         report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(1);
         report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(1);
         report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(0);
@@ -1902,11 +1929,11 @@ mod tests {
         report["runs"][0]["selected_generation_tiers"] = serde_json::json!(["CloudLLM"]);
         report["runs"][0]["backend_attempts"] = serde_json::json!([
             {
-                "tier": "CloudLLM", "backend_name": "Anthropic", "success": false,
+                "tier": "CloudLLM", "backend_name": "Anthropic", "success": false, "usable_generation": false,
                 "verification_passed": null, "elapsed_ms": 5, "estimated_energy_cost": 50.0
             },
             {
-                "tier": "LocalLLM", "backend_name": "Ollama", "success": true,
+                "tier": "LocalLLM", "backend_name": "Ollama", "success": true, "usable_generation": true,
                 "verification_passed": null, "elapsed_ms": 11, "estimated_energy_cost": 10.0
             }
         ]);
@@ -1920,6 +1947,8 @@ mod tests {
             serde_json::json!({"Anthropic": 1, "Ollama": 1});
         report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
         report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_usable_generations"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_nonempty_unusable_outputs"] = Value::from(0);
         report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(0);
         report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
         report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(2);
@@ -1959,6 +1988,7 @@ mod tests {
             "tier": "Native",
             "backend_name": "NativeCodeTemplate",
             "success": true,
+            "usable_generation": true,
             "verification_passed": null,
             "elapsed_ms": 7,
             "estimated_energy_cost": 1.0
