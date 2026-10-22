@@ -271,9 +271,9 @@ impl PredictiveRankMartingale {
             .ok_or(PredictiveRankError::ObservationCounterOverflow)?;
 
         let key = (audit_score, audit_tie_breaker);
-        let reference_count_le = self
-            .sorted_reference
-            .partition_point(|reference_key| compare_keys(reference_key, &key) != Ordering::Greater);
+        let reference_count_le = self.sorted_reference.partition_point(|reference_key| {
+            compare_keys(reference_key, &key) != Ordering::Greater
+        });
         if reference_count_le > 0
             && compare_keys(&self.sorted_reference[reference_count_le - 1], &key) == Ordering::Equal
         {
@@ -343,7 +343,11 @@ impl PredictiveRankMartingale {
             feature_stats(&next_counts, n, next_audit_index, RankFeature::Order)?;
         let next_dispersion_stats =
             feature_stats(&next_counts, n, next_audit_index, RankFeature::Dispersion)?;
-        let next_order_lambda = next_lambda(self.order.lambda, order_observation, next_order_stats.bet_bound)?;
+        let next_order_lambda = next_lambda(
+            self.order.lambda,
+            order_observation,
+            next_order_stats.bet_bound,
+        )?;
         let next_dispersion_lambda = next_lambda(
             self.dispersion.lambda,
             dispersion_observation,
@@ -569,6 +573,17 @@ mod tests {
             PredictiveRankMartingale::new(&[1.0, 1.0], &[0.5, 0.5], 0.05),
             Err(PredictiveRankError::DuplicateCalibrationKey { .. })
         ));
+    }
+
+    #[test]
+    fn randomized_tie_breakers_define_order_within_atomic_scores() {
+        let calibration_scores = [1.0, 1.0, 1.0];
+        let calibration_ties = [0.1, 0.5, 0.9];
+        let mut monitor =
+            PredictiveRankMartingale::new(&calibration_scores, &calibration_ties, 0.05).unwrap();
+
+        let result = monitor.observe(1.0, 0.4).unwrap();
+        assert_eq!(result.rank, 2);
     }
 
     #[test]
