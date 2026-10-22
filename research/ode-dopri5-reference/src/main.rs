@@ -13,7 +13,7 @@ use ode_verify_001_harness::dynamical_system::{HarmonicOscillator, Rk45Integrato
 
 const T_END: f64 = 10.0;
 const INITIAL_DT: f64 = 0.2;
-const DENSE_OUTPUT_DT: f64 = 0.1;
+const SPARSE_MODE_INCREMENT_ARGUMENT: f64 = 0.1;
 const COMMON_OUTPUT_INTERVALS: usize = 100;
 const SCALES: [f64; 3] = [1.0e-6, 1.0, 1.0e6];
 const RELATIVE_TOLERANCES: [f64; 3] = [1.0e-3, 1.0e-5, 1.0e-7];
@@ -270,7 +270,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 UnitHarmonicOscillator,
                 0.0,
                 T_END,
-                DENSE_OUTPUT_DT,
+                SPARSE_MODE_INCREMENT_ARGUMENT,
                 y0,
                 rtol,
                 atol,
@@ -424,6 +424,35 @@ mod tests {
         // Quintic Hermite is a sixth-order local interpolation approximation on this smooth fixture.
         let maximum_error = max_sampled_scaled_trajectory_error(samples.iter().copied(), 1.0);
         assert!(maximum_error < 1.0e-7, "max interpolation error={maximum_error}");
+    }
+
+    #[test]
+    fn dopri5_sparse_mode_records_accepted_states_then_resamples() {
+        let rtol = 1.0e-7;
+        let atol = 1.0e-10;
+        let mut solver = Dopri5::new(
+            UnitHarmonicOscillator,
+            0.0,
+            T_END,
+            SPARSE_MODE_INCREMENT_ARGUMENT,
+            Vector2::new(1.0, 0.0),
+            rtol,
+            atol,
+        );
+        solver.set_output(OutputType::Sparse);
+        let stats = solver.integrate().unwrap();
+        let times = solver.x_out();
+        let states: Vec<Vec<f64>> = solver
+            .y_out()
+            .iter()
+            .map(|state| vec![state[0], state[1]])
+            .collect();
+        assert_eq!(times.len(), stats.accepted_steps + 1);
+        assert_eq!(times.len(), states.len());
+        let samples = quintic_hermite_sample_grid(times, &states).unwrap();
+        assert_eq!(samples.len(), COMMON_OUTPUT_INTERVALS + 1);
+        let maximum_error = max_sampled_scaled_trajectory_error(samples.iter().copied(), 1.0);
+        assert!(maximum_error < 10.0 * rtol, "max sparse-interpolated error={maximum_error}");
     }
 
     #[test]
