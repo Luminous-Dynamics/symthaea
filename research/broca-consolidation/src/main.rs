@@ -870,6 +870,18 @@ mod tests {
     }
 
     #[test]
+    fn instrument_self_checks_accept_multiple_noisy_seeds() {
+        for seed in 1..=32 {
+            let candidates = build_fixture(seed, 24);
+            let rows = evaluate_all(&candidates);
+            assert!(
+                validate_self_checks(&candidates, &rows).is_ok(),
+                "instrument self-check failed for seed {seed}"
+            );
+        }
+    }
+
+    #[test]
     fn self_check_rejects_missing_mutation_controls() {
         let candidates = build_fixture(3, 12);
         let only_baseline: Vec<_> = candidates.iter().map(|candidate| {
