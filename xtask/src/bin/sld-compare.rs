@@ -116,6 +116,7 @@ struct Evaluator {
 #[derive(Debug, Deserialize, PartialEq)]
 struct OracleAdjudication {
     status: String,
+    case_id_inventory_sha256: String,
     ledger_sha256: Option<String>,
     protocol_sha256: String,
     rubric_sha256: String,
@@ -351,12 +352,18 @@ fn validate_receipt<'r>(
         .context(format!("{label}: complete oracle adjudication lacks ledger_sha256"))?;
     ensure!(is_lower_hex(ledger_digest, 64), "{label}: oracle ledger digest is malformed");
     ensure!(
-        is_lower_hex(&oracle.protocol_sha256, 64) && is_lower_hex(&oracle.rubric_sha256, 64),
+        is_lower_hex(&oracle.case_id_inventory_sha256, 64)
+            && is_lower_hex(&oracle.protocol_sha256, 64)
+            && is_lower_hex(&oracle.rubric_sha256, 64),
         "{label}: oracle protocol/rubric digest is malformed"
     );
     ensure!(
         oracle.rubric_sha256 == receipt.evaluator.rubric_sha256,
         "{label}: oracle ledger rubric digest does not match evaluator rubric"
+    );
+    ensure!(
+        oracle.case_id_inventory_sha256 == receipt.case_set.inventory_sha256,
+        "{label}: oracle ledger is not bound to the receipt's exact case-ID inventory"
     );
     ensure!(
         oracle.expected_case_count == receipt.case_set.expected_case_count
@@ -905,6 +912,7 @@ mod tests {
             },
             "oracle_adjudication": {
                 "status": "COMPLETE",
+                "case_id_inventory_sha256": digest,
                 "ledger_sha256": digest,
                 "protocol_sha256": digest,
                 "rubric_sha256": digest,
