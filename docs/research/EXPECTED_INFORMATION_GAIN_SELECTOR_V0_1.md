@@ -41,7 +41,7 @@ The simulator's actual noise scale depends on the hidden truth's output magnitud
 
 ## Scheduled audit policy for model mismatch
 
-A latest literature-driven extension adds an explicitly separate policy arm, `InformationGainWithAudits`: it uses the information-gain selector on ordinary rounds and selects one seeded-uniform admissible experiment every second round. This is not claimed to be optimal. It is a controlled way to test whether periodic measurements outside the greedy acquisition score reduce false confidence when the candidate class does not contain the observation-generating process.
+A literature-driven extension adds an explicitly separate policy arm, `InformationGainWithAudits`: it uses the information-gain selector on ordinary rounds, selects a seeded-uniform admissible experiment every second round, and—critically—treats a single surviving hypothesis as provisional. Once only one candidate remains, all remaining queries in the budget become validation audits rather than stopping immediately. A contradictory observation can therefore reject that candidate. This is not claimed to be optimal; it is a controlled test of whether periodic exploration and post-selection validation reduce false confidence when the candidate class does not contain the observation-generating process.
 
 The integrated simulator now accepts a hidden additive discrepancy term proportional to the base law magnitude and a combination of sinusoidal input terms. Selectors receive only their live candidate predictions and never the discrepancy amplitude or hidden transformed truth. The paired diagnostic compares plain EIG and EIG-with-audits on the same seeds and candidate-pool generation in two regimes:
 
