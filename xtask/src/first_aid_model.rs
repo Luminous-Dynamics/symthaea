@@ -703,6 +703,59 @@ mod tests {
     }
 
     #[test]
+    fn seeded_long_horizon_histories_match_production_trace_checker() {
+        const SEED: u64 = 0x4c55_4d49_4e4f_5553;
+        const TRIALS: usize = 4_096;
+        const MAX_ACTIONS: usize = 64;
+
+        fn next_random(state: &mut u64) -> u64 {
+            // xorshift64*: deterministic, dependency-free, and reproducible from SEED.
+            let mut value = *state;
+            value ^= value >> 12;
+            value ^= value << 25;
+            value ^= value >> 27;
+            *state = value;
+            value.wrapping_mul(0x2545_f491_4f6c_dd1d)
+        }
+
+        let mut random_state = SEED;
+        let mut compared = 0usize;
+        let mut action_histogram = [0usize; ACTIONS.len()];
+
+        for trial in 0..TRIALS {
+            let length = (next_random(&mut random_state) as usize % MAX_ACTIONS) + 1;
+            let mut actions = Vec::with_capacity(length);
+            for _ in 0..length {
+                let index = next_random(&mut random_state) as usize % ACTIONS.len();
+                action_histogram[index] += 1;
+                actions.push(ACTIONS[index]);
+            }
+
+            let trace = action_history_json(&actions);
+            let model_codes = model_violation_codes(&actions);
+            let production_codes =
+                super::super::first_aid_trajectory::inspect_trace_json(&trace)
+                    .expect("seeded generated trace must satisfy the event schema");
+
+            assert_eq!(
+                production_codes,
+                model_codes,
+                "seeded model/production mismatch; seed=0x{SEED:016x}, trial={trial},                  length={length}, actions={actions:?}"
+            );
+            compared += 1;
+        }
+
+        assert_eq!(compared, TRIALS);
+        assert!(
+            action_histogram.iter().all(|count| *count > 0),
+            "seeded traces must exercise every modeled action: {action_histogram:?}"
+        );
+        println!(
+            "model_production_seeded_long_horizon_comparisons={compared}              seed=0x{SEED:016x} max_actions={MAX_ACTIONS}"
+        );
+    }
+
+    #[test]
     fn resuming_without_an_interrupt_cannot_retain_a_verified_bundle() {
         let state = State {
             session_active: true,
