@@ -26,7 +26,7 @@ The immediate work corrects overclaims and adds deterministic witnesses for the 
 
 No per-session ephemeral private input or ratchet contributes to the DH result. Repeating the same static key pair repeats the shared secret and the derived keys. Consequently, a later attacker who obtains a long-term private key and has the corresponding recorded peer public key can recompute that pairwise key. This is the opposite of forward secrecy as defined for ephemeral DH exchange; forward secrecy requires ephemeral contributions and appropriate erasure. See RFC 9678, which explicitly describes ECDH as ephemeral for forward secrecy: https://www.rfc-editor.org/rfc/rfc9678.html.
 
-The new test `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse` records this property using fixed test secrets. It is a known limitation witness, not a security-passing test.
+The new test `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse` records this property using fixed test secrets. The companion test `legacy_static_x25519_derivation_does_not_bind_peer_source_id` shows the same static peer key derives the same traffic key even when stored under different peer-ID labels. These are known limitation witnesses, not security-passing tests.
 
 ## K-2 — Peer identity is a lookup label, not KDF-bound context
 
@@ -63,7 +63,7 @@ The current API does not bind all of the following into one authenticated transc
 - the classical handshake challenge and evidence that it was verified;
 - session/boot context, key epoch, and downgrade policy.
 
-This review does not claim that a higher layer cannot perform some of these checks. It states that this module's public interface does not enforce them, so production callers can misuse it without the type system preventing that state.
+This review does not claim that a higher layer cannot perform some of these checks. It states that this module's public interface does not enforce them, so production callers can misuse it without the type system preventing that state. The test `legacy_pqc_session_derivation_does_not_bind_peer_id` deterministically derives the same key under two peer-ID labels from the same KEM ciphertext and public challenge. The former derivation smoke test is now explicitly named `legacy_pqc_derivation_succeeds_without_verified_classical_handshake_state` to make clear that no classical verification is performed by that test.
 
 ## K-5 — Static ML-KEM manager keypair does not provide KEM forward secrecy
 
@@ -112,4 +112,4 @@ A model discovery counts only when the issue is independently reproducible again
 
 ## Validation status
 
-Source review and regression-test authoring only. Tests were not compiled or run in this environment. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
+Source review and regression-test authoring only. Tests were not compiled or run in this environment. The added/renamed witnesses are `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse`, `legacy_static_x25519_derivation_does_not_bind_peer_source_id`, `legacy_pqc_derivation_succeeds_without_verified_classical_handshake_state`, and `legacy_pqc_session_derivation_does_not_bind_peer_id`. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
