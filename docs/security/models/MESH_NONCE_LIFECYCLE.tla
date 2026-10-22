@@ -1,0 +1,99 @@
+-------------------- MODULE MESH_NONCE_LIFECYCLE --------------------
+EXTENDS Naturals, FiniteSets, TLC
+
+CONSTANTS
+  SenderIDs,
+  Prefixes,
+  PrefixOf,
+  EffectiveKeys,
+  EffectiveKeyOf,
+  PayloadTypes,
+  FragmentIndices,
+  EpochValues,
+  DefaultEpoch,
+  MaxSeq,
+  FragmentModulus,
+  Variant,
+  StrictNoReuse
+
+ASSUME
+  /\ SenderIDs # {}
+  /\ Prefixes # {}
+  /\ EffectiveKeys # {}
+  /\ PayloadTypes # {}
+  /\ FragmentIndices # {}
+  /\ EpochValues # {}
+  /\ PrefixOf \in [SenderIDs -> Prefixes]
+  /\ EffectiveKeyOf \in [SenderIDs -> EffectiveKeys]
+  /\ DefaultEpoch \in EpochValues
+  /\ MaxSeq \in Nat
+  /\ MaxSeq > 0
+  /\ FragmentModulus \in Nat
+  /\ FragmentModulus > 0
+  /\ Variant \in {"packet", "fragment"}
+  /\ StrictNoReuse \in BOOLEAN
+
+VARIABLES nextSeq, epochs, usedPairs, reuseDetected
+
+vars == <<nextSeq, epochs, usedPairs, reuseDetected>>
+
+\* In packet mode, PrefixOf models an identity truncated in the nonce.
+\* In fragment mode, FragmentModulus is deliberately small so TLC can
+\* explore low-bit wrap quickly; it abstracts the actual 16-bit thought ID.
+Nonce(sender, payloadType, fragmentIndex) ==
+  IF Variant = "packet"
+  THEN <<PrefixOf[sender], payloadType, epochs[sender], nextSeq[sender]>>
+  ELSE <<sender, nextSeq[sender] % FragmentModulus, fragmentIndex, 0>>
+
+Init ==
+  /\ nextSeq = [sender \in SenderIDs |-> 0]
+  /\ epochs = [sender \in SenderIDs |-> DefaultEpoch]
+  /\ usedPairs = {}
+  /\ reuseDetected = FALSE
+
+Send(sender, payloadType, fragmentIndex) ==
+  LET pair == <<EffectiveKeyOf[sender],
+                Nonce(sender, payloadType, fragmentIndex)>>
+  IN
+    /\ (~StrictNoReuse \/ pair \notin usedPairs)
+    /\ usedPairs' = usedPairs \cup {pair}
+    /\ reuseDetected' = reuseDetected \/ (pair \in usedPairs)
+    /\ nextSeq' =
+         [nextSeq EXCEPT
+           ![sender] = IF @ = MaxSeq THEN 0 ELSE @ + 1]
+    /\ UNCHANGED epochs
+
+\* This models the observed deterministic restart default. It does not model
+\* operating-system randomness, durable counter reservation, or key custody.
+Restart(sender) ==
+  /\ nextSeq' = [nextSeq EXCEPT ![sender] = 0]
+  /\ epochs' = [epochs EXCEPT ![sender] = DefaultEpoch]
+  /\ UNCHANGED <<usedPairs, reuseDetected>>
+
+\* Rotation may choose any configured epoch, including a previously used one.
+\* Reusing an epoch is legal in the legacy model and must be blocked by a
+\* strict allocator unless the effective key namespace has changed.
+RotateEpoch(sender, epoch) ==
+  /\ epoch \in EpochValues
+  /\ epochs' = [epochs EXCEPT ![sender] = epoch]
+  /\ UNCHANGED <<nextSeq, usedPairs, reuseDetected>>
+
+Next ==
+  \/ \E sender \in SenderIDs :
+       \E payloadType \in PayloadTypes :
+         \E fragmentIndex \in FragmentIndices :
+           Send(sender, payloadType, fragmentIndex)
+  \/ \E sender \in SenderIDs : Restart(sender)
+  \/ \E sender \in SenderIDs :
+       \E epoch \in EpochValues : RotateEpoch(sender, epoch)
+
+Spec == Init /\ [][Next]_vars
+
+TypeOK ==
+  /\ nextSeq \in [SenderIDs -> 0..MaxSeq]
+  /\ epochs \in [SenderIDs -> EpochValues]
+  /\ reuseDetected \in BOOLEAN
+
+NoNonceReuse == reuseDetected = FALSE
+
+=============================================================================
