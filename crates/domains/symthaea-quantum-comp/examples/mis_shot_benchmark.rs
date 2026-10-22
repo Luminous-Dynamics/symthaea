@@ -9,7 +9,7 @@
 use std::env;
 use std::error::Error;
 
-use symthaea_quantum_comp::mis_informer::MisShotBudgetConfig;
+use symthaea_quantum_comp::mis_shot_budget::MisShotBudgetConfig;
 use symthaea_quantum_comp::mis_shot_simulation::{
     MisSamplingAggregate, MisSamplingScenario, MisSamplingTrial,
     aggregate_mis_sampling_trials, simulate_mis_sampling_scenario,
@@ -140,7 +140,7 @@ fn fmt_optional(value: Option<f64>) -> String {
 }
 
 fn csv_cell(value: &str) -> String {
-    if value.contains([',', '"', '\n', '\r']) {
+    if value.contains(',') || value.contains('"') || value.contains('\n') || value.contains('\r') {
         format!("\"{}\"", value.replace('"', "\"\""))
     } else {
         value.to_owned()
