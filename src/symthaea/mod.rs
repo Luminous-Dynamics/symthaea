@@ -23,7 +23,7 @@ mod school;
 
 // ── Re-exports ────────────────────────────────────────────────────────────
 
-pub use relational::PartnershipState;
+pub use relational::{PartnershipState, PartnerStateEvidenceStatus, PhiDyadStatus};
 #[cfg(feature = "school_learning")]
 pub use school::{CurriculumObjectiveSummary, CurriculumReport};
 
@@ -49,7 +49,7 @@ use crate::databases::{
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridgeV2;
 
-use crate::hdc::relational_consciousness::{RelationMode, RelationalAssessment, RelationshipStage};
+use crate::hdc::relational_consciousness::RelationshipStage;
 #[cfg(feature = "full_language")]
 use crate::language::learning_persistence::LearningPersistence;
 use crate::language::{
@@ -65,11 +65,6 @@ use crate::mind::structured_thought::{ETier, EpistemicCube, NTier};
 use crate::mind::{
     ConstraintType, ContinuousMind, DomainContext, EpistemicStatus, MindConfig, StructuredThought,
 };
-use crate::partnership::{
-    DyadInput, DyadWeights, HumanPartnerModel, InteractionEvent, PhiDyadCalculator,
-    RelationshipTrajectory,
-};
-
 use crate::action::SimpleExecutor;
 pub use crate::action::bindings::ActionRegistry;
 use crate::consciousness::interoception::InteroceptionTag;
@@ -953,7 +948,7 @@ impl Symthaea {
             relational: RelationalCore::from_persisted(
                 state.partner,
                 state.trajectory,
-                state.recent_ai_states,
+                state.recent_user_input_states,
             ),
             plugin_registry,
             #[cfg(feature = "full_language")]
@@ -1287,8 +1282,10 @@ impl Symthaea {
         // Prune completed tasks from the supervisor
         self.task_supervisor.prune_completed();
 
-        // Feed relational Psi from previous cycle's Phi_dyad into the mind.
-        self.mind.set_relational_psi(self.relational.last_phi_dyad);
+        // The facade has no independently sourced partner-observation stream yet.
+        // A dyadic estimate is therefore unavailable and must not be fed back
+        // into cognition as if it were validated relational evidence.
+        self.mind.set_relational_psi(0.0);
 
         self.mind.tick();
 
@@ -2644,13 +2641,17 @@ impl Symthaea {
         // ====================================================================
         // PHASE 7: PARTNERSHIP UPDATE
         // ====================================================================
-        let consciousness = thought.psi as f32;
-        self.update_partnership(content, consciousness);
+        // Record the turn without inferring trust/safety/mutuality from the
+        // system's own consciousness-related scalar.
+        self.relational.record_interaction();
 
-        let ai_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_values(
+        // This buffer contains the user's utterance embedding. Do not label it
+        // as an AI state; no assistant-response or independent partner-state stream
+        // is currently wired into the facade's dyadic estimator.
+        let user_input_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_values(
             input_embedding.values.clone(),
         );
-        self.relational.push_ai_state(ai_hv);
+        self.relational.push_user_input_state(user_input_hv);
 
         // ====================================================================
         // PHASE 7.25: LEARNING PERSISTENCE OUTCOME RECORDING + AUTO-SAVE
@@ -3246,7 +3247,7 @@ impl Symthaea {
             interactions: self.interactions,
             partner: self.relational.partner.clone(),
             trajectory: self.relational.trajectory.clone(),
-            recent_ai_states: self.relational.recent_ai_states.clone(),
+            recent_user_input_states: self.relational.recent_user_input_states.clone(),
             database_path: None,
             user_state: Some(self.user_state_inference.state().clone()),
         };
@@ -3565,11 +3566,6 @@ impl Symthaea {
             }
         }
         loops
-    }
-
-    /// Update partnership model based on interaction.
-    fn update_partnership(&mut self, _content: &str, consciousness: f32) {
-        self.relational.update_partnership(consciousness);
     }
 
     // ========================================================================

@@ -168,18 +168,26 @@ Post-translation verification (`src/symthaea.rs:385`) runs four checks:
 4. **Factual assertion guard**: If status is Unknown, the output must not contain
    factual assertion patterns (e.g., "X is the capital of Y")
 
-### Phase 7: Partnership Update
+### Phase 7: Interaction Record (dyadic estimate gated)
 
 ```rust
-// src/symthaea.rs:297-307
-self.update_partnership(content, consciousness);
-// Track AI state for dyad computation
-let ai_hv = ContinuousHV::from_values(input_embedding.values.clone());
-self.recent_ai_states.push(ai_hv);
+// src/symthaea/mod.rs — facade interaction record
+self.relational.record_interaction();
+let user_input_hv = ContinuousHV::from_values(input_embedding.values.clone());
+self.relational.push_user_input_state(user_input_hv);
 ```
 
-Updates the relational model based on the interaction. Maintains a rolling window
-of the 8 most recent AI states for dyad resonance computation.
+The facade records the turn and stores the user's utterance embedding under an
+accurate name. It does **not** synthesize a second "human" stream from that same
+embedding, infer trust/safety/mutuality from the system's consciousness scalar, or
+feed an ungrounded dyadic estimate back into cognition. Until independently sourced,
+appropriately paired interaction streams are available, `PartnershipState` exposes
+explicit unavailable statuses and a numeric zero only as a backwards-compatible
+placeholder. No new zero-valued Φ point is appended to the relationship trajectory.
+
+On resume, legacy partner-state heuristics and dyadic trajectory points without
+independent provenance are reset rather than silently promoted to observations.
+This is an intentional compatibility change and requires review before merge.
 
 ### Phase 8: Response Assembly
 
