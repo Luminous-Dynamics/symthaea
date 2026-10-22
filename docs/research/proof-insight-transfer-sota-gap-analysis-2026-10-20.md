@@ -43,6 +43,19 @@ VeriSoftBench contains **500 Lean 4 proof obligations across 23 real-world repos
 
 First Proof Batch 3, published **14 October 2026**, tested five systems on ten research problems for 24 hours per system without human intervention; 30 expert reviewers graded correctness, exposition, and attribution. ProofCouncil was graded correct on **9/10**, while the direct GPT-6 Astra entry reached **7/10**. The reported costs were **$1,888** and **$36**, respectively, and adequate citations were judged on **7/10** ProofCouncil outputs versus **4/10** direct Astra outputs ([official press release](https://1stproof.org/third-batch-press-release.html); [benchmark page](https://1stproof.org/third-batch.html)). This is a distinct, human-reviewed informal-proof setting, not a Lean pass-rate baseline. It does establish that abstention, citation provenance, exposition, and resource cost deserve explicit measures.
 
+### Open proof generation has moved beyond older MiniF2F reference numbers
+
+The ICLR 2026 Goedel-Prover-V2 paper reports **84.6% pass@32 on MiniF2F for its 8B model**, and **88.1% pass@32** for its 32B model in standard mode, rising to **90.4%** with its self-correction setup. It also reports 86 PutnamBench problems solved at pass@184 for its flagship model ([ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/13e8be77982beb73d7ed0bbf122f9f3c-Abstract-Conference.html)). These results supersede older 26.5%-class MiniF2F figures as a useful description of the open proof-generation frontier.
+
+**This is not a direct PITB baseline.** MiniF2F pass@32 measures generated formal proofs under a particular task set and search budget. PITB's primary outcome is causal utility from transferring typed proof insights to exact held-out targets under matched treatment/control arms. PITB must not compare its future solve percentage to Goedel's MiniF2F score as if they shared a denominator.
+
+The comparison plan therefore has two distinct tracks:
+
+- **Proof-generation strength:** on a frozen common theorem set, compare the strongest reproducible prover and the same prover with/without the insight intervention, under the same wall-clock, token, checker, and test-time-search budgets. If a full Goedel-Prover-V2 reproduction is infeasible for the pinned corpus, state that explicitly and do not label a substitute as a reproduction.
+- **Transfer-mechanism utility:** retain the preregistered retrieval and proof-context arms, select baselines on validation families only, and estimate the paired difference between the typed-insight arm and the strongest eligible baseline on confirmed exact-target semantic-gate success. Report a clustered confidence interval and all exclusions/unknowns.
+
+The 2026 result strengthens the case for self-correction and test-time search as controls, not just as competitor names. It also makes verifier cost and search budget part of the benchmark identity: any gain attributed to insight transfer must survive a matched budget and cannot borrow extra search for one arm.
+
 ## Paradigm shifts worth pursuing
 
 1. **From similarity search to executable strategy contracts.** Represent each insight as a structured operation: applicable object/domain, preconditions, proof-state/obligation transformation, expected dependency effect, evidence locator, and known failure modes. A candidate is only a hypothesis until its preconditions are checked and target-side proof gates pass. Long-term, compile the schema into small typed tactic or proof-plan combinators that the kernel can reject—not into trusted natural-language assertions.
