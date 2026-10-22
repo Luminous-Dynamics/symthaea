@@ -122,6 +122,7 @@ struct RunResult {
     false_alarm_beneficial_blocks: usize,
     total_benefit: f64,
     task_loss: f64,
+    cvar95_incremental_loss: f64,
     charged_units: u64,
     budget_units: u64,
     reservation_overruns: usize,
@@ -305,6 +306,7 @@ fn run_policy(
     let mut false_alarm_candidate_blocks = 0;
     let mut false_alarm_beneficial_blocks = 0;
     let mut total_benefit = 0.0;
+    let mut incremental_losses = Vec::with_capacity(trials.len());
     let mut reservation_overruns = 0;
     let mut run_budget_overruns = 0;
     let mut stop_after_accounting_failure = false;
@@ -345,6 +347,11 @@ fn run_policy(
         } else {
             Choice::KeepCheap
         };
+        incremental_losses.push(if choice == Choice::Escalate {
+            -trial.true_dvpc
+        } else {
+            0.0
+        });
 
         if choice == Choice::Escalate {
             escalations += 1;
@@ -383,6 +390,7 @@ fn run_policy(
     // Score the evaluator-only oracle only after every policy decision is committed.
     let oracle_benefit = evaluator_oracle_benefit(trials, budget_units);
     let task_loss = BASE_TASK_LOSS * trials.len() as f64 - total_benefit;
+    let cvar95_incremental_loss = cvar95_upper_tail(&incremental_losses);
     let regret_is_valid = reservation_overruns == 0 && run_budget_overruns == 0;
 
     RunResult {
@@ -404,6 +412,7 @@ fn run_policy(
         false_alarm_beneficial_blocks,
         total_benefit,
         task_loss,
+        cvar95_incremental_loss,
         charged_units,
         budget_units,
         reservation_overruns,
@@ -415,6 +424,17 @@ fn run_policy(
 
 fn mean(values: &[f64]) -> Option<f64> {
     (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
+}
+
+/// Mean of the worst ceil(5% * n) per-trial incremental losses (positive means harm).
+fn cvar95_upper_tail(values: &[f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    let mut ordered = values.to_vec();
+    ordered.sort_by(|left, right| right.total_cmp(left));
+    let tail_count = ((ordered.len() + 19) / 20).max(1);
+    ordered.iter().take(tail_count).sum::<f64>() / tail_count as f64
 }
 
 fn render_report() -> String {
@@ -438,15 +458,16 @@ fn render_report() -> String {
     report.push_str("META\tbudget_reference\t4_fixed_full_fidelity_units_per_trial\n");
     report.push_str("META\talarm_generation\t80_percent_sensitivity_10_percent_false_positive_rate_in_generator\n");
     report.push_str("META\tregret_validity\tINVALID_IF_RESERVATION_OVERRUN_OR_RUN_BUDGET_OVERRUN\n");
-    report.push_str("RUN_HEADER\tregime\tpolicy\tbudget_percent\tseed\ttrial_count\tescalations\tbeneficial_escalations\tharmful_escalations\tmissed_beneficial\tshifted_trials\tshifted_escalations\tshifted_harmful\tshift_alarms\tfalse_alarms\tfalse_alarm_candidate_blocks\tfalse_alarm_beneficial_blocks\ttotal_benefit\ttask_loss\tcharged_units\tbudget_units\treservation_overruns\trun_budget_overruns\toracle_benefit\tregret\n");
+    report.push_str("RUN_HEADER\tregime\tpolicy\tbudget_percent\tseed\ttrial_count\tescalations\tbeneficial_escalations\tharmful_escalations\tmissed_beneficial\tshifted_trials\tshifted_escalations\tshifted_harmful\tshift_alarms\tfalse_alarms\tfalse_alarm_candidate_blocks\tfalse_alarm_beneficial_blocks\ttotal_benefit\ttask_loss\tcvar95_incremental_loss\tcharged_units\tbudget_units\treservation_overruns\trun_budget_overruns\toracle_benefit\tregret\n");
     for row in &results {
         report.push_str(&format!(
-            "RUN\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{:.6}\t{}\n",
+            "RUN\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{:.6}\t{}\n",
             row.regime.label(), row.policy.label(), row.budget_percent, row.seed, row.trials,
             row.escalations, row.beneficial_escalations, row.harmful_escalations,
             row.missed_beneficial, row.shifted_trials, row.shifted_escalations, row.shifted_harmful,
             row.shift_alarms, row.false_alarms, row.false_alarm_candidate_blocks,
-            row.false_alarm_beneficial_blocks, row.total_benefit, row.task_loss, row.charged_units,
+            row.false_alarm_beneficial_blocks, row.total_benefit, row.task_loss,
+            row.cvar95_incremental_loss, row.charged_units,
             row.budget_units, row.reservation_overruns, row.run_budget_overruns, row.oracle_benefit,
             row.regret
                 .map(|value| format!("{value:.6}"))
@@ -454,7 +475,7 @@ fn render_report() -> String {
         ));
     }
 
-    report.push_str("SUMMARY_HEADER\tregime\tpolicy\tbudget_percent\tseed_count\tmean_task_loss\tmean_total_benefit\tmean_harmful_escalations\tmean_missed_beneficial\tmean_shifted_harmful\tmean_false_alarm_beneficial_blocks\tmean_charged_units\tbudget_violation_runs\tvalid_regret_seeds\tmean_regret\n");
+    report.push_str("SUMMARY_HEADER\tregime\tpolicy\tbudget_percent\tseed_count\tmean_task_loss\tmean_cvar95_incremental_loss\tmean_total_benefit\tmean_harmful_escalations\tmean_missed_beneficial\tmean_shifted_harmful\tmean_false_alarm_beneficial_blocks\tmean_charged_units\tbudget_violation_runs\tvalid_regret_seeds\tmean_regret\n");
     for regime in Regime::ALL {
         for budget_percent in BUDGET_PERCENTAGES {
             for policy in Policy::ALL {
@@ -466,6 +487,7 @@ fn render_report() -> String {
                     })
                     .collect();
                 let loss: Vec<f64> = rows.iter().map(|row| row.task_loss).collect();
+                let cvar95: Vec<f64> = rows.iter().map(|row| row.cvar95_incremental_loss).collect();
                 let benefit: Vec<f64> = rows.iter().map(|row| row.total_benefit).collect();
                 let harmful: Vec<f64> = rows
                     .iter()
@@ -490,9 +512,10 @@ fn render_report() -> String {
                     .filter(|row| row.reservation_overruns > 0 || row.run_budget_overruns > 0)
                     .count();
                 report.push_str(&format!(
-                    "SUMMARY\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                    "SUMMARY\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
                     regime.label(), policy.label(), budget_percent, rows.len(),
                     mean(&loss).map(|v| format!("{v:.6}")).unwrap_or_else(|| "UNKNOWN".to_owned()),
+                    mean(&cvar95).map(|v| format!("{v:.6}")).unwrap_or_else(|| "UNKNOWN".to_owned()),
                     mean(&benefit)
                         .map(|v| format!("{v:.6}"))
                         .unwrap_or_else(|| "UNKNOWN".to_owned()),
@@ -538,6 +561,12 @@ mod tests {
             declared_cost_units: cost,
             observable_shift_alarm: alarm,
         }
+    }
+
+    #[test]
+    fn cvar95_uses_the_worst_five_percent_of_trial_losses() {
+        let values: Vec<f64> = (0..19).map(|_| 0.0).chain([10.0]).collect();
+        assert_eq!(cvar95_upper_tail(&values), 10.0);
     }
 
     #[test]
