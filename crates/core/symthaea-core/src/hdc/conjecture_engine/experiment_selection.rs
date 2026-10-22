@@ -553,7 +553,7 @@ mod tests {
             InformationGainScenario { observation_std_dev: 1.0, prediction_model: 7 },
         ];
         let predict = |hypothesis: &usize, candidate: &u8, scenario: &InformationGainScenario| {
-            match (candidate, scenario.prediction_model) {
+            match (*candidate, scenario.prediction_model) {
                 // Candidate 0 has one outlier in both predictive worlds and remains
                 // somewhat informative under the noisier scenario.
                 (0, 0 | 7) => Some([0.0_f64, 0.0, 0.0, 3.0][*hypothesis]),
@@ -569,11 +569,16 @@ mod tests {
             &candidates,
             &hypotheses,
             0.1,
-            |hypothesis, candidate| predict(
-                hypothesis,
-                candidate,
-                &InformationGainScenario { observation_std_dev: 0.1, prediction_model: 0 },
-            ),
+            |hypothesis, candidate| {
+                predict(
+                    hypothesis,
+                    candidate,
+                    &InformationGainScenario {
+                        observation_std_dev: 0.1,
+                        prediction_model: 0,
+                    },
+                )
+            },
             |_| 1.0,
         )
         .expect("nominal pool is informative");
