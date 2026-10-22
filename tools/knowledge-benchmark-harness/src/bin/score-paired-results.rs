@@ -1759,8 +1759,7 @@ mod tests {
     fn held_out_inference_rejects_too_few_independent_clusters() {
         let mut plan = fixture_plan();
         plan.phase = "preregistered_held_out".into();
-        let error = compute_pairwise_comparisons(&plan, &[], &[], &[vec![0]])
-            .unwrap_err();
+        let error = compute_pairwise_comparisons(&plan, &[], &[], &[vec![0]]).unwrap_err();
         assert!(error.contains("at least 20 independent source-family clusters"));
     }
 
@@ -1826,24 +1825,27 @@ mod tests {
                 &pair_id,
                 "context_swap",
                 "local_change",
-                if index == 0 { "release_blocker" } else { "major" },
+                if index == 0 {
+                    "release_blocker"
+                } else {
+                    "major"
+                },
                 true,
             );
             case.split = "holdout".into();
             case.synthetic_only = false;
             case.source_family_ids = vec![format!("independent-family-{index:02}")];
             pairs.push(case);
-            observations.push(observation(
-                "base",
-                "s1",
-                &pair_id,
-                "incorrect",
-            ));
+            observations.push(observation("base", "s1", &pair_id, "incorrect"));
             observations.push(observation(
                 "candidate",
                 "s2",
                 &pair_id,
-                if index == 0 { "incorrect" } else { "local_change" },
+                if index == 0 {
+                    "incorrect"
+                } else {
+                    "local_change"
+                },
             ));
         }
         (plan, pairs, observations)
