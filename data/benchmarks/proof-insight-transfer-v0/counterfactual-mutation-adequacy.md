@@ -131,6 +131,25 @@ Report (a) sensitivity to genuinely absent prerequisites, (b) stability on alpha
 
 This design isolates a cleaner causal question than statement mutation alone: **does the system track the prerequisite in the actual proof state, or does it only react to surface similarity and mutation labels?** It is a proposed next track, not yet an implemented schema, executed state replayer, dataset, or measured result. The existing statement-mutation suite remains necessary for testing formal-equivalence handling and statement fidelity.
 
+## Fixed-theorem proof-state intervention contract
+
+The first machine-readable contract for this track is `proof-state-intervention-suite.schema.json`, with a four-pair synthetic fixture at `fixtures/proof-state-intervention-suite.synthetic.json`. The fixture covers required-hypothesis removal, alpha-renaming, irrelevant-declaration removal, and reordering of independent declarations.
+
+Every pair binds base and variant snapshots to the same target statement digest, goal-type digest, environment digest, source commit, Lean toolchain, and goal count. State snapshot IDs/hashes and replay receipts differ, and the local-context digest must change. The declared operation must match the intervention kind and apply to exactly one tracked local declaration. The case also binds two independent reviewer decisions and unique outcome-row IDs. The synthetic fixture explicitly uses `outcome_links.status: not_run`; no model outcomes are fabricated.
+
+The dedicated PITB workflow checks the schema with the pinned Draft 2020-12 validator and then applies cross-field invariants that JSON Schema cannot express as relational equality: the same theorem/goal/environment across states, valid before/after declaration changes, precondition availability, expected action policy, reviewer agreement, unique joins, and family/component split isolation. It also injects nine negative controls. This provides a contract guard, not proof that a state was replayed: real pairs still require a Lean-side state capture/operation receipt, independently reviewed eligibility labels, and actual linked model outcomes.
+
+### Action-selection metrics for the fixed-theorem track
+
+Keep this track separate from theorem mutation sensitivity and exact-target proof utility. Primary metrics are:
+- **Prerequisite-withdrawal sensitivity:** rate at which the system avoids the specified move or replans when its required local declaration is absent.
+- **Presentation stability:** rate of preserving move eligibility after alpha-renaming or harmless reordering.
+- **Irrelevant-edit specificity:** rate of preserving eligibility after removal of a reviewed irrelevant declaration.
+- **Recovery rate:** rate of alternative plans that eventually produce a kernel-checked closure of the same goal.
+- **State fidelity:** fraction of pairs with exact snapshot and replay receipts, same target/goal/environment bindings, and one audited intervention.
+
+Proposed pilot gates are 100% state/operation receipt validity, zero theorem/goal/environment drift, at least 90% prerequisite-withdrawal sensitivity, at least 95% presentation stability, and at least 90% irrelevant-edit specificity. These are future adoption targets, not measured results; report component-clustered intervals and all unknown/excluded pairs. A system that abstains on every context mutation must fail the presentation and irrelevant-edit metrics.
+
 ## Relation to external work
 
 T² shows why compilation is an insufficient proxy for semantic correctness by using dependent successor theorems ([ACL 2026 paper](https://aclanthology.org/2026.acl-industry.150/)). FormalRewardBench uses expert-curated proof-error mutations for proof evaluation ([paper](https://arxiv.org/abs/2605.10141)). A 2026 audit of Lean benchmarks documents how incorrect or incomplete specifications, vacuous theorems, missing hypotheses and unsound axioms can distort reported scores ([PMLR paper](https://proceedings.mlr.press/v306/ammanamanchi26a.html)). PITB's proposed distinction is to study *whether a typed strategy's declared preconditions causally govern transfer decisions and verified utility*; that is a research hypothesis and should not be presented as an established SOTA result or an unprecedented capability before a literature review and matched experiments.
