@@ -1834,8 +1834,12 @@ fn test_peer_key_store_dh_agreement() {
     let source_a: [u8; 8] = [0x0A; 8];
     let source_b: [u8; 8] = [0x0B; 8];
 
-    let key_ab = store_a.agree(source_b, &pub_b);
-    let key_ba = store_b.agree(source_a, &pub_a);
+    let key_ab = store_a
+        .agree(source_b, &pub_b)
+        .expect("valid peer public key must be contributory");
+    let key_ba = store_b
+        .agree(source_a, &pub_a)
+        .expect("valid peer public key must be contributory");
 
     assert_eq!(key_ab, key_ba, "DH shared secret must be symmetric");
     assert_eq!(store_a.peer_count(), 1);
@@ -1854,8 +1858,12 @@ fn test_peer_key_store_encrypt_decrypt_roundtrip() {
     let source_a: [u8; 8] = [0x0A; 8];
     let source_b: [u8; 8] = [0x0B; 8];
 
-    store_a.agree(source_b, &pub_b);
-    store_b.agree(source_a, &pub_a);
+    store_a
+        .agree(source_b, &pub_b)
+        .expect("valid peer public key must be contributory");
+    store_b
+        .agree(source_a, &pub_a)
+        .expect("valid peer public key must be contributory");
 
     let key_a = store_a.peer_key(&source_b).unwrap();
     let plaintext = b"wisdom vector payload";
@@ -1880,17 +1888,23 @@ fn test_peer_key_store_wrong_peer_key_fails() {
     let source_c: [u8; 8] = [0x0C; 8];
 
     // A agrees with B
-    store_a.agree(source_b, &pub_b);
+    store_a
+        .agree(source_b, &pub_b)
+        .expect("valid peer public key must be contributory");
     // B agrees with A
     let pub_a = store_a.public_key();
-    store_b.agree([0x0A; 8], &pub_a);
+    store_b
+        .agree([0x0A; 8], &pub_a)
+        .expect("valid peer public key must be contributory");
 
     let key_a_for_b = store_a.peer_key(&source_b).unwrap();
     let ct = encrypt_packet(b"secret", key_a_for_b, &[0x0A; 8], 0xAB, 1);
 
     // C's public key is different — derive a different shared secret
     let mut store_a2 = PeerKeyStore::new([0x11; 32]);
-    store_a2.agree(source_c, &pub_c);
+    store_a2
+        .agree(source_c, &pub_c)
+        .expect("valid peer public key must be contributory");
     let wrong_key = store_a2.peer_key(&source_c).unwrap();
 
     assert!(
@@ -1903,9 +1917,12 @@ fn test_peer_key_store_wrong_peer_key_fails() {
 #[test]
 fn test_peer_key_store_remove_peer() {
     let mut store = PeerKeyStore::new([0x55; 32]);
-    let peer_pub = [0x66; 32];
+    let peer = PeerKeyStore::new([0x66; 32]);
+    let peer_pub = peer.public_key();
     let source: [u8; 8] = [0x0A; 8];
-    store.agree(source, &peer_pub);
+    store
+        .agree(source, &peer_pub)
+        .expect("valid peer public key must be contributory");
     assert_eq!(store.peer_count(), 1);
     store.remove_peer(&source);
     assert_eq!(store.peer_count(), 0);
@@ -2000,13 +2017,17 @@ fn legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse() {
     let remote_public = store_b.public_key();
 
     let mut original = PeerKeyStore::new(local_secret);
-    let recorded_key = original.agree(peer_id, &remote_public);
+    let recorded_key = original
+        .agree(peer_id, &remote_public)
+        .expect("valid peer public key must be contributory");
     drop(original);
 
     // Simulate later access to the same long-term secret and recorded peer
     // public key. Static X25519 + fixed HKDF info reproduces the old key.
     let mut after_compromise = PeerKeyStore::new(local_secret);
-    let recovered_key = after_compromise.agree(peer_id, &remote_public);
+    let recovered_key = after_compromise
+        .agree(peer_id, &remote_public)
+        .expect("valid peer public key must be contributory");
 
     assert_eq!(
         recorded_key, recovered_key,
@@ -2026,8 +2047,12 @@ fn legacy_static_x25519_derivation_does_not_bind_peer_source_id() {
     let remote_public = remote.public_key();
     let mut local = PeerKeyStore::new(local_secret);
 
-    let key_a = local.agree(claimed_peer_a, &remote_public);
-    let key_b = local.agree(claimed_peer_b, &remote_public);
+    let key_a = local
+        .agree(claimed_peer_a, &remote_public)
+        .expect("valid peer public key must be contributory");
+    let key_b = local
+        .agree(claimed_peer_b, &remote_public)
+        .expect("valid peer public key must be contributory");
 
     assert_ne!(claimed_peer_a, claimed_peer_b);
     assert_eq!(
@@ -2039,41 +2064,21 @@ fn legacy_static_x25519_derivation_does_not_bind_peer_source_id() {
 }
 
 
-/// Intentional legacy vulnerability witness: X25519 with an all-zero peer
-/// public input yields the all-zero shared secret. Because `PeerKeyStore::agree`
-/// does not check contributory behavior and uses fixed HKDF info labels, any
-/// caller can derive the same traffic key without either private key.
+/// Regression: a non-contributory all-zero X25519 result must be rejected
+/// before deriving or storing encryption/authentication keys.
 #[cfg(feature = "mesh-key-exchange")]
 #[test]
-fn legacy_x25519_low_order_peer_key_produces_publicly_predictable_traffic_key() {
+fn x25519_low_order_peer_key_is_rejected_without_storing_keys() {
     let zero_peer_public = [0u8; 32];
-    let peer_a = [0xA1u8; 8];
-    let peer_b = [0xB2u8; 8];
+    let peer_id = [0xA1u8; 8];
+    let mut local = PeerKeyStore::new([0x11u8; 32]);
 
-    let mut local_a = PeerKeyStore::new([0x11u8; 32]);
-    let mut local_b = PeerKeyStore::new([0x22u8; 32]);
-
-    let key_a = local_a.agree(peer_a, &zero_peer_public);
-    let key_b = local_b.agree(peer_b, &zero_peer_public);
-
-    // Different local private keys and lookup labels do not help: the
-    // non-contributory DH result is zero for both sides.
-    assert_eq!(key_a, key_b);
-
-    // Anyone can reproduce the resulting encryption key from the known-zero
-    // shared secret and the public, fixed HKDF context used by PeerKeyStore.
-    let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, &[0u8; 32]);
-    let mut attacker_computable_key = [0u8; 32];
-    hk.expand(
-        b"symthaea-mesh-chacha20-v1",
-        &mut attacker_computable_key,
-    )
-    .expect("32-byte HKDF-SHA256 output is valid");
-    assert_eq!(key_a, attacker_computable_key);
-
-    let source_id = [0x33u8; 8];
-    let ciphertext = encrypt_packet(b"confidential mesh payload", &key_a, &source_id, 0, 1);
-    let recovered = decrypt_packet(&ciphertext, &attacker_computable_key)
-        .expect("publicly reconstructed key decrypts the ciphertext");
-    assert_eq!(recovered, b"confidential mesh payload");
+    let result = local.agree(peer_id, &zero_peer_public);
+    assert!(
+        result.is_err(),
+        "all-zero X25519 shared secret must fail closed"
+    );
+    assert_eq!(local.peer_count(), 0);
+    assert!(local.peer_key(&peer_id).is_none());
+    assert!(local.peer_auth_key(&peer_id).is_none());
 }
