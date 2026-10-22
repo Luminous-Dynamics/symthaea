@@ -876,6 +876,38 @@ fn clustered_bootstrap_summary(report: &Value) -> Option<Value> {
     }))
 }
 
+fn parse_pin_args(args: &[String]) -> Result<(Option<String>, Option<String>), String> {
+    let mut expected_source_sha: Option<String> = None;
+    let mut expected_manifest_sha: Option<String> = None;
+    let mut index = 0;
+    while index < args.len() {
+        let option = args[index].as_str();
+        let value = args
+            .get(index + 1)
+            .ok_or_else(|| format!("Missing value for {option}"))?;
+        if value.trim().is_empty() || value.starts_with("--") {
+            return Err(format!("Missing or invalid value for {option}"));
+        }
+        match option {
+            "--expected-source-sha" => {
+                if expected_source_sha.is_some() {
+                    return Err("--expected-source-sha may only be specified once".to_string());
+                }
+                expected_source_sha = Some(value.clone());
+            }
+            "--expected-manifest-blake3" => {
+                if expected_manifest_sha.is_some() {
+                    return Err("--expected-manifest-blake3 may only be specified once".to_string());
+                }
+                expected_manifest_sha = Some(value.clone());
+            }
+            _ => return Err(format!("Unknown option: {option}")),
+        }
+        index += 2;
+    }
+    Ok((expected_source_sha, expected_manifest_sha))
+}
+
 fn print_usage(program: &str) {
     eprintln!(
         "Usage: {program} RECEIPT.json [--expected-source-sha <40-hex>] [--expected-manifest-blake3 <64-hex>]\n\
@@ -895,28 +927,15 @@ fn main() {
         return;
     }
 
-    let mut expected_source_sha: Option<String> = None;
-    let mut expected_manifest_sha: Option<String> = None;
     let rest: Vec<String> = args.collect();
-    let mut index = 0;
-    while index < rest.len() {
-        let option = rest[index].as_str();
-        if index + 1 >= rest.len() {
-            eprintln!("Missing value for {option}");
+    let (expected_source_sha, expected_manifest_sha) = match parse_pin_args(&rest) {
+        Ok(pins) => pins,
+        Err(error) => {
+            eprintln!("{error}");
             print_usage(&program);
             std::process::exit(2);
         }
-        match option {
-            "--expected-source-sha" => expected_source_sha = Some(rest[index + 1].clone()),
-            "--expected-manifest-blake3" => expected_manifest_sha = Some(rest[index + 1].clone()),
-            _ => {
-                eprintln!("Unknown option: {option}");
-                print_usage(&program);
-                std::process::exit(2);
-            }
-        }
-        index += 2;
-    }
+    };
 
     if expected_source_sha.as_deref().is_some_and(|s| !is_hex(s, 40)) {
         eprintln!("--expected-source-sha must be 40 hexadecimal characters");
@@ -1162,6 +1181,33 @@ mod tests {
                 fixture_run(true, false, 120, 1.5, &"f".repeat(64))
             ]
         })
+    }
+
+    #[test]
+    fn external_pin_cli_rejects_duplicate_or_ambiguous_flags() {
+        let source = "a".repeat(40);
+        let manifest = "b".repeat(64);
+        let valid = vec![
+            "--expected-source-sha".to_string(), source.clone(),
+            "--expected-manifest-blake3".to_string(), manifest.clone(),
+        ];
+        assert_eq!(
+            parse_pin_args(&valid).unwrap(),
+            (Some(source.clone()), Some(manifest.clone()))
+        );
+        assert!(parse_pin_args(&vec![
+            "--expected-source-sha".to_string(), source.clone(),
+            "--expected-source-sha".to_string(), source.clone(),
+        ]).is_err());
+        assert!(parse_pin_args(&vec![
+            "--expected-manifest-blake3".to_string(), manifest.clone(),
+            "--expected-manifest-blake3".to_string(), manifest.clone(),
+        ]).is_err());
+        assert!(parse_pin_args(&vec!["--expected-source-sha".to_string()]).is_err());
+        assert!(parse_pin_args(&vec![
+            "--expected-source-sha".to_string(), "--expected-manifest-blake3".to_string(),
+        ]).is_err());
+        assert!(parse_pin_args(&vec!["--unknown".to_string(), "value".to_string()]).is_err());
     }
 
     #[test]
