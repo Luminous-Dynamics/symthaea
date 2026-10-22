@@ -1,0 +1,117 @@
+name: PARADOX A0R M0 Static Contract Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/paradox-a0r-m0-static-qualification.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paradox-a0r-m0-static-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  RUNNER_SHA: ${{ github.event.pull_request.head.sha }}
+  RUNNER_BASE_SHA: 4bad8af72ff775e7c869b6df83faba718a339a36
+  SUBJECT_SHA: 306b0471a0854d2e77c1d50438fc493806fe1564
+  A0_PARENT_SHA: 8cc2651576f0068a1ccac3ef21c8a0a0eb3c2afb
+  G2B_SHA: 09d83a1d1fddbbbd30e4eba7cc95946c8eab871f
+  PRODUCTION_SHA: eb73527d05a913e79d1f05135ad6b06c1da8e2ee
+  CONTRACT_SHA256: 4fa80c3860bdec1921b4a34ecb9583f93e12b9a715877a6af80d58088c056e79
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact runner plane
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.RUNNER_SHA }}
+          fetch-depth: 2
+
+      - name: Bind runner plane
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${RUNNER_SHA}"
+          test "$(git rev-parse HEAD^)" = "${RUNNER_BASE_SHA}"
+          test "$(git rev-list --count "${RUNNER_BASE_SHA}..${RUNNER_SHA}")" = 1
+          test -z "$(git status --porcelain --untracked-files=all)"
+          changed="$(git diff --name-only "${RUNNER_BASE_SHA}" "${RUNNER_SHA}")"
+          test "${changed}" = '.github/workflows/paradox-a0r-m0-static-qualification.yml'
+          printf 'runner-plane subject=%s base=%s\n' "${RUNNER_SHA}" "${RUNNER_BASE_SHA}"
+
+      - name: Checkout exact M0 static subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 0
+
+      - name: Bind exact M0 subject and three-file surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test "$(git rev-parse HEAD^)" = "${A0_PARENT_SHA}"
+          test "$(git rev-list --count "${A0_PARENT_SHA}..${SUBJECT_SHA}")" = 1
+          test "$(git rev-parse "${A0_PARENT_SHA}^")" = "${G2B_SHA}"
+          git cat-file -e "${G2B_SHA}^{commit}"
+          git cat-file -e "${PRODUCTION_SHA}^{commit}"
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+          actual="$(git diff --name-only "${A0_PARENT_SHA}" "${SUBJECT_SHA}" | LC_ALL=C sort)"
+          expected="$(printf '%s\n' \
+            tools/paradox_a0_native_readout/m0/PROTOCOL.md \
+            tools/paradox_a0_native_readout/m0/m0_static_audit.py \
+            tools/paradox_a0_native_readout/m0/m0_static_contract.json | LC_ALL=C sort)"
+          test "${actual}" = "${expected}"
+          test "$(git diff --name-only "${A0_PARENT_SHA}" "${SUBJECT_SHA}" | wc -l | tr -d '[:space:]')" = 3
+          unexpected_status="$(git diff --name-status "${A0_PARENT_SHA}" "${SUBJECT_SHA}" | awk '$1 != "A" { print }')"
+          test -z "${unexpected_status}"
+          test "$(sha256sum tools/paradox_a0_native_readout/m0/m0_static_contract.json | awk '{print $1}')" = "${CONTRACT_SHA256}"
+          printf 'm0-subject=%s a0-parent=%s g2b=%s production=%s files=3 contract=%s\n' \
+            "${SUBJECT_SHA}" "${A0_PARENT_SHA}" "${G2B_SHA}" "${PRODUCTION_SHA}" "${CONTRACT_SHA256}"
+
+      - name: Execute M0 static audit twice
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          a="${RUNNER_TEMP}/m0-static-a.json"
+          b="${RUNNER_TEMP}/m0-static-b.json"
+
+          python3 -B tools/paradox_a0_native_readout/m0/m0_static_audit.py > "${a}"
+          python3 -B tools/paradox_a0_native_readout/m0/m0_static_audit.py > "${b}"
+          cmp -s "${a}" "${b}"
+
+          python3 - "${a}" "${CONTRACT_SHA256}" <<'PY'
+          import json
+          import sys
+
+          receipt_path, contract_sha = sys.argv[1:]
+          with open(receipt_path, encoding='utf-8') as handle:
+              receipt = json.load(handle)
+          assert receipt == {
+              'schema': 'PARADOX-A0R-M0-STATIC-AUDIT-RECEIPT-V1',
+              'status': 'PASS',
+              'contract_sha256': contract_sha,
+              'mutation_controls_executed': 14,
+              'execution_authority': 'STATIC_ONLY',
+          }
+          PY
+
+          printf 'python=%s\n' "$(python3 --version 2>&1)"
+          printf 'audit-script-sha256=%s\n' "$(sha256sum tools/paradox_a0_native_readout/m0/m0_static_audit.py | awk '{print $1}')"
+          cat "${a}"
+          printf 'm0-static-audit-log-sha256=%s\n' "$(sha256sum "${a}" | awk '{print $1}')"
+
+      - name: Postflight M0 subject immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test "$(git rev-parse HEAD^)" = "${A0_PARENT_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
