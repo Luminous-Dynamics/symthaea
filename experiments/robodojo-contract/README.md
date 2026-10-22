@@ -22,6 +22,10 @@ Prediction error is a caller-defined scalar and must be calibrated for the selec
 
 The calibration module also exposes an expected-value intervention rule: it compares the estimated success-probability improvement from replanning, multiplied by an explicit failure-cost estimate, against the intervention cost. If the current success probability is below a declared continue threshold and no justified intervention remains, it returns StopAndEscalate rather than authorizing continuation. All costs must use the same utility unit and probabilities must be calibrated on held-out data. This is a research primitive, not a safety controller, and it has no direct actuator authority.
 
+The `active_sensing` module adds a value-of-information decision for acquiring another observation. It prices expected task-success improvement and reduction in unsafe-event probability against sensing energy and latency, using one explicit utility scale. A mandatory risk/confidence gate takes priority over optional expected utility: if the required sensor is missing, its posterior forecast is unavailable, the risk remains above the declared bound, or sensing cannot fit the remaining resource budget, the result is `StopAndEscalate` rather than pretending the current evidence is sufficient. When no hard gate requires more evidence, sensing is selected only when its estimated net benefit meets the declared minimum.
+
+The sensing function has no sensor or actuator I/O and does not establish that its forecasts are calibrated. Its probability and cost inputs must come from a preregistered evaluation, and the caller must re-evaluate after the new observation while retaining its independent collision, workspace, interlock, and actuator checks. Nine synthetic unit tests cover value-positive sensing, low-value sensing, risk-bound recovery, unavailable/missing evidence, over-budget cases, and invalid inputs. These fixtures test decision arithmetic only; they are not robot performance measurements.
+
 ## Trial TSV schema
 
 The CLI requires this exact tab-separated header, in this order:
