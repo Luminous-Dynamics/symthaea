@@ -12,16 +12,18 @@
         "record_id": "synthetic-insight-0",
         "family_id": "synthetic-source-family-0",
         "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "insight_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+        "insight_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       },
       "target": {
         "target_id": "synthetic-target-0",
         "family_id": "synthetic-target-family-0",
         "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "artifact_path": "synthetic/Target0.lean",
-        "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "base_statement_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
-        "counterfactual_statement_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        "counterfactual_statement_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "mutation": {
         "kind": "no_semantic_change",
@@ -85,16 +87,18 @@
         "record_id": "synthetic-insight-1",
         "family_id": "synthetic-source-family-1",
         "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "insight_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        "insight_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       },
       "target": {
         "target_id": "synthetic-target-1",
         "family_id": "synthetic-target-family-1",
         "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "artifact_path": "synthetic/Target1.lean",
-        "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "base_statement_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
-        "counterfactual_statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        "counterfactual_statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "mutation": {
         "kind": "precondition_removed",
@@ -158,16 +162,18 @@
         "record_id": "synthetic-insight-2",
         "family_id": "synthetic-source-family-2",
         "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        "insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       },
       "target": {
         "target_id": "synthetic-target-2",
         "family_id": "synthetic-target-family-2",
         "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "artifact_path": "synthetic/Target2.lean",
-        "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "base_statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
-        "counterfactual_statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+        "counterfactual_statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "mutation": {
         "kind": "inequality_direction_reversed",
@@ -231,16 +237,18 @@
         "record_id": "synthetic-insight-3",
         "family_id": "synthetic-source-family-3",
         "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "insight_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        "insight_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       },
       "target": {
         "target_id": "synthetic-target-3",
         "family_id": "synthetic-target-family-3",
         "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "artifact_path": "synthetic/Target3.lean",
-        "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "base_statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
-        "counterfactual_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+        "counterfactual_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "mutation": {
         "kind": "object_type_changed",
@@ -304,16 +312,18 @@
         "record_id": "synthetic-insight-4",
         "family_id": "synthetic-source-family-4",
         "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "insight_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+        "insight_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       },
       "target": {
         "target_id": "synthetic-target-4",
         "family_id": "synthetic-target-family-4",
         "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "artifact_path": "synthetic/Target4.lean",
-        "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "base_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
-        "counterfactual_statement_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+        "counterfactual_statement_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "mutation": {
         "kind": "quantifier_scope_changed",
@@ -377,16 +387,18 @@
         "record_id": "synthetic-insight-5",
         "family_id": "synthetic-source-family-5",
         "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "insight_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+        "insight_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       },
       "target": {
         "target_id": "synthetic-target-5",
         "family_id": "synthetic-target-family-5",
         "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "artifact_path": "synthetic/Target5.lean",
-        "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "base_statement_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
-        "counterfactual_statement_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+        "counterfactual_statement_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "mutation": {
         "kind": "premise_removed",
@@ -450,16 +462,18 @@
         "record_id": "synthetic-insight-6",
         "family_id": "synthetic-source-family-6",
         "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "insight_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+        "insight_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       },
       "target": {
         "target_id": "synthetic-target-6",
         "family_id": "synthetic-target-family-6",
         "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "artifact_path": "synthetic/Target6.lean",
-        "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "base_statement_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
-        "counterfactual_statement_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+        "counterfactual_statement_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "mutation": {
         "kind": "predicate_changed",
