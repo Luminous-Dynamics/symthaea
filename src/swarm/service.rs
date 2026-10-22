@@ -1511,6 +1511,17 @@ fn safe_truncate(s: &str, max_chars: usize) -> &str {
 mod tests {
     use super::*;
 
+    /// The PQC feature must pull in the real transport implementation rather
+    /// than select the non-swarm LocalTrust stub.
+    #[cfg(feature = "pqc-handshake")]
+    #[test]
+    fn test_pqc_handshake_feature_requires_swarm_transport() {
+        assert!(
+            cfg!(feature = "swarm"),
+            "pqc-handshake must imply swarm; it must never compile the LocalTrust stub"
+        );
+    }
+
     // =========================================================================
     // ServiceStats Tests
     // =========================================================================
