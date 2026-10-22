@@ -42,7 +42,7 @@ Move from toy functions to repository-level fixes: multi-file changes, regressio
 
 For each configuration report:
 - pass@1, repeated pass rate and paired win/loss/tie counts, plus a deterministic task-cluster bootstrap interval for the equal-task paired effect;
-- valid-oracle, mutation-adequacy and unresolved-execution rates;
+- valid-oracle, decisive compiler-rejection, mutation-adequacy and unresolved-execution rates;
 - pass-to-pass regression rate and security-regression rate;
 - cost per verified fix, wall time, nearest-rank p50/p95 agent and verification latency, tokens, retries, observed generation-tier counts, and energy/compute estimates;
 - result confidence intervals clustered by repository/task family, plus per-category results.
