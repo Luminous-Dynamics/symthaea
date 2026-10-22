@@ -3,199 +3,405 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! # Epistemic Gating for Mathematical Claims (Phase 7b)
+//! # Numerical Epistemic Gating for Mathematical Outputs (Phase 7b)
 //!
-//! Applies epistemic constraints to math outputs so that Symthaea
-//! knows WHAT IT DOESN'T KNOW about its mathematical answers.
+//! Applies epistemic constraints to numerical math outputs so that Symthaea
+//! knows what its computations do and do not establish.
 //!
-//! Every math result carries an `EpistemicMathResult` with:
-//! - Numerical error bounds
-//! - Multi-method agreement fraction
-//! - Soundness classification (Verified / Probable / Uncertain)
-//! - Explicit caveats ("what I don't know")
+//! Every result carries an [`EpistemicMathResult`] with:
+//! - numerical error bounds;
+//! - method-count and cross-method agreement evidence;
+//! - a numerical evidence classification;
+//! - explicit caveats ("what I don't know").
 //!
-//! Science: Lakatos (1976) — mathematical knowledge is fallible and
-//! progresses through proofs and refutations. Polya (1954) — plausible
-//! reasoning in mathematics requires tracking confidence.
+//! ## Authority boundary
+//!
+//! Numerical agreement is evidence about a computation, not theorem authority.
+//!
+//! ```text
+//! multiple numerical methods agree
+//!     != formal proof
+//!     != Lean/kernel acceptance
+//!     != specification correctness
+//!     != mathematical novelty
+//! ```
+//!
+//! Formal authority belongs to the dedicated proof/specification evidence stack.
+//! This module deliberately cannot mint it.
+//!
+//! Science: Lakatos (1976) — mathematical knowledge is fallible and progresses
+//! through proofs and refutations. Polya (1954) — plausible mathematical
+//! reasoning requires tracking uncertainty without confusing plausibility with
+//! proof.
 
 use serde::{Deserialize, Serialize};
 
-// ─── Soundness Level ──────────────────────────────────────────────────────────
+// ─── Numerical Evidence Level ─────────────────────────────────────────────────
 
-/// Classification of mathematical claim soundness.
+/// Classification of evidence supporting a numerical mathematical output.
 ///
-/// Ordered from strongest to weakest evidence.
+/// This is intentionally **not** a theorem-soundness or proof-verification
+/// classification. The strongest state means that multiple reported numerical
+/// methods agree within a tight declared error bound.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum SoundnessLevel {
-    /// Multi-path verified, error < 1e-10.
-    /// Multiple independent methods agree on the result.
-    Verified,
-    /// Single method, error < 1e-6.
-    /// Result is likely correct but lacks independent verification.
-    Probable,
-    /// No verification, or large error.
-    /// Result should be treated with caution.
+pub enum NumericalEvidenceLevel {
+    /// Multiple methods corroborate a finite result with a tight finite error
+    /// bound. This remains numerical evidence only.
+    #[serde(alias = "Verified")]
+    Corroborated,
+    /// The result has some usable numerical support but lacks qualified
+    /// multi-method corroboration.
+    #[serde(alias = "Probable")]
+    Plausible,
+    /// Evidence is missing, internally inconsistent, non-finite, or too weak.
     Uncertain,
 }
 
-impl SoundnessLevel {
-    /// Return a human-readable label.
+impl NumericalEvidenceLevel {
+    /// Human-readable evidence label.
     pub fn as_str(&self) -> &'static str {
         match self {
-            SoundnessLevel::Verified => "Verified",
-            SoundnessLevel::Probable => "Probable",
-            SoundnessLevel::Uncertain => "Uncertain",
+            Self::Corroborated => "NumericallyCorroborated",
+            Self::Plausible => "Plausible",
+            Self::Uncertain => "Uncertain",
         }
     }
 
-    /// Numeric confidence floor for this soundness level.
-    pub fn confidence_floor(&self) -> f64 {
+    /// Maximum confidence compatible with this numerical evidence tier.
+    ///
+    /// This is a ceiling, never a floor: evidence classification may reduce a
+    /// solver's declared confidence but may not manufacture confidence that the
+    /// solver itself did not have.
+    pub fn confidence_ceiling(&self) -> f64 {
         match self {
-            SoundnessLevel::Verified => 0.95,
-            SoundnessLevel::Probable => 0.70,
-            SoundnessLevel::Uncertain => 0.30,
+            Self::Corroborated => 0.99,
+            Self::Plausible => 0.85,
+            Self::Uncertain => 0.49,
         }
     }
 }
 
-impl Default for SoundnessLevel {
+impl Default for NumericalEvidenceLevel {
     fn default() -> Self {
-        SoundnessLevel::Uncertain
+        Self::Uncertain
     }
 }
+
+/// Compatibility name for downstream callers during the terminology migration.
+///
+/// New code should use [`NumericalEvidenceLevel`]. The historical name could be
+/// misread as formal mathematical soundness.
+#[deprecated(
+    note = "use NumericalEvidenceLevel; this layer classifies numerical evidence, not formal soundness"
+)]
+pub type SoundnessLevel = NumericalEvidenceLevel;
 
 // ─── Epistemic Math Result ────────────────────────────────────────────────────
 
-/// A math result with full epistemic metadata.
+/// A numerical math result with explicit epistemic metadata.
 ///
-/// Wraps a numerical answer with everything the system knows (and
-/// doesn't know) about the quality of that answer.
+/// The result describes numerical evidence only. It cannot carry or imply a
+/// formal proof receipt. Public/Serde fields are treated as evidence to
+/// re-validate, never as self-authorizing classification state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EpistemicMathResult {
     /// The computed value.
     pub value: f64,
-    /// Estimated numerical error bound (e.g., floating-point, truncation).
+    /// Estimated numerical error bound (e.g. floating-point/truncation error).
     pub error_bound: f64,
-    /// Overall confidence in the result (0.0-1.0).
+    /// Solver confidence after fail-closed numerical-evidence capping (0.0-1.0).
     pub confidence: f64,
-    /// Fraction of methods that agree on the result (0.0-1.0).
-    /// 1.0 means all tried methods agree; 0.0 means a single method was used.
+    /// Fraction of distinct tried methods that agree when at least two methods
+    /// were tried. A single method has agreement 0.0 because it provides no
+    /// cross-method corroboration.
     pub method_agreement: f64,
-    /// Explicit caveats: things the system doesn't know or can't guarantee.
+    /// Total numerical methods reported for this result.
+    #[serde(default)]
+    pub method_count: usize,
+    /// Methods reported to agree within the caller's declared tolerance.
+    #[serde(default)]
+    pub agreeing_methods: usize,
+    /// Whether the caller reports that a genuine multipath comparison occurred.
+    /// This flag is checked against the method counts and cannot establish formal
+    /// verification authority.
+    #[serde(default, alias = "multipath_verified")]
+    pub multipath_reported: bool,
+    /// Explicit caveats: things the numerical computation does not establish.
     pub caveats: Vec<String>,
-    /// Soundness classification derived from evidence quality.
-    pub soundness: SoundnessLevel,
+    /// Stored numerical evidence classification. Promotion consumers re-derive
+    /// this from the raw evidence fields before trusting it.
+    #[serde(alias = "soundness")]
+    pub numerical_evidence: NumericalEvidenceLevel,
 }
 
 impl EpistemicMathResult {
-    /// Determine soundness level from error bound, method agreement, and
-    /// whether multi-path verification was performed.
-    pub fn classify_soundness(
+    /// Classify numerical evidence from the complete reported computation state.
+    ///
+    /// Invalid or contradictory metadata always fails closed to `Uncertain`.
+    pub fn classify_numerical_evidence(
+        value: f64,
         error_bound: f64,
-        method_agreement: f64,
-        multipath_verified: bool,
-    ) -> SoundnessLevel {
-        if multipath_verified && error_bound < 1e-10 && method_agreement >= 0.9 {
-            SoundnessLevel::Verified
-        } else if error_bound < 1e-6 && method_agreement >= 0.5 {
-            SoundnessLevel::Probable
+        multipath_reported: bool,
+        method_count: usize,
+        agreeing_methods: usize,
+    ) -> NumericalEvidenceLevel {
+        if !Self::evidence_inputs_valid(
+            value,
+            error_bound,
+            multipath_reported,
+            method_count,
+            agreeing_methods,
+        ) {
+            return NumericalEvidenceLevel::Uncertain;
+        }
+
+        let method_agreement = Self::cross_method_agreement(method_count, agreeing_methods);
+        let multipath_supported =
+            multipath_reported && method_count >= 2 && agreeing_methods >= 2;
+
+        if multipath_supported && error_bound < 1e-10 && method_agreement >= 0.9 {
+            NumericalEvidenceLevel::Corroborated
+        } else if error_bound < 1e-6 && agreeing_methods >= 1 {
+            NumericalEvidenceLevel::Plausible
         } else {
-            SoundnessLevel::Uncertain
+            NumericalEvidenceLevel::Uncertain
         }
     }
 
-    /// Create an epistemic result from a raw computation.
+    /// Historical classification entry point retained during migration.
     ///
-    /// # Arguments
-    /// * `value` — the computed numerical result
-    /// * `error_bound` — estimated error (0.0 if exact)
-    /// * `multipath_verified` — whether multiple methods agree
-    /// * `method_count` — total methods tried
-    /// * `agreeing_methods` — methods that agree within tolerance
-    /// * `base_confidence` — solver's own confidence estimate
+    /// Because the old signature did not contain method counts or the numerical
+    /// value, it cannot establish the strongest tier anymore. Callers that need
+    /// full classification should use [`classify_numerical_evidence`](Self::classify_numerical_evidence).
+    #[deprecated(
+        note = "use classify_numerical_evidence with value and method counts; old inputs cannot establish corroboration"
+    )]
+    pub fn classify_soundness(
+        error_bound: f64,
+        method_agreement: f64,
+        _multipath_reported: bool,
+    ) -> NumericalEvidenceLevel {
+        if !error_bound.is_finite()
+            || error_bound < 0.0
+            || !method_agreement.is_finite()
+            || !(0.0..=1.0).contains(&method_agreement)
+        {
+            return NumericalEvidenceLevel::Uncertain;
+        }
+
+        // The historical interface has no method-count or value evidence, so it
+        // is intentionally incapable of establishing the strongest tier.
+        if error_bound < 1e-6 && method_agreement > 0.0 {
+            NumericalEvidenceLevel::Plausible
+        } else {
+            NumericalEvidenceLevel::Uncertain
+        }
+    }
+
+    /// Create an epistemic result from a raw numerical computation.
+    ///
+    /// `multipath_reported` is treated as a declaration to validate, not as an
+    /// authority token. At least two methods and two agreeing methods are
+    /// required before it can contribute to the strongest numerical tier.
     pub fn from_computation(
         value: f64,
         error_bound: f64,
-        multipath_verified: bool,
+        multipath_reported: bool,
         method_count: usize,
         agreeing_methods: usize,
         base_confidence: f64,
     ) -> Self {
-        let method_agreement = if method_count > 0 {
-            agreeing_methods as f64 / method_count as f64
+        let evidence_inputs_valid = Self::evidence_inputs_valid(
+            value,
+            error_bound,
+            multipath_reported,
+            method_count,
+            agreeing_methods,
+        );
+
+        let method_agreement = Self::cross_method_agreement(method_count, agreeing_methods);
+        let numerical_evidence = Self::classify_numerical_evidence(
+            value,
+            error_bound,
+            multipath_reported,
+            method_count,
+            agreeing_methods,
+        );
+
+        let base_confidence_valid =
+            base_confidence.is_finite() && (0.0..=1.0).contains(&base_confidence);
+        let confidence = if evidence_inputs_valid && base_confidence_valid {
+            base_confidence.min(numerical_evidence.confidence_ceiling())
         } else {
             0.0
         };
 
-        let soundness = Self::classify_soundness(error_bound, method_agreement, multipath_verified);
-
-        // Confidence is the max of base_confidence and soundness floor,
-        // scaled by method agreement.
-        let confidence = base_confidence.max(soundness.confidence_floor()).min(1.0)
-            * (0.5 + 0.5 * method_agreement);
-
         let mut caveats = Vec::new();
 
-        // Generate caveats based on what we don't know
-        if !multipath_verified {
-            caveats.push("Result not independently verified by multiple methods".to_string());
+        if !value.is_finite() {
+            caveats.push("Result is non-finite; numerical evidence fails closed".to_string());
         }
-        if error_bound > 1e-6 {
+        if !error_bound.is_finite() || error_bound < 0.0 {
+            caveats.push("Error bound must be finite and non-negative".to_string());
+        } else if error_bound > 1e-6 {
             caveats.push(format!(
                 "Numerical error may be significant (bound: {:.2e})",
                 error_bound
             ));
         }
-        if method_agreement < 0.5 && method_count > 1 {
+        if method_count == 0 {
+            caveats.push("No numerical method was recorded".to_string());
+        }
+        if agreeing_methods > method_count {
             caveats.push(format!(
-                "Low method agreement ({}/{} methods agree)",
+                "Invalid method counts: {} agreeing methods exceeds {} tried methods",
                 agreeing_methods, method_count
             ));
         }
-        if value.is_nan() {
-            caveats.push("Result is NaN; computation may be ill-defined".to_string());
-        }
-        if value.is_infinite() {
-            caveats.push("Result is infinite; possible singularity or overflow".to_string());
-        }
         if method_count == 1 {
-            caveats.push("Only one method available; no cross-validation possible".to_string());
+            caveats.push("Only one method available; no cross-method corroboration possible".to_string());
+        }
+        if multipath_reported && (method_count < 2 || agreeing_methods < 2) {
+            caveats.push(
+                "Multipath corroboration was reported without at least two agreeing methods"
+                    .to_string(),
+            );
+        } else if !multipath_reported {
+            caveats.push("No qualified multi-method corroboration reported".to_string());
+        }
+        if method_count > 1 && method_agreement < 0.5 {
+            caveats.push(format!(
+                "Low cross-method agreement ({}/{} methods agree)",
+                agreeing_methods, method_count
+            ));
+        }
+        if !base_confidence_valid {
+            caveats.push("Base confidence must be finite and within [0, 1]".to_string());
         }
 
-        EpistemicMathResult {
+        Self {
             value,
             error_bound,
             confidence,
             method_agreement,
+            method_count,
+            agreeing_methods,
+            multipath_reported,
             caveats,
-            soundness,
+            numerical_evidence,
         }
     }
 
-    /// Create a verified result (all checks pass, high confidence).
-    pub fn verified(value: f64, error_bound: f64) -> Self {
+    /// Create a strongly numerically corroborated result.
+    pub fn corroborated(value: f64, error_bound: f64) -> Self {
         Self::from_computation(value, error_bound, true, 3, 3, 0.99)
     }
 
-    /// Create a probable result (single method, reasonable confidence).
-    pub fn probable(value: f64, error_bound: f64) -> Self {
+    /// Historical constructor retained as a compatibility shim.
+    #[deprecated(note = "use corroborated(); numerical corroboration is not formal verification")]
+    pub fn verified(value: f64, error_bound: f64) -> Self {
+        Self::corroborated(value, error_bound)
+    }
+
+    /// Create a plausible single-method numerical result.
+    pub fn plausible(value: f64, error_bound: f64) -> Self {
         Self::from_computation(value, error_bound, false, 1, 1, 0.80)
     }
 
-    /// Create an uncertain result (no verification, low confidence).
+    /// Historical constructor retained as a compatibility shim.
+    #[deprecated(note = "use plausible()")]
+    pub fn probable(value: f64, error_bound: f64) -> Self {
+        Self::plausible(value, error_bound)
+    }
+
+    /// Create an uncertain result.
     pub fn uncertain(value: f64, error_bound: f64) -> Self {
         Self::from_computation(value, error_bound, false, 1, 0, 0.30)
     }
 
-    /// Is this result trustworthy enough to act on?
+    /// Re-derive the evidence level from raw fields and fail closed on any
+    /// self-inconsistency in the stored classification/agreement/confidence.
+    pub fn effective_numerical_evidence(&self) -> NumericalEvidenceLevel {
+        if self.is_self_consistent() {
+            self.numerical_evidence
+        } else {
+            NumericalEvidenceLevel::Uncertain
+        }
+    }
+
+    /// Whether the public/Serde representation is internally consistent with
+    /// the evidence rules implemented by this module.
+    pub fn is_self_consistent(&self) -> bool {
+        let expected_level = Self::classify_numerical_evidence(
+            self.value,
+            self.error_bound,
+            self.multipath_reported,
+            self.method_count,
+            self.agreeing_methods,
+        );
+        let expected_agreement =
+            Self::cross_method_agreement(self.method_count, self.agreeing_methods);
+        let confidence_valid = self.confidence.is_finite()
+            && (0.0..=expected_level.confidence_ceiling()).contains(&self.confidence);
+
+        Self::evidence_inputs_valid(
+            self.value,
+            self.error_bound,
+            self.multipath_reported,
+            self.method_count,
+            self.agreeing_methods,
+        ) && self.numerical_evidence == expected_level
+            && (self.method_agreement - expected_agreement).abs() <= 1e-12
+            && confidence_valid
+    }
+
+    /// Whether the numerical output is usable as a bounded computation result.
+    ///
+    /// This is intentionally weaker than mathematical/formal authority.
+    pub fn is_numerically_usable(&self) -> bool {
+        self.is_self_consistent()
+            && self.effective_numerical_evidence() != NumericalEvidenceLevel::Uncertain
+            && self.confidence >= 0.5
+    }
+
+    /// Historical convenience name retained during migration.
+    #[deprecated(note = "use is_numerically_usable(); numerical usability is not general action authority")]
     pub fn is_actionable(&self) -> bool {
-        self.soundness != SoundnessLevel::Uncertain && self.confidence >= 0.5
+        self.is_numerically_usable()
+    }
+
+    /// Numerical evidence in this module never grants formal theorem authority.
+    pub const fn grants_formal_authority(&self) -> bool {
+        false
     }
 
     /// Return the epistemic "humility score" — higher means more uncertainty.
     /// Range: 0.0 (fully confident) to 1.0 (maximally uncertain).
     pub fn humility(&self) -> f64 {
         1.0 - self.confidence
+    }
+
+    fn evidence_inputs_valid(
+        value: f64,
+        error_bound: f64,
+        multipath_reported: bool,
+        method_count: usize,
+        agreeing_methods: usize,
+    ) -> bool {
+        value.is_finite()
+            && error_bound.is_finite()
+            && error_bound >= 0.0
+            && method_count > 0
+            && agreeing_methods <= method_count
+            && (!multipath_reported || (method_count >= 2 && agreeing_methods >= 2))
+    }
+
+    fn cross_method_agreement(method_count: usize, agreeing_methods: usize) -> f64 {
+        if method_count < 2 || agreeing_methods > method_count {
+            0.0
+        } else {
+            agreeing_methods as f64 / method_count as f64
+        }
     }
 }
 
@@ -206,27 +412,29 @@ impl Default for EpistemicMathResult {
             error_bound: f64::INFINITY,
             confidence: 0.0,
             method_agreement: 0.0,
+            method_count: 0,
+            agreeing_methods: 0,
+            multipath_reported: false,
             caveats: vec!["No computation performed".to_string()],
-            soundness: SoundnessLevel::Uncertain,
+            numerical_evidence: NumericalEvidenceLevel::Uncertain,
         }
     }
 }
 
 // ─── Epistemic Gating ─────────────────────────────────────────────────────────
 
-/// Gate that applies epistemic constraints to math service outputs.
-///
-/// Tracks cumulative statistics to detect systematic issues like
-/// growing uncertainty or declining verification rates.
+/// Tracks numerical evidence quality over math-service outputs.
 #[derive(Debug, Clone)]
 pub struct EpistemicGate {
-    /// Running count of verified results.
-    verified_count: usize,
-    /// Running count of probable results.
-    probable_count: usize,
+    /// Running count of numerically corroborated results.
+    corroborated_count: usize,
+    /// Running count of plausible results.
+    plausible_count: usize,
     /// Running count of uncertain results.
     uncertain_count: usize,
-    /// Running sum of confidence values (for average).
+    /// Running count of structurally inconsistent/tampered records.
+    invalid_count: usize,
+    /// Running sum of confidence values (for average; invalid records add zero).
     confidence_sum: f64,
     /// Total results processed.
     total_count: usize,
@@ -236,26 +444,37 @@ impl EpistemicGate {
     /// Create a new epistemic gate.
     pub fn new() -> Self {
         Self {
-            verified_count: 0,
-            probable_count: 0,
+            corroborated_count: 0,
+            plausible_count: 0,
             uncertain_count: 0,
+            invalid_count: 0,
             confidence_sum: 0.0,
             total_count: 0,
         }
     }
 
-    /// Record an epistemic result and update running statistics.
+    /// Record a numerical epistemic result and update running statistics.
+    ///
+    /// Stored classification is never trusted directly: it is re-derived from
+    /// the raw evidence fields. Invalid records are counted as uncertain and add
+    /// zero confidence.
     pub fn record(&mut self, result: &EpistemicMathResult) {
-        match result.soundness {
-            SoundnessLevel::Verified => self.verified_count += 1,
-            SoundnessLevel::Probable => self.probable_count += 1,
-            SoundnessLevel::Uncertain => self.uncertain_count += 1,
+        let consistent = result.is_self_consistent();
+        match result.effective_numerical_evidence() {
+            NumericalEvidenceLevel::Corroborated => self.corroborated_count += 1,
+            NumericalEvidenceLevel::Plausible => self.plausible_count += 1,
+            NumericalEvidenceLevel::Uncertain => self.uncertain_count += 1,
         }
-        self.confidence_sum += result.confidence;
+        if consistent {
+            self.confidence_sum += result.confidence;
+        } else {
+            self.invalid_count += 1;
+        }
         self.total_count += 1;
     }
 
-    /// Average confidence across all recorded results (0.0 if none).
+    /// Average numerical confidence across all recorded results (0.0 if none).
+    /// Invalid records remain in the denominator and contribute zero.
     pub fn average_confidence(&self) -> f64 {
         if self.total_count == 0 {
             return 0.0;
@@ -271,12 +490,23 @@ impl EpistemicGate {
         self.uncertain_count as f64 / self.total_count as f64
     }
 
-    /// Fraction of results that are verified (0.0-1.0).
-    pub fn verification_rate(&self) -> f64 {
+    /// Fraction of results with strong multi-method numerical corroboration.
+    pub fn corroboration_rate(&self) -> f64 {
         if self.total_count == 0 {
             return 0.0;
         }
-        self.verified_count as f64 / self.total_count as f64
+        self.corroborated_count as f64 / self.total_count as f64
+    }
+
+    /// Historical metric name retained during migration.
+    #[deprecated(note = "use corroboration_rate(); this metric is not formal verification")]
+    pub fn verification_rate(&self) -> f64 {
+        self.corroboration_rate()
+    }
+
+    /// Number of structurally inconsistent/tampered results recorded.
+    pub fn invalid_count(&self) -> usize {
+        self.invalid_count
     }
 
     /// Number of uncertain results recorded.
@@ -303,140 +533,195 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_epistemic_verified_level() {
-        let result = EpistemicMathResult::verified(2.0, 1e-12);
-        assert_eq!(result.soundness, SoundnessLevel::Verified);
+    fn numerically_corroborated_is_not_formal_authority() {
+        let result = EpistemicMathResult::corroborated(2.0, 1e-12);
+        assert_eq!(
+            result.numerical_evidence,
+            NumericalEvidenceLevel::Corroborated
+        );
         assert!(result.confidence >= 0.90);
-        assert!(result.is_actionable());
+        assert!(result.is_numerically_usable());
+        assert!(!result.grants_formal_authority());
         assert!(result.caveats.is_empty());
     }
 
     #[test]
-    fn test_epistemic_probable_level() {
-        let result = EpistemicMathResult::probable(3.14159, 1e-8);
-        assert_eq!(result.soundness, SoundnessLevel::Probable);
-        assert!(result.confidence >= 0.5);
-        assert!(result.is_actionable());
-        // Should have a caveat about not being verified
-        assert!(
-            result
-                .caveats
-                .iter()
-                .any(|c| c.contains("not independently verified"))
+    fn plausible_single_method_has_no_cross_method_agreement() {
+        let result = EpistemicMathResult::plausible(std::f64::consts::PI, 1e-8);
+        assert_eq!(result.numerical_evidence, NumericalEvidenceLevel::Plausible);
+        assert_eq!(result.method_agreement, 0.0);
+        assert!(result.is_numerically_usable());
+        assert!(result
+            .caveats
+            .iter()
+            .any(|c| c.contains("Only one method")));
+    }
+
+    #[test]
+    fn non_finite_values_fail_closed() {
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let result =
+                EpistemicMathResult::from_computation(value, 1e-12, true, 3, 3, 0.99);
+            assert_eq!(result.numerical_evidence, NumericalEvidenceLevel::Uncertain);
+            assert_eq!(result.confidence, 0.0);
+            assert!(!result.is_numerically_usable());
+        }
+    }
+
+    #[test]
+    fn invalid_error_bounds_fail_closed() {
+        for error_bound in [-1e-12, f64::NAN, f64::INFINITY] {
+            let result =
+                EpistemicMathResult::from_computation(1.0, error_bound, true, 3, 3, 0.99);
+            assert_eq!(result.numerical_evidence, NumericalEvidenceLevel::Uncertain);
+            assert_eq!(result.confidence, 0.0);
+        }
+    }
+
+    #[test]
+    fn reported_multipath_requires_multiple_methods() {
+        let one_method = EpistemicMathResult::from_computation(1.0, 1e-12, true, 1, 1, 0.99);
+        assert_eq!(
+            one_method.numerical_evidence,
+            NumericalEvidenceLevel::Uncertain
+        );
+        assert!(one_method
+            .caveats
+            .iter()
+            .any(|c| c.contains("Multipath corroboration was reported")));
+
+        let only_one_agrees =
+            EpistemicMathResult::from_computation(1.0, 1e-12, true, 3, 1, 0.99);
+        assert_eq!(
+            only_one_agrees.numerical_evidence,
+            NumericalEvidenceLevel::Uncertain
         );
     }
 
     #[test]
-    fn test_epistemic_uncertain_level() {
-        let result = EpistemicMathResult::uncertain(1.0, 0.5);
-        assert_eq!(result.soundness, SoundnessLevel::Uncertain);
-        assert!(!result.is_actionable());
-        // Should have caveats about error and no verification
-        assert!(!result.caveats.is_empty());
-    }
-
-    #[test]
-    fn test_error_bound_propagation() {
-        // Small error → Probable
-        let small_err = EpistemicMathResult::from_computation(42.0, 1e-8, false, 2, 1, 0.8);
-        assert!(small_err.error_bound < 1e-6);
-        assert!(small_err.soundness == SoundnessLevel::Probable);
-
-        // Large error → Uncertain
-        let large_err = EpistemicMathResult::from_computation(42.0, 1.0, false, 2, 1, 0.8);
-        assert_eq!(large_err.soundness, SoundnessLevel::Uncertain);
-        assert!(
-            large_err
-                .caveats
-                .iter()
-                .any(|c| c.contains("Numerical error"))
-        );
-    }
-
-    #[test]
-    fn test_caveat_generation() {
-        // NaN result should generate NaN caveat
-        let nan_result = EpistemicMathResult::from_computation(f64::NAN, 0.0, false, 1, 0, 0.1);
-        assert!(nan_result.caveats.iter().any(|c| c.contains("NaN")));
-
-        // Infinite result
-        let inf_result =
-            EpistemicMathResult::from_computation(f64::INFINITY, 0.0, false, 1, 0, 0.1);
-        assert!(inf_result.caveats.iter().any(|c| c.contains("infinite")));
-
-        // Low method agreement
-        let low_agree = EpistemicMathResult::from_computation(1.0, 1e-8, false, 4, 1, 0.7);
-        assert!(
-            low_agree
-                .caveats
-                .iter()
-                .any(|c| c.contains("Low method agreement"))
-        );
-
-        // Single method
-        let single = EpistemicMathResult::from_computation(1.0, 1e-8, false, 1, 1, 0.8);
-        assert!(single.caveats.iter().any(|c| c.contains("Only one method")));
-    }
-
-    #[test]
-    fn test_method_agreement_score() {
-        // All methods agree
-        let all_agree = EpistemicMathResult::from_computation(1.0, 1e-12, true, 3, 3, 0.99);
-        assert!((all_agree.method_agreement - 1.0).abs() < 1e-10);
-
-        // Half agree
-        let half_agree = EpistemicMathResult::from_computation(1.0, 1e-8, false, 4, 2, 0.8);
-        assert!((half_agree.method_agreement - 0.5).abs() < 1e-10);
-
-        // None agree (zero of zero)
-        let none = EpistemicMathResult::from_computation(1.0, 1.0, false, 0, 0, 0.1);
-        assert!((none.method_agreement - 0.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_soundness_confidence_floor() {
-        assert!((SoundnessLevel::Verified.confidence_floor() - 0.95).abs() < 1e-10);
-        assert!((SoundnessLevel::Probable.confidence_floor() - 0.70).abs() < 1e-10);
-        assert!((SoundnessLevel::Uncertain.confidence_floor() - 0.30).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_humility_score() {
-        let verified = EpistemicMathResult::verified(1.0, 1e-15);
-        assert!(verified.humility() < 0.1); // Very confident → low humility
-
-        let uncertain = EpistemicMathResult::uncertain(1.0, 1.0);
-        assert!(uncertain.humility() > 0.5); // Low confidence → high humility
-    }
-
-    #[test]
-    fn test_default_epistemic_result() {
-        let result = EpistemicMathResult::default();
-        assert_eq!(result.soundness, SoundnessLevel::Uncertain);
+    fn impossible_method_counts_fail_closed() {
+        let result = EpistemicMathResult::from_computation(1.0, 1e-12, false, 2, 3, 0.99);
+        assert_eq!(result.numerical_evidence, NumericalEvidenceLevel::Uncertain);
+        assert_eq!(result.method_agreement, 0.0);
         assert_eq!(result.confidence, 0.0);
-        assert!(!result.is_actionable());
     }
 
     #[test]
-    fn test_epistemic_gate_tracking() {
+    fn evidence_tier_never_inflates_solver_confidence() {
+        let result = EpistemicMathResult::from_computation(1.0, 1e-12, true, 3, 3, 0.20);
+        assert_eq!(
+            result.numerical_evidence,
+            NumericalEvidenceLevel::Corroborated
+        );
+        assert!((result.confidence - 0.20).abs() < 1e-12);
+        assert!(!result.is_numerically_usable());
+    }
+
+    #[test]
+    fn uncertain_tier_caps_high_solver_confidence() {
+        let result = EpistemicMathResult::from_computation(42.0, 1.0, false, 1, 1, 0.99);
+        assert_eq!(result.numerical_evidence, NumericalEvidenceLevel::Uncertain);
+        assert!(result.confidence <= NumericalEvidenceLevel::Uncertain.confidence_ceiling());
+        assert!(!result.is_numerically_usable());
+    }
+
+    #[test]
+    fn tampered_stored_classification_fails_closed() {
+        let mut result = EpistemicMathResult::plausible(2.0, 1e-8);
+        result.numerical_evidence = NumericalEvidenceLevel::Corroborated;
+
+        assert!(!result.is_self_consistent());
+        assert_eq!(
+            result.effective_numerical_evidence(),
+            NumericalEvidenceLevel::Uncertain
+        );
+        assert!(!result.is_numerically_usable());
+    }
+
+    #[test]
+    fn tampered_method_agreement_fails_closed() {
+        let mut result = EpistemicMathResult::corroborated(2.0, 1e-12);
+        result.method_agreement = 0.5;
+
+        assert!(!result.is_self_consistent());
+        assert_eq!(
+            result.effective_numerical_evidence(),
+            NumericalEvidenceLevel::Uncertain
+        );
+    }
+
+    #[test]
+    fn legacy_missing_method_evidence_cannot_retain_corroboration() {
+        let mut result = EpistemicMathResult::corroborated(2.0, 1e-12);
+        result.method_count = 0;
+        result.agreeing_methods = 0;
+        result.multipath_reported = false;
+
+        assert!(!result.is_self_consistent());
+        assert_eq!(
+            result.effective_numerical_evidence(),
+            NumericalEvidenceLevel::Uncertain
+        );
+        assert!(!result.is_numerically_usable());
+    }
+
+    #[test]
+    fn low_cross_method_agreement_is_explicit() {
+        let result = EpistemicMathResult::from_computation(1.0, 1e-8, false, 4, 1, 0.7);
+        assert!(result
+            .caveats
+            .iter()
+            .any(|c| c.contains("Low cross-method agreement")));
+    }
+
+    #[test]
+    fn confidence_ceiling_is_monotone_with_evidence_strength() {
+        assert!(
+            NumericalEvidenceLevel::Corroborated.confidence_ceiling()
+                > NumericalEvidenceLevel::Plausible.confidence_ceiling()
+        );
+        assert!(
+            NumericalEvidenceLevel::Plausible.confidence_ceiling()
+                > NumericalEvidenceLevel::Uncertain.confidence_ceiling()
+        );
+    }
+
+    #[test]
+    fn default_epistemic_result_is_non_authorizing() {
+        let result = EpistemicMathResult::default();
+        assert_eq!(result.numerical_evidence, NumericalEvidenceLevel::Uncertain);
+        assert_eq!(result.confidence, 0.0);
+        assert!(!result.is_numerically_usable());
+        assert!(!result.grants_formal_authority());
+    }
+
+    #[test]
+    fn epistemic_gate_rederives_evidence_and_tracks_invalid_records() {
         let mut gate = EpistemicGate::new();
 
-        gate.record(&EpistemicMathResult::verified(1.0, 1e-15));
-        gate.record(&EpistemicMathResult::probable(2.0, 1e-8));
+        gate.record(&EpistemicMathResult::corroborated(1.0, 1e-15));
+        gate.record(&EpistemicMathResult::plausible(2.0, 1e-8));
         gate.record(&EpistemicMathResult::uncertain(3.0, 1.0));
 
-        assert_eq!(gate.total_count(), 3);
-        assert_eq!(gate.uncertain_count(), 1);
-        assert!((gate.uncertainty_rate() - 1.0 / 3.0).abs() < 1e-10);
-        assert!((gate.verification_rate() - 1.0 / 3.0).abs() < 1e-10);
+        let mut tampered = EpistemicMathResult::plausible(4.0, 1e-8);
+        tampered.numerical_evidence = NumericalEvidenceLevel::Corroborated;
+        gate.record(&tampered);
+
+        assert_eq!(gate.total_count(), 4);
+        assert_eq!(gate.invalid_count(), 1);
+        assert_eq!(gate.uncertain_count(), 2);
+        assert!((gate.uncertainty_rate() - 0.5).abs() < 1e-10);
+        assert!((gate.corroboration_rate() - 0.25).abs() < 1e-10);
         assert!(gate.average_confidence() > 0.0);
     }
 
     #[test]
-    fn test_epistemic_gate_empty() {
+    fn epistemic_gate_empty() {
         let gate = EpistemicGate::new();
         assert_eq!(gate.total_count(), 0);
         assert_eq!(gate.average_confidence(), 0.0);
         assert_eq!(gate.uncertainty_rate(), 0.0);
+        assert_eq!(gate.corroboration_rate(), 0.0);
+        assert_eq!(gate.invalid_count(), 0);
     }
 }
