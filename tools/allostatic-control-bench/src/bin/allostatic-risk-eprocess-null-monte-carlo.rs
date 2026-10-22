@@ -328,11 +328,21 @@ fn validate_monte_carlo_gates(
             .map(|row| row.3)
             .unwrap_or(f64::NAN)
     };
-    if fwer(0, "mix3") > 0.02 || fwer(0, "mix7") > 0.02 ||
-       fwer(1, "mix3") > 0.08 || fwer(1, "mix7") > 0.08 ||
-       fwer(2, "mix7") < fwer(2, "mix3") + 0.15 ||
-       fwer(3, "mix7") < fwer(3, "mix3") + 0.20 ||
-       fwer(4, "mix3") < 0.95 || fwer(4, "mix7") < 0.95 {
+    if fwer(0, "fixed") > 0.02
+        || fwer(0, "mix3") > 0.02
+        || fwer(0, "mix7") > 0.02
+        || fwer(1, "fixed") > 0.08
+        || fwer(1, "mix3") > 0.08
+        || fwer(1, "mix7") > 0.08
+        || fwer(2, "mix7") < fwer(2, "mix3") + 0.15
+        || fwer(3, "mix7") < fwer(3, "mix3") + 0.20
+        || fwer(4, "fixed") < 0.95
+        || fwer(4, "mix3") < 0.95
+        || fwer(4, "mix7") < 0.95
+        || fwer(5, "fixed") < 0.99
+        || fwer(5, "mix3") < 0.99
+        || fwer(5, "mix7") < 0.99
+    {
         return Err(IoError::new(
             ErrorKind::InvalidData,
             "e-process Monte Carlo calibration/power gates failed",
