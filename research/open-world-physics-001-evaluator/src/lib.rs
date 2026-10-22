@@ -25,6 +25,10 @@ const RELATIVE_NOISE: f64 = 0.005;
 const BIC_DECISIVE_DELTA: f64 = 2.0;
 /// Per-family proposal counts used to expose the candidate-selection bottleneck.
 const CANDIDATES_PER_FAMILY: &[usize] = &[1, 3, 10, 30];
+/// Independent paired seed replications for each diagnostic world.
+const SELECTION_REPLICATION_COUNT: usize = 5;
+const SELECTION_SEED_SCHEDULE: &str = "splitmix64(world_seed ^ fixed_salt ^ replication_index_times_golden_ratio_v1";
+const SELECTION_SEED_SALT: u64 = 0x5345_4c45_4354_0001;
 
 const AMPLITUDES: &[f64] = &[0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
 const EXPONENTS: &[f64] = &[1.0, 1.5, 2.0, 2.5, 3.0];
@@ -149,6 +153,8 @@ pub struct PolicySummary {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SelectionBottleneckCase {
     pub world_id: String,
+    /// Zero-based deterministic replication index; matches policies at paired seed.
+    pub replication_index: usize,
     pub policy: QueryPolicy,
     pub candidates_per_family: usize,
     pub candidate_count: usize,
@@ -187,6 +193,9 @@ pub struct ReportBody {
     pub corpus_sha256: String,
     /// Digest of the full 9-world corpus used by the candidate-selection diagnostic.
     pub selection_diagnostic_corpus_sha256: String,
+    /// Frozen seed protocol for repeated candidate-selection measurements.
+    pub selection_replication_count: usize,
+    pub selection_seed_schedule: String,
     /// Compiler identity captured by the build script.
     pub rustc_identity: String,
     /// Cargo identity captured by the build script.
@@ -223,6 +232,8 @@ impl BenchmarkReport {
         self.receipt_sha256 == sha256_hex(&bytes)
             && self.body.corpus_sha256 == reference_corpus_sha256()
             && self.body.selection_diagnostic_corpus_sha256 == selection_diagnostic_corpus_sha256()
+            && self.body.selection_replication_count == SELECTION_REPLICATION_COUNT
+            && self.body.selection_seed_schedule == SELECTION_SEED_SCHEDULE
     }
 }
 
@@ -760,10 +771,22 @@ fn training_nrmse_for_law(law: Law, observations: &[Observation]) -> Option<f64>
     normalized_rmse(&predicted, &observed)
 }
 
+fn selection_replica(world: &ReferenceWorld, replication_index: usize) -> ReferenceWorld {
+    let mut state = world.seed
+        ^ SELECTION_SEED_SALT
+        ^ (replication_index as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+    ReferenceWorld {
+        id: world.id,
+        truth: world.truth,
+        seed: splitmix64(&mut state),
+    }
+}
+
 fn evaluate_selection_bottleneck(
     world: &ReferenceWorld,
     policy: QueryPolicy,
     candidates_per_family: usize,
+    replication_index: usize,
 ) -> Option<SelectionBottleneckCase> {
     let points = query_points(policy, world.seed);
     let observations = points
@@ -814,6 +837,7 @@ fn evaluate_selection_bottleneck(
 
     Some(SelectionBottleneckCase {
         world_id: world.id.to_owned(),
+        replication_index,
         policy,
         candidates_per_family,
         candidate_count,
@@ -886,13 +910,21 @@ pub fn run_reference_benchmark() -> BenchmarkReport {
 
     let selection_worlds = selection_diagnostic_worlds();
     let mut selection_bottleneck_cases = Vec::new();
-    for &candidates_per_family in CANDIDATES_PER_FAMILY {
-        for policy in [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom] {
-            for world in &selection_worlds {
-                selection_bottleneck_cases.push(
-                    evaluate_selection_bottleneck(world, policy, candidates_per_family)
-                        .expect("fixed candidate-selection diagnostic must evaluate"),
-                );
+    for replication_index in 0..SELECTION_REPLICATION_COUNT {
+        for &candidates_per_family in CANDIDATES_PER_FAMILY {
+            for policy in [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom] {
+                for world in &selection_worlds {
+                    let replica = selection_replica(world, replication_index);
+                    selection_bottleneck_cases.push(
+                        evaluate_selection_bottleneck(
+                            &replica,
+                            policy,
+                            candidates_per_family,
+                            replication_index,
+                        )
+                        .expect("fixed replicated candidate-selection diagnostic must evaluate"),
+                    );
+                }
             }
         }
     }
@@ -915,6 +947,8 @@ pub fn run_reference_benchmark() -> BenchmarkReport {
         blind_evaluation: false,
         corpus_sha256: reference_corpus_sha256(),
         selection_diagnostic_corpus_sha256: selection_diagnostic_corpus_sha256(),
+        selection_replication_count: SELECTION_REPLICATION_COUNT,
+        selection_seed_schedule: SELECTION_SEED_SCHEDULE.to_owned(),
         rustc_identity: option_env!("OPEN_WORLD_RUSTC_ID")
             .unwrap_or("unavailable")
             .to_owned(),
@@ -1188,7 +1222,9 @@ mod tests {
         let second = run_reference_benchmark();
         assert_eq!(first, second);
         assert!(first.verify_receipt());
-        assert_eq!(first.body.selection_bottleneck_cases.len(), 72);
+        assert_eq!(first.body.selection_bottleneck_cases.len(), 72 * SELECTION_REPLICATION_COUNT);
+        assert_eq!(first.body.selection_replication_count, SELECTION_REPLICATION_COUNT);
+        assert_eq!(first.body.selection_seed_schedule, SELECTION_SEED_SCHEDULE);
         assert_eq!(first.body.selection_bottleneck_summaries.len(), 8);
         assert_eq!(
             first.body.selection_diagnostic_corpus_sha256,
@@ -1217,31 +1253,35 @@ mod tests {
         // The pool is built from deterministic shuffled prefixes. More candidate
         // proposals may improve the evaluator-only oracle, but may not worsen it.
         for world in selection_diagnostic_worlds() {
-            for policy in [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom] {
-                let mut previous_oracle = f64::INFINITY;
-                for &pool_size in CANDIDATES_PER_FAMILY {
-                    let row = first
-                        .body
-                        .selection_bottleneck_cases
-                        .iter()
-                        .find(|row| {
-                            row.world_id == world.id
-                                && row.policy == policy
-                                && row.candidates_per_family == pool_size
-                        })
-                        .expect("candidate-selection row exists");
-                    assert!(
-                        row.oracle_pool_heldout_nrmse <= previous_oracle + 1.0e-12,
-                        "oracle error worsened as nested candidate pool grew: {}",
-                        world.id
-                    );
-                    previous_oracle = row.oracle_pool_heldout_nrmse;
+            for replication_index in 0..SELECTION_REPLICATION_COUNT {
+                for policy in [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom] {
+                    let mut previous_oracle = f64::INFINITY;
+                    for &pool_size in CANDIDATES_PER_FAMILY {
+                        let row = first
+                            .body
+                            .selection_bottleneck_cases
+                            .iter()
+                            .find(|row| {
+                                row.world_id == world.id
+                                    && row.replication_index == replication_index
+                                    && row.policy == policy
+                                    && row.candidates_per_family == pool_size
+                            })
+                            .expect("candidate-selection row exists");
+                        assert!(
+                            row.oracle_pool_heldout_nrmse <= previous_oracle + 1.0e-12,
+                            "oracle error worsened as nested candidate pool grew: {} replication {}",
+                            world.id,
+                            replication_index
+                        );
+                        previous_oracle = row.oracle_pool_heldout_nrmse;
+                    }
                 }
             }
         }
 
         for summary in &first.body.selection_bottleneck_summaries {
-            assert_eq!(summary.case_count, 9);
+            assert_eq!(summary.case_count, 9 * SELECTION_REPLICATION_COUNT);
             assert!(summary.family_recovery_rate.is_finite());
             assert!((0.0..=1.0).contains(&summary.family_recovery_rate));
             assert!(summary.mean_selected_heldout_nrmse.is_finite());
