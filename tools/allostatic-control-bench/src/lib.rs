@@ -9,6 +9,7 @@
 
 pub mod calibration;
 pub mod certificate_lease;
+pub mod independent_verifier;
 pub mod model_mismatch;
 pub mod multistep_viability;
 pub mod robust_viability;
