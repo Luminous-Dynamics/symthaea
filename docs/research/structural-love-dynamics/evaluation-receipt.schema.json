@@ -574,6 +574,7 @@
       "additionalProperties": false,
       "required": [
         "status",
+        "case_id_inventory_sha256",
         "ledger_sha256",
         "protocol_sha256",
         "rubric_sha256",
@@ -660,6 +661,10 @@
             "null"
           ],
           "format": "date-time"
+        },
+        "case_id_inventory_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         }
       }
     }
