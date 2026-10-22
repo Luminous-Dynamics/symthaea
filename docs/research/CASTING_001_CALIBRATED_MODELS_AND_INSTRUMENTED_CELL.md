@@ -165,6 +165,33 @@ Foundry simulation and process-control tools are already mature; we should not c
 
 Start with baselines that are easy to reproduce: fixed-parameter Chvorinov estimate, a simple statistical predictor, and available validated casting simulation. In later phases, compare calibrated hybrid models on held-out geometries and whole production lots, not just random train/test rows. Report error, calibration, runtime, memory, experimental cost, defect rates, and energy per accepted unit.
 
+### Current research frontier and fair comparison
+
+A relevant published point of comparison is the 2025 *npj Computational Materials* study that combined revised Latin-hypercube sampling, Bayesian optimization, and phase-field simulation for squeeze casting. It started from 25 samples and reported ultimate tensile strength of 239.7 MPa and elongation of 12.2% after six optimization iterations, representing 17.6% and 18.4% improvements over the initial dataset's best values. That is evidence that small-data, physics-linked experimental optimization is already a serious baseline—not an unexplored idea.
+
+This result is **not** a directly transferable target for our first sand-cast coupon study: its alloy, process, part, and target properties differ. We should reproduce the *methodological comparison* (experiment count, improvement versus the same baseline, and physical verification), not copy its strength numbers as generic casting thresholds.
+
+The 2026 review of casting simulation, AI, and digital twins highlights unresolved industrial barriers including cross-alloy generalization, quantified uncertainty, shared benchmark datasets, model/data integration, and production-scale validation. ISO 23247 provides an appropriate manufacturing digital-twin framework and digital-thread concepts for connecting process and quality records; it does not itself certify a particular digital twin.
+
+### Benchmark ladder to beat
+
+1. **Analytical baselines:** fitted Chvorinov exponent; predeclared fixed exponent n = 2; training-set geometric mean / median predictor. Use the same training and holdout split for every method.
+2. **Designed-experiment baselines:** random search, a documented factorial or response-surface design, Latin-hypercube sampling, then Bayesian optimization. Freeze the budget in *physical trials* and simulated calls separately.
+3. **Physics baselines:** available, independently validated filling/solidification solver with documented material data and boundary conditions. Report solver time and the effort needed to prepare a model, not only accuracy.
+4. **Hybrid candidates:** calibrated physics model plus residual correction; reduced-order/surrogate model with explicit applicability detection; Bayesian optimization that chooses experiments by expected improvement or information gain under constraints.
+5. **Production trial:** compare candidates prospectively against a frozen control on the same product revision, alloy/lot policy, acceptance tests, accounting boundary, and operator conditions.
+
+For every predictive method, publish:
+- **Accuracy:** MAE/RMSE and median/mean absolute relative error on an untouched holdout.
+- **Coverage:** supported-prediction fraction and out-of-domain abstention count. Compare methods at both matched coverage and their natural coverage; do not let abstention masquerade as low error.
+- **Uncertainty:** interval coverage and width, then calibration under process drift; point error alone is insufficient.
+- **Sample efficiency:** number of actual trials required to reach a predeclared quality-constrained improvement; count simulations separately from physical samples.
+- **Process outcomes:** first-pass yield, scrap/rework mass per accepted mass, relevant defect prevalence, energy per accepted part, cycle time, and total cost per accepted part.
+- **Robustness:** performance on a held-out geometry or tooling state, new material lot within the declared envelope, missing/noisy sensors, and intentional out-of-domain inputs.
+- **Operational burden:** experiment preparation, sensor/calibration work, simulation wall-time, analysis latency, hardware needs, and human review hours.
+
+A strong result would show a **Pareto improvement**: fewer physical trials to reach the same or better tested part quality, while reducing cost or energy without sacrificing yield, safety, or measurement integrity. Do not collapse this into a single unvalidated “foundry intelligence score”.
+
 ## Delivery sequence
 
 - **CASTING-001A — first slice (this change):** calibrated Chvorinov-style solidification model, explicit SI semantics, diagnostics, synthetic regression tests, and reference cell/process design.
