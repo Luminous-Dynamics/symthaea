@@ -773,6 +773,47 @@ mod tests {
 
     #[cfg(feature = "mesh-encryption")]
     #[test]
+    fn test_rekey_keeps_aead_sequence_monotonic_for_replay_window() {
+        let mut sender = RdpSession::new("sender".into(), "peer".into(), default_config(), true);
+        let mut receiver = RdpSession::new("receiver".into(), "peer".into(), default_config(), false);
+
+        // The two endpoints must model the same sender nonce namespace so the
+        // receiver's replay window observes the exact wire stream.
+        sender.source_id = [0xA1; 8];
+        receiver.source_id = sender.source_id;
+        sender.epoch = 0x52;
+        receiver.epoch = sender.epoch;
+
+        sender.on_connected();
+        receiver.on_connected();
+        sender.on_handshake_complete([1u8; 32]);
+        receiver.on_handshake_complete([1u8; 32]);
+        sender.on_attestation(0.5, &[0u8; 32], &[]);
+        receiver.on_attestation(0.5, &[0u8; 32], &[]);
+
+        let before = sender.seal(b"before rekey", 0x10).expect("seal before rekey");
+        assert_eq!(
+            receiver.open_with_payload_type(&before, 0x10).as_deref(),
+            Some(b"before rekey".as_slice())
+        );
+
+        sender.start_rekey();
+        receiver.start_rekey();
+        sender.on_handshake_complete([2u8; 32]);
+        receiver.on_handshake_complete([2u8; 32]);
+
+        let after = sender.seal(b"after rekey", 0x10).expect("seal after rekey");
+        let sequence = u32::from_le_bytes(after[8..12].try_into().unwrap());
+        assert_eq!(sequence, 1, "rekey must not reset the wire sequence to zero");
+        assert_eq!(
+            receiver.open_with_payload_type(&after, 0x10).as_deref(),
+            Some(b"after rekey".as_slice()),
+            "fresh post-rekey traffic must not collide with the previous replay-window sequence"
+        );
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
     fn test_seal_fails_closed_before_32_bit_nonce_sequence_wrap() {
         let mut s = RdpSession::new("s1".into(), "peer1".into(), default_config(), true);
         s.on_connected();
