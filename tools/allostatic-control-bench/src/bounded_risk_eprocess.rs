@@ -206,6 +206,40 @@ impl BoundedRiskEProcess {
 /// bet = fraction / risk_bound. The arithmetic mixture of nonnegative
 /// supermartingales is itself a nonnegative supermartingale under the same
 /// conditional-risk null. This avoids selecting one bet using evaluation data.
+const MIXTURE_CHECKPOINT_MAGIC: &str = "SYMTHEA_MIXTURE_EPROCESS_CHECKPOINT_V1";
+
+/// FNV-1a detects accidental checkpoint corruption; it is not a MAC/signature
+/// and does not protect against an attacker who can rewrite the checkpoint.
+fn checkpoint_checksum(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01B3);
+    }
+    hash
+}
+
+fn checkpoint_float(name: &str, value: f64) -> String {
+    format!("{name}={:016x}", value.to_bits())
+}
+
+fn parse_checkpoint_float(line: &str, name: &str) -> Option<f64> {
+    let encoded = line.strip_prefix(&format!("{name}="))?;
+    if encoded.len() != 16 {
+        return None;
+    }
+    let bits = u64::from_str_radix(encoded, 16).ok()?;
+    let value = f64::from_bits(bits);
+    value.is_finite().then_some(value)
+}
+
+fn checkpoint_close(left: f64, right: f64) -> bool {
+    if left.to_bits() == right.to_bits() {
+        return true;
+    }
+    (left - right).abs() <= 1e-10 * left.abs().max(right.abs()).max(1.0)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MixtureBoundedRiskEProcess {
     risk_bound: f64,
@@ -284,6 +318,128 @@ impl MixtureBoundedRiskEProcess {
     pub const fn episode_budget_index(self) -> Option<u64> {
         self.episode_budget_index
     }
+
+    /// Encode the live monitor state as a versioned canonical text checkpoint.
+    ///
+    /// The checksum detects accidental corruption and truncation; it is not an
+    /// authentication mechanism. Use an authenticated, access-controlled store
+    /// when tamper resistance is required.
+    pub fn encode_checkpoint(self) -> String {
+        let episode_index = self
+            .episode_budget_index
+            .map_or_else(|| "none".to_string(), |index| index.to_string());
+        let payload = format!(
+            "{MIXTURE_CHECKPOINT_MAGIC}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n",
+            checkpoint_float("risk_bound", self.risk_bound),
+            checkpoint_float("bet_fraction_1", self.bet_fractions[0]),
+            checkpoint_float("bet_fraction_2", self.bet_fractions[1]),
+            checkpoint_float("bet_fraction_3", self.bet_fractions[2]),
+            checkpoint_float("total_delta", self.total_delta),
+            format!("simultaneous_monitors={}", self.simultaneous_monitors),
+            format!("episode_budget_index={episode_index}"),
+            checkpoint_float("log_alarm_threshold", self.log_alarm_threshold),
+            checkpoint_float("component_log_e_1", self.component_log_e_values[0]),
+            checkpoint_float("component_log_e_2", self.component_log_e_values[1]),
+            checkpoint_float("component_log_e_3", self.component_log_e_values[2]),
+            checkpoint_float("log_e_value", self.log_e_value),
+            format!("alarmed={}", u8::from(self.alarmed)),
+        );
+        let checksum = checkpoint_checksum(payload.as_bytes());
+        format!("{payload}checksum={checksum:016x}\n")
+    }
+
+    /// Restore a mixture monitor only if the version, checksum, parameters,
+    /// threshold, component evidence and mixture evidence are consistent.
+    /// An incompatible or corrupted checkpoint fails closed.
+    pub fn from_checkpoint(encoded: &str) -> Option<Self> {
+        if !encoded.ends_with('\n') || encoded.contains('\r') {
+            return None;
+        }
+        let lines: Vec<&str> = encoded.strip_suffix('\n')?.split('\n').collect();
+        if lines.len() != 15 || lines[0] != MIXTURE_CHECKPOINT_MAGIC {
+            return None;
+        }
+        let checksum_line = lines[14].strip_prefix("checksum=")?;
+        if checksum_line.len() != 16 {
+            return None;
+        }
+        let expected_checksum = u64::from_str_radix(checksum_line, 16).ok()?;
+        let payload = format!("{}\n", lines[..14].join("\n"));
+        if checkpoint_checksum(payload.as_bytes()) != expected_checksum {
+            return None;
+        }
+
+        let risk_bound = parse_checkpoint_float(lines[1], "risk_bound")?;
+        let bet_fractions = [
+            parse_checkpoint_float(lines[2], "bet_fraction_1")?,
+            parse_checkpoint_float(lines[3], "bet_fraction_2")?,
+            parse_checkpoint_float(lines[4], "bet_fraction_3")?,
+        ];
+        let total_delta = parse_checkpoint_float(lines[5], "total_delta")?;
+        let simultaneous_monitors = lines[6]
+            .strip_prefix("simultaneous_monitors=")?
+            .parse::<usize>()
+            .ok()?;
+        let episode_index_text = lines[7].strip_prefix("episode_budget_index=")?;
+        let episode_budget_index = if episode_index_text == "none" {
+            None
+        } else {
+            Some(episode_index_text.parse::<u64>().ok()?)
+        };
+        let saved_threshold = parse_checkpoint_float(lines[8], "log_alarm_threshold")?;
+        let component_log_e_values = [
+            parse_checkpoint_float(lines[9], "component_log_e_1")?,
+            parse_checkpoint_float(lines[10], "component_log_e_2")?,
+            parse_checkpoint_float(lines[11], "component_log_e_3")?,
+        ];
+        let saved_log_e_value = parse_checkpoint_float(lines[12], "log_e_value")?;
+        let alarmed = match lines[13].strip_prefix("alarmed=")? {
+            "0" => false,
+            "1" => true,
+            _ => return None,
+        };
+
+        let mut restored = if let Some(index) = episode_budget_index {
+            Self::new_with_alpha_spending(
+                risk_bound,
+                bet_fractions,
+                total_delta,
+                simultaneous_monitors,
+                index,
+            )?
+        } else {
+            Self::new(risk_bound, bet_fractions, total_delta, simultaneous_monitors)?
+        };
+        if !checkpoint_close(saved_threshold, restored.log_alarm_threshold) {
+            return None;
+        }
+
+        let maximum = component_log_e_values
+            .iter()
+            .copied()
+            .fold(f64::NEG_INFINITY, f64::max);
+        let mean_exp = component_log_e_values
+            .iter()
+            .map(|value| (*value - maximum).exp())
+            .sum::<f64>()
+            / component_log_e_values.len() as f64;
+        let reconstructed_log_e = maximum + mean_exp.ln();
+        if !reconstructed_log_e.is_finite()
+            || !checkpoint_close(saved_log_e_value, reconstructed_log_e)
+            || (!alarmed && saved_log_e_value >= saved_threshold)
+        {
+            return None;
+        }
+
+        restored.component_log_e_values = component_log_e_values;
+        restored.log_e_value = saved_log_e_value;
+        restored.alarmed = alarmed;
+        if restored.encode_checkpoint() != encoded {
+            return None;
+        }
+        Some(restored)
+    }
+
 
     pub const fn risk_bound(self) -> f64 {
         self.risk_bound
@@ -481,6 +637,160 @@ mod tests {
                 - 3.0_f64.ln();
             assert!((process.log_e_value() - expected_mix).abs() < 1e-12);
         }
+    }
+
+    #[test]
+    fn checkpoint_resume_is_bitwise_equivalent_across_alpha_spent_episode() {
+        let losses = [
+            0.05, 0.10, 0.17, 0.22, 0.07, 0.31, 0.42, 0.12, 0.15, 0.28, 0.06,
+        ];
+        let split = 5;
+        let mut uninterrupted = MixtureBoundedRiskEProcess::new_with_alpha_spending(
+            0.15,
+            [0.25, 0.50, 0.75],
+            0.05,
+            20,
+            37,
+        )
+        .expect("valid alpha-spent stream");
+        for loss in &losses[..split] {
+            assert!(uninterrupted.observe(*loss).is_some());
+        }
+
+        let encoded = uninterrupted.encode_checkpoint();
+        let mut resumed =
+            MixtureBoundedRiskEProcess::from_checkpoint(&encoded).expect("valid checkpoint");
+        assert_eq!(resumed.encode_checkpoint(), encoded);
+        assert_eq!(resumed.episode_budget_index(), Some(37));
+        assert_eq!(
+            resumed.component_log_e_values(),
+            uninterrupted.component_log_e_values()
+        );
+        assert_eq!(
+            resumed.log_e_value().to_bits(),
+            uninterrupted.log_e_value().to_bits()
+        );
+        assert_eq!(resumed.alarmed(), uninterrupted.alarmed());
+
+        for loss in &losses[split..] {
+            assert_eq!(resumed.observe(*loss), uninterrupted.observe(*loss));
+            assert_eq!(
+                resumed.component_log_e_values(),
+                uninterrupted.component_log_e_values()
+            );
+            assert_eq!(
+                resumed.log_e_value().to_bits(),
+                uninterrupted.log_e_value().to_bits()
+            );
+            assert_eq!(resumed.alarmed(), uninterrupted.alarmed());
+        }
+    }
+
+    #[test]
+    fn checkpoint_restore_fails_closed_on_corruption_truncation_and_wrong_version() {
+        let mut monitor = MixtureBoundedRiskEProcess::new_with_alpha_spending(
+            0.15,
+            [0.25, 0.50, 0.75],
+            0.05,
+            20,
+            4,
+        )
+        .expect("valid stream");
+        for loss in [0.12, 0.18, 0.21] {
+            assert!(monitor.observe(loss).is_some());
+        }
+        let encoded = monitor.encode_checkpoint();
+        assert!(MixtureBoundedRiskEProcess::from_checkpoint(&encoded).is_some());
+        assert!(MixtureBoundedRiskEProcess::from_checkpoint(
+            &encoded[..encoded.len() - 4]
+        )
+        .is_none());
+
+        let mut corrupted = encoded.clone();
+        let position = corrupted
+            .find("component_log_e_2=")
+            .expect("checkpoint field exists")
+            + "component_log_e_2=".len();
+        let replacement = if corrupted.as_bytes()[position] == b'0' {
+            '1'
+        } else {
+            '0'
+        };
+        corrupted.replace_range(position..position + 1, &replacement.to_string());
+        assert!(MixtureBoundedRiskEProcess::from_checkpoint(&corrupted).is_none());
+
+        let mut wrong_version = encoded;
+        wrong_version.replace_range(0..MIXTURE_CHECKPOINT_MAGIC.len(), "BROKEN_CHECKPOINT_V1");
+        assert!(MixtureBoundedRiskEProcess::from_checkpoint(&wrong_version).is_none());
+    }
+
+    #[test]
+    fn checkpoint_rejects_semantic_tampering_even_with_a_recomputed_checksum() {
+        let monitor = MixtureBoundedRiskEProcess::new_with_alpha_spending(
+            0.15,
+            [0.25, 0.50, 0.75],
+            0.05,
+            20,
+            9,
+        )
+        .expect("valid monitor");
+        let encoded = monitor.encode_checkpoint();
+
+        let mut altered_lines: Vec<String> = encoded
+            .strip_suffix('\n')
+            .expect("canonical trailing newline")
+            .split('\n')
+            .map(str::to_string)
+            .collect();
+        altered_lines[8] = checkpoint_float(
+            "log_alarm_threshold",
+            monitor.log_alarm_threshold() + 1.0,
+        );
+        let altered_payload = format!("{}\n", altered_lines[..14].join("\n"));
+        let altered_checksum = checkpoint_checksum(altered_payload.as_bytes());
+        let altered = format!("{altered_payload}checksum={altered_checksum:016x}\n");
+        assert!(MixtureBoundedRiskEProcess::from_checkpoint(&altered).is_none());
+
+        let mut altered_components = encoded
+            .strip_suffix('\n')
+            .expect("canonical trailing newline")
+            .split('\n')
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        altered_components[9] =
+            checkpoint_float("component_log_e_1", monitor.component_log_e_values()[0] + 0.5);
+        let altered_payload = format!("{}\n", altered_components[..14].join("\n"));
+        let altered_checksum = checkpoint_checksum(altered_payload.as_bytes());
+        let altered = format!("{altered_payload}checksum={altered_checksum:016x}\n");
+        assert!(MixtureBoundedRiskEProcess::from_checkpoint(&altered).is_none());
+    }
+
+    #[test]
+    fn checkpoint_preserves_latched_alarm_and_alpha_budget_boundary() {
+        let mut monitor = MixtureBoundedRiskEProcess::new_with_alpha_spending(
+            0.15,
+            [0.25, 0.50, 0.75],
+            0.05,
+            1,
+            1,
+        )
+        .expect("valid stream");
+        for _ in 0..12 {
+            assert!(monitor.observe(0.85).is_some());
+        }
+        assert!(monitor.alarmed());
+        let encoded = monitor.encode_checkpoint();
+        let restored =
+            MixtureBoundedRiskEProcess::from_checkpoint(&encoded).expect("valid latched state");
+        assert!(restored.alarmed());
+        assert_eq!(
+            restored.log_alarm_threshold().to_bits(),
+            monitor.log_alarm_threshold().to_bits()
+        );
+        assert_eq!(
+            restored.log_e_value().to_bits(),
+            monitor.log_e_value().to_bits()
+        );
     }
 
     #[test]

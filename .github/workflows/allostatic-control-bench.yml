@@ -13,6 +13,7 @@ on:
       - "docs/research/BOUNDED_RISK_EPROCESS_V1.md"
       - "docs/research/EPROCESS_LIFETIME_ALPHA_SPENDING_V1.md"
       - "docs/research/EPROCESS_PERSISTENT_VS_RESET_V1.md"
+      - "docs/research/EPROCESS_DURABLE_CHECKPOINTS_V1.md"
       - ".github/workflows/allostatic-control-bench.yml"
   workflow_dispatch:
 
