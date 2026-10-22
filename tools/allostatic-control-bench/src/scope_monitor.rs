@@ -397,8 +397,8 @@ mod tests {
         assert!(calibrate_scope_threshold(&[], 0.05).is_none());
         assert!(calibrate_scope_threshold(&[0.1, f64::NAN], 0.05).is_none());
         assert!(calibrate_scope_threshold(&nominal_scores(), 0.0).is_none());
-        let threshold =
-            calibrate_scope_threshold(&nominal_scores(), 0.05).expect("valid threshold");
+        let threshold = calibrate_scope_threshold(&nominal_scores(), 0.05)
+            .expect("valid threshold");
         assert_eq!(threshold.calibration_episodes(), 159);
         assert_eq!(threshold.target_false_alarm_rate(), 0.05);
     }
