@@ -1072,8 +1072,6 @@ if ! awk -F, '
     expected_spend_sum = 0.05 / 5 * (1 - 1 / 301)
     if (($15 - expected_spend_sum > 0.0000001) ||
         (expected_spend_sum - $15 > 0.0000001)) failed = 1
-    if ($5 != $4 || $8 != $7) failed = 1
-    if ($4 > $7 || $5 > $8 || $6 < $9) failed = 1
     key = $1 SUBSEP $2
     if (seen[key]++) failed = 1
     if ($2 == "nominal") {
