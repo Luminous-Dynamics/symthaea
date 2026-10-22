@@ -7,6 +7,7 @@
 //! zero inclusion frequency.
 
 use core::fmt;
+use crate::mis_graph_identity::MisGraphIdentity;
 
 /// Direction in which an empirical inclusion-frequency signal is interpreted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -168,6 +169,41 @@ impl MisInformerSignal {
             sample_count,
             inclusion_counts,
         })
+    }
+
+    /// Build a signal from a computed canonical graph identity.
+    ///
+    /// Prefer this constructor over supplying a raw digest: the identity's digest
+    /// was computed from a canonical edge list, rather than asserted by the caller.
+    /// This still does not attest who produced the sample population.
+    pub fn from_graph(
+        instance_id: impl Into<String>,
+        graph: &MisGraphIdentity,
+        sample_count: u64,
+        inclusion_counts: Vec<u64>,
+    ) -> Result<Self, MisSignalError> {
+        Self::new(
+            instance_id,
+            graph.sha256(),
+            graph.vertex_count(),
+            sample_count,
+            inclusion_counts,
+        )
+    }
+
+    /// Recommend a vertex only when this signal matches a computed graph identity.
+    pub fn recommend_for_graph(
+        &self,
+        expected_instance_id: &str,
+        graph: &MisGraphIdentity,
+        mode: MisSelectionMode,
+    ) -> Result<MisVertexRecommendation, MisSignalError> {
+        self.recommend_vertex(
+            expected_instance_id,
+            graph.sha256(),
+            graph.vertex_count(),
+            mode,
+        )
     }
 
     /// Frozen benchmark-instance identifier attached to this signal.
@@ -377,6 +413,42 @@ mod tests {
         assert_eq!(result.sample_count, 100);
         assert_eq!(result.inclusion_count, 0);
         assert_eq!(result.tie_count, 2);
+    }
+
+    #[test]
+    fn computed_graph_identity_binds_signal_to_canonical_graph() {
+        let graph = MisGraphIdentity::from_edges(3, &[(0, 1), (1, 2)]).expect("valid graph");
+        let equivalent = MisGraphIdentity::from_edges(3, &[(2, 1), (1, 0), (0, 1)])
+            .expect("canonical equivalent graph");
+        let signal = MisInformerSignal::from_graph("case-graph-a", &graph, 20, vec![18, 1, 17])
+            .expect("valid graph-bound signal");
+        assert_eq!(
+            signal
+                .recommend_for_graph("case-graph-a", &equivalent, MisSelectionMode::PreferInSet)
+                .expect("equivalent canonical graph"),
+            MisVertexRecommendation {
+                vertex: 0,
+                inclusion_count: 18,
+                sample_count: 20,
+                tie_count: 1,
+                mode: MisSelectionMode::PreferInSet,
+            }
+        );
+    }
+
+    #[test]
+    fn computed_graph_identity_rejects_structurally_different_graph() {
+        let graph = MisGraphIdentity::from_edges(3, &[(0, 1), (1, 2)]).expect("valid graph");
+        let wrong_graph = MisGraphIdentity::from_edges(3, &[(0, 1), (0, 2)])
+            .expect("other valid graph");
+        let signal = MisInformerSignal::from_graph("case-graph-a", &graph, 20, vec![18, 1, 17])
+            .expect("valid graph-bound signal");
+        assert_eq!(
+            signal
+                .recommend_for_graph("case-graph-a", &wrong_graph, MisSelectionMode::PreferOutSet)
+                .expect_err("graph content must match"),
+            MisSignalError::GraphDigestMismatch
+        );
     }
 
     #[test]
