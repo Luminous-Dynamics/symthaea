@@ -64,7 +64,7 @@ use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleResu
 use crate::consciousness::fep_active_inference::MotorCommandType;
 #[cfg(feature = "code_generation")]
 use crate::language::code_orchestrator::CodeOrchestrator;
-use crate::language::intelligent_dispatcher::{BackendTier, DispatchResult, IntelligentDispatcher};
+use crate::language::intelligent_dispatcher::{BackendAttempt, BackendTier, DispatchResult, IntelligentDispatcher};
 use crate::language::llm_backend::GenerationParams;
 use crate::mind::structured_thought::EpistemicStatus;
 use std::path::PathBuf;
@@ -118,8 +118,10 @@ pub struct AgentResult {
     pub observations: Vec<String>,
     /// Error messages encountered during the run.
     pub errors: Vec<String>,
-    /// Backend tiers used for generation (one per generation attempt).
+    /// Selected dispatcher tiers (one per generation decision; fallback may differ).
     pub generation_tiers: Vec<BackendTier>,
+    /// Actual backend invocations in order, including failed attempts and fallback paths.
+    pub actual_backend_attempts: Vec<BackendAttempt>,
     /// Total energy consumed across all generations.
     pub total_energy: f64,
     /// Remaining energy budget after execution.
@@ -163,7 +165,16 @@ impl AgentResult {
             },
             "epistemic_status": format!("{:?}", self.epistemic_status),
             "generation": {
+                // Keep "tiers" for existing consumers; it is the selected tier, not necessarily the actual fallback backend.
                 "tiers": self.generation_tiers.iter().map(|t| t.to_string()).collect::<Vec<_>>(),
+                "selected_tiers": self.generation_tiers.iter().map(|t| t.to_string()).collect::<Vec<_>>(),
+                "backend_attempts": self.actual_backend_attempts.iter().map(|attempt| {
+                    serde_json::json!({
+                        "tier": attempt.tier.to_string(),
+                        "backend_name": attempt.backend_name,
+                        "success": attempt.success
+                    })
+                }).collect::<Vec<_>>(),
                 "total_energy": self.total_energy,
                 "remaining_energy": self.remaining_energy,
             },
@@ -374,8 +385,10 @@ pub struct CodingAgent {
     dispatcher: Option<IntelligentDispatcher>,
     /// Last dispatch result for telemetry.
     last_dispatch: Option<DispatchResult>,
-    /// Backend tiers used across generations.
+    /// Selected routing tier per generation decision; does not imply that tier supplied output after fallback.
     generation_tiers: Vec<BackendTier>,
+    /// Backend implementation invocations recorded by the dispatcher, including fallback attempts.
+    actual_backend_attempts: Vec<BackendAttempt>,
     /// Last generated code (for writing to disk and feeding into Testing).
     generated_code: Option<String>,
     /// Codebase context: pre-queried relevant code snippets from CodebaseMemory.
@@ -540,6 +553,7 @@ impl CodingAgent {
             dispatcher: Some(dispatcher),
             last_dispatch: None,
             generation_tiers: Vec::new(),
+            actual_backend_attempts: Vec::new(),
             generated_code: None,
             code_context: Vec::new(),
             experience_store,
@@ -635,6 +649,7 @@ impl CodingAgent {
         self.last_test_output = None;
         self.generated_code = None;
         self.generation_tiers.clear();
+        self.actual_backend_attempts.clear();
         self.failure_patterns.clear();
         self.native_exhausted = false;
         self.prediction_error_history.clear();
