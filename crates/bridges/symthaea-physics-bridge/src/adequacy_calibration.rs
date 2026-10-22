@@ -267,7 +267,7 @@ mod tests {
 
     #[test]
     fn more_extreme_audit_score_can_raise_a_calibrated_alarm() {
-        let calibration_scores = (1..=19).map(f64::from).collect::<Vec<_>>();
+        let calibration_scores = (1..=19).map(|value| value as f64).collect::<Vec<_>>();
         let calibrator = ConformalAdequacyCalibrator::new(&calibration_scores, 0.05)
             .expect("enough valid calibration batches");
         let result = calibrator
