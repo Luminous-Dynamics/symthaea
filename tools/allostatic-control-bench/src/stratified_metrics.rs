@@ -337,7 +337,7 @@ mod tests {
         BTreeMap::from([
             (
                 "cartpole".to_owned(),
-                (0..20)
+                (0..30)
                     .map(|seed| TaskEpisode {
                         seed,
                         baseline_score: 0.4,
@@ -347,7 +347,7 @@ mod tests {
             ),
             (
                 "quadrotor".to_owned(),
-                (0..20)
+                (0..10)
                     .map(|seed| TaskEpisode {
                         seed,
                         baseline_score: 0.7,
