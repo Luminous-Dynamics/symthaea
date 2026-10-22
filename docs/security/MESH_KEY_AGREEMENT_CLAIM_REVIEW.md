@@ -71,6 +71,32 @@ This review does not claim that a higher layer cannot perform some of these chec
 
 A production design needs a documented KEM-key rotation and erasure lifecycle, and must decide whether ephemeral/session-specific KEM keys are feasible for its deployment. It must also bind the KEM key to the intended peer identity. An Ed25519 signature that is assumed to become forgeable in a quantum threat model is not sufficient authentication for claiming post-quantum protection against an active attacker; use a suitable post-quantum authentication mechanism or another explicit trust anchor for that threat model.
 
+## K-6 — Implicit rejection means decapsulation success is not peer authentication
+
+The existing invalid-ciphertext test notes ML-KEM implicit rejection: an invalid ciphertext may yield a pseudorandom shared secret rather than a distinguishable decapsulation failure. Accordingly, a successful return from `decapsulate_and_derive` does not prove the sender used a valid encapsulation, that the other side holds the same key, or that the peer is authenticated. The old test name `test_wrong_ciphertext_fails` was misleading because it asserted the result was `Ok`. It is renamed to `test_invalid_ciphertext_uses_implicit_rejection_and_needs_key_confirmation` and now makes explicit that the API stores a candidate session key.
+
+Production protocols need **key confirmation** bound to the authenticated transcript before marking the session established. Treat derived keys as unconfirmed until the peer proves possession of the same key over the exact transcript. Negative cases must include bad KEM ciphertexts, mismatched key shares and identities, and key-confirmation failure. Do not try to detect invalid KEM ciphertext by relying on a distinguishable decapsulation error; implicit rejection is a deliberate KEM property.
+
+## Standards-based remediation baseline (current as of October 2026)
+
+The appropriate next baseline is not an ad-hoc “X25519 + ML-KEM secret concatenation.” As of August 2026, **RFC 10024** defines the TLS 1.3 `X25519MLKEM768` hybrid group, combining ML-KEM-768 with **ephemeral** X25519/ECDHE. It applies the hybrid framework in RFC 9954, where component shared secrets are combined through the existing TLS 1.3 key schedule. RFC 9954 explicitly warns that its security analysis relies crucially on the TLS 1.3 transcript; implementers cannot assume the same hybridization is secure merely by copying the concatenation into a different protocol.
+
+References:
+- RFC 10024, *Post-Quantum Traditional (PQ/T) Hybrid Key Agreement Mechanisms for TLS 1.3*: https://www.rfc-editor.org/rfc/rfc10024.html
+- RFC 9954, *Hybrid Key Exchange in TLS 1.3*: https://www.rfc-editor.org/rfc/rfc9954.html
+- NIST FIPS 203, ML-KEM: https://csrc.nist.gov/pubs/fips/203/final
+- NIST SP 800-227, Recommendations for Key-Encapsulation Mechanisms: https://csrc.nist.gov/pubs/sp/800/227/final
+
+**Recommendation:** prefer a reviewed standard implementation for the existing online/IP transports. For the off-grid LoRa transport, treat protocol adaptation as a separate design and review task. Do not claim RFC 10024 compliance unless the implementation actually conforms to TLS 1.3 and its exact construction. Use the standard as a security-model baseline, not permission to improvise a novel transcript or key schedule.
+
+### Constrained-link cost is part of cryptographic correctness
+
+The current LoRa fragment payload is 214 bytes (222-byte MTU minus the 8-byte fragment header), plus one XOR parity frame per payload. ML-KEM-768 has a 1,184-byte public key and a 1,088-byte ciphertext. Under the current framing, each one requires six data fragments plus a parity fragment. A combined server share containing the ciphertext and a 32-byte X25519 ephemeral public share is still about 1,120 bytes, also six data fragments plus parity.
+
+Therefore, the two hybrid key-share directions alone imply at least **14 fragment transmissions** under this simple framing—before transcript/authentication metadata, retransmissions, key confirmation, link-layer overhead or packet loss. This is a capacity estimate from serialized sizes, not a measured radio benchmark. The protocol must define canonical lengths, FEC over the correct authenticated representation, per-fragment authenticity/reassembly, retry and timeouts, identity binding, and a downgrade-proof transition. Never squeeze key-share bytes into the existing packet identifier or MTU by truncating them.
+
+Benchmark the real trade-off: setup latency and completion probability across loss rates; bytes/fragments per successful session; radio airtime and energy; peak memory; CPU and wall-clock cost on the intended embedded hardware; and session recovery after loss/restart. Compare the secure protocol against itself under link conditions, and against a reviewed implementation on a comparable platform.
+
 ## Immediate disposition
 
 - The existing X25519 helper should be described as **static pairwise key derivation**, not forward-secret key exchange.
@@ -112,4 +138,4 @@ A model discovery counts only when the issue is independently reproducible again
 
 ## Validation status
 
-Source review and regression-test authoring only. Tests were not compiled or run in this environment. The added/renamed witnesses are `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse`, `legacy_static_x25519_derivation_does_not_bind_peer_source_id`, `legacy_pqc_derivation_succeeds_without_verified_classical_handshake_state`, and `legacy_pqc_session_derivation_does_not_bind_peer_id`. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
+Source review and regression-test authoring only. Tests were not compiled or run in this environment. The added/renamed witnesses are `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse`, `legacy_static_x25519_derivation_does_not_bind_peer_source_id`, `legacy_pqc_derivation_succeeds_without_verified_classical_handshake_state`, and `legacy_pqc_session_derivation_does_not_bind_peer_id`; the implicit-rejection test is now `test_invalid_ciphertext_uses_implicit_rejection_and_needs_key_confirmation`. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
