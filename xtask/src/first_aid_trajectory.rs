@@ -1201,7 +1201,8 @@ mod tests {
                 {"sequence": 1, "kind": "session_started"},
                 {"sequence": 2, "kind": "connectivity_changed", "connectivity": "intermittent"},
                 {"sequence": 3, "kind": "network_required_for_core"}
-            ]
+            ],
+            "expected_violation_codes": ["intermittent_core_network_dependency"]
         });
         assert_eq!(
             inspect_trace_json(&json).expect("dynamic trace schema is valid"),
@@ -1226,6 +1227,10 @@ mod tests {
         trace.events = events;
         resequence(&mut trace);
         trace.expected_violation_codes = vec!["offline_core_network_dependency".to_owned()];
+        let mut changed_corpus = corpus();
+        changed_corpus.scenarios = vec![trace.clone()];
+        validate_corpus(&changed_corpus)
+            .expect("connectivity recovery trace must satisfy the ordered contract");
         assert_eq!(
             inspect_trace(&trace),
             vec!["offline_core_network_dependency"]
