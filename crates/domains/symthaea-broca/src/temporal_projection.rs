@@ -1451,54 +1451,145 @@ impl TemporalProjection {
         ssm_gradients: &[Option<Vec<f32>>],
     ) {
         let scale = 1.0 / self.num_chunks as f32;
-        for chunk_idx in 0..self.num_chunks {
-            let grad = match &ssm_gradients[chunk_idx] {
-                Some(g) => g,
+        self.compute_e2e_gradients_with_scale(thought, ssm_gradients, scale)
+            .expect("legacy E2E gradients must match the configured temporal projection");
+    }
+
+    /// Accumulate language-model gradients through the exact temporal forward map.
+    ///
+    /// ssm_gradients[i] is d(loss)/d(projected_ssm_chunk[i]).
+    /// Missing entries support sparse/rotating gradient estimation. gradient_scale
+    /// is applied once to each observed token-gradient contribution. This function
+    /// only accumulates gradients; callers apply them after the complete target sequence.
+    pub fn compute_e2e_gradients_with_scale(
+        &mut self,
+        thought: &ContinuousHV,
+        ssm_gradients: &[Option<Vec<f32>>],
+        gradient_scale: f32,
+    ) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            thought.values.len() == self.hdc_dim,
+            "temporal HDC input dimension mismatch: expected {}, got {}",
+            self.hdc_dim,
+            thought.values.len()
+        );
+        anyhow::ensure!(
+            ssm_gradients.len() == self.num_chunks,
+            "temporal SSM gradient count mismatch: expected {}, got {}",
+            self.num_chunks,
+            ssm_gradients.len()
+        );
+        anyhow::ensure!(
+            gradient_scale.is_finite() && gradient_scale >= 0.0,
+            "temporal gradient scale must be finite and non-negative"
+        );
+        for (chunk_idx, gradient) in ssm_gradients.iter().enumerate() {
+            if let Some(gradient) = gradient {
+                anyhow::ensure!(
+                    gradient.len() == self.ssm_dim,
+                    "temporal gradient at chunk {chunk_idx} must have dimension {}, got {}",
+                    self.ssm_dim,
+                    gradient.len()
+                );
+                anyhow::ensure!(
+                    gradient.iter().all(|v| v.is_finite()),
+                    "temporal gradient at chunk {chunk_idx} contains a non-finite value"
+                );
+            }
+        }
+        if gradient_scale == 0.0 {
+            return Ok(());
+        }
+
+        for (chunk_idx, maybe_grad) in ssm_gradients.iter().enumerate() {
+            let grad = match maybe_grad {
+                Some(grad) => grad,
                 None => continue,
             };
             let start = chunk_idx * self.stride;
+            anyhow::ensure!(
+                start + self.chunk_size <= thought.values.len(),
+                "temporal chunk {chunk_idx} extends beyond the HDC input"
+            );
             let chunk = &thought.values[start..start + self.chunk_size];
-            let g = self.group_for_chunk(chunk_idx);
+            let group = self.group_for_chunk(chunk_idx);
+
+            // Recompute pre-adapter projected chunk and its LayerNorm statistics.
             let normed = self.layer_norm(chunk);
+            let n = chunk.len() as f32;
+            let mean = chunk.iter().sum::<f32>() / n;
+            let variance = chunk.iter().map(|&x| (x - mean).powi(2)).sum::<f32>() / n;
+            let inv_std = 1.0 / (variance + 1e-5f32).sqrt();
+            let x_hat: Vec<f32> = chunk.iter().map(|&x| (x - mean) * inv_std).collect();
 
-            let mut ssm_error = grad.clone();
-            for v in &mut ssm_error {
-                *v *= scale;
-            }
-
-            // If adapter is present, backprop through it first
-            if let Some(ref mut adapter) = self.adapter {
-                // Recompute pre-adapter ssm_vec for adapter backward
-                let mut ssm_vec = vec![0.0f32; self.ssm_dim];
-                for j in 0..self.ssm_dim {
-                    let mut sum = 0.0f32;
-                    for k in 0..self.chunk_size {
-                        sum += self.group_w_up[g][j * self.chunk_size + k] * normed[k];
-                    }
-                    ssm_vec[j] = sum;
+            let mut pre_adapter = vec![0.0f32; self.ssm_dim];
+            for out_idx in 0..self.ssm_dim {
+                for in_idx in 0..self.chunk_size {
+                    pre_adapter[out_idx] +=
+                        self.group_w_up[group][out_idx * self.chunk_size + in_idx] * normed[in_idx];
                 }
-                let pos_offset = chunk_idx * self.ssm_dim;
-                for j in 0..self.ssm_dim {
-                    ssm_vec[j] += self.pos_enc[pos_offset + j];
-                }
-                ssm_error = adapter.backward(&ssm_vec, &ssm_error);
             }
-
-            // Gradient for w_chunk_up
+            let pos_offset = chunk_idx * self.ssm_dim;
             for j in 0..self.ssm_dim {
-                for k in 0..self.chunk_size {
-                    self.grad_group_up[g][j * self.chunk_size + k] += ssm_error[j] * normed[k];
+                pre_adapter[j] += self.pos_enc[pos_offset + j];
+            }
+
+            let adapted = if let Some(ref adapter) = self.adapter {
+                adapter.forward(&pre_adapter)
+            } else {
+                pre_adapter.clone()
+            };
+
+            // Reverse the learned attention multiplier before the adapter, and
+            // accumulate the gradient for the attention logit itself.
+            let attention = if self.learned_attention {
+                sigmoid(self.chunk_attention[chunk_idx])
+            } else {
+                1.0
+            };
+            let mut d_adapted = vec![0.0f32; self.ssm_dim];
+            for j in 0..self.ssm_dim {
+                let scaled_grad = grad[j] * gradient_scale;
+                if self.learned_attention {
+                    self.grad_chunk_attention[chunk_idx] +=
+                        scaled_grad * adapted[j] * attention * (1.0 - attention);
+                }
+                d_adapted[j] = scaled_grad * attention;
+            }
+
+            let d_pre_adapter = if let Some(ref mut adapter) = self.adapter {
+                adapter.backward(&pre_adapter, &d_adapted)
+            } else {
+                d_adapted
+            };
+
+            // dW_up, learned positional encoding, and LayerNorm gamma/beta gradients.
+            for out_idx in 0..self.ssm_dim {
+                for in_idx in 0..self.chunk_size {
+                    self.grad_group_up[group][out_idx * self.chunk_size + in_idx] +=
+                        d_pre_adapter[out_idx] * normed[in_idx];
+                }
+                if self.learned_pos_enc {
+                    self.grad_pos_enc[pos_offset + out_idx] += d_pre_adapter[out_idx];
                 }
             }
 
-            // Gradient for learned positional encoding
-            if self.learned_pos_enc {
-                let pos_offset = chunk_idx * self.ssm_dim;
-                for j in 0..self.ssm_dim {
-                    self.grad_pos_enc[pos_offset + j] += ssm_error[j];
+            // dL/d(normed[k]) = sum_j W_up[j,k] * dL/d(pre_adapter[j]).
+            let mut d_normed = vec![0.0f32; self.chunk_size];
+            for in_idx in 0..self.chunk_size {
+                for out_idx in 0..self.ssm_dim {
+                    d_normed[in_idx] +=
+                        self.group_w_up[group][out_idx * self.chunk_size + in_idx]
+                            * d_pre_adapter[out_idx];
                 }
+            }
+            for in_idx in 0..self.chunk_size {
+                self.grad_ln_gamma[in_idx] += d_normed[in_idx] * x_hat[in_idx];
+                self.grad_ln_beta[in_idx] += d_normed[in_idx];
             }
         }
+
+        Ok(())
     }
 
     // ─── Gradient application ────────────────────────────────────────────
