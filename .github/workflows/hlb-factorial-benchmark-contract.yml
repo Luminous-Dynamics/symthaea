@@ -13,6 +13,7 @@ on:
       - "crates/core/symthaea-core/examples/hlb_information_choice_fixture.rs"
       - "docs/research/hlb-information-choice-task-v1.json"
       - "docs/research/HLB_INFORMATION_CHOICE_FIXTURE.md"
+      - "crates/core/symthaea-fep/examples/hlb_epistemic_value_audit.rs"
   push:
     branches: [main]
     paths:
@@ -24,6 +25,7 @@ on:
       - "crates/core/symthaea-core/examples/hlb_information_choice_fixture.rs"
       - "docs/research/hlb-information-choice-task-v1.json"
       - "docs/research/HLB_INFORMATION_CHOICE_FIXTURE.md"
+      - "crates/core/symthaea-fep/examples/hlb_epistemic_value_audit.rs"
   workflow_dispatch:
 
 permissions:
@@ -86,12 +88,14 @@ jobs:
         run: |
           rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_factorial_benchmark_contract.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_information_choice_fixture.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_epistemic_value_audit.rs
 
       - name: Test factorial, environment, and negative-control invariants
         run: |
           set -euo pipefail
           cargo test --locked --release -p symthaea-core --example hlb_factorial_benchmark_contract -- --nocapture
           cargo test --locked --release -p symthaea-core --example hlb_information_choice_fixture -- --nocapture
+          cargo test --locked --release -p symthaea-fep --example hlb_epistemic_value_audit -- --nocapture
 
       - name: Generate protocol-only receipt
         env:
@@ -101,6 +105,7 @@ jobs:
           mkdir -p research-results
           cargo run --locked --release -p symthaea-core --example hlb_factorial_benchmark_contract 2>&1 | tee research-results/hlb-factorial-contract.log
           cargo run --locked --release -p symthaea-core --example hlb_information_choice_fixture 2>&1 | tee research-results/hlb-information-choice-fixture.log
+          cargo run --locked --release -p symthaea-fep --example hlb_epistemic_value_audit 2>&1 | tee research-results/hlb-fep-epistemic-audit.log
           sha256sum \
             docs/research/hlb-factorial-benchmark-v1.json \
             docs/research/HLB_INTEGRATED_FACTORIAL_BENCHMARK.md \
@@ -108,8 +113,10 @@ jobs:
             docs/research/hlb-information-choice-task-v1.json \
             docs/research/HLB_INFORMATION_CHOICE_FIXTURE.md \
             crates/core/symthaea-core/examples/hlb_information_choice_fixture.rs \
+            crates/core/symthaea-fep/examples/hlb_epistemic_value_audit.rs \
             research-results/hlb-factorial-contract.log \
-            research-results/hlb-information-choice-fixture.log > research-results/SHA256SUMS
+            research-results/hlb-information-choice-fixture.log \
+            research-results/hlb-fep-epistemic-audit.log > research-results/SHA256SUMS
           cat research-results/SHA256SUMS
 
       - name: Upload contract-validation receipt
