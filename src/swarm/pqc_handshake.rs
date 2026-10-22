@@ -55,6 +55,7 @@ use mycelix_crypto::traits::KeyEncapsulator;
 use mycelix_crypto::{AlgorithmId, TaggedPublicKey};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use zeroize::Zeroize;
 
 // ML-KEM-768 encodings from FIPS 203. Validate lengths before storing or decapsulating.
 const ML_KEM_768_PUBLIC_KEY_BYTES: usize = 1_184;
@@ -297,7 +298,7 @@ impl PqcHandshakeManager {
         })?;
 
         // Encapsulate shared secret
-        let (ciphertext, kem_shared_secret) =
+        let (ciphertext, mut kem_shared_secret) =
             self.kem_keypair.encapsulate(&tagged_pk).map_err(|e| {
                 SwarmError::TrustVerificationError {
                     reason: format!("ML-KEM-768 encapsulation failed: {e}"),
@@ -305,7 +306,8 @@ impl PqcHandshakeManager {
             })?;
 
         // Derive using BLAKE3 context-based derivation; the nonce is public context.
-        let session_key = Self::blake3_derive_session_key(classical_nonce, &kem_shared_secret);
+        let mut session_key = Self::blake3_derive_session_key(classical_nonce, &kem_shared_secret);
+        kem_shared_secret.zeroize();
 
         self.pending_session_keys.insert(
             peer_id.to_string(),
@@ -314,6 +316,8 @@ impl PqcHandshakeManager {
                 created_at: std::time::SystemTime::now(),
             },
         );
+        // Arrays are Copy; clear the temporary stack copy after insertion.
+        session_key.zeroize();
 
         Ok(ciphertext)
     }
@@ -356,14 +360,15 @@ impl PqcHandshakeManager {
         }
 
         // Decapsulate shared secret
-        let kem_shared_secret = self.kem_keypair.decapsulate(kem_ciphertext).map_err(|e| {
+        let mut kem_shared_secret = self.kem_keypair.decapsulate(kem_ciphertext).map_err(|e| {
             SwarmError::TrustVerificationError {
                 reason: format!("ML-KEM-768 decapsulation failed: {e}"),
             }
         })?;
 
         // Derive using BLAKE3 context-based derivation; the nonce is public context.
-        let session_key = Self::blake3_derive_session_key(classical_nonce, &kem_shared_secret);
+        let mut session_key = Self::blake3_derive_session_key(classical_nonce, &kem_shared_secret);
+        kem_shared_secret.zeroize();
 
         self.pending_session_keys.insert(
             peer_id.to_string(),
@@ -372,6 +377,8 @@ impl PqcHandshakeManager {
                 created_at: std::time::SystemTime::now(),
             },
         );
+        // Arrays are Copy; clear the temporary stack copy after insertion.
+        session_key.zeroize();
 
         Ok(())
     }
@@ -390,10 +397,12 @@ impl PqcHandshakeManager {
         classical_nonce: &[u8],
         kem_shared_secret: &[u8],
     ) -> [u8; 32] {
-        let mut ikm = Vec::with_capacity(classical_nonce.len() + kem_shared_secret.len());
+        let mut ikm = zeroize::Zeroizing::new(
+            Vec::with_capacity(classical_nonce.len() + kem_shared_secret.len()),
+        );
         ikm.extend_from_slice(classical_nonce);
         ikm.extend_from_slice(kem_shared_secret);
-        blake3::derive_key("symthaea-pqc-session-v1", &ikm)
+        blake3::derive_key("symthaea-pqc-session-v1", ikm.as_slice())
     }
 }
 
