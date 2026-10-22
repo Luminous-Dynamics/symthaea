@@ -750,7 +750,13 @@ impl NetworkService {
         // is intentionally fail-closed until both sides decapsulate and confirm
         // the same key over an authenticated transcript.
         #[cfg(feature = "pqc-handshake")]
-        if let Some(ref pqc) = self.pqc_manager {
+        {
+            // The feature must never silently skip PQC when manager setup is absent.
+            let pqc = self.pqc_manager.as_ref().ok_or_else(|| {
+                SwarmError::TrustVerificationError {
+                    reason: "PQC feature enabled but no KEM manager is configured".to_string(),
+                }
+            })?;
             match self
                 .run_pqc_exchange(peer_id, channel, &challenge_bytes, pqc)
                 .await
@@ -758,13 +764,12 @@ impl NetworkService {
                 Ok(()) => {
                     tracing::info!(
                         peer = peer_id,
-                        "PQC key exchange complete"
+                        "PQC handshake requirements verified"
                     );
                 }
                 Err(e) => {
-                    // The feature requests hybrid establishment. Do not silently
-                    // downgrade to classical-only after a PQC failure. Roll back
-                    // the just-verified trust entry and return an error.
+                    // Do not downgrade to classical-only. Roll back the trust
+                    // mutation from classical verification and return the error.
                     self.handshake.write().remove_peer(peer_id);
                     tracing::warn!(
                         peer = peer_id,
@@ -994,17 +999,34 @@ impl NetworkService {
 
             // Responder-side handshake: the outbound peer sends us a TrustChallenge;
             // we must sign their nonce with our Ed25519 key and reply.
-            let trust_level = self
-                .run_inbound_handshake(&peer_id, &channel)
-                .await
-                .unwrap_or_else(|e| {
+            let trust_level = match self.run_inbound_handshake(&peer_id, &channel).await {
+                Ok(trust) => trust,
+                Err(e) => {
                     tracing::warn!(
                         peer = %safe_truncate(&peer_id, 16),
                         error = %e,
-                        "Inbound handshake failed — using LocalTrust (QUIC NodeId already verified)"
+                        "Inbound handshake failed"
                     );
-                    TrustLevel::LocalTrust
-                });
+                    #[cfg(feature = "api_module")]
+                    crate::api::metrics::global()
+                        .increment("iroh_handshakes_failed_total");
+                    #[cfg(feature = "pqc-handshake")]
+                    {
+                        // The PQC protocol is incomplete; never register as
+                        // LocalTrust after an inbound handshake failure.
+                        channel.close();
+                        continue;
+                    }
+                    #[cfg(not(feature = "pqc-handshake"))]
+                    {
+                        tracing::warn!(
+                            peer = %safe_truncate(&peer_id, 16),
+                            "Using LocalTrust fallback because PQC is not required"
+                        );
+                        TrustLevel::LocalTrust
+                    }
+                }
+            };
 
             // Register peer
             let mut peer_info = PeerInfo::new(&peer_id);
@@ -1041,25 +1063,39 @@ impl NetworkService {
         peer_id: &str,
         channel: &super::iroh::IrohChannel,
     ) -> SwarmResult<TrustLevel> {
-        if !self.config.require_handshake {
-            return Ok(TrustLevel::LocalTrust);
+        #[cfg(feature = "pqc-handshake")]
+        {
+            // The responder path does not yet perform bidirectional ML-KEM,
+            // transcript binding, or key confirmation. Reject before allowing
+            // QUIC-only LocalTrust or a classical-only authenticated response.
+            let _ = (peer_id, channel);
+            return Err(SwarmError::TrustVerificationError {
+                reason: "PQC-enabled inbound handshake is unavailable until bidirectional KEM and key confirmation are implemented".to_string(),
+            });
         }
 
-        #[cfg(feature = "identity")]
-        if let Some(ref attestation) = self.attestation {
-            // Clone keys out of the read lock so we don't hold a RwLockReadGuard
-            // across the .await point inside respond_to_handshake.
-            let agent_key = attestation.read().public_key_hex().to_string();
-            let signing_key = attestation.read().signing_key().clone();
-            let trust = self
-                .respond_to_handshake(peer_id, channel, &agent_key, &signing_key)
-                .await
-                .map(|()| TrustLevel::Verified(0.8))?;
-            return Ok(trust);
-        }
+        #[cfg(not(feature = "pqc-handshake"))]
+        {
+            if !self.config.require_handshake {
+                return Ok(TrustLevel::LocalTrust);
+            }
 
-        // No attestation set: QUIC NodeId is sufficient for LocalTrust
-        Ok(TrustLevel::LocalTrust)
+            #[cfg(feature = "identity")]
+            if let Some(ref attestation) = self.attestation {
+                // Clone keys out of the read lock so we don't hold a RwLockReadGuard
+                // across the .await point inside respond_to_handshake.
+                let agent_key = attestation.read().public_key_hex().to_string();
+                let signing_key = attestation.read().signing_key().clone();
+                let trust = self
+                    .respond_to_handshake(peer_id, channel, &agent_key, &signing_key)
+                    .await
+                    .map(|()| TrustLevel::Verified(0.8))?;
+                return Ok(trust);
+            }
+
+            // No attestation set: QUIC NodeId is sufficient for LocalTrust
+            Ok(TrustLevel::LocalTrust)
+        }
     }
 
     /// Stub for non-swarm builds.
