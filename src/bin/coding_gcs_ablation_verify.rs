@@ -1465,6 +1465,20 @@ mod tests {
     }
 
     #[test]
+    fn observed_cloud_tier_is_rejected_for_native_requested_backend() {
+        let mut report = valid_fixture();
+        report["runs"][0]["generation_tiers"] = serde_json::json!(["CloudLLM"]);
+        report["summary"]["gcs_off"]["generation_tier_attempts"] = serde_json::json!({
+            "Native": 0, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 1, "Simulated": 0
+        });
+        report["summary"]["gcs_off"]["runs_with_external_llm_tier"] = Value::from(1);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| {
+            error.contains("conflict with requested model_mode native")
+        }));
+    }
+
+    #[test]
     fn generation_tier_summary_distinguishes_simulated_and_external_routes() {
         let mut report = valid_fixture();
         report["model_mode"] = Value::String("ollama".to_string());
