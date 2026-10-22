@@ -298,15 +298,14 @@ mod tests {
     #[test]
     fn missing_strong_baseline_fails_closed() {
         let mut value = fixture();
-        value["baselines"] = Value::Array(
-            value["baselines"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .filter(|baseline| baseline["id"] != "parameter_matched_gru")
-                .cloned()
-                .collect(),
-        );
+        let remaining = value["baselines"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|baseline| baseline["id"] != "parameter_matched_gru")
+            .cloned()
+            .collect();
+        value["baselines"] = Value::Array(remaining);
         assert!(validate_manifest(&value).is_err());
     }
 
