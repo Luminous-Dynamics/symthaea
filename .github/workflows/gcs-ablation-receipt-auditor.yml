@@ -39,6 +39,8 @@ jobs:
           rustfmt --edition 2024 --check examples/coding_gcs_ablation_benchmark.rs
       - name: Run independent receipt and mutation tests
         run: cargo test --locked --bin coding_gcs_ablation_verify
+      - name: Run producer provenance and backend-identity tests
+        run: cargo test --locked --example coding_gcs_ablation_benchmark --features "code_generation geodesic_synthesis"
       - name: Compile the paired benchmark producer
         run: cargo check --locked --example coding_gcs_ablation_benchmark --features "code_generation geodesic_synthesis"
       - name: Run strict Clippy on the auditor
