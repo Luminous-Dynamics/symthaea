@@ -7,12 +7,15 @@
     "provider": "Microsoft SWE-bench-Live MultiLang",
     "repository_url": "https://github.com/microsoft/SWE-bench-Live",
     "code_revision_sha": "62d02936a0726fbf4597b05bd07b09fb99eddae6",
-    "data_revision": null,
-    "split": "UNPINNED - choose and record the official split before any scored run",
-    "language_slice": "Rust-only; filter by upstream language metadata and freeze ordered task IDs",
+    "data_revision": "3638632e8153a10ca422c1022bed79023084b5c9",
+    "split": "rust",
+    "language_slice": "Official Rust split at the pinned Hugging Face snapshot; 171 candidate rows reported upstream. Final denominator must be computed after three gold-patch validation runs and an independent task-quality audit.",
     "task_count": null,
     "task_ids_sha256": null,
-    "manifest_sha256": null
+    "manifest_sha256": null,
+    "candidate_row_count": 171,
+    "data_file_path": "data/rust-00000-of-00001.parquet",
+    "data_file_sha256": "02ac78e2c51a84eb174ac393bb07b77478f1f96cf260af18835a711dd8074ebc"
   },
   "agent": {
     "agent_name": "Symthaea coding agent",
