@@ -276,13 +276,20 @@ impl CognitiveLoopService {
         // This complements FEP surprise tau (Friston 2010) — they work in synergy:
         // FEP surprise drives fast dynamics, horizon scale drives planning depth.
         let prediction_horizon_tau = {
-            let pe = self.stats.avg_prediction_error.clamp(0.0, 1.0);
-            let pe_scale = if pe > HORIZON_PE_CONTRACT_THRESHOLD {
-                1.0 - (pe - HORIZON_PE_CONTRACT_THRESHOLD) * HORIZON_PE_CONTRACT_RATE
-            } else if pe < HORIZON_PE_EXPAND_THRESHOLD {
-                1.0 + (HORIZON_PE_EXPAND_THRESHOLD - pe) * HORIZON_PE_EXPAND_RATE
-            } else {
+            // An unobserved PE history is not evidence that the current model is
+            // accurate. Keep this controller neutral until a genuine comparison
+            // has been recorded.
+            let pe_scale = if self.error_history.is_empty() {
                 1.0
+            } else {
+                let pe = self.stats.avg_prediction_error.clamp(0.0, 1.0);
+                if pe > HORIZON_PE_CONTRACT_THRESHOLD {
+                    1.0 - (pe - HORIZON_PE_CONTRACT_THRESHOLD) * HORIZON_PE_CONTRACT_RATE
+                } else if pe < HORIZON_PE_EXPAND_THRESHOLD {
+                    1.0 + (HORIZON_PE_EXPAND_THRESHOLD - pe) * HORIZON_PE_EXPAND_RATE
+                } else {
+                    1.0
+                }
             };
             let slope = perception.urgency.error_slope;
             let slope_scale = if slope > HORIZON_SLOPE_THRESHOLD {
