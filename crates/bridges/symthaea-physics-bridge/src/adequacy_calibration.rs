@@ -9,8 +9,11 @@
 //! scores, the rank p-value controls marginal false alarms without assuming a Gaussian residual
 //! distribution. It does not detect every type of misspecification: a wrong law can have an
 //! ordinary residual score on a particular audit batch, and covariate shift can invalidate
-//! exchangeability. Use target-distribution audit batches or a separately justified shift-aware
-//! method when the target distribution differs.
+//! exchangeability. A single RMS score can be insensitive to localized outliers or residual
+//! dependence. The multi-view score below combines predeclared batch diagnostics into one scalar
+//! before conformal calibration; calibration is then applied to that aggregate statistic, not to
+//! each component separately. Use target-distribution audit batches or a separately justified
+//! shift-aware method when the target distribution differs.
 //!
 //! This module never sees hidden ground truth or discrepancy amplitudes. It only evaluates a
 //! caller-supplied batch score and independent calibration-score reference set.
@@ -236,6 +239,119 @@ pub fn standardized_rms_residual(
     rms.is_finite().then_some(rms)
 }
 
+/// Composite batch-level nonconformity score for several predeclared residual failure modes.
+///
+/// The function takes the maximum of four complementary standardized diagnostics:
+/// - RMS standardized residual (broad predictive misfit);
+/// - maximum absolute standardized residual divided by sqrt(2 ln(n + 1)) (localized outlier);
+/// - sqrt(n) times the absolute mean standardized residual (systematic bias);
+/// - sqrt(n - 1) times the absolute lag-one residual correlation (serial structure).
+///
+/// These normalizers are sensitivity heuristics, not Gaussian p-values. Finite-sample false-alarm
+/// control comes from conformal calibration of this *single aggregate score* on independent clean
+/// batches, using exactly the same function, batch length, ordering convention, and predeclared
+/// diagnostic family for calibration and audit data. Do not calibrate each component separately
+/// and then treat this score as if it were calibrated. Changing batch size or the diagnostic family
+/// defines a different score contract and requires fresh calibration.
+///
+/// Returns None for empty/mismatched arrays, invalid scales, non-finite values, or arithmetic
+/// overflow. For an all-zero residual batch the score is zero. The caller must preserve the
+/// intended target-distribution/exchangeability protocol.
+pub fn multi_view_standardized_residual_score(
+    observed: &[f64],
+    predicted: &[f64],
+    predictive_scales: &[f64],
+) -> Option<f64> {
+    if observed.is_empty()
+        || observed.len() != predicted.len()
+        || observed.len() != predictive_scales.len()
+    {
+        return None;
+    }
+
+    let mut standardized = Vec::with_capacity(observed.len());
+    for ((observed_value, predicted_value), scale) in observed
+        .iter()
+        .copied()
+        .zip(predicted.iter().copied())
+        .zip(predictive_scales.iter().copied())
+    {
+        if !observed_value.is_finite()
+            || !predicted_value.is_finite()
+            || !scale.is_finite()
+            || scale <= 0.0
+        {
+            return None;
+        }
+        let residual = observed_value - predicted_value;
+        if !residual.is_finite() {
+            return None;
+        }
+        let score = residual / scale;
+        if !score.is_finite() {
+            return None;
+        }
+        standardized.push(score);
+    }
+
+    let n = standardized.len();
+    let max_abs = standardized
+        .iter()
+        .map(|score| score.abs())
+        .fold(0.0_f64, f64::max);
+    if max_abs == 0.0 {
+        return Some(0.0);
+    }
+
+    // Normalize before summing to avoid premature overflow in the moments.
+    let normalized = standardized
+        .iter()
+        .map(|score| score / max_abs)
+        .collect::<Vec<_>>();
+    let mean_normalized = normalized.iter().sum::<f64>() / n as f64;
+    let mean_scaled_squares = normalized
+        .iter()
+        .map(|score| score * score)
+        .sum::<f64>()
+        / n as f64;
+    let rms = max_abs * mean_scaled_squares.sqrt();
+
+    // These are fixed scale factors for the predeclared statistic, not analytic p-values.
+    let peak_normalizer = (2.0 * ((n as f64) + 1.0).ln()).sqrt();
+    let peak = max_abs / peak_normalizer;
+    let bias = max_abs * mean_normalized.abs() * (n as f64).sqrt();
+
+    let serial = if n < 2 {
+        0.0
+    } else {
+        let centered = normalized
+            .iter()
+            .map(|score| score - mean_normalized)
+            .collect::<Vec<_>>();
+        let numerator = centered
+            .windows(2)
+            .map(|pair| pair[0] * pair[1])
+            .sum::<f64>();
+        let left_sum_squares = centered[..n - 1]
+            .iter()
+            .map(|score| score * score)
+            .sum::<f64>();
+        let right_sum_squares = centered[1..]
+            .iter()
+            .map(|score| score * score)
+            .sum::<f64>();
+        let denominator = left_sum_squares.sqrt() * right_sum_squares.sqrt();
+        if denominator == 0.0 {
+            0.0
+        } else {
+            (numerator / denominator).abs().min(1.0) * ((n - 1) as f64).sqrt()
+        }
+    };
+
+    let composite = rms.max(peak).max(bias).max(serial);
+    composite.is_finite().then_some(composite)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262,6 +378,95 @@ mod tests {
         assert_eq!(standardized_rms_residual(&[1.0], &[0.0], &[0.0]), None);
         assert_eq!(standardized_rms_residual(&[f64::NAN], &[0.0], &[1.0]), None);
         assert_eq!(standardized_rms_residual(&[f64::MAX], &[-f64::MAX], &[1.0]), None);
+    }
+
+    #[test]
+    fn multi_view_score_detects_a_localized_outlier_better_than_rms() {
+        let mut observed = vec![0.0; 100];
+        observed[50] = 1.0;
+        let predicted = vec![0.0; 100];
+        let scales = vec![1.0; 100];
+
+        let rms = standardized_rms_residual(&observed, &predicted, &scales).unwrap();
+        let multi_view =
+            multi_view_standardized_residual_score(&observed, &predicted, &scales).unwrap();
+
+        assert!((rms - 0.1).abs() < 1e-12);
+        assert!(multi_view > rms * 3.0);
+    }
+
+    #[test]
+    fn multi_view_score_detects_systematic_bias_beyond_rms() {
+        let observed = vec![0.25; 64];
+        let predicted = vec![0.0; 64];
+        let scales = vec![1.0; 64];
+
+        let rms = standardized_rms_residual(&observed, &predicted, &scales).unwrap();
+        let multi_view =
+            multi_view_standardized_residual_score(&observed, &predicted, &scales).unwrap();
+
+        assert!((rms - 0.25).abs() < 1e-12);
+        assert!(multi_view >= 2.0 - 1e-12);
+    }
+
+    #[test]
+    fn multi_view_score_detects_alternating_residual_structure() {
+        let observed = (0..32)
+            .map(|index| if index % 2 == 0 { 1.0 } else { -1.0 })
+            .collect::<Vec<_>>();
+        let predicted = vec![0.0; 32];
+        let scales = vec![1.0; 32];
+
+        let rms = standardized_rms_residual(&observed, &predicted, &scales).unwrap();
+        let multi_view =
+            multi_view_standardized_residual_score(&observed, &predicted, &scales).unwrap();
+
+        assert!((rms - 1.0).abs() < 1e-12);
+        assert!(multi_view > 5.0);
+    }
+
+    #[test]
+    fn multi_view_score_preserves_zero_and_fails_closed() {
+        assert_eq!(
+            multi_view_standardized_residual_score(
+                &[1.0, -2.0],
+                &[1.0, -2.0],
+                &[0.1, 100.0]
+            ),
+            Some(0.0)
+        );
+        assert_eq!(multi_view_standardized_residual_score(&[], &[], &[]), None);
+        assert_eq!(
+            multi_view_standardized_residual_score(&[1.0], &[0.0], &[0.0]),
+            None
+        );
+        assert_eq!(
+            multi_view_standardized_residual_score(&[f64::NAN], &[0.0], &[1.0]),
+            None
+        );
+        assert_eq!(
+            multi_view_standardized_residual_score(&[f64::MAX], &[-f64::MAX], &[1.0]),
+            None
+        );
+    }
+
+    #[test]
+    fn conformal_calibration_applies_to_the_frozen_aggregate_score() {
+        let calibration_scores = (1..=19)
+            .map(|value| multi_view_standardized_residual_score(
+                &[value as f64, 0.0, 0.0],
+                &[0.0, 0.0, 0.0],
+                &[1.0, 1.0, 1.0],
+            ).unwrap())
+            .collect::<Vec<_>>();
+        let calibrator =
+            ConformalAdequacyCalibrator::new(&calibration_scores, 0.05).unwrap();
+        let audit_score =
+            multi_view_standardized_residual_score(&[100.0, 0.0, 0.0], &[0.0; 3], &[1.0; 3])
+                .unwrap();
+        let result = calibrator.assess_audit_score(audit_score, true).unwrap();
+        assert!((result.p_value - 0.05).abs() < 1e-12);
+        assert!(matches!(result.assessment, AdequacyAssessment::Alarm { .. }));
     }
 
     #[test]
