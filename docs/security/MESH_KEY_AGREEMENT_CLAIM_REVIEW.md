@@ -107,7 +107,7 @@ Before this change, `receive_kem_public_key` copied arbitrary-length public-key 
 - Return errors for invalid lengths, empty/oversized peer identifiers, and capacity exhaustion without inserting new state.
 - Add tests for public-key lengths 0/1,183/1,185, ciphertext lengths 0/1,087/1,089, and refusal of a 257th pending KEM exchange.
 
-The public-key-length check confirms only the encoding size; it does not authenticate the key or prove it is cryptographically valid. `TaggedPublicKey` construction/encapsulation can still reject malformed contents at the crypto boundary. Identity/transcript binding and rate limits at the transport edge remain mandatory. The new tests have not been compiled or run locally.
+Regression coverage is in `test_kem_public_key_length_and_peer_id_are_validated_before_storage`, `test_pending_kem_exchange_count_is_bounded`, `test_pending_candidate_count_is_bounded_before_kem_work`, and `test_invalid_kem_ciphertext_lengths_do_not_create_candidates`. The public-key-length check confirms only the encoding size; it does not authenticate the key or prove it is cryptographically valid. `TaggedPublicKey` construction/encapsulation can still reject malformed contents at the crypto boundary. Identity/transcript binding and rate limits at the transport edge remain mandatory. The new tests have not been compiled or run locally.
 
 ## K-8 — The service was marking a one-sided KEM exchange as complete
 
