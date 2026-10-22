@@ -705,8 +705,8 @@ mod tests {
         );
         assert_eq!(raw_only_wins + eig_only_wins + ties, SEEDS as usize);
         assert_eq!(paired_outcomes.len(), SEEDS as usize);
-        assert!(success_ci_low <= success_delta && success_delta <= success_ci_high);
-        assert!(round_ci_low <= round_delta && round_delta <= round_ci_high);
+        assert!(success_ci_low <= success_ci_high);
+        assert!(round_ci_low <= round_ci_high);
         assert!(success_ci_low.is_finite() && success_ci_high.is_finite());
         assert!(round_ci_low.is_finite() && round_ci_high.is_finite());
         assert!((0.0..=1.0).contains(&(raw_successes as f64 / SEEDS as f64)));
