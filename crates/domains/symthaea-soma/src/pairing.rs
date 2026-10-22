@@ -755,6 +755,31 @@ mod tests {
         let trusted_key = alice.paired_devices()[0].pubkey;
         let _ = alice.drain_outbound(); // discard the expected Ack
 
+        // The same key may re-pair and refresh liveness, but must not create
+        // a duplicate identity record.
+        alice.tick(101);
+        bob.tick(101);
+        assert!(alice.initiate_pairing(2));
+        let repeat_challenge = alice.drain_outbound();
+        let (repeat_nonce, repeat_initiator_pubkey) = match &repeat_challenge[0] {
+            PairingOutbound::Challenge { nonce, initiator_pubkey, .. } => {
+                (nonce.clone(), initiator_pubkey.clone())
+            }
+            other => panic!("Expected Challenge, got {:?}", other),
+        };
+        assert!(bob.receive_challenge(1, &repeat_nonce, &repeat_initiator_pubkey));
+        let repeat_response = bob.drain_outbound();
+        let (repeat_signature, repeat_bob_pubkey) = match &repeat_response[0] {
+            PairingOutbound::Response { signature, pubkey, .. } => {
+                (signature.clone(), pubkey.clone())
+            }
+            other => panic!("Expected Response, got {:?}", other),
+        };
+        assert!(alice.verify_response(2, &repeat_signature, &repeat_bob_pubkey));
+        assert_eq!(alice.paired_count(), 1);
+        assert_eq!(alice.paired_devices()[0].last_seen, 101);
+        let _ = alice.drain_outbound(); // discard the expected Ack
+
         // A different key can produce a cryptographically valid response, but
         // it must not replace the identity already pinned to peer ID 2.
         assert!(alice.initiate_pairing(2));
