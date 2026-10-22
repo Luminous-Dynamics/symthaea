@@ -6,6 +6,10 @@ on:
     paths:
       - "tools/allostatic-control-bench/**"
       - "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
+      - "docs/research/EXTERNAL_RUNTIME_ASSURANCE_BENCHMARK_V1.md"
+      - "docs/research/PAIRED_RUNTIME_ASSURANCE_INFERENCE_V1.md"
+      - "docs/research/STRATIFIED_RUNTIME_ASSURANCE_AGGREGATION_V1.md"
+      - "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
       - ".github/workflows/allostatic-control-bench.yml"
   workflow_dispatch:
 
@@ -52,3 +56,4 @@ jobs:
             allostatic-control-v1-mismatch-frontier.csv
             allostatic-control-v1-mismatch-frontier-summary.csv
             allostatic-control-v1-paired-eval-selftest-summary.csv
+            allostatic-control-v1-stratified-aggregate.csv
