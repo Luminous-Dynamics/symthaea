@@ -108,6 +108,8 @@ jobs:
                       " ".join(case["variant_statement"].split()).encode("utf-8")
                   ).hexdigest(),
                   "evidence_declarations": case["evidence_declarations"],
+                  "contract_precondition": case.get("contract_precondition"),
+                  "state_intervention": case.get("state_intervention"),
                   "model_outcomes": case["model_outcomes"],
               })
 
