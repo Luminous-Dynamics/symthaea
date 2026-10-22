@@ -178,6 +178,159 @@ pub fn select_most_informative_experiment<'a, H, E>(
     best
 }
 
+/// Number of deterministic quadrature points used to integrate expected information gain.
+const INFORMATION_GAIN_QUADRATURE_STEPS: usize = 256;
+const INFORMATION_GAIN_Z_LIMIT: f64 = 8.0;
+
+/// Compute log(sum(exp(values))) without overflowing intermediate exponentials.
+fn log_sum_exp(values: &[f64]) -> f64 {
+    let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    if maximum == f64::NEG_INFINITY {
+        return maximum;
+    }
+    maximum + values.iter().map(|value| (*value - maximum).exp()).sum::<f64>().ln()
+}
+
+/// Limit of the uniform-prior information gain as the observation noise tends to zero.
+/// Predictions that are exactly equal remain observationally indistinguishable.
+fn noiseless_information_gain(predictions: &[f64]) -> f64 {
+    let mut groups: Vec<(f64, usize)> = Vec::new();
+    for &prediction in predictions {
+        if let Some((_, count)) = groups.iter_mut().find(|(value, _)| *value == prediction) {
+            *count += 1;
+        } else {
+            groups.push((prediction, 1));
+        }
+    }
+    let total = predictions.len() as f64;
+    groups
+        .iter()
+        .map(|(_, count)| {
+            let probability = *count as f64 / total;
+            -probability * probability.ln()
+        })
+        .sum()
+}
+
+/// Estimate expected information gain, in nats, from an experiment under a common
+/// Gaussian observation-noise model and a uniform prior over live hypotheses.
+///
+/// This is a model-discrimination score, not raw prediction variance:
+///
+/// I(H; Y | experiment) = E[log(p(Y | H, experiment) / p(Y | experiment))].
+///
+/// A deterministic midpoint quadrature integrates standard-normal noise over ±8
+/// standard deviations. Candidate scoring is comparable only when the supplied
+/// observation_std_dev represents the same measurement process for all candidates.
+/// To avoid silently rewarding a candidate whose predictions are undefined, every
+/// hypothesis must return a finite prediction. None indicates invalid noise,
+/// fewer than two hypotheses, or incomplete/non-finite predictions. Identical
+/// predictions score zero; as noise decreases, distinguishable prediction groups
+/// approach their categorical entropy (at most ln(hypotheses.len()) nats).
+pub fn expected_information_gain_nats<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    observation_std_dev: f64,
+    predict: impl Fn(&H, &E) -> Option<f64>,
+) -> Option<f64> {
+    if hypotheses.len() < 2 || !observation_std_dev.is_finite() || observation_std_dev <= 0.0 {
+        return None;
+    }
+
+    let predictions: Vec<f64> = hypotheses
+        .iter()
+        .map(|hypothesis| predict(hypothesis, experiment))
+        .collect::<Option<Vec<_>>>()?;
+    if predictions.iter().any(|prediction| !prediction.is_finite()) {
+        return None;
+    }
+
+    // Scale means and noise by a shared finite magnitude before subtraction. This
+    // avoids overflow for large, opposite-sign predictions while preserving ratios.
+    let mean_scale = predictions
+        .iter()
+        .map(|prediction| prediction.abs())
+        .fold(observation_std_dev, f64::max);
+    let scaled_means: Vec<f64> = predictions
+        .iter()
+        .map(|prediction| prediction / mean_scale)
+        .collect();
+    let scaled_noise = observation_std_dev / mean_scale;
+    if scaled_noise == 0.0 {
+        return Some(noiseless_information_gain(&predictions));
+    }
+
+    let step_width = 2.0 * INFORMATION_GAIN_Z_LIMIT / INFORMATION_GAIN_QUADRATURE_STEPS as f64;
+    let mut quadrature = Vec::with_capacity(INFORMATION_GAIN_QUADRATURE_STEPS);
+    for step_index in 0..INFORMATION_GAIN_QUADRATURE_STEPS {
+        let z = -INFORMATION_GAIN_Z_LIMIT + (step_index as f64 + 0.5) * step_width;
+        // The normalizing constant cancels when these density weights are normalized.
+        quadrature.push((z, (-0.5 * z * z).exp() * step_width));
+    }
+    let weight_sum: f64 = quadrature.iter().map(|(_, weight)| weight).sum();
+    let prior_log_probability = -(predictions.len() as f64).ln();
+    let prior_probability = prior_log_probability.exp();
+    let mut log_terms = Vec::with_capacity(predictions.len());
+    let mut information_gain = 0.0;
+
+    for true_mean in scaled_means.iter().copied() {
+        for &(z, weight) in &quadrature {
+            log_terms.clear();
+            for other_mean in scaled_means.iter().copied() {
+                let separation = (true_mean - other_mean) / scaled_noise;
+                let log_likelihood_ratio = if separation == 0.0 {
+                    0.0
+                } else if !separation.is_finite() || separation.abs() > 1.0e6 {
+                    f64::NEG_INFINITY
+                } else {
+                    -0.5 * separation * separation - z * separation
+                };
+                log_terms.push(prior_log_probability + log_likelihood_ratio);
+            }
+            let log_mixture_ratio = log_sum_exp(&log_terms);
+            // Pointwise information is -log of the prior-weighted likelihood ratio mixture.
+            information_gain -= (weight / weight_sum) * prior_probability * log_mixture_ratio;
+        }
+    }
+
+    if !information_gain.is_finite() {
+        return None;
+    }
+    Some(information_gain.clamp(0.0, (predictions.len() as f64).ln()))
+}
+
+/// Select the candidate maximizing expected information gain per unit cost.
+///
+/// Candidates with non-positive/non-finite costs or incomplete predictions are
+/// skipped. The returned score is nats per cost unit. Strict comparison preserves
+/// the first candidate when scores tie, making selection deterministic.
+pub fn select_experiment_by_information_gain_per_cost<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    observation_std_dev: f64,
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let Some(information_gain) =
+            expected_information_gain_nats(experiment, hypotheses, observation_std_dev, predict)
+        else {
+            continue;
+        };
+        let score = information_gain / experiment_cost;
+        if score.is_finite() && best.is_none_or(|(_, best_score)| score > best_score) {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268,6 +421,117 @@ mod tests {
     /// hypothesis representation), not just closures -- confirms this is
     /// directly usable against the discovery engine's own candidate type,
     /// without depending on any specific domain (wave-chain or otherwise).
+    #[test]
+    fn information_gain_is_zero_when_all_hypotheses_predict_the_same_value() {
+        let hypotheses = [0_i32, 1, 2, 3];
+        let score = expected_information_gain_nats(&(), &hypotheses, 1.0, |_, _| Some(42.0))
+            .expect("valid noise and complete predictions");
+        assert!(score.abs() < 1.0e-12, "identical predictions should teach nothing: {score}");
+    }
+
+    #[test]
+    fn information_gain_prefers_balanced_discrimination_over_a_single_outlier() {
+        // Raw variance heavily favors [0, 0, 0, 100], although one observation
+        // can only identify one hypothesis against three indistinguishable ones.
+        let outlier = [0.0, 0.0, 0.0, 100.0];
+        let balanced = [0.0, 0.0, 10.0, 10.0];
+        assert!(variance(&outlier) > variance(&balanced));
+        let hypotheses = [0_usize, 1, 2, 3];
+        let outlier_gain = expected_information_gain_nats(
+            &0_usize,
+            &hypotheses,
+            1.0,
+            |hypothesis, _| Some(outlier[*hypothesis]),
+        )
+        .expect("complete finite predictions");
+        let balanced_gain = expected_information_gain_nats(
+            &0_usize,
+            &hypotheses,
+            1.0,
+            |hypothesis, _| Some(balanced[*hypothesis]),
+        )
+        .expect("complete finite predictions");
+        assert!(
+            balanced_gain > outlier_gain + 0.05,
+            "balanced split should reduce hypothesis uncertainty more: outlier={outlier_gain}, balanced={balanced_gain}"
+        );
+        assert!(balanced_gain <= 4.0_f64.ln());
+    }
+
+    #[test]
+    fn information_gain_decreases_as_measurement_noise_increases() {
+        let hypotheses = [0.0_f64, 2.0];
+        let predict = |hypothesis: &f64, _: &()| Some(*hypothesis);
+        let low_noise = expected_information_gain_nats(&(), &hypotheses, 0.1, predict).unwrap();
+        let medium_noise = expected_information_gain_nats(&(), &hypotheses, 1.0, predict).unwrap();
+        let high_noise = expected_information_gain_nats(&(), &hypotheses, 10.0, predict).unwrap();
+        assert!(low_noise > medium_noise);
+        assert!(medium_noise > high_noise);
+        for score in [low_noise, medium_noise, high_noise] {
+            assert!(score.is_finite() && (0.0..=2.0_f64.ln()).contains(&score));
+        }
+    }
+
+    #[test]
+    fn information_gain_fails_closed_on_invalid_noise_or_incomplete_predictions() {
+        let hypotheses = [0_i32, 1, 2];
+        assert!(expected_information_gain_nats(&(), &hypotheses, 0.0, |h, _| Some(*h as f64)).is_none());
+        assert!(expected_information_gain_nats(&(), &hypotheses, f64::NAN, |h, _| Some(*h as f64)).is_none());
+        assert!(expected_information_gain_nats(&(), &hypotheses, 1.0, |h, _| {
+            (*h != 1).then_some(*h as f64)
+        })
+        .is_none());
+        assert!(expected_information_gain_nats(&(), &[1_i32], 1.0, |h, _| Some(*h as f64)).is_none());
+    }
+
+    #[test]
+    fn information_gain_selector_maximizes_information_per_cost_not_raw_information() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let candidates = [1_u8, 2, 3];
+        let predict = |hypothesis: &usize, experiment: &u8| {
+            match (*experiment, *hypothesis) {
+                (1, 0 | 1) => Some(0.0),
+                (1, 2 | 3) => Some(1.0),
+                (2, 0 | 1) => Some(0.0),
+                (2, 2 | 3) => Some(10.0),
+                (3, 0) => Some(-100.0),
+                (3, 1) => Some(-50.0),
+                (3, 2) => Some(50.0),
+                (3, 3) => Some(100.0),
+                _ => None,
+            }
+        };
+        let low_cost_information =
+            expected_information_gain_nats(&1, &hypotheses, 1.0, predict).unwrap();
+        let high_cost_information =
+            expected_information_gain_nats(&2, &hypotheses, 1.0, predict).unwrap();
+        assert!(high_cost_information > low_cost_information);
+
+        let (chosen, score) = select_experiment_by_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            1.0,
+            predict,
+            |experiment| match experiment {
+                1 => 1.0,
+                2 => 100.0,
+                3 => 0.0, // Non-physical costs are rejected, even with high information.
+                _ => f64::INFINITY,
+            },
+        )
+        .expect("at least one valid candidate");
+        assert_eq!(*chosen, 1);
+        assert!(score.is_finite() && score > 0.0);
+    }
+
+    #[test]
+    fn information_gain_is_robust_to_extreme_finite_predictions() {
+        let hypotheses = [-1.0e308_f64, 1.0e308_f64];
+        let score = expected_information_gain_nats(&(), &hypotheses, 1.0, |h, _| Some(*h))
+            .expect("finite means and noise");
+        assert!((score - 2.0_f64.ln()).abs() < 1.0e-12);
+    }
+
     #[test]
     fn works_directly_against_expr_hypotheses() {
         use crate::hdc::conjecture_engine::BinOp;
