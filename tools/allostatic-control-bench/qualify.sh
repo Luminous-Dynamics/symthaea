@@ -12,6 +12,7 @@ source_files=(
   "tools/allostatic-control-bench/src/lib.rs"
   "tools/allostatic-control-bench/src/calibration.rs"
   "tools/allostatic-control-bench/src/drift_monitor.rs"
+  "tools/allostatic-control-bench/src/scope_monitor.rs"
   "tools/allostatic-control-bench/src/model_mismatch.rs"
   "tools/allostatic-control-bench/src/multistep_viability.rs"
   "tools/allostatic-control-bench/src/robust_viability.rs"
@@ -20,11 +21,13 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-model-mismatch-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-multistep-viability-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-ood-fallback-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-task-scope-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
   "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
   "docs/research/OOD_REACHABILITY_FALLBACK_V1.md"
+  "docs/research/TASK_RELEVANT_SCOPE_MONITOR_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -52,6 +55,8 @@ horizon_out="${out_base}-multistep-horizon.csv"
 horizon_summary_out="${out_base}-multistep-horizon-summary.csv"
 ood_out="${out_base}-ood-fallback.csv"
 ood_summary_out="${out_base}-ood-fallback-summary.csv"
+scope_out="${out_base}-task-scope.csv"
+scope_summary_out="${out_base}-task-scope-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -369,6 +374,93 @@ if ! awk -F, '
   exit 1
 fi
 
+# Compare generic feature-space OOD scores with task-relevant one-step
+# model-scope residuals. Calibration is episode-level and test cases include a
+# stealth shift with nominal-distribution feature scores but shifted dynamics.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-task-scope-bench -- \
+  "$tmpdir/scope-a.csv" "$tmpdir/scope-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-task-scope-bench -- \
+  "$tmpdir/scope-b.csv" "$tmpdir/scope-summary-b.csv"
+if ! cmp -s "$tmpdir/scope-a.csv" "$tmpdir/scope-b.csv" ||
+   ! cmp -s "$tmpdir/scope-summary-a.csv" "$tmpdir/scope-summary-b.csv"; then
+  printf 'FAIL: repeated task-scope raw and summary outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 19) failed = 1; next }
+  {
+    if (NF != 19) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "moderate_shift" &&
+        $2 != "strong_shift" && $2 != "stealth_shift") failed = 1
+    if ($3 !~ /^[0-9]+$/ || $3 >= 300) failed = 1
+    for (i = 4; i <= 5; i++) if ($i !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    for (i = 6; i <= 11; i++) if ($i != "true" && $i != "false") failed = 1
+    for (i = 12; i <= 15; i++) if ($i !~ /^[0-8]$/) failed = 1
+    for (i = 16; i <= 19; i++) if ($i != "true" && $i != "false") failed = 1
+    if (($4 > $5) != ($6 == "true")) failed = 1
+    if (($7 > $8) != ($9 == "true")) failed = 1
+    if (($6 == "true" || $9 == "true") != ($10 == "true")) failed = 1
+    if ($12 != (($6 == "true") ? 0 : 8)) failed = 1
+    if (($13 < 8) != ($9 == "true")) failed = 1
+    expected_combined = ($12 < $13 ? $12 : $13)
+    if ($14 != expected_combined) failed = 1
+    if (($15 < 8) != ($19 == "true")) failed = 1
+    if ($11 != ($2 == "nominal" ? "false" : "true")) failed = 1
+    if (($15 < 8 && $16 == "true") != ($15 < 8 && $12 <= $15)) failed = 1
+    if (($15 < 8 && $17 == "true") != ($15 < 8 && $13 <= $15)) failed = 1
+    if (($15 < 8 && $18 == "true") != ($15 < 8 && $14 <= $15)) failed = 1
+    pair_key = $1 SUBSEP $3
+    if ($2 == "nominal") nominal_feature_alarm[pair_key] = $6
+    if ($2 == "stealth_shift" && nominal_feature_alarm[pair_key] != $6) failed = 1
+    key = $1 SUBSEP $2 SUBSEP $3
+    if (seen[key]++) failed = 1
+    rows++
+  }
+  END { if (NR != 6001 || rows != 6000 || failed) exit 1 }
+' "$tmpdir/scope-a.csv"; then
+  printf 'FAIL: task-scope raw schema, paired stealth score, envelope or alarm-step contract is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 23) failed = 1; next }
+  {
+    if (NF != 23) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "moderate_shift" &&
+        $2 != "strong_shift" && $2 != "stealth_shift") failed = 1
+    if ($3 != 300) failed = 1
+    for (i = 4; i <= 19; i++) if ($i !~ /^[0-9]+$/) failed = 1
+    if ($4 > 300 || $5 > 300 || $6 > 300 ||
+        $7 > $4 || $8 > $5 || $9 > $6 ||
+        $10 > 300 || $11 > 300 || $12 > 300 ||
+        $13 > 300 || $14 > $13 || $15 > $13 || $16 > $13 ||
+        $17 > $13 || $18 > $13 || $19 > $13) failed = 1
+    if (($14 + $17) != $13 || ($15 + $18) != $13 ||
+        ($16 + $19) != $13) failed = 1
+    if ($20 !~ /^[0-9]*[.]?[0-9]+$/ || $21 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        $22 !~ /^[0-9]*[.]?[0-9]+$/ || $23 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($2 == "nominal" && ($7 > 30 || $8 > 30 || $9 > 30)) failed = 1
+    if (($2 == "moderate_shift" || $2 == "strong_shift" || $2 == "stealth_shift") &&
+        ($11 > 30 || $12 > 30)) failed = 1
+    if ($2 == "moderate_shift" && $10 > 150) failed = 1
+    if ($2 == "strong_shift" && $10 != 0) failed = 1
+    if ($2 == "stealth_shift" && ($10 < 240 || $11 > 30)) failed = 1
+    if ($2 == "nominal" && $11 > 30) failed = 1
+    key = $1 SUBSEP $2
+    if (seen[key]++) failed = 1
+    rows++
+  }
+  END { if (NR != 21 || rows != 20 || failed) exit 1 }
+' "$tmpdir/scope-summary-a.csv"; then
+  printf 'FAIL: task-scope per-state false-alarm, missed-shift or safety-event summary is invalid\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -395,6 +487,8 @@ cp "$tmpdir/horizon-a.csv" "$horizon_out"
 cp "$tmpdir/horizon-summary-a.csv" "$horizon_summary_out"
 cp "$tmpdir/ood-a.csv" "$ood_out"
 cp "$tmpdir/ood-summary-a.csv" "$ood_summary_out"
+cp "$tmpdir/scope-a.csv" "$scope_out"
+cp "$tmpdir/scope-summary-a.csv" "$scope_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -422,6 +516,10 @@ cp "$tmpdir/ood-summary-a.csv" "$ood_summary_out"
   printf 'ood_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$ood_out") - 1 ))"
   printf 'ood_summary_sha256=%s\n' "$(sha256sum "$ood_summary_out" | awk '{print $1}')"
   printf 'ood_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$ood_summary_out") - 1 ))"
+  printf 'task_scope_sha256=%s\n' "$(sha256sum "$scope_out" | awk '{print $1}')"
+  printf 'task_scope_rows_excluding_header=%s\n' "$(( $(wc -l < "$scope_out") - 1 ))"
+  printf 'task_scope_summary_sha256=%s\n' "$(sha256sum "$scope_summary_out" | awk '{print $1}')"
+  printf 'task_scope_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$scope_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -435,4 +533,6 @@ printf 'Multi-step viability horizon frontier: %s\n' "$horizon_out"
 printf 'Multi-step viability horizon summary: %s\n' "$horizon_summary_out"
 printf 'OOD fallback frontier: %s\n' "$ood_out"
 printf 'OOD fallback summary: %s\n' "$ood_summary_out"
+printf 'Task-relevant scope frontier: %s\n' "$scope_out"
+printf 'Task-relevant scope summary: %s\n' "$scope_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
