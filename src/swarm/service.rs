@@ -743,19 +743,6 @@ impl NetworkService {
             .write()
             .verify_response(peer_id, &signed_nonce, &agent_key)?;
 
-        // Emit TrustChanged event
-        let _ = self.peer_event_tx.send(PeerEvent::TrustChanged {
-            peer_id: peer_id.to_string(),
-            old: TrustLevel::Unknown,
-            new: trust,
-        });
-
-        tracing::info!(
-            peer = peer_id,
-            trust = ?trust,
-            "Classical handshake verified"
-        );
-
         // ── PQC Key Exchange (Phase 2 of hybrid handshake) ──────────
         // After classical Ed25519 verification, perform ML-KEM-768
         // key encapsulation for quantum-resistant session key derivation.
@@ -772,92 +759,53 @@ impl NetworkService {
                     );
                 }
                 Err(e) => {
-                    // PQC failure is non-fatal: classical handshake already verified.
-                    // Log and continue with classical-only security.
+                    // The feature requests hybrid establishment. Do not silently
+                    // downgrade to classical-only after a PQC failure. Roll back
+                    // the just-verified trust entry and return an error.
+                    self.handshake.write().remove_peer(peer_id);
                     tracing::warn!(
                         peer = peer_id,
                         error = %e,
-                        "PQC key exchange failed — falling back to classical-only"
+                        "PQC establishment failed — trust rolled back; refusing downgrade"
                     );
+                    return Err(e);
                 }
             }
         }
 
+        // Emit trust only after all enabled handshake requirements have passed.
+        let _ = self.peer_event_tx.send(PeerEvent::TrustChanged {
+            peer_id: peer_id.to_string(),
+            old: TrustLevel::Unknown,
+            new: trust.clone(),
+        });
+        tracing::info!(
+            peer = peer_id,
+            trust = ?trust,
+            "Handshake requirements verified"
+        );
+
         Ok(trust)
     }
 
-    /// Attempt the current research ML-KEM exchange after the classical handshake.
+    /// Fail closed because the current PQC exchange is incomplete.
     ///
-    /// The current transport only exchanges the public-key payload and derives
-    /// an initiator-side candidate key. It does not deliver the KEM ciphertext
-    /// to a responder, complete peer decapsulation, bind a transcript, or perform
-    /// key confirmation. Consequently it must not leave a session marked active.
+    /// The current transport lacks responder-side KEM ciphertext processing and
+    /// transcript-bound key confirmation. Until those steps are implemented,
+    /// no session key can be marked active and no classical-only downgrade is
+    /// accepted when the `pqc-handshake` feature is enabled.
     #[cfg(all(feature = "swarm", feature = "pqc-handshake"))]
     async fn run_pqc_exchange(
         &self,
         peer_id: &str,
-        channel: &super::iroh::IrohChannel,
-        classical_nonce: &[u8],
-        pqc: &Arc<RwLock<super::pqc_handshake::PqcHandshakeManager>>,
+        _channel: &super::iroh::IrohChannel,
+        _classical_nonce: &[u8],
+        _pqc: &Arc<RwLock<super::pqc_handshake::PqcHandshakeManager>>,
     ) -> SwarmResult<()> {
-        let connection = channel.connection_ref().ok_or(SwarmError::ChannelClosed {
-            peer_id: peer_id.to_string(),
-        })?;
-
-        // Open a new bi-directional stream for KEM exchange
-        let (mut send, mut recv) =
-            connection
-                .open_bi()
-                .await
-                .map_err(|e| SwarmError::SendFailed {
-                    peer_id: peer_id.to_string(),
-                    reason: format!("PQC stream open failed: {e}"),
-                })?;
-
-        // Step 1: Send our KEM public key
-        let our_kem_pk = pqc.read().kem_public_key_bytes();
-        send.write_all(&our_kem_pk)
-            .await
-            .map_err(|e| SwarmError::SendFailed {
-                peer_id: peer_id.to_string(),
-                reason: format!("PQC KEM PK send failed: {e}"),
-            })?;
-        send.finish().map_err(|e| SwarmError::SendFailed {
-            peer_id: peer_id.to_string(),
-            reason: format!("PQC stream finish failed: {e}"),
-        })?;
-
-        // Step 2: Receive peer's KEM public key (1184 bytes for ML-KEM-768)
-        let peer_kem_pk = tokio::time::timeout(std::time::Duration::from_secs(10), async {
-            recv.read_to_end(2048) // Slightly over 1184 to detect oversized
-                .await
-                .map_err(|e| SwarmError::ReceiveFailed {
-                    peer_id: peer_id.to_string(),
-                    reason: format!("PQC KEM PK recv failed: {e}"),
-                })
-        })
-        .await
-        .map_err(|_| SwarmError::TrustVerificationError {
-            reason: format!("PQC KEM exchange timeout (10s) for peer {peer_id}"),
-        })??;
-
-        // Step 3: This currently derives only an initiator-side candidate. The
-        // ciphertext is not sent to a responder, and no peer-side decapsulation
-        // or key confirmation occurs. Remove the candidate immediately and fail
-        // this phase closed so callers cannot mistake it for an active session.
-        let mut mgr = pqc.write();
-        mgr.receive_kem_public_key(peer_id, &peer_kem_pk);
-        let _ciphertext = mgr.encapsulate_for_peer(peer_id, classical_nonce)?;
-        mgr.remove_session(peer_id);
-
-        tracing::warn!(
-            peer = peer_id,
-            session_active = false,
-            "PQC candidate discarded: bidirectional KEM delivery and key confirmation are not implemented"
-        );
-
         Err(SwarmError::TrustVerificationError {
-            reason: "PQC session not established: responder decapsulation, authenticated transcript binding, and key confirmation are not implemented".to_string(),
+            reason: format!(
+                "PQC session establishment is not implemented for {peer_id}:                  responder-side ciphertext delivery, decapsulation, transcript binding,                  and key confirmation are missing"
+            ),
         })
     }
 
