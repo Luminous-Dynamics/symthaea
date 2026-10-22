@@ -1,0 +1,385 @@
+{
+  "schema_version": "hmr0-tool-cad-concepts-v0.1",
+  "design_status": "parametric_concept_only",
+  "physical_actuation_authorized": false,
+  "fabrication_authorized": false,
+  "patient_contact_authorized": false,
+  "clinical_function_authorized": false,
+  "units": {
+    "length": "mm",
+    "angle": "deg",
+    "force": "N",
+    "mass": "kg"
+  },
+  "important_note": "All values are exploratory parameter ranges for simulation and geometry review. They are not validated clearances, force limits, tolerances, materials, manufacturing drawings, sterile/cleanability claims or permission to fabricate.",
+  "shared_interface": {
+    "interface_id": "HMR0-TOOL-MOUNT-V0",
+    "interface_status": "provisional_not_a_physical_standard",
+    "required_identity_fields": [
+      "tool_id",
+      "tool_revision",
+      "geometry_sha256",
+      "simulation_model_sha256",
+      "mount_interface_id"
+    ],
+    "required_safety_fields": [
+      "attachment_identity_verified",
+      "tool_detach_detection",
+      "independent_stop_required",
+      "failure_release_mode"
+    ],
+    "verified_physical_mating": false
+  },
+  "concepts": [
+    {
+      "tool_id": "SEALED_TOTE_GRIPPER",
+      "revision": "0.1.0",
+      "intended_use": "nonclinical sealed mock supply tote transfer in simulation",
+      "eligibility": "simulation_review_only",
+      "prohibited": [
+        "patient_contact",
+        "medication_delivery",
+        "clinical_measurement",
+        "sharp_or_piercing_features",
+        "physical_actuation"
+      ],
+      "geometry": {
+        "topology": "two opposing parallel jaws with replaceable compliant pad inserts",
+        "parameters": [
+          {
+            "name": "jaw_opening_min",
+            "unit": "mm",
+            "candidate_range": [
+              70,
+              120
+            ],
+            "nominal_candidate": 90
+          },
+          {
+            "name": "jaw_opening_max",
+            "unit": "mm",
+            "candidate_range": [
+              220,
+              320
+            ],
+            "nominal_candidate": 260
+          },
+          {
+            "name": "pad_width",
+            "unit": "mm",
+            "candidate_range": [
+              45,
+              75
+            ],
+            "nominal_candidate": 60
+          },
+          {
+            "name": "pad_contact_height",
+            "unit": "mm",
+            "candidate_range": [
+              50,
+              100
+            ],
+            "nominal_candidate": 70
+          },
+          {
+            "name": "pad_compliance_travel",
+            "unit": "mm",
+            "candidate_range": [
+              2,
+              8
+            ],
+            "nominal_candidate": 4
+          },
+          {
+            "name": "finger_length",
+            "unit": "mm",
+            "candidate_range": [
+              60,
+              120
+            ],
+            "nominal_candidate": 90
+          }
+        ],
+        "design_constraints": [
+          "symmetric jaw motion",
+          "rounded non-cutting edges",
+          "no exposed pinch edge in the declared grasp envelope",
+          "replaceable pad identity",
+          "tote center-of-mass and slip detection modeled explicitly"
+        ],
+        "unknowns_to_resolve": [
+          "fixture-specific allowed force",
+          "pad friction under contamination/cleaning cycles",
+          "wear and fatigue",
+          "maximum tote mass and center of mass",
+          "detachment behavior"
+        ]
+      },
+      "test_proposals": [
+        "opening-range boundary sweep",
+        "fixture force-sensor correlation",
+        "slip and center-of-mass perturbation",
+        "wrong-tool/wrong-tote rejection",
+        "power-loss and attachment-loss simulation"
+      ]
+    },
+    {
+      "tool_id": "PASSIVE_TRAY_DOCK",
+      "revision": "0.1.0",
+      "intended_use": "align and retain a passive exchange tray for mock logistics",
+      "eligibility": "simulation_review_only",
+      "prohibited": [
+        "medication_dispensing",
+        "patient_contact",
+        "sterile_field_access",
+        "physical_actuation"
+      ],
+      "geometry": {
+        "topology": "passive guide rails with tapered entry and a mechanical stop; no powered release",
+        "parameters": [
+          {
+            "name": "tray_width",
+            "unit": "mm",
+            "candidate_range": [
+              250,
+              500
+            ],
+            "nominal_candidate": 360
+          },
+          {
+            "name": "tray_depth",
+            "unit": "mm",
+            "candidate_range": [
+              180,
+              360
+            ],
+            "nominal_candidate": 260
+          },
+          {
+            "name": "guide_clearance_per_side",
+            "unit": "mm",
+            "candidate_range": [
+              2,
+              12
+            ],
+            "nominal_candidate": 6
+          },
+          {
+            "name": "entry_taper_angle",
+            "unit": "deg",
+            "candidate_range": [
+              10,
+              30
+            ],
+            "nominal_candidate": 20
+          },
+          {
+            "name": "stop_height",
+            "unit": "mm",
+            "candidate_range": [
+              5,
+              18
+            ],
+            "nominal_candidate": 10
+          },
+          {
+            "name": "retention_travel",
+            "unit": "mm",
+            "candidate_range": [
+              3,
+              15
+            ],
+            "nominal_candidate": 8
+          }
+        ],
+        "design_constraints": [
+          "no spring-driven ejection",
+          "visible seated/not-seated state",
+          "no trapping slot accessible to a person during the simulated task",
+          "tray remains captive during planned transport",
+          "manual safe release path must be explicitly modeled"
+        ],
+        "unknowns_to_resolve": [
+          "tray dimensional population",
+          "tolerance stack-up",
+          "retention load",
+          "cleanability/material selection",
+          "human factors of the exchange workflow"
+        ]
+      },
+      "test_proposals": [
+        "misalignment grid sweep",
+        "tolerance stack simulation",
+        "tray-presence and latch-state sensor mutation",
+        "transport acceleration perturbation",
+        "safe-release failure cases"
+      ]
+    },
+    {
+      "tool_id": "INVENTORY_LABEL_READER",
+      "revision": "0.1.0",
+      "intended_use": "read synthetic inventory labels on nonclinical mock bins",
+      "eligibility": "simulation_review_only",
+      "prohibited": [
+        "patient_observation",
+        "biometric_capture",
+        "diagnosis",
+        "clinical_record_capture",
+        "physical_actuation"
+      ],
+      "geometry": {
+        "topology": "non-contact scan head with constrained label-facing field of view and local parsing",
+        "parameters": [
+          {
+            "name": "standoff_distance",
+            "unit": "mm",
+            "candidate_range": [
+              40,
+              220
+            ],
+            "nominal_candidate": 100
+          },
+          {
+            "name": "field_of_view_width",
+            "unit": "mm",
+            "candidate_range": [
+              40,
+              180
+            ],
+            "nominal_candidate": 100
+          },
+          {
+            "name": "scan_head_tilt",
+            "unit": "deg",
+            "candidate_range": [
+              0,
+              35
+            ],
+            "nominal_candidate": 15
+          },
+          {
+            "name": "mount_adjustment_travel",
+            "unit": "mm",
+            "candidate_range": [
+              0,
+              50
+            ],
+            "nominal_candidate": 20
+          }
+        ],
+        "design_constraints": [
+          "labels only in the synthetic fixture",
+          "privacy-preserving local decode",
+          "no recording or transmission of surrounding people",
+          "explicit unreadable/ambiguous disposition",
+          "tool identity and calibration bound to the scan result"
+        ],
+        "unknowns_to_resolve": [
+          "barcode/RFID modality choice",
+          "lighting and glare robustness",
+          "privacy verification",
+          "label wear and occlusion performance"
+        ]
+      },
+      "test_proposals": [
+        "glare/occlusion matrix",
+        "duplicate/malformed label rejection",
+        "wrong-bin identity mismatch",
+        "low-light variation",
+        "privacy/log-retention negative controls"
+      ]
+    },
+    {
+      "tool_id": "DRAWER_LEVER_ADAPTER",
+      "revision": "0.1.0",
+      "intended_use": "simulate interaction with mock drawer and lever fixtures only",
+      "eligibility": "simulation_only_not_in_first_physical_release",
+      "prohibited": [
+        "real_clinical_drawer_operation",
+        "patient_contact",
+        "unbounded_pull",
+        "physical_actuation"
+      ],
+      "geometry": {
+        "topology": "interchangeable rounded hook/pad interfaces represented as collision meshes",
+        "parameters": [
+          {
+            "name": "fixture_handle_width",
+            "unit": "mm",
+            "candidate_range": [
+              8,
+              45
+            ],
+            "nominal_candidate": 20
+          },
+          {
+            "name": "engagement_depth",
+            "unit": "mm",
+            "candidate_range": [
+              5,
+              25
+            ],
+            "nominal_candidate": 12
+          },
+          {
+            "name": "tool_offset",
+            "unit": "mm",
+            "candidate_range": [
+              0,
+              80
+            ],
+            "nominal_candidate": 30
+          },
+          {
+            "name": "compliant_release_travel",
+            "unit": "mm",
+            "candidate_range": [
+              2,
+              10
+            ],
+            "nominal_candidate": 5
+          }
+        ],
+        "design_constraints": [
+          "no sharp tip",
+          "finite force envelope",
+          "clear disengagement path",
+          "pinch zones represented in simulation",
+          "abort on unexpected resistance or fixture mismatch"
+        ],
+        "unknowns_to_resolve": [
+          "fixture variability",
+          "pinch-point model validity",
+          "force/torque measurement",
+          "safe release under jam",
+          "task-specific hazard review"
+        ]
+      },
+      "test_proposals": [
+        "wrong-fixture mutation",
+        "unexpected-resistance abort",
+        "pinch-zone path sweep",
+        "jammed-handle safe recovery",
+        "loss-of-localization abort"
+      ]
+    }
+  ],
+  "generation_contract": {
+    "required_steps": [
+      "requirements_traceability",
+      "parameter_validation",
+      "geometry_generation",
+      "mesh/solid_validation",
+      "collision_and_clearance_checks",
+      "simulation_model_binding",
+      "adversarial_simulation",
+      "independent_review"
+    ],
+    "positive_output": "eligible_for_simulation_review_only",
+    "generator_can_self_approve": false,
+    "physical_output_enabled": false,
+    "unverified_parameters_must_remain_unknown": true
+  },
+  "claim_ceiling": "Illustrative parametric concepts only. No actual CAD/STEP geometry, physical test data, human factors, cleanability/sterility evidence, medical-device conformity or fabrication authorization is included."
+}
