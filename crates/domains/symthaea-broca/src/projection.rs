@@ -2778,3 +2778,67 @@ mod tests {
         );
     }
 }
+
+
+#[cfg(test)]
+mod language_model_gradient_tests {
+    use super::*;
+
+    fn objective(projection: &HdcSsmProjection, input: &ContinuousHV, d_ssm: &[f32]) -> f32 {
+        projection
+            .project_to_ssm(input)
+            .iter()
+            .zip(d_ssm.iter())
+            .map(|(output, grad)| output * grad)
+            .sum()
+    }
+
+    #[test]
+    fn forward_projection_lm_gradient_matches_finite_differences() {
+        let genesis = GenesisSeed::from_phrase("lm-projection-gradient-fd");
+        let mut projection = HdcSsmProjection::new(&genesis, 8, 4, 3);
+        let input = ContinuousHV::from_vec(vec![0.2, -0.7, 0.4, 1.1, -0.3, 0.8, -1.2, 0.5]);
+        let d_ssm = [0.3, -0.2, 0.15];
+
+        projection
+            .accumulate_language_model_gradients(&input, &d_ssm, 1.0)
+            .expect("valid projection gradient should accumulate");
+
+        let epsilon = 1e-3f32;
+        for (label, parameter_index, analytic) in [
+            ("w_up", 0usize, projection.grad_up[0]),
+            ("w_down", 0usize, projection.grad_down[0]),
+        ] {
+            let parameter = if label == "w_up" {
+                &mut projection.w_up
+            } else {
+                &mut projection.w_down
+            };
+            let original = parameter[parameter_index];
+            parameter[parameter_index] = original + epsilon;
+            let plus = objective(&projection, &input, &d_ssm);
+            parameter[parameter_index] = original - epsilon;
+            let minus = objective(&projection, &input, &d_ssm);
+            parameter[parameter_index] = original;
+
+            let numeric = (plus - minus) / (2.0 * epsilon);
+            let tolerance = 2e-2 + numeric.abs() * 0.08;
+            assert!(
+                (analytic - numeric).abs() <= tolerance,
+                "{label} gradient mismatch: analytic={analytic}, finite_difference={numeric}, tolerance={tolerance}"
+            );
+        }
+    }
+
+    #[test]
+    fn projection_gradient_rejects_wrong_ssm_dimension() {
+        let genesis = GenesisSeed::from_phrase("lm-projection-gradient-contract");
+        let mut projection = HdcSsmProjection::new(&genesis, 8, 4, 3);
+        let input = ContinuousHV::from_vec(vec![0.0; 8]);
+        assert!(
+            projection
+                .accumulate_language_model_gradients(&input, &[0.1, 0.2], 1.0)
+                .is_err()
+        );
+    }
+}
