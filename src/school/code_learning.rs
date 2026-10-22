@@ -103,9 +103,15 @@ pub struct LessonOutcome {
 }
 
 impl LessonOutcome {
-    /// Whether the lesson was fully successful
+    /// Whether real compilation and at least one behavioral test succeeded.
+    ///
+    /// A compiled lesson with no executed tests may earn partial mastery, but it is not
+    /// counted as a passed lesson and must not be promoted as behaviorally verified.
     pub fn is_success(&self) -> bool {
-        !self.simulated_execution && self.compiled && self.tests_failed == 0
+        !self.simulated_execution
+            && self.compiled
+            && self.tests_passed > 0
+            && self.tests_failed == 0
     }
 
     /// Mastery signal: 1.0 for perfect, scaled down for partial success
@@ -115,7 +121,7 @@ impl LessonOutcome {
         }
         let total_tests = self.tests_passed + self.tests_failed;
         if total_tests == 0 {
-            // Compiled but no tests — partial credit
+            // Compiled but no tests — partial credit, not a verified success.
             0.5
         } else {
             self.tests_passed as f32 / total_tests as f32
@@ -1905,6 +1911,47 @@ mod tests {
         let generator = CodeGenerator::new(encoder);
         // Simulation mode — no real compilation
         CodeLearningEngine::new(generator)
+    }
+
+    fn make_lesson_outcome(tests_passed: usize, tests_failed: usize, simulated_execution: bool, compiled: bool) -> LessonOutcome {
+        LessonOutcome {
+            objective_id: "test-objective".to_string(),
+            source: "fn answer() -> u32 { 42 }".to_string(),
+            simulated_execution,
+            compiled,
+            tests_passed,
+            tests_failed,
+            surprise: 0.0,
+            retries_used: 0,
+            plan_coverage: 1.0,
+            phi_score: 0.5,
+            used_llm: false,
+            llm_retries_used: 0,
+            distillation_eligible: false,
+            energy_spent: 0.0,
+            predicted_quality: Some(1.0),
+            actual_quality: 1.0,
+            was_hallucination: false,
+        }
+    }
+
+    #[test]
+    fn test_compiled_lesson_without_tests_is_not_passed() {
+        let outcome = make_lesson_outcome(0, 0, false, true);
+        assert!(!outcome.is_success());
+        assert_eq!(outcome.mastery_signal(), 0.5, "compile-only lesson keeps its explicit partial mastery credit");
+    }
+
+    #[test]
+    fn test_lesson_requires_at_least_one_passing_test() {
+        let passing = make_lesson_outcome(2, 0, false, true);
+        assert!(passing.is_success());
+
+        let failing = make_lesson_outcome(1, 1, false, true);
+        assert!(!failing.is_success());
+
+        let simulated = make_lesson_outcome(2, 0, true, true);
+        assert!(!simulated.is_success());
     }
 
     #[test]
