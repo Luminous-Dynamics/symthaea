@@ -279,7 +279,7 @@ struct PolicySpec {
 
 const POLICIES: [PolicySpec; 7] = [
     PolicySpec { name: "always_raw", role: "baseline", policy: Policy::AlwaysRaw },
-    PolicySpec { name: "fixed_interval", role: "baseline", policy: Policy::FixedInterval },
+    PolicySpec { name: "repeat_threshold_summary", role: "baseline", policy: Policy::FixedInterval },
     PolicySpec { name: "dedup_only", role: "baseline", policy: Policy::DedupOnly },
     PolicySpec { name: "feature_threshold", role: "baseline", policy: Policy::FeatureThreshold },
     PolicySpec { name: "typed_lifecycle", role: "candidate", policy: Policy::TypedLifecycle },
