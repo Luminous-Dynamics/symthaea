@@ -265,7 +265,7 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
             .or_insert(0) += 1;
     }
     let receipt = TrajectoryReceipt {
-        receipt_version: "first-aid-trajectory-receipt-v0",
+        receipt_version: "first-aid-trajectory-receipt-v1",
         status: "synthetic_trajectory_contract_passed",
         corpus_sha256: corpus_digest,
         evaluation_protocol_sha256: evaluation_protocol_digest,
