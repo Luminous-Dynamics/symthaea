@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Exact active-intervention benchmark for small noisy Boolean SCMs.
 
-Standard-library only. This evaluates which hard intervention to run next when
-the candidate structural causal models and prior are explicit. It uses exact
-enumeration of binary outcomes and Bayesian updates, not Monte Carlo estimates.
-It is a controlled pilot, not ACDB/CausalArena and not evidence of SOTA.
+Standard-library only. This benchmark evaluates which hard intervention to run
+next when the candidate structural causal models and prior are explicit. It uses
+exact enumeration of binary outcomes and Bayesian posterior updates; no Monte
+Carlo estimate is used for reported expected metrics. It is a controlled pilot,
+not an implementation of ACDB/CausalArena and not evidence of SOTA.
 
-V1 supports hard do(X=x): replace the target equation, retain descendant
-mechanisms. Candidate action cost and disturbance are synthetic annotations,
-not measured operational risk.
+Intervention semantics in v1 are deliberately narrow and explicit: hard do(X=x).
+The intervened node's structural mechanism is replaced by the assigned value;
+its descendants still evaluate against that value. Candidate action cost and
+disturbance are deterministic synthetic annotations, not measured risk.
 """
 from __future__ import annotations
 
@@ -30,7 +32,9 @@ STRATEGIES = ("fixed_order", "random", "cost_first", "greedy_eig", "greedy_effic
 @dataclass(frozen=True)
 class SCM:
     identifier: int
+    # parents[node] is a sorted tuple of parent node indices.
     parents: tuple[tuple[int, ...], ...]
+    # Bit i in truth_tables[node] is the output for parent-assignment i.
     truth_tables: tuple[int, ...]
 
     def graph_key(self) -> tuple[tuple[int, ...], ...]:
@@ -112,7 +116,8 @@ def random_dag_scm(rng: random.Random, identifier: int, node_count: int, dense: 
         if k == 0:
             table = rng.randrange(2)
         else:
-            # Rejection sampling avoids materializing up to 65,536 truth tables.
+            # Rejection-sample functions where every declared parent is essential.
+            # This avoids materializing 65,536 truth tables at the 5-node limit.
             while True:
                 table = rng.getrandbits(1 << k)
                 if all(parent_is_essential(table, k, p) for p in range(k)):
@@ -146,22 +151,23 @@ def make_case(seed: int, budget: int = 2, node_count: int = 3, hypothesis_count:
         seen.add(signature)
         hypotheses.append(candidate)
     priors = tuple(rng.randint(1, 5) for _ in hypotheses)
-    # Cost/disturbance are deliberately known, synthetic, and hidden-model-independent.
+    # Synthetic action annotations are independent of the hidden SCM.
     interventions = tuple(
-        Intervention(2 * node + value, node, value, 1 + rng.randrange(2), rng.randrange(3))
+        Intervention(identifier=2 * node + value, target=node, value=value,
+                     cost=1 + rng.randrange(2), disturbance=rng.randrange(3))
         for node in range(node_count) for value in (0, 1)
     )
     return Case(seed, node_count, tuple(hypotheses), priors, interventions, budget, noise)
 
 
 def outcome_likelihood(scm: SCM, intervention: Intervention, outcome: tuple[int, ...], noise: float) -> float:
-    """Likelihood under noisy Boolean structural equations and hard do(X=x)."""
+    """Likelihood under independent noisy Boolean structural equations and do(X=x)."""
     if outcome[intervention.target] != intervention.value:
         return 0.0
     likelihood = 1.0
     for node in range(len(outcome)):
         if node == intervention.target:
-            continue  # hard do replaces this node's equation
+            continue  # hard intervention replaces this node's mechanism
         predicted = mechanism_output(scm, node, outcome)
         likelihood *= (1.0 - noise) if outcome[node] == predicted else noise
     return likelihood
@@ -181,8 +187,9 @@ def posterior_outcomes(case: Case, posterior: tuple[float, ...], action: Interve
             for h, model in enumerate(case.hypotheses)
         )
         probability = sum(unnormalized)
-        if probability > 0.0:
-            yield probability, tuple(value / probability for value in unnormalized), outcome
+        if probability <= 0.0:
+            continue
+        yield probability, tuple(value / probability for value in unnormalized), outcome
 
 
 def graph_weights(case: Case, posterior: tuple[float, ...]) -> dict[tuple[tuple[int, ...], ...], float]:
@@ -199,8 +206,8 @@ def posterior_metrics(case: Case, posterior: tuple[float, ...]) -> tuple[float, 
 
 
 def expected_action_value(case: Case, posterior: tuple[float, ...], action: Intervention,
-                          remaining: tuple[int, ...], budget_left: int, strategy: str,
-                          random_rank: tuple[int, ...], damage_weight: float) -> Value:
+                          remaining: tuple[int, ...], budget_left: int,
+                          strategy: str, random_rank: tuple[int, ...], damage_weight: float) -> Value:
     branch_values = []
     for probability, updated, _outcome in posterior_outcomes(case, posterior, action):
         child = recurse(case, updated, tuple(i for i in remaining if i != action.identifier),
@@ -221,12 +228,12 @@ def recurse(case: Case, posterior: tuple[float, ...], remaining: tuple[int, ...]
             budget_left: int, strategy: str, random_rank: tuple[int, ...],
             damage_weight: float) -> Value:
     if budget_left <= 0 or not remaining:
-        gh, mh, mp = posterior_metrics(case, posterior)
-        return Value(gh, mh, mp, 0.0, 0.0)
+        graph_h, model_h, map_p = posterior_metrics(case, posterior)
+        return Value(graph_h, model_h, map_p, 0.0, 0.0)
     affordable = [case.interventions[i] for i in remaining if case.interventions[i].cost <= budget_left]
     if not affordable:
-        gh, mh, mp = posterior_metrics(case, posterior)
-        return Value(gh, mh, mp, 0.0, 0.0)
+        graph_h, model_h, map_p = posterior_metrics(case, posterior)
+        return Value(graph_h, model_h, map_p, 0.0, 0.0)
 
     current_graph_h = entropy(graph_weights(case, posterior).values())
     gains: dict[int, tuple[float, float]] = {}
@@ -234,22 +241,22 @@ def recurse(case: Case, posterior: tuple[float, ...], remaining: tuple[int, ...]
         branches = list(posterior_outcomes(case, posterior, action))
         after_graph_h = sum(p * posterior_metrics(case, updated)[0] for p, updated, _ in branches)
         after_model_h = sum(p * posterior_metrics(case, updated)[1] for p, updated, _ in branches)
-        gains[action.identifier] = (
-            max(0.0, current_graph_h - after_graph_h),
-            max(0.0, entropy(posterior) - after_model_h),
-        )
+        gains[action.identifier] = (max(0.0, current_graph_h - after_graph_h),
+                                    max(0.0, entropy(posterior) - after_model_h))
 
     if strategy == "exact_oracle":
-        stop_h, stop_m, stop_p = posterior_metrics(case, posterior)
-        candidates = [((stop_h, 0.0, 0.0, -stop_p), Value(stop_h, stop_m, stop_p, 0.0, 0.0))]
+        stop = (posterior_metrics(case, posterior)[0], 0.0, 0.0,
+                -posterior_metrics(case, posterior)[2])
+        candidates: list[tuple[tuple[float, ...], Value]] = [
+            (stop, Value(*posterior_metrics(case, posterior), 0.0, 0.0))
+        ]
         for action in affordable:
             value = expected_action_value(case, posterior, action, remaining, budget_left,
                                           strategy, random_rank, damage_weight)
-            # Exact objective: graph entropy, then synthetic disturbance, then cost.
-            key = (value.expected_graph_entropy_bits, value.expected_disturbance,
-                   value.expected_cost, -value.expected_map_graph_probability)
-            candidates.append((key, value))
-        return min(candidates, key=lambda item: item[0])[1]
+            # Exact declared objective: graph entropy, then synthetic disturbance, then cost.
+            candidates.append(((value.expected_graph_entropy_bits, value.expected_disturbance,
+                                value.expected_cost, -value.expected_map_graph_probability), value))
+        return min(candidates, key=lambda item: item[0])[-1]
 
     if strategy == "fixed_order":
         chosen = min(affordable, key=lambda a: a.identifier)
@@ -266,10 +273,10 @@ def recurse(case: Case, posterior: tuple[float, ...], remaining: tuple[int, ...]
     else:
         raise ValueError(f"unknown strategy: {strategy}")
 
-    # Fixed/random/cost-first intentionally remain simple baselines and may waste a probe.
+    # Fixed/random/cost-first remain simple baselines and can waste a probe.
     if strategy in ("greedy_eig", "greedy_efficiency") and gains[chosen.identifier][0] <= 1e-12:
-        gh, mh, mp = posterior_metrics(case, posterior)
-        return Value(gh, mh, mp, 0.0, 0.0)
+        graph_h, model_h, map_p = posterior_metrics(case, posterior)
+        return Value(graph_h, model_h, map_p, 0.0, 0.0)
     return expected_action_value(case, posterior, chosen, remaining, budget_left,
                                  strategy, random_rank, damage_weight)
 
@@ -277,9 +284,9 @@ def recurse(case: Case, posterior: tuple[float, ...], remaining: tuple[int, ...]
 def evaluate_policy(case: Case, strategy: str, damage_weight: float = 0.25) -> Value:
     total = float(sum(case.prior_weights))
     posterior = tuple(weight / total for weight in case.prior_weights)
-    rng = random.Random(case.seed ^ 0x5A17C9E3)
+    random_rng = random.Random(case.seed ^ 0x5A17C9E3)
     order = list(range(len(case.interventions)))
-    rng.shuffle(order)
+    random_rng.shuffle(order)
     rank = [0] * len(order)
     for index, action_id in enumerate(order):
         rank[action_id] = index
@@ -311,26 +318,34 @@ def run_benchmark(instances: int, budget: int, source_sha: str, node_count: int,
     summary = {}
     for strategy in STRATEGIES:
         chosen = [r for r in rows if r["strategy"] == strategy]
-        summary[strategy] = {key: sum(r[key] for r in chosen) / len(chosen) for key in (
-            "expected_graph_entropy_bits", "expected_model_entropy_bits",
-            "expected_map_graph_probability", "expected_intervention_cost",
-            "expected_synthetic_disturbance")}
+        summary[strategy] = {
+            key: sum(r[key] for r in chosen) / len(chosen) for key in (
+                "expected_graph_entropy_bits", "expected_model_entropy_bits",
+                "expected_map_graph_probability", "expected_intervention_cost",
+                "expected_synthetic_disturbance")
+        }
     return {
-        "schema": SCHEMA, "source_sha": source_sha,
-        "generator": "seeded labeled DAGs; functionally essential Boolean parents; alternating sparse/dense SCM hypotheses",
-        "inference": "exact enumeration of all binary outcomes; Bayesian updates use known independent mechanism-noise probability",
-        "intervention_semantics": "hard do(X=x) replaces target equation and preserves descendants",
-        "cost_disturbance_semantics": "synthetic action annotations, not empirical cost or safety risk",
-        "primary_objective": "expected posterior entropy over graph structures; oracle tie-breaks by disturbance, cost, then MAP graph probability",
-        "instances": instances, "budget_requested": budget, "node_count": node_count,
-        "hypothesis_count": hypothesis_count, "noise_probability": noise,
-        "policy_count": len(STRATEGIES), "case_count": instances,
-        "summary": summary, "rows": rows,
+        "schema": SCHEMA,
+        "source_sha": source_sha,
+        "generator": "seeded-labeled-DAGs; Boolean mechanisms with every declared parent functionally essential; alternating sparse/dense candidate SCMs",
+        "inference": "exact enumeration over all binary outcome assignments; exact Bayesian update under known independent mechanism-noise probability",
+        "intervention_semantics": "hard do(X=x): replace the target equation; preserve descendant mechanism evaluation",
+        "cost_disturbance_semantics": "deterministic synthetic action annotations; not empirical operational cost or safety risk",
+        "primary_objective": "minimize expected posterior entropy over distinct graph structures; exact oracle tie-breaks by disturbance, cost, then MAP graph probability",
+        "instances": instances,
+        "budget_requested": budget,
+        "node_count": node_count,
+        "hypothesis_count": hypothesis_count,
+        "noise_probability": noise,
+        "policy_count": len(STRATEGIES),
+        "case_count": instances,
+        "summary": summary,
+        "rows": rows,
     }
 
 
 def self_test() -> None:
-    case = make_case(17, budget=2, node_count=3, hypothesis_count=6, noise=0.1)
+    case = make_case(seed=17, budget=2, node_count=3, hypothesis_count=6, noise=0.1)
     assert len(case.interventions) == 2 * case.node_count
     assert all(action.kind == "hard_do" for action in case.interventions)
     for model in case.hypotheses:
@@ -346,8 +361,9 @@ def self_test() -> None:
     for action in case.interventions:
         outcomes = list(posterior_outcomes(case, prior, action))
         assert abs(sum(row[0] for row in outcomes) - 1.0) <= 1e-10
-        for probability, updated, outcome in outcomes:
-            assert probability > 0.0 and abs(sum(updated) - 1.0) <= 1e-10
+        for probability, posterior_after, outcome in outcomes:
+            assert probability > 0.0
+            assert abs(sum(posterior_after) - 1.0) <= 1e-10
             assert outcome[action.target] == action.value
     values = {name: evaluate_policy(case, name) for name in STRATEGIES}
     oracle = values["exact_oracle"]
