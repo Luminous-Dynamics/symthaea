@@ -231,9 +231,8 @@ fn run_candidate(
     let code_written = !source.trim().is_empty();
     let expected_symbol_found = source.contains(task.expected_symbol);
     let expected = expected_test_functions(task.test_source);
-    let verification_start = Instant::now();
     let oracle = evaluate_source(&source, task.test_source);
-    let verification_elapsed_ms = verification_start.elapsed().as_millis();
+    let verification_elapsed_ms = oracle.elapsed_ms;
     let oracle_complete = expected > 0
         && !oracle.simulated
         && oracle.compiled
