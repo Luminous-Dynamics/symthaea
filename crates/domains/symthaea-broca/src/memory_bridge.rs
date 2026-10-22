@@ -6,7 +6,7 @@
 //! Allows Broca to query the long-term narrative self and blend past experiences
 //! into the current thought stream.
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_hdc_store::store::HdcStore;
 
