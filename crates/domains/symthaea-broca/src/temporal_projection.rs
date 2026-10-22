@@ -2870,3 +2870,85 @@ mod tests {
         assert!(sequence.iter().all(|v| v.iter().all(|x| x.is_finite())));
     }
 }
+
+
+#[cfg(test)]
+mod language_model_gradient_tests {
+    use super::*;
+
+    fn objective(
+        projection: &TemporalProjection,
+        thought: &ContinuousHV,
+        gradients: &[Option<Vec<f32>>],
+        scale: f32,
+    ) -> f32 {
+        projection
+            .project_to_ssm_sequence(thought)
+            .iter()
+            .zip(gradients.iter())
+            .map(|(output, maybe_grad)| match maybe_grad {
+                Some(grad) => output.iter().zip(grad.iter()).map(|(v, g)| v * g).sum::<f32>(),
+                None => 0.0,
+            })
+            .sum::<f32>()
+            * scale
+    }
+
+    #[test]
+    fn temporal_projection_lm_gradient_matches_finite_differences() {
+        let genesis = GenesisSeed::from_phrase("temporal-lm-gradient-fd");
+        let mut projection = TemporalProjection::new(&genesis, 8, 4, 3);
+        projection.set_learned_attention(true);
+        let thought = ContinuousHV::from_vec(vec![0.2, -0.7, 0.4, 1.1, -0.3, 0.8, -1.2, 0.5]);
+        let scale = 0.7f32;
+        let gradients: Vec<Option<Vec<f32>>> = (0..projection.num_chunks())
+            .map(|index| Some(vec![0.1 + index as f32 * 0.02, -0.2, 0.15]))
+            .collect();
+
+        projection
+            .compute_e2e_gradients_with_scale(&thought, &gradients, scale)
+            .expect("valid temporal gradients should accumulate");
+
+        let epsilon = 1e-3f32;
+        let original_up = projection.group_w_up[0][0];
+        projection.group_w_up[0][0] = original_up + epsilon;
+        let plus_up = objective(&projection, &thought, &gradients, scale);
+        projection.group_w_up[0][0] = original_up - epsilon;
+        let minus_up = objective(&projection, &thought, &gradients, scale);
+        projection.group_w_up[0][0] = original_up;
+        let numeric_up = (plus_up - minus_up) / (2.0 * epsilon);
+        let analytic_up = projection.grad_group_up[0][0];
+        let tolerance_up = 2e-2 + numeric_up.abs() * 0.08;
+        assert!(
+            (analytic_up - numeric_up).abs() <= tolerance_up,
+            "temporal w_up gradient mismatch: analytic={analytic_up}, finite_difference={numeric_up}"
+        );
+
+        let original_attention = projection.chunk_attention[0];
+        projection.chunk_attention[0] = original_attention + epsilon;
+        let plus_attention = objective(&projection, &thought, &gradients, scale);
+        projection.chunk_attention[0] = original_attention - epsilon;
+        let minus_attention = objective(&projection, &thought, &gradients, scale);
+        projection.chunk_attention[0] = original_attention;
+        let numeric_attention = (plus_attention - minus_attention) / (2.0 * epsilon);
+        let analytic_attention = projection.grad_chunk_attention[0];
+        let tolerance_attention = 2e-2 + numeric_attention.abs() * 0.08;
+        assert!(
+            (analytic_attention - numeric_attention).abs() <= tolerance_attention,
+            "temporal attention gradient mismatch: analytic={analytic_attention}, finite_difference={numeric_attention}"
+        );
+    }
+
+    #[test]
+    fn temporal_projection_gradient_rejects_bad_chunk_shape() {
+        let genesis = GenesisSeed::from_phrase("temporal-lm-gradient-contract");
+        let mut projection = TemporalProjection::new(&genesis, 8, 4, 3);
+        let thought = ContinuousHV::from_vec(vec![0.0; 8]);
+        let gradients = vec![Some(vec![0.1, 0.2]) ; projection.num_chunks()];
+        assert!(
+            projection
+                .compute_e2e_gradients_with_scale(&thought, &gradients, 1.0)
+                .is_err()
+        );
+    }
+}
