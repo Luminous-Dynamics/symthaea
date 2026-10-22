@@ -753,6 +753,8 @@ fn trace_cases() -> Vec<TraceCase> {
 }
 
 fn main() -> BenchResult<()> {
+    let source_sha = std::env::var("SYMTHAEA_SOURCE_SHA")
+        .unwrap_or_else(|_| "UNBOUND_LOCAL".to_owned());
     let cases = trace_cases();
     let mut fixture_canonical = String::new();
     let mut execution_canonical = String::new();
@@ -846,7 +848,7 @@ fn main() -> BenchResult<()> {
     let fixture_digest = blake3::hash(fixture_canonical.as_bytes()).to_hex().to_string();
     let execution_digest = blake3::hash(execution_canonical.as_bytes()).to_hex().to_string();
     println!(
-        "# temporal_integrity_receipt=protocol:{PROTOCOL_ID},case_count:{},step_count:{total_steps},matching_steps:{matching_steps},failed_cases:{failed_cases},accepted_operations:{accepted_steps},rejected_operations:{rejected_steps},fixture_blake3:{fixture_digest},execution_blake3:{execution_digest}",
+        "# temporal_integrity_receipt=protocol:{PROTOCOL_ID},source_sha:{source_sha},case_count:{},step_count:{total_steps},matching_steps:{matching_steps},failed_cases:{failed_cases},accepted_operations:{accepted_steps},rejected_operations:{rejected_steps},fixture_blake3:{fixture_digest},execution_blake3:{execution_digest}",
         cases.len()
     );
 
