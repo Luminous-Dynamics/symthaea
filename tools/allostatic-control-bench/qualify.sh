@@ -282,7 +282,8 @@ if ! awk -F, '
     if (NF != 28) failed = 1
     if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
         $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
-    if ($2 != "nominal" && $2 != "moderate_shift" && $2 != "strong_shift") failed = 1
+    if ($2 != "nominal" && $2 != "moderate_shift" &&
+        $2 != "strong_shift" && $2 != "stealth_shift") failed = 1
     if ($3 !~ /^[0-9]+$/ || $3 >= 300) failed = 1
     if ($4 !~ /^[0-9]*[.]?[0-9]+$/ || $5 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
     if ($6 != "true" && $6 != "false") failed = 1
@@ -310,11 +311,14 @@ if ! awk -F, '
          ($11 != "none" && $25 != "true"))) failed = 1
     if ($2 != "nominal" && ($23 != "false" || $24 != "true")) failed = 1
     if ($2 == "strong_shift" && ($6 != "true" || $22 == "true")) failed = 1
+    pair_key = $1 SUBSEP $3
+    if ($2 == "nominal") nominal_alarm[pair_key] = $6
+    if ($2 == "stealth_shift" && nominal_alarm[pair_key] != $6) failed = 1
     key = $1 SUBSEP $2 SUBSEP $3
     if (seen[key]++) failed = 1
     rows++
   }
-  END { if (NR != 4501 || rows != 4500 || failed) exit 1 }
+  END { if (NR != 6001 || rows != 6000 || failed) exit 1 }
 ' "$tmpdir/ood-a.csv"; then
   printf 'FAIL: OOD switch, active-filter certification, actual safety or raw coverage is invalid\n' >&2
   exit 1
@@ -326,7 +330,8 @@ if ! awk -F, '
     if (NF != 31) failed = 1
     if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
         $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
-    if ($2 != "nominal" && $2 != "moderate_shift" && $2 != "strong_shift") failed = 1
+    if ($2 != "nominal" && $2 != "moderate_shift" &&
+        $2 != "strong_shift" && $2 != "stealth_shift") failed = 1
     if ($3 != 300 || $4 < 0 || $4 > 300 || $5 < 0 || $5 > 300 || $6 < 0 || $6 > 300) failed = 1
     if ($5 > $4 || $6 > $3) failed = 1
     if ($9 != $4 || $10 > $9) failed = 1
@@ -356,13 +361,26 @@ if ! awk -F, '
     if ($2 == "strong_shift" &&
         ($5 != 0 || $6 != 0 || $20 != 0 || $22 != 0)) failed = 1
     if ($2 == "nominal" && $25 != 0) failed = 1
-    if ($2 == "strong_shift") strong_predictive_false_certificates += $25
+    if ($2 == "strong_shift") {
+      if ($4 != 300 || $6 != 0) failed = 1
+      strong_predictive_false_certificates += $25
+    }
+    if ($2 == "nominal") nominal_alarms[$1] = $4
+    if ($2 == "stealth_shift") {
+      if ($5 != 0 || $4 != nominal_alarms[$1] || $6 != 300 - $4 ||
+          $22 != 0 || $23 != 300 || $25 < 0) failed = 1
+      stealth_predictive_false_certificates += $25
+      stealth_switch_false_certificates += $20
+    }
     key = $1 SUBSEP $2
     if (seen[key]++) failed = 1
     rows++
   }
   END {
-    if (NR != 16 || rows != 15 || strong_predictive_false_certificates < 1 || failed) exit 1
+    if (NR != 21 || rows != 20 ||
+        strong_predictive_false_certificates < 1 ||
+        stealth_predictive_false_certificates < 1 ||
+        stealth_switch_false_certificates < 1 || failed) exit 1
   }
 ' "$tmpdir/ood-summary-a.csv"; then
   printf 'FAIL: OOD fallback per-state alarm, miss, true-safety or availability summary is invalid\n' >&2
