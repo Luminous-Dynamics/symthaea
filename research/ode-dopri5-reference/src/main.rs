@@ -35,7 +35,7 @@ fn scaled_state_error(state: [f64; 2], scale: f64, time: f64) -> f64 {
     ((state[0] - exact[0]).powi(2) + (state[1] - exact[1]).powi(2)).sqrt() / scale
 }
 
-fn max_scaled_trajectory_error(
+fn max_sampled_scaled_trajectory_error(
     samples: impl Iterator<Item = (f64, [f64; 2])>,
     scale: f64,
 ) -> f64 {
@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Ok(report) => {
                     let endpoint = report.simulation.final_state();
                     let endpoint_error = scaled_state_error([endpoint[0], endpoint[1]], scale, T_END);
-                    let trajectory_error = max_scaled_trajectory_error(
+                    let trajectory_error = max_sampled_scaled_trajectory_error(
                         report.simulation.times.iter().copied().zip(
                             report.simulation.states.iter().map(|state| [state[0], state[1]]),
                         ),
@@ -118,7 +118,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         && report.diagnostics.max_error_norm <= 1.0;
                     all_passed &= pass;
                     format!(
-                        "\"custom_endpoint_error_scaled\":{:.17e},\"custom_max_scaled_trajectory_error\":{:.17e},\"custom_energy_drift\":{:.17e},\"custom_accepted_steps\":{},\"custom_rejected_steps\":{},\"custom_rhs_evaluations\":{},\"custom_max_error_norm\":{:.17e},\"custom_complete\":{},\"custom_finite\":{},\"custom_pass\":{}",
+                        "\"custom_endpoint_error_scaled\":{:.17e},\"custom_max_sampled_scaled_trajectory_error\":{:.17e},\"custom_energy_drift\":{:.17e},\"custom_accepted_steps\":{},\"custom_rejected_steps\":{},\"custom_rhs_evaluations\":{},\"custom_max_error_norm\":{:.17e},\"custom_complete\":{},\"custom_finite\":{},\"custom_pass\":{}",
                         endpoint_error,
                         trajectory_error,
                         energy_drift,
@@ -169,7 +169,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     let endpoint_time = reference_times.last().copied().unwrap_or(f64::NAN);
                     let endpoint_error =
                         scaled_state_error([endpoint[0], endpoint[1]], scale, T_END);
-                    let trajectory_error = max_scaled_trajectory_error(
+                    let trajectory_error = max_sampled_scaled_trajectory_error(
                         reference_times.iter().copied().zip(
                             reference_states.iter().map(|state| [state[0], state[1]]),
                         ),
@@ -196,7 +196,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         && energy_drift <= energy_drift_limit;
                     all_passed &= pass;
                     format!(
-                        "\"dopri5_terminal_time\":{:.17e},\"dopri5_terminal_time_error\":{:.17e},\"dopri5_terminal_time_tolerance\":{:.17e},\"dopri5_endpoint_error_scaled\":{:.17e},\"dopri5_max_scaled_trajectory_error\":{:.17e},\"dopri5_sampled_energy_drift\":{:.17e},\"dopri5_accepted_steps\":{},\"dopri5_rejected_steps\":{},\"dopri5_rhs_evaluations\":{},\"dopri5_output_samples\":{},\"dopri5_complete\":{},\"dopri5_finite\":{},\"dopri5_pass\":{}",
+                        "\"dopri5_terminal_time\":{:.17e},\"dopri5_terminal_time_error\":{:.17e},\"dopri5_terminal_time_tolerance\":{:.17e},\"dopri5_endpoint_error_scaled\":{:.17e},\"dopri5_max_sampled_scaled_trajectory_error\":{:.17e},\"dopri5_sampled_energy_drift\":{:.17e},\"dopri5_accepted_steps\":{},\"dopri5_rejected_steps\":{},\"dopri5_rhs_evaluations\":{},\"dopri5_output_samples\":{},\"dopri5_complete\":{},\"dopri5_finite\":{},\"dopri5_pass\":{}",
                         endpoint_time,
                         (endpoint_time - T_END).abs(),
                         terminal_time_tolerance,
