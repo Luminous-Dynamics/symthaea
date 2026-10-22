@@ -1672,13 +1672,13 @@ fn metric_json(numerator: usize, denominator: usize, estimate: Option<f64>) -> V
 }
 
 fn metric_json_value(metric: &Metric, name: &str) -> Value {
-    let statistic = if name.contains("_delta") {
-        "paired_difference"
-    } else if name == "compatibility_probability_brier_score"
+    let statistic = if name == "compatibility_probability_brier_score"
         || name == "semantics_preserving_mean_probability_absolute_delta"
         || name.starts_with("mean_counterfactual_to_base_")
     {
         "mean"
+    } else if name.contains("_delta") {
+        "paired_difference"
     } else {
         "ratio"
     };
