@@ -18,7 +18,8 @@
     "environment",
     "case_results",
     "summary",
-    "limitations"
+    "limitations",
+    "comparison_eligibility"
   ],
   "properties": {
     "receipt_id": {
@@ -449,6 +450,12 @@
       "items": {
         "type": "string"
       }
+    },
+    "comparison_eligibility": {
+      "enum": [
+        "COMPARABLE",
+        "NOT_COMPARABLE"
+      ]
     }
   },
   "$defs": {
