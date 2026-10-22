@@ -420,6 +420,10 @@ fn join_pairs(pairs: &[Value], outcomes: &BTreeMap<String, Value>, requested_spl
         let target_family = required_string(target, "family_id", &format!("{ctx}.target"))?;
         let target_commit = required_string(target, "source_commit", &format!("{ctx}.target"))?;
         let artifact_path = required_string(target, "artifact_path", &format!("{ctx}.target"))?;
+        if artifact_path.starts_with('/')
+            || artifact_path.split('/').any(|part| part == ".." || part.is_empty()) {
+            bail!("{ctx}.target.artifact_path must be a safe repository-relative path");
+        }
         let artifact_digest = required_string(target, "artifact_sha256", &format!("{ctx}.target"))?;
         let base_statement_digest = required_string(target, "base_statement_sha256", &format!("{ctx}.target"))?;
         let variant_statement_digest = required_string(target, "counterfactual_statement_sha256", &format!("{ctx}.target"))?;
@@ -447,6 +451,7 @@ fn join_pairs(pairs: &[Value], outcomes: &BTreeMap<String, Value>, requested_spl
 
         let base = outcomes.get(&base_id).with_context(|| format!("{ctx} missing base outcome {base_id}"))?;
         let variant = outcomes.get(&variant_id).with_context(|| format!("{ctx} missing counterfactual outcome {variant_id}"))?;
+        validate_matched_arm(base, variant, &ctx)?;
         for (row, expected_id, label, status, statement_digest, side) in [
             (base, &base_id, base_label, base_status, base_statement_digest, "base"),
             (variant, &variant_id, variant_label, variant_status, variant_statement_digest, "counterfactual"),
@@ -591,6 +596,20 @@ fn metric_json_value(metric: &Metric, name: &str) -> Value {
         "ci_95": metric.ci_95,
         "defined_bootstrap_replicates": metric.defined_bootstrap_replicates
     })
+}
+
+fn validate_matched_arm(base: &Value, variant: &Value, context: &str) -> Result<()> {
+    for field in ["model_id", "model_version", "prompt_sha256", "config_sha256"] {
+        if required_string_at(base, &["run", field], context)?
+            != required_string_at(variant, &["run", field], context)? {
+            bail!("{context}: base/counterfactual rows do not use the same {field}");
+        }
+    }
+    if base.get("run").and_then(|x| x.get("budget"))
+        != variant.get("run").and_then(|x| x.get("budget")) {
+        bail!("{context}: base/counterfactual run budgets differ");
+    }
+    Ok(())
 }
 
 fn validate_adjudication_link(suite_adj: &Value, outcome: &Value, context: &str) -> Result<()> {
