@@ -1,0 +1,8 @@
+[package]
+name = "broca-consolidation-reference"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Deterministic oracle-by-construction reference harness for memory consolidation decisions"
+
+[workspace]
