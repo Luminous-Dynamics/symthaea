@@ -26,14 +26,16 @@ const SUMMARY_HEADER: &str = "operating_point,condition,episodes,pointwise_alarm
 #[derive(Clone, Copy, Debug)]
 struct OperatingPoint {
     name: &'static str,
+    reserve: f64,
+    load: f64,
 }
 
 const OPERATING_POINTS: [OperatingPoint; 5] = [
-    OperatingPoint { name: "critical_low_reserve_high_load" },
-    OperatingPoint { name: "reserve_limited" },
-    OperatingPoint { name: "load_limited" },
-    OperatingPoint { name: "balanced" },
-    OperatingPoint { name: "high_margin" },
+    OperatingPoint { name: "critical_low_reserve_high_load", reserve: 0.22, load: 0.80 },
+    OperatingPoint { name: "reserve_limited", reserve: 0.20, load: 0.45 },
+    OperatingPoint { name: "load_limited", reserve: 0.50, load: 0.78 },
+    OperatingPoint { name: "balanced", reserve: 0.40, load: 0.55 },
+    OperatingPoint { name: "high_margin", reserve: 0.65, load: 0.30 },
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -193,14 +195,15 @@ fn residual_magnitude(seed: u64, point_index: usize, step: usize, condition: Con
 
 fn score_from_magnitude(
     magnitude: f64,
+    point: OperatingPoint,
     limits: ViabilityLimits,
     scales: PredictionErrorScales,
 ) -> Result<PredictionErrorScore, Box<dyn Error>> {
     score_prediction_error(
-        0.5,
-        0.5,
-        0.5 - magnitude * 0.02,
-        0.5 + magnitude * 0.02,
+        point.reserve,
+        point.load,
+        point.reserve - magnitude * scales.reserve_scale(),
+        point.load + magnitude * scales.load_scale(),
         limits,
         scales,
     )
@@ -210,6 +213,7 @@ fn score_from_magnitude(
 fn score_episode(
     seed: u64,
     point_index: usize,
+    point: OperatingPoint,
     condition: Condition,
     limits: ViabilityLimits,
     scales: PredictionErrorScales,
@@ -219,7 +223,7 @@ fn score_episode(
             let magnitude = residual_magnitude(seed, point_index, step, condition);
             Ok(StepScore {
                 magnitude,
-                prediction_error: score_from_magnitude(magnitude, limits, scales)?,
+                prediction_error: score_from_magnitude(magnitude, point, limits, scales)?,
             })
         })
         .collect()
@@ -233,7 +237,14 @@ fn episode_max_scores(
     let mut pointwise_max = 0.0_f64;
     let mut cusum_max = 0.0_f64;
     for point_index in 0..OPERATING_POINTS.len() {
-        let trace = score_episode(seed, point_index, Condition::Nominal, limits, scales)?;
+        let trace = score_episode(
+            seed,
+            point_index,
+            OPERATING_POINTS[point_index],
+            Condition::Nominal,
+            limits,
+            scales,
+        )?;
         let mut accumulator = ScopeCusumAccumulator::new(CUSUM_ALLOWANCE)
             .ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "invalid CUSUM allowance"))?;
         for item in trace {
@@ -277,7 +288,14 @@ fn detect_episode(
     limits: ViabilityLimits,
     scales: PredictionErrorScales,
 ) -> Result<(EpisodeOutcome, Vec<(StepScore, bool, bool, f64)>), Box<dyn Error>> {
-    let trace = score_episode(seed, point_index, condition, limits, scales)?;
+    let trace = score_episode(
+        seed,
+        point_index,
+        OPERATING_POINTS[point_index],
+        condition,
+        limits,
+        scales,
+    )?;
     let mut cusum = ScopeCusumMonitor::new(CUSUM_ALLOWANCE, cusum_threshold)
         .ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "invalid CUSUM monitor"))?;
     let mut first_pointwise_alarm_step = HORIZON;
@@ -288,12 +306,13 @@ fn detect_episode(
     let mut rows = Vec::with_capacity(HORIZON);
 
     for (step, item) in trace.into_iter().enumerate() {
+        let operating_point = OPERATING_POINTS[point_index];
         let pointwise_assessment =
             allostatic_control_bench::scope_monitor::assess_prediction_scope(
-                0.5,
-                0.5,
-                0.5 - item.magnitude * 0.02,
-                0.5 + item.magnitude * 0.02,
+                operating_point.reserve,
+                operating_point.load,
+                operating_point.reserve - item.magnitude * scales.reserve_scale(),
+                operating_point.load + item.magnitude * scales.load_scale(),
                 limits,
                 scales,
                 pointwise_threshold,
