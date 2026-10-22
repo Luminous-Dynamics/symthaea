@@ -283,39 +283,43 @@ fn validate_regression(root: &Path, regression: &Regression) -> Result<ParsedCom
         );
     }
 
-    let tokens: Vec<&str> = regression.command.split_ascii_whitespace().collect();
-    if tokens.len() < 5 || tokens[0] != "cargo" || tokens[1] != "test" || tokens[2] != "-p" {
-        bail!("only 'cargo test -p <approved-package> [--lib] <test-filter>' is allowed");
-    }
-    let package = tokens[3];
-    if !ALLOWED_PACKAGES.contains(&package) {
-        bail!("unapproved calibration package: {package}");
-    }
-
-    let (flags, filter) = if tokens.len() == 5 {
-        (Vec::<String>::new(), tokens[4])
-    } else if tokens.len() == 6 && tokens[4] == "--lib" {
-        (vec!["--lib".to_owned()], tokens[5])
-    } else {
-        bail!("unapproved cargo test arguments for {}", regression.test);
-    };
-    if filter != regression.test {
-        bail!(
-            "command filter '{}' does not match manifest test '{}'",
-            filter,
-            regression.test
-        );
-    }
-
-    let mut cargo_args = vec!["test".to_owned(), "-p".to_owned(), package.to_owned()];
-    cargo_args.extend(flags);
-    cargo_args.push(filter.to_owned());
-    Ok(ParsedCommand {
-        package: package.to_owned(),
-        test_filter: filter.to_owned(),
-        cargo_args,
-    })
+    parse_command_for_test(&regression.command, &regression.test)
 }
+
+fn parse_command_for_test(command: &str, expected_test: &str) -> Result<ParsedCommand> {
+        let tokens: Vec<&str> = command.split_ascii_whitespace().collect();
+        if tokens.len() < 5 || tokens[0] != "cargo" || tokens[1] != "test" || tokens[2] != "-p" {
+            bail!("only 'cargo test -p <approved-package> [--lib] <test-filter>' is allowed");
+        }
+        let package = tokens[3];
+        if !ALLOWED_PACKAGES.contains(&package) {
+            bail!("unapproved calibration package: {package}");
+        }
+    
+        let (flags, filter) = if tokens.len() == 5 {
+            (Vec::<String>::new(), tokens[4])
+        } else if tokens.len() == 6 && tokens[4] == "--lib" {
+            (vec!["--lib".to_owned()], tokens[5])
+        } else {
+            bail!("unapproved cargo test arguments for {}", expected_test);
+        };
+        if filter != expected_test {
+            bail!(
+                "command filter '{}' does not match manifest test '{}'",
+                filter,
+                expected_test
+            );
+        }
+    
+        let mut cargo_args = vec!["test".to_owned(), "-p".to_owned(), package.to_owned()];
+        cargo_args.extend(flags);
+        cargo_args.push(filter.to_owned());
+        Ok(ParsedCommand {
+            package: package.to_owned(),
+            test_filter: filter.to_owned(),
+            cargo_args,
+        })
+
 
 fn execute_regression(root: &Path, task: &Task, regression: &Regression, parsed: ParsedCommand) -> TaskResult {
     let started = Instant::now();
@@ -366,7 +370,7 @@ fn task_result_from_output(
         category: task.category.clone(),
         security_notion: task.security_notion.clone(),
         source_path: regression.path.clone(),
-        regression_test: parsed.test_filter,
+        regression_test: parsed.test_filter.clone(),
         command_argv: parsed.cargo_args,
         outcome,
         exit_code,
@@ -467,7 +471,7 @@ mod tests {
 
     #[test]
     fn accepts_only_approved_cargo_test_shapes() {
-        let parsed = parse_command_for_test("cargo test -p symthaea-core --lib legacy_attack_known_pair_forges_hdc_mac").unwrap();
+        let parsed = parse_command_for_test("cargo test -p symthaea-core --lib legacy_attack_known_pair_forges_hdc_mac", "legacy_attack_known_pair_forges_hdc_mac").unwrap();
         assert_eq!(parsed.package, "symthaea-core");
         assert_eq!(parsed.test_filter, "legacy_attack_known_pair_forges_hdc_mac");
         assert_eq!(parsed.cargo_args, vec!["test", "-p", "symthaea-core", "--lib", "legacy_attack_known_pair_forges_hdc_mac"]);
