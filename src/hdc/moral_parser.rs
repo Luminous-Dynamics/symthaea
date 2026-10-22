@@ -55,6 +55,10 @@ pub struct ParsedMoralScenario {
     /// Detected consent state
     pub consent: ConsentState,
 
+    /// Evidence trace supporting the consent label. This remains text-level
+    /// evidence and must not be treated as identity, provenance, or authorization.
+    pub consent_assessment: ConsentTextAssessment,
+
     /// Detected magnitude (for proportionality)
     pub magnitude: Option<Magnitude>,
 
@@ -86,6 +90,7 @@ impl Default for ParsedMoralScenario {
             patient: None,
             intent: MoralIntent::Unknown,
             consent: ConsentState::Unknown,
+            consent_assessment: ConsentTextAssessment::default(),
             magnitude: None,
             has_negation: false,
             confidence: 0.0,
@@ -132,6 +137,18 @@ pub struct ConsentTextAssessment {
     pub question_suppressed: bool,
     /// Whether text inside supported quote delimiters was masked from matching.
     pub quoted_text_suppressed: bool,
+}
+
+impl Default for ConsentTextAssessment {
+    fn default() -> Self {
+        Self {
+            state: ConsentState::Unknown,
+            basis: ConsentEvidenceBasis::NoAssertedEvidence,
+            matched_phrase: None,
+            question_suppressed: false,
+            quoted_text_suppressed: false,
+        }
+    }
 }
 
 impl ConsentTextAssessment {
@@ -1042,8 +1059,9 @@ impl MoralParser {
             ..Default::default()
         };
 
-        // Detect consent state (check phrases first, then words)
-        scenario.consent = self.assess_consent_evidence(&lower).state;
+        // Preserve both the classification and its evidence trace.
+        scenario.consent_assessment = self.assess_consent_evidence(&lower);
+        scenario.consent = scenario.consent_assessment.state;
 
         // Detect negation
         scenario.has_negation = self.detect_negation(&words);
