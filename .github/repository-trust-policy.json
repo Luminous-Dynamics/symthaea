@@ -1,0 +1,30 @@
+{
+  "schema": "symthaea-repository-trust-policy-v1",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "main",
+  "effective_rules_endpoint": "/repos/{repository}/rules/branches/{branch}",
+  "ruleset_recipe": ".github/rulesets/main-trusted-root-v1.json",
+  "minimum_active_rule_types": [
+    "pull_request",
+    "deletion",
+    "non_fast_forward"
+  ],
+  "solo_maintainer_core": {
+    "require_pull_request": true,
+    "block_branch_deletion": true,
+    "block_force_push": true,
+    "required_approving_review_count_min": 0,
+    "require_code_owner_review": false
+  },
+  "independent_review_tier": {
+    "state": "deferred-until-second-trusted-maintainer-or-team",
+    "future_require_code_owner_review": true,
+    "reason": "A sole PR author cannot provide an independent approval for their own change."
+  },
+  "out_of_band_requirements": [
+    "ruleset bypass identities are explicitly reviewed and minimized",
+    "an ordinary direct push to main is rejected",
+    "a force push to main is rejected",
+    "deletion of main is rejected"
+  ]
+}
