@@ -1,4 +1,4 @@
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -175,8 +175,22 @@ mod tests {
     fn rejects_parent_traversal_paths() {
         let root = temporary_root();
         fs::create_dir_all(&root).expect("create temporary root");
-        let manifest_path = write_fixture(&root, "../outside.json", b"{}\n");
+        let manifest_path = root.join("manifest.json");
+        let bytes = b"{}\\n";
+        let document = json!({
+            "manifest_format": EXPECTED_FORMAT,
+            "status": "DRAFT_CANDIDATE",
+            "hash_algorithm": "SHA-256",
+            "source_commit_before_manifest": "0123456789abcdef0123456789abcdef01234567",
+            "self_digest_excluded": true,
+            "artifacts": [{
+                "path": "../outside.json",
+                "sha256": sha256_hex(bytes),
+                "utf8_bytes": bytes.len()
+            }]
+        });
+        fs::write(&manifest_path, serde_json::to_vec_pretty(&document).expect("serialize manifest"))
+            .expect("write manifest");
         assert!(verify(&root, &manifest_path).is_err(), "parent traversal must be rejected");
         fs::remove_dir_all(&root).expect("remove temporary root");
-    }
-}
+    }}
