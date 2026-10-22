@@ -272,9 +272,7 @@ fn actual_dynamics_for(seed: u64, condition: Condition) -> Result<DynamicsBounds
     let offsets = match condition.name {
         "nominal" => [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
         "moderate_shift" => [(-0.025, 0.050), (-0.020, 0.035), (-0.030, 0.060)],
-        "strong_shift" | "stealth_shift" => {
-            [(-0.055, 0.100), (-0.025, 0.070), (-0.035, 0.080)]
-        }
+        "strong_shift" | "stealth_shift" => [(-0.055, 0.100), (-0.025, 0.070), (-0.035, 0.080)],
         _ => return Err(IoError::new(ErrorKind::InvalidInput, "unknown shift condition").into()),
     };
     let (push_r, push_l) = center(estimate.effect_for_action(Action::Push));
@@ -566,12 +564,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                     csv_bool(false_safety_certificate).to_string(),
                     csv_bool(actual_inside_predictive).to_string(),
                     csv_bool(actual_inside_fallback).to_string(),
-                    csv_bool(predictive_action.is_some_and(|action| actual_one_step.contains(action)))
-                        .to_string(),
-                    csv_bool(predictive_action.is_some_and(|action| actual_horizon.contains(action)))
-                        .to_string(),
-                    csv_bool(fallback_action.is_some_and(|action| actual_one_step.contains(action)))
-                        .to_string(),
+                    csv_bool(
+                        predictive_action.is_some_and(|action| actual_one_step.contains(action)),
+                    )
+                    .to_string(),
+                    csv_bool(
+                        predictive_action.is_some_and(|action| actual_horizon.contains(action)),
+                    )
+                    .to_string(),
+                    csv_bool(
+                        fallback_action.is_some_and(|action| actual_one_step.contains(action)),
+                    )
+                    .to_string(),
                     csv_bool(fallback_action.is_some_and(|action| actual_horizon.contains(action)))
                         .to_string(),
                 ];
