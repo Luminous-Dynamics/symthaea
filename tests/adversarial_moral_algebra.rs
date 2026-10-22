@@ -107,6 +107,17 @@ fn consent_unknown_does_not_become_positive_judgment() {
     );
     assert!(!ConsentState::Unknown.is_explicitly_given());
     assert!(ConsentState::Unknown.requires_clarification());
+
+    let implied = ma.judge_consent_action(&action, ConsentState::Implied);
+    assert_eq!(
+        implied.verdict,
+        MoralVerdict::Neutral,
+        "An explicit assumption must not be upgraded to a positive consent-sensitive verdict"
+    );
+    assert!(
+        implied.consent_violation_similarity < judgment.consent_violation_similarity,
+        "An assumption is less severe than unknown evidence in this score contract"
+    );
 }
 
 #[test]
