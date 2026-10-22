@@ -39,14 +39,19 @@ Use the same task, simulation step, action bounds, observation access, episode h
 
 | ID | Policy | Role |
 |---|---|---|
-| B0 | Task-native reference controller (e.g. pinned PID/LQR/MPC where supported) | Strong task-performance reference |
+| B0 | Task-native reference controller (pinned PID/LQR/iLQR/MPC where supported) | Strong task-performance reference |
 | B1 | Unshielded task-native policy | Failure/utility reference only; never a safety claim |
 | B2 | Point-prediction shield | Tests value of uncertainty accounting |
 | B3 | Global interval/worst-case shield | Conservative robust baseline |
 | B4 | State-and-action-conditioned uncertainty shield | Capability-preservation candidate |
 | B5 | Always-reachability policy | Conservative runtime-assurance reference |
 | B6 | Calibrated score-triggered predictive/reachability switch | Current architecture under evaluation |
-| B7 | Residual-aware monitor plus reachability fallback | Proposed next comparator; monitors observed prediction error / constraint margin in addition to ensemble novelty |
+| B7 | Residual-aware monitor plus reachability fallback | Tests post-action evidence in addition to novelty scores |
+| B8 | Safety-constrained active model discrimination | Tests safe information gathering and post-probe viable-set gain |
+| B9 | Task-compatible MPSC safety filter | Native strong safety-filter baseline in Safe-Control-Gym tasks that support it |
+| B10 | Task-compatible CBF / neural CBF safety filter | Competing certificate/filter family; use only when task and constraints match |
+| B11 | Conformalized SLS-MPC | Strong uncertainty-aware reachable-set comparator; requires pinned reproduction/adaptation |
+| B12 | GPU-SLS robust MPC | High-performance reachability/control comparator; requires pinned reproduction/adaptation and separate hardware disclosure |
 | O0 | Evaluator-only oracle with knowledge of the shift and actual model | Diagnostic upper bound; never eligible as a deployable baseline |
 
 Include a published algorithm such as SODA-MPC or conformalized SLS-MPC in a **headline comparison only** after its method is either reproduced on the same task or adapted with a documented mathematical mapping, pinned implementation, matched information access, and comparable tuning/compute budget. SODA-MPC's published demonstration uses learned pedestrian prediction in autonomous driving; its reported results are not directly comparable to CartPole or Quadrotor. The 2026 conformalized SLS-MPC work uses state/control-dependent uncertainty and volume-optimized reachable sets; it is a key methodological reference, not evidence that this prototype implements or beats it.
