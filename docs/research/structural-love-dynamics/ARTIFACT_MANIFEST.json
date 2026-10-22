@@ -3,12 +3,13 @@
   "status": "DRAFT_CANDIDATE",
   "hash_algorithm": "SHA-256",
   "encoding": "UTF-8 bytes of the exact repository file content",
-  "source_commit_before_manifest": "d059ef16dfa5cb2a27db1f48751d42224896639d",
+  "source_commit_before_manifest": "109ca42aa20fb193ef408bf66b9be7eaf77f0b9d",
   "generated_date": "2026-10-22",
   "self_digest_excluded": true,
   "notes": [
-    "This manifest binds artifacts at the source commit above; its own bytes are excluded to avoid a self-referential digest.",
-    "Any change to a listed artifact requires regenerating the manifest against a new source commit.",
+    "Binds schemas, corpora, Rust tests, research protocols, verifier source, and xtask dependencies at the source commit above.",
+    "The manifest itself is excluded from its own digest set to avoid self-reference.",
+    "Any change to a listed artifact requires regenerating the manifest against the new pre-manifest source commit.",
     "Digests establish artifact identity only, not correctness, oracle validity, model behavior, or benchmark passage."
   ],
   "artifacts": [
@@ -44,15 +45,15 @@
     },
     {
       "path": "docs/research/STRUCTURAL_LOVE_DYNAMICS.md",
-      "sha256": "de4f715fc377af01c5d1196ab802aef58473321e3b19bb64334d592d10dcadb8",
-      "utf8_bytes": 26393,
-      "git_blob_sha1": "04ef1e02da82c78deae93c345b9a9b10ffa225e1"
+      "sha256": "ccc41867b1cbd7504a83cc72d232b73439ea604c53884ae64a41c0ea5dfc330e",
+      "utf8_bytes": 26524,
+      "git_blob_sha1": "97bdfce405339b5ca445b2e000eb151947815ee6"
     },
     {
       "path": "docs/research/structural-love-dynamics/BASELINE_PROTOCOL.md",
-      "sha256": "a8e1b8be03d94e16dcdc10c88ff46a4ecdb2a87d6ee08d949f65e24dbc276b7c",
-      "utf8_bytes": 31034,
-      "git_blob_sha1": "6843bdd07d17b49a72f900108166bb091b09a7b9"
+      "sha256": "2cfaf89cba583232558fee24553fca543e02cc1d89dfd756e45ae004f9577804",
+      "utf8_bytes": 31453,
+      "git_blob_sha1": "5c9da17f8bf6fb4c85fb1a45c050c449a295e541"
     },
     {
       "path": "docs/research/structural-love-dynamics/MEASUREMENT_INTEGRITY_RED_TEAM.md",
@@ -65,6 +66,24 @@
       "sha256": "569d8b57315f012a54384ae189a5f570ed3297b1a207fca3a68d477d9ad854bb",
       "utf8_bytes": 4898,
       "git_blob_sha1": "be700b069b66ae7349370d0bd7fe8526695cfc40"
+    },
+    {
+      "path": "xtask/src/sld_manifest.rs",
+      "sha256": "186c76a2c4b94076345e62a84e869e12c61749f3754540e395f2d612ab269c94",
+      "utf8_bytes": 7223,
+      "git_blob_sha1": "2528e8d79c63fd6a0b8e35a0d28cc713eef38b89"
+    },
+    {
+      "path": "xtask/src/main.rs",
+      "sha256": "a6bf0eb160d1f0a62d4820a962792ca3a477d875c76e53b2883c920bbc3a7fd7",
+      "utf8_bytes": 5989,
+      "git_blob_sha1": "31b0be90a16914104bc735c8f73d37d198b87f94"
+    },
+    {
+      "path": "xtask/Cargo.toml",
+      "sha256": "652140f55757b13acd62ae7ad496793957b3beb159034d378a3bcef1a27a2673",
+      "utf8_bytes": 250,
+      "git_blob_sha1": "6f97f736e554825b5ef11474f8b8b9d07586efd9"
     }
   ]
 }
