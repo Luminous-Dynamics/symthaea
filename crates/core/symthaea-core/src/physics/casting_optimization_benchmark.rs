@@ -336,6 +336,73 @@ fn evaluate_trial(
     }
 }
 
+/// Select the next point using only the previously observed values.
+///
+/// This intentionally simple adaptive baseline is not Bayesian optimization: it uses
+/// a nearest-observation surrogate plus a fixed distance-based exploration bonus over
+/// a finite candidate lattice. It does not fit a Gaussian process or calibrated
+/// posterior. Evaluation-only objective truth is not read by this selection function.
+fn choose_adaptive_point(records: &[TrialRecord]) -> Option<Point> {
+    const SIDE: usize = 16;
+    const EXPLORATION_WEIGHT: f64 = 0.20;
+
+    let measured: Vec<&TrialRecord> = records
+        .iter()
+        .filter(|record| record.status == TrialStatus::Feasible)
+        .filter(|record| record.observed_objective.is_some())
+        .collect();
+
+    let mut best: Option<(f64, Point)> = None;
+    for ix in 0..SIDE {
+        for iy in 0..SIDE {
+            let candidate = Point {
+                x: (ix as f64 + 0.5) / SIDE as f64,
+                y: (iy as f64 + 0.5) / SIDE as f64,
+            };
+            if records.iter().any(|record| {
+                let dx = record.point.x - candidate.x;
+                let dy = record.point.y - candidate.y;
+                dx * dx + dy * dy < 1e-20
+            }) {
+                continue;
+            }
+
+            let mut nearest_any_distance_sq = f64::INFINITY;
+            for record in records {
+                let dx = record.point.x - candidate.x;
+                let dy = record.point.y - candidate.y;
+                nearest_any_distance_sq =
+                    nearest_any_distance_sq.min(dx * dx + dy * dy);
+            }
+
+            let mut nearest_measured_distance_sq = f64::INFINITY;
+            let mut nearest_observed: Option<f64> = None;
+            for record in &measured {
+                let dx = record.point.x - candidate.x;
+                let dy = record.point.y - candidate.y;
+                let distance_sq = dx * dx + dy * dy;
+                if distance_sq < nearest_measured_distance_sq {
+                    nearest_measured_distance_sq = distance_sq;
+                    nearest_observed = record.observed_objective;
+                }
+            }
+
+            let novelty = nearest_any_distance_sq.sqrt();
+            // If every initial trial failed or was infeasible, continue space-filling
+            // exploration rather than aborting. Otherwise balance local value and novelty.
+            let acquisition = match nearest_observed {
+                Some(predicted) => predicted - EXPLORATION_WEIGHT * novelty,
+                None => -novelty,
+            };
+            if best.map_or(true, |(best_score, _)| acquisition < best_score) {
+                best = Some((acquisition, candidate));
+            }
+        }
+    }
+
+    best.map(|(_, point)| point)
+}
+
 fn run_benchmark(
     case: SyntheticCase,
     design: SamplingDesign,
@@ -650,6 +717,27 @@ mod tests {
             .map(|record| (record.point.x.to_bits(), record.point.y.to_bits()))
             .collect::<std::collections::HashSet<_>>();
         assert_eq!(distinct_points.len(), BUDGET);
+    }
+
+    #[test]
+    fn adaptive_strategy_keeps_exploring_when_warm_start_has_no_usable_observation() {
+        let points = sample_points(SamplingDesign::LatinHypercube, 4, 99).unwrap();
+        let records: Vec<TrialRecord> = points
+            .iter()
+            .enumerate()
+            .map(|(index, point)| TrialRecord {
+                point: *point,
+                status: TrialStatus::Infeasible,
+                fidelity: Fidelity::High,
+                true_objective_for_evaluation_only: 1.0,
+                observed_objective: None,
+                cost_units: HIGH_FIDELITY_COST_UNITS,
+                cumulative_cost_units: (index as u64 + 1) * HIGH_FIDELITY_COST_UNITS,
+            })
+            .collect();
+
+        let next = choose_adaptive_point(&records).unwrap();
+        assert!(!records.iter().any(|record| record.point == next));
     }
 
     #[test]
