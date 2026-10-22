@@ -281,6 +281,7 @@ pub mod hdc_ltc_unified; // Revolutionary unified HDC-LTC: state AS hypervector 
 pub mod hdc_ltc_unified_validation; // Numerical validation of closed-form solution accuracy
 pub mod hebbian;
 pub mod hrr_baseline; // HRR associative-memory baseline for cross-algebra comparisons
+pub mod identity_evidence; // Evidence-gated identity resolution for HDC retrieval
 pub mod morphogenetic;
 pub mod pattern_interaction; // Abstract pattern algebra and interaction experiments
 pub mod predictor; // Unified predictor trait for Symthaea integration (links prediction to Φ)
