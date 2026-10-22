@@ -49,6 +49,11 @@ impl BoundedRiskEProcess {
             return None;
         }
 
+        let e_value_threshold = simultaneous_monitors as f64 / total_delta;
+        if !e_value_threshold.is_finite() {
+            return None;
+        }
+
         Some(Self {
             risk_bound,
             bet,
@@ -165,6 +170,14 @@ impl MixtureBoundedRiskEProcess {
             || total_delta <= 0.0
             || total_delta >= 1.0
             || simultaneous_monitors == 0
+        {
+            return None;
+        }
+
+        if bet_fractions
+            .iter()
+            .any(|fraction| !(fraction / risk_bound).is_finite())
+            || !(simultaneous_monitors as f64 / total_delta).is_finite()
         {
             return None;
         }
@@ -397,6 +410,24 @@ mod tests {
         assert!(process.observe(-0.01).is_none());
         assert!(process.observe(1.01).is_none());
         assert_eq!(process.log_e_value(), before);
+    }
+
+    #[test]
+    fn rejects_non_finite_e_value_thresholds_at_construction() {
+        assert!(BoundedRiskEProcess::new(
+            0.2,
+            2.0,
+            f64::MIN_POSITIVE,
+            usize::MAX,
+        )
+        .is_none());
+        assert!(MixtureBoundedRiskEProcess::new(
+            f64::MIN_POSITIVE,
+            [0.25, 0.5, 0.75],
+            0.05,
+            5,
+        )
+        .is_none());
     }
 
     #[test]
