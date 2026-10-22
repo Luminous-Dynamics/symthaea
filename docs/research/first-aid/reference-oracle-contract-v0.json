@@ -1,0 +1,339 @@
+{
+  "schema_version": "first-aid-reference-oracle-contract-v0",
+  "status": "proposed_synthetic_process_contract",
+  "clinical_use_authorized": false,
+  "claim_ceiling": "Exact conformance to this versioned synthetic workflow-process contract on the exact cases executed; no clinical safety or patient-outcome claim.",
+  "provenance": {
+    "implementation_independence_required": true,
+    "production_types_imported": false,
+    "production_transition_functions_called": false,
+    "external_domain_review_status": "not_yet_performed",
+    "blinded_holdout_status": "not_available_in_public_repo",
+    "note": "A distinct implementation alone does not establish independent ground truth. Record reviewer role separation and shared assumptions."
+  },
+  "trace_semantics": {
+    "events_are_ordered": true,
+    "object_member_order_semantic": false,
+    "initial_connectivity_source": "scenario.connectivity",
+    "event_connectivity_changes_apply_from_that_event_forward": true,
+    "violations_preserve_occurrence_order": true,
+    "repeated_violation_codes_preserved": true,
+    "malformed_input_is_reject_not_empty_violation_list": true,
+    "duplicate_or_nonincreasing_event_sequence": "reject"
+  },
+  "initial_state": {
+    "session_active": false,
+    "loaded_bundle_id": null,
+    "verified_bundle_id": null,
+    "revoked_bundle_ids": [],
+    "uncertainty_pending": false,
+    "uncertainty_preserved": false,
+    "connectivity": "scenario.connectivity"
+  },
+  "event_contract": [
+    {
+      "kind": "session_started",
+      "required_fields": [],
+      "allowed_fields": [
+        "sequence",
+        "kind"
+      ],
+      "state_effects": [
+        "session_active=true",
+        "loaded_bundle_id=null",
+        "verified_bundle_id=null",
+        "revoked_bundle_ids unchanged",
+        "uncertainty flags retained"
+      ],
+      "violations": [
+        {
+          "when": "uncertainty_pending=true and uncertainty_preserved=false",
+          "code": "uncertainty_lost_at_session_boundary"
+        }
+      ]
+    },
+    {
+      "kind": "bundle_loaded",
+      "required_fields": [
+        "bundle_id",
+        "bundle_state"
+      ],
+      "allowed_fields": [
+        "sequence",
+        "kind",
+        "bundle_id",
+        "bundle_state"
+      ],
+      "state_effects": [
+        "loaded_bundle_id=bundle_id",
+        "verified_bundle_id=null"
+      ],
+      "violations": []
+    },
+    {
+      "kind": "bundle_verified",
+      "required_fields": [
+        "bundle_id",
+        "bundle_state",
+        "digest_verified"
+      ],
+      "allowed_fields": [
+        "sequence",
+        "kind",
+        "bundle_id",
+        "bundle_state",
+        "digest_verified"
+      ],
+      "success_preconditions": [
+        "session_active=true",
+        "bundle_id equals loaded_bundle_id",
+        "bundle_state=valid",
+        "digest_verified=true",
+        "bundle_id not revoked"
+      ],
+      "state_effects_on_success": [
+        "verified_bundle_id=bundle_id"
+      ],
+      "state_effects_on_failure": [
+        "verified_bundle_id=null"
+      ],
+      "violations": [
+        {
+          "when": "any success precondition fails",
+          "code": "invalid_bundle_verification"
+        }
+      ]
+    },
+    {
+      "kind": "protocol_rendered",
+      "required_fields": [
+        "bundle_id"
+      ],
+      "optional_fields": [
+        "bundle_state"
+      ],
+      "allowed_fields": [
+        "sequence",
+        "kind",
+        "bundle_id",
+        "bundle_state"
+      ],
+      "state_effects": [],
+      "violation_order": [
+        {
+          "when": "session_active=false",
+          "code": "render_without_active_session"
+        },
+        {
+          "when": "bundle_id is revoked OR event.bundle_state=revoked",
+          "code": "render_after_revocation"
+        },
+        {
+          "when": "not revoked and verified_bundle_id differs from bundle_id",
+          "code": "render_without_verified_bundle"
+        }
+      ],
+      "precedence_note": "The revoked branch suppresses only generic missing-verification for the same render; inactive-session violation may co-occur."
+    },
+    {
+      "kind": "bundle_revoked",
+      "required_fields": [
+        "bundle_id"
+      ],
+      "allowed_fields": [
+        "sequence",
+        "kind",
+        "bundle_id"
+      ],
+      "state_effects": [
+        "add bundle_id to revoked_bundle_ids monotonically",
+        "if loaded_bundle_id=bundle_id then verified_bundle_id=null"
+      ],
+      "violations": []
+    },
+    {
+      "kind": "session_interrupted",
+      "required_fields": [],
+      "allowed_fields": [
+        "sequence",
+        "kind"
+      ],
+      "state_effects": [
+        "session_active=false",
+        "verified_bundle_id=null"
+      ],
+      "violations": []
+    },
+    {
+      "kind": "session_resumed",
+      "required_fields": [],
+      "allowed_fields": [
+        "sequence",
+        "kind"
+      ],
+      "state_effects": [
+        "session_active=true",
+        "verified_bundle_id=null"
+      ],
+      "violations": []
+    },
+    {
+      "kind": "uncertainty_detected",
+      "required_fields": [],
+      "allowed_fields": [
+        "sequence",
+        "kind"
+      ],
+      "state_effects": [
+        "uncertainty_pending=true",
+        "uncertainty_preserved=false"
+      ],
+      "violations": []
+    },
+    {
+      "kind": "uncertainty_preserved",
+      "required_fields": [],
+      "allowed_fields": [
+        "sequence",
+        "kind"
+      ],
+      "state_effects": [
+        "if uncertainty_pending then uncertainty_preserved=true"
+      ],
+      "violations": []
+    },
+    {
+      "kind": "unknown_normalized",
+      "required_fields": [],
+      "allowed_fields": [
+        "sequence",
+        "kind"
+      ],
+      "state_effects": [],
+      "violations": [
+        {
+          "when": "always",
+          "code": "unknown_normalized"
+        }
+      ]
+    },
+    {
+      "kind": "handoff_emitted",
+      "required_fields": [],
+      "allowed_fields": [
+        "sequence",
+        "kind"
+      ],
+      "state_effects": [
+        "uncertainty_pending=false",
+        "uncertainty_preserved=false"
+      ],
+      "violations": [
+        {
+          "when": "uncertainty_pending=true and uncertainty_preserved=false",
+          "code": "uncertainty_lost_at_handoff"
+        }
+      ]
+    },
+    {
+      "kind": "resource_presented",
+      "required_fields": [
+        "resource_state",
+        "presented_as"
+      ],
+      "allowed_fields": [
+        "sequence",
+        "kind",
+        "resource_state",
+        "presented_as"
+      ],
+      "state_effects": [],
+      "violations": [
+        {
+          "when": "resource_state is stale or unknown AND presented_as=confirmed",
+          "code": "stale_resource_claimed_confirmed"
+        }
+      ]
+    },
+    {
+      "kind": "connectivity_changed",
+      "required_fields": [
+        "connectivity"
+      ],
+      "allowed_fields": [
+        "sequence",
+        "kind",
+        "connectivity"
+      ],
+      "state_effects": [
+        "current_connectivity=event.connectivity"
+      ],
+      "violations": []
+    },
+    {
+      "kind": "network_required_for_core",
+      "required_fields": [],
+      "allowed_fields": [
+        "sequence",
+        "kind"
+      ],
+      "state_effects": [],
+      "violations": [
+        {
+          "when": "current_connectivity=offline",
+          "code": "offline_core_network_dependency"
+        },
+        {
+          "when": "current_connectivity=intermittent",
+          "code": "intermittent_core_network_dependency"
+        }
+      ]
+    },
+    {
+      "kind": "sensitive_data_egress",
+      "required_fields": [
+        "sensitive_payload",
+        "consent_scoped"
+      ],
+      "allowed_fields": [
+        "sequence",
+        "kind",
+        "sensitive_payload",
+        "consent_scoped"
+      ],
+      "state_effects": [],
+      "violations": [
+        {
+          "when": "sensitive_payload=true AND consent_scoped is not true",
+          "code": "sensitive_data_egress_without_consent"
+        }
+      ]
+    }
+  ],
+  "violation_codes": [
+    "invalid_bundle_verification",
+    "render_without_active_session",
+    "render_after_revocation",
+    "render_without_verified_bundle",
+    "unknown_normalized",
+    "uncertainty_lost_at_handoff",
+    "uncertainty_lost_at_session_boundary",
+    "stale_resource_claimed_confirmed",
+    "offline_core_network_dependency",
+    "intermittent_core_network_dependency",
+    "sensitive_data_egress_without_consent"
+  ],
+  "required_test_families": [
+    "all 12 frozen trace fixtures",
+    "every declared critical mutation plus paired benign control",
+    "render precedence and co-occurring violations",
+    "bundle identity switch and stale verification",
+    "monotonic revocation across session boundaries",
+    "repeated uncertainty and preservation reset",
+    "time-ordered connectivity recovery",
+    "duplicate violation accounting",
+    "all sensitive-payload and consent combinations",
+    "strict schema, unknown field/kind, missing metadata, duplicate sequence, and digest tampering"
+  ],
+  "target_status": "Prospective only; no pass or clinical performance is implied by this specification."
+}
