@@ -35,6 +35,23 @@ fn check_bool(
     }
 }
 
+fn reject_unknown_fields(
+    value: &Value,
+    allowed: &[&str],
+    context: &str,
+    errors: &mut Vec<String>,
+) {
+    let Some(object) = value.as_object() else {
+        errors.push(format!("{context}: must be a JSON object"));
+        return;
+    };
+    for key in object.keys() {
+        if !allowed.contains(&key.as_str()) {
+            errors.push(format!("{context}: unknown field '{key}'"));
+        }
+    }
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest
@@ -50,6 +67,22 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
     if !root.is_object() {
         return Err(vec!["registry root must be a JSON object".to_owned()]);
     }
+    reject_unknown_fields(
+        root,
+        &[
+            "schema_version",
+            "registry_version",
+            "checked_at",
+            "evidence_class",
+            "clinical_use_authorized",
+            "south_africa_localization_status",
+            "claim_admission_policy",
+            "sources",
+            "claims",
+        ],
+        "registry",
+        &mut errors,
+    );
     if field_str(root, "schema_version") != Some("first-aid-clinical-evidence-registry-v0") {
         errors.push("schema_version is missing or unsupported".to_owned());
     }
@@ -62,9 +95,24 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
 
     let null_value = Value::Null;
     let policy = root.get("claim_admission_policy").unwrap_or(&null_value);
-    if !policy.is_object() {
-        errors.push("claim_admission_policy must be an object".to_owned());
-    }
+    reject_unknown_fields(
+        policy,
+        &[
+            "zero_approved_claims_disposition",
+            "approved_claim_status",
+            "source_reference_model",
+            "minimum_independent_reviewers",
+            "separate_qualified_adjudicator_required",
+            "exact_source_locator_required",
+            "population_setting_jurisdiction_required",
+            "localization_review_required",
+            "review_date_and_source_update_trigger_required",
+            "patient_data_allowed",
+            "source_text_reproduction_authorized",
+        ],
+        "claim_admission_policy",
+        &mut errors,
+    );
     for key in [
         "separate_qualified_adjudicator_required",
         "exact_source_locator_required",
@@ -118,6 +166,26 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
     let mut source_ids = BTreeSet::new();
     for (index, source) in sources.iter().enumerate() {
         let context = format!("sources[{index}]");
+        reject_unknown_fields(
+            source,
+            &[
+                "source_id",
+                "publisher",
+                "title",
+                "edition",
+                "publication_or_update_date",
+                "url",
+                "scope",
+                "source_role",
+                "jurisdiction_relevance",
+                "localization_status",
+                "claim_use_status",
+                "text_reproduced",
+                "notes",
+            ],
+            &context,
+            &mut errors,
+        );
         for key in [
             "source_id",
             "publisher",
@@ -168,6 +236,29 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
     let mut approved_claim_count = 0usize;
     for (index, claim) in claims.iter().enumerate() {
         let context = format!("claims[{index}]");
+        reject_unknown_fields(
+            claim,
+            &[
+                "claim_id",
+                "topic",
+                "population",
+                "setting",
+                "target_jurisdiction",
+                "locale",
+                "source_edition",
+                "source_locator",
+                "limitations",
+                "claim_status",
+                "source_ids",
+                "localization_status",
+                "review_date",
+                "source_update_trigger",
+                "reviewers",
+                "adjudicator",
+            ],
+            &context,
+            &mut errors,
+        );
         for key in [
             "claim_id",
             "topic",
@@ -259,6 +350,12 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
             let mut reviewer_ids = BTreeSet::new();
             let mut approving_reviewers = 0usize;
             for reviewer in reviewers {
+                reject_unknown_fields(
+                    reviewer,
+                    &["reviewer_id", "qualification", "decision", "independent"],
+                    &context,
+                    &mut errors,
+                );
                 for key in ["reviewer_id", "qualification", "decision"] {
                     require_text(reviewer, key, &context, &mut errors);
                 }
@@ -280,6 +377,12 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
 
             let null_adjudicator = Value::Null;
             let adjudicator = claim.get("adjudicator").unwrap_or(&null_adjudicator);
+            reject_unknown_fields(
+                adjudicator,
+                &["adjudicator_id", "qualification", "decision", "independent"],
+                &context,
+                &mut errors,
+            );
             require_text(adjudicator, "adjudicator_id", &context, &mut errors);
             require_text(adjudicator, "qualification", &context, &mut errors);
             if adjudicator.get("independent").and_then(Value::as_bool) != Some(true)
@@ -518,6 +621,14 @@ mod tests {
         }]);
         let errors = validate_registry(&input).expect_err("reviewer cannot adjudicate own review");
         assert!(errors.iter().any(|error| error.contains("adjudicator identity must differ")));
+    }
+
+    #[test]
+    fn unknown_registry_fields_fail_closed() {
+        let mut input = registry();
+        input["sources"][0]["clinical_recommendation"] = json!("must not be admitted");
+        let errors = validate_registry(&input).expect_err("unknown fields must be rejected");
+        assert!(errors.iter().any(|error| error.contains("unknown field 'clinical_recommendation'")));
     }
 
     #[test]
