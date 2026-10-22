@@ -173,12 +173,16 @@ fn run() -> Result<(), String> {
     // This prevents a failed write from leaving a truncated "successful" report.
     let target = Path::new(output_path);
     let temporary = temporary_sibling_path(target)?;
+    // Open outside the cleanup closure: if create_new fails because another
+    // writer owns this temporary path, do not remove that writer's file.
+    let mut report = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+        .map_err(|error| {
+            format!("cannot create temporary report {}: {error}", temporary.display())
+        })?;
     let write_result = (|| -> Result<(), String> {
-        let mut report = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-            .map_err(|error| format!("cannot create temporary report {}: {error}", temporary.display()))?;
         writeln!(
             report,
             "scenario,shielded,metric,baseline_policy,candidate_policy,n_pairs,baseline_mean,candidate_mean,candidate_minus_baseline_mean,median_paired_delta,paired_bootstrap_ci95_low,paired_bootstrap_ci95_high,bootstrap_replicates,bootstrap_seed,baseline_violations,candidate_violations,candidate_only_violations,baseline_only_violations,mcnemar_exact_two_sided_p,baseline_violation_rate,candidate_violation_rate,baseline_violation_upper95_exact,candidate_violation_upper95_exact"
