@@ -151,6 +151,8 @@ jobs:
         run: cargo test --locked --release -p symthaea-core --example platonic_registry_event_integrity -- --nocapture
 
       - name: Run temporal registry integrity trace benchmark
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: cargo run --locked --release -p symthaea-core --example platonic_registry_event_integrity 2>&1 | tee research-results/platonic-registry-temporal-integrity.log
 
       - name: Check identity-evidence API and example formatting
