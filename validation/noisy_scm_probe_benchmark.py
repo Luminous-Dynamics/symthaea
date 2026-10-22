@@ -245,10 +245,9 @@ def recurse(case: Case, posterior: tuple[float, ...], remaining: tuple[int, ...]
                                     max(0.0, entropy(posterior) - after_model_h))
 
     if strategy == "exact_oracle":
-        stop = (posterior_metrics(case, posterior)[0], 0.0, 0.0,
-                -posterior_metrics(case, posterior)[2])
+        stop_h, stop_m, stop_p = posterior_metrics(case, posterior)
         candidates: list[tuple[tuple[float, ...], Value]] = [
-            (stop, Value(*posterior_metrics(case, posterior), 0.0, 0.0))
+            ((stop_h, 0.0, 0.0, -stop_p), Value(stop_h, stop_m, stop_p, 0.0, 0.0))
         ]
         for action in affordable:
             value = expected_action_value(case, posterior, action, remaining, budget_left,
@@ -305,10 +304,13 @@ def run_benchmark(instances: int, budget: int, source_sha: str, node_count: int,
             if value.expected_graph_entropy_bits + 1e-9 < oracle.expected_graph_entropy_bits:
                 raise AssertionError(f"policy {name} beat exact oracle's primary objective on seed={seed}")
             rows.append({
-                "seed": seed, "strategy": name, "node_count": case.node_count,
+                "seed": seed,
+                "strategy": name,
+                "node_count": case.node_count,
                 "hypothesis_count": len(case.hypotheses),
                 "distinct_graph_count": len({h.graph_key() for h in case.hypotheses}),
-                "budget": case.budget, "noise_probability": case.noise,
+                "budget": case.budget,
+                "noise_probability": case.noise,
                 "expected_graph_entropy_bits": value.expected_graph_entropy_bits,
                 "expected_model_entropy_bits": value.expected_model_entropy_bits,
                 "expected_map_graph_probability": value.expected_map_graph_probability,
