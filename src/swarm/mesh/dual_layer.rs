@@ -109,7 +109,7 @@ pub struct DualLayerMesh {
     /// Optional ChaCha20-Poly1305 encryption key for packet envelopes.
     #[cfg(feature = "mesh-encryption")]
     encryption_key: Option<[u8; 32]>,
-    /// Legacy random 8-bit epoch for packet-level nonce construction; it does not guarantee restart nonce uniqueness. Fragment-level nonce construction does not include this epoch.
+    /// Legacy 8-bit packet-level epoch (defaults to zero; not randomized by `new`). It does not guarantee restart nonce uniqueness. Fragment-level nonce construction does not include this epoch.
     #[cfg(feature = "mesh-encryption")]
     encryption_epoch: u8,
     /// Whether to encrypt individual LoRa fragments (fragment-level AEAD).
@@ -140,8 +140,9 @@ impl DualLayerMesh {
 
     /// Set the ChaCha20-Poly1305 encryption key for outbound packets.
     ///
-    /// When set, all packets are encrypted after compression, before
-    /// fragmentation/transmission.
+    /// This enables the legacy packet-level nonce format described in
+    /// `docs/security/MESH_AEAD_NONCE_UNIQUENESS.md`; setting a key alone does
+    /// not establish a restart-safe nonce namespace or per-sender identity.
     #[cfg(feature = "mesh-encryption")]
     pub fn with_encryption_key(mut self, key: [u8; 32]) -> Self {
         self.encryption_key = Some(key);
@@ -150,10 +151,10 @@ impl DualLayerMesh {
 
     /// Set the legacy 8-bit epoch for packet-level nonce construction.
     ///
-    /// A fresh random value only reduces restart collision probability; it does
-    /// not guarantee uniqueness when the same key is reused. Fragment-level
-    /// encryption does not include this epoch. See
-    /// `docs/security/MESH_AEAD_NONCE_UNIQUENESS.md`.
+    /// The default is zero unless explicitly changed. Setting a fresh random
+    /// value only reduces restart collision probability; it does not guarantee
+    /// uniqueness when the same key is reused. Fragment-level encryption does
+    /// not include this epoch. See `docs/security/MESH_AEAD_NONCE_UNIQUENESS.md`.
     #[cfg(feature = "mesh-encryption")]
     pub fn with_encryption_epoch(mut self, epoch: u8) -> Self {
         self.encryption_epoch = epoch;
