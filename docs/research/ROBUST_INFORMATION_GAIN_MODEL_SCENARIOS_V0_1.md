@@ -45,7 +45,8 @@ Compare at minimum:
 - joint-scenario robust EIG;
 - EIG with scheduled audits;
 - joint-scenario robust EIG plus the same audit schedule;
-- evaluator-only oracle, used solely as an upper bound.
+- evaluator-only oracle, used solely as an upper bound;
+- where faithful implementations and compatible tasks can be made available, robust published baselines: R-IDeA (representativeness + informativeness + error de-amplification), generalized-Bayesian/Gibbs EIG (GBOED), and maximin robust Bayesian experimental design. Report the exact paper objective, implementation commit, tuning procedure, and approximation for each; otherwise label the baseline unavailable instead of implying SOTA superiority.
 
 Hold candidate pools and random seeds constant across arms. Split by *held-out structural world/family*, not by seed alone. Include correctly specified and systematically misspecified laws, omitted variables/terms, heteroscedastic and heavy-tailed noise, scale-estimation error, shifted query/test distributions, and varied experiment costs.
 
@@ -57,7 +58,7 @@ Initial confirmatory matrix: at least 60 held-out worlds spanning 6 or more stru
 
 ## External comparison
 
-Protocol alignment matters more than a superficial leaderboard comparison. NewtonBench is an interactive scientific-law discovery benchmark with 324 tasks across 12 physics domains. SciLaws-Bench reports numerical fit, scientific validity, and structural recovery separately. Their scores are not directly comparable to Symthaea's Rust simulator unless the task subset, query budget, candidate representation, tool/model access, and evaluator are matched.
+Protocol alignment matters more than a superficial leaderboard comparison. NewtonBench is an interactive scientific-law discovery benchmark with 324 tasks across 12 physics domains. SciLaws-Bench contains 118 problems across six disciplines and reports numerical fit, scientific validity, and structural recovery separately. Its public 2026-10-22 aggregate leaderboard reports GPT-6 at 51.33% fit, 82.91% validity, and 72.46% structural recovery; the task and harness differ from Symthaea's selector simulator, so these figures are **context, not a head-to-head result**. The benchmark itself finds that good fit is not a reliable substitute for scientific validity and that candidate selection is a discovery bottleneck. Before adopting tasks, audit task-level data licensing.
 
 Current research informing the design:
 - Tang, Sloman & Kaski, *Representative, Informative, and De-Amplifying: Requirements for Robust Bayesian Active Learning under Model Misspecification*, AISTATS 2026: https://proceedings.mlr.press/v300/tang26d.html
