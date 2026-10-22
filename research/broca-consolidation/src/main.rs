@@ -299,7 +299,7 @@ fn choose_action(policy: Policy, f: &ObservedFeatures) -> Action {
             if f.repeat_count >= 2 { Action::Summary } else { Action::Raw }
         }
         Policy::FeatureThreshold => {
-            if f.correction_seen || f.contradiction_count >= 2 {
+            if f.correction_seen || f.contradiction_count >= 2 || f.recency <= 1 {
                 Action::Retire
             } else if f.provenance_diversity >= 5
                 && f.repeat_count >= 5
@@ -517,6 +517,17 @@ fn validate_self_checks(candidates: &[Candidate], rows: &[Decision]) -> Result<(
     }
 
     let summaries = summarize(rows);
+    for spec in &POLICIES {
+        let summary = summaries
+            .get(spec.name)
+            .ok_or_else(|| format!("missing policy {}", spec.name))?;
+        if summary.candidates != candidates.len() {
+            return Err(format!(
+                "policy {} produced {} decisions for {} candidates",
+                spec.name, summary.candidates, candidates.len()
+            ));
+        }
+    }
     let retire = summaries.get("retire_everything")
         .ok_or_else(|| "missing retire-everything anti-control".to_owned())?;
     if retire.covered_load_bearing != 0
@@ -626,10 +637,19 @@ fn run(config: Config) -> Result<(), String> {
         role: "oracle_diagnostic",
         policy: Policy::AlwaysRaw,
     };
+    let mut oracle_rows = Vec::with_capacity(candidates.len());
     for candidate in &candidates {
         let row = Decision::from_candidate(candidate, &oracle_spec, candidate.truth.kind.oracle_action());
-        emit_candidate(&row, &config.source_sha, config.seed, config.candidates);
+        oracle_rows.push(row);
     }
+    for row in &oracle_rows {
+        emit_candidate(row, &config.source_sha, config.seed, config.candidates);
+    }
+    let mut oracle_summary = PolicySummary::default();
+    for row in &oracle_rows {
+        oracle_summary.add(row);
+    }
+    emit_summary("oracle_diagnostic", &oracle_summary, &config.source_sha, config.seed);
     Ok(())
 }
 
