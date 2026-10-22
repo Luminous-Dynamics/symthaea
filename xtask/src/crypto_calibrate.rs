@@ -107,7 +107,7 @@ pub(super) fn run(
     dry_run: bool,
     out_arg: Option<&Path>,
 ) -> Result<()> {
-    let selected_modes = usize::from(task_id.is_some()) + usize::from(all) + usize::from(list);
+    let selected_modes = task_id.is_some() as usize + all as usize + list as usize;
     if selected_modes != 1 {
         bail!("choose exactly one of --list, --all, or --task-id <ID>");
     }
@@ -121,6 +121,14 @@ pub(super) fn run(
     validate_suite(&suite)?;
 
     if list {
+        // Listing is also a manifest integrity check: every declared regression
+        // must still map to a test function and an allowlisted Cargo invocation.
+        for task in &suite.tasks {
+            for regression in &task.source_regressions {
+                validate_regression(root, regression)
+                    .with_context(|| format!("validate {} / {}", task.task_id, regression.test))?;
+            }
+        }
         println!("suite_id={} schema={} sha256={}", suite.suite_id, suite.schema_version, suite_sha256);
         for task in &suite.tasks {
             println!(
@@ -150,6 +158,12 @@ pub(super) fn run(
     let status_output = command_output(root, "git", &["status", "--porcelain"]);
     let tree_status = status_output.unwrap_or_else(|| "git status unavailable".to_owned());
     let working_tree_clean = tree_status.is_empty();
+    if !dry_run && !working_tree_clean {
+        bail!(
+            "refusing to execute calibration from a dirty/unverifiable working tree (status digest {}); commit or clean the tree first",
+            sha256_hex(tree_status.as_bytes())
+        );
+    }
     let rustc_version = command_text(root, "rustc", &["--version"]);
     let cargo_version = command_text(root, "cargo", &["--version"]);
 
@@ -219,7 +233,7 @@ pub(super) fn run(
         }
         fs::write(&out_path, &receipt_bytes)
             .with_context(|| format!("write evidence receipt {}", out_path.display()))?;
-        println!("wrote evidence receipt: {}", out_path.display());
+        eprintln!("wrote evidence receipt: {}", out_path.display());
     }
     println!("{}", String::from_utf8(receipt_bytes)?);
 
@@ -448,33 +462,36 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn clip(text: &str) -> String {
-    let mut chars = text.chars();
-    let prefix: String = chars.by_ref().take(MAX_EXCERPT_CHARS).collect();
-    if chars.next().is_some() {
-        format!("{prefix}… [excerpt truncated; full output digest retained]")
-    } else {
-        prefix
+    let count = text.chars().count();
+    if count <= MAX_EXCERPT_CHARS {
+        return text.to_owned();
     }
+    let suffix: String = text
+        .chars()
+        .skip(count.saturating_sub(MAX_EXCERPT_CHARS))
+        .collect();
+    format!("[excerpt begins near end; full output digest retained]…{suffix}")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn regression(command: &str, test: &str) -> Regression {
-        Regression {
-            path: "xtask/src/main.rs".to_owned(),
-            test: test.to_owned(),
-            command: command.to_owned(),
-        }
-    }
-
     #[test]
     fn accepts_only_approved_cargo_test_shapes() {
         let parsed = parse_command_for_test("cargo test -p symthaea-core --lib legacy_attack_known_pair_forges_hdc_mac", "legacy_attack_known_pair_forges_hdc_mac").unwrap();
         assert_eq!(parsed.package, "symthaea-core");
         assert_eq!(parsed.test_filter, "legacy_attack_known_pair_forges_hdc_mac");
-        assert_eq!(parsed.cargo_args, vec!["test", "-p", "symthaea-core", "--lib", "legacy_attack_known_pair_forges_hdc_mac"]);
+        assert_eq!(
+            parsed.cargo_args,
+            vec![
+                "test",
+                "-p",
+                "symthaea-core",
+                "--lib",
+                "legacy_attack_known_pair_forges_hdc_mac"
+            ]
+        );
     }
 
     #[test]
