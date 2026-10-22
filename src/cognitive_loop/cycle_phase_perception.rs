@@ -350,6 +350,20 @@ impl CognitiveLoopService {
             self.run_surprise_exploration(&encoding_res.compressed_state);
         module_timings.surprise_exploration = _t_surprise.elapsed().as_micros() as u64;
 
+        // Exploration can change confidence/curiosity state, so compute the
+        // adaptive threshold after the single exploration update for this cycle.
+        let confidence_scale = (1.0
+            + (self.prediction_confidence - super::thresholds::CONFIDENCE_SCALE_MIDPOINT as f64)
+                * super::thresholds::CONFIDENCE_SCALE_SENSITIVITY as f64) as f32;
+        let exploration_scale = (1.0
+            - (self.behavior.curiosity_drive.exploration_urge
+                - super::thresholds::EXPLORATION_SCALE_MIDPOINT as f64)
+                * super::thresholds::EXPLORATION_SCALE_SENSITIVITY as f64) as f32;
+        let effective_threshold = self.config.learning_threshold
+            * self.carryover.learning.adaptive_threshold_scale as f32
+            * confidence_scale
+            * exploration_scale;
+
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 1.2: Urgency Phase
         // ═══════════════════════════════════════════════════════════════════════
@@ -357,7 +371,7 @@ impl CognitiveLoopService {
             prediction_error,
             prediction_error_valid,
             surprise_triggered,
-            encoding_res.effective_threshold,
+            effective_threshold,
         );
 
         // ═══════════════════════════════════════════════════════════════════════
