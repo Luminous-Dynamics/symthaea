@@ -36,6 +36,7 @@ struct Task {
     production_use_allowed: bool,
     novel_discovery: bool,
     source_regressions: Vec<Regression>,
+    positive_controls: Vec<Regression>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,6 +73,7 @@ struct Receipt {
 #[derive(Debug, Serialize)]
 struct TaskResult {
     task_id: String,
+    role: &'static str,
     category: String,
     security_notion: String,
     source_path: String,
@@ -93,6 +95,9 @@ struct Summary {
     regression_commands: usize,
     planned_commands: usize,
     reproduced_known_breaks: usize,
+    positive_control_commands: usize,
+    positive_controls_passed: usize,
+    positive_control_failures: usize,
     command_failures: usize,
     launch_errors: usize,
     novel_discoveries: usize,
@@ -124,7 +129,7 @@ pub(super) fn run(
         // Listing is also a manifest integrity check: every declared regression
         // must still map to a test function and an allowlisted Cargo invocation.
         for task in &suite.tasks {
-            for regression in &task.source_regressions {
+            for regression in task.source_regressions.iter().chain(&task.positive_controls) {
                 validate_regression(root, regression)
                     .with_context(|| format!("validate {} / {}", task.task_id, regression.test))?;
             }
@@ -174,18 +179,24 @@ pub(super) fn run(
     // path or disallowed invocation must not leave a partially executed suite.
     let mut validated = Vec::new();
     for task in &selected {
-        for regression in &task.source_regressions {
-            let parsed = validate_regression(root, regression)
-                .with_context(|| format!("validate {} / {}", task.task_id, regression.test))?;
-            validated.push((*task, regression, parsed));
+        for (role, regressions) in [
+            ("known_break", &task.source_regressions),
+            ("positive_control", &task.positive_controls),
+        ] {
+            for regression in regressions {
+                let parsed = validate_regression(root, regression)
+                    .with_context(|| format!("validate {} / {}", task.task_id, regression.test))?;
+                validated.push((*task, regression, parsed, role));
+            }
         }
     }
 
     let mut task_results = Vec::new();
-    for (task, regression, parsed) in validated {
+    for (task, regression, parsed, role) in validated {
         if dry_run {
             task_results.push(TaskResult {
                 task_id: task.task_id.clone(),
+                role,
                 category: task.category.clone(),
                 security_notion: task.security_notion.clone(),
                 source_path: regression.path.clone(),
@@ -201,13 +212,28 @@ pub(super) fn run(
                 note: "not executed; no attack result inferred".to_owned(),
             });
         } else {
-            task_results.push(execute_regression(root, task, regression, parsed));
+            task_results.push(execute_regression(root, task, regression, parsed, role));
         }
     }
 
     let reproduced_known_breaks = task_results
         .iter()
         .filter(|r| r.outcome == "reproduced_known_break")
+        .count();
+    let positive_control_commands = task_results
+        .iter()
+        .filter(|r| r.role == "positive_control")
+        .count();
+    let positive_controls_passed = task_results
+        .iter()
+        .filter(|r| r.outcome == "positive_control_passed")
+        .count();
+    let positive_control_failures = task_results
+        .iter()
+        .filter(|r| {
+            r.role == "positive_control"
+                && (r.outcome == "command_failed" || r.outcome == "launch_error")
+        })
         .count();
     let command_failures = task_results.iter().filter(|r| r.outcome == "command_failed").count();
     let launch_errors = task_results.iter().filter(|r| r.outcome == "launch_error").count();
@@ -230,6 +256,9 @@ pub(super) fn run(
             regression_commands: task_results.len(),
             planned_commands,
             reproduced_known_breaks,
+            positive_control_commands,
+            positive_controls_passed,
+            positive_control_failures,
             command_failures,
             launch_errors,
             novel_discoveries: 0,
@@ -286,6 +315,9 @@ fn validate_suite(suite: &Suite) -> Result<()> {
         }
         if task.source_regressions.is_empty() {
             bail!("task {} has no source regression commands", task.task_id);
+        }
+        if task.positive_controls.is_empty() {
+            bail!("task {} has no positive controls", task.task_id);
         }
     }
     Ok(())
@@ -361,6 +393,7 @@ fn execute_regression(
     task: &Task,
     regression: &Regression,
     parsed: ParsedCommand,
+    role: &'static str,
 ) -> TaskResult {
     let started = Instant::now();
     let output = Command::new("cargo")
@@ -370,9 +403,10 @@ fn execute_regression(
 
     let elapsed = started.elapsed().as_millis();
     match output {
-        Ok(output) => task_result_from_output(task, regression, parsed, output, elapsed),
+        Ok(output) => task_result_from_output(task, regression, parsed, output, elapsed, role),
         Err(error) => TaskResult {
             task_id: task.task_id.clone(),
+            role,
             category: task.category.clone(),
             security_notion: task.security_notion.clone(),
             source_path: regression.path.clone(),
@@ -399,17 +433,21 @@ fn task_result_from_output(
     parsed: ParsedCommand,
     output: Output,
     elapsed_ms: u128,
+    role: &'static str,
 ) -> TaskResult {
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
     let exit_code = output.status.code();
-    let outcome = if output.status.success() {
+    let outcome = if output.status.success() && role == "positive_control" {
+        "positive_control_passed"
+    } else if output.status.success() {
         "reproduced_known_break"
     } else {
         "command_failed"
     };
     TaskResult {
         task_id: task.task_id.clone(),
+        role,
         category: task.category.clone(),
         security_notion: task.security_notion.clone(),
         source_path: regression.path.clone(),
@@ -422,7 +460,10 @@ fn task_result_from_output(
         stderr_sha256: sha256_hex(stderr.as_bytes()),
         stdout_excerpt: clip(&stdout),
         stderr_excerpt: clip(&stderr),
-        note: if output.status.success() {
+        note: if output.status.success() && role == "positive_control" {
+            "functional positive control passed; this does not establish a security property"
+                .to_owned()
+        } else if output.status.success() {
             format!(
                 "known-break regression passed for package {}; this is calibration, not novelty",
                 parsed.package
