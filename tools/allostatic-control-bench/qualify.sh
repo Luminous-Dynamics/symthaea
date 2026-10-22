@@ -1140,6 +1140,12 @@ if ! awk -F, '
         ($26 != "true" && $26 != "false") ||
         $27 !~ /^[0-8]$/ ||
         $28 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    expected_reset_budget = 0.05 / (20 * $16 * ($16 + 1))
+    expected_reset_threshold = log(20 * $16 * ($16 + 1) / 0.05)
+    if (($25 - expected_reset_threshold > 0.000001) ||
+        (expected_reset_threshold - $25 > 0.000001)) failed = 1
+    if (($28 - expected_reset_budget > 0.0000000001) ||
+        (expected_reset_budget - $28 > 0.0000000001)) failed = 1
     for (i = 21; i <= 23; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
     for (i = 29; i <= 31; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
 
@@ -1241,7 +1247,10 @@ if ! awk -F, '
   END {
     if (NR != 48001 || rows != 48000 || failed) exit 1
     for (cell in next_stream) {
-      if (next_stream[cell] != 2400 || first_persistent[cell] != recorded_persistent_first[cell]) exit 1
+      if (next_stream[cell] != 2400) exit 1
+      if (first_persistent[cell] == 2400) {
+        if (recorded_persistent_first[cell] != "NA") exit 1
+      } else if (first_persistent[cell] != recorded_persistent_first[cell]) exit 1
     }
     for (episode in first_reset) {
       if (first_reset[episode] != recorded_reset_first[episode]) exit 1
