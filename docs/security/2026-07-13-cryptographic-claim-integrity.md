@@ -465,3 +465,19 @@ the cache-poisoning case (an unauthenticated packet shares a tuple with a later
 valid packet). Tests were authored as part of the candidate change but have not
 been run locally; no pass is claimed here. Exact-head CI must include the
 `mesh` configuration and the existing packet-MAC tests.
+
+
+### Related 2026-10-22 finding: source-ID rate-limit spoofing
+
+The same candidate receive-path hardening also moves the tracked-peer rate-limit check
+after MAC verification and replay checks. Previously, the limiter charged a peer based
+on an eight-byte source ID before authenticating the packet. A sender could spoof a
+known source ID with invalid-MAC telemetry and consume that peer's 100-packets-per-
+10-second quota, causing valid traffic to be dropped.
+
+A regression now establishes a peer using a valid MAC, sends over 100 invalid-MAC
+packets with the same claimed source ID, and checks that a fresh valid packet remains
+accepted. This is separate from raw ingress flood protection: a transport-layer limiter
+must use the actual radio/socket endpoint or connection identifier, not an untrusted
+source ID embedded in the packet. With a shared group MAC key, all key holders can still
+forge another member's source ID; the group-key trust model remains a limitation.
