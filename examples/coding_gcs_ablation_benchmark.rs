@@ -356,8 +356,39 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
     let complete = mode.iter().filter(|r| r.oracle_complete).count();
     let agent_ms: u128 = mode.iter().map(|r| r.agent_elapsed_ms).sum();
     let energy: f64 = mode.iter().map(|r| r.energy).sum();
+    let tier_attempt_count = |target: &str| -> usize {
+        mode.iter()
+            .map(|run| run.generation_tiers.iter().filter(|tier| tier.as_str() == target).count())
+            .sum()
+    };
+    let runs_with_external_llm_tier = mode
+        .iter()
+        .filter(|run| {
+            run.generation_tiers
+                .iter()
+                .any(|tier| matches!(tier.as_str(), "LocalLLM" | "CloudLLM"))
+        })
+        .count();
+    let runs_with_simulated_tier = mode
+        .iter()
+        .filter(|run| run.generation_tiers.iter().any(|tier| tier == "Simulated"))
+        .count();
+    let runs_with_no_generation_attempts = mode
+        .iter()
+        .filter(|run| run.generation_tiers.is_empty())
+        .count();
     serde_json::json!({
         "gcs_advisories_enabled": enabled,
+        "generation_tier_attempts": {
+            "Native": tier_attempt_count("Native"),
+            "Hardware": tier_attempt_count("Hardware"),
+            "LocalLLM": tier_attempt_count("LocalLLM"),
+            "CloudLLM": tier_attempt_count("CloudLLM"),
+            "Simulated": tier_attempt_count("Simulated")
+        },
+        "runs_with_external_llm_tier": runs_with_external_llm_tier,
+        "runs_with_simulated_tier": runs_with_simulated_tier,
+        "runs_with_no_generation_attempts": runs_with_no_generation_attempts,
         "runs": total,
         "behavioral_successes": passed,
         "pass_rate": if total == 0 { 0.0 } else { passed as f64 / total as f64 },
