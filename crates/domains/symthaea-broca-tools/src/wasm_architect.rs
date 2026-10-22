@@ -522,11 +522,15 @@ impl WasmArchitect {
         Ok(())
     }
 
-    /// Non-wasmtime fallback.
+    /// Fail closed when the sandbox runtime is not compiled in.
+    ///
+    /// This method must never report success for an artifact that has not
+    /// been authenticated, loaded, and executed by Wasmtime.
     #[cfg(not(feature = "wasm-sandbox"))]
     pub fn execute_plugin(&self, _artifact: &[u8], _func_name: &str) -> Result<()> {
-        println!("🚀 WASM plugin verification (no runtime enabled).");
-        Ok(())
+        Err(anyhow::anyhow!(
+            "WASM execution is disabled: rebuild with the `wasm-sandbox` feature; refusing to report verification or execution success"
+        ))
     }
 }
 
@@ -597,5 +601,24 @@ mod tests {
         let mut legacy = signed_fixture(&signer, b"wasm", b"precompiled", [7; 32]);
         legacy.format_version = 1;
         assert!(verify_signed_artifact(&legacy, signer.public_key()).is_err());
+    }
+
+    #[cfg(not(feature = "wasm-sandbox"))]
+    #[test]
+    fn execution_without_sandbox_runtime_fails_closed() {
+        let architect = WasmArchitect {
+            build_dir: PathBuf::new(),
+            aot_cache: Arc::new(Mutex::new(LruCache::new(
+                NonZeroUsize::new(1).unwrap(),
+            ))),
+            keypair: Arc::new(DilithiumKeypair::generate()),
+        };
+
+        let error = architect
+            .execute_plugin(b"not a signed artifact", "run")
+            .expect_err("disabled runtime must not claim verification/execution success");
+        let message = error.to_string();
+        assert!(message.contains("execution is disabled"));
+        assert!(message.contains("wasm-sandbox"));
     }
 }
