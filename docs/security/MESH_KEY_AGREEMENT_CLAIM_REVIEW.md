@@ -89,6 +89,19 @@ References:
 
 **Recommendation:** prefer a reviewed standard implementation for the existing online/IP transports. For the off-grid LoRa transport, treat protocol adaptation as a separate design and review task. Do not claim RFC 10024 compliance unless the implementation actually conforms to TLS 1.3 and its exact construction. Use the standard as a security-model baseline, not permission to improvise a novel transcript or key schedule.
 
+### QUIC/IP transport audit: standardized hybrid TLS is not yet proven active
+
+The source tree's vendored Iroh transport currently declares `rustls = { version = "0.23.33", default-features = false, features = ["ring"] }` and enables `noq` with `rustls-ring`. The `pqc-handshake` feature does not itself activate the root crate's separate optional `holon-quic` dependency. In Rustls 0.23.45's upstream feature table, `prefer-post-quantum` depends on `aws_lc_rs`; the current Iroh-specific configuration does not request either `aws_lc_rs` or `prefer-post-quantum`. Therefore, enabling the application-level `pqc-handshake` feature **does not establish that QUIC negotiated RFC 10024's `X25519MLKEM768` group**. The custom helper and TLS key exchange are separate layers.
+
+This is a configuration-level finding from the checked manifests, not a live handshake capture. Required proof before claiming hybrid TLS support:
+1. Decide whether the Iroh/QUIC stack can use a reviewed provider supporting ML-KEM and the standardized group without conflicting provider registration.
+2. Explicitly configure peer-compatible hybrid group preference while preserving the approved algorithm and fallback policy. Never infer negotiation from compiled features alone.
+3. Add an integration test that captures the negotiated TLS supported group or equivalent trustworthy provider telemetry, checks that both peers use the intended hybrid group, and proves that unsupported peers fail or downgrade only under an explicit authenticated policy.
+4. Benchmark handshake time, CPU, allocations, first-flight bytes, retransmissions and failure rate using the production provider and intended hardware.
+5. Keep the custom `PqcHandshakeManager` out of the claim path until it has a reviewed, transcript-bound protocol with bidirectional KEM processing and key confirmation. The current service code now fails closed rather than claiming the incomplete helper established a hybrid session.
+
+The first dependency action is tracked separately in [PR #8443](https://github.com/Luminous-Dynamics/symthaea/pull/8443), which upgrades the locked Rustls release to a version containing the September 2026 TLS 1.3 encryption-level validation fix. That patch alone does not enable hybrid key exchange.
+
 ### Constrained-link cost is part of cryptographic correctness
 
 The current LoRa fragment payload is 214 bytes (222-byte MTU minus the 8-byte fragment header), plus one XOR parity frame per payload. ML-KEM-768 has a 1,184-byte public key and a 1,088-byte ciphertext. Under the current framing, each one requires six data fragments plus a parity fragment. A combined server share containing the ciphertext and a 32-byte X25519 ephemeral public share is still about 1,120 bytes, also six data fragments plus parity.
