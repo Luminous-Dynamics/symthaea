@@ -1,15 +1,22 @@
 //! Fixed-reference predictive-rank martingales for anytime shift monitoring.
 //!
-//! This implementation follows the predictive-rank martingale construction of
-//! Kuang and Xia (2026): each new score is ranked against a fixed reference
-//! sample; the next-rank null probabilities account for dependence induced by
-//! repeatedly reusing that reference; a predictably centered feature payoff is
-//! then multiplied into an online wealth process. Under the paper's IID/continuity
-//! assumptions, the nonnegative martingale and Ville threshold give anytime
-//! marginal type-I error control. This module does not make those assumptions true
-//! for a real plant, and it is not a physical safety certificate.
+//! This implements the predictive-rank conditioning and a bounded ONS-style
+//! bettor inspired by Kuang and Xia (2026): each score is ranked against a fixed
+//! reference sample; the next-rank null probabilities account for dependence
+//! induced by reuse of that reference; and a predictably centered feature payoff
+//! updates an online wealth process. The local ONS step-size coefficient is set
+//! explicitly below and has not yet been independently checked against the
+//! authors' exact algorithm. Do not claim exact method reproduction or the
+//! paper's detection-delay bounds until that comparison is complete. The
+//! nonnegative-wealth martingale argument remains conditional on valid rank
+//! exchangeability, predictable bets, and positive betting factors; this module
+//! does not make those assumptions true for a real plant or certify an action.
 
 use std::cmp::Ordering;
+
+/// Prototype ONS gain, fixed before benchmark evaluation. This is not asserted
+/// to match the source paper's exact optimizer parameterization.
+const ONS_STEP_SIZE: f64 = 4.5;
 
 /// A score paired with an independent tie-breaking key.
 /// The tie key is needed to retain an exchangeable total ordering when scores tie.
@@ -231,7 +238,8 @@ impl RankMartingale {
             .max((self.feature_max - next_predictive_mean).abs())
             .min(1.0);
         let next_radius = 1.0 - next_bound / 4.0;
-        let next_lambda = self.lambda + 4.5 * gradient / self.accumulated_squared_gradients;
+        let next_lambda =
+            self.lambda + ONS_STEP_SIZE * gradient / self.accumulated_squared_gradients;
         self.lambda = next_lambda.clamp(-next_radius, next_radius);
 
         Some(RankObservation {
