@@ -914,7 +914,19 @@ fn evaluation_receipt_fails_closed_on_missing_skipped_and_duplicate_cases() {
     missing["run_status"] = Value::String("PARTIAL".to_owned());
     missing["comparison_eligibility"] = Value::String("NOT_COMPARABLE".to_owned());
     let errors = validate_evaluation_receipt(&missing);
-    assert!(errors.iter().any(|error| error.contains("COMPLETE run must account")));
+    assert!(
+        errors.is_empty(),
+        "a correctly recorded partial run should be valid evidence but non-comparable: {errors:#?}"
+    );
+    assert_eq!(missing["comparison_eligibility"], "NOT_COMPARABLE");
+
+    let mut falsely_complete = missing.clone();
+    falsely_complete["run_status"] = Value::String("COMPLETE".to_owned());
+    let errors = validate_evaluation_receipt(&falsely_complete);
+    assert!(
+        errors.iter().any(|error| error.contains("COMPLETE run must account")),
+        "a partial census must be rejected when labelled COMPLETE"
+    );
 
     let mut duplicate = receipt.clone();
     duplicate["case_results"][1]["case_id"] = Value::String("SLD-TEST-001".to_owned());
