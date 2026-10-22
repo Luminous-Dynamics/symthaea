@@ -17,7 +17,7 @@ That means a zero-test result could be promoted as a successful example despite 
 
 ## Scope and limits
 
-The expected test count is computed by counting external Rust `#[test]` declarations in the lesson fixture. This is a simple source-level check, not a Rust parser. The fixture must be well-formed and test-runner errors remain fail-closed. Higher-level benchmark receipts should continue to use their own explicit expected-vs-observed counts and two-sided reference/mutant controls.
+The expected test count is computed by counting external Rust `#[test]` declarations in the lesson fixture. This is a simple source-level check, not a Rust parser. The fixture must be well-formed and test-runner errors remain fail-closed. Auto-generated remediation drills now wrap their assertion snippets in a named `#[test]` function so that those fixtures have an explicit test entry point. Higher-level benchmark receipts should continue to use their own explicit expected-vs-observed counts and two-sided reference/mutant controls.
 
 ## Regressions added
 
