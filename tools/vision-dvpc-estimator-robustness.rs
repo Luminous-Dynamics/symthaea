@@ -284,13 +284,6 @@ fn make_trials(regime: Regime, seed: u64) -> Vec<EvaluatorTrial> {
             }
         }
 
-        if regime == Regime::CostUnderestimate && !is_critical_tail {
-            // The intervention is applied irrespective of the value estimator.
-            if rng.unit() < 0.75 {
-                declared_cost_units = Some(actual_cost_units.saturating_sub(1).max(1));
-            }
-        }
-
         // Keep model outputs finite by construction; the evaluator still validates below.
         if !estimated_net_benefit.is_finite() {
             estimated_net_benefit = 0.0;
@@ -361,7 +354,7 @@ fn evaluator_oracle_benefit(trials: &[EvaluatorTrial], budget: u64) -> f64 {
     let cap = budget as usize;
     let mut best = vec![0.0_f64; cap + 1];
     for trial in trials {
-        if trial.true_dvpc <= NEUTRAL_VALUE || trial.actual_cost_units as usize > cap {
+        if trial.true_dvpc <= 0.0 || trial.actual_cost_units as usize > cap {
             continue;
         }
         let cost = trial.actual_cost_units as usize;
