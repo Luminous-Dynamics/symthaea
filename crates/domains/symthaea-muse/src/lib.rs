@@ -186,6 +186,11 @@ pub mod structural_evidence;
 pub mod structure;
 #[cfg(feature = "theory")]
 pub mod studio_contract;
+// Studio-only endpoints depend on the optional theory/protocol stack.
+#[cfg(feature = "studio")]
+pub mod symbolic_import;
+#[cfg(feature = "studio")]
+pub mod teaching_corpus;
 #[cfg(feature = "theory")]
 pub mod study_artifact;
 #[cfg(feature = "theory")]
