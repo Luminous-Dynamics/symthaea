@@ -171,6 +171,15 @@
               2
             ],
             "nominal_candidate": 1
+          },
+          {
+            "name": "jaw_height_margin",
+            "unit": "mm",
+            "candidate_range": [
+              5,
+              20
+            ],
+            "nominal_candidate": 10
           }
         ],
         "design_constraints": [
