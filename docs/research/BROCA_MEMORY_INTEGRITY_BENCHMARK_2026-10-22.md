@@ -3,7 +3,7 @@
 **Status:** preregistration proposal; no benchmark has been executed  
 **Date:** 2026-10-22  
 **Scope:** controlled memory behavior for Symthaea Liquid Broca and its recurrent/HDC memory alternatives  
-**Related work:** [architecture bake-off protocol](BROCA_ARCHITECTURE_BAKEOFF_PROTOCOL_2026-10-22.md), [#8308 training/evaluation validity](https://github.com/Luminous-Dynamics/symthaea/issues/8308), [#8330 bake-off protocol PR](https://github.com/Luminous-Dynamics/symthaea/pull/8330), [#8364 LoRA update isolation](https://github.com/Luminous-Dynamics/symthaea/issues/8364), [#8392 selective memory intervention](https://github.com/Luminous-Dynamics/symthaea/issues/8392)
+**Related work:** [architecture bake-off protocol](BROCA_ARCHITECTURE_BAKEOFF_PROTOCOL_2026-10-22.md), [#8308 training/evaluation validity](https://github.com/Luminous-Dynamics/symthaea/issues/8308), [#8330 bake-off protocol PR](https://github.com/Luminous-Dynamics/symthaea/pull/8330), [#8364 LoRA update isolation](https://github.com/Luminous-Dynamics/symthaea/issues/8364), [#8392 selective memory intervention](https://github.com/Luminous-Dynamics/symthaea/issues/8392), [#8411 bounded-payload stale-replay safety](https://github.com/Luminous-Dynamics/symthaea/issues/8411)
 
 This document proposes a separate benchmark for **memory integrity over time**. It complements ordinary retrieval and long-context QA. It does not replace them and does not claim results for Liquid Broca.
 
@@ -206,3 +206,22 @@ Hold the aggregation rule fixed when evaluating gating policy. Then, in a separa
 A gate is useful only if it preserves relevant-query performance and improves the actual quality/cost frontier after accounting for false negatives, retrieval cost, blending cost, latency, memory traffic, and answer generation. Fewer interventions alone is not a success criterion. Tune on development data, freeze the gate, and evaluate on the held-out split with paired confidence intervals.
 
 This section specifies an experiment; it does not assert that a gating policy or weighted aggregator currently improves Broca.
+
+## 12. Control-plane/data-plane separation under capacity pressure
+
+The reference harness in [PR #8395](https://github.com/Luminous-Dynamics/symthaea/pull/8395) now includes a diagnostic system, `bounded_payload_persistent_ledger`, that bounds payload count while retaining version/deletion metadata separately.
+
+The hypothesis is that memory capacity should be allowed to reduce **availability of an evictable payload** without reducing **authority to reject an obsolete update**. For a query whose latest record is valid but whose payload was evicted, a cache miss/abstention is safer than falling back to an older payload. For a deleted key, a stale write must not resurrect the value merely because the original payload and its tombstone were evicted together.
+
+This first model deliberately keeps its ledger unbounded. It tests the semantic separation, not an equal-total-memory efficiency claim. The ledger bytes, indexing, persistence, write amplification, compaction, recovery and tail latency must all be counted before any deployable-memory claim is made.
+
+Compare:
+1. unbounded versioned reference;
+2. bounded LRU carrying payload and lifecycle metadata together;
+3. bounded payload plus separate unbounded version/deletion ledger (diagnostic only);
+4. bounded payload plus a durable append-only lifecycle journal and compacted snapshot/index;
+5. a watermark/epoch design only when source monotonicity and the accepted replay horizon are explicitly guaranteed.
+
+Required adversarial mutations include stale update after eviction, deletion replay after eviction/restart, out-of-order event arrival, reused key, writer epoch change, damaged snapshot, and stale generation acceptance. If the implementation cannot establish that its control-plane state is current and complete, it should fail closed with an explicit unavailable/incomplete state.
+
+This design direction is tracked separately in [issue #8411](https://github.com/Luminous-Dynamics/symthaea/issues/8411). No physical secure erasure, distributed consistency, or production recovery claim follows from the in-memory fixture alone.
