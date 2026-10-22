@@ -64,6 +64,12 @@ pub struct StratifiedSummary {
     pub bootstrap_seed: u64,
 }
 
+struct TaskSamples {
+    baseline: Vec<f64>,
+    candidate: Vec<f64>,
+    deltas: Vec<f64>,
+}
+
 #[derive(Clone, Copy)]
 struct TaskDraw {
     mean_delta: f64,
@@ -90,8 +96,7 @@ impl StratifiedSummary {
         }
 
         let mut task_summaries = Vec::with_capacity(tasks.len());
-        let mut samples_by_task: Vec<(Vec<f64>, Vec<f64>, Vec<f64>)> =
-            Vec::with_capacity(tasks.len());
+        let mut samples_by_task: Vec<TaskSamples> = Vec::with_capacity(tasks.len());
         let mut total_pairs = 0_usize;
 
         for (task, episodes) in tasks {
@@ -131,7 +136,7 @@ impl StratifiedSummary {
                 .checked_add(episodes.len())
                 .ok_or("total paired episode count overflow")?;
             task_summaries.push(summary);
-            samples_by_task.push((baseline, candidate, deltas));
+            samples_by_task.push(TaskSamples { baseline, candidate, deltas });
         }
 
         let task_count = task_summaries.len();
@@ -174,13 +179,13 @@ impl StratifiedSummary {
         let task_balanced_baseline_iqm = task_balanced_iqm(
             &samples_by_task
                 .iter()
-                .map(|(baseline, _, _)| baseline.clone())
+                .map(|samples| samples.baseline.clone())
                 .collect::<Vec<_>>(),
         );
         let task_balanced_candidate_iqm = task_balanced_iqm(
             &samples_by_task
                 .iter()
-                .map(|(_, candidate, _)| candidate.clone())
+                .map(|samples| samples.candidate.clone())
                 .collect::<Vec<_>>(),
         );
         let task_balanced_iqm_delta = task_balanced_candidate_iqm - task_balanced_baseline_iqm;
@@ -206,16 +211,17 @@ impl StratifiedSummary {
             let mut task_draws = Vec::with_capacity(task_count);
             let mut sampled_baseline_by_task = Vec::with_capacity(task_count);
             let mut sampled_candidate_by_task = Vec::with_capacity(task_count);
-            for (baseline, candidate, deltas) in &samples_by_task {
-                let mut sampled_baseline = Vec::with_capacity(deltas.len());
-                let mut sampled_candidate = Vec::with_capacity(deltas.len());
-                let mut sampled_deltas = Vec::with_capacity(deltas.len());
+            for samples in &samples_by_task {
+                let mut sampled_baseline = Vec::with_capacity(samples.deltas.len());
+                let mut sampled_candidate = Vec::with_capacity(samples.deltas.len());
+                let mut sampled_deltas = Vec::with_capacity(samples.deltas.len());
 
-                for _ in 0..deltas.len() {
-                    let index = (next_random(&mut random_state) % deltas.len() as u64) as usize;
-                    sampled_baseline.push(baseline[index]);
-                    sampled_candidate.push(candidate[index]);
-                    sampled_deltas.push(deltas[index]);
+                for _ in 0..samples.deltas.len() {
+                    let index =
+                        (next_random(&mut random_state) % samples.deltas.len() as u64) as usize;
+                    sampled_baseline.push(samples.baseline[index]);
+                    sampled_candidate.push(samples.candidate[index]);
+                    sampled_deltas.push(samples.deltas[index]);
                 }
                 task_draws.push(TaskDraw {
                     mean_delta: mean(&sampled_deltas),
