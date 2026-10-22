@@ -1132,7 +1132,11 @@ if ! awk -F, '
           $25 != "NA" || $26 != "NA" || $27 != "NA") failed = 1
     } else {
       if ($20 == "NA" || $21 == "NA" || $22 == "NA" || $23 == "NA") failed = 1
-      if ($20 >= $18) failed = 1
+      if ($20 >= $18 || ($18 - $20) >= 64) failed = 1
+      expected_start_threshold = log(100) + log(3.141592653589793^2 / 6) +
+        2 * log($20 + 1)
+      if (($22 - expected_start_threshold > 0.000001) ||
+          (expected_start_threshold - $22 > 0.000001)) failed = 1
       if (($21 - $22 - $23 > 0.000001) || ($22 + $23 - $21 > 0.000001)) failed = 1
       if (($21 + 0.000001) < $22) failed = 1
       if (($27 == "true") != ($26 != "NA" && $26 <= 8)) failed = 1
@@ -1239,7 +1243,8 @@ if ! awk -F, '
     if (($1 == "null_low" || $1 == "null_boundary" || $1 == "stealth_paired") &&
         ($12 > 0.03 || $25 > 0.03)) failed = 1
     if ($1 == "early_shift_050" && ($16 > 50 || $29 > 50)) failed = 1
-    if ($1 == "late_shift_065" && ($16 < 200 || $29 > 150 || $16 <= $29 + 100)) failed = 1
+    if ($1 == "late_shift_065" &&
+        ($16 < 200 || $29 > 150 || $16 <= $29 + 100 || $37 < 300)) failed = 1
 
     key = $1
     if (seen[key]++) failed = 1
