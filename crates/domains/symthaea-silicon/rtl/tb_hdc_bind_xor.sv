@@ -18,6 +18,10 @@ module tb_hdc_bind_xor;
     logic out_valid;
     logic out_ready;
     logic [DATA_W-1:0] result;
+    logic [31:0] rng_a;
+    logic [31:0] rng_b;
+    logic [DATA_W-1:0] random_a;
+    logic [DATA_W-1:0] random_b;
 
     hdc_bind_xor #(.DATA_W(DATA_W)) dut (
         .clk,
@@ -75,6 +79,20 @@ module tb_hdc_bind_xor;
         check_xor(256'h0123456789abcdef_fedcba9876543210_0123456789abcdef_fedcba9876543210,
                   256'hffff0000ffff0000_0000ffff0000ffff_aaaa5555aaaa5555_5555aaaa5555aaaa,
                   "structured-pattern");
+
+        // Deterministic LCG-generated word pairs. This exercises many bit
+        // combinations without relying on simulator-specific $urandom state.
+        rng_a = 32'h13579bdf;
+        rng_b = 32'h2468ace1;
+        for (int trial = 0; trial < 32; trial++) begin
+            for (int lane = 0; lane < DATA_W; lane += 32) begin
+                rng_a = rng_a * 32'd1664525 + 32'd1013904223;
+                rng_b = rng_b * 32'd22695477 + 32'd1;
+                random_a[lane +: 32] = rng_a;
+                random_b[lane +: 32] = rng_b;
+            end
+            check_xor(random_a, random_b, "deterministic-lcg");
+        end
 
         // Backpressure must hold the first result and refuse a second input.
         out_ready = 1'b0;
