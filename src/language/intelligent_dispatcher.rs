@@ -51,6 +51,19 @@ impl std::fmt::Display for BackendTier {
     }
 }
 
+impl BackendTier {
+    /// Metabolic energy estimate assigned to the selected dispatch tier.
+    /// This is an internal budget unit, not provider billing or measured joules.
+    pub fn estimated_energy_cost(self) -> f64 {
+        match self {
+            Self::Native | Self::Hardware => COST_NATIVE,
+            Self::LocalLlm => COST_LOCAL_LLM,
+            Self::CloudLlm => COST_CLOUD_LLM,
+            Self::Simulated => 0.0,
+        }
+    }
+}
+
 /// One backend invocation observed during a dispatch, including fallback attempts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BackendAttempt {
@@ -62,6 +75,8 @@ pub struct BackendAttempt {
     pub success: bool,
     /// Wall-clock time spent in this backend invocation, including failures.
     pub elapsed_ms: u128,
+    /// Internal metabolic estimate assigned to the invocation's dispatch tier; not billing.
+    pub estimated_energy_cost: f64,
 }
 
 /// Result of an intelligent dispatch decision.
@@ -101,6 +116,7 @@ fn record_backend_attempt(
         backend_name: backend_name.to_string(),
         success,
         elapsed_ms,
+        estimated_energy_cost: selected_tier.estimated_energy_cost(),
     });
 }
 
@@ -481,7 +497,7 @@ impl IntelligentDispatcher {
                                         success,
                                         fallback_elapsed_ms,
                                     );
-                                    (output, success, COST_LOCAL_LLM)
+                                    (output, success, COST_CLOUD_LLM + COST_LOCAL_LLM)
                                 }
                                 Err(e2) => {
                                     self.local_stats.record(false);
@@ -495,7 +511,7 @@ impl IntelligentDispatcher {
                                     (
                                         format!("All LLMs failed: cloud={e}, local={e2}"),
                                         false,
-                                        COST_LOCAL_LLM,
+                                        COST_CLOUD_LLM + COST_LOCAL_LLM,
                                     )
                                 }
                             }
