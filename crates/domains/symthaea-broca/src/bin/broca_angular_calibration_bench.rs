@@ -383,9 +383,13 @@ fn candidate_diversity(candidates: &[ContinuousHV]) -> (f64, f64) {
 }
 
 fn digest_fixture() -> String {
-    let fixture = format!(
-        "schema=1;dimension={HDC_DIMENSION};base_vocab={BASE_VOCAB_SIZE};new_tokens={NEW_TOKEN_COUNT};train={TRAIN_QUERY_COUNT};heldout={HELDOUT_QUERY_COUNT};noise=0.25;logit_scale={LOGIT_SCALE};lambda_grid={LAMBDA_GRID:?}"
-    );
+    let fixture = [
+        format!("schema=1;dimension={HDC_DIMENSION};base_vocab={BASE_VOCAB_SIZE}"),
+        format!("new_tokens={NEW_TOKEN_COUNT};train={TRAIN_QUERY_COUNT}"),
+        format!("heldout={HELDOUT_QUERY_COUNT};noise=0.25;logit_scale={LOGIT_SCALE}"),
+        format!("lambda_grid={LAMBDA_GRID:?}"),
+    ]
+    .join(";");
     format!("{:x}", Sha256::digest(fixture.as_bytes()))
 }
 
