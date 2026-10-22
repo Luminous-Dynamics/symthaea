@@ -622,12 +622,10 @@ mod tests {
     fn continuous_scores_distinguish_joint_90_and_95_percent_calibration_targets() {
         let scores: Vec<f64> = (1..=159).map(|rank| rank as f64 / 160.0).collect();
 
-        let global_90 =
-            calibrate_episode_radii(&scores, &scores, &scores, &scores, 0.90)
-                .expect("90% global radius");
-        let global_95 =
-            calibrate_episode_radii(&scores, &scores, &scores, &scores, 0.95)
-                .expect("95% global radius");
+        let global_90 = calibrate_episode_radii(&scores, &scores, &scores, &scores, 0.90)
+            .expect("90% global radius");
+        let global_95 = calibrate_episode_radii(&scores, &scores, &scores, &scores, 0.95)
+            .expect("95% global radius");
         assert!(global_95.reserve_state_radius() > global_90.reserve_state_radius());
         assert!(global_95.reserve_effect_radius() > global_90.reserve_effect_radius());
 
@@ -640,8 +638,7 @@ mod tests {
         )
         .expect("95% action-specific radius");
         assert!(
-            specific_95.effect_radii(Action::Push).0
-                > specific_90.effect_radii(Action::Push).0
+            specific_95.effect_radii(Action::Push).0 > specific_90.effect_radii(Action::Push).0
         );
         assert!(
             specific_95.effect_radii(Action::Maintain).1
