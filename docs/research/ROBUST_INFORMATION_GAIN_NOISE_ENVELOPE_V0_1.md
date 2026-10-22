@@ -28,6 +28,7 @@ The focused Rust tests cover:
 1. The robust score is no larger than any included scenario score.
 2. A rank-reversal example where low-noise nominal EIG favors a four-way split, but the worst-case envelope favors a higher-signal-variance experiment when the noise scenario rises sharply.
 3. Empty and invalid noise envelopes fail closed.
+4. A paired-seed discovery pilot compares nominal EIG with a factor-of-two noise envelope on matched clean and hidden-discrepancy worlds, reporting recovery, false confident-singleton, discrepancy detection, unresolved outcomes, and paired bootstrap intervals. The pilot intentionally reports results without asserting that the robust policy wins.
 
 A separate numeric translation of the rank-reversal case predicts these scenario scores (nats): at standard deviation 0.1, candidate A ≈ 0.562 and B ≈ 1.386; at standard deviation 5.0, A ≈ 0.0326 and B ≈ 0.0244. This calculation verifies the intended test geometry only; it is not a Rust build or CI result.
 
@@ -46,7 +47,7 @@ Use held-out discovery worlds clustered by structural family, not a random-seed-
 
 Proposed confirmatory target (not a result): at least 20% lower median cost-to-valid-recovery than nominal EIG across held-out worlds, paired world-level 95% interval excluding zero, with no more than a 1 percentage-point scientific-validity regression. Under misspecification, separately target at least 20% relative reduction in false confident singletons while bounding clean-world recovery degradation to 5 percentage points. Publish negative results and all failure modes.
 
-Initial matrix: at least 60 held-out worlds across 6 or more structural families, five noise/misspecification regimes, and at least 20 paired seeds per world. Treat seeds as repeated runs within worlds; use hierarchical/clustered intervals at world level and predeclare exclusions.
+Initial matrix: at least 60 held-out worlds across 6 or more structural families, five noise/misspecification regimes, and at least 20 paired seeds per world. The small in-repository pilot is a smoke/diagnostic experiment, not this confirmatory matrix. Treat seeds as repeated runs within worlds; use hierarchical/clustered intervals at world level and predeclare exclusions.
 
 ## External comparison and reading
 
