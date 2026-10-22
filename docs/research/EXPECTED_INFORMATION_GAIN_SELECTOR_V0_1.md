@@ -48,7 +48,7 @@ The integrated simulator now accepts a hidden additive discrepancy term proporti
 - **Matched regime:** discrepancy amplitude is zero; track recovery to ensure audit sampling does not catastrophically harm ordinary discovery.
 - **Misspecified regime:** discrepancy amplitude is 0.12; track how often all candidate hypotheses are eliminated (a detectable model-coverage failure) versus how often the procedure ends with exactly one candidate (false certainty under known misspecification).
 
-The pilot reports paired 2,000-resample percentile intervals for the difference in false-singleton rate, discrepancy detection, and matched-world recovery. The bootstrap pairs the two policies by seed but is not a world-clustered external benchmark. A lower false-singleton rate and higher discrepancy-detection rate are desired; the test does not assert that the audit policy wins.
+The pilot reports paired 2,000-resample percentile intervals for the difference in false-singleton rate, discrepancy detection, and matched-world recovery. It also reports an explicit three-way outcome partition in the misspecified regime: candidate set collapsed to empty (detectable model-coverage failure), exactly one candidate remains (false certainty in this controlled regime), or multiple candidates remain (unresolved). The paired bootstrap pairs policies by seed but is not a world-clustered external benchmark. A lower false-singleton rate and higher discrepancy-detection rate are desired; the test does not assert that the audit policy wins.
 
 This is inspired by recent research on misspecified experimental design: classical information-maximizing experiments can amplify inferential bias, while representativeness and error de-amplification are separate acquisition concerns. It does **not** implement the published R-IDeA criterion or the maximin/Sibson-MI robust-design method and must not be presented as a reimplementation of either.
 
@@ -90,6 +90,10 @@ Report each independently; do not collapse them into a single composite headline
 - Runtime per scored candidate and total experiment-selection overhead.
 
 For uncertainty, pair methods within world and seed, resample worlds as clusters first, then seeds within sampled worlds. Keep the candidate-pool oracle separate from model-visible scores. Freeze a benchmark manifest, corpus digest, code commit, toolchain, seed schedule, and scoring version in every receipt.
+
+### Misspecification-specific target (target, not result)
+
+For the audit-augmented policy, preregister a stress sweep at systematic discrepancy amplitudes `0, 0.03, 0.06, 0.12, 0.24`, then repeat under heteroscedastic noise and shifted query distributions. Compare random, raw variance, plain EIG, and EIG-with-audits at equal observation budgets. The preliminary target is at least a 20% relative reduction in false-singleton decisions on held-out misspecified worlds, with a paired 95% interval excluding zero, while matched-world structural recovery drops by no more than 5 percentage points. Always publish the unresolved fraction and empty-set/model-coverage-failure fraction as well—lower false certainty alone can be achieved by refusing to decide, so all three outcomes matter. This is a target for future confirmatory runs, not a result from the current 40-seed pilot.
 
 ### Proposed advancement gate (target, not result)
 
