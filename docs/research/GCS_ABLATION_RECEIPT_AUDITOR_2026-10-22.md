@@ -17,6 +17,7 @@ The goal is *proof-carrying measurement*: make an evaluation artifact independen
 - Fail-closed behavioral score recomputed from compile status, simulation status, runtime errors, and complete expected test counts.
 - Oracle-completeness classification recomputed separately from correctness. A complete run that fails one behavioral test is an assessed failure, not an incomplete oracle.
 - Alternating paired order checks and recomputation of GCS-on wins, GCS-off wins, ties, net pass delta, per-mode rates, timings, and energy totals. Pairs count as comparable only if both arm oracles completed; unresolved pairs are reported separately and are not silently counted as ties.
+- Prints a deterministic 10,000-resample percentile bootstrap interval over task-identity clusters. Repeated trials are averaged within each task before resampling; the seed derives from the frozen manifest digest. Small task-cluster counts are explicitly labelled descriptive.
 - Optional external pins for the exact source SHA and frozen task-manifest digest.
 
 ## Run
@@ -47,11 +48,11 @@ cargo run --release --bin coding_gcs_ablation_verify -- \
   --expected-manifest-blake3 "$PINNED_TASK_MANIFEST_BLAKE3"
 ```
 
-A failure exits nonzero and identifies all detected consistency problems. A clean result prints `RECEIPT CONSISTENT`.
+A failure exits nonzero and identifies all detected consistency problems. A clean result prints `RECEIPT CONSISTENT` and the equal-task paired effect with a task-cluster bootstrap interval when at least one complete paired outcome is available.
 
 ## Scope and security boundary
 
-The eight-task pilot uses public fixtures and ten hand-authored semantic mutants; this is a small oracle-discrimination screen, not a comprehensive mutation score, hidden-test or contamination-resistant evaluation. For a publication-grade benchmark, split public development tasks from held-out/private tasks and preserve the exact task-manifest pin independently from the receipt.
+The eight-task pilot uses public fixtures and ten hand-authored semantic mutants; this is a small oracle-discrimination screen, not a comprehensive mutation score, hidden-test or contamination-resistant evaluation. Its task-cluster bootstrap has only eight task identities at most and the tasks share a toy-function task family, so its interval is descriptive and does not justify broad generalization. Larger studies should preserve repository and task-family identifiers and resample at the independence unit relevant to the claim. For a publication-grade benchmark, split public development tasks from held-out/private tasks and preserve the exact task-manifest pin independently from the receipt.
 
 This tool audits **receipt consistency**, not the truth of every claimed execution. It cannot independently prove that a compiler ran, that the runner was uncompromised, that a model label is accurate, or that the benchmark tasks are representative. The source SHA is metadata, not a signature; BLAKE3 digests do not authenticate a producer. Test counting intentionally mirrors the producer’s simple `#[test]` text scan and is not a Rust parser; prefer structured test metadata or AST-based extraction for a larger heterogeneous suite. Test-function counting intentionally mirrors the producer's simple `#[test]` text scan and is not a Rust parser; use structured test metadata or AST-based extraction for a larger heterogeneous suite. The verifier intentionally does not accept a self-reported "pass" as proof of correctness: for behavioral outcomes it recomputes the claim from the receipt's raw counts and flags.
 
