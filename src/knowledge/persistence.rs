@@ -232,7 +232,7 @@ fn read_graph_fact_records(
              FROM knowledge_facts ORDER BY cycle DESC, id DESC",
         )
         .map_err(|error| error.to_string())?;
-    statement
+    let rows = statement
         .query_map([], |row| {
             let claim_context = row
                 .get::<_, Option<String>>(7)?
@@ -259,8 +259,8 @@ fn read_graph_fact_records(
                 claim_context,
             })
         })
-        .map_err(|error| error.to_string())?
-        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>()
         .map_err(|error| format!("Graph fact record decoding failed: {error}"))
 }
 
