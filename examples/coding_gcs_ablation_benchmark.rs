@@ -217,8 +217,19 @@ fn task_digest(task: &TaskCase) -> String {
 }
 
 fn manifest_digest(tasks: &[TaskCase]) -> String {
-    let canonical = tasks.iter().map(|task| format!("{}:{}", task.id, task_digest(task))).collect::<Vec<_>>().join("\n");
-    source_digest(&canonical)
+    // The manifest is an ordered list of length-prefixed (task ID, task digest)
+    // pairs, so separators/newlines inside a future task ID cannot alias a row.
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&(tasks.len() as u64).to_be_bytes());
+    for task in tasks {
+        let id = task.id.as_bytes();
+        let digest = task_digest(task);
+        hasher.update(&(id.len() as u64).to_be_bytes());
+        hasher.update(id);
+        hasher.update(&(digest.len() as u64).to_be_bytes());
+        hasher.update(digest.as_bytes());
+    }
+    hasher.finalize().to_hex().to_string()
 }
 
 fn evaluate_source(source: &str, test_source: &str) -> OracleRun {
