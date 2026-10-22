@@ -29,9 +29,76 @@ The cost-aware score is nats per cost unit. Callers must supply a common, scient
 
 ## What this does not establish
 
-This is an approximate, equal-prior, homoscedastic-Gaussian design criterion, not a general Bayesian experimental-design engine. It does not yet support non-uniform posterior hypothesis probabilities, heteroscedastic noise, correlated measurements, nuisance-parameter integration, experiment safety constraints, or calibrated predictive distributions. The uniform prior is over candidate instances, not canonical laws: duplicated/equivalent expressions can alter prior mass and bias experiment selection. A future version should accept calibrated posterior weights and/or normalize priors over validated structural-equivalence classes rather than pretending generic expressions can be safely deduplicated. A stress-grid regression test now compares the production 256-point midpoint estimate against a 2,048-point refinement across several prediction geometries and noise levels with a 1e-6 absolute-difference tolerance. This is a convergence check against a higher-resolution estimate, not a rigorous error bound or an independent mathematical oracle. Do not use this selector for real-world experimental decisions until its noise assumptions, bounds, and domain constraints are validated.
+This is an approximate, equal-prior, homoscedastic-Gaussian design criterion, not a general Bayesian experimental-design engine. It does not yet support non-uniform posterior hypothesis probabilities, heteroscedastic noise, correlated measurements, nuisance-parameter integration, experiment safety constraints, or calibrated predictive distributions. The uniform-prior API is over candidate instances, not canonical laws: duplicated/equivalent expressions can alter prior mass and bias experiment selection. An opt-in weighted API now accepts caller-supplied non-negative prior masses and normalizes them internally; this supports posterior-weighted designs and lets callers split prior mass across known duplicates without changing the predictive mixture. It does not estimate or calibrate posterior weights itself, and it does not safely deduplicate generic expressions. Callers remain responsible for deriving weights from audited evidence and using only validated structural-equivalence classes. The weighted API is a new comparator, not evidence of improved discovery. A stress-grid regression test now compares the production 256-point midpoint estimate against a 2,048-point refinement across several prediction geometries and noise levels with a 1e-6 absolute-difference tolerance. This is a convergence check against a higher-resolution estimate, not a rigorous error bound or an independent mathematical oracle. Do not use this selector for real-world experimental decisions until its noise assumptions, bounds, and domain constraints are validated.
 
 This code does not prove improved scientific discovery or SOTA performance. Unit tests demonstrate selected mathematical/numerical properties only.
+
+
+
+## Weighted-prior extension (v0.1)
+
+The new `expected_information_gain_weighted_nats` and `select_experiment_by_weighted_information_gain_per_cost` APIs preserve the uniform-prior API and accept explicit caller-supplied prior masses. They normalize masses, reject mismatched/negative/non-finite/all-zero inputs, require at least two positive-mass hypotheses, and fail closed on incomplete or non-finite predictions. Zero-mass hypotheses are excluded from the mixture but still must provide a finite prediction, preventing malformed candidates from being silently ignored.
+
+The key invariance control is duplicate-mass splitting: replacing one hypothesis of mass (w) with two observationally identical instances of mass (w/2) each should preserve the predictive mixture and expected information gain. Regression tests also check agreement with the uniform API for equal masses and invalid-prior behavior. These are mathematical contract tests; they do not show that a particular prior is scientifically calibrated or that weighted EIG beats nominal EIG under model misspecification. Prior normalization scales all finite masses by the maximum before summing, preventing avoidable overflow for valid inputs such as `[f64::MAX, f64::MAX, 1.0]`; the minimum-positive-mass guard still rejects a numerically degenerate prior. A separate metamorphic test verifies that scenario order does not affect the worst-case score and adding another scenario cannot increase the minimum-over-scenarios score. These tests protect numeric and aggregation contracts, not model adequacy or experimental utility.
+
+## Weighted finite-scenario envelope
+
+The new `expected_information_gain_weighted_over_scenarios_nats` and `select_experiment_by_weighted_scenario_robust_information_gain_per_cost` APIs compose two existing controls: an explicit caller-supplied hypothesis prior and a finite set of joint predictive-model / observation-noise scenarios. Their objective is
+
+`score(x) = min_{s in S} I_p(H; Y | x, s) / cost(x)`
+
+where `p` is held fixed across the declared scenarios and each scenario supplies its own noise scale and prediction closure. The evaluator rejects an empty/invalid scenario declaration and rejects a candidate if its prediction is missing/non-finite in any scenario. Prior validation is shared with the overflow-safe weighted API. Ties remain stable by input order.
+
+This is a lower-envelope acquisition rule, **not** a general distributionally robust Bayesian design algorithm. It is robust only to the finite, caller-selected set; it does not optimize over uncertainty in the prior, estimate the prior from evidence, prove that scenarios span the true system, or implement the published R-IDeA or Sibson-mutual-information methods. It also uses the current homoscedastic Gaussian likelihood independently within each scenario.
+
+### Required paired benchmark
+
+Add this arm to the same frozen-world, matched-budget evaluation before claiming benefit:
+
+1. Uniform random admissible query.
+2. Uniform-prior nominal EIG-per-cost.
+3. Weighted-prior nominal EIG-per-cost.
+4. Uniform-prior finite-scenario worst-case EIG-per-cost.
+5. Weighted-prior finite-scenario worst-case EIG-per-cost (this extension).
+6. Evaluator-only oracle, never exposed to the selectors, reported as a ceiling rather than a competitor.
+
+Compare all policies on the same worlds, admissible actions, query and monetary/time budgets, and paired seeds. Freeze a separate held-out structural-family set before tuning. Include candidate-pool omissions, duplicate/equivalent hypotheses, skewed prior masses, outlier hypotheses, misspecified noise, an alternative model that reverses the nominal winner, and a no-information negative control. Report success/recovery rate, false-singleton rate when the candidate set omits the truth, detectable model-coverage failures, held-out predictive loss, actual cost, invalid-selection rate, wall time, and paired confidence intervals clustered by world rather than treating seeds as independent worlds. The acceptance criterion is non-inferiority in the matched regime plus a predeclared improvement in at least one misspecification metric, with no hidden threshold tuning on held-out worlds. These are targets, not achieved results.
+
+This design makes the comparison falsifiable: if the robust selector only reduces useful information in matched worlds without reducing false certainty under misspecification, it should not be promoted as the default.
+
+## Prior-uncertainty envelope (incremental extension)
+
+The `PriorInformationGainScenario`, `expected_information_gain_over_prior_scenarios_nats` and `select_experiment_by_prior_robust_information_gain_per_cost` APIs add another explicit robustness axis. Each finite scenario supplies its own non-negative hypothesis prior, observation-noise standard deviation, and predictive-model identifier; the score is the minimum weighted EIG-per-cost across those declared belief/model/noise combinations. Scenario priors are normalized by the existing overflow-safe normalizer and are **not inferred** from data by this API.
+
+A synthetic ranking-reversal test uses two plausible priors: `[0.49, 0.49, 0.01, 0.01]` and `[0.01, 0.01, 0.49, 0.49]`. At the first prior, candidate 1 is strongly informative (about 0.693 nats) while candidate 0 scores about 0.098 nats. Candidate 1's score falls to about 0.056 nats under the second prior, so the conservative envelope prefers candidate 0. A separate test verifies scenario-order invariance and rejects malformed prior scenarios. These approximate figures were independently recomputed with a separate JavaScript quadrature spot-check; the Rust tests remain subject to exact-head CI.
+
+This is a **finite prior ambiguity set**, not a guarantee over arbitrary priors, an automatically learned posterior, an adversarial distribution over all hypotheses, or a published distributionally robust design algorithm. It also applies only to the supplied candidate pool. If the real model is absent and every declared prior is confidently misspecified in the same way, the envelope can still be confidently wrong. Keep the prior-shift / candidate-pool-omission conditions in the held-out benchmark.
+
+## Published robust-design comparison frontier
+
+The finite prior/model/noise envelope is deliberately a transparent baseline, not a claim to be the current state of the art. The confirmatory benchmark should add separately implemented and version-pinned comparator arms when reproducible reference implementations or complete equations are available:
+
+- **Nominal Bayesian EIG / Bayesian adaptive design:** information-only reference.
+- **Expected generalized information gain (EGIG) and separate model-error penalties:** Callahan and Catanach, AISTATS 2026, analyze how misspecified models can make nominally most-informative experiments amplify bias and propose inferential-error/model-error criteria: https://proceedings.mlr.press/v300/callahan26a.html
+- **R-IDeA:** Tang, Sloman and Kaski, AISTATS 2026, combines representativeness, informativeness and error de-amplification under misspecification: https://proceedings.mlr.press/v300/tang26d.html
+- **Maximin robust Bayesian experimental design:** Abdulsamad et al. (2026) formulate a max-min information-theoretic design using Sibson alpha-mutual information and PAC-Bayes lower bounds: https://arxiv.org/abs/2603.14094
+- **Generalised Bayesian optimal experimental design (GBOED):** Barlas, Sloman and Kaski propose Gibbs EIG based on loss-based updates and study robustness to outliers / incorrect noise assumptions: https://arxiv.org/abs/2511.07671
+- **Random, raw-variance/query-by-committee, weighted EIG, model-robust finite envelope, and prior/model/noise envelope:** maintain these simple, inspectable baselines as ablations.
+
+These methods do not share identical assumptions or objectives, so report their own valid metrics and implementation/evaluation budgets; do not force all outputs into a single unqualified score. Before comparing a method as “reproduced,” record its paper version, implementation commit, estimator choices, tuning budget, and known deviations. This repository's finite-scenario minimum is **not** an implementation of EGIG, R-IDeA, Sibson-MI/PAC-Bayes robust design, or GBOED.
+
+### Benchmark acceptance targets
+
+Freeze complete structural families for test-only evaluation before tuning. Use paired worlds and seeds; cluster uncertainty intervals by world, not by treating every seed as a new independent scientific world. Report at least:
+
+- Discovery/recovery accuracy and held-out predictive loss on a declared target distribution.
+- False-singleton / false-certainty rate under deliberate candidate-pool omissions.
+- Detectable model-coverage failure rate and time/query count to detect the misspecification.
+- Calibration and interval coverage where an output distribution exists; proper scoring rules for probabilistic forecasts.
+- Utility after exact sensing cost, wall time, invalid-selection rate, and an evaluator-only oracle reported strictly as a ceiling.
+- Performance on both matched models and diverse shift / outlier / discrepancy settings; report regressions as well as wins.
+
+A credible SOTA claim requires a preregistered primary metric, matched query and monetary/time budgets, documented tuning, complete test-set disclosure, an independent rerun, and uncertainty that supports the claimed improvement. A small synthetic rank reversal is a unit test for a selector contract, not the evidence required for that claim.
 
 ## Integrated law-discovery pilot
 

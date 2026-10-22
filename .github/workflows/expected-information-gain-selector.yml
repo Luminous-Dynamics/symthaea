@@ -8,6 +8,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs"
       - "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs"
       - "docs/research/EXPECTED_INFORMATION_GAIN_SELECTOR_V0_1.md"
+      - "docs/research/ROBUST_INFORMATION_GAIN_MODEL_SCENARIOS_V0_1.md"
       - ".github/workflows/expected-information-gain-selector.yml"
   workflow_dispatch:
 
@@ -38,5 +39,7 @@ jobs:
         run: cargo test -p symthaea-physics-bridge expected_information_gain_vs_variance_on_paired_seeds --lib -- --nocapture
       - name: Run model-misspecification audit pilot
         run: cargo test -p symthaea-physics-bridge scheduled_audits_measure_false_confidence_under_model_misspecification --lib -- --nocapture
+      - name: Run robust noise-envelope pilot
+        run: cargo test -p symthaea-physics-bridge scenario_robust_eig_vs_nominal_eig_pilot --lib -- --nocapture
       - name: Strict Clippy for the core library
         run: cargo clippy -p symthaea-core --lib -- -D warnings

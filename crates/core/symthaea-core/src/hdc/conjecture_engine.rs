@@ -83,8 +83,16 @@ use dynamics::*;
 /// FEP-flavored active experiment selection. See
 /// `experiment_selection.rs` module docs.
 pub use experiment_selection::{
-    EpistemicAssessment, assess_epistemic_value, epistemic_value, expected_information_gain_nats,
-    select_experiment_by_information_gain_per_cost, select_most_informative_experiment,
+    EpistemicAssessment, InformationGainScenario, PriorInformationGainScenario,
+    assess_epistemic_value, epistemic_value, expected_information_gain_nats,
+    expected_information_gain_over_prior_scenarios_nats, expected_information_gain_over_scenarios_nats,
+    expected_information_gain_weighted_nats, expected_information_gain_weighted_over_scenarios_nats,
+    expected_information_gain_worst_case_nats, select_experiment_by_information_gain_per_cost,
+    select_experiment_by_prior_robust_information_gain_per_cost,
+    select_experiment_by_scenario_robust_information_gain_per_cost,
+    select_experiment_by_weighted_information_gain_per_cost,
+    select_experiment_by_weighted_scenario_robust_information_gain_per_cost,
+    select_experiment_by_worst_case_information_gain_per_cost, select_most_informative_experiment,
 };
 pub use expressions::*;
 /// Stage B M2: constrained flux discovery given a known density. See

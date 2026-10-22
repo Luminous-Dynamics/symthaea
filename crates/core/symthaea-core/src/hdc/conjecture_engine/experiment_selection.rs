@@ -319,6 +319,222 @@ fn expected_information_gain_with_steps<H, E>(
     Some(information_gain.clamp(0.0, (predictions.len() as f64).ln()))
 }
 
+/// Normalize finite non-negative prior masses. At least two hypotheses must retain
+/// positive mass so the result measures discrimination rather than a degenerate prior.
+fn normalized_prior_probabilities(
+    prior_weights: &[f64],
+    hypothesis_count: usize,
+) -> Option<Vec<f64>> {
+    if hypothesis_count < 2
+        || prior_weights.len() != hypothesis_count
+        || prior_weights
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight < 0.0)
+    {
+        return None;
+    }
+
+    // Normalize after dividing by the largest mass. Summing finite inputs first can
+    // overflow (e.g. [f64::MAX, f64::MAX, 1.0]) even though their ratios are valid.
+    let maximum = prior_weights.iter().copied().fold(0.0_f64, f64::max);
+    if maximum <= 0.0 {
+        return None;
+    }
+    let scaled_weights: Vec<f64> = prior_weights
+        .iter()
+        .map(|weight| weight / maximum)
+        .collect();
+    let total = scaled_weights.iter().sum::<f64>();
+    if !total.is_finite() || total <= 0.0 {
+        return None;
+    }
+    let probabilities: Vec<f64> = scaled_weights
+        .iter()
+        .map(|weight| weight / total)
+        .collect();
+    (probabilities.iter().filter(|probability| **probability > 0.0).count() >= 2)
+        .then_some(probabilities)
+}
+
+/// Zero-noise limit when observationally identical prediction means form a single group.
+fn noiseless_weighted_information_gain(predictions: &[f64], prior: &[f64]) -> f64 {
+    let mut groups: Vec<(f64, f64)> = Vec::new();
+    for (&prediction, &probability) in predictions.iter().zip(prior) {
+        if probability == 0.0 {
+            continue;
+        }
+        if let Some((_, group_probability)) =
+            groups.iter_mut().find(|(value, _)| *value == prediction)
+        {
+            *group_probability += probability;
+        } else {
+            groups.push((prediction, probability));
+        }
+    }
+    groups
+        .iter()
+        .filter(|(_, probability)| *probability > 0.0)
+        .map(|(_, probability)| -probability * probability.ln())
+        .sum()
+}
+
+/// Estimate expected information gain under caller-supplied prior masses.
+///
+/// Prior masses are normalized internally; zero-mass hypotheses do not contribute to the
+/// mixture, but predictions must still be complete and finite for every supplied hypothesis.
+/// Splitting one hypothesis' prior mass across observationally identical duplicates leaves the
+/// score unchanged. This avoids making the score depend on how many times a candidate was
+/// inserted into the list, provided callers supply equivalent prior mass. It does not infer
+/// calibrated posterior weights or establish structural equivalence between expressions.
+///
+/// Uses the same deterministic Gaussian midpoint quadrature as the uniform-prior API. Returns
+/// None for a malformed prior, fewer than two positive-mass hypotheses, invalid noise, or
+/// incomplete/non-finite predictions. Scores are in nats and bounded by the entropy of the
+/// normalized prior over observationally distinguishable prediction groups.
+pub fn expected_information_gain_weighted_nats<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    observation_std_dev: f64,
+    predict: impl Fn(&H, &E) -> Option<f64>,
+) -> Option<f64> {
+    if hypotheses.len() < 2
+        || !observation_std_dev.is_finite()
+        || observation_std_dev <= 0.0
+    {
+        return None;
+    }
+    let prior = normalized_prior_probabilities(prior_weights, hypotheses.len())?;
+    let predictions: Vec<f64> = hypotheses
+        .iter()
+        .map(|hypothesis| predict(hypothesis, experiment))
+        .collect::<Option<Vec<_>>>()?;
+    if predictions.iter().any(|prediction| !prediction.is_finite()) {
+        return None;
+    }
+
+    let mean_scale = predictions
+        .iter()
+        .zip(&prior)
+        .filter(|(_, probability)| **probability > 0.0)
+        .map(|(prediction, _)| prediction.abs())
+        .fold(observation_std_dev, f64::max);
+    let scaled_means: Vec<f64> = predictions
+        .iter()
+        .zip(&prior)
+        .map(|(prediction, probability)| {
+            if *probability > 0.0 {
+                prediction / mean_scale
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    let scaled_noise = observation_std_dev / mean_scale;
+    if scaled_noise == 0.0 {
+        return Some(noiseless_weighted_information_gain(&predictions, &prior));
+    }
+
+    let step_width = 2.0 * INFORMATION_GAIN_Z_LIMIT / INFORMATION_GAIN_QUADRATURE_STEPS as f64;
+    let mut quadrature = Vec::with_capacity(INFORMATION_GAIN_QUADRATURE_STEPS);
+    for step_index in 0..INFORMATION_GAIN_QUADRATURE_STEPS {
+        let z = -INFORMATION_GAIN_Z_LIMIT + (step_index as f64 + 0.5) * step_width;
+        quadrature.push((z, (-0.5 * z * z).exp() * step_width));
+    }
+    let weight_sum: f64 = quadrature.iter().map(|(_, weight)| weight).sum();
+    let prior_entropy = prior
+        .iter()
+        .filter(|probability| **probability > 0.0)
+        .map(|probability| -probability * probability.ln())
+        .sum::<f64>();
+    if !weight_sum.is_finite() || weight_sum <= 0.0 || !prior_entropy.is_finite() {
+        return None;
+    }
+
+    let prior_log_probabilities: Vec<f64> = prior
+        .iter()
+        .map(|probability| {
+            if *probability > 0.0 {
+                probability.ln()
+            } else {
+                f64::NEG_INFINITY
+            }
+        })
+        .collect();
+    let mut log_terms = Vec::with_capacity(predictions.len());
+    let mut information_gain = 0.0;
+
+    for (index, true_mean) in scaled_means.iter().copied().enumerate() {
+        let true_prior = prior[index];
+        if true_prior == 0.0 {
+            continue;
+        }
+        for &(z, weight) in &quadrature {
+            log_terms.clear();
+            for (other_index, other_mean) in scaled_means.iter().copied().enumerate() {
+                let separation = (true_mean - other_mean) / scaled_noise;
+                let log_likelihood_ratio = if separation == 0.0 {
+                    0.0
+                } else if !separation.is_finite() || separation.abs() > 1.0e6 {
+                    f64::NEG_INFINITY
+                } else {
+                    -0.5 * separation * separation - z * separation
+                };
+                log_terms.push(prior_log_probabilities[other_index] + log_likelihood_ratio);
+            }
+            let log_mixture_ratio = log_sum_exp(&log_terms);
+            information_gain -= (weight / weight_sum) * true_prior * log_mixture_ratio;
+        }
+    }
+
+    if !information_gain.is_finite() {
+        return None;
+    }
+    Some(information_gain.clamp(0.0, prior_entropy))
+}
+
+/// Select by weighted expected information gain divided by positive finite experiment cost.
+///
+/// This opt-in API leaves the uniform-prior selector unchanged. Candidate predictions must be
+/// complete, and invalid costs or non-informative candidates are skipped. Ties preserve input
+/// order. The prior is supplied by the caller; it is not automatically calibrated by this code.
+pub fn select_experiment_by_weighted_information_gain_per_cost<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    observation_std_dev: f64,
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if normalized_prior_probabilities(prior_weights, hypotheses.len()).is_none() {
+        return None;
+    }
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let Some(information_gain) = expected_information_gain_weighted_nats(
+            experiment,
+            hypotheses,
+            prior_weights,
+            observation_std_dev,
+            predict,
+        ) else {
+            continue;
+        };
+        let score = information_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
 /// Select the candidate maximizing expected information gain per unit cost.
 ///
 /// Candidates with non-positive/non-finite costs, incomplete predictions, or zero
@@ -354,11 +570,1041 @@ pub fn select_experiment_by_information_gain_per_cost<'a, H, E>(
     best
 }
 
+/// Compute conservative expected information gain over a finite set of plausible
+/// observation-noise standard deviations.
+///
+/// Compute conservative expected information gain over a finite set of plausible
+/// observation-noise standard deviations.
+///
+/// Under the shared additive Gaussian-noise model, increasing noise is a
+/// post-processing channel, so exact mutual information cannot increase with
+/// noise. Thus the worst case is the largest supplied standard deviation; this
+/// computes that score once instead of repeating the quadrature for every
+/// scenario. The finite set is still validated in full, and this is not a bound
+/// over unlisted noise scales or protection against a misspecified hypothesis
+/// class. An empty/invalid scenario set, incomplete predictions, or non-finite
+/// prediction fails closed with `None`.
+pub fn expected_information_gain_worst_case_nats<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    observation_std_devs: &[f64],
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+) -> Option<f64> {
+    if observation_std_devs.is_empty()
+        || observation_std_devs
+            .iter()
+            .any(|sigma| !sigma.is_finite() || *sigma <= 0.0)
+    {
+        return None;
+    }
+
+    let worst_case_std_dev = observation_std_devs
+        .iter()
+        .copied()
+        .fold(0.0_f64, f64::max);
+    expected_information_gain_nats(experiment, hypotheses, worst_case_std_dev, predict)
+}
+
+/// Select the experiment maximizing worst-case expected information gain per cost.
+///
+/// Each candidate is scored at the largest supplied observation-noise scale;
+/// under the shared additive Gaussian-noise model, this realizes the exact
+/// information-gain minimum across the finite set by data-processing monotonicity.
+/// The score is divided by positive finite cost. This is conservative only with
+/// respect to the caller-provided noise scales. It does not replace discrepancy
+/// audits, posterior calibration, safety constraints, or out-of-model hypothesis
+/// checks. Invalid scenario sets are rejected before ranking; candidates with
+/// invalid predictions or costs are skipped. Input-order tie-breaking is stable.
+pub fn select_experiment_by_worst_case_information_gain_per_cost<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    observation_std_devs: &[f64],
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if observation_std_devs.is_empty()
+        || observation_std_devs
+            .iter()
+            .any(|sigma| !sigma.is_finite() || *sigma <= 0.0)
+    {
+        return None;
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let Some(worst_case_gain) = expected_information_gain_worst_case_nats(
+            experiment,
+            hypotheses,
+            observation_std_devs,
+            predict,
+        ) else {
+            continue;
+        };
+        let score = worst_case_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
+/// One finite scenario for robust expected-information-gain evaluation.
+///
+/// `prediction_model` is an opaque, caller-defined scenario identifier passed to
+/// the prediction closure. It can represent an alternative structural model,
+/// omitted-term hypothesis, nuisance setting, or other plausible predictive world.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct InformationGainScenario {
+    /// Standard deviation of the observation noise for this scenario.
+    pub observation_std_dev: f64,
+    /// Caller-defined predictive-model/discrepancy scenario identifier.
+    pub prediction_model: usize,
+}
+
+/// Compute the minimum expected information gain across explicit joint scenarios
+/// of observation noise and plausible predictive-model variants.
+///
+/// Unlike a noise-only envelope, scenarios may produce different predictions
+/// for a given candidate experiment. This allows the acquisition rule to account
+/// for a finite set of structural/discrepancy alternatives rather than only
+/// choosing the largest Gaussian noise scale. The supplied scenario set is not
+/// a guarantee over unlisted worlds, and the caller remains responsible for
+/// defining defensible alternatives. Empty scenarios, invalid noise, or any
+/// incomplete/non-finite scenario predictions fail closed with `None`.
+pub fn expected_information_gain_over_scenarios_nats<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    scenarios: &[InformationGainScenario],
+    predict_under_scenario: impl Fn(&H, &E, &InformationGainScenario) -> Option<f64> + Copy,
+) -> Option<f64> {
+    if scenarios.is_empty()
+        || scenarios.iter().any(|scenario| {
+            !scenario.observation_std_dev.is_finite() || scenario.observation_std_dev <= 0.0
+        })
+    {
+        return None;
+    }
+
+    let mut worst_case = f64::INFINITY;
+    for scenario in scenarios {
+        let information_gain = expected_information_gain_nats(
+            experiment,
+            hypotheses,
+            scenario.observation_std_dev,
+            |hypothesis, experiment| predict_under_scenario(hypothesis, experiment, scenario),
+        )?;
+        worst_case = worst_case.min(information_gain);
+    }
+
+    (worst_case.is_finite() && worst_case >= 0.0).then_some(worst_case)
+}
+
+/// Select the candidate maximizing scenario-robust information gain per cost.
+///
+/// Each candidate is evaluated under every finite joint scenario, using that
+/// scenario's noise scale and predictive model variant. The minimum information
+/// gain is divided by positive finite cost. This is only robust to the supplied
+/// scenario set; it is not a calibrated posterior, a formal uncertainty bound,
+/// or a substitute for open-world audits. Invalid scenario sets fail closed,
+/// invalid candidate costs/predictions are skipped, and input-order tie breaking
+/// is deterministic.
+pub fn select_experiment_by_scenario_robust_information_gain_per_cost<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    scenarios: &[InformationGainScenario],
+    predict_under_scenario: impl Fn(&H, &E, &InformationGainScenario) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if scenarios.is_empty()
+        || scenarios.iter().any(|scenario| {
+            !scenario.observation_std_dev.is_finite() || scenario.observation_std_dev <= 0.0
+        })
+    {
+        return None;
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let Some(worst_case_gain) = expected_information_gain_over_scenarios_nats(
+            experiment,
+            hypotheses,
+            scenarios,
+            predict_under_scenario,
+        ) else {
+            continue;
+        };
+        let score = worst_case_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
+/// One finite scenario that includes its own hypothesis-prior masses plus observation
+/// noise and a caller-defined predictive-model variant.
+///
+/// Prior masses are supplied, not estimated. Each scenario is evaluated as a separate
+/// plausible belief/model/noise world; the robust envelope takes the minimum information gain.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PriorInformationGainScenario {
+    /// Standard deviation of Gaussian observation noise for this scenario.
+    pub observation_std_dev: f64,
+    /// Caller-defined predictive-model or discrepancy scenario identifier.
+    pub prediction_model: usize,
+    /// Non-negative hypothesis prior masses; normalized by the evaluator.
+    pub prior_weights: Vec<f64>,
+}
+
+/// Compute the minimum weighted EIG across explicit prior, predictive-model, and noise scenarios.
+///
+/// This treats prior uncertainty as part of the scenario set rather than holding one prior fixed.
+/// The returned lower envelope applies only to the caller-supplied finite set: it is not a
+/// distributionally robust guarantee over all possible priors or unlisted worlds.
+pub fn expected_information_gain_over_prior_scenarios_nats<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    scenarios: &[PriorInformationGainScenario],
+    predict_under_scenario: impl Fn(&H, &E, &PriorInformationGainScenario) -> Option<f64> + Copy,
+) -> Option<f64> {
+    if scenarios.is_empty()
+        || scenarios.iter().any(|scenario| {
+            !scenario.observation_std_dev.is_finite()
+                || scenario.observation_std_dev <= 0.0
+                || normalized_prior_probabilities(&scenario.prior_weights, hypotheses.len())
+                    .is_none()
+        })
+    {
+        return None;
+    }
+
+    let mut worst_case = f64::INFINITY;
+    for scenario in scenarios {
+        let information_gain = expected_information_gain_weighted_nats(
+            experiment,
+            hypotheses,
+            &scenario.prior_weights,
+            scenario.observation_std_dev,
+            |hypothesis, experiment| {
+                predict_under_scenario(hypothesis, experiment, scenario)
+            },
+        )?;
+        worst_case = worst_case.min(information_gain);
+    }
+
+    (worst_case.is_finite() && worst_case >= 0.0).then_some(worst_case)
+}
+
+/// Select by minimum weighted EIG across explicit prior/model/noise scenarios, divided by cost.
+///
+/// Invalid scenario declarations reject the selection. A candidate with incomplete predictions
+/// in any scenario or with an invalid cost is skipped. Ties preserve input order.
+pub fn select_experiment_by_prior_robust_information_gain_per_cost<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    scenarios: &[PriorInformationGainScenario],
+    predict_under_scenario: impl Fn(&H, &E, &PriorInformationGainScenario) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if scenarios.is_empty()
+        || scenarios.iter().any(|scenario| {
+            !scenario.observation_std_dev.is_finite()
+                || scenario.observation_std_dev <= 0.0
+                || normalized_prior_probabilities(&scenario.prior_weights, hypotheses.len())
+                    .is_none()
+        })
+    {
+        return None;
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let Some(worst_case_gain) = expected_information_gain_over_prior_scenarios_nats(
+            experiment,
+            hypotheses,
+            scenarios,
+            predict_under_scenario,
+        ) else {
+            continue;
+        };
+        let score = worst_case_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
+/// Compute the minimum weighted expected information gain across explicit joint
+/// scenarios of observation noise and plausible predictive-model variants.
+///
+/// The caller-supplied prior is held fixed across scenarios; only the predictive
+/// model and noise scale vary. This is a finite-scenario lower envelope, not a
+/// guarantee over unlisted worlds or over uncertainty in the prior itself.
+pub fn expected_information_gain_weighted_over_scenarios_nats<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    scenarios: &[InformationGainScenario],
+    predict_under_scenario: impl Fn(&H, &E, &InformationGainScenario) -> Option<f64> + Copy,
+) -> Option<f64> {
+    normalized_prior_probabilities(prior_weights, hypotheses.len())?;
+    if scenarios.is_empty()
+        || scenarios
+            .iter()
+            .any(|scenario| {
+                !scenario.observation_std_dev.is_finite() || scenario.observation_std_dev <= 0.0
+            })
+    {
+        return None;
+    }
+
+    let mut worst_case = f64::INFINITY;
+    for scenario in scenarios {
+        let information_gain = expected_information_gain_weighted_nats(
+            experiment,
+            hypotheses,
+            prior_weights,
+            scenario.observation_std_dev,
+            |hypothesis, experiment| predict_under_scenario(hypothesis, experiment, scenario),
+        )?;
+        worst_case = worst_case.min(information_gain);
+    }
+
+    (worst_case.is_finite() && worst_case >= 0.0).then_some(worst_case)
+}
+
+/// Select by minimum weighted expected information gain across the supplied scenarios,
+/// divided by positive finite experiment cost.
+///
+/// The prior is supplied by the caller and remains fixed across scenarios. Candidate
+/// predictions must be complete and finite for every scenario; invalid priors or scenario
+/// declarations reject the selection, while invalid costs or candidate predictions skip
+/// that candidate. Ties preserve input order.
+pub fn select_experiment_by_weighted_scenario_robust_information_gain_per_cost<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    scenarios: &[InformationGainScenario],
+    predict_under_scenario: impl Fn(&H, &E, &InformationGainScenario) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    normalized_prior_probabilities(prior_weights, hypotheses.len())?;
+    if scenarios.is_empty()
+        || scenarios
+            .iter()
+            .any(|scenario| {
+                !scenario.observation_std_dev.is_finite() || scenario.observation_std_dev <= 0.0
+            })
+    {
+        return None;
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let Some(worst_case_gain) = expected_information_gain_weighted_over_scenarios_nats(
+            experiment,
+            hypotheses,
+            prior_weights,
+            scenarios,
+            predict_under_scenario,
+        ) else {
+            continue;
+        };
+        let score = worst_case_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::hdc::conjecture_engine::Expr;
+
+    #[test]
+    fn weighted_information_gain_matches_uniform_api_for_equal_masses() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let prediction = |hypothesis: &usize, _: &u8| {
+            Some([0.0_f64, 0.25, 1.5, 3.0][*hypothesis])
+        };
+        let uniform = expected_information_gain_nats(&0_u8, &hypotheses, 0.4, prediction).unwrap();
+        let weighted = expected_information_gain_weighted_nats(
+            &0_u8,
+            &hypotheses,
+            &[7.0, 7.0, 7.0, 7.0],
+            0.4,
+            prediction,
+        )
+        .unwrap();
+        assert!((uniform - weighted).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn weighted_information_gain_is_invariant_to_splitting_duplicate_prior_mass() {
+        let hypotheses = [0_usize, 1];
+        let base = expected_information_gain_weighted_nats(
+            &(),
+            &hypotheses,
+            &[0.5, 0.5],
+            0.3,
+            |hypothesis, _| Some([0.0_f64, 1.0][*hypothesis]),
+        )
+        .unwrap();
+
+        let duplicated_hypotheses = [0_usize, 1, 2];
+        let duplicated = expected_information_gain_weighted_nats(
+            &(),
+            &duplicated_hypotheses,
+            &[0.25, 0.25, 0.5],
+            0.3,
+            |hypothesis, _| Some([0.0_f64, 0.0, 1.0][*hypothesis]),
+        )
+        .unwrap();
+        assert!((base - duplicated).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn weighted_information_gain_rejects_malformed_priors_and_predictions() {
+        let hypotheses = [0_i32, 1, 2];
+        let prediction = |hypothesis: &i32, _: &()| Some(*hypothesis as f64);
+        for weights in [
+            &[][..],
+            &[1.0, 1.0][..],
+            &[1.0, -1.0, 1.0][..],
+            &[1.0, f64::NAN, 1.0][..],
+            &[0.0, 0.0, 0.0][..],
+            &[1.0, 0.0, 0.0][..],
+        ] {
+            assert!(
+                expected_information_gain_weighted_nats(&(), &hypotheses, weights, 1.0, prediction)
+                    .is_none()
+            );
+        }
+        assert!(expected_information_gain_weighted_nats(
+            &(),
+            &hypotheses,
+            &[1.0, 1.0, 1.0],
+            1.0,
+            |hypothesis, _| if *hypothesis == 1 { None } else { Some(*hypothesis as f64) },
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn weighted_prior_normalization_avoids_finite_sum_overflow() {
+        let weights = [f64::MAX, f64::MAX, 1.0];
+        let probabilities = normalized_prior_probabilities(&weights, weights.len())
+            .expect("finite masses should normalize without summing them first");
+
+        assert_eq!(probabilities[0], probabilities[1]);
+        assert!((probabilities[0] - 0.5).abs() <= 1.0e-15);
+        assert!(probabilities[2] > 0.0 && probabilities[2].is_finite());
+        assert!((probabilities.iter().sum::<f64>() - 1.0).abs() <= 1.0e-15);
+    }
+
+    #[test]
+    fn weighted_selector_respects_prior_mass_when_uniform_partitions_tie() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let candidates = [0_u8, 1_u8];
+        let predict = |hypothesis: &usize, candidate: &u8| {
+            let values = match candidate {
+                // Under the weighted prior, this partitions mass 0.8 versus 0.2.
+                0 => [0.0_f64, 10.0, 0.0, 10.0],
+                // This partitions the same hypotheses 0.5 versus 0.5.
+                1 => [0.0_f64, 0.0, 10.0, 10.0],
+                _ => return None,
+            };
+            Some(values[*hypothesis])
+        };
+        let uniform = select_experiment_by_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            0.05,
+            predict,
+            |_| 1.0,
+        )
+        .expect("both partitions are informative");
+        assert_eq!(*uniform.0, 0, "uniform-prior ties retain first-candidate order");
+
+        let weighted = select_experiment_by_weighted_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[0.4, 0.1, 0.4, 0.1],
+            0.05,
+            predict,
+            |_| 1.0,
+        )
+        .expect("both weighted partitions retain positive information");
+        assert_eq!(*weighted.0, 1, "weighted selector should prefer balanced prior mass");
+        assert!(weighted.1 > 0.0 && weighted.1.is_finite());
+    }
+
+    #[test]
+    fn weighted_cost_selector_fails_closed_on_invalid_prior_and_cost() {
+        let hypotheses = [0_i32, 1];
+        let candidates = [0_u8, 1_u8];
+        let prediction = |hypothesis: &i32, candidate: &u8| {
+            Some(*hypothesis as f64 * *candidate as f64)
+        };
+        assert!(select_experiment_by_weighted_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[1.0, -1.0],
+            1.0,
+            prediction,
+            |_| 1.0,
+        )
+        .is_none());
+        assert!(select_experiment_by_weighted_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[1.0, 1.0],
+            1.0,
+            prediction,
+            |_| f64::NAN,
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn scenario_robust_selector_accounts_for_prediction_discrepancy_not_only_noise() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let candidates = [0_u8, 1_u8];
+        let scenarios = [
+            InformationGainScenario { observation_std_dev: 0.1, prediction_model: 0 },
+            InformationGainScenario { observation_std_dev: 1.0, prediction_model: 7 },
+        ];
+        let predict = |hypothesis: &usize, candidate: &u8, scenario: &InformationGainScenario| {
+            match (*candidate, scenario.prediction_model) {
+                // Candidate 0 has one outlier in both predictive worlds and remains
+                // somewhat informative under the noisier scenario.
+                (0, 0 | 7) => Some([0.0_f64, 0.0, 0.0, 3.0][*hypothesis]),
+                // Candidate 1 wins nominally, but one defensible alternative model
+                // compresses its predicted outcomes to a near-agreement point.
+                (1, 0) => Some([0.0_f64, 1.0, 2.0, 3.0][*hypothesis]),
+                (1, 7) => Some([0.0_f64, 0.001, -0.001, 0.002][*hypothesis]),
+                _ => None,
+            }
+        };
+
+        let (nominal, _) = select_experiment_by_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            0.1,
+            |hypothesis, candidate| {
+                predict(
+                    hypothesis,
+                    candidate,
+                    &InformationGainScenario {
+                        observation_std_dev: 0.1,
+                        prediction_model: 0,
+                    },
+                )
+            },
+            |_| 1.0,
+        )
+        .expect("nominal pool is informative");
+        assert_eq!(*nominal, 1);
+
+        let (robust, robust_score) =
+            select_experiment_by_scenario_robust_information_gain_per_cost(
+                &candidates,
+                &hypotheses,
+                &scenarios,
+                predict,
+                |_| 1.0,
+            )
+            .expect("candidate 0 has positive information under each scenario");
+        assert_eq!(*robust, 0);
+        assert!(robust_score.is_finite() && robust_score > 0.0);
+    }
+
+    #[test]
+    fn scenario_robust_information_gain_is_permutation_invariant_and_cannot_increase_when_scenarios_are_added() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let base = [
+            InformationGainScenario {
+                observation_std_dev: 0.1,
+                prediction_model: 0,
+            },
+            InformationGainScenario {
+                observation_std_dev: 0.6,
+                prediction_model: 1,
+            },
+        ];
+        let reversed = [base[1], base[0]];
+        let extended = [
+            base[0],
+            base[1],
+            InformationGainScenario {
+                observation_std_dev: 0.2,
+                prediction_model: 2,
+            },
+        ];
+        let predict = |hypothesis: &usize, _: &(), scenario: &InformationGainScenario| {
+            let values = match scenario.prediction_model {
+                0 => [0.0_f64, 1.0, 2.0, 3.0],
+                1 => [0.0_f64, 0.2, 2.0, 3.5],
+                2 => [0.0_f64, 0.001, 0.002, 0.003],
+                _ => return None,
+            };
+            Some(values[*hypothesis])
+        };
+
+        let score = expected_information_gain_over_scenarios_nats(
+            &(),
+            &hypotheses,
+            &base,
+            predict,
+        )
+        .expect("base scenarios are valid");
+        let reversed_score = expected_information_gain_over_scenarios_nats(
+            &(),
+            &hypotheses,
+            &reversed,
+            predict,
+        )
+        .expect("reordered scenarios are valid");
+        let extended_score = expected_information_gain_over_scenarios_nats(
+            &(),
+            &hypotheses,
+            &extended,
+            predict,
+        )
+        .expect("extended scenarios are valid");
+
+        assert!((score - reversed_score).abs() <= 1.0e-12);
+        assert!(
+            extended_score <= score + 1.0e-12,
+            "adding a plausible world must not increase a minimum-over-worlds score"
+        );
+    }
+
+    #[test]
+    fn weighted_scenario_robust_gain_equals_the_minimum_scenario_specific_weighted_gain() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let prior_weights = [0.4_f64, 0.1, 0.4, 0.1];
+        let scenarios = [
+            InformationGainScenario {
+                observation_std_dev: 0.1,
+                prediction_model: 0,
+            },
+            InformationGainScenario {
+                observation_std_dev: 0.8,
+                prediction_model: 1,
+            },
+        ];
+        let predict = |hypothesis: &usize, _: &(), scenario: &InformationGainScenario| {
+            let values = match scenario.prediction_model {
+                0 => [0.0_f64, 1.0, 2.0, 3.0],
+                1 => [0.0_f64, 0.0, 0.1, 2.0],
+                _ => return None,
+            };
+            Some(values[*hypothesis])
+        };
+        let robust = expected_information_gain_weighted_over_scenarios_nats(
+            &(),
+            &hypotheses,
+            &prior_weights,
+            &scenarios,
+            predict,
+        )
+        .expect("all declared scenarios are valid");
+        let expected = scenarios
+            .iter()
+            .map(|scenario| {
+                expected_information_gain_weighted_nats(
+                    &(),
+                    &hypotheses,
+                    &prior_weights,
+                    scenario.observation_std_dev,
+                    |hypothesis, experiment| predict(hypothesis, experiment, scenario),
+                )
+                .unwrap()
+            })
+            .fold(f64::INFINITY, f64::min);
+        assert!((robust - expected).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn weighted_scenario_robust_selector_avoids_candidate_that_fails_under_alternative_model() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let prior_weights = [0.4_f64, 0.1, 0.4, 0.1];
+        let candidates = [0_u8, 1_u8];
+        let scenarios = [
+            InformationGainScenario {
+                observation_std_dev: 0.1,
+                prediction_model: 0,
+            },
+            InformationGainScenario {
+                observation_std_dev: 1.0,
+                prediction_model: 1,
+            },
+        ];
+        let predict = |hypothesis: &usize, candidate: &u8, scenario: &InformationGainScenario| {
+            let values = match (*candidate, scenario.prediction_model) {
+                (0, 0 | 1) => [0.0_f64, 0.0, 0.0, 3.0],
+                (1, 0) => [0.0_f64, 1.0, 2.0, 3.0],
+                (1, 1) => [0.0_f64, 0.001, -0.001, 0.002],
+                _ => return None,
+            };
+            Some(values[*hypothesis])
+        };
+        let nominal = select_experiment_by_weighted_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &prior_weights,
+            0.1,
+            |hypothesis, candidate| {
+                predict(
+                    hypothesis,
+                    candidate,
+                    &InformationGainScenario {
+                        observation_std_dev: 0.1,
+                        prediction_model: 0,
+                    },
+                )
+            },
+            |_| 1.0,
+        )
+        .expect("nominal candidates are informative");
+        assert_eq!(*nominal.0, 1);
+
+        let robust = select_experiment_by_weighted_scenario_robust_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &prior_weights,
+            &scenarios,
+            predict,
+            |_| 1.0,
+        )
+        .expect("candidate zero retains information in both declared worlds");
+        assert_eq!(*robust.0, 0);
+        assert!(robust.1.is_finite() && robust.1 > 0.0);
+    }
+
+    #[test]
+    fn weighted_scenario_robust_selector_rejects_invalid_priors_and_scenarios() {
+        let hypotheses = [0_usize, 1];
+        let candidates = [0_u8, 1_u8];
+        let scenario = [InformationGainScenario {
+            observation_std_dev: 0.5,
+            prediction_model: 0,
+        }];
+        let predict = |hypothesis: &usize, candidate: &u8, _: &InformationGainScenario| {
+            Some(*hypothesis as f64 * *candidate as f64)
+        };
+        assert!(select_experiment_by_weighted_scenario_robust_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[1.0, f64::NAN],
+            &scenario,
+            predict,
+            |_| 1.0,
+        )
+        .is_none());
+        assert!(select_experiment_by_weighted_scenario_robust_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[1.0, 1.0],
+            &[],
+            predict,
+            |_| 1.0,
+        )
+        .is_none());
+        assert!(select_experiment_by_weighted_scenario_robust_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[1.0, 1.0],
+            &scenario,
+            predict,
+            |_| f64::NAN,
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn prior_robust_selector_handles_prior_shift_and_scenario_order() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let candidates = [0_u8, 1_u8];
+        let scenarios = [
+            PriorInformationGainScenario {
+                observation_std_dev: 0.05,
+                prediction_model: 0,
+                prior_weights: vec![0.49, 0.49, 0.01, 0.01],
+            },
+            PriorInformationGainScenario {
+                observation_std_dev: 0.05,
+                prediction_model: 0,
+                prior_weights: vec![0.01, 0.01, 0.49, 0.49],
+            },
+        ];
+        let predict = |hypothesis: &usize, candidate: &u8, _: &PriorInformationGainScenario| {
+            let values = match candidate {
+                // Separates the two halves evenly under either plausible prior.
+                0 => [0.0_f64, 0.0, 5.0, 5.0],
+                // Excellent under the first prior; almost uninformative under the second.
+                1 => [0.0_f64, 5.0, 0.0, 0.0],
+                _ => return None,
+            };
+            Some(values[*hypothesis])
+        };
+
+        let nominal = select_experiment_by_weighted_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &scenarios[0].prior_weights,
+            scenarios[0].observation_std_dev,
+            |hypothesis, candidate| {
+                predict(hypothesis, candidate, &scenarios[0])
+            },
+            |_| 1.0,
+        )
+        .expect("first prior makes one candidate strongly informative");
+        assert_eq!(*nominal.0, 1);
+
+        let robust = select_experiment_by_prior_robust_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &scenarios,
+            predict,
+            |_| 1.0,
+        )
+        .expect("each candidate has positive gain over the complete prior envelope");
+        assert_eq!(*robust.0, 0);
+
+        let base_envelope = expected_information_gain_over_prior_scenarios_nats(
+            &0_u8,
+            &hypotheses,
+            &scenarios,
+            predict,
+        )
+        .expect("base prior envelope is valid");
+        let mut extended = scenarios.to_vec();
+        extended.push(PriorInformationGainScenario {
+            observation_std_dev: 0.05,
+            prediction_model: 0,
+            prior_weights: vec![0.99, 0.003, 0.003, 0.004],
+        });
+        let extended_envelope = expected_information_gain_over_prior_scenarios_nats(
+            &0_u8,
+            &hypotheses,
+            &extended,
+            predict,
+        )
+        .expect("extended prior envelope is valid");
+        assert!(
+            extended_envelope <= base_envelope + 1.0e-12,
+            "adding a prior scenario cannot increase the minimum information gain"
+        );
+
+        let reversed = [scenarios[1].clone(), scenarios[0].clone()];
+        let robust_reversed = select_experiment_by_prior_robust_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &reversed,
+            predict,
+            |_| 1.0,
+        )
+        .expect("reordered finite prior set remains valid");
+        assert_eq!(robust.0, robust_reversed.0);
+        assert!((robust.1 - robust_reversed.1).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn prior_robust_selector_rejects_invalid_prior_scenarios() {
+        let hypotheses = [0_usize, 1];
+        let candidates = [0_u8, 1_u8];
+        let invalid = [
+            PriorInformationGainScenario {
+                observation_std_dev: 0.5,
+                prediction_model: 0,
+                prior_weights: vec![1.0, f64::NAN],
+            },
+        ];
+        assert!(
+            select_experiment_by_prior_robust_information_gain_per_cost(
+                &candidates,
+                &hypotheses,
+                &invalid,
+                |hypothesis, candidate, _| Some(*hypothesis as f64 * *candidate as f64),
+                |_| 1.0,
+            )
+            .is_none()
+        );
+        assert!(
+            expected_information_gain_over_prior_scenarios_nats(
+                &0_u8,
+                &hypotheses,
+                &[],
+                |hypothesis, candidate, _| Some(*hypothesis as f64 * *candidate as f64),
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn scenario_robust_selector_fails_closed_on_invalid_scenarios() {
+        let hypotheses = [0_i32, 1];
+        let candidates = [0_u8, 1_u8];
+        assert!(expected_information_gain_over_scenarios_nats(
+            &0_u8,
+            &hypotheses,
+            &[],
+            |hypothesis, candidate, _| Some(*hypothesis as f64 * *candidate as f64),
+        )
+        .is_none());
+        assert!(select_experiment_by_scenario_robust_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[InformationGainScenario {
+                observation_std_dev: f64::NAN,
+                prediction_model: 0,
+            }],
+            |hypothesis, candidate, _| Some(*hypothesis as f64 * *candidate as f64),
+            |_| 1.0,
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn worst_case_information_gain_is_bounded_by_every_scenario() {
+        let hypotheses = [0_i32, 1, 2, 3];
+        let predictions = [0.0_f64, 0.0, 0.0, 3.0];
+        let scenarios = [0.1_f64, 1.0, 5.0];
+        let robust = expected_information_gain_worst_case_nats(
+            &(),
+            &hypotheses,
+            &scenarios,
+            |hypothesis, _| Some(predictions[*hypothesis as usize]),
+        )
+        .expect("valid finite scenarios");
+        for sigma in scenarios {
+            let scenario_score = expected_information_gain_nats(
+                &(),
+                &hypotheses,
+                sigma,
+                |hypothesis, _| Some(predictions[*hypothesis as usize]),
+            )
+            .unwrap();
+            assert!(
+                robust <= scenario_score + 1.0e-12,
+                "worst-case score {robust} exceeded scenario score {scenario_score} at sigma={sigma}"
+            );
+        }
+    }
+
+    #[test]
+    fn robust_selector_can_trade_nominal_information_for_noise_envelope() {
+        // Candidate 1 separates every hypothesis at low noise. Candidate 0 has
+        // lower low-noise entropy, but higher signal variance and therefore better
+        // worst-case information under the much noisier scenario.
+        let hypotheses = [0_usize, 1, 2, 3];
+        let candidates = [0_u8, 1_u8];
+        let predict = |hypothesis: &usize, candidate: &u8| {
+            let values = match candidate {
+                0 => [0.0_f64, 0.0, 0.0, 3.0],
+                1 => [0.0_f64, 1.0, 2.0, 3.0],
+                _ => return None,
+            };
+            Some(values[*hypothesis])
+        };
+        let (nominal, nominal_score) =
+            select_experiment_by_information_gain_per_cost(
+                &candidates,
+                &hypotheses,
+                0.1,
+                predict,
+                |_| 1.0,
+            )
+            .expect("a low-noise candidate is informative");
+        assert_eq!(*nominal, 1);
+
+        let (robust, robust_score) =
+            select_experiment_by_worst_case_information_gain_per_cost(
+                &candidates,
+                &hypotheses,
+                &[0.1, 5.0],
+                predict,
+                |_| 1.0,
+            )
+            .expect("both candidates have positive worst-case information");
+        assert_eq!(*robust, 0);
+        assert!(nominal_score > 0.0 && robust_score > 0.0);
+
+        let (cost_aware, cost_score) = select_experiment_by_worst_case_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[0.1, 5.0],
+            predict,
+            |candidate| if *candidate == 0 { 100.0 } else { 1.0 },
+        )
+        .expect("at least one candidate has positive information per cost");
+        assert_eq!(*cost_aware, 1);
+        assert!(cost_score.is_finite() && cost_score > 0.0);
+    }
+
+    #[test]
+    fn robust_selector_fails_closed_on_invalid_noise_envelope() {
+        let hypotheses = [0_i32, 1];
+        let candidates = [0.0_f64, 1.0];
+        let predict = |hypothesis: &i32, experiment: &f64| {
+            Some(*hypothesis as f64 * *experiment)
+        };
+        assert!(expected_information_gain_worst_case_nats(
+            &0.0,
+            &hypotheses,
+            &[],
+            predict
+        )
+        .is_none());
+        assert!(expected_information_gain_worst_case_nats(
+            &0.0,
+            &hypotheses,
+            &[1.0, f64::NAN],
+            predict
+        )
+        .is_none());
+        assert!(select_experiment_by_worst_case_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[1.0, 0.0],
+            predict,
+            |_| 1.0
+        )
+        .is_none());
+    }
 
     #[test]
     fn variance_of_identical_values_is_zero() {
