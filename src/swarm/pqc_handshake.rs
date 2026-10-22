@@ -548,20 +548,35 @@ mod tests {
     fn test_stub_backend_cannot_create_candidate_or_active_session() {
         let mut manager = PqcHandshakeManager::new(test_config());
         let public_key = vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES];
+        let ciphertext = vec![0u8; ML_KEM_768_CIPHERTEXT_BYTES];
 
-        // The backend guard rejects a correctly sized public key. A caller
-        // cannot obtain stub outputs through the supported public API.
-        assert!(manager.receive_kem_public_key("peer-B", &public_key).is_err());
-        assert!(manager.encapsulate_for_peer("peer-B", &[0x42u8; 32]).is_err());
-        assert!(manager
-            .decapsulate_and_derive(
-                "peer-B",
-                &vec![0u8; ML_KEM_768_CIPHERTEXT_BYTES],
-                &[0x42u8; 32],
-            )
-            .is_err());
-
+        assert!(matches!(
+            manager.kem_public_key_bytes(),
+            Err(SwarmError::FeatureNotEnabled { .. })
+        ));
+        assert!(matches!(
+            manager.receive_kem_public_key("peer-B", &public_key),
+            Err(SwarmError::FeatureNotEnabled { .. })
+        ));
         assert!(manager.pending_kem.is_empty());
+
+        // Exercise encapsulation with an already-populated pending slot so the
+        // backend guard, not a missing-key check, is the reason it fails.
+        manager.pending_kem.insert("peer-B".to_string(), public_key);
+        assert!(matches!(
+            manager.encapsulate_for_peer("peer-B", &[0x42u8; 32]),
+            Err(SwarmError::FeatureNotEnabled { .. })
+        ));
+        assert!(
+            manager.pending_kem.contains_key("peer-B"),
+            "backend refusal must not consume pending caller state"
+        );
+
+        assert!(matches!(
+            manager.decapsulate_and_derive("peer-B", &ciphertext, &[0x42u8; 32]),
+            Err(SwarmError::FeatureNotEnabled { .. })
+        ));
+
         assert_eq!(manager.pending_session_count(), 0);
         assert_eq!(manager.session_count(), 0);
         assert!(manager.session_key("peer-B").is_none());
