@@ -84,7 +84,8 @@ impl PqcSessionKey {
 
 impl Drop for PqcSessionKey {
     fn drop(&mut self) {
-        self.session_key = [0u8; 32];
+        use zeroize::Zeroize;
+        self.session_key.zeroize();
     }
 }
 
@@ -109,7 +110,8 @@ impl PqcCandidateKey {
 
 impl Drop for PqcCandidateKey {
     fn drop(&mut self) {
-        self.candidate_key = [0u8; 32];
+        use zeroize::Zeroize;
+        self.candidate_key.zeroize();
     }
 }
 
