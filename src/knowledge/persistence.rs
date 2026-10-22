@@ -134,6 +134,18 @@ fn validate_graph_snapshot(
         {
             return Err("adjudicated link evidence must reference both claim contexts".into());
         }
+        let context_evidence: HashSet<&str> = from
+            .evidence_ids
+            .iter()
+            .chain(to.evidence_ids.iter())
+            .map(String::as_str)
+            .collect();
+        if !evidence.is_subset(&context_evidence) {
+            return Err(
+                "adjudicated link contains evidence IDs not declared by either endpoint context"
+                    .into(),
+            );
+        }
         match link.relation {
             EvidenceRelation::SemanticNeighbor | EvidenceRelation::SameWitnessVariant => {
                 return Err("candidate-only relations cannot be persisted as adjudicated".into());
@@ -836,6 +848,60 @@ mod tests {
         assert!(validate_graph_snapshot(&[fact], &[link])
             .unwrap_err()
             .contains("absent from graph snapshot"));
+    }
+
+    #[test]
+    fn graph_snapshot_rejects_unbound_adjudication_evidence_ids() {
+        let context = |witness: &str, family: &str, evidence: &str| ClaimContext {
+            subject: "symbol-x".into(),
+            predicate: "associated_with".into(),
+            object: "meaning-y".into(),
+            witness_id: witness.into(),
+            source_family_id: family.into(),
+            context_id: "synthetic-context".into(),
+            temporal_scope: None,
+            event_time: None,
+            claim_kind: super::super::claim_provenance::ClaimKind::SourceAttested,
+            polarity: super::super::claim_provenance::ClaimPolarity::Positive,
+            evidence_ids: vec![evidence.into()],
+        };
+        let fact = |id: u64, witness: &str, family: &str, evidence: &str| GraphFactRecord {
+            fact_id: Some(id),
+            fact: FactRecord {
+                vector_bytes: vec![id as u8; 2048],
+                source_text: format!("fact {id}"),
+                confidence: 0.5,
+                domain: None,
+                cycle: id,
+                is_causal: false,
+            },
+            claim_context: Some(context(witness, family, evidence)),
+        };
+        let link = EvidenceLink {
+            from_fact_id: 1,
+            to_fact_id: 2,
+            relation: EvidenceRelation::Resembles,
+            status: EvidenceLinkStatus::Adjudicated,
+            evidence_ids: vec![
+                "evidence-a".into(),
+                "evidence-b".into(),
+                "not-attached-to-either-context".into(),
+            ],
+            rationale: Some("attempted to attach an unbound evidence ID".into()),
+            causal_argument: None,
+            transmission_chain: None,
+            detected_at_cycle: 3,
+        };
+
+        let error = validate_graph_snapshot(
+            &[
+                fact(1, "witness-a", "family-a", "evidence-a"),
+                fact(2, "witness-b", "family-b", "evidence-b"),
+            ],
+            &[link],
+        )
+        .unwrap_err();
+        assert!(error.contains("not declared by either endpoint context"));
     }
 
     #[test]
