@@ -8,8 +8,10 @@
 //! including whichever scoring backend the build enables. Run in release mode.
 //!
 //! Usage:
-//!   cargo run --release -p symthaea-broca --bin broca-vocab-budget-bench
-//!   cargo run --release -p symthaea-broca --bin broca-vocab-budget-bench -- --json-out budget.json
+//!   GIT_COMMIT_SHA=$(git rev-parse HEAD) \
+//!     cargo run --release -p symthaea-broca --bin broca-vocab-budget-bench
+//!   GIT_COMMIT_SHA=$(git rev-parse HEAD) \
+//!     cargo run --release -p symthaea-broca --bin broca-vocab-budget-bench -- --json-out budget.json
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -225,4 +227,28 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{json}");
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nearest_rank_statistics_are_deterministic() {
+        let samples = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
+        assert_eq!(percentile_nearest_rank(&samples, 0.50), 5.0);
+        assert_eq!(percentile_nearest_rank(&samples, 0.95), 9.0);
+    }
+
+    #[test]
+    fn raw_embedding_storage_lower_bound_uses_f32_coordinate_size() {
+        let bytes = 2_048 * HDC_DIMENSION * std::mem::size_of::<f32>();
+        assert_eq!(bytes, 128 * 1024 * 1024);
+    }
+
+    #[test]
+    fn empty_percentile_sample_fails_closed_to_zero() {
+        assert_eq!(percentile_nearest_rank(&[], 0.95), 0.0);
+    }
 }
