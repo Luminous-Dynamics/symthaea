@@ -1,0 +1,45 @@
+name: GCS ablation receipt auditor
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "src/bin/coding_gcs_ablation_verify.rs"
+      - "examples/coding_gcs_ablation_benchmark.rs"
+      - "docs/research/GCS_ABLATION_RECEIPT_AUDITOR_2026-10-22.md"
+      - "docs/research/GCS_RUNTIME_ABLATION_BENCHMARK_2026-10-22.md"
+      - ".github/workflows/gcs-ablation-receipt-auditor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gcs-ablation-receipt-auditor-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  verify:
+    name: Verify GCS receipt auditor and producer
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+      - name: Format changed Rust targets
+        run: |
+          rustfmt --edition 2024 --check src/bin/coding_gcs_ablation_verify.rs
+          rustfmt --edition 2024 --check examples/coding_gcs_ablation_benchmark.rs
+      - name: Run independent receipt and mutation tests
+        run: cargo test --locked --bin coding_gcs_ablation_verify
+      - name: Compile the paired benchmark producer
+        run: cargo check --locked --example coding_gcs_ablation_benchmark --features "code_generation geodesic_synthesis"
+      - name: Run strict Clippy on the auditor
+        run: cargo clippy --locked --bin coding_gcs_ablation_verify -- -D warnings

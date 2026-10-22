@@ -8,12 +8,25 @@ This is a pilot instrument, not an SOTA claim. It starts with eight small determ
 
 ## Current methodology
 
-- **Paired intervention:** each task/repeat runs once with GCS advisories off and once on.
+- **Paired intervention:** each task/repeat runs once with GCS advisories off and once on. A pair enters the win/loss/tie treatment comparison only when both arms have complete oracles; unresolved pairs are counted separately, not treated as ties.
 - **Order control:** treatment order alternates by task index plus repeat (`off_then_on` / `on_then_off`) to reduce simple order effects.
-- **Oracle preflight:** every task must have at least one declared `#[test]` function; a hand-written reference must pass all expected tests, and an empty patch must fail before agent trials begin. A failed control aborts the run.
-- **Fail-closed scoring:** success requires real execution, successful compilation, no runtime/test-runner error, exactly the expected number of observed test functions, all expected tests passing, and zero failures. Missing code or an incomplete oracle execution is not success.
-- **Reproducible receipt:** the JSON includes source revision (when `GIT_COMMIT_SHA` is supplied), model mode, BLAKE3 task-manifest digest, per-task reference/test digests, generated-source digests, repeat/order, expected/observed test counts, completion status, pass result, runtime, iterations, and energy.
+- **Oracle preflight:** every task must have declared `#[test]` functions; the reference must pass all tests; an empty patch must be rejected by a real, non-simulated Rust compiler diagnostic; and every task-specific semantic mutant must compile and fail at least one expected test with complete execution. Missing mutants, surviving mutants, compile errors in a mutant, simulated execution, or incomplete tests abort before agent trials.
+- **Fail-closed scoring:** success requires real execution, successful compilation, no runtime/test-runner error, exactly the expected number of observed test functions, all expected tests passing, and zero failures. Oracle completeness is separate: `CodeExecutor` may record a nonzero test-binary exit in `runtime_error` when an assertion fails. If the full expected test count is present, the result is a complete behavioral failure, not an unresolved oracle; missing counts or simulated execution remain unresolved.
+- **Source-bound execution:** before oracle controls or agent trials, the producer requires `GIT_COMMIT_SHA` to be a full 40-character SHA matching `git rev-parse HEAD`, and requires a clean working tree. It refuses to create an unauditable receipt from a dirty or ambiguous checkout.
+- **Reproducible receipt:** the JSON includes the resolved source revision, model mode, ordered task-manifest digest and task content (description, expected symbol, reference source, test fixture, semantic mutants), per-task source/test digests, mutant preflight outcomes, generated-source digests, repeat/order, expected/observed test counts, completion status, pass result, runtime, iterations, and energy. Treat these pilot fixtures as public; this receipt design is not a substitute for hidden tests.
 - **Separate outcomes:** compilation rate, complete-oracle rate, behavioral success rate, per-task paired wins/losses, and time/energy are reported independently.
+
+## Pre-register the task manifest
+
+Before any compiler controls or model trials, print the current frozen manifest without running the benchmark:
+
+```bash
+GIT_COMMIT_SHA="$(git rev-parse HEAD)" cargo run --release \
+  --example coding_gcs_ablation_benchmark \
+  --features 'code_generation geodesic_synthesis' -- --print-manifest
+```
+
+Record `source_revision` and `task_manifest_blake3` in an independently reviewed preregistration or committed protocol record. This command requires the same clean source checkout, but performs no reference, mutant, empty-patch or agent trial execution.
 
 ## Run
 
@@ -38,7 +51,7 @@ cargo run --release --example coding_gcs_ablation_benchmark \
   --features 'code_generation geodesic_synthesis' -- --cloud --repeats 3
 ```
 
-The default pilot is 8 tasks x 3 repeats x 2 modes = 48 agent runs, plus reference and empty-patch controls. Increase repeats only after checking run-to-run variance. Output is written to the selected `--json-out` path (or a default temp path).
+The default pilot is 8 tasks x 3 repeats x 2 modes = 48 agent runs, plus reference, empty-patch, and ten semantic-mutant controls. Increase repeats only after checking run-to-run variance. Output is written to the selected `--json-out` path (or a default temp path).
 
 ## Pre-registered interpretation
 
@@ -48,7 +61,7 @@ Secondary outcomes: complete-oracle rate, real compilation rate, median/p95 agen
 
 ## Expansion gates
 
-1. Run the reference/empty-patch controls and confirm every fixture is sound.
+1. Run reference-pass and real empty-patch-compile-rejection controls; every semantic mutant must compile and be rejected by at least one test.
 2. Run formatting and compile/test checks on the exact PR head.
 3. Execute the pilot in both native and a configured LLM mode; archive receipts, even if the result is null or negative.
 4. Re-run after each benchmark/task/verifier change; version the task manifest and explain result breaks.
