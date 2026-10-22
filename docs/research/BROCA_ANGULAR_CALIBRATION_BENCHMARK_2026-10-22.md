@@ -54,6 +54,18 @@ The benchmark is designed to falsify these hypotheses as well as support them. I
 5. Require both higher intended-token quality and non-inferior protected-old behavior. Then run short adaptation ablations because published work shows initialization-only signals may not predict later convergence.
 6. Do not claim SOTA until a reproducible, apples-to-apples comparison against strong published baselines on an independently labelled task passes.
 
+## False-activation uncertainty (diagnostic, not a guarantee)
+
+The benchmark now emits a one-sided exact Clopper–Pearson 95% upper bound for the observed protected-query false-activation count, and tests its implementation at 0, 1, and 2 events out of 512. The held-out bank has 64 samples per concept and side (512 positives and 512 protected queries across eight concepts). Under an IID Bernoulli assumption, zero events gives an upper bound below 1%; one event also remains just below 1%, while two exceed 1%.
+
+**Important limitation:** the synthetic queries share eight planted concepts, so event rates may be heterogeneous and dependent within concept. The IID bound is therefore a diagnostic only—not a distribution-free or deployment risk guarantee. The selected 1% training condition is an empirical calibration constraint; with only 64 protected training queries, it effectively requires zero observed false activations and by itself cannot certify a 1% population rate. A real risk-control claim requires a justified sampling unit, enough independent examples, source-/family-separated data, and distribution-shift evaluation.
+
+The broader principle is risk-controlled activation: report confidence bounds and the risk/coverage trade-off, rather than only a raw rate or cosine margin. Recent selective-risk work uses held-out confidence bounds to set acceptance thresholds; this motivates the measurement design without claiming Broca inherits any guarantee: [Fixed-Sequence Confidence-Interval Calibration (2026)](https://www.mdpi.com/2571-905X/9/5/109).
+
+## Complementary direction: coverage versus vocabulary budget
+
+Vocabulary expansion is not free. At 16,384 dimensions with f32 components, a raw row occupies 64 KiB, and the weight-tied cosine score evaluates each row. The related [Vocab Diet (Findings ACL 2026)](https://aclanthology.org/2026.findings-acl.1618/) reports reclaiming 10–40% of vocabulary slots while reallocating capacity in its tested LLM settings. Broca needs a separate matched-budget comparison of append-only growth versus opt-in pruning/merging or sparse/hierarchical scoring, with token-ID/checkpoint compatibility and rollback invariants. This work is tracked in [issue #8290](https://github.com/Luminous-Dynamics/symthaea/issues/8290).
+
 ## Validation boundary
 
 The benchmark source is checked into a separate branch so the experiment can be reviewed independently from the initializer implementation. Rust compilation, formatting, linting, and execution have not been verified in this environment. No benchmark results are asserted here.
