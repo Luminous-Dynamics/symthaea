@@ -270,3 +270,123 @@ fn main() {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::{digest, verify};
+    use serde_json::{json, Value};
+
+    fn valid_receipt() -> Value {
+        let task_id = "signed_addition";
+        let reference_source = "fn add(a: i32, b: i32) -> i32 { a + b }";
+        let mutant_source = "fn add(a: i32, b: i32) -> i32 { a - b }";
+        let test_source = "#[test]\nfn addition() { assert_eq!(add(2, 3), 5); }\n";
+        let reference_digest = digest(reference_source);
+        let mutant_digest = digest(mutant_source);
+        let fixture_digest = digest(test_source);
+        let aggregate = format!(
+            "{task_id}\n{reference_digest}\n{mutant_digest}\n{fixture_digest}\n"
+        );
+        json!({
+            "schema_version": 1,
+            "schema_id": "symthaea.coding-oracle-mutation.v1",
+            "benchmark": "symthaea_coding_oracle_mutation",
+            "source_revision": "test-revision",
+            "fixture_digest_blake3": digest(&aggregate),
+            "runtime": {
+                "rustc_version": "test",
+                "os": "test",
+                "arch": "test",
+                "debug_assertions": true,
+                "code_generation_feature": true,
+                "executor": "CodeExecutor::with_real_execution"
+            },
+            "summary": {
+                "task_count": 1,
+                "expected_assertion_tests": 1,
+                "reference_controls_passed": 1,
+                "mutants_killed": 1,
+                "mutation_kill_rate": 1.0,
+                "qualified": true,
+                "elapsed_ms": 1,
+                "qualification_errors": []
+            },
+            "tasks": [{
+                "task_id": task_id,
+                "fixture_digest_blake3": fixture_digest,
+                "reference_source_digest_blake3": reference_digest,
+                "mutant_source_digest_blake3": mutant_digest,
+                "reference_source": reference_source,
+                "mutant_source": mutant_source,
+                "test_source": test_source,
+                "tests_expected": 1,
+                "reference": {
+                    "status": "passed", "compiled": true, "simulated": false,
+                    "tests_expected": 1, "tests_executed": 1, "tests_passed": 1,
+                    "tests_failed": 0, "elapsed_ms": 1, "compile_errors": [],
+                    "runtime_error": null
+                },
+                "mutant": {
+                    "status": "failed", "compiled": true, "simulated": false,
+                    "tests_expected": 1, "tests_executed": 1, "tests_passed": 0,
+                    "tests_failed": 1, "elapsed_ms": 1, "compile_errors": [],
+                    "runtime_error": null
+                },
+                "reference_control_passed": true,
+                "mutation_killed": true
+            }]
+        })
+    }
+
+    #[test]
+    fn accepts_consistent_receipt() {
+        assert_eq!(verify(&valid_receipt()).unwrap(), (1, 1, 1, true));
+    }
+
+    #[test]
+    fn rejects_source_tampering_without_updated_digest() {
+        let mut receipt = valid_receipt();
+        receipt["tasks"][0]["reference_source"] = json!("fn add(_: i32, _: i32) -> i32 { 0 }");
+        assert!(verify(&receipt).unwrap_err().contains("digest mismatch"));
+    }
+
+    #[test]
+    fn rejects_incomplete_oracle_counts_even_if_status_claims_failure() {
+        let mut receipt = valid_receipt();
+        receipt["tasks"][0]["mutant"]["tests_executed"] = json!(0);
+        receipt["tasks"][0]["mutant"]["tests_passed"] = json!(0);
+        receipt["tasks"][0]["mutant"]["tests_failed"] = json!(0);
+        assert!(verify(&receipt).unwrap_err().contains("status mismatch"));
+    }
+
+    #[test]
+    fn rejects_false_mutation_kill_flag() {
+        let mut receipt = valid_receipt();
+        receipt["tasks"][0]["mutation_killed"] = json!(false);
+        assert!(verify(&receipt).unwrap_err().contains("mutation_killed contradicts"));
+    }
+
+    #[test]
+    fn rejects_inconsistent_summary_totals() {
+        let mut receipt = valid_receipt();
+        receipt["summary"]["mutants_killed"] = json!(0);
+        assert!(verify(&receipt).unwrap_err().contains("summary mutants_killed"));
+    }
+
+    #[test]
+    fn rejects_duplicate_task_ids() {
+        let mut receipt = valid_receipt();
+        let duplicate = receipt["tasks"][0].clone();
+        receipt["tasks"].as_array_mut().unwrap().push(duplicate);
+        receipt["summary"]["task_count"] = json!(2);
+        assert!(verify(&receipt).unwrap_err().contains("duplicate task_id"));
+    }
+
+    #[test]
+    fn rejects_corrupt_aggregate_digest() {
+        let mut receipt = valid_receipt();
+        receipt["fixture_digest_blake3"] = json!("0".repeat(64));
+        assert!(verify(&receipt).unwrap_err().contains("aggregate fixture digest"));
+    }
+}
