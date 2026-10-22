@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/counterfactual-sensitivity-report.schema.json",
+  "title": "PITB Counterfactual Sensitivity Analysis Report v0",
+  "description": "Deterministic paired counterfactual outcome analysis. A report is descriptive and never makes the overall confirmatory decision pass.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "suite_id",
+    "dataset_kind",
+    "split",
+    "suite_sha256",
+    "outcomes_sha256",
+    "counts",
+    "metrics",
+    "by_mutation_kind",
+    "bootstrap",
+    "proposed_gates",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.counterfactual-sensitivity-report.v0"
+    },
+    "suite_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_kind": {
+      "enum": [
+        "synthetic_fixture",
+        "reviewed_benchmark"
+      ]
+    },
+    "split": {
+      "enum": [
+        "test",
+        "external_challenge"
+      ]
+    },
+    "suite_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "outcomes_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite_pairs_in_requested_split",
+        "adjudicated_pairs_analyzed",
+        "base_compatible_pairs",
+        "counterfactual_compatible_pairs",
+        "counterfactual_incompatible_pairs",
+        "paired_contract_eligible_pairs",
+        "semantics_preserving_pairs",
+        "probability_scored_rows",
+        "components"
+      ],
+      "properties": {
+        "suite_pairs_in_requested_split": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "adjudicated_pairs_analyzed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "base_compatible_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "counterfactual_compatible_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "counterfactual_incompatible_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "paired_contract_eligible_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "semantics_preserving_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "probability_scored_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "components": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/metric"
+      }
+    },
+    "by_mutation_kind": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pair_count",
+          "incompatible_variant_count",
+          "sensitivity",
+          "false_accept_rate"
+        ],
+        "properties": {
+          "pair_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "incompatible_variant_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sensitivity": {
+            "$ref": "#/$defs/metric"
+          },
+          "false_accept_rate": {
+            "$ref": "#/$defs/metric"
+          }
+        }
+      }
+    },
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "replicates",
+        "seed",
+        "interval"
+      ],
+      "properties": {
+        "unit": {
+          "const": "component_id"
+        },
+        "replicates": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "interval": {
+          "const": "percentile_95"
+        }
+      }
+    },
+    "proposed_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_counterfactual_sensitivity_min",
+        "target_base_positive_recall_min",
+        "target_semantics_preserving_decision_stability_min",
+        "overall_confirmatory_decision"
+      ],
+      "properties": {
+        "target_counterfactual_sensitivity_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "target_base_positive_recall_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "target_semantics_preserving_decision_stability_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "overall_confirmatory_decision": {
+          "const": "not_evaluated_requires_real_adjudication_and_independent_checker_receipts"
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "numerator",
+        "denominator",
+        "estimate",
+        "ci_95",
+        "defined_bootstrap_replicates"
+      ],
+      "properties": {
+        "numerator": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "denominator": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci_95": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          ]
+        },
+        "defined_bootstrap_replicates": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
