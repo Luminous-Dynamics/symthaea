@@ -969,17 +969,17 @@ fn run_task(task: &BenchTask, task_idx: usize, task_count: usize, use_llm: bool,
         .map(|t| t.to_string())
         .collect();
 
-    // A compile-only or incomplete test run is never shown as correctness success.
-    let status = if compiled
-        && tests_expected > 0
-        && tests_passed + tests_failed == tests_expected
-        && tests_failed == 0
-    {
-        "✓"
-    } else if compiled {
+    // ✓ = complete passing oracle; ◐ = complete oracle with failures;
+    // ? = compiled but unverified; ✗ = compilation failed.
+    let executed_tests = tests_passed + tests_failed;
+    let status = if !compiled {
+        "✗"
+    } else if tests_expected == 0 || executed_tests != tests_expected {
+        "?"
+    } else if tests_failed > 0 {
         "◐"
     } else {
-        "✗"
+        "✓"
     };
 
     eprint!(
