@@ -53,7 +53,7 @@ impl DynamicalSystem for CountedOscillator {
 
 #[derive(Clone, Debug)]
 struct Metrics {
-    integrator: &'static str,
+    integrator: String,
     steps_per_period: usize,
     step_size: f64,
     steps: usize,
