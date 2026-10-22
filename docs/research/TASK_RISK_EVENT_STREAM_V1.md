@@ -17,7 +17,7 @@ The monitor tests the explicit conditional-risk null (mathbb{E}[L_imidmathcal{F}
 
 - The input is the task-scope raw CSV, 5 operating points × 4 conditions × 300 episodes = 6,000 episode records.
 - For each operating-point/condition stream, the e-process **persists across all 300 episodes**. It resets only at the beginning of that evaluation stream, not every 8-step episode.
-- Five operating points are treated as parallel monitors, with total (delta=0.05) allocated by the union bound. The e-value threshold is (K/delta=100), or (log(100)) in log space.
+- Five operating points are treated as parallel monitors, with total delta=0.05 allocated by the union bound. The e-value threshold is K/delta=100, or log(100) in log space. The mixture and fixed-bet baseline are competing policies with separate thresholds; their alarms are not OR-combined. A deployed supervisor that triggers on either would need to allocate delta across both families (for example, K=10 or split delta) to retain the same joint error budget.
 - The primary estimator is the fixed equal-weight mixture of three predeclared bet fractions ([0.25,0.50,0.75]) of (1/epsilon). A single fixed bet with fraction 0.50 is an ablation, evaluated on exactly the same binary event stream.
 - The raw output preserves the first 19 task-scope columns and appends the observed false-safe event, mixture log-evidence and component logs, fixed-bet log-evidence, alert states, first alert episode and frozen risk parameters.
 - The summary reports false-safe episode count/rate, first event, first mixture/fixed alarm, detection delay from first event, number of false-safe events observed by the alarm, and final evidence.
