@@ -1008,7 +1008,7 @@ mod provenance_tests {
                     backend_name: "Simulated".to_string(),
                     success: true,
                     elapsed_ms: 7,
-                    estimated_energy_cost: 10.0,
+                    estimated_energy_cost: 0.0,
                 },
                 BackendAttemptRecord {
                     tier: "LocalLLM".to_string(),
@@ -1028,7 +1028,7 @@ mod provenance_tests {
         assert_eq!(summary["backend_attempts_by_name"]["Simulated"], 1);
         assert_eq!(summary["backend_attempts_succeeded"], 1);
         assert_eq!(summary["backend_attempts_failed"], 1);
-        assert_eq!(summary["backend_attempt_estimated_energy_total"], 20.0);
+        assert_eq!(summary["backend_attempt_estimated_energy_total"], 10.0);
         assert_eq!(summary["backend_attempt_elapsed_ms_total"], 18);
         assert_eq!(summary["backend_attempt_elapsed_ms_p50"], 7);
         assert_eq!(summary["backend_attempt_elapsed_ms_p95"], 11);
