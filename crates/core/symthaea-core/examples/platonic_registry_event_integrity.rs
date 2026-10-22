@@ -1096,6 +1096,10 @@ mod tests {
         }
         assert_eq!(traces, 2_304);
         assert_eq!(event_applications, 4_608);
+        println!(
+            "# bounded_event_pair_receipt=templates:{},traces:{traces},event_applications:{event_applications},invariant_checks_passed:true",
+            templates.len()
+        );
     }
 
     #[test]
