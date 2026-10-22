@@ -12,6 +12,7 @@ on:
       - "docs/research/hlb-factorial-benchmark-v1.json"
       - "crates/core/symthaea-core/examples/hlb_information_choice_fixture.rs"
       - "docs/research/hlb-information-choice-task-v1.json"
+      - "docs/research/HLB_INFORMATION_CHOICE_FIXTURE.md"
   push:
     branches: [main]
     paths:
@@ -22,6 +23,7 @@ on:
       - "docs/research/hlb-factorial-benchmark-v1.json"
       - "crates/core/symthaea-core/examples/hlb_information_choice_fixture.rs"
       - "docs/research/hlb-information-choice-task-v1.json"
+      - "docs/research/HLB_INFORMATION_CHOICE_FIXTURE.md"
   workflow_dispatch:
 
 permissions:
@@ -104,6 +106,7 @@ jobs:
             docs/research/HLB_INTEGRATED_FACTORIAL_BENCHMARK.md \
             crates/core/symthaea-core/examples/hlb_factorial_benchmark_contract.rs \
             docs/research/hlb-information-choice-task-v1.json \
+            docs/research/HLB_INFORMATION_CHOICE_FIXTURE.md \
             crates/core/symthaea-core/examples/hlb_information_choice_fixture.rs \
             research-results/hlb-factorial-contract.log \
             research-results/hlb-information-choice-fixture.log > research-results/SHA256SUMS
