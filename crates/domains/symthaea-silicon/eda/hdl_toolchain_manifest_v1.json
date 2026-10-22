@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "experiment": "symthaea-silicon HDC XOR first simulation",
+  "required_tools": [
+    {
+      "name": "verilator",
+      "purpose": "SystemVerilog lint, compilation and smoke simulation"
+    },
+    {
+      "name": "jq",
+      "purpose": "structured receipt output"
+    },
+    {
+      "name": "sha256sum",
+      "purpose": "source and log content identities"
+    },
+    {
+      "name": "git",
+      "purpose": "repository and source revision identity"
+    },
+    {
+      "name": "make",
+      "purpose": "Verilator C++ build"
+    },
+    {
+      "name": "c++",
+      "purpose": "Verilator generated model compilation"
+    }
+  ],
+  "commands": {
+    "lint": "verilator --lint-only --timing -Wall --top-module tb_hdc_bind_xor <rtl> <testbench>",
+    "simulation": "verilator --binary --timing --assert -Wall --top-module tb_hdc_bind_xor --Mdir <output>/obj_dir <rtl> <testbench>"
+  },
+  "output": "target/hdl-qualification/hdc-bind-xor/<UTC timestamp>/receipt.json plus immutable-per-run logs",
+  "pass_semantics": "simulation_smoke_pass means lint+build+simulation exit zero and the exact expected PASS marker is present.",
+  "fail_closed_semantics": [
+    "missing tool => unqualified_tool_missing",
+    "lint/build/test failure => failed",
+    "exit code zero without expected PASS marker => failed",
+    "a receipt never implies formal proof, synthesis, PPA, FPGA observation, physical energy or SOTA"
+  ],
+  "tool_versions": "Provided by root flake.lock through devShells.hdl, subject to platform and lock file",
+  "status": "specification for the first tool execution only; not yet run on this authoring host"
+}
