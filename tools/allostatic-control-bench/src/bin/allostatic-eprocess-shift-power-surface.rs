@@ -291,6 +291,8 @@ fn simulate_episode(
         create_fixed(FIXED_BET_FRACTIONS[0])?,
         create_fixed(FIXED_BET_FRACTIONS[1])?,
         create_fixed(FIXED_BET_FRACTIONS[2])?,
+        create_fixed(FIXED_BET_FRACTIONS[3])?,
+        create_fixed(FIXED_BET_FRACTIONS[4])?,
     ];
 
     let mut first_alarm_steps = [ALARM_SENTINEL; 7];
