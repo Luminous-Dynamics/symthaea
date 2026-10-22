@@ -146,6 +146,7 @@ struct EvaluatorTrial {
     true_dvpc: f64,
     actual_action_cost_units: u64,
     is_shifted: bool,
+    shift_episode_id: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -195,6 +196,7 @@ struct RunResult {
 struct ObservedAlarm {
     value: bool,
     is_shifted_for_evaluator_only: bool,
+    shift_episode_id_for_evaluator_only: Option<u64>,
 }
 
 fn base_value(rng: &mut SplitMix64) -> f64 {
@@ -227,6 +229,8 @@ fn make_trials(scenario: &Scenario, seed: u64) -> Vec<EvaluatorTrial> {
     let mut rng = SplitMix64::new(seed ^ scenario_seed);
     let mut trials = Vec::with_capacity(TRIALS_PER_SEED);
     let mut previous_shift = false;
+    let mut current_episode_id: Option<u64> = None;
+    let mut episode_counter = 0_u64;
     let mut previous_alarm = false;
 
     for index in 0..TRIALS_PER_SEED {
@@ -241,6 +245,12 @@ fn make_trials(scenario: &Scenario, seed: u64) -> Vec<EvaluatorTrial> {
             };
             rng.unit() < transition
         };
+        if shifted && !previous_shift {
+            episode_counter += 1;
+            current_episode_id = Some(episode_counter);
+        } else if !shifted {
+            current_episode_id = None;
+        }
         previous_shift = shifted;
 
         let true_dvpc = base_value(&mut rng);
@@ -288,6 +298,7 @@ fn make_trials(scenario: &Scenario, seed: u64) -> Vec<EvaluatorTrial> {
             true_dvpc,
             actual_action_cost_units,
             is_shifted: shifted,
+            shift_episode_id: current_episode_id,
         });
     }
     trials
@@ -402,6 +413,7 @@ fn run_policy(
                 alarm_history.push(ObservedAlarm {
                     value: trial.alarm_draw,
                     is_shifted_for_evaluator_only: trial.is_shifted,
+                    shift_episode_id_for_evaluator_only: trial.shift_episode_id,
                 });
                 if alarm_history.len() > 3 {
                     alarm_history.remove(0);
@@ -431,9 +443,12 @@ fn run_policy(
                 current_alarm.is_some()
                     && observed_values.len() >= 3
                     && observed_values.iter().rev().take(3).filter(|alarm| **alarm).count() >= 2
-                    && recent.filter(|entry| {
-                        entry.value && entry.is_shifted_for_evaluator_only
-                    }).count() >= 2
+                    && trial.shift_episode_id.is_some_and(|episode_id| {
+                        recent.filter(|entry| {
+                            entry.value
+                                && entry.shift_episode_id_for_evaluator_only == Some(episode_id)
+                        }).count() >= 2
+                    })
             }
         };
         gate_trigger_timeline.push(gate_triggered);
@@ -541,13 +556,16 @@ fn run_policy(
     let mut undetected_shift_episodes = 0;
     let mut detection_delays = Vec::new();
     let mut episode_start: Option<usize> = None;
+    let mut active_episode_id: Option<u64> = None;
     for index in 0..=trials.len() {
         let in_shift = index < trials.len() && trials[index].is_shifted;
         if in_shift {
             if episode_start.is_none() {
                 episode_start = Some(index);
+                active_episode_id = trials[index].shift_episode_id;
             }
         } else if let Some(start) = episode_start.take() {
+            let _completed_episode_id = active_episode_id.take();
             shift_episodes += 1;
             if let Some(detected_at) = (start..index).find(|&at| gate_trigger_timeline[at]) {
                 detected_shift_episodes += 1;
