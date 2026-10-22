@@ -507,7 +507,9 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
                 Some(value) => {
                     let digest = value
                         .as_str()
-                        .with_context(|| format!("{check_context}.evidence_sha256 must be null or a digest"))?;
+                        .with_context(|| {
+                            format!("{check_context}.evidence_sha256 must be null or a digest")
+                        })?;
                     validate_digest(digest, 64, &format!("{check_context}.evidence_sha256"))?;
                 }
                 None => bail!("{check_context}.evidence_sha256 is required"),
@@ -695,7 +697,11 @@ fn join_pairs(
         let base_status = required_string(base_adj, "status", &format!("{ctx}.base_adjudication"))?;
         let base_label = required_string(base_adj, "label", &format!("{ctx}.base_adjudication"))?;
         if base_status == "adjudicated"
-            && required_string(variant_adj, "status", &format!("{ctx}.counterfactual_adjudication"))? == "adjudicated"
+            && required_string(
+                variant_adj,
+                "status",
+                &format!("{ctx}.counterfactual_adjudication"),
+            )? == "adjudicated"
             && reviewer_ids(base_adj, &format!("{ctx}.base_adjudication"))?
                 != reviewer_ids(variant_adj, &format!("{ctx}.counterfactual_adjudication"))? {
             bail!("{ctx}: base and counterfactual require the same independent reviewer set");
