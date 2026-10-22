@@ -372,24 +372,89 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
             &context,
         )?;
         for (field, required, optional) in [
-            ("source", &["record_id", "family_id", "source_commit", "artifact_sha256", "insight_sha256"][..], &[][..]),
-            ("target", &["theorem_id", "family_id", "source_commit", "artifact_path", "artifact_sha256", "statement_sha256", "obligation_sha256"][..], &["domain_labels"][..]),
-            ("adjudication", &["status", "label", "rubric_version", "reviewer_decisions", "receipt_sha256"][..], &["adjudication_note"][..]),
-            ("prediction", &["decision", "predicted_label", "confidence", "compatibility_probability", "mismatch_codes", "precondition_checks", "receipt_sha256"][..], &[][..]),
-            ("run", &["model_id", "model_version", "prompt_sha256", "config_sha256", "input_sha256", "output_sha256", "budget"][..], &["actual_model_calls", "actual_tokens", "actual_wall_ms", "actual_cost_microusd"][..]),
+            (
+                "source",
+                &["record_id", "family_id", "source_commit", "artifact_sha256", "insight_sha256"][..],
+                &[][..],
+            ),
+            (
+                "target",
+                &[
+                    "theorem_id",
+                    "family_id",
+                    "source_commit",
+                    "artifact_path",
+                    "artifact_sha256",
+                    "statement_sha256",
+                    "obligation_sha256",
+                ][..],
+                &["domain_labels"][..],
+            ),
+            (
+                "adjudication",
+                &["status", "label", "rubric_version", "reviewer_decisions", "receipt_sha256"][..],
+                &["adjudication_note"][..],
+            ),
+            (
+                "prediction",
+                &[
+                    "decision",
+                    "predicted_label",
+                    "confidence",
+                    "compatibility_probability",
+                    "mismatch_codes",
+                    "precondition_checks",
+                    "receipt_sha256",
+                ][..],
+                &[][..],
+            ),
+            (
+                "run",
+                &[
+                    "model_id",
+                    "model_version",
+                    "prompt_sha256",
+                    "config_sha256",
+                    "input_sha256",
+                    "output_sha256",
+                    "budget",
+                ][..],
+                &[
+                    "actual_model_calls",
+                    "actual_tokens",
+                    "actual_wall_ms",
+                    "actual_cost_microusd",
+                ][..],
+            ),
         ] {
             let object = value.get(field).with_context(|| format!("{context}.{field} missing"))?;
             require_exact_keys(object, required, optional, &format!("{context}.{field}"))?;
         }
-        let reviewer_rows = value.get("adjudication").and_then(|x| x.get("reviewer_decisions")).and_then(Value::as_array)
+        let reviewer_rows = value
+            .get("adjudication")
+            .and_then(|x| x.get("reviewer_decisions"))
+            .and_then(Value::as_array)
             .with_context(|| format!("{context}.adjudication.reviewer_decisions must be an array"))?;
         for (reviewer_index, reviewer) in reviewer_rows.iter().enumerate() {
-            require_exact_keys(reviewer, &["reviewer_id", "label", "reason_codes", "evidence_sha256"], &[], &format!("{context}.reviewer_decisions[{reviewer_index}]"))?;
+            require_exact_keys(
+                reviewer,
+                &["reviewer_id", "label", "reason_codes", "evidence_sha256"],
+                &[],
+                &format!("{context}.reviewer_decisions[{reviewer_index}]"),
+            )?;
         }
-        let check_rows = value.get("prediction").and_then(|x| x.get("precondition_checks")).and_then(Value::as_array)
+        let check_rows = value
+            .get("prediction")
+            .and_then(|x| x.get("precondition_checks"))
+            .and_then(Value::as_array)
             .with_context(|| format!("{context}.prediction.precondition_checks must be an array"))?;
         for (check_index, check) in check_rows.iter().enumerate() {
-            require_exact_keys(check, &["check_id", "outcome", "evidence_sha256"], &[], &format!("{context}.precondition_checks[{check_index}]"))?;
+            require_exact_keys(
+                check,
+                &["check_id", "outcome", "evidence_sha256"],
+                &[],
+                &format!("{context}.precondition_checks[{check_index}]"),
+            )?;
         }
         require_exact_keys(
             value.get("run").and_then(|x| x.get("budget")).context("run budget missing")?,
@@ -404,17 +469,33 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
         if required_string(&value, "split", &context)? != requested_split {
             bail!("{context} is not in requested split {requested_split}");
         }
-        if !matches!(required_string_at(&value, &["adjudication", "status"], &context)?, "adjudicated" | "unresolved" | "pending") {
+        if !matches!(
+            required_string_at(&value, &["adjudication", "status"], &context)?,
+            "adjudicated" | "unresolved" | "pending"
+        ) {
             bail!("{context} has invalid adjudication status");
         }
-        if !matches!(required_string_at(&value, &["adjudication", "label"], &context)?, "compatible" | "incompatible" | "partial" | "unknown") {
+        if !matches!(
+            required_string_at(&value, &["adjudication", "label"], &context)?,
+            "compatible" | "incompatible" | "partial" | "unknown"
+        ) {
             bail!("{context} has invalid adjudication label");
         }
-        if !matches!(required_string_at(&value, &["prediction", "decision"], &context)?, "accept" | "reject" | "abstain") {
+        if !matches!(
+            required_string_at(&value, &["prediction", "decision"], &context)?,
+            "accept" | "reject" | "abstain"
+        ) {
             bail!("{context} has invalid decision");
         }
-        validate_probability(value.get("prediction").and_then(|p| p.get("compatibility_probability")), &context)?;
-        validate_digest(required_string_at(&value, &["source", "source_commit"], &context)?, 40, &format!("{context}.source.source_commit"))?;
+        validate_probability(
+            value.get("prediction").and_then(|p| p.get("compatibility_probability")),
+            &context,
+        )?;
+        validate_digest(
+            required_string_at(&value, &["source", "source_commit"], &context)?,
+            40,
+            &format!("{context}.source.source_commit"),
+        )?;
         for (path, name) in [
             (&["source", "artifact_sha256"][..], "source.artifact_sha256"),
             (&["source", "insight_sha256"][..], "source.insight_sha256"),
@@ -425,7 +506,11 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
             (&["adjudication", "receipt_sha256"][..], "adjudication.receipt_sha256"),
             (&["prediction", "receipt_sha256"][..], "prediction.receipt_sha256"),
         ] {
-            validate_digest(required_string_at(&value, path, &context)?, if name.ends_with("source_commit") {40} else {64}, &format!("{context}.{name}"))?;
+            validate_digest(
+                required_string_at(&value, path, &context)?,
+                if name.ends_with("source_commit") { 40 } else { 64 },
+                &format!("{context}.{name}"),
+            )?;
         }
         for name in ["record_id", "family_id"] {
             required_string_at(&value, &["source", name], &context)?;
@@ -444,7 +529,11 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
     Ok(outcomes)
 }
 
-fn join_pairs(pairs: &[Value], outcomes: &BTreeMap<String, Value>, requested_split: &str) -> Result<Vec<PairObservation>> {
+fn join_pairs(
+    pairs: &[Value],
+    outcomes: &BTreeMap<String, Value>,
+    requested_split: &str,
+) -> Result<Vec<PairObservation>> {
     let mut all_references = BTreeSet::new();
     let mut observations = Vec::new();
     let mut family_split = BTreeMap::<String, String>::new();
@@ -461,10 +550,15 @@ fn join_pairs(pairs: &[Value], outcomes: &BTreeMap<String, Value>, requested_spl
         let target = pair.get("target").context("target missing")?;
         let mutation = pair.get("mutation").context("mutation missing")?;
         let base_adj = pair.get("base_adjudication").context("base_adjudication missing")?;
-        let variant_adj = pair.get("counterfactual_adjudication").context("counterfactual_adjudication missing")?;
+        let variant_adj = pair
+            .get("counterfactual_adjudication")
+            .context("counterfactual_adjudication missing")?;
         let base_id = required_string(pair, "base_outcome_pair_id", &ctx)?.to_owned();
         let variant_id = required_string(pair, "counterfactual_outcome_pair_id", &ctx)?.to_owned();
-        if base_id == variant_id || !all_references.insert(base_id.clone()) || !all_references.insert(variant_id.clone()) {
+        if base_id == variant_id
+            || !all_references.insert(base_id.clone())
+            || !all_references.insert(variant_id.clone())
+        {
             bail!("{ctx} has duplicate outcome links");
         }
         let source_record = required_string(source, "record_id", &format!("{ctx}.source_insight"))?;
