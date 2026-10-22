@@ -1,0 +1,212 @@
+{
+  "protocol_version": "1.0.0",
+  "status": "protocol_only_not_executed",
+  "repository": "Luminous-Dynamics/symthaea",
+  "benchmark_plan": "external_runtime_assurance",
+  "revision_pinning": {
+    "required": true,
+    "fields": [
+      "benchmark_repository_url",
+      "benchmark_git_commit",
+      "environment_config_digest",
+      "dependency_lock_digest",
+      "simulator_version",
+      "control_frequency_hz",
+      "physics_step_hz",
+      "policy_revision",
+      "rust_toolchain",
+      "hardware_and_os"
+    ],
+    "fail_closed_if_missing": true
+  },
+  "task_families": [
+    {
+      "id": "safe_control_gym_cartpole",
+      "phase": 1,
+      "environment_family": "CartPole",
+      "adapter_required": true,
+      "native_units_preserved": true
+    },
+    {
+      "id": "safe_control_gym_quadrotor",
+      "phase": 1,
+      "environment_family": "Quadrotor",
+      "adapter_required": true,
+      "native_units_preserved": true
+    },
+    {
+      "id": "safety_gymnasium_navigation_or_manipulation",
+      "phase": 2,
+      "environment_family": "Safety-Gymnasium",
+      "adapter_required": true,
+      "run_only_after_phase_1_reproduction": true
+    }
+  ],
+  "seed_partitions": {
+    "nominal_calibration": {
+      "first": 100000,
+      "last": 100999,
+      "count": 1000,
+      "usage": "monitor threshold only"
+    },
+    "nominal_test": {
+      "first": 200000,
+      "last": 200299,
+      "count": 300
+    },
+    "within_envelope": {
+      "first": 300000,
+      "last": 300299,
+      "count": 300
+    },
+    "dynamics_parameter_shift": {
+      "first": 400000,
+      "last": 400299,
+      "count": 300
+    },
+    "observation_actuator_shift": {
+      "first": 500000,
+      "last": 500299,
+      "count": 300
+    },
+    "compound_shift": {
+      "first": 600000,
+      "last": 600299,
+      "count": 300
+    },
+    "stealth_score_negative_control": {
+      "first": 700000,
+      "last": 700299,
+      "count": 300
+    },
+    "overlap_forbidden": true,
+    "paired_exogenous_disturbance_tapes": true
+  },
+  "policies": [
+    {
+      "id": "B0",
+      "name": "task_native_reference",
+      "deployable_baseline": true
+    },
+    {
+      "id": "B1",
+      "name": "unshielded_reference",
+      "deployable_baseline": false,
+      "role": "utility_and_failure_reference"
+    },
+    {
+      "id": "B2",
+      "name": "point_prediction_shield",
+      "deployable_baseline": true
+    },
+    {
+      "id": "B3",
+      "name": "global_interval_shield",
+      "deployable_baseline": true
+    },
+    {
+      "id": "B4",
+      "name": "state_action_conditioned_shield",
+      "deployable_baseline": true
+    },
+    {
+      "id": "B5",
+      "name": "always_reachability",
+      "deployable_baseline": true
+    },
+    {
+      "id": "B6",
+      "name": "score_triggered_predictive_reachability_switch",
+      "deployable_baseline": true
+    },
+    {
+      "id": "B7",
+      "name": "residual_aware_monitor_with_reachability_fallback",
+      "deployable_baseline": true,
+      "status": "proposed_not_implemented"
+    },
+    {
+      "id": "O0",
+      "name": "evaluator_oracle",
+      "deployable_baseline": false,
+      "role": "diagnostic_upper_bound"
+    }
+  ],
+  "conditions": [
+    {
+      "id": "nominal",
+      "envelope_relation": "inside_predictive",
+      "monitor_score_source": "observed_nominal"
+    },
+    {
+      "id": "within_envelope",
+      "envelope_relation": "inside_declared",
+      "monitor_score_source": "observed"
+    },
+    {
+      "id": "dynamics_parameter_shift",
+      "envelope_relation": "outside_predictive",
+      "monitor_score_source": "observed"
+    },
+    {
+      "id": "observation_actuator_shift",
+      "envelope_relation": "may_be_outside_predictive",
+      "monitor_score_source": "observed"
+    },
+    {
+      "id": "compound_shift",
+      "envelope_relation": "must_be_measured",
+      "monitor_score_source": "observed"
+    },
+    {
+      "id": "stealth_score_negative_control",
+      "envelope_relation": "outside_predictive_inside_fallback_if_constructed",
+      "monitor_score_source": "paired_nominal_score"
+    }
+  ],
+  "required_metrics": [
+    "episode_violation_rate",
+    "one_sided_95_percent_violation_upper_bound",
+    "normalized_violation_magnitude",
+    "integrated_normalized_violation_exposure",
+    "maximum_constraint_excursion",
+    "time_to_first_violation",
+    "false_certificate_count_and_rate",
+    "predictive_and_fallback_envelope_membership_rates",
+    "reward_and_task_success",
+    "safe_action_availability",
+    "false_veto_rate_among_oracle_safe_actions",
+    "no_certified_action_rate",
+    "monitor_false_alarm_rate",
+    "shift_miss_rate",
+    "time_to_alarm",
+    "p50_p95_p99_decision_latency",
+    "search_work_and_budget_exhaustion",
+    "calibration_test_provenance",
+    "raw_trace_and_output_digests"
+  ],
+  "mandatory_gates": [
+    "invalid_input_or_missing_calibration_is_uncertified",
+    "budget_exhaustion_is_uncertified",
+    "empty_fallback_never_reverts_to_predictive_policy",
+    "horizon_1_parity_with_one_step_evaluator",
+    "viable_action_sets_are_nested_as_horizon_grows",
+    "independent_actual_plant_evaluation",
+    "disjoint_calibration_tuning_and_test_seeds",
+    "independent_metrics_recomputation_from_raw_traces"
+  ],
+  "proposed_targets_not_results": {
+    "in_envelope_false_certificates": 0,
+    "false_veto_reduction_vs_global_margin_fraction": 0.2,
+    "nominal_return_loss_fraction_max": 0.05,
+    "note": "Targets are hypotheses and must be reported with denominators, confidence intervals, and per-condition results."
+  },
+  "references": [
+    "https://github.com/learnsyslab/safe-control-gym",
+    "https://safety-gymnasium.readthedocs.io/en/latest/",
+    "https://proceedings.mlr.press/v283/contreras25a.html",
+    "https://proceedings.mlr.press/v331/srinivasan26a.html",
+    "https://arxiv.org/abs/2609.15315",
+    "https://github.com/lindsayspoor/SafeRLEval"
+  ]
+}
