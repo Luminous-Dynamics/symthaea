@@ -243,6 +243,25 @@ fn test_urgency_consecutive_low_error_resets_on_high_error() {
 }
 
 #[test]
+fn invalid_prediction_error_does_not_advance_low_error_or_history() {
+    let mut service = make_service();
+    let threshold = service.config.learning_threshold;
+    service.carryover.urgency.consecutive_low_error = 3;
+
+    let result = service.compute_urgency_and_error_pattern(0.0, false, false, threshold);
+
+    assert_eq!(
+        service.carryover.urgency.consecutive_low_error, 0,
+        "missing prediction evidence must break, not advance, a low-error streak"
+    );
+    assert!(
+        service.carryover.history.error_history.is_empty(),
+        "missing PE must not enter the measured-error history"
+    );
+    assert_eq!(result.error_pattern, "Warmup");
+}
+
+#[test]
 fn test_urgency_mode_transition_increments_stat() {
     let mut service =
         CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
