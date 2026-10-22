@@ -5,7 +5,9 @@
 //! The input trace is reused verbatim so pointwise, CUSUM and e-process results
 //! can be compared at identical episode/state/step coordinates.
 
-use allostatic_control_bench::bounded_risk_eprocess::MixtureBoundedRiskEProcess;
+use allostatic_control_bench::bounded_risk_eprocess::{
+    BoundedRiskEProcess, MixtureBoundedRiskEProcess,
+};
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
@@ -17,10 +19,12 @@ const RISK_BOUND: f64 = 0.15;
 const GLOBAL_DELTA: f64 = 0.05;
 const PARALLEL_MONITORS: usize = 5;
 const BET_FRACTIONS: [f64; 3] = [0.25, 0.5, 0.75];
+const FIXED_BET_FRACTION: f64 = 0.5;
+const FIXED_BET: f64 = FIXED_BET_FRACTION / RISK_BOUND;
 
 const INPUT_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,ground_truth_outside_predictor_envelope,all_episode_scores_below_pointwise_threshold";
-const RAW_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,ground_truth_outside_predictor_envelope,all_episode_scores_below_pointwise_threshold,bounded_risk_loss,log_e_value,eprocess_latched_alarm,first_eprocess_alarm_step,log_e_alarm_threshold,risk_bound,bet_fraction_1,bet_fraction_2,bet_fraction_3,component_log_e_1,component_log_e_2,component_log_e_3";
-const SUMMARY_HEADER: &str = "operating_point,condition,episodes,eprocess_alarms,eprocess_false_alarms,eprocess_missed_shifts,mean_detection_step,p95_detection_step,median_detection_step,episodes_all_scores_below_pointwise,eprocess_caught_below_pointwise,mean_final_log_e,max_final_log_e,log_alarm_threshold,risk_bound,bet_fraction_1,bet_fraction_2,bet_fraction_3,global_delta";
+const RAW_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,ground_truth_outside_predictor_envelope,all_episode_scores_below_pointwise_threshold,bounded_risk_loss,log_e_value,eprocess_latched_alarm,first_eprocess_alarm_step,log_e_alarm_threshold,risk_bound,bet_fraction_1,bet_fraction_2,bet_fraction_3,component_log_e_1,component_log_e_2,component_log_e_3,fixed_log_e_value,fixed_eprocess_latched_alarm,fixed_first_alarm_step";
+const SUMMARY_HEADER: &str = "operating_point,condition,episodes,eprocess_alarms,eprocess_false_alarms,eprocess_missed_shifts,mean_detection_step,p95_detection_step,median_detection_step,episodes_all_scores_below_pointwise,eprocess_caught_below_pointwise,mean_final_log_e,max_final_log_e,log_alarm_threshold,risk_bound,bet_fraction_1,bet_fraction_2,bet_fraction_3,global_delta,fixed_alarms,fixed_false_alarms,fixed_missed_shifts,fixed_mean_detection_step,fixed_p95_detection_step,fixed_median_detection_step,fixed_caught_below_pointwise,fixed_mean_final_log_e,fixed_max_final_log_e";
 
 #[derive(Clone, Debug)]
 struct InputRow {
@@ -88,6 +92,12 @@ struct CellSummary {
     all_below_episodes: usize,
     caught_below_episodes: usize,
     final_log_values: Vec<f64>,
+    fixed_alarms: usize,
+    fixed_false_alarms: usize,
+    fixed_missed_shifts: usize,
+    fixed_detection_steps: Vec<usize>,
+    fixed_caught_below_episodes: usize,
+    fixed_final_log_values: Vec<f64>,
 }
 
 impl CellSummary {
@@ -97,8 +107,11 @@ impl CellSummary {
         first_alarm_step: usize,
         all_scores_below_pointwise: bool,
         final_log_e_value: f64,
+        fixed_first_alarm_step: usize,
+        fixed_final_log_e_value: f64,
     ) {
         let detected = first_alarm_step < HORIZON;
+        let fixed_detected = fixed_first_alarm_step < HORIZON;
         let shifted = condition != "nominal";
         self.episodes += 1;
         self.alarms += usize::from(detected);
@@ -111,6 +124,15 @@ impl CellSummary {
         self.caught_below_episodes +=
             usize::from(all_scores_below_pointwise && detected);
         self.final_log_values.push(final_log_e_value);
+        self.fixed_alarms += usize::from(fixed_detected);
+        self.fixed_false_alarms += usize::from(!shifted && fixed_detected);
+        self.fixed_missed_shifts += usize::from(shifted && !fixed_detected);
+        if fixed_detected {
+            self.fixed_detection_steps.push(fixed_first_alarm_step);
+        }
+        self.fixed_caught_below_episodes +=
+            usize::from(all_scores_below_pointwise && fixed_detected);
+        self.fixed_final_log_values.push(fixed_final_log_e_value);
     }
 }
 
@@ -180,6 +202,21 @@ fn summary_row(
         format!("{:.9}", BET_FRACTIONS[1]),
         format!("{:.9}", BET_FRACTIONS[2]),
         format!("{GLOBAL_DELTA:.9}"),
+        summary.fixed_alarms.to_string(),
+        summary.fixed_false_alarms.to_string(),
+        summary.fixed_missed_shifts.to_string(),
+        optional_float(mean(
+            &summary
+                .fixed_detection_steps
+                .iter()
+                .map(|step| *step as f64)
+                .collect::<Vec<_>>(),
+        )),
+        optional_number(percentile(&summary.fixed_detection_steps, 95)),
+        optional_number(percentile(&summary.fixed_detection_steps, 50)),
+        summary.fixed_caught_below_episodes.to_string(),
+        optional_float(mean(&summary.fixed_final_log_values)),
+        optional_float(summary.fixed_final_log_values.iter().copied().reduce(f64::max)),
     ];
     output.push_str(&fields.join(","));
     output.push('\n');
@@ -205,8 +242,16 @@ fn process_episode(
         GLOBAL_DELTA,
         PARALLEL_MONITORS,
     )
-    .ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "invalid e-process configuration"))?;
+    .ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "invalid mixture e-process config"))?;
+    let mut fixed_monitor = BoundedRiskEProcess::new(
+        RISK_BOUND,
+        FIXED_BET,
+        GLOBAL_DELTA,
+        PARALLEL_MONITORS,
+    )
+    .ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "invalid fixed e-process config"))?;
     let mut first_alarm_step = HORIZON;
+    let mut fixed_first_alarm_step = HORIZON;
     let mut episode_rows = Vec::with_capacity(HORIZON);
     let mut all_scores_below_pointwise = true;
 
@@ -229,10 +274,16 @@ fn process_episode(
 
         let bounded_loss = (row.residual_score / CALIBRATED_RESIDUAL_SCALE).clamp(0.0, 1.0);
         let alarm = monitor.observe(bounded_loss).ok_or_else(|| {
-            IoError::new(ErrorKind::InvalidData, "e-process rejected valid bounded loss")
+            IoError::new(ErrorKind::InvalidData, "mixture e-process rejected valid bounded loss")
+        })?;
+        let fixed_alarm = fixed_monitor.observe(bounded_loss).ok_or_else(|| {
+            IoError::new(ErrorKind::InvalidData, "fixed e-process rejected valid bounded loss")
         })?;
         if alarm && first_alarm_step == HORIZON {
             first_alarm_step = expected_step;
+        }
+        if fixed_alarm && fixed_first_alarm_step == HORIZON {
+            fixed_first_alarm_step = expected_step;
         }
         all_scores_below_pointwise &= row.residual_score <= row.pointwise_threshold;
         episode_rows.push((
@@ -241,6 +292,8 @@ fn process_episode(
             monitor.log_e_value(),
             monitor.component_log_e_values(),
             alarm,
+            fixed_monitor.log_e_value(),
+            fixed_alarm,
         ));
     }
 
@@ -255,7 +308,16 @@ fn process_episode(
         .into());
     }
 
-    for (row, bounded_loss, log_e_value, component_logs, alarm) in &episode_rows {
+    for (
+        row,
+        bounded_loss,
+        log_e_value,
+        component_logs,
+        alarm,
+        fixed_log_e_value,
+        fixed_alarm,
+    ) in &episode_rows
+    {
         let mut fields = row.fields.clone();
         fields.push(format!("{bounded_loss:.9}"));
         fields.push(format!("{log_e_value:.9}"));
@@ -269,6 +331,9 @@ fn process_episode(
         for component_log in component_logs {
             fields.push(format!("{component_log:.9}"));
         }
+        fields.push(format!("{fixed_log_e_value:.9}"));
+        fields.push(if *fixed_alarm { "true" } else { "false" }.to_string());
+        fields.push(fixed_first_alarm_step.to_string());
         raw_output.push_str(&fields.join(","));
         raw_output.push('\n');
     }
@@ -281,6 +346,8 @@ fn process_episode(
         first_alarm_step,
         all_scores_below_pointwise,
         monitor.log_e_value(),
+        fixed_first_alarm_step,
+        fixed_monitor.log_e_value(),
     );
     Ok(())
 }
