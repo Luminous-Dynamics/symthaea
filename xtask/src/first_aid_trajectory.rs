@@ -225,12 +225,11 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
     let state_model_spec = fs::read(root.join("docs/research/first-aid/STATE_MODEL_V0.md"))
         .context("read state model specification for receipt identity")?;
     let state_model_spec_digest = sha256_hex(&state_model_spec);
-    let model_production_edge_comparison_count = std::env::var(
-        "MODEL_PRODUCTION_EDGE_COMPARISON_COUNT",
-    )
-    .ok()
-    .and_then(|value| value.parse::<usize>().ok())
-    .unwrap_or(0);
+    let model_production_edge_comparison_count =
+        std::env::var("MODEL_PRODUCTION_EDGE_COMPARISON_COUNT")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(0);
     let policy_truth_table_comparison_count =
         std::env::var("POLICY_TRUTH_TABLE_CASE_COMPARISON_COUNT")
             .ok()
