@@ -36,6 +36,102 @@
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
+/// Stable semantic intent contract for the first eight thought channels.
+///
+/// Keep channel indices, decoder labels, and HDC seed names tied to this type.
+/// The legacy index-based constructor remains available for existing callers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IntentChannel {
+    Acknowledge,
+    Answer,
+    Clarify,
+    Propose,
+    Uncertainty,
+    Reflect,
+    Continue,
+    Unknown,
+}
+
+impl IntentChannel {
+    pub const ALL: [Self; 8] = [
+        Self::Acknowledge,
+        Self::Answer,
+        Self::Clarify,
+        Self::Propose,
+        Self::Uncertainty,
+        Self::Reflect,
+        Self::Continue,
+        Self::Unknown,
+    ];
+
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Acknowledge => 0,
+            Self::Answer => 1,
+            Self::Clarify => 2,
+            Self::Propose => 3,
+            Self::Uncertainty => 4,
+            Self::Reflect => 5,
+            Self::Continue => 6,
+            Self::Unknown => 7,
+        }
+    }
+
+    pub const fn from_index(index: usize) -> Self {
+        match index {
+            0 => Self::Acknowledge,
+            1 => Self::Answer,
+            2 => Self::Clarify,
+            3 => Self::Propose,
+            4 => Self::Uncertainty,
+            5 => Self::Reflect,
+            6 => Self::Continue,
+            _ => Self::Unknown,
+        }
+    }
+
+    pub fn from_name(name: &str) -> Self {
+        match name {
+            "acknowledge" => Self::Acknowledge,
+            "answer" => Self::Answer,
+            "clarify" => Self::Clarify,
+            "propose" => Self::Propose,
+            "uncertainty" => Self::Uncertainty,
+            "reflect" => Self::Reflect,
+            "continue" => Self::Continue,
+            _ => Self::Unknown,
+        }
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Acknowledge => "acknowledge",
+            Self::Answer => "answer",
+            Self::Clarify => "clarify",
+            Self::Propose => "propose",
+            Self::Uncertainty => "uncertainty",
+            Self::Reflect => "reflect",
+            Self::Continue => "continue",
+            Self::Unknown => "unknown",
+        }
+    }
+
+    /// Preserve the existing HDC seed namespace so old encodings/checkpoints
+    /// are not silently changed by the typed-intent refactor.
+    pub const fn channel_name(self) -> &'static str {
+        match self {
+            Self::Acknowledge => "intent_acknowledge",
+            Self::Answer => "intent_answer",
+            Self::Clarify => "intent_clarify",
+            Self::Propose => "intent_propose",
+            Self::Uncertainty => "intent_uncertainty",
+            Self::Reflect => "intent_reflect",
+            Self::Continue => "intent_continue",
+            Self::Unknown => "intent_unknown",
+        }
+    }
+}
+
 /// Number of thought channels.
 #[cfg(not(feature = "therapeutic"))]
 pub const NUM_CHANNELS: usize = 43;
@@ -63,14 +159,14 @@ const DEFAULT_NUM_LEVELS: usize = 32;
 /// Channel names for genesis seeding.
 #[cfg(not(feature = "therapeutic"))]
 const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
-    "intent_acknowledge",  // 0
-    "intent_answer",       // 1
-    "intent_clarify",      // 2
-    "intent_propose",      // 3
-    "intent_uncertainty",  // 4
-    "intent_reflect",      // 5
-    "intent_continue",     // 6
-    "intent_unknown",      // 7
+    IntentChannel::Acknowledge.channel_name(), // 0
+    IntentChannel::Answer.channel_name(),      // 1
+    IntentChannel::Clarify.channel_name(),     // 2
+    IntentChannel::Propose.channel_name(),     // 3
+    IntentChannel::Uncertainty.channel_name(), // 4
+    IntentChannel::Reflect.channel_name(),     // 5
+    IntentChannel::Continue.channel_name(),    // 6
+    IntentChannel::Unknown.channel_name(),     // 7
     "epistemic_status",    // 8
     "valence",             // 9
     "arousal",             // 10
@@ -114,14 +210,14 @@ const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
 /// Channel names for genesis seeding (therapeutic variant with 4 extra channels).
 #[cfg(feature = "therapeutic")]
 const CHANNEL_NAMES: [&str; NUM_CHANNELS] = [
-    "intent_acknowledge",  // 0
-    "intent_answer",       // 1
-    "intent_clarify",      // 2
-    "intent_propose",      // 3
-    "intent_uncertainty",  // 4
-    "intent_reflect",      // 5
-    "intent_continue",     // 6
-    "intent_unknown",      // 7
+    IntentChannel::Acknowledge.channel_name(), // 0
+    IntentChannel::Answer.channel_name(),      // 1
+    IntentChannel::Clarify.channel_name(),     // 2
+    IntentChannel::Propose.channel_name(),     // 3
+    IntentChannel::Uncertainty.channel_name(), // 4
+    IntentChannel::Reflect.channel_name(),     // 5
+    IntentChannel::Continue.channel_name(),    // 6
+    IntentChannel::Unknown.channel_name(),     // 7
     "epistemic_status",    // 8
     "valence",             // 9
     "arousal",             // 10
@@ -433,17 +529,60 @@ impl ThoughtChannels {
     }
 
     /// Create channels with a specific semantic intent one-hot.
+    ///
+    /// Kept for compatibility with older data and index-based callers.
     pub fn with_intent(intent_index: usize) -> Self {
+        let intent = IntentChannel::from_index(intent_index);
+        if intent_index < 8 {
+            Self::with_semantic_intent(intent)
+        } else {
+            let mut channels = Self::default();
+            for i in 0..8 {
+                channels.channels[i] = 0.0;
+            }
+            channels
+        }
+    }
+
+    /// Create channels using the typed intent contract.
+    pub fn with_semantic_intent(intent: IntentChannel) -> Self {
         let mut channels = Self::default();
-        // Clear all intent channels
         for i in 0..8 {
             channels.channels[i] = 0.0;
         }
-        // Set the active intent
-        if intent_index < 8 {
-            channels.channels[intent_index] = 1.0;
-        }
+        channels.channels[intent.index()] = 1.0;
         channels
+    }
+
+    /// Return the dominant intent channel, failing closed on missing,
+    /// non-positive, non-finite, or tied intent evidence.
+    ///
+    /// Intent is specified as one-hot. Silently choosing between tied channels
+    /// would turn malformed input into a confident but arbitrary semantic act.
+    pub fn semantic_intent(&self) -> IntentChannel {
+        let mut best_value = f32::NEG_INFINITY;
+        let mut best_index = None;
+        let mut tied_for_best = false;
+
+        for (index, value) in self.channels.iter().take(8).enumerate() {
+            if !value.is_finite() {
+                continue;
+            }
+            if *value > best_value {
+                best_value = *value;
+                best_index = Some(index);
+                tied_for_best = false;
+            } else if *value == best_value {
+                tied_for_best = true;
+            }
+        }
+
+        match best_index {
+            Some(index) if best_value > 0.0 && !tied_for_best => {
+                IntentChannel::from_index(index)
+            }
+            _ => IntentChannel::Unknown,
+        }
     }
 
     /// Set epistemic status (0=Certain, 1=Probable, 2=Uncertain, 3=Unknown, 4=OutOfDomain).
@@ -963,6 +1102,56 @@ mod tests {
             "Different intents should produce dissimilar HVs: sim={sim}"
         );
         assert!(sim > 0.0, "Should share structure: sim={sim}");
+    }
+
+    #[test]
+    fn typed_intent_contract_round_trips_all_channels() {
+        for intent in IntentChannel::ALL {
+            assert_eq!(IntentChannel::from_index(intent.index()), intent);
+            assert_eq!(IntentChannel::from_name(intent.as_str()), intent);
+            assert_eq!(CHANNEL_NAMES[intent.index()], intent.channel_name());
+
+            let channels = ThoughtChannels::with_semantic_intent(intent);
+            assert_eq!(channels.semantic_intent(), intent);
+            assert_eq!(channels.channels[intent.index()], 1.0);
+        }
+    }
+
+    #[test]
+    fn semantic_intent_is_invariant_under_non_intent_channel_perturbations() {
+        for intent in IntentChannel::ALL {
+            let mut channels = ThoughtChannels::with_semantic_intent(intent);
+            channels.set_epistemic(4.0);
+            channels.set_emotion(-1.0, 1.0, 0.0);
+            channels.set_consciousness(0.0, 1.0, 0.0);
+            channels.set_context(1.0, 0.0, 1.0, 0.0);
+            channels.set_code(1.0, 0.0, 1.0, 1.0);
+            channels.set_epistemic_cube(4, 3, 3, 1.0, 1.0);
+
+            assert_eq!(
+                channels.semantic_intent(),
+                intent,
+                "non-intent feature changes must not alter intent {intent:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn ambiguous_or_missing_intent_fails_closed_to_unknown() {
+        let mut channels = ThoughtChannels::default();
+        for channel in channels.channels.iter_mut().take(8) {
+            *channel = 0.0;
+        }
+        assert_eq!(channels.semantic_intent(), IntentChannel::Unknown);
+
+        channels.channels[0] = 0.8;
+        channels.channels[1] = 0.8;
+        assert_eq!(channels.semantic_intent(), IntentChannel::Unknown);
+
+        for channel in channels.channels.iter_mut().take(8) {
+            *channel = f32::NAN;
+        }
+        assert_eq!(channels.semantic_intent(), IntentChannel::Unknown);
     }
 
     #[test]
