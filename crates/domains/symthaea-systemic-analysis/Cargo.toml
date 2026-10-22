@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-systemic-analysis"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Systemic-analysis authority state and qualification primitives with explicit uncertainty boundaries."
+
+# First tranche is deliberately pure-std and zero-dependency. It defines
+# authority state only; graph, causal, futures, and Mycelix bridges follow later.
+[dependencies]
