@@ -383,7 +383,8 @@
         "error",
         "skipped",
         "missing",
-        "duplicate_ids"
+        "duplicate_ids",
+        "critical_invariant_failures"
       ],
       "properties": {
         "expected": {
