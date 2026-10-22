@@ -783,8 +783,14 @@ impl EnhancedKnowledgeGraph {
                 .evidence_links
                 .iter()
                 .find(|link| {
-                    link.from_fact_id == alert.existing_fact_id
-                        && link.to_fact_id == alert.new_fact_id
+                    let same_direction = link.from_fact_id == alert.existing_fact_id
+                        && link.to_fact_id == alert.new_fact_id;
+                    // Contradicts is symmetric: adjudication may be recorded from
+                    // either witness toward the other, but resolution must still apply
+                    // to the confidence ordering carried by this alert.
+                    let reverse_direction = link.from_fact_id == alert.new_fact_id
+                        && link.to_fact_id == alert.existing_fact_id;
+                    (same_direction || reverse_direction)
                         && link.relation == EvidenceRelation::Contradicts
                         && link.status == EvidenceLinkStatus::Adjudicated
                         && !link.evidence_ids.is_empty()
@@ -1550,11 +1556,18 @@ mod tests {
         assert_eq!(graph.resolve_contradictions(&candidates), 0);
         assert_eq!(graph.get_fact(negative_id).unwrap().confidence, 0.6);
 
+        // Contradiction is symmetric, so deliberately adjudicate from the
+        // newly inserted negative claim back toward the existing positive claim.
         graph
-            .adjudicate_contradiction(
-                &candidates[0],
+            .adjudicate_evidence_relation(
+                negative_id,
+                positive_id,
+                EvidenceRelation::Contradicts,
                 vec!["evidence-a".into(), "evidence-b".into()],
                 "Both source claims address the same scoped proposition with opposite polarity".into(),
+                None,
+                None,
+                3,
             )
             .unwrap();
         assert_eq!(graph.resolve_contradictions(&candidates), 1);
