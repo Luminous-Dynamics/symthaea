@@ -419,7 +419,11 @@ impl RegistryState {
         if expected_generation != record.generation {
             return Err("stale_generation");
         }
-        if generation != record.generation.saturating_add(1) {
+        let next_generation = record
+            .generation
+            .checked_add(1)
+            .ok_or("generation_exhausted")?;
+        if generation != next_generation {
             return Err("generation_not_next");
         }
 
@@ -801,7 +805,7 @@ fn main() -> BenchResult<()> {
                 state_digest
             ));
             println!(
-                "{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+                "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
                 case.id,
                 index + 1,
                 event.event_id,
@@ -976,6 +980,56 @@ mod tests {
         assert_eq!(record.generation, 3);
         assert_eq!(record.vector_digest, "vec-D1");
         assert!(record.history.contains("vec-D2"));
+    }
+
+    #[test]
+    fn length_prefixed_event_encoding_has_no_delimiter_boundary_collision() {
+        let left = enroll(
+            1,
+            "event-a",
+            Authority::Enroller,
+            "identity|split",
+            "digest",
+            1,
+        );
+        let right = enroll(
+            1,
+            "event-a",
+            Authority::Enroller,
+            "identity",
+            "split|digest",
+            1,
+        );
+        assert_ne!(left.canonical(), right.canonical());
+    }
+
+    #[test]
+    fn generation_overflow_fails_closed_in_replace_revoke_and_rollback() {
+        let mut state = RegistryState::default();
+        let mut history = BTreeSet::new();
+        history.insert("digest-max".to_owned());
+        state.records.insert(
+            "maxed".to_owned(),
+            IdentityRecord {
+                generation: u64::MAX,
+                vector_digest: "digest-max".to_owned(),
+                status: RecordStatus::Active,
+                history,
+                revocation_floor: 0,
+            },
+        );
+        assert_eq!(
+            state.replace("maxed", u64::MAX, u64::MAX, "digest-next", Authority::Registrar),
+            Err("generation_exhausted")
+        );
+        assert_eq!(
+            state.revoke("maxed", u64::MAX, u64::MAX, Authority::Revoker),
+            Err("generation_exhausted")
+        );
+        assert_eq!(
+            state.rollback("maxed", u64::MAX, "digest-max", Authority::Recovery),
+            Err("generation_exhausted")
+        );
     }
 
     #[test]
