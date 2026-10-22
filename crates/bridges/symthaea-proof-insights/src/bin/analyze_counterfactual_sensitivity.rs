@@ -1680,13 +1680,14 @@ fn validate_run_budgets(row: &Value, context: &str) -> Result<()> {
         let cap = budget.get(limit).and_then(Value::as_u64).with_context(|| {
             format!("{context}.run.budget.{limit} must be non-negative integer")
         })?;
-        if let Some(actual_value) = run.get(actual) {
-            let amount = actual_value
-                .as_u64()
-                .with_context(|| format!("{context}.run.{actual} must be non-negative integer"))?;
-            if amount > cap {
-                bail!("{context}.run.{actual} exceeds {limit}");
-            }
+        let amount = run
+            .get(actual)
+            .and_then(Value::as_u64)
+            .with_context(|| {
+                format!("{context}.run.{actual} is required as a non-negative integer")
+            })?;
+        if amount > cap {
+            bail!("{context}.run.{actual} exceeds {limit}");
         }
     }
     Ok(())
@@ -1863,6 +1864,30 @@ impl SplitMix64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[test]
+    fn budget_gate_rejects_missing_actual_usage() {
+        let row = json!({
+            "run": {
+                "budget": {
+                    "max_model_calls": 4,
+                    "max_tokens": 1000,
+                    "max_wall_ms": 5000,
+                    "max_cost_microusd": 1000
+                },
+                "actual_model_calls": 1,
+                "actual_wall_ms": 10,
+                "actual_cost_microusd": 20
+            }
+        });
+        assert!(validate_run_budgets(&row, "missing actual_tokens").is_err());
+        let mut complete = row;
+        complete["run"]["actual_tokens"] = json!(200);
+        assert!(validate_run_budgets(&complete, "complete usage").is_ok());
+        complete["run"]["actual_tokens"] = json!(1001);
+        assert!(validate_run_budgets(&complete, "over-budget usage").is_err());
+    }
 
     #[test]
     fn paired_metrics_require_both_sides_to_be_correct() {
