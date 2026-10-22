@@ -321,7 +321,10 @@ fn expected_information_gain_with_steps<H, E>(
 
 /// Normalize finite non-negative prior masses. At least two hypotheses must retain
 /// positive mass so the result measures discrimination rather than a degenerate prior.
-fn normalized_prior_probabilities(prior_weights: &[f64], hypothesis_count: usize) -> Option<Vec<f64>> {
+fn normalized_prior_probabilities(
+    prior_weights: &[f64],
+    hypothesis_count: usize,
+) -> Option<Vec<f64>> {
     if hypothesis_count < 2
         || prior_weights.len() != hypothesis_count
         || prior_weights
@@ -870,7 +873,9 @@ pub fn expected_information_gain_weighted_over_scenarios_nats<H, E>(
     if scenarios.is_empty()
         || scenarios
             .iter()
-            .any(|scenario| !scenario.observation_std_dev.is_finite() || scenario.observation_std_dev <= 0.0)
+            .any(|scenario| {
+                !scenario.observation_std_dev.is_finite() || scenario.observation_std_dev <= 0.0
+            })
     {
         return None;
     }
@@ -909,7 +914,9 @@ pub fn select_experiment_by_weighted_scenario_robust_information_gain_per_cost<'
     if scenarios.is_empty()
         || scenarios
             .iter()
-            .any(|scenario| !scenario.observation_std_dev.is_finite() || scenario.observation_std_dev <= 0.0)
+            .any(|scenario| {
+                !scenario.observation_std_dev.is_finite() || scenario.observation_std_dev <= 0.0
+            })
     {
         return None;
     }
