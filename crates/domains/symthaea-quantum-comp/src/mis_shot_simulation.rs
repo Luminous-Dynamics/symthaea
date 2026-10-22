@@ -301,12 +301,15 @@ pub fn simulate_mis_sampling_scenario(
                     }
                 }
                 MisShotBudgetDecision::Selected { vertex, total_shots, .. } => {
-                    if vertex >= candidate_count || total_shots != sum_shots(&adaptive_shots)? {
+                    if vertex >= candidate_count {
                         return Err(MisSamplingSimulationError::InvalidSelectedVertex { vertex });
+                    }
+                    if total_shots != sum_shots(&adaptive_shots)? {
+                        return Err(MisSamplingSimulationError::BudgetInvariantViolation);
                     }
                     break (
                         Some(vertex),
-                        Some(vertex == true_best_vertex),
+                        Some(scenario.inclusion_probabilities[vertex] == scenario.inclusion_probabilities[true_best_vertex]),
                         None,
                         total_shots,
                     );
@@ -347,7 +350,8 @@ pub fn simulate_mis_sampling_scenario(
             adaptive_shots_by_vertex: adaptive_shots,
             adaptive_successes_by_vertex: adaptive_successes,
             uniform_selected_vertex,
-            uniform_correct: uniform_selected_vertex == true_best_vertex,
+            uniform_correct: scenario.inclusion_probabilities[uniform_selected_vertex]
+                == scenario.inclusion_probabilities[true_best_vertex],
             uniform_total_shots,
             uniform_shots_by_vertex: uniform_shots,
             uniform_successes_by_vertex: uniform_successes,
@@ -538,6 +542,18 @@ mod tests {
         assert_eq!(aggregate.uniform_correct + aggregate.uniform_incorrect, aggregate.trial_count);
         assert!(aggregate.adaptive_mean_shots() <= default_config().max_total_shots as f64);
         assert!(aggregate.uniform_mean_shots() == default_config().max_total_shots as f64);
+    }
+
+    #[test]
+    fn every_equal_mean_candidate_counts_as_a_correct_best_arm() {
+        let scenario = MisSamplingScenario::new("exact-tie", vec![0.5, 0.5, 0.5])
+            .expect("valid tie scenario");
+        let trials = simulate_mis_sampling_scenario(&scenario, default_config(), 40, 2026)
+            .expect("simulation succeeds");
+        assert!(trials.iter().all(|trial| trial.uniform_correct));
+        assert!(trials.iter().all(|trial| {
+            trial.adaptive_selected_vertex.is_none() || trial.adaptive_correct == Some(true)
+        }));
     }
 
     #[test]
