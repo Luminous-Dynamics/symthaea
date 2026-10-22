@@ -69,8 +69,8 @@ pub struct PqcSessionKey {
     /// 32-byte session key derived from ML-KEM secret plus public challenge context.
     /// Suitable for ChaCha20-Poly1305; this field alone does not imply hybrid security.
     session_key: [u8; 32],
-    /// When the session was established (for expiration tracking).
-    established_at: std::time::SystemTime,
+    /// When the pending candidate was derived (not a session establishment time).
+    created_at: std::time::SystemTime,
 }
 
 impl PqcSessionKey {
@@ -79,9 +79,9 @@ impl PqcSessionKey {
         &self.session_key
     }
 
-    /// When the session was established.
-    pub fn established_at(&self) -> std::time::SystemTime {
-        self.established_at
+    /// When the pending candidate key was derived.
+    pub fn created_at(&self) -> std::time::SystemTime {
+        self.created_at
     }
 }
 
@@ -241,7 +241,7 @@ impl PqcHandshakeManager {
             peer_id.to_string(),
             PqcSessionKey {
                 session_key,
-                established_at: std::time::SystemTime::now(),
+                created_at: std::time::SystemTime::now(),
             },
         );
 
@@ -278,7 +278,7 @@ impl PqcHandshakeManager {
             peer_id.to_string(),
             PqcSessionKey {
                 session_key,
-                established_at: std::time::SystemTime::now(),
+                created_at: std::time::SystemTime::now(),
             },
         );
 
