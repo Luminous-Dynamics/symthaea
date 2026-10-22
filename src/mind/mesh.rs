@@ -21,7 +21,7 @@ pub(super) const MESH_MAX_FUTURE_SKEW_S: u32 = 5;
 #[cfg(feature = "mesh")]
 pub(super) const MESH_SEQUENCE_WINDOW_WIDTH: u32 = 64;
 
-/// Bound authenticated replay tracking to 512 sources × 9 current payload types.
+/// Bound memory used by authenticated replay windows to 4,608 streams.
 #[cfg(feature = "mesh")]
 pub(super) const MESH_REPLAY_STREAM_CAPACITY: usize = 4_608;
 
