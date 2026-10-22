@@ -833,8 +833,8 @@ mod tests {
             },
             PairObservation {
                 component_id: "c3".into(), mutation_kind: "no_semantic_change".into(),
-                base_compatible: true, base_accept: true,
-                variant_compatible: true, variant_accept: false, noop: true,
+                base_compatible: true, base_accept: true, base_decision: "accept".into(),
+                variant_compatible: true, variant_accept: false, variant_decision: "reject".into(), noop: true,
                 base_probability: Some(0.8), variant_probability: Some(0.4),
             },
         ];
@@ -860,6 +860,25 @@ mod tests {
         assert_eq!(counts.metrics()["counterfactual_incompatible_sensitivity"].2, Some(1.0));
         assert_eq!(counts.metrics()["base_compatible_accept_recall"].2, Some(0.0));
         assert_eq!(counts.metrics()["paired_contract_adherence"].2, Some(0.0));
+    }
+
+    #[test]
+    fn reject_and_abstain_are_not_the_same_noop_decision() {
+        let changed_action = PairObservation {
+            component_id: "noop-component".into(),
+            mutation_kind: "no_semantic_change".into(),
+            base_compatible: true,
+            base_accept: false,
+            base_decision: "reject".into(),
+            variant_compatible: true,
+            variant_accept: false,
+            variant_decision: "abstain".into(),
+            noop: true,
+            base_probability: Some(0.2),
+            variant_probability: Some(0.3),
+        };
+        let metrics = aggregate(&[changed_action]).metrics();
+        assert_eq!(metrics["semantics_preserving_decision_stability"].2, Some(0.0));
     }
 
     #[test]
