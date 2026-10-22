@@ -66,6 +66,14 @@ Compare all policies on the same worlds, admissible actions, query and monetary/
 
 This design makes the comparison falsifiable: if the robust selector only reduces useful information in matched worlds without reducing false certainty under misspecification, it should not be promoted as the default.
 
+## Prior-uncertainty envelope (incremental extension)
+
+The `PriorInformationGainScenario`, `expected_information_gain_over_prior_scenarios_nats` and `select_experiment_by_prior_robust_information_gain_per_cost` APIs add another explicit robustness axis. Each finite scenario supplies its own non-negative hypothesis prior, observation-noise standard deviation, and predictive-model identifier; the score is the minimum weighted EIG-per-cost across those declared belief/model/noise combinations. Scenario priors are normalized by the existing overflow-safe normalizer and are **not inferred** from data by this API.
+
+A synthetic ranking-reversal test uses two plausible priors: `[0.49, 0.49, 0.01, 0.01]` and `[0.01, 0.01, 0.49, 0.49]`. At the first prior, candidate 1 is strongly informative (about 0.693 nats) while candidate 0 scores about 0.098 nats. Candidate 1's score falls to about 0.056 nats under the second prior, so the conservative envelope prefers candidate 0. A separate test verifies scenario-order invariance and rejects malformed prior scenarios. These approximate figures were independently recomputed with a separate JavaScript quadrature spot-check; the Rust tests remain subject to exact-head CI.
+
+This is a **finite prior ambiguity set**, not a guarantee over arbitrary priors, an automatically learned posterior, an adversarial distribution over all hypotheses, or a published distributionally robust design algorithm. It also applies only to the supplied candidate pool. If the real model is absent and every declared prior is confidently misspecified in the same way, the envelope can still be confidently wrong. Keep the prior-shift / candidate-pool-omission conditions in the held-out benchmark.
+
 ## Integrated law-discovery pilot
 
 The focused workflow also runs `expected_information_gain_vs_variance_on_paired_seeds` inside the existing `symthaea-physics-bridge` multi-round discovery simulator. It compares the raw-variance selector with expected-information-gain-per-cost (equal unit cost in this first ablation), using the same 40 deterministic seeds, typed-generation setting, four-round budget and candidate-pool generation per seed. The report prints paired selector-only wins, both success rates, mean rounds, EIG selection failures, and 2,000-resample percentile intervals for EIG-minus-variance changes in success rate and rounds. Positive success deltas favor EIG; negative round deltas favor EIG. These seed-resampled pilot intervals do not replace world-clustered confirmatory inference. This is a small pilot diagnostic, not a confirmatory performance claim.
