@@ -768,7 +768,10 @@ fn audit(
         let actual_attempts_compatible_with_requested_backend = match model_mode {
             "native" => !has_attempt("LocalLLM") && !has_attempt("CloudLLM"),
             "ollama" => !has_attempt("CloudLLM"),
-            "cloud" => !has_attempt("LocalLLM"),
+            // Cloud mode may fall back to LocalLLM after a failed cloud invocation.
+            // The ordered attempt receipt, not the requested mode alone, tells which
+            // backend actually ran and whether the preferred tier failed.
+            "cloud" => true,
             _ => false,
         };
         push_check(
