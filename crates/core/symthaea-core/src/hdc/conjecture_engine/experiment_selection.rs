@@ -1059,13 +1059,13 @@ mod tests {
 
     #[test]
     fn scenario_robust_selector_avoids_prior_fragile_partition() {
-        let hypotheses = [0_usize, 1, 2, 3];
+        let hypotheses = [0_usize, 1, 2];
         let scenarios = vec![
-            vec![0.49, 0.01, 0.49, 0.01],
-            vec![0.49, 0.49, 0.01, 0.01],
+            vec![0.7, 0.2, 0.1],
+            vec![0.6, 0.05, 0.35],
         ];
         let experiments = [0_usize, 1_usize];
-        let prediction_table = [[0.0_f64, 0.0, 10.0, 10.0], [0.0, 10.0, 0.0, 10.0]];
+        let prediction_table = [[0.0_f64, 10.0, 0.0], [0.0, 0.0, 10.0]];
         let predict = |hypothesis: &usize, experiment: &usize| {
             Some(prediction_table[*experiment][*hypothesis])
         };
@@ -1091,10 +1091,10 @@ mod tests {
         .expect("both scenarios score every experiment")
         .0;
 
-        assert_eq!(*nominal, 0, "nominal prior prefers its balanced partition");
+        assert_eq!(*nominal, 0, "nominal prior favors the 0.2-mass hypothesis split");
         assert_eq!(
             *robust, 1,
-            "the orthogonal partition remains informative when prior mass shifts between pairs"
+            "the robust partition retains information across both plausible prior scenarios"
         );
     }
 
