@@ -1,6 +1,6 @@
 import unittest
 from family_heldout_scm_benchmark import (
-    MECHANISMS, TOPOLOGIES, build_suite, graph_scores, make_scm, split_label, validate_scm,
+    MECHANISMS, TOPOLOGIES, SCM, build_suite, graph_scores, make_scm, split_label, validate_scm,
 )
 
 class FamilyHeldoutTests(unittest.TestCase):
@@ -22,6 +22,11 @@ class FamilyHeldoutTests(unittest.TestCase):
         suite = build_suite(5, 2)
         self.assertEqual(set(suite["split_counts"]), {"train_id", "topology_ood", "mechanism_ood", "combined_ood"})
         self.assertEqual(sum(suite["split_counts"].values()), 6 * 5 * 2)
+
+    def test_validator_rejects_cycles_in_supplied_parent_lists(self):
+        cyclic = SCM("cycle", 0, 4, "chain", "and", ((1,), (0,), (), ()), (0b10, 0b10, 0, 1))
+        with self.assertRaises(AssertionError):
+            validate_scm(cyclic)
 
     def test_exact_graph_has_perfect_scores(self):
         graph = [(0, 1), (1, 2)]
