@@ -188,6 +188,7 @@ impl CodingAgent {
                     tier: BackendTier::Native,
                     backend_name: "NativeCodeTemplate".to_string(),
                     success: native_candidate.as_ref().is_some_and(|code| !code.trim().is_empty()),
+                    usable_generation: native_candidate.as_ref().is_some_and(|code| !code.trim().is_empty()),
                     verification_passed: None,
                     elapsed_ms: native_elapsed_ms,
                     estimated_energy_cost: BackendTier::Native.estimated_energy_cost(),
@@ -901,6 +902,7 @@ impl CodingAgent {
                 tier,
                 backend_name: response.backend_name.clone(),
                 success: !response.source.trim().is_empty(),
+                usable_generation: !response.source.trim().is_empty() && tier != BackendTier::Simulated,
                 verification_passed: Some(response.accepted),
                 elapsed_ms: orchestration_elapsed_ms,
                 estimated_energy_cost: response.energy_cost as f64,
@@ -910,14 +912,16 @@ impl CodingAgent {
             // rejected candidates before the eventual accepted/fallback attempt.
             for attempt in new_attempts {
                 let tier = Self::orchestrator_backend_tier(&attempt.backend);
+                let output_nonempty = attempt
+                    .source_preview
+                    .as_deref()
+                    .is_some_and(|source| !source.trim().is_empty());
                 self.generation_tiers.push(tier);
                 self.actual_backend_attempts.push(BackendAttempt {
                     tier,
                     backend_name: attempt.backend.clone(),
-                    success: attempt
-                        .source_preview
-                        .as_deref()
-                        .is_some_and(|source| !source.trim().is_empty()),
+                    success: output_nonempty,
+                    usable_generation: output_nonempty && tier != BackendTier::Simulated,
                     verification_passed: Some(attempt.verified),
                     elapsed_ms: attempt.elapsed_ms,
                     estimated_energy_cost: attempt.energy_cost as f64,
