@@ -41,6 +41,31 @@ The new `expected_information_gain_weighted_nats` and `select_experiment_by_weig
 
 The key invariance control is duplicate-mass splitting: replacing one hypothesis of mass (w) with two observationally identical instances of mass (w/2) each should preserve the predictive mixture and expected information gain. Regression tests also check agreement with the uniform API for equal masses and invalid-prior behavior. These are mathematical contract tests; they do not show that a particular prior is scientifically calibrated or that weighted EIG beats nominal EIG under model misspecification. Prior normalization scales all finite masses by the maximum before summing, preventing avoidable overflow for valid inputs such as `[f64::MAX, f64::MAX, 1.0]`; the minimum-positive-mass guard still rejects a numerically degenerate prior. A separate metamorphic test verifies that scenario order does not affect the worst-case score and adding another scenario cannot increase the minimum-over-scenarios score. These tests protect numeric and aggregation contracts, not model adequacy or experimental utility.
 
+## Weighted finite-scenario envelope
+
+The new `expected_information_gain_weighted_over_scenarios_nats` and `select_experiment_by_weighted_scenario_robust_information_gain_per_cost` APIs compose two existing controls: an explicit caller-supplied hypothesis prior and a finite set of joint predictive-model / observation-noise scenarios. Their objective is
+
+`score(x) = min_{s in S} I_p(H; Y | x, s) / cost(x)`
+
+where `p` is held fixed across the declared scenarios and each scenario supplies its own noise scale and prediction closure. The evaluator rejects an empty/invalid scenario declaration and rejects a candidate if its prediction is missing/non-finite in any scenario. Prior validation is shared with the overflow-safe weighted API. Ties remain stable by input order.
+
+This is a lower-envelope acquisition rule, **not** a general distributionally robust Bayesian design algorithm. It is robust only to the finite, caller-selected set; it does not optimize over uncertainty in the prior, estimate the prior from evidence, prove that scenarios span the true system, or implement the published R-IDeA or Sibson-mutual-information methods. It also uses the current homoscedastic Gaussian likelihood independently within each scenario.
+
+### Required paired benchmark
+
+Add this arm to the same frozen-world, matched-budget evaluation before claiming benefit:
+
+1. Uniform random admissible query.
+2. Uniform-prior nominal EIG-per-cost.
+3. Weighted-prior nominal EIG-per-cost.
+4. Uniform-prior finite-scenario worst-case EIG-per-cost.
+5. Weighted-prior finite-scenario worst-case EIG-per-cost (this extension).
+6. Evaluator-only oracle, never exposed to the selectors, reported as a ceiling rather than a competitor.
+
+Compare all policies on the same worlds, admissible actions, query and monetary/time budgets, and paired seeds. Freeze a separate held-out structural-family set before tuning. Include candidate-pool omissions, duplicate/equivalent hypotheses, skewed prior masses, outlier hypotheses, misspecified noise, an alternative model that reverses the nominal winner, and a no-information negative control. Report success/recovery rate, false-singleton rate when the candidate set omits the truth, detectable model-coverage failures, held-out predictive loss, actual cost, invalid-selection rate, wall time, and paired confidence intervals clustered by world rather than treating seeds as independent worlds. The acceptance criterion is non-inferiority in the matched regime plus a predeclared improvement in at least one misspecification metric, with no hidden threshold tuning on held-out worlds. These are targets, not achieved results.
+
+This design makes the comparison falsifiable: if the robust selector only reduces useful information in matched worlds without reducing false certainty under misspecification, it should not be promoted as the default.
+
 ## Integrated law-discovery pilot
 
 The focused workflow also runs `expected_information_gain_vs_variance_on_paired_seeds` inside the existing `symthaea-physics-bridge` multi-round discovery simulator. It compares the raw-variance selector with expected-information-gain-per-cost (equal unit cost in this first ablation), using the same 40 deterministic seeds, typed-generation setting, four-round budget and candidate-pool generation per seed. The report prints paired selector-only wins, both success rates, mean rounds, EIG selection failures, and 2,000-resample percentile intervals for EIG-minus-variance changes in success rate and rounds. Positive success deltas favor EIG; negative round deltas favor EIG. These seed-resampled pilot intervals do not replace world-clustered confirmatory inference. This is a small pilot diagnostic, not a confirmatory performance claim.
