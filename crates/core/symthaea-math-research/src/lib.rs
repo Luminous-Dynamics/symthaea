@@ -3,10 +3,12 @@
 
 //! Evidence-bearing mathematical research primitives for Symthaea.
 //!
-//! Authority is split by module so specification, claims, verification, and
-//! later novelty/research-policy layers cannot silently collapse into one
-//! confidence score.
+//! Authority is split by module so specification, semantic auditing, claims,
+//! verification, and later novelty/research-policy layers cannot silently
+//! collapse into one confidence score.
 
+pub mod mutation;
 pub mod spec;
 
+pub use mutation::*;
 pub use spec::*;
