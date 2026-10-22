@@ -155,7 +155,7 @@
     },
     "minimum_independent_clusters": {
       "type": "integer",
-      "minimum": 20
+      "minimum": 30
     }
   },
   "$defs": {
@@ -390,7 +390,7 @@
         },
         "minimum_independent_clusters": {
           "type": "integer",
-          "minimum": 20
+          "minimum": 30
         }
       }
     }
