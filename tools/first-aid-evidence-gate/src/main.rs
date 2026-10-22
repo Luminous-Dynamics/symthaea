@@ -61,6 +61,28 @@ fn sha256_hex(bytes: &[u8]) -> String {
         .join("")
 }
 
+fn official_source_identity(source_id: &str) -> Option<(&'static str, &'static str)> {
+    match source_id {
+        "IFRC-IFA-2025" => Some((
+            "International Federation of Red Cross and Red Crescent Societies",
+            "https://www.ifrc.org/",
+        )),
+        "ERC-FA-2025" => Some((
+            "European Resuscitation Council; page hosted by Resuscitation Council UK",
+            "https://www.resus.org.uk/",
+        )),
+        "AHA-CPR-ECC-2025" => Some((
+            "American Heart Association",
+            "https://professional.heart.org/",
+        )),
+        "RCSA-ECC-AED-2026" => Some((
+            "Resuscitation Council of Southern Africa",
+            "https://resus.co.za/",
+        )),
+        _ => None,
+    }
+}
+
 fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
     let mut errors = Vec::new();
 
@@ -155,6 +177,20 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
     {
         errors.push("claim_admission_policy.source_reference_model is unsupported".to_owned());
     }
+    if field_str(policy, "zero_approved_claims_disposition")
+        != Some("BLOCKED_NO_ADJUDICATED_CLAIMS")
+    {
+        errors.push(
+            "claim_admission_policy.zero_approved_claims_disposition is unsupported".to_owned(),
+        );
+    }
+    if field_str(root, "south_africa_localization_status")
+        != Some("not_verified_no_clinical_claim_admitted")
+    {
+        errors.push(
+            "registry South African localization must remain explicitly unverified".to_owned(),
+        );
+    }
 
     let sources: &[Value] = match root.get("sources").and_then(Value::as_array) {
         Some(sources) if !sources.is_empty() => sources.as_slice(),
@@ -205,6 +241,25 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
         if let Some(id) = field_str(source, "source_id") {
             if !source_ids.insert(id.to_owned()) {
                 errors.push(format!("{context}: duplicate source_id '{id}'"));
+            }
+            match official_source_identity(id) {
+                Some((expected_publisher, expected_url_prefix)) => {
+                    if field_str(source, "publisher") != Some(expected_publisher) {
+                        errors.push(format!(
+                            "{context}: publisher does not match allowlisted source identity '{id}'"
+                        ));
+                    }
+                    if field_str(source, "url")
+                        .is_none_or(|url| !url.starts_with(expected_url_prefix))
+                    {
+                        errors.push(format!(
+                            "{context}: URL host/path prefix does not match allowlisted source '{id}'"
+                        ));
+                    }
+                }
+                None => errors.push(format!(
+                    "{context}: unrecognized source_id '{id}' requires explicit provenance review"
+                )),
             }
         }
         if field_str(source, "url").is_none_or(|url| !url.starts_with("https://")) {
@@ -621,6 +676,22 @@ mod tests {
         }]);
         let errors = validate_registry(&input).expect_err("reviewer cannot adjudicate own review");
         assert!(errors.iter().any(|error| error.contains("adjudicator identity must differ")));
+    }
+
+    #[test]
+    fn official_source_host_cannot_be_replaced_with_an_arbitrary_https_host() {
+        let mut input = registry();
+        input["sources"][0]["url"] = json!("https://example.org/pretend-ifrc");
+        let errors = validate_registry(&input).expect_err("untrusted URL must fail");
+        assert!(errors.iter().any(|error| error.contains("URL host/path prefix")));
+    }
+
+    #[test]
+    fn unregistered_source_identity_is_not_admitted_automatically() {
+        let mut input = registry();
+        input["sources"][0]["source_id"] = json!("NEW-UNKNOWN-SOURCE");
+        let errors = validate_registry(&input).expect_err("new source needs explicit review");
+        assert!(errors.iter().any(|error| error.contains("unrecognized source_id")));
     }
 
     #[test]
