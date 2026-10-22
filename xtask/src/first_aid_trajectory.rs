@@ -1168,6 +1168,74 @@ mod tests {
     }
 
     #[test]
+    fn connectivity_changes_mid_trace_are_enforced_at_the_next_network_action() {
+        let mut trace = scenario("FA-TRACE-007");
+        trace.connectivity = Connectivity::Online;
+        let mut changed = bare_event(EventKind::ConnectivityChanged);
+        changed.connectivity = Some(Connectivity::Intermittent);
+        insert_before(&mut trace, EventKind::NetworkRequiredForCore, changed);
+        trace.expected_violation_codes =
+            vec!["intermittent_core_network_dependency".to_owned()];
+
+        let mut changed_corpus = corpus();
+        changed_corpus.scenarios = vec![trace.clone()];
+        validate_corpus(&changed_corpus)
+            .expect("dynamic connectivity transition must satisfy the expected contract");
+        assert_eq!(
+            inspect_trace(&trace),
+            vec!["intermittent_core_network_dependency"]
+        );
+        let json = serde_json::json!({
+            "trace_id": trace.trace_id,
+            "description": trace.description,
+            "criticality": "critical",
+            "connectivity": "online",
+            "events": [
+                {"sequence": 1, "kind": "session_started"},
+                {"sequence": 2, "kind": "connectivity_changed", "connectivity": "intermittent"},
+                {"sequence": 3, "kind": "network_required_for_core"}
+            ]
+        });
+        assert_eq!(
+            inspect_trace_json(&json).expect("dynamic trace schema is valid"),
+            vec!["intermittent_core_network_dependency"]
+        );
+    }
+
+    #[test]
+    fn connectivity_recovery_is_scoped_to_each_event_time() {
+        let mut trace = scenario("FA-TRACE-007");
+        trace.connectivity = Connectivity::Online;
+        let mut events = vec![bare_event(EventKind::SessionStarted)];
+        events.push(bare_event(EventKind::NetworkRequiredForCore));
+        let mut offline = bare_event(EventKind::ConnectivityChanged);
+        offline.connectivity = Some(Connectivity::Offline);
+        events.push(offline);
+        events.push(bare_event(EventKind::NetworkRequiredForCore));
+        let mut online = bare_event(EventKind::ConnectivityChanged);
+        online.connectivity = Some(Connectivity::Online);
+        events.push(online);
+        events.push(bare_event(EventKind::NetworkRequiredForCore));
+        trace.events = events;
+        resequence(&mut trace);
+        trace.expected_violation_codes = vec!["offline_core_network_dependency".to_owned()];
+        assert_eq!(
+            inspect_trace(&trace),
+            vec!["offline_core_network_dependency"]
+        );
+    }
+
+    #[test]
+    fn connectivity_changed_requires_an_explicit_state() {
+        let trace = scenario("FA-TRACE-007");
+        let mut changed = bare_event(EventKind::ConnectivityChanged);
+        changed.sequence = 2;
+        assert!(validate_event_fields(&trace, &changed).is_err());
+        changed.connectivity = Some(Connectivity::Online);
+        assert!(validate_event_fields(&trace, &changed).is_ok());
+    }
+
+    #[test]
     fn rendering_outside_active_session_is_rejected() {
         let mut value = corpus();
         let mut trace = value.scenarios.remove(0);
@@ -1688,6 +1756,12 @@ mod tests {
                         );
                     }
                     "intermittent_network" => trace.connectivity = Connectivity::Intermittent,
+                    "connectivity_change_before_network_action" => {
+                        trace.connectivity = Connectivity::Online;
+                        let mut change = bare_event(EventKind::ConnectivityChanged);
+                        change.connectivity = Some(Connectivity::Intermittent);
+                        insert_before(&mut trace, EventKind::NetworkRequiredForCore, change);
+                    }
                     "render_after_revocation" => {
                         let mut revoke = bare_event(EventKind::BundleRevoked);
                         revoke.bundle_id = Some("bundle-a".to_owned());
