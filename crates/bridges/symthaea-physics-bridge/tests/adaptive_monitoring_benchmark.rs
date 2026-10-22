@@ -187,7 +187,13 @@ fn report(world: &str, mut summary: (AlarmSummary, AlarmSummary, AlarmSummary)) 
         summary.2,
     );
     println!(
-        "adaptive_monitoring_benchmark,world={world},streams={STREAMS},horizon={HORIZON},reference_count={REFERENCE_COUNT},alpha={ALPHA},pooled_pit_fwer={:.4},contextual_pit_fwer={:.4},prm_fwer={:.4},pooled_pit_median_delay={:?},contextual_pit_median_delay={:?},prm_median_delay={:?}",
+        concat!(
+            "adaptive_monitoring_benchmark,world={world},streams={STREAMS},",
+            "horizon={HORIZON},reference_count={REFERENCE_COUNT},alpha={ALPHA},",
+            "pooled_pit_fwer={:.4},contextual_pit_fwer={:.4},prm_fwer={:.4},",
+            "pooled_pit_median_delay={:?},contextual_pit_median_delay={:?},",
+            "prm_median_delay={:?}"
+        ),
         pooled.rate(),
         contextual.rate(),
         prm.rate(),
