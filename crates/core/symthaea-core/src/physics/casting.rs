@@ -75,6 +75,8 @@ pub enum CastingModelError {
     NonPositiveExponent,
     /// The fitted parameters or diagnostics were not finite and positive where required.
     InvalidCalibrationParameters,
+    /// A holdout evaluation set was empty.
+    EmptyValidationSet,
     /// A requested prediction lies outside the measured calibration domain.
     OutsideCalibrationDomain {
         /// Requested thermal modulus, in metres.
@@ -108,6 +110,9 @@ impl fmt::Display for CastingModelError {
             }
             Self::InvalidCalibrationParameters => {
                 f.write_str("casting calibration produced invalid parameters or diagnostics")
+            }
+            Self::EmptyValidationSet => {
+                f.write_str("casting holdout evaluation set must not be empty")
             }
             Self::OutsideCalibrationDomain {
                 requested_m,
@@ -146,6 +151,73 @@ pub struct ChvorinovModel {
     thermal_modulus_max_m: f64,
     fit_r_squared: f64,
     sample_count: usize,
+}
+
+/// The outcome for one held-out casting in a validation report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CastingValidationStatus {
+    /// The point was within the training model's domain and was scored.
+    PredictedWithinCalibrationDomain,
+    /// The point was outside the training domain and the model abstained.
+    AbstainedOutsideCalibrationDomain,
+}
+
+/// One held-out casting's prediction and error, if a prediction was supported.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CastingValidationPoint {
+    /// Tested thermal modulus, in metres.
+    pub thermal_modulus_m: f64,
+    /// Measured solidification time, in seconds.
+    pub observed_time_s: f64,
+    /// Prediction in seconds; absent if the model abstained.
+    pub predicted_time_s: Option<f64>,
+    /// Absolute error in seconds; absent if the model abstained.
+    pub absolute_error_s: Option<f64>,
+    /// Absolute relative error against the observed time; absent if abstained.
+    pub absolute_relative_error: Option<f64>,
+    /// Whether a prediction was supported by the training domain.
+    pub status: CastingValidationStatus,
+}
+
+/// Holdout metrics that report both selective accuracy and prediction coverage.
+///
+/// Error metrics are calculated only over points the model predicted inside the
+/// training domain. Coverage and per-point statuses must be reported beside those
+/// errors; otherwise a model can appear artificially accurate by abstaining on
+/// difficult or novel geometries.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CastingValidationReport {
+    /// Number of valid held-out observations.
+    pub total_count: usize,
+    /// Number of observations that received an in-domain prediction.
+    pub prediction_count: usize,
+    /// Number of observations rejected as outside the calibration domain.
+    pub abstained_out_of_domain_count: usize,
+    /// Fraction of held-out observations that received predictions, in [0, 1].
+    pub coverage_fraction: f64,
+    /// Mean absolute error in seconds, over predicted points only.
+    pub mae_s: Option<f64>,
+    /// Root-mean-square error in seconds, over predicted points only.
+    pub rmse_s: Option<f64>,
+    /// Median absolute relative error, over predicted points only.
+    pub median_absolute_relative_error: Option<f64>,
+    /// Mean absolute relative error, over predicted points only.
+    pub mean_absolute_relative_error: Option<f64>,
+    /// Per-point outcomes so abstentions and errors remain auditable.
+    pub points: Vec<CastingValidationPoint>,
+}
+
+fn median(mut values: Vec<f64>) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_by(f64::total_cmp);
+    let mid = values.len() / 2;
+    if values.len() % 2 == 0 {
+        Some((values[mid - 1] + values[mid]) / 2.0)
+    } else {
+        Some(values[mid])
+    }
 }
 
 impl ChvorinovModel {
@@ -282,6 +354,107 @@ impl ChvorinovModel {
         self.estimate_solidification_time_s(modulus)
     }
 
+    /// Evaluate a frozen set of held-out observations against this fitted model.
+    ///
+    /// This method never refits the model on validation observations. It reports
+    /// prediction coverage separately from errors: out-of-domain observations are
+    /// recorded as abstentions, not silently discarded from the denominator and not
+    /// assigned extrapolated predictions. Report both coverage and conditional error
+    /// when comparing this model to any baseline.
+    pub fn evaluate_holdout(
+        &self,
+        observations: &[ChvorinovObservation],
+    ) -> Result<CastingValidationReport, CastingModelError> {
+        if observations.is_empty() {
+            return Err(CastingModelError::EmptyValidationSet);
+        }
+
+        let mut points = Vec::with_capacity(observations.len());
+        let mut absolute_errors_s = Vec::new();
+        let mut absolute_relative_errors = Vec::new();
+        let mut squared_errors_s = Vec::new();
+        let mut abstained_out_of_domain_count = 0usize;
+
+        for (index, observation) in observations.iter().enumerate() {
+            if !observation.thermal_modulus_m.is_finite()
+                || observation.thermal_modulus_m <= 0.0
+                || !observation.solidification_time_s.is_finite()
+                || observation.solidification_time_s <= 0.0
+            {
+                return Err(CastingModelError::InvalidObservation { index });
+            }
+
+            match self.estimate_solidification_time_s(observation.thermal_modulus_m) {
+                Ok(predicted_time_s) => {
+                    let absolute_error_s =
+                        (predicted_time_s - observation.solidification_time_s).abs();
+                    let absolute_relative_error =
+                        absolute_error_s / observation.solidification_time_s;
+                    if !absolute_error_s.is_finite()
+                        || !absolute_relative_error.is_finite()
+                    {
+                        return Err(CastingModelError::NonFinitePrediction);
+                    }
+                    absolute_errors_s.push(absolute_error_s);
+                    absolute_relative_errors.push(absolute_relative_error);
+                    squared_errors_s.push(absolute_error_s.powi(2));
+                    points.push(CastingValidationPoint {
+                        thermal_modulus_m: observation.thermal_modulus_m,
+                        observed_time_s: observation.solidification_time_s,
+                        predicted_time_s: Some(predicted_time_s),
+                        absolute_error_s: Some(absolute_error_s),
+                        absolute_relative_error: Some(absolute_relative_error),
+                        status: CastingValidationStatus::PredictedWithinCalibrationDomain,
+                    });
+                }
+                Err(CastingModelError::OutsideCalibrationDomain { .. }) => {
+                    abstained_out_of_domain_count += 1;
+                    points.push(CastingValidationPoint {
+                        thermal_modulus_m: observation.thermal_modulus_m,
+                        observed_time_s: observation.solidification_time_s,
+                        predicted_time_s: None,
+                        absolute_error_s: None,
+                        absolute_relative_error: None,
+                        status: CastingValidationStatus::AbstainedOutsideCalibrationDomain,
+                    });
+                }
+                Err(error) => return Err(error),
+            }
+        }
+
+        let total_count = observations.len();
+        let prediction_count = absolute_errors_s.len();
+        let coverage_fraction = prediction_count as f64 / total_count as f64;
+        let mae_s = if prediction_count == 0 {
+            None
+        } else {
+            Some(absolute_errors_s.iter().sum::<f64>() / prediction_count as f64)
+        };
+        let rmse_s = if prediction_count == 0 {
+            None
+        } else {
+            Some((squared_errors_s.iter().sum::<f64>() / prediction_count as f64).sqrt())
+        };
+        let median_absolute_relative_error = median(absolute_relative_errors.clone());
+        let mean_absolute_relative_error = if prediction_count == 0 {
+            None
+        } else {
+            Some(absolute_relative_errors.iter().sum::<f64>() / prediction_count as f64)
+        };
+
+        Ok(CastingValidationReport {
+            total_count,
+            prediction_count,
+            abstained_out_of_domain_count,
+            coverage_fraction,
+            mae_s,
+            rmse_s,
+            median_absolute_relative_error,
+            mean_absolute_relative_error,
+            points,
+        })
+    }
+
     /// Return the fitted mold constant in seconds per metre raised to the fitted exponent.
     pub fn mold_constant_s_per_m_pow_n(&self) -> f64 {
         self.mold_constant_s_per_m_pow_n
@@ -408,6 +581,58 @@ mod tests {
         assert!(matches!(
             ChvorinovModel::calibrate(&invalid),
             Err(CastingModelError::InvalidObservation { index: 2 })
+        ));
+    }
+
+    #[test]
+    fn holdout_reports_error_and_domain_coverage_separately() {
+        let model = ChvorinovModel::calibrate(&synthetic_observations()).unwrap();
+        let holdout = [
+            ChvorinovObservation::new(0.005, 33.0),
+            ChvorinovObservation::new(0.020, 500.0),
+            ChvorinovObservation::new(0.0005, 0.5),
+        ];
+
+        let report = model.evaluate_holdout(&holdout).unwrap();
+        assert_eq!(report.total_count, 3);
+        assert_eq!(report.prediction_count, 1);
+        assert_eq!(report.abstained_out_of_domain_count, 2);
+        assert!((report.coverage_fraction - (1.0 / 3.0)).abs() < 1e-12);
+        assert!((report.mae_s.unwrap() - 3.0).abs() < 1e-8);
+        assert!((report.rmse_s.unwrap() - 3.0).abs() < 1e-8);
+        assert!((report.mean_absolute_relative_error.unwrap() - (3.0 / 33.0)).abs() < 1e-8);
+        assert_eq!(
+            report.points[1].status,
+            CastingValidationStatus::AbstainedOutsideCalibrationDomain
+        );
+        assert_eq!(report.points[1].predicted_time_s, None);
+    }
+
+    #[test]
+    fn holdout_with_zero_coverage_does_not_report_fake_error_metrics() {
+        let model = ChvorinovModel::calibrate(&synthetic_observations()).unwrap();
+        let holdout = [ChvorinovObservation::new(0.020, 500.0)];
+
+        let report = model.evaluate_holdout(&holdout).unwrap();
+        assert_eq!(report.prediction_count, 0);
+        assert_eq!(report.abstained_out_of_domain_count, 1);
+        assert_eq!(report.coverage_fraction, 0.0);
+        assert_eq!(report.mae_s, None);
+        assert_eq!(report.rmse_s, None);
+        assert_eq!(report.median_absolute_relative_error, None);
+        assert_eq!(report.mean_absolute_relative_error, None);
+    }
+
+    #[test]
+    fn holdout_rejects_empty_and_invalid_observations() {
+        let model = ChvorinovModel::calibrate(&synthetic_observations()).unwrap();
+        assert!(matches!(
+            model.evaluate_holdout(&[]),
+            Err(CastingModelError::EmptyValidationSet)
+        ));
+        assert!(matches!(
+            model.evaluate_holdout(&[ChvorinovObservation::new(0.002, f64::NAN)]),
+            Err(CastingModelError::InvalidObservation { index: 0 })
         ));
     }
 
