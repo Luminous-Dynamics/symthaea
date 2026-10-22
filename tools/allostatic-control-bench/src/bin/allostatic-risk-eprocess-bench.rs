@@ -5,7 +5,7 @@
 //! The input trace is reused verbatim so pointwise, CUSUM and e-process results
 //! can be compared at identical episode/state/step coordinates.
 
-use allostatic_control_bench::bounded_risk_eprocess::BoundedRiskEProcess;
+use allostatic_control_bench::bounded_risk_eprocess::MixtureBoundedRiskEProcess;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
@@ -16,11 +16,11 @@ const CALIBRATED_RESIDUAL_SCALE: f64 = 0.05;
 const RISK_BOUND: f64 = 0.15;
 const GLOBAL_DELTA: f64 = 0.05;
 const PARALLEL_MONITORS: usize = 5;
-const BET: f64 = 0.5 / RISK_BOUND;
+const BET_FRACTIONS: [f64; 3] = [0.25, 0.5, 0.75];
 
 const INPUT_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,ground_truth_outside_predictor_envelope,all_episode_scores_below_pointwise_threshold";
-const RAW_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,ground_truth_outside_predictor_envelope,all_episode_scores_below_pointwise_threshold,bounded_risk_loss,log_e_value,eprocess_latched_alarm,first_eprocess_alarm_step,log_e_alarm_threshold,risk_bound,bet";
-const SUMMARY_HEADER: &str = "operating_point,condition,episodes,eprocess_alarms,eprocess_false_alarms,eprocess_missed_shifts,mean_detection_step,p95_detection_step,median_detection_step,episodes_all_scores_below_pointwise,eprocess_caught_below_pointwise,mean_final_log_e,max_final_log_e,log_alarm_threshold,risk_bound,bet,global_delta";
+const RAW_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,ground_truth_outside_predictor_envelope,all_episode_scores_below_pointwise_threshold,bounded_risk_loss,log_e_value,eprocess_latched_alarm,first_eprocess_alarm_step,log_e_alarm_threshold,risk_bound,bet_fraction_1,bet_fraction_2,bet_fraction_3,component_log_e_1,component_log_e_2,component_log_e_3";
+const SUMMARY_HEADER: &str = "operating_point,condition,episodes,eprocess_alarms,eprocess_false_alarms,eprocess_missed_shifts,mean_detection_step,p95_detection_step,median_detection_step,episodes_all_scores_below_pointwise,eprocess_caught_below_pointwise,mean_final_log_e,max_final_log_e,log_alarm_threshold,risk_bound,bet_fraction_1,bet_fraction_2,bet_fraction_3,global_delta";
 
 #[derive(Clone, Debug)]
 struct InputRow {
@@ -176,7 +176,9 @@ fn summary_row(
         optional_float(summary.final_log_values.iter().copied().reduce(f64::max)),
         format!("{log_threshold:.9}"),
         format!("{RISK_BOUND:.9}"),
-        format!("{BET:.9}"),
+        format!("{:.9}", BET_FRACTIONS[0]),
+        format!("{:.9}", BET_FRACTIONS[1]),
+        format!("{:.9}", BET_FRACTIONS[2]),
         format!("{GLOBAL_DELTA:.9}"),
     ];
     output.push_str(&fields.join(","));
@@ -197,9 +199,9 @@ fn process_episode(
         .into());
     }
     let first = &rows[0];
-    let mut monitor = BoundedRiskEProcess::new(
+    let mut monitor = MixtureBoundedRiskEProcess::new(
         RISK_BOUND,
-        BET,
+        BET_FRACTIONS,
         GLOBAL_DELTA,
         PARALLEL_MONITORS,
     )
@@ -233,7 +235,13 @@ fn process_episode(
             first_alarm_step = expected_step;
         }
         all_scores_below_pointwise &= row.residual_score <= row.pointwise_threshold;
-        episode_rows.push((row, bounded_loss, monitor.log_e_value(), alarm));
+        episode_rows.push((
+            row,
+            bounded_loss,
+            monitor.log_e_value(),
+            monitor.component_log_e_values(),
+            alarm,
+        ));
     }
 
     if rows
@@ -247,7 +255,7 @@ fn process_episode(
         .into());
     }
 
-    for (row, bounded_loss, log_e_value, alarm) in &episode_rows {
+    for (row, bounded_loss, log_e_value, component_logs, alarm) in &episode_rows {
         let mut fields = row.fields.clone();
         fields.push(format!("{bounded_loss:.9}"));
         fields.push(format!("{log_e_value:.9}"));
@@ -255,7 +263,12 @@ fn process_episode(
         fields.push(first_alarm_step.to_string());
         fields.push(format!("{log_threshold:.9}"));
         fields.push(format!("{RISK_BOUND:.9}"));
-        fields.push(format!("{BET:.9}"));
+        fields.push(format!("{:.9}", BET_FRACTIONS[0]));
+        fields.push(format!("{:.9}", BET_FRACTIONS[1]));
+        fields.push(format!("{:.9}", BET_FRACTIONS[2]));
+        for component_log in component_logs {
+            fields.push(format!("{component_log:.9}"));
+        }
         raw_output.push_str(&fields.join(","));
         raw_output.push('\n');
     }
@@ -300,14 +313,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .into());
     }
 
-    let monitor = BoundedRiskEProcess::new(
+    let monitor = MixtureBoundedRiskEProcess::new(
         RISK_BOUND,
-        BET,
+        BET_FRACTIONS,
         GLOBAL_DELTA,
         PARALLEL_MONITORS,
     )
     .ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "invalid e-process config"))?;
-    let log_threshold = monitor.alarm_threshold();
+    let log_threshold = monitor.log_alarm_threshold();
 
     let mut raw_output = format!("{RAW_HEADER}\n");
     let mut summaries = BTreeMap::new();
