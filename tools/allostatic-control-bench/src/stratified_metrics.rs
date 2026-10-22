@@ -53,8 +53,6 @@ pub struct StratifiedSummary {
 
 #[derive(Clone, Copy)]
 struct TaskDraw {
-    baseline_mean: f64,
-    candidate_mean: f64,
     mean_delta: f64,
     iqm_delta: f64,
     paired_win_rate: f64,
@@ -156,11 +154,12 @@ impl StratifiedSummary {
             .count() as f64
             / task_count as f64;
 
-        let mut random_state = if random_seed == 0 {
+        let effective_seed = if random_seed == 0 {
             0x9E37_79B9_7F4A_7C15
         } else {
             random_seed
         };
+        let mut random_state = effective_seed;
         let mut bootstrap_mean = Vec::with_capacity(bootstrap_replicates);
         let mut bootstrap_iqm = Vec::with_capacity(bootstrap_replicates);
         let mut bootstrap_win_rate = Vec::with_capacity(bootstrap_replicates);
@@ -168,19 +167,13 @@ impl StratifiedSummary {
         for _ in 0..bootstrap_replicates {
             let mut task_draws = Vec::with_capacity(task_count);
             for (baseline, candidate, deltas) in &deltas_by_task {
-                let mut sampled_baseline = Vec::with_capacity(baseline.len());
-                let mut sampled_candidate = Vec::with_capacity(candidate.len());
                 let mut sampled_deltas = Vec::with_capacity(deltas.len());
 
                 for _ in 0..deltas.len() {
                     let index = (next_random(&mut random_state) % deltas.len() as u64) as usize;
-                    sampled_baseline.push(baseline[index]);
-                    sampled_candidate.push(candidate[index]);
                     sampled_deltas.push(deltas[index]);
                 }
                 task_draws.push(TaskDraw {
-                    baseline_mean: mean(&sampled_baseline),
-                    candidate_mean: mean(&sampled_candidate),
                     mean_delta: mean(&sampled_deltas),
                     iqm_delta: interquartile_mean(&sampled_deltas),
                     paired_win_rate: paired_win_rate(&sampled_deltas),
@@ -220,7 +213,7 @@ impl StratifiedSummary {
             macro_paired_win_rate_ci95_high: quantile_sorted(&bootstrap_win_rate, 0.975),
             fraction_tasks_positive_mean_delta,
             bootstrap_replicates,
-            bootstrap_seed: random_seed,
+            bootstrap_seed: effective_seed,
         };
 
         let values = [
