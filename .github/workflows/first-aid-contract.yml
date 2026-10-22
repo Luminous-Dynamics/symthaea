@@ -104,6 +104,11 @@ jobs:
             ([.cases[] | select(
               .evidence_status == "workflow_gate_existing" and
               ((.gate_ref | type) != "string" or (.gate_ref | length) == 0)
+            )] | length) == 0 and
+            ([.cases[] | select(
+              .execution_target == "rust_matrix_runner" and
+              ((.operator_id | type) != "string" or (.operator_id | length) == 0 or
+               .execution_test_name != .differential_oracle.matrix_runner_test_name)
             )] | length) == 0
           ' "$matrix"
           while IFS= read -r test_name; do
