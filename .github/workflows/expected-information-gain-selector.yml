@@ -9,6 +9,7 @@ on:
       - "Cargo.toml"
       - "crates/core/symthaea-core/src/hdc/conjecture_engine.rs"
       - "crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs"
+      - "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs"
       - ".github/workflows/expected-information-gain-selector.yml"
 
 permissions:
@@ -28,9 +29,13 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
-      - name: Format focused selector module
-        run: rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs
+      - name: Format focused selector and integration benchmark
+        run: |
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs
       - name: Test information-gain selector
         run: cargo test -p symthaea-core hdc::conjecture_engine::experiment_selection --lib
+      - name: Run paired law-discovery selector pilot
+        run: cargo test -p symthaea-physics-bridge expected_information_gain_vs_variance_on_paired_seeds --lib -- --nocapture
       - name: Strict Clippy for the core library
         run: cargo clippy -p symthaea-core --lib -- -D warnings
