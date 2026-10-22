@@ -164,7 +164,7 @@ impl CandidateKind {
 
 /// Observable evidence available to policies. It deliberately contains no
 /// candidate kind, future-task label, oracle action, or future utility.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct ObservedFeatures {
     repeat_count: u8,
     distinct_episodes: u8,
@@ -258,6 +258,29 @@ impl Candidate {
             },
         }
     }
+
+    /// Add seed-controlled noise to observable evidence without changing the
+    /// evaluator-owned kind or the synthetic utility contract.
+    fn with_feature_noise(mut self, rng: &mut DeterministicRng) -> Self {
+        self.features.repeat_count = jitter(self.features.repeat_count, 2, rng);
+        self.features.distinct_episodes = jitter(self.features.distinct_episodes, 2, rng);
+        self.features.contradiction_count = jitter(self.features.contradiction_count, 1, rng);
+        self.features.recency = jitter(self.features.recency, 2, rng);
+        self.features.independent_successes = jitter(self.features.independent_successes, 2, rng);
+        self.features.provenance_diversity = jitter(self.features.provenance_diversity, 2, rng);
+        // Simulate one imperfectly observed correction signal without leaking
+        // whether a candidate is actually poisoned or obsolete.
+        if rng.next_u64() % 7 == 0 {
+            self.features.correction_seen = !self.features.correction_seen;
+        }
+        self
+    }
+}
+
+fn jitter(value: u8, magnitude: u8, rng: &mut DeterministicRng) -> u8 {
+    let span = u64::from(magnitude) * 2 + 1;
+    let delta = (rng.next_u64() % span) as i16 - i16::from(magnitude);
+    (i16::from(value) + delta).clamp(0, 10) as u8
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -439,7 +462,9 @@ fn build_fixture(seed: u64, count: usize) -> Vec<Candidate> {
     }
 
     kinds.into_iter().enumerate()
-        .map(|(index, kind)| Candidate::new(index as u64 + 1, kind))
+        .map(|(index, kind)| {
+            Candidate::new(index as u64 + 1, kind).with_feature_noise(&mut rng)
+        })
         .collect()
 }
 
@@ -544,8 +569,11 @@ fn validate_self_checks(candidates: &[Candidate], rows: &[Decision]) -> Result<(
 
     let typed = summaries.get("typed_lifecycle")
         .ok_or_else(|| "missing typed lifecycle candidate".to_owned())?;
-    if typed.covered_load_bearing != typed.load_bearing_candidates {
-        return Err("typed lifecycle baseline unexpectedly retired load-bearing evidence".into());
+    if typed.covered_load_bearing * 4 < typed.load_bearing_candidates * 3 {
+        return Err("typed lifecycle coverage fell below the 75% anti-degeneracy floor".into());
+    }
+    if typed.total_regret >= promote.total_regret {
+        return Err("typed lifecycle did not improve on the promote-everything mutation control".into());
     }
     Ok(())
 }
@@ -702,6 +730,24 @@ mod tests {
     }
 
     #[test]
+    fn observable_feature_profiles_vary_within_each_ground_truth_class() {
+        let candidates = build_fixture(171, 240);
+        for kind in CandidateKind::ALL {
+            let profiles: Vec<_> = candidates
+                .iter()
+                .filter(|candidate| candidate.truth.kind == kind)
+                .map(|candidate| candidate.features)
+                .collect();
+            assert!(profiles.len() >= 2);
+            assert!(
+                profiles.windows(2).any(|pair| pair[0] != pair[1]),
+                "observable profiles did not vary for {:?}",
+                kind
+            );
+        }
+    }
+
+    #[test]
     fn policies_receive_features_not_ground_truth() {
         fn accepts_features_only(policy: Policy, features: &ObservedFeatures) -> Action {
             choose_action(policy, features)
@@ -729,23 +775,18 @@ mod tests {
     }
 
     #[test]
-    fn typed_lifecycle_preserves_load_bearing_candidates_and_retires_poison() {
-        let candidates = build_fixture(5, 24);
-        let mut covered = 0;
-        let mut load_bearing = 0;
-        let mut wrong_promotions = 0;
-        for candidate in &candidates {
-            let action = choose_action(Policy::TypedLifecycle, &candidate.features);
-            if candidate.truth.load_bearing {
-                load_bearing += 1;
-                if action != Action::Retire { covered += 1; }
-            }
-            if candidate.truth.poisoned_or_obsolete && action.is_high_level_promotion() {
-                wrong_promotions += 1;
-            }
-        }
-        assert_eq!(covered, load_bearing);
-        assert_eq!(wrong_promotions, 0);
+    fn typed_lifecycle_beats_both_degenerate_extremes_on_noisy_features() {
+        let candidates = build_fixture(5, 240);
+        let rows = evaluate_all(&candidates);
+        let summaries = summarize(&rows);
+        let typed = summaries.get("typed_lifecycle").unwrap();
+        let retire = summaries.get("retire_everything").unwrap();
+        let promote = summaries.get("promote_everything").unwrap();
+
+        assert!(typed.load_bearing_coverage() >= 0.75);
+        assert!(typed.total_regret < retire.total_regret);
+        assert!(typed.total_regret < promote.total_regret);
+        assert!(typed.false_promotions < promote.false_promotions);
     }
 
     #[test]
