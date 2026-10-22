@@ -37,6 +37,7 @@ source_files=(
   "docs/research/BOUNDED_RISK_EPROCESS_V1.md"
   "docs/research/EPROCESS_LIFETIME_ALPHA_SPENDING_V1.md"
   "docs/research/EPROCESS_PERSISTENT_VS_RESET_V1.md"
+  "docs/research/EPROCESS_DURABLE_CHECKPOINTS_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
