@@ -173,12 +173,16 @@ fn run() -> Result<(), String> {
     // This prevents a failed write from leaving a truncated "successful" report.
     let target = Path::new(output_path);
     let temporary = temporary_sibling_path(target)?;
+    // Open outside the cleanup closure: if create_new fails because another
+    // writer owns this temporary path, do not remove that writer's file.
+    let mut report = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+        .map_err(|error| {
+            format!("cannot create temporary report {}: {error}", temporary.display())
+        })?;
     let write_result = (|| -> Result<(), String> {
-        let mut report = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-            .map_err(|error| format!("cannot create temporary report {}: {error}", temporary.display()))?;
         writeln!(
             report,
             "scenario,shielded,metric,baseline_policy,candidate_policy,n_pairs,baseline_mean,candidate_mean,candidate_minus_baseline_mean,median_paired_delta,paired_bootstrap_ci95_low,paired_bootstrap_ci95_high,bootstrap_replicates,bootstrap_seed,baseline_violations,candidate_violations,candidate_only_violations,baseline_only_violations,mcnemar_exact_two_sided_p,baseline_violation_rate,candidate_violation_rate,baseline_violation_upper95_exact,candidate_violation_upper95_exact"
@@ -204,7 +208,9 @@ fn run() -> Result<(), String> {
             .map_err(|error| format!("cannot sync report: {error}"))?;
         drop(report);
         fs::rename(&temporary, target)
-            .map_err(|error| format!("cannot atomically publish report {}: {error}", target.display()))?;
+            .map_err(|error| {
+                format!("cannot atomically publish report {}: {error}", target.display())
+            })?;
         Ok(())
     })();
     if let Err(error) = write_result {
@@ -219,7 +225,9 @@ fn ensure_distinct_paths(input: &Path, output: &Path) -> Result<(), String> {
         .map_err(|error| format!("cannot resolve input CSV {}: {error}", input.display()))?;
     let canonical_output = canonical_output_path(output)?;
     if canonical_input == canonical_output {
-        return Err("input and output resolve to the same file; refusing to overwrite source data".to_owned());
+        return Err(
+            "input and output resolve to the same file; refusing to overwrite source data".to_owned(),
+        );
     }
     Ok(())
 }
@@ -298,7 +306,12 @@ fn is_slug(value: &str) -> bool {
     !value.is_empty()
         && value
             .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-' || byte == b'.')
+            .all(|byte| {
+                byte.is_ascii_alphanumeric()
+                    || byte == b'_'
+                    || byte == b'-'
+                    || byte == b'.'
+            })
 }
 
 fn write_summary_row(
@@ -364,7 +377,10 @@ mod tests {
 
     #[test]
     fn bootstrap_seed_is_stable_and_order_sensitive() {
-        assert_eq!(stable_scenario_seed("cartpole", false), stable_scenario_seed("cartpole", false));
+        assert_eq!(
+            stable_scenario_seed("cartpole", false),
+            stable_scenario_seed("cartpole", false)
+        );
         assert_ne!(stable_scenario_seed("ab", false), stable_scenario_seed("ba", false));
         assert_ne!(stable_scenario_seed("cartpole", false), stable_scenario_seed("cartpole", true));
     }
