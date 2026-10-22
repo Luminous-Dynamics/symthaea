@@ -230,7 +230,8 @@ fn main() {
                 // accepted dt is the smallest attempt within a successful call.
                 last_attempted_dt = Some(step.accepted_dt);
                 min_attempted_dt = Some(
-                    min_attempted_dt.map_or(step.accepted_dt, |previous| previous.min(step.accepted_dt)),
+                    min_attempted_dt
+                        .map_or(step.accepted_dt, |previous| previous.min(step.accepted_dt)),
                 );
 
                 let previous_time = time;
@@ -275,7 +276,8 @@ fn main() {
                 rejected_steps = rejected_steps.saturating_add(receipt.rejected_steps);
                 if let Some(observed_min) = receipt.min_attempted_dt {
                     min_attempted_dt = Some(
-                        min_attempted_dt.map_or(observed_min, |previous| previous.min(observed_min)),
+                        min_attempted_dt
+                            .map_or(observed_min, |previous| previous.min(observed_min)),
                     );
                 }
                 if let Some(observed_last) = receipt.last_attempted_dt {
@@ -320,7 +322,8 @@ fn main() {
         if status_detail.is_empty() {
             status_detail = "fixed attempt budget reached before the final sample time".to_owned();
         } else {
-            status_detail.push_str("; fixed global attempt budget reached before the final sample time");
+            status_detail
+                .push_str("; fixed global attempt budget reached before the final sample time");
         }
     }
 
