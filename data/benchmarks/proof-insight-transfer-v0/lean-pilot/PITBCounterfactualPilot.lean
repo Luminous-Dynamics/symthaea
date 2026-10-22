@@ -26,7 +26,7 @@ theorem identity_statement_iff_true_function :
     (∀ n : Nat, n = n) ↔ (∀ n : Nat, True) :=
   Iff.intro
     (fun _ n => True.intro)
-    (fun _ n => rfl
+    (fun _ n => rfl)
 
 /-- The strategy works when its required order hypothesis is available. -/
 theorem successor_monotonicity_with_premise
