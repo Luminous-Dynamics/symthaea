@@ -797,15 +797,13 @@ impl NetworkService {
     #[cfg(all(feature = "swarm", feature = "pqc-handshake"))]
     async fn run_pqc_exchange(
         &self,
-        peer_id: &str,
+        _peer_id: &str,
         _channel: &super::iroh::IrohChannel,
         _classical_nonce: &[u8],
         _pqc: &Arc<RwLock<super::pqc_handshake::PqcHandshakeManager>>,
     ) -> SwarmResult<()> {
         Err(SwarmError::TrustVerificationError {
-            reason: format!(
-                "PQC session establishment is not implemented for {peer_id}:                  responder-side ciphertext delivery, decapsulation, transcript binding,                  and key confirmation are missing"
-            ),
+            reason: "PQC session establishment is not implemented: responder-side ciphertext delivery, decapsulation, transcript binding, and key confirmation are missing".to_string(),
         })
     }
 
