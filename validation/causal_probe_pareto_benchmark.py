@@ -31,14 +31,24 @@ def fixtures():
 
 
 def distribution_mixture(models, weights, action, noise, q):
+    if not models or len(models) != len(weights):
+        raise ValueError("mixture model/weight lengths must match and be nonempty")
+    if any(weight < 0.0 for weight in weights):
+        raise ValueError("mixture weights must be nonnegative")
+    weight_total = sum(weights)
+    if weight_total <= 0.0:
+        raise ValueError("mixture weights must have positive total")
     out = {}
     for model, weight in zip(models, weights):
+        normalized_weight = weight / weight_total
         for y, py in outcome_distribution(model, action, noise, q).items():
-            out[y] = out.get(y, 0.0) + weight * py
+            out[y] = out.get(y, 0.0) + normalized_weight * py
     total = sum(out.values())
     if total <= 0.0:
         raise ValueError("mixture predictive has zero mass")
-    return {y: p / total for y, p in out.items()}
+    if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=1e-12):
+        raise AssertionError(f"mixture predictive failed to normalize: {total}")
+    return out
 
 
 def js_divergence(p, q):
@@ -63,7 +73,7 @@ def action_components(models, posterior, ood_reference, action, noise, assumed_q
         post = update(models, posterior, action, y, noise, assumed_q)
         expected_h_after += py * entropy(graph_posterior(models, post).values())
     eig = max(0.0, graph_h_before - expected_h_after)
-    ood_pred = distribution_mixture(ood_reference, (0.5, 0.5), action, noise, assumed_q)
+    ood_pred = distribution_mixture(ood_reference, [1.0] * len(ood_reference), action, noise, assumed_q)
     divergence = js_divergence(pred, ood_pred)
     return eig, divergence
 
@@ -196,7 +206,7 @@ def self_test():
             for world in (*models, *refs, test):
                 for action in actions:
                     p = outcome_distribution(world, action, noise, q)
-                    assert math.isclose(sum(p.values()), 1.0, abs_tol=1e-12, rel_tol=0.0)
+                    assert math.isclose(sum(p.values()), 1.0, rel_tol=0.0, abs_tol=1e-12)
     for action in actions:
         eig, jsd = action_components(models, (0.5, 0.5), refs, action, 0.1, 1.0)
         assert eig >= -1e-12 and 0.0 <= jsd <= 1.0 + 1e-12
