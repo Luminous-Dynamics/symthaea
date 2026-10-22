@@ -122,17 +122,11 @@ impl ActionRegistry {
                     recursive: false,
                 })
             })
-            .register("NIX_BUILD", |ctx| {
-                let _path = ctx
-                    .target_path
-                    .clone()
-                    .unwrap_or_else(|| PathBuf::from("."));
-                Ok(ActionIR::RunCommand {
-                    program: "nix".into(),
-                    args: vec!["--version".into()],
-                    env: BTreeMap::new(),
-                    working_dir: None,
-                })
+            .register("NIX_BUILD", |_ctx| {
+                Err(ActionError::ValidationFailed(
+                    "NIX_BUILD requires an explicit build target/profile; legacy nix --version probe disabled"
+                        .into(),
+                ))
             })
             .register("CARGO_TEST", |ctx| {
                 let path = ctx
@@ -263,5 +257,32 @@ impl PrimitiveExecutor {
             }
         }
         Ok(actions)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nix_build_cannot_resolve_to_version_probe() {
+        let registry = ActionRegistry::standard();
+        let err = registry
+            .resolve("NIX_BUILD", &ActionContext::default())
+            .expect_err("NIX_BUILD must fail closed until real build semantics are explicit");
+        let message = format!("{err}");
+        assert!(message.contains("explicit build target/profile"));
+        assert!(!message.contains("--version"));
+    }
+
+    #[test]
+    fn nix_version_probe_is_not_exposed_as_nix_build() {
+        let registry = ActionRegistry::standard();
+        let context = ActionContext {
+            target_path: Some(PathBuf::from(".")),
+            ..Default::default()
+        };
+        let result = registry.resolve("NIX_BUILD", &context);
+        assert!(result.is_err());
     }
 }
