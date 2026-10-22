@@ -1,0 +1,37 @@
+name: Larsen Basin Assessment V0
+
+on:
+  pull_request:
+    paths:
+      - "research/larsen-basin-repro/**"
+      - "scripts/check-larsen-basin-assessment.sh"
+      - ".github/workflows/larsen-basin-assessment.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/larsen-basin-repro/**"
+      - "scripts/check-larsen-basin-assessment.sh"
+      - ".github/workflows/larsen-basin-assessment.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: larsen-basin-assessment-v0-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  table-transcription-audit:
+    name: Audit USGS published table and negative controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact source revision
+        uses: actions/checkout@v4
+
+      - name: Verify jq is available
+        run: command -v jq
+
+      - name: Run the published-table audit
+        run: bash scripts/check-larsen-basin-assessment.sh
