@@ -53,6 +53,8 @@ The checker performs breadth-first exploration from the initial state. For each 
 
 The exact lifecycle graph is pinned at 84 reachable abstract states and 1,344 state/action transitions; the Rust test prints both counts and fails if either changes. A changed count requires reviewing the state/action space rather than silently accepting a smaller graph.
 
+The test suite now stores a breadth-first shortest event-history witness for each reachable abstract state. For every state it appends every one of the 16 actions, feeds each resulting history through the production JSON trace checker, and compares the ordered violation codes to those returned by replaying the abstract model. This gives 84 × 16 = 1,344 model-to-production edge comparisons, in addition to state invariants and the 18 orthogonal policy truth tables. It is a same-repository differential check: a matching result catches implementation divergence, but shared requirements and abstractions mean it is not an independent clinical oracle. The newest exact-head workflow must pass before these comparisons count as verified evidence.
+
 A second exhaustive test covers 18 **orthogonal policy combinations** that are deliberately kept outside the lifecycle product graph to prevent a Cartesian state-space explosion:
 
 - Six connectivity/requirement combinations: online, offline, or intermittent connectivity when the core workflow either does or does not require the network.
