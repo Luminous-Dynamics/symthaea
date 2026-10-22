@@ -1,4 +1,4 @@
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -320,14 +320,19 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
             let final_disposition = adjudication.final_disposition.as_deref()
                 .context(format!("case {} lacks a final disposition", case.case_id))?;
             ensure!(!final_disposition.trim().is_empty(), "case {} final disposition is blank", case.case_id);
-            if initial_dispositions.len() > 1 {
+
+            let requires_adjudicator =
+                initial_dispositions.len() > 1 || adjudication.status == "REVISED";
+            if requires_adjudicator {
                 let adjudicator_id = adjudication.adjudicator_id.as_deref()
-                    .context(format!("case {} has disagreement but no third-party adjudicator", case.case_id))?;
+                    .context(format!("case {} requires an independent adjudicator", case.case_id))?;
                 ensure!(
                     !initial_reviewers.contains(adjudicator_id),
-                    "case {} disagreement adjudicator must differ from initial reviewers",
+                    "case {} adjudicator must differ from initial reviewers",
                     case.case_id
                 );
+            }
+            if let Some(adjudicator_id) = adjudication.adjudicator_id.as_deref() {
                 let adjudicator = reviewers.get(adjudicator_id)
                     .with_context(|| format!("case {} refers to undeclared adjudicator {}", case.case_id, adjudicator_id))?;
                 ensure!(
@@ -337,7 +342,8 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
                     "case {} adjudicator is not independent or has an unmanaged conflict",
                     case.case_id
                 );
-            } else if adjudication.status == "ACCEPTED" {
+            }
+            if adjudication.status == "ACCEPTED" && initial_dispositions.len() == 1 {
                 ensure!(
                     initial_dispositions.iter().next().copied() == Some(final_disposition),
                     "case {} accepted disposition differs from unanimous initial judgments",
@@ -346,11 +352,11 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
             }
             adjudicated_count += 1;
         } else {
-            indeterminate_count += usize::from(adjudication.status == "INDETERMINATE");
+            indeterminate_count += if adjudication.status == "INDETERMINATE" { 1 } else { 0 };
             unresolved_count += 1;
         }
         if case.risk_level == "critical" {
-            critical_reviewed += usize::from(initial_reviewers.len() >= 2);
+            critical_reviewed += if initial_reviewers.len() >= 2 { 1 } else { 0 };
         }
         for dissent in &case.dissent {
             ensure!(
