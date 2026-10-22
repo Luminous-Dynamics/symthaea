@@ -30,7 +30,7 @@ Each row is stratified by seed, poison-entry count, poison corruption, and query
 - **Attacker prediction rate** across all genuine queries.
 - **Targeted attack success rate** among queries whose genuine class has a poison entry, plus the conditional attacker success rate among accepted targeted queries.
 - **Entry count** and estimated vector payload bytes, excluding labels, runtime overhead, allocator capacity, and indexes.
-- **p50/p95 exact-scan latency**, scan-loop wall time, and aggregate single-thread query throughput. These timings include ranking only and must not be compared with ANN-database throughput absent matched hardware, corpus, batching, warm-up, memory accounting, and ground-truth protocol.
+- **p50/p95 exact-scan latency**, scan-loop wall time, and aggregate single-thread query throughput. Per-query p50/p95 measures the `rank` call; scan-loop wall time and aggregate QPS also include per-query timing calls and metric bookkeeping, but exclude query generation and registry construction. These figures must not be compared with ANN-database throughput absent matched hardware, corpus, batching, warm-up, memory accounting, and ground-truth protocol.
 - Registry-build time in a comment record. This is kept separate from query/scan timing.
 
 Rates stay separated by seed and noise level so aggregate averages cannot hide an attack that is highly effective in a particular regime. The 3-seed, 8-query-per-class smoke setup is not enough for tight confidence intervals; it is meant to establish a reproducible measurement contract and regression controls.
