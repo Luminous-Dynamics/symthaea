@@ -89,6 +89,16 @@ pub struct MisSamplingTrial {
     pub uniform_shots_by_vertex: Vec<u64>,
     /// Uniform inclusion count for each candidate.
     pub uniform_successes_by_vertex: Vec<u64>,
+    /// Selected candidate for fixed-budget Successive Rejects.
+    pub successive_rejects_selected_vertex: usize,
+    /// Whether Successive Rejects selected a candidate with the maximal synthetic mean.
+    pub successive_rejects_correct: bool,
+    /// Total observations consumed by Successive Rejects (never above the configured budget).
+    pub successive_rejects_total_shots: u64,
+    /// Successive Rejects observation count for each candidate.
+    pub successive_rejects_shots_by_vertex: Vec<u64>,
+    /// Successive Rejects inclusion count for each candidate.
+    pub successive_rejects_successes_by_vertex: Vec<u64>,
 }
 
 /// Counts accumulated from paired adaptive-vs-uniform synthetic trials.
@@ -112,6 +122,12 @@ pub struct MisSamplingAggregate {
     pub uniform_incorrect: u64,
     /// Sum of candidate observations used by the uniform baseline.
     pub uniform_total_shots: u128,
+    /// Correct Successive Rejects selections.
+    pub successive_rejects_correct: u64,
+    /// Incorrect Successive Rejects selections.
+    pub successive_rejects_incorrect: u64,
+    /// Sum of candidate observations used by Successive Rejects.
+    pub successive_rejects_total_shots: u128,
 }
 
 impl MisSamplingAggregate {
@@ -141,9 +157,19 @@ impl MisSamplingAggregate {
         self.uniform_total_shots as f64 / self.trial_count as f64
     }
 
-    /// Fraction of uniform-baseline trials selecting the synthetic best candidate.
+    /// Fraction of uniform-baseline trials selecting a synthetic best candidate.
     pub fn uniform_accuracy(&self) -> f64 {
         ratio(self.uniform_correct, self.trial_count)
+    }
+
+    /// Fraction of Successive Rejects trials selecting a synthetic best candidate.
+    pub fn successive_rejects_accuracy(&self) -> f64 {
+        ratio(self.successive_rejects_correct, self.trial_count)
+    }
+
+    /// Mean observations per Successive Rejects trial.
+    pub fn successive_rejects_mean_shots(&self) -> f64 {
+        self.successive_rejects_total_shots as f64 / self.trial_count as f64
     }
 }
 
@@ -212,13 +238,13 @@ impl From<MisShotBudgetError> for MisSamplingSimulationError {
     }
 }
 
-/// Simulate paired adaptive and uniform fixed-budget policies on synthetic Bernoulli arms.
+/// Simulate paired adaptive, uniform fixed-budget, and Successive Rejects policies on synthetic Bernoulli arms.
 ///
-/// The policies receive common random-number streams, derived deterministically from
-/// `master_seed`, trial index, and candidate identity. The adaptive arm receives only
-/// the observations it requests; the baseline takes a uniform fixed allocation that
-/// spends exactly `config.max_total_shots`. Since this is a synthetic independent-arm
-/// model, results do not establish quantum advantage or predict final MIS quality.
+/// All policies receive candidate-specific deterministic streams derived from the same
+/// trial seed. Adaptive sampling uses only requested observations, uniform sampling
+/// spends exactly `config.max_total_shots`, and Successive Rejects uses a standard
+/// staged fixed-budget allocation bounded by that total. This synthetic independent-arm
+/// model does not establish quantum advantage or predict final MIS quality.
 pub fn simulate_mis_sampling_scenario(
     scenario: &MisSamplingScenario,
     config: MisShotBudgetConfig,
@@ -337,6 +363,12 @@ pub fn simulate_mis_sampling_scenario(
         if uniform_total_shots != config.max_total_shots {
             return Err(MisSamplingSimulationError::BudgetInvariantViolation);
         }
+        let (successive_rejects_selected_vertex, successive_rejects_shots_by_vertex,
+            successive_rejects_successes_by_vertex, successive_rejects_total_shots) =
+            run_successive_rejects(&scenario.inclusion_probabilities, config.max_total_shots, trial_seed)?;
+        if successive_rejects_total_shots > config.max_total_shots {
+            return Err(MisSamplingSimulationError::BudgetInvariantViolation);
+        }
 
         output.push(MisSamplingTrial {
             scenario_name: scenario.name.clone(),
@@ -355,6 +387,12 @@ pub fn simulate_mis_sampling_scenario(
             uniform_total_shots,
             uniform_shots_by_vertex: uniform_shots,
             uniform_successes_by_vertex: uniform_successes,
+            successive_rejects_selected_vertex,
+            successive_rejects_correct: scenario.inclusion_probabilities[successive_rejects_selected_vertex]
+                == scenario.inclusion_probabilities[true_best_vertex],
+            successive_rejects_total_shots,
+            successive_rejects_shots_by_vertex,
+            successive_rejects_successes_by_vertex,
         });
     }
 
@@ -378,11 +416,20 @@ pub fn aggregate_mis_sampling_trials(
         uniform_correct: 0,
         uniform_incorrect: 0,
         uniform_total_shots: 0,
+        successive_rejects_correct: 0,
+        successive_rejects_incorrect: 0,
+        successive_rejects_total_shots: 0,
     };
 
     for trial in trials {
         aggregate.adaptive_total_shots += u128::from(trial.adaptive_total_shots);
         aggregate.uniform_total_shots += u128::from(trial.uniform_total_shots);
+        aggregate.successive_rejects_total_shots += u128::from(trial.successive_rejects_total_shots);
+        if trial.successive_rejects_correct {
+            aggregate.successive_rejects_correct += 1;
+        } else {
+            aggregate.successive_rejects_incorrect += 1;
+        }
         if trial.adaptive_selected_vertex.is_some() {
             aggregate.adaptive_selected += 1;
             match trial.adaptive_correct {
@@ -406,6 +453,95 @@ pub fn aggregate_mis_sampling_trials(
         }
     }
     Ok(aggregate)
+}
+
+/// Fixed-budget Successive Rejects baseline for iid synthetic Bernoulli arms.
+///
+/// Uses the staged allocation from Audibert, Bubeck & Munos (2010), with
+/// n_k = ceil((T-K)/(H_K-1/2)/(K+1-k)) samples per still-active arm by stage k.
+/// Eliminates the arm with the smallest empirical mean after each stage. It spends
+/// at most T observations; ceiling effects may leave a small amount unused.
+/// This implementation is included as an established baseline, not claimed as novel.
+fn run_successive_rejects(
+    probabilities: &[f64],
+    total_budget: u64,
+    trial_seed: u64,
+) -> Result<(usize, Vec<u64>, Vec<u64>, u64), MisSamplingSimulationError> {
+    let candidate_count = probabilities.len();
+    if candidate_count == 0 {
+        return Err(MisSamplingSimulationError::EmptyCandidates);
+    }
+    if total_budget < candidate_count as u64 {
+        return Err(MisSamplingSimulationError::BudgetSmallerThanCandidateCount {
+            budget: total_budget,
+            candidates: candidate_count,
+        });
+    }
+
+    let mut rngs = make_candidate_rngs(trial_seed, candidate_count);
+    let mut shots = vec![0_u64; candidate_count];
+    let mut successes = vec![0_u64; candidate_count];
+
+    if candidate_count == 1 {
+        successes[0] = sample_bernoulli(probabilities[0], total_budget, &mut rngs[0]);
+        shots[0] = total_budget;
+        return Ok((0, shots, successes, total_budget));
+    }
+
+    // Degenerate minimum budget: sample every candidate once and use a deterministic
+    // empirical argmax; there is no remaining budget for meaningful elimination stages.
+    if total_budget == candidate_count as u64 {
+        for vertex in 0..candidate_count {
+            shots[vertex] = 1;
+            successes[vertex] = sample_bernoulli(probabilities[vertex], 1, &mut rngs[vertex]);
+        }
+        let selected = best_empirical_rate(&shots, &successes)?;
+        return Ok((selected, shots.clone(), successes, sum_shots(&shots)?));
+    }
+
+    // H_K - 1/2: the standard Successive Rejects normalizer.
+    let harmonic_minus_half = 0.5
+        + (2..=candidate_count).map(|index| 1.0 / index as f64).sum::<f64>();
+    let scaled_budget = (total_budget - candidate_count as u64) as f64 / harmonic_minus_half;
+    let mut active = (0..candidate_count).collect::<Vec<_>>();
+    let mut previous_target = 0_u64;
+
+    for stage in 1..candidate_count {
+        let denominator = (candidate_count + 1 - stage) as f64;
+        let target = (scaled_budget / denominator).ceil() as u64;
+        let target = target.max(previous_target);
+        let additional = target - previous_target;
+
+        for &vertex in &active {
+            let added = sample_bernoulli(probabilities[vertex], additional, &mut rngs[vertex]);
+            shots[vertex] = shots[vertex]
+                .checked_add(additional)
+                .ok_or(MisSamplingSimulationError::ShotCountOverflow)?;
+            successes[vertex] = successes[vertex]
+                .checked_add(added)
+                .ok_or(MisSamplingSimulationError::ShotCountOverflow)?;
+        }
+        previous_target = target;
+
+        // At a stage all active arms have the same number of samples. Counts therefore
+        // compare empirical means exactly without floating-point ratios.
+        let mut worst = active[0];
+        for &candidate in active.iter().skip(1) {
+            if successes[candidate] < successes[worst]
+                || (successes[candidate] == successes[worst] && candidate > worst)
+            {
+                worst = candidate;
+            }
+        }
+        active.retain(|&vertex| vertex != worst);
+    }
+
+    let selected = *active.first().expect("at least one arm survives Successive Rejects");
+    let used = sum_shots(&shots)?;
+    if used > total_budget {
+        return Err(MisSamplingSimulationError::BudgetInvariantViolation);
+    }
+    Ok((selected, shots, successes, used))
 }
 
 fn uniform_allocations(total_budget: u64, candidate_count: usize) -> Vec<u64> {
