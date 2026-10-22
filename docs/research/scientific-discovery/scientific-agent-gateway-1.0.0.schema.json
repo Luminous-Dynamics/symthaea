@@ -1,0 +1,14 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://symthaea.luminousdynamics.io/schemas/scientific-agent-gateway-1.0.0.json",
+  "title":"Scientific Agent Proposal Gateway",
+  "type":"object",
+  "required":["schema","schema_version","authority","allowed_disposition","forbidden_promotions"],
+  "properties":{
+    "schema":{"const":"symthaea.scientific_discovery.agent_gateway"},
+    "schema_version":{"const":"1.0.0"},
+    "authority":{"const":"proposal_ingress_only"},
+    "allowed_disposition":{"const":"AcceptedForPlanning"},
+    "forbidden_promotions":{"type":"array","items":{"enum":["Observation","IndependentReplication","OfficialCriterionEvidence"]},"minItems":3,"maxItems":3,"uniqueItems":true}
+  }
+}
