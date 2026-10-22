@@ -225,7 +225,6 @@ fn main() -> BenchResult<()> {
                 }
             }
         }
-
     }
 
     println!("# total_runtime_ms={}", started.elapsed().as_millis());
@@ -447,8 +446,16 @@ mod tests {
         let poisoned_ranked = rank(&replaced, &prototypes[target]).expect("replacement rank");
 
         assert_eq!(clean.len(), CLASS_COUNT);
-        assert_eq!(replaced.len(), clean.len(), "replacement must preserve entry budget");
-        assert!(replaced.iter().all(|entry| entry.label != format!("id-{target:02}")));
+        assert_eq!(
+            replaced.len(),
+            clean.len(),
+            "replacement must preserve entry budget"
+        );
+        assert!(
+            replaced
+                .iter()
+                .all(|entry| entry.label != format!("id-{target:02}"))
+        );
         assert_eq!(poisoned_ranked.label, format!("attacker-{target:02}-00"));
         assert!(poisoned_ranked.similarity > clean_ranked.similarity - f64::EPSILON);
         assert!(poisoned_ranked.margin >= MIN_TOP_TWO_MARGIN);
