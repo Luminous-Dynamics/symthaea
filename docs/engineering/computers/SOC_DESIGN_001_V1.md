@@ -6,7 +6,7 @@
 **Canonical HDC hardware owners:** [#5804](https://github.com/Luminous-Dynamics/symthaea/issues/5804), [#5805](https://github.com/Luminous-Dynamics/symthaea/issues/5805), [#5808](https://github.com/Luminous-Dynamics/symthaea/issues/5808)  
 **Silicon evidence ladder:** [#5800](https://github.com/Luminous-Dynamics/symthaea/issues/5800)  
 **Phone benchmark:** [#8413](https://github.com/Luminous-Dynamics/symthaea/issues/8413) · **Laptop benchmark:** [#8446](https://github.com/Luminous-Dynamics/symthaea/issues/8446)  
-**Symtropy thermal-model qualification:** [#2697](https://github.com/Luminous-Dynamics/symtropy/issues/2697)  
+**Symtropy thermal-model qualification:** [#2697](https://github.com/Luminous-Dynamics/symtropy/issues/2697) · **Symtropy architecture search:** [#2706](https://github.com/Luminous-Dynamics/symtropy/issues/2706)  
 **Version:** 1.0 · **2026-10-22**
 
 ## Executive design decision
