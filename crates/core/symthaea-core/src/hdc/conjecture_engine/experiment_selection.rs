@@ -446,13 +446,10 @@ pub fn expected_information_gain_with_prior_nats<H, E>(
                 } else {
                     -0.5 * separation * separation - z * separation
                 };
-                log_terms.push(
-                    log_prior_probabilities[other_index] + log_likelihood_ratio,
-                );
+                log_terms.push(log_prior_probabilities[other_index] + log_likelihood_ratio);
             }
             let log_mixture_ratio = log_sum_exp(&log_terms);
-            information_gain -=
-                (weight / weight_sum) * true_probability * log_mixture_ratio;
+            information_gain -= (weight / weight_sum) * true_probability * log_mixture_ratio;
         }
     }
 
@@ -905,33 +902,53 @@ mod tests {
     fn weighted_information_gain_rejects_invalid_priors_and_accepts_zero_mass() {
         let hypotheses = [0_i32, 1, 2];
         assert!(
-            expected_information_gain_with_prior_nats(&(), &hypotheses, &[1.0, 2.0], 1.0, |h, _| {
-                Some(*h as f64)
-            })
+            expected_information_gain_with_prior_nats(
+                &(),
+                &hypotheses,
+                &[1.0, 2.0],
+                1.0,
+                |h, _| Some(*h as f64),
+            )
             .is_none()
         );
         assert!(
-            expected_information_gain_with_prior_nats(&(), &hypotheses, &[1.0, -1.0, 1.0], 1.0, |h, _| {
-                Some(*h as f64)
-            })
+            expected_information_gain_with_prior_nats(
+                &(),
+                &hypotheses,
+                &[1.0, -1.0, 1.0],
+                1.0,
+                |h, _| Some(*h as f64),
+            )
             .is_none()
         );
         assert!(
-            expected_information_gain_with_prior_nats(&(), &hypotheses, &[0.0, 0.0, 0.0], 1.0, |h, _| {
-                Some(*h as f64)
-            })
+            expected_information_gain_with_prior_nats(
+                &(),
+                &hypotheses,
+                &[0.0, 0.0, 0.0],
+                1.0,
+                |h, _| Some(*h as f64),
+            )
             .is_none()
         );
         assert!(
-            expected_information_gain_with_prior_nats(&(), &hypotheses, &[1.0, f64::NAN, 1.0], 1.0, |h, _| {
-                Some(*h as f64)
-            })
+            expected_information_gain_with_prior_nats(
+                &(),
+                &hypotheses,
+                &[1.0, f64::NAN, 1.0],
+                1.0,
+                |h, _| Some(*h as f64),
+            )
             .is_none()
         );
         assert_eq!(
-            expected_information_gain_with_prior_nats(&(), &hypotheses, &[0.0, 0.0, 1.0], 1.0, |h, _| {
-                Some(*h as f64)
-            }),
+            expected_information_gain_with_prior_nats(
+                &(),
+                &hypotheses,
+                &[0.0, 0.0, 1.0],
+                1.0,
+                |h, _| Some(*h as f64),
+            ),
             Some(0.0)
         );
     }
