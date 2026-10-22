@@ -665,6 +665,8 @@ fn validate_evaluation_receipt(receipt: &Value) -> Vec<String> {
     let oracle = &receipt["oracle_adjudication"];
     let oracle_complete = oracle["status"].as_str() == Some("COMPLETE")
         && oracle["ledger_sha256"].as_str().is_some_and(|s| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()))
+        && oracle["case_id_inventory_sha256"].as_str()
+            == case_set.get("inventory_sha256").and_then(Value::as_str)
         && oracle["protocol_sha256"].as_str().is_some_and(|s| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()))
         && oracle["rubric_sha256"].as_str() == receipt["evaluator"]["rubric_sha256"].as_str()
         && oracle["expected_case_count"].as_u64() == Some(expected as u64)
@@ -875,6 +877,14 @@ fn evaluation_receipt_requires_auditable_oracle_review_before_comparison() {
     assert!(
         validate_evaluation_receipt(&receipt).is_empty(),
         "fully reviewed synthetic fixture should satisfy the receipt cross-field contract"
+    );
+
+    let mut wrong_inventory = receipt.clone();
+    wrong_inventory["oracle_adjudication"]["case_id_inventory_sha256"] = Value::String("0".repeat(64));
+    let inventory_errors = validate_evaluation_receipt(&wrong_inventory);
+    assert!(
+        inventory_errors.iter().any(|error| error.contains("comparison_eligibility must be NOT_COMPARABLE")),
+        "oracle evidence bound to a different case inventory must not be compared"
     );
 
     // One case without two independent initial reviews blocks comparison even
