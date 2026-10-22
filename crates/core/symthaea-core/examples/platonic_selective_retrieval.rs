@@ -1020,7 +1020,7 @@ fn area_under_generalized_risk_coverage(
         index = end;
     }
 
-    (area.clamp(0.0, 0.5), confidence_levels)
+    (area, confidence_levels)
 }
 
 /// Conformal nonconformity is 1 - similarity to the true target. The
