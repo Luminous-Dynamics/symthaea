@@ -10,12 +10,14 @@
 //! from repeatedly applying a batch conformal p-value, and distinct from the finite-horizon
 //! Bonferroni baseline in sequential_adequacy.
 //!
-//! Validity depends on the data protocol, not on this Rust type alone: under the null, reference
-//! and online scores must follow the declared exchangeability/i.i.d. protocol; the score function
-//! must stay fixed; and tie breakers for atomic scores must be independent Uniform(0,1) draws.
-//! Callers pass tie breakers explicitly so their source and provenance can be recorded. This
-//! implementation validates their numeric range but cannot prove randomness, independence, or
-//! exchangeability.
+//! Validity depends on the data protocol, not on this Rust type alone. The paper's anytime
+//! type-I guarantee is marginal over the jointly sampled calibration reference and online stream;
+//! it is not generally conditional on the exact realized numeric reference sample. Under the null,
+//! calibration and online scores must be i.i.d./exchangeable under a frozen scoring rule, and tie
+//! breakers for atomic scores must be independent Uniform(0,1) draws. The martingale filtration is
+//! the history of ranks, not arbitrary information about raw scores. Callers pass tie breakers
+//! explicitly so their source and provenance can be recorded. This implementation validates their
+//! numeric range but cannot prove randomness, independence, or exchangeability.
 //!
 //! The portfolio is 0.5 times the Order e-process plus 0.5 times the Dispersion e-process. Each
 //! constituent uses the paper's online Newton step betting update. Wealth is accumulated in log
