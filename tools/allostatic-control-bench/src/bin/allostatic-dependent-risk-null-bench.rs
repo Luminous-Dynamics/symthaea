@@ -214,8 +214,6 @@ fn run_trial(condition: Condition, trial: usize) -> Result<TrialOutcome, Box<dyn
     let mut low_persistent_result = StrategyOutcome::default();
     let mut high_reset_result = StrategyOutcome::default();
     let mut low_reset_result = StrategyOutcome::default();
-    let mut high_reset_episode_alarmed = false;
-    let mut low_reset_episode_alarmed = false;
 
     for step in 0..TOTAL_STEPS {
         let transition_roll = next_uniform(&mut random_state);
@@ -236,7 +234,7 @@ fn run_trial(condition: Condition, trial: usize) -> Result<TrialOutcome, Box<dyn
         let loss = next_uniform(&mut random_state) < loss_probability;
         losses.push(loss);
         loss_events += usize::from(loss);
-        let bounded_loss = f64::from(loss);
+        let bounded_loss = if loss { 1.0 } else { 0.0 };
 
         let high_persistent_alarm = high_persistent.observe(bounded_loss).ok_or_else(|| {
             IoError::new(ErrorKind::InvalidData, "high-bet persistent monitor rejected loss")
@@ -255,8 +253,6 @@ fn run_trial(condition: Condition, trial: usize) -> Result<TrialOutcome, Box<dyn
             let next_episode_index = (step / EPISODE_LENGTH + 1) as u64;
             high_reset = make_monitor(HIGH_BETS, Some(next_episode_index))?;
             low_reset = make_monitor(LOW_BETS, Some(next_episode_index))?;
-            high_reset_episode_alarmed = false;
-            low_reset_episode_alarmed = false;
         }
 
         let high_reset_was_alarmed = high_reset.alarmed();
@@ -265,7 +261,6 @@ fn run_trial(condition: Condition, trial: usize) -> Result<TrialOutcome, Box<dyn
         })?;
         if high_reset_alarm && !high_reset_was_alarmed {
             high_reset_result.alarm_episodes += 1;
-            high_reset_episode_alarmed = true;
             if high_reset_result.first_alarm_step.is_none() {
                 high_reset_result.first_alarm_step = Some(step);
             }
@@ -277,12 +272,10 @@ fn run_trial(condition: Condition, trial: usize) -> Result<TrialOutcome, Box<dyn
         })?;
         if low_reset_alarm && !low_reset_was_alarmed {
             low_reset_result.alarm_episodes += 1;
-            low_reset_episode_alarmed = true;
             if low_reset_result.first_alarm_step.is_none() {
                 low_reset_result.first_alarm_step = Some(step);
             }
         }
-        let _ = (high_reset_episode_alarmed, low_reset_episode_alarmed);
     }
 
     Ok(TrialOutcome {
@@ -332,12 +325,15 @@ fn summary_row(output: &mut String, condition: Condition, summary: &ConditionSum
         format!("{mean_regime_transitions:.6}"),
     ];
 
-    for strategy in [
+    for (index, strategy) in [
         &summary.high_persistent,
         &summary.high_reset,
         &summary.low_persistent,
         &summary.low_reset,
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let (ci_low, ci_high) = strategy.wilson_interval();
         fields.push(strategy.alarms.to_string());
         fields.push(format!("{:.9}", strategy.alarm_rate()));
@@ -346,7 +342,12 @@ fn summary_row(output: &mut String, condition: Condition, summary: &ConditionSum
         fields.push(strategy.false_alarms.to_string());
         fields.push(strategy.missed_shifts.to_string());
         fields.push(optional_float(strategy.mean_detection_step()));
-        fields.push(format!("{:.6}", strategy.reset_alarm_episodes as f64 / summary.trials as f64));
+        if index == 1 || index == 3 {
+            fields.push(format!(
+                "{:.6}",
+                strategy.reset_alarm_episodes as f64 / summary.trials as f64
+            ));
+        }
     }
     fields.push(format!("{GLOBAL_DELTA:.6}"));
     fields.push(format!("{RISK_BOUND:.6}"));
