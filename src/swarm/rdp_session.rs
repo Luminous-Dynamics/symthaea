@@ -365,18 +365,50 @@ impl RdpSession {
     /// **Mutability note**: this used to be `&self` before the replay
     /// window was added in Phase I.A.5 Track 2.2. Callers must update to
     /// pass `&mut session`.
+    /// Open an authenticated envelope without imposing an application payload type.
+    ///
+    /// Prefer `open_with_payload_type` at protocol boundaries so a valid
+    /// ciphertext for one message class cannot be passed to a different decoder.
     #[cfg(feature = "mesh-encryption")]
     pub fn open(&mut self, envelope: &[u8]) -> Option<Vec<u8>> {
+        self.open_inner(envelope, None)
+    }
+
+    /// Open an authenticated envelope only when its nonce declares the expected
+    /// application payload type. The type is checked before decryption or
+    /// deserialization; AEAD still authenticates the complete nonce and payload.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn open_with_payload_type(
+        &mut self,
+        envelope: &[u8],
+        expected_payload_type: u8,
+    ) -> Option<Vec<u8>> {
+        self.open_inner(envelope, Some(expected_payload_type))
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    fn open_inner(
+        &mut self,
+        envelope: &[u8],
+        expected_payload_type: Option<u8>,
+    ) -> Option<Vec<u8>> {
         use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, aead::Aead};
 
-        // (1) length check
+        // (1) Length check before reading the nonce.
         if envelope.len() < 12 + 16 {
             return None;
         }
         let (nonce_bytes, ciphertext) = envelope.split_at(12);
+
+        // The nonce prefix is attacker-controlled until AEAD verification, but
+        // this equality check is only a cheap dispatch guard. A matching value
+        // is never trusted without the subsequent AEAD authentication.
+        if expected_payload_type.is_some_and(|expected| nonce_bytes[6] != expected) {
+            return None;
+        }
         let nonce = Nonce::from_slice(nonce_bytes);
 
-        // (2) AEAD verify with current key, then prev_session_key fallback.
+        // (2) AEAD verify with current key, then previous-session-key fallback.
         let plaintext = if let Some(key) = self.session_key.as_ref() {
             let cipher = ChaCha20Poly1305::new(key.into());
             if let Ok(pt) = cipher.decrypt(nonce, ciphertext) {
@@ -394,15 +426,9 @@ impl RdpSession {
             None
         }?;
 
-        // (3) Replay window: extract source_id (high 6 bytes of nonce
-        // bytes 0..6, padded to u64) and payload_type (nonce byte 6) and
-        // sequence (nonce bytes 8..12). Note: the seal path puts source_id
-        // in nonce[0..6] (6 bytes), so we read those 6 bytes into the low
-        // 48 bits of a u64 stream key. epoch (nonce[7]) is not part of
-        // the replay window key — different epochs are different sessions
-        // semantically, but a rekey within the same session does not
-        // change source_id, so the window correctly persists across
-        // rekey for the same logical stream.
+        // (3) Replay window: extract source_id (first 6 nonce bytes), payload
+        // type (byte 6), and sequence (bytes 8..12). Keep the payload type in
+        // the replay key so each authenticated stream has an independent window.
         let mut source_id_u64 = 0u64;
         for (i, b) in nonce_bytes[..6].iter().enumerate() {
             source_id_u64 |= (*b as u64) << (i * 8);
@@ -419,7 +445,6 @@ impl RdpSession {
             .replay_window
             .accept((source_id_u64, payload_type), seq)
         {
-            // AEAD passed but the message is a replay or too old. Drop.
             return None;
         }
 
