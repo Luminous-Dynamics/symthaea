@@ -242,6 +242,7 @@ A separate synthesis examines possible relations among love-consistent behavior,
 
 - [Cross-scale dynamics and experiment plan](structural-love-dynamics/CROSS_SCALE_DYNAMICS.md) distinguishes empirical, computational, normative, and phenomenological claims; proposes falsifiable hypotheses and ablation experiments; and audits current Symthaea measurement semantics.
 - [Issue #8274: audit Φ-dyad construct validity](https://github.com/Luminous-Dynamics/symthaea/issues/8274) tracks the concrete concern that current dyad inputs may be self-generated proxies rather than independent human observations. It requires provenance, construct separation, and negative controls before interpreting those outputs relationally.
+- [Issue #8291: break the endogenous Φ-dyad feedback loop](https://github.com/Luminous-Dynamics/symthaea/issues/8291) traces the full path from user-input embedding → synthetic nominal partner state → `last_phi_dyad` → `relational_psi` → the next cognitive tick. It requires evidence-gated feedback and compatibility analysis, not just relabeling the metric.
 
 The cross-scale extension is MeasurementOnly: it does not authorize runtime changes, claim that Φ measures love, or establish subjective experience.
 
