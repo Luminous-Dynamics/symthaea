@@ -197,7 +197,17 @@ A custom block should proceed beyond research only if it:
 
 These proposed gates are deliberately demanding. If only FPGA LUTs or modeled energy are available, report a research result—not a product claim. A claim of broad SOTA superiority requires direct, independent, matched physical benchmarks of the actual implementation.
 
-## 10. Immediate deliverables
+## 10. Existing silicon-generator audit — current blocker
+
+A direct source review of `crates/domains/symthaea-silicon/src/lib.rs` found a specific gap worth fixing before any CPU/GPU claims:
+- `SiliconArchitect::synthesize_rtl` returns a Verilog string containing `// Logic here...`; it does not call an HDL compiler, simulator, synthesis or physical-design tool.
+- `actual_ppa` is set to `None`.
+- `derive_timing_invariants` uses requested `ppa_target` values as the assertion bounds; that generates requirements, not timing proof from a parsed report.
+- The demo prints “Silicon RTL Synthesized” even though it received the placeholder stub.
+
+The existing [COMPUTE-MFG-001E #5800](https://github.com/Luminous-Dynamics/symthaea/issues/5800) already states that the full EDA chain is not integrated. The focused corrective work is tracked separately in [SILICON-EDA-001 #8462](https://github.com/Luminous-Dynamics/symthaea/issues/8462). Until that gap is repaired, treat `symthaea-silicon` output as design intent/stub—not as RTL, PPA or formal evidence.
+
+## 11. Immediate deliverables
 
 - [ ] Freeze CPU/GPU/HDC workload matrix and software baselines, reusing #5805, #6530, #7905, #8413 and #8446.
 - [ ] Version the candidate matrix in `soc_design_candidate_matrix_v1.json`.
