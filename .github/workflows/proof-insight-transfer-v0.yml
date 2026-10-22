@@ -1418,7 +1418,25 @@ jobs:
               )
               if result.returncode == 0:
                   raise SystemExit(f"counterfactual analyzer negative control unexpectedly passed: {name}")
-          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, eight malformed-link/arm/budget/schema controls")
+
+          # This mutant puts a shared source family in train/validation with one
+          # shared component ID. Analysis requests only test; the standalone
+          # analyzer must still reject leakage in all non-scored suite splits.
+          leaked_suite = copy.deepcopy(suite)
+          leaked_suite["pairs"][1]["source_insight"]["family_id"] = leaked_suite["pairs"][0]["source_insight"]["family_id"]
+          leaked_suite["pairs"][1]["component_id"] = leaked_suite["pairs"][0]["component_id"]
+          leaked_suite["pairs"][1]["split"] = "validation"
+          leaked_suite_path = report_path.parent / "bad-counterfactual-cross-split-suite.json"
+          leaked_suite_path.write_text(json.dumps(leaked_suite))
+          result = subprocess.run(
+              [str(binary), str(leaked_suite_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-cross-split.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly ignored cross-split family leakage")
+
+          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, eight malformed-outcome controls, one whole-suite leakage control")
           PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
