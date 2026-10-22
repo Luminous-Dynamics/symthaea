@@ -92,9 +92,9 @@ impl SimpleHdcEvaluator {
         ContinuousHV::bundle(&refs)
     }
 
-    fn evaluate(&self, reference: &ContinuousHV, test_data: &[(Vec<f32>, bool)]) -> (f64, f64) {
+    fn evaluate(&self, reference: &ContinuousHV, test_data: &[(Vec<f32>, bool)]) -> Option<f64> {
         eprintln!(
-            "  Computing free energy for {} test samples...",
+            "  Computing ROC-AUC for {} held-out test samples...",
             test_data.len()
         );
 
@@ -102,165 +102,58 @@ impl SimpleHdcEvaluator {
             .iter()
             .map(|(features, is_anomaly)| {
                 let hv = self.encode(features);
-                let sim = hv.similarity(reference);
-                let free_energy = 1.0 - sim as f64;
-                (free_energy, *is_anomaly)
+                let similarity = hv.similarity(reference);
+                (1.0 - similarity as f64, *is_anomaly)
             })
             .collect();
 
-        let roc = compute_roc_curve(&scored);
-        let auc = compute_auc(&roc);
-        let best_f1 = find_best_f1(&scored);
-
-        (auc, best_f1)
+        compute_auc(&scored)
     }
 }
 
-// ── ROC / AUC Computation ────────────────────────────────────────────────────
+// ── Exact rank-based ROC-AUC ──────────────────────────────────────────────────
 
-struct RocPoint {
-    fpr: f64,
-    tpr: f64,
-    #[allow(dead_code)]
-    threshold: f64,
-}
-
-fn compute_roc_curve(scored: &[(f64, bool)]) -> Vec<RocPoint> {
-    if scored.is_empty() {
-        return vec![];
+/// Exact ROC-AUC from anomaly scores (higher scores mean more anomalous).
+///
+/// Uses the Mann–Whitney rank-sum identity with average ranks for ties.
+/// This avoids the former ~500-threshold approximation and does not select a
+/// decision threshold from held-out test labels. AUC is undefined if either
+/// class is absent or any score is non-finite, so those cases return None.
+fn compute_auc(scored: &[(f64, bool)]) -> Option<f64> {
+    if scored.is_empty() || scored.iter().any(|(score, _)| !score.is_finite()) {
+        return None;
     }
 
-    let total_pos = scored.iter().filter(|(_, lab)| *lab).count() as f64;
-    let total_neg = scored.iter().filter(|(_, lab)| !*lab).count() as f64;
-
-    if total_pos < 1.0 || total_neg < 1.0 {
-        return vec![
-            RocPoint {
-                fpr: 0.0,
-                tpr: 0.0,
-                threshold: 1.0,
-            },
-            RocPoint {
-                fpr: 1.0,
-                tpr: 1.0,
-                threshold: 0.0,
-            },
-        ];
+    let positive_count = scored.iter().filter(|sample| sample.1).count() as f64;
+    let negative_count = scored.len() as f64 - positive_count;
+    if positive_count == 0.0 || negative_count == 0.0 {
+        return None;
     }
 
-    let mut scores: Vec<f64> = scored.iter().map(|(s, _)| *s).collect();
-    scores.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let mut ranked = scored.to_vec();
+    ranked.sort_by(|a, b| a.0.total_cmp(&b.0));
 
-    let n = scores.len();
-    let step = (n / 500).max(1); // finer granularity for large datasets
-    let mut thresholds: Vec<f64> = Vec::with_capacity(502);
-    thresholds.push(scores[n - 1] + 0.01);
-    for i in (0..n).rev().step_by(step) {
-        thresholds.push(scores[i]);
-    }
-    if thresholds.last().map_or(true, |&t| t > scores[0]) {
-        thresholds.push(scores[0] - 0.01);
-    }
-
-    let mut points = Vec::with_capacity(thresholds.len());
-    for &thresh in &thresholds {
-        let mut tp = 0u64;
-        let mut fp = 0u64;
-
-        for &(score, is_pos) in scored {
-            if score >= thresh {
-                if is_pos {
-                    tp += 1;
-                } else {
-                    fp += 1;
-                }
-            }
+    let mut positive_rank_sum = 0.0;
+    let mut start = 0;
+    while start < ranked.len() {
+        let mut end = start + 1;
+        while end < ranked.len() && ranked[end].0 == ranked[start].0 {
+            end += 1;
         }
 
-        let tpr = tp as f64 / total_pos;
-        let fpr = fp as f64 / total_neg;
-
-        points.push(RocPoint {
-            fpr,
-            tpr,
-            threshold: thresh,
-        });
+        // Zero-based [start, end) covers one-based ranks start+1 through end.
+        let average_rank = (start + 1 + end) as f64 / 2.0;
+        let positives_in_tie = ranked[start..end]
+            .iter()
+            .filter(|sample| sample.1)
+            .count() as f64;
+        positive_rank_sum += positives_in_tie * average_rank;
+        start = end;
     }
 
-    points.sort_by(|a, b| {
-        a.fpr
-            .partial_cmp(&b.fpr)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    points
-}
-
-fn compute_auc(roc: &[RocPoint]) -> f64 {
-    if roc.len() < 2 {
-        return 0.0;
-    }
-    let mut auc = 0.0;
-    for i in 1..roc.len() {
-        let dx = roc[i].fpr - roc[i - 1].fpr;
-        let avg_tpr = (roc[i].tpr + roc[i - 1].tpr) / 2.0;
-        auc += dx * avg_tpr;
-    }
-    auc.clamp(0.0, 1.0)
-}
-
-fn find_best_f1(scored: &[(f64, bool)]) -> f64 {
-    let total_pos = scored.iter().filter(|(_, lab)| *lab).count() as f64;
-    if total_pos < 1.0 {
-        return 0.0;
-    }
-
-    let mut scores: Vec<f64> = scored.iter().map(|(s, _)| *s).collect();
-    scores.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-    let n = scores.len();
-    let step = (n / 500).max(1);
-    let mut best_f1 = 0.0;
-
-    for i in (0..n).step_by(step) {
-        let thresh = scores[i];
-        let mut tp = 0u64;
-        let mut fp = 0u64;
-        let mut fn_ = 0u64;
-
-        for &(score, is_pos) in scored {
-            if score >= thresh {
-                if is_pos {
-                    tp += 1;
-                } else {
-                    fp += 1;
-                }
-            } else if is_pos {
-                fn_ += 1;
-            }
-        }
-
-        let precision = if tp + fp > 0 {
-            tp as f64 / (tp + fp) as f64
-        } else {
-            0.0
-        };
-        let recall = if tp + fn_ > 0 {
-            tp as f64 / (tp + fn_) as f64
-        } else {
-            0.0
-        };
-        let f1 = if precision + recall > 0.0 {
-            2.0 * precision * recall / (precision + recall)
-        } else {
-            0.0
-        };
-
-        if f1 > best_f1 {
-            best_f1 = f1;
-        }
-    }
-
-    best_f1
+    let positive_rank_baseline = positive_count * (positive_count + 1.0) / 2.0;
+    let auc = (positive_rank_sum - positive_rank_baseline) / (positive_count * negative_count);
+    Some(auc.clamp(0.0, 1.0))
 }
 
 fn deterministic_subsample(data: &[Vec<f32>], max_n: usize) -> Vec<Vec<f32>> {
@@ -284,8 +177,7 @@ struct DomainResult {
     train: usize,
     test: usize,
     features: usize,
-    auc: f64,
-    f1: f64,
+    auc: Option<f64>,
 }
 
 // ── A. SMAP Satellite ────────────────────────────────────────────────────────
@@ -373,16 +265,15 @@ fn evaluate_smap() -> anyhow::Result<DomainResult> {
     let reference_sample = deterministic_subsample(&train_normal, 10_000);
     let reference = evaluator.build_reference(&reference_sample);
 
-    let (auc, f1) = evaluator.evaluate(&reference, &test_data);
+    let auc = evaluator.evaluate(&reference, &test_data);
 
-    eprintln!("  AUC: {:.4} | Best F1: {:.4}", auc, f1);
+    eprintln!("  ROC-AUC: {}", format_auc(auc));
     Ok(DomainResult {
         name: "SMAP (satellite)",
         train: n_train,
         test: n_test,
         features: n_features,
         auc,
-        f1,
     })
 }
 
@@ -430,16 +321,15 @@ fn evaluate_msl() -> anyhow::Result<DomainResult> {
     let reference_sample = deterministic_subsample(&train_normal, 10_000);
     let reference = evaluator.build_reference(&reference_sample);
 
-    let (auc, f1) = evaluator.evaluate(&reference, &test_data);
+    let auc = evaluator.evaluate(&reference, &test_data);
 
-    eprintln!("  AUC: {:.4} | Best F1: {:.4}", auc, f1);
+    eprintln!("  ROC-AUC: {}", format_auc(auc));
     Ok(DomainResult {
         name: "MSL (Mars rover)",
         train: n_train,
         test: n_test,
         features: n_features,
         auc,
-        f1,
     })
 }
 
@@ -569,16 +459,15 @@ fn evaluate_sepsis() -> anyhow::Result<DomainResult> {
     let reference_sample = deterministic_subsample(&train_normal, 10_000);
     let reference = evaluator.build_reference(&reference_sample);
 
-    let (auc, f1) = evaluator.evaluate(&reference, &test_rows);
+    let auc = evaluator.evaluate(&reference, &test_rows);
 
-    eprintln!("  AUC: {:.4} | Best F1: {:.4}", auc, f1);
+    eprintln!("  ROC-AUC: {}", format_auc(auc));
     Ok(DomainResult {
         name: "Sepsis (ICU)",
         train: n_train,
         test: n_test,
         features: n_features,
         auc,
-        f1,
     })
 }
 
@@ -605,28 +494,25 @@ fn main() -> anyhow::Result<()> {
     );
     println!("================================================================");
     println!(
-        "{:<22}| {:<9}| {:<9}| {:<9}| {:<7}| {}",
-        "Domain", "Train", "Test", "Features", "AUC", "F1"
+        "{:<22}| {:<9}| {:<9}| {:<9}| {}",
+        "Domain", "Train", "Test", "Features", "ROC-AUC"
     );
-    println!("--------------------|---------|---------|---------|-------|------");
+    println!("--------------------|---------|---------|---------|--------");
 
     for r in &results {
         println!(
-            "{:<22}| {:<9}| {:<9}| {:<9}| {:<7.4}| {:.4}",
+            "{:<22}| {:<9}| {:<9}| {:<9}| {}",
             r.name,
             format_number(r.train),
             format_number(r.test),
             r.features,
-            r.auc,
-            r.f1,
+            format_auc(r.auc),
         );
     }
 
     println!("================================================================");
 
-    let avg_auc: f64 = results.iter().map(|r| r.auc).sum::<f64>() / results.len() as f64;
-    let avg_f1: f64 = results.iter().map(|r| r.f1).sum::<f64>() / results.len() as f64;
-    println!("\nMean AUC: {:.4}, Mean F1: {:.4}", avg_auc, avg_f1);
+    println!("Metrics are reported per domain; no cross-domain aggregate is computed.");
 
     Ok(())
 }
@@ -638,5 +524,49 @@ fn format_number(n: usize) -> String {
         format!("{},{:03}", n / 1_000, n % 1_000)
     } else {
         format!("{}", n)
+    }
+}
+
+
+fn format_auc(auc: Option<f64>) -> String {
+    match auc {
+        Some(value) if value.is_finite() => format!("{value:.4}"),
+        _ => "N/A".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod auc_tests {
+    use super::compute_auc;
+
+    #[test]
+    fn perfect_ranking_has_auc_one() {
+        let scored = [(0.1, false), (0.2, false), (0.8, true), (0.9, true)];
+        assert_eq!(compute_auc(&scored), Some(1.0));
+    }
+
+    #[test]
+    fn reversed_ranking_has_auc_zero() {
+        let scored = [(0.8, false), (0.9, false), (0.1, true), (0.2, true)];
+        assert_eq!(compute_auc(&scored), Some(0.0));
+    }
+
+    #[test]
+    fn tied_positive_and_negative_scores_have_auc_half() {
+        let scored = [(0.5, false), (0.5, true)];
+        assert_eq!(compute_auc(&scored), Some(0.5));
+    }
+
+    #[test]
+    fn auc_is_undefined_when_a_class_is_missing() {
+        assert_eq!(compute_auc(&[(0.1, false), (0.2, false)]), None);
+        assert_eq!(compute_auc(&[(0.1, true), (0.2, true)]), None);
+        assert_eq!(compute_auc(&[]), None);
+    }
+
+    #[test]
+    fn auc_is_undefined_for_non_finite_scores() {
+        assert_eq!(compute_auc(&[(f64::NAN, false), (0.9, true)]), None);
+        assert_eq!(compute_auc(&[(f64::INFINITY, false), (0.9, true)]), None);
     }
 }
