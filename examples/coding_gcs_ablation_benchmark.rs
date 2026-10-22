@@ -560,7 +560,12 @@ fn main() {
         "repeats": repeats,
         "task_manifest_blake3": manifest,
         "task_manifest": tasks.iter().map(|task| serde_json::json!({
-            "task_id": task.id, "task_digest_blake3": task_digest(task),
+            "task_id": task.id,
+            "description": task.description,
+            "expected_symbol": task.expected_symbol,
+            "reference_source": task.reference_source,
+            "test_source": task.test_source,
+            "task_digest_blake3": task_digest(task),
             "expected_test_functions": expected_test_functions(task.test_source),
             "reference_source_blake3": source_digest(task.reference_source),
             "test_source_blake3": source_digest(task.test_source)
