@@ -641,7 +641,7 @@ if ! cmp -s "$tmpdir/sequential-a.csv" <(cut -d, -f1-14 "$tmpdir/eprocess-a.csv"
 fi
 
 if ! awk -F, '
-  NR == 1 { if (NF != 26) failed = 1; next }
+  NR == 1 { if (NF != 30) failed = 1; next }
   NR == 2 {
     log_threshold = $19
     risk_bound = $20
@@ -650,7 +650,7 @@ if ! awk -F, '
     fraction_3 = $23
   }
   {
-    if (NF != 26) failed = 1
+    if (NF != 30) failed = 1
     if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
         $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
     if ($2 != "nominal" && $2 != "gradual_shift" &&
@@ -682,7 +682,10 @@ if ! awk -F, '
     if (($21 - fraction_1 > 0.000001) || (fraction_1 - $21 > 0.000001) ||
         ($22 - fraction_2 > 0.000001) || (fraction_2 - $22 > 0.000001) ||
         ($23 - fraction_3 > 0.000001) || (fraction_3 - $23 > 0.000001)) failed = 1
-    for (i = 24; i <= 26; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    for (i = 24; i <= 27; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($28 != "true" && $28 != "false") failed = 1
+    if ($29 !~ /^[0-8]$/) failed = 1
+    if (($30 - 0.5 > 0.000001) || (0.5 - $30 > 0.000001)) failed = 1
 
     key = $1 SUBSEP $2 SUBSEP $3
     if ($4 == 0) {
@@ -690,8 +693,11 @@ if ! awk -F, '
       previous_1[key] = 0
       previous_2[key] = 0
       previous_3[key] = 0
+      previous_fixed[key] = 0
       first_alarm[key] = 8
+      first_fixed_alarm[key] = 8
       recorded_first_alarm[key] = $18
+      recorded_fixed_first_alarm[key] = $29
       recorded_below[key] = $14
       latched[key] = "false"
       episode_max_score[key] = 0
@@ -729,6 +735,18 @@ if ! awk -F, '
     if ($17 == "true" && first_alarm[key] == 8) first_alarm[key] = $4
     latched[key] = expected_alarm
     if ($18 != recorded_first_alarm[key]) failed = 1
+
+    factor_fixed = 1 + (0.5 / risk_bound) * ($15 - risk_bound)
+    if (factor_fixed <= 0) failed = 1
+    expected_fixed = previous_fixed[key] + log(factor_fixed)
+    if (($27 - expected_fixed > 0.000001) || (expected_fixed - $27 > 0.000001)) failed = 1
+    previous_fixed[key] = $27
+    expected_fixed_alarm = (fixed_latched[key] == "true" || $27 >= log_threshold) ? "true" : "false"
+    if ($28 != expected_fixed_alarm) failed = 1
+    if ($28 == "true" && first_fixed_alarm[key] == 8) first_fixed_alarm[key] = $4
+    fixed_latched[key] = expected_fixed_alarm
+    if ($29 != recorded_fixed_first_alarm[key]) failed = 1
+    if ($29 != recorded_fixed_first_alarm[key]) failed = 1
     if ($14 != recorded_below[key]) failed = 1
     if ($5 > episode_max_score[key]) episode_max_score[key] = $5
     if ($5 > $6) episode_all_below[key] = "false"
@@ -743,6 +761,9 @@ if ! awk -F, '
       nominal_1[pair_key] = $24
       nominal_2[pair_key] = $25
       nominal_3[pair_key] = $26
+      nominal_fixed_log[pair_key] = $27
+      nominal_fixed_alarm[pair_key] = $28
+      nominal_fixed_first[pair_key] = $29
     }
     if ($2 == "stealth_shift" &&
         (nominal_score[pair_key] != $5 ||
@@ -752,7 +773,10 @@ if ! awk -F, '
          nominal_first_alarm[pair_key] != $18 ||
          nominal_1[pair_key] != $24 ||
          nominal_2[pair_key] != $25 ||
-         nominal_3[pair_key] != $26)) failed = 1
+         nominal_3[pair_key] != $26 ||
+         nominal_fixed_log[pair_key] != $27 ||
+         nominal_fixed_alarm[pair_key] != $28 ||
+         nominal_fixed_first[pair_key] != $29)) failed = 1
 
     if ($4 == 7 && ($14 == "true") != (episode_max_score[key] <= threshold_by_episode[key])) failed = 1
     if ($4 == 7 && (episode_all_below[key] == "true") != ($14 == "true")) failed = 1
@@ -765,7 +789,8 @@ if ! awk -F, '
     if (NR != 48001 || rows != 48000 || failed) exit 1
     for (key in next_step) {
       if (next_step[key] != 8 ||
-          first_alarm[key] != recorded_first_alarm[key]) exit 1
+          first_alarm[key] != recorded_first_alarm[key] ||
+          first_fixed_alarm[key] != recorded_fixed_first_alarm[key]) exit 1
     }
   }
 ' "$tmpdir/eprocess-a.csv"; then
@@ -774,9 +799,9 @@ if ! awk -F, '
 fi
 
 if ! awk -F, '
-  NR == 1 { if (NF != 19) failed = 1; next }
+  NR == 1 { if (NF != 29) failed = 1; next }
   {
-    if (NF != 19) failed = 1
+    if (NF != 29) failed = 1
     if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
         $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
     if ($2 != "nominal" && $2 != "gradual_shift" &&
@@ -785,8 +810,10 @@ if ! awk -F, '
     for (i = 4; i <= 6; i++) if ($i !~ /^[0-9]+$/ || $i > 300) failed = 1
     if ($2 == "nominal") {
       if ($5 != $4 || $6 != 0 || $4 > 30) failed = 1
+      if ($21 != $20 || $22 != 0 || $20 > 30) failed = 1
     } else {
       if ($4 + $6 != 300 || $5 != 0) failed = 1
+      if ($20 + $22 != 300 || $21 != 0) failed = 1
     }
     if ($7 != "NA" && $7 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
     if ($8 != "NA" && $8 !~ /^[0-9]+$/) failed = 1
@@ -801,20 +828,34 @@ if ! awk -F, '
         ($17 - 0.50 > 0.000001) || (0.50 - $17 > 0.000001) ||
         ($18 - 0.75 > 0.000001) || (0.75 - $18 > 0.000001)) failed = 1
     if (($19 - 0.05 > 0.000001) || (0.05 - $19 > 0.000001)) failed = 1
+    if ($23 != "NA" && $23 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($24 != "NA" && $24 !~ /^[0-9]+$/) failed = 1
+    if ($25 != "NA" && $25 !~ /^[0-9]+$/) failed = 1
+    if ($26 < 0 || $26 > 300 || $26 > $10) failed = 1
+    if ($27 !~ /^-?[0-9]*[.]?[0-9]+$/ || $28 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if (($29 - 0.5 > 0.000001) || (0.5 - $29 > 0.000001)) failed = 1
 
     if ($2 == "nominal" && ($4 > 30 || $5 != $4 || $6 != 0)) failed = 1
     if ($2 == "gradual_shift" &&
-        ($4 < 240 || $6 > 60 || $10 != 300 || $11 < 240)) failed = 1
-    if ($2 == "abrupt_shift" && ($4 < 270 || $6 > 30)) failed = 1
-    if ($2 == "stealth_shift" && ($4 > 30 || $6 < 270)) failed = 1
+        ($4 < 240 || $6 > 60 || $10 != 300 || $11 < 240 ||
+         $20 < 120 || $20 > 240 || $22 > 180 || $26 != $20 ||
+         $4 < $20 + 60)) failed = 1
+    if ($2 == "abrupt_shift" &&
+        ($4 < 270 || $6 > 30 || $20 < 270 || $22 > 30)) failed = 1
+    if ($2 == "stealth_shift" &&
+        ($4 > 30 || $6 < 270 || $20 > 30 || $22 < 270)) failed = 1
     key = $1 SUBSEP $2
     if (seen[key]++) failed = 1
     if ($2 == "nominal") {
       nominal_alarms[$1] = $4
       nominal_misses[$1] = $6
+      nominal_fixed_alarms[$1] = $20
+      nominal_fixed_misses[$1] = $22
     }
     if ($2 == "stealth_shift" &&
-        ($4 != nominal_alarms[$1] || $6 != nominal_misses[$1])) failed = 1
+        ($4 != nominal_alarms[$1] || $6 != nominal_misses[$1] ||
+         $20 != nominal_fixed_alarms[$1] ||
+         $22 != nominal_fixed_misses[$1])) failed = 1
     rows++
   }
   END { if (NR != 21 || rows != 20 || failed) exit 1 }
