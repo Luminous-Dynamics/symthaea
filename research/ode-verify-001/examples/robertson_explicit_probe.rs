@@ -11,8 +11,8 @@ use ode_verify_001_harness::dynamical_system::{
 };
 
 const OUTPUT_TIMES: [f64; 17] = [
-    0.0, 1.0e-8, 1.0e-6, 1.0e-4, 1.0e-2, 1.0, 10.0, 1.0e2, 1.0e3, 1.0e4, 1.0e5, 1.0e6,
-    1.0e7, 1.0e8, 1.0e9, 1.0e10, 1.0e11,
+    0.0, 1.0e-8, 1.0e-6, 1.0e-4, 1.0e-2, 1.0, 10.0, 1.0e2, 1.0e3, 1.0e4, 1.0e5, 1.0e6, 1.0e7,
+    1.0e8, 1.0e9, 1.0e10, 1.0e11,
 ];
 const INITIAL_STATE: [f64; 3] = [1.0, 0.0, 0.0];
 const RELATIVE_TOLERANCE: f64 = 1.0e-8;
@@ -124,18 +124,14 @@ fn update_structural_metrics(
 
 fn main() {
     let source_sha = env::var("ODE_BENCH_SOURCE_SHA").unwrap_or_else(|_| "unknown".to_owned());
-    let checkout_sha =
-        env::var("ODE_BENCH_CHECKOUT_SHA").unwrap_or_else(|_| "unknown".to_owned());
+    let checkout_sha = env::var("ODE_BENCH_CHECKOUT_SHA").unwrap_or_else(|_| "unknown".to_owned());
 
     let integrator = Rk45Integrator {
         tol: RELATIVE_TOLERANCE,
         dt_min: 1.0e-24,
         dt_max: 1.0e11,
     };
-    let tolerances = Rk45Tolerances::new(
-        RELATIVE_TOLERANCE,
-        ABSOLUTE_TOLERANCES.to_vec(),
-    );
+    let tolerances = Rk45Tolerances::new(RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCES.to_vec());
     let system = Robertson {
         derivative_evaluations: AtomicUsize::new(0),
     };
@@ -187,14 +183,8 @@ fn main() {
         }
 
         let rhs_before = system.derivative_evaluations.load(Ordering::Relaxed);
-        let step_result = controller.try_step(
-            &integrator,
-            &system,
-            &state,
-            time,
-            remaining,
-            &tolerances,
-        );
+        let step_result =
+            controller.try_step(&integrator, &system, &state, time, remaining, &tolerances);
         let rhs_after = system.derivative_evaluations.load(Ordering::Relaxed);
         let rhs_delta = rhs_after.saturating_sub(rhs_before);
         derivative_evaluations = rhs_after;
@@ -214,9 +204,7 @@ fn main() {
                 }
                 accepted_steps = accepted_steps.saturating_add(1);
 
-                if !step.accepted_dt.is_finite()
-                    || step.accepted_dt <= 0.0
-                    || step.state.len() != 3
+                if !step.accepted_dt.is_finite() || step.accepted_dt <= 0.0 || step.state.len() != 3
                 {
                     status = "invalid_step_report";
                     status_detail =
@@ -286,9 +274,8 @@ fn main() {
         status_detail = "fixed attempt budget reached before the final sample time".to_owned();
     }
 
-    let nonnegative_within_tolerance = (0..3).all(|i| {
-        min_state[i] >= -TOLERANCE_MULTIPLIER * ABSOLUTE_TOLERANCES[i]
-    });
+    let nonnegative_within_tolerance =
+        (0..3).all(|i| min_state[i] >= -TOLERANCE_MULTIPLIER * ABSOLUTE_TOLERANCES[i]);
     let reached_final_time = target_index == OUTPUT_TIMES.len()
         && (time - OUTPUT_TIMES[OUTPUT_TIMES.len() - 1]).abs()
             <= 16.0 * f64::EPSILON * time.abs().max(1.0);
