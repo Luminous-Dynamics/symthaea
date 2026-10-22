@@ -76,6 +76,7 @@ fn action_name(action: Option<Action>) -> &'static str {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_result(
     case: &str,
     expected: &str,
@@ -102,6 +103,7 @@ fn render_result(
     summary.push_str(&format!("{},{},{},{}\n", case, expected, observed, expected == observed));
 }
 
+#[allow(clippy::too_many_arguments)]
 fn direct_case(
     case: &str,
     expected: &str,
@@ -126,6 +128,7 @@ fn direct_case(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn leased_case(
     case: &str,
     expected: &str,
