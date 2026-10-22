@@ -9,6 +9,7 @@ on:
       - "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
       - "docs/research/OOD_REACHABILITY_FALLBACK_V1.md"
       - "docs/research/SEQUENTIAL_RESIDUAL_MONITOR_V1.md"
+      - "docs/research/MONITORABILITY_PREEMPTION_FRONTIER_V1.md"
       - ".github/workflows/allostatic-control-bench.yml"
   workflow_dispatch:
 
@@ -60,3 +61,5 @@ jobs:
             allostatic-control-v1-ood-fallback-summary.csv
             allostatic-control-v1-residual-monitor.csv
             allostatic-control-v1-residual-monitor-summary.csv
+            allostatic-control-v1-monitorability-frontier.csv
+            allostatic-control-v1-monitorability-frontier-summary.csv

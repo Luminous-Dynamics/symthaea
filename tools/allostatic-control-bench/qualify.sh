@@ -22,12 +22,14 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-multistep-viability-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-ood-fallback-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-residual-monitor-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-monitorability-frontier-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
   "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
   "docs/research/OOD_REACHABILITY_FALLBACK_V1.md"
   "docs/research/SEQUENTIAL_RESIDUAL_MONITOR_V1.md"
+  "docs/research/MONITORABILITY_PREEMPTION_FRONTIER_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -57,6 +59,8 @@ ood_out="${out_base}-ood-fallback.csv"
 ood_summary_out="${out_base}-ood-fallback-summary.csv"
 residual_out="${out_base}-residual-monitor.csv"
 residual_summary_out="${out_base}-residual-monitor-summary.csv"
+monitorability_out="${out_base}-monitorability-frontier.csv"
+monitorability_summary_out="${out_base}-monitorability-frontier-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -480,6 +484,102 @@ if ! awk -F, '
   exit 1
 fi
 
+# Compare signal availability with time remaining before a synthetic hazard.
+# Score evidence is available before the current action; transition residual evidence
+# arrives after that transition and can only affect the next action.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-monitorability-frontier-bench -- \
+  "$tmpdir/monitorability-a.csv" "$tmpdir/monitorability-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-monitorability-frontier-bench -- \
+  "$tmpdir/monitorability-b.csv" "$tmpdir/monitorability-summary-b.csv"
+if ! cmp -s "$tmpdir/monitorability-a.csv" "$tmpdir/monitorability-b.csv" ||
+   ! cmp -s "$tmpdir/monitorability-summary-a.csv" "$tmpdir/monitorability-summary-b.csv"; then
+  printf 'FAIL: repeated monitorability outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 15) failed = 1; next }
+  {
+    if (NF != 15) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "score_only" && $2 != "residual_only" && $2 != "sensor_blind") failed = 1
+    if ($3 != "0.02" && $3 != "0.05" && $3 != "0.10" && $3 != "0.20") failed = 1
+    if ($4 != 0 && $4 != 1 && $4 != 2 && $4 != 4 && $4 != 8) failed = 1
+    if ($5 !~ /^[0-9]+$/ || $5 < 200000 || $5 >= 200300) failed = 1
+    if ($6 != 12 || $7 != 12 + $4) failed = 1
+    if ($8 !~ /^[0-9]*[.]?[0-9]+$/ || $10 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($9 !~ /^[0-9]+$/ || $9 > 48 || $11 !~ /^[0-9]+$/ || $11 > 48) failed = 1
+    for (i = 12; i <= 15; i++) if ($i != "true" && $i != "false") failed = 1
+    score_pre = ($9 > 0 && $9 <= $7) ? "true" : "false"
+    residual_pre = ($11 > 0 && $11 + 1 <= $7) ? "true" : "false"
+    score_late = ($9 > $7) ? "true" : "false"
+    residual_late = ($11 > 0 && $11 + 1 > $7) ? "true" : "false"
+    if ($12 != score_pre || $13 != residual_pre || $14 != score_late || $15 != residual_late) failed = 1
+    key = $1 SUBSEP $5
+    if ($2 == "sensor_blind") {
+      if (!(key in blind_score)) { blind_score[key] = $9; blind_residual[key] = $11 }
+      else if (blind_score[key] != $9 || blind_residual[key] != $11) failed = 1
+    } else if ($2 == "score_only") {
+      if (!(key in score_only_residual)) score_only_residual[key] = $11
+      else if (score_only_residual[key] != $11) failed = 1
+    } else if ($2 == "residual_only") {
+      if (!(key in residual_only_score)) residual_only_score[key] = $9
+      else if (residual_only_score[key] != $9) failed = 1
+    }
+    unique = $1 SUBSEP $2 SUBSEP $3 SUBSEP $4 SUBSEP $5
+    if (seen[unique]++) failed = 1
+    rows++
+  }
+  END {
+    if (NR != 90001 || rows != 90000 || failed) exit 1
+    for (key in blind_score) {
+      if (!(key in score_only_residual) || !(key in residual_only_score)) exit 1
+      if (blind_residual[key] != score_only_residual[key]) exit 1
+      if (blind_score[key] != residual_only_score[key]) exit 1
+    }
+  }
+' "$tmpdir/monitorability-a.csv"; then
+  printf 'FAIL: monitorability schema, causality timing, or paired-channel control failed\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 17) failed = 1; next }
+  {
+    if (NF != 17) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "score_only" && $2 != "residual_only" && $2 != "sensor_blind") failed = 1
+    if ($3 != "0.02" && $3 != "0.05" && $3 != "0.10" && $3 != "0.20") failed = 1
+    if ($4 != 0 && $4 != 1 && $4 != 2 && $4 != 4 && $4 != 8) failed = 1
+    if ($5 != 300) failed = 1
+    for (i = 6; i <= 15; i++) if ($i !~ /^[0-9]+$/ || $i > 300) failed = 1
+    if ($10 + $8 != 300 || $11 + $9 != 300) failed = 1
+    if ($16 != "NA" && ($16 !~ /^[0-9]*[.]?[0-9]+$/ || $16 < 0 || $16 > 36)) failed = 1
+    if ($17 != "NA" && ($17 !~ /^[0-9]*[.]?[0-9]+$/ || $17 < 0 || $17 > 36)) failed = 1
+    if ($2 == "sensor_blind") {
+      blind_key = $1
+      if (!(blind_key in blind_pre_score)) {
+        blind_pre_score[blind_key] = $6
+        blind_pre_residual[blind_key] = $7
+        blind_post_score[blind_key] = $8
+        blind_post_residual[blind_key] = $9
+      } else if ($6 != blind_pre_score[blind_key] ||
+                 $7 != blind_pre_residual[blind_key] ||
+                 $8 != blind_post_score[blind_key] ||
+                 $9 != blind_post_residual[blind_key]) failed = 1
+    }
+    key = $1 SUBSEP $2 SUBSEP $3 SUBSEP $4
+    if (seen[key]++) failed = 1
+    rows++
+  }
+  END { if (NR != 301 || rows != 300 || failed) exit 1 }
+' "$tmpdir/monitorability-summary-a.csv"; then
+  printf 'FAIL: monitorability summary coverage or sensor-blind parity failed\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -508,6 +608,8 @@ cp "$tmpdir/ood-a.csv" "$ood_out"
 cp "$tmpdir/ood-summary-a.csv" "$ood_summary_out"
 cp "$tmpdir/residual-a.csv" "$residual_out"
 cp "$tmpdir/residual-summary-a.csv" "$residual_summary_out"
+cp "$tmpdir/monitorability-a.csv" "$monitorability_out"
+cp "$tmpdir/monitorability-summary-a.csv" "$monitorability_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -539,6 +641,10 @@ cp "$tmpdir/residual-summary-a.csv" "$residual_summary_out"
   printf 'residual_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$residual_out") - 1 ))"
   printf 'residual_summary_sha256=%s\n' "$(sha256sum "$residual_summary_out" | awk '{print $1}')"
   printf 'residual_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$residual_summary_out") - 1 ))"
+  printf 'monitorability_frontier_sha256=%s\n' "$(sha256sum "$monitorability_out" | awk '{print $1}')"
+  printf 'monitorability_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$monitorability_out") - 1 ))"
+  printf 'monitorability_summary_sha256=%s\n' "$(sha256sum "$monitorability_summary_out" | awk '{print $1}')"
+  printf 'monitorability_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$monitorability_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -554,4 +660,6 @@ printf 'OOD fallback frontier: %s\n' "$ood_out"
 printf 'OOD fallback summary: %s\n' "$ood_summary_out"
 printf 'Sequential residual frontier: %s\n' "$residual_out"
 printf 'Sequential residual summary: %s\n' "$residual_summary_out"
+printf 'Monitorability frontier: %s\n' "$monitorability_out"
+printf 'Monitorability summary: %s\n' "$monitorability_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
