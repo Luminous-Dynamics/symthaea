@@ -1687,6 +1687,9 @@ mod tests {
         report["summary"]["gcs_off"]["backend_attempts_by_name"] = serde_json::json!({"Anthropic": 1});
         report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
         report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(1);
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(5);
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(5);
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(5);
@@ -1724,6 +1727,9 @@ mod tests {
         });
         report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(2);
         report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(2);
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(18);
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(7);
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(11);
@@ -1732,6 +1738,51 @@ mod tests {
         report["summary"]["gcs_off"]["runs_with_simulated_backend_attempts"] = Value::from(1);
         report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
         assert!(audit(&report, None, None).is_empty());
+    }
+
+    #[test]
+    fn verifier_outcomes_are_recomputed_from_per_attempt_records() {
+        let mut report = valid_fixture();
+        report["runs"][0]["backend_attempts"] = serde_json::json!([
+            {
+                "tier": "Native",
+                "backend_name": "NativeCodeTemplate",
+                "success": true,
+                "verification_passed": true,
+                "elapsed_ms": 4,
+                "estimated_energy_cost": 1.0
+            },
+            {
+                "tier": "Native",
+                "backend_name": "NativeCodeTemplate",
+                "success": false,
+                "verification_passed": false,
+                "elapsed_ms": 7,
+                "estimated_energy_cost": 1.0
+            }
+        ]);
+        report["summary"]["gcs_off"]["backend_attempts_by_tier"] = serde_json::json!({
+            "Native": 2, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0
+        });
+        report["summary"]["gcs_off"]["backend_attempts_by_name"] =
+            serde_json::json!({"NativeCodeTemplate": 2});
+        report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(11);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(4);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(7);
+        report["summary"]["gcs_off"]["backend_attempt_estimated_energy_total"] = Value::from(2.0);
+        report["summary"]["gcs_off"]["runs_with_external_backend_attempts"] = Value::from(0);
+        report["summary"]["gcs_off"]["runs_with_simulated_backend_attempts"] = Value::from(0);
+        report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
+        assert!(audit(&report, None, None).is_empty());
+
+        report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempts_verifier_rejected")));
     }
 
     #[test]
@@ -1760,6 +1811,7 @@ mod tests {
             "tier": "Native",
             "backend_name": "NativeCodeTemplate",
             "success": true,
+            "verification_passed": null,
             "elapsed_ms": 7,
             "estimated_energy_cost": 1.0
         }]);
@@ -1768,6 +1820,9 @@ mod tests {
             serde_json::json!({"NativeCodeTemplate": 1});
         report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
         report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(1);
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(7);
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(7);
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(7);
