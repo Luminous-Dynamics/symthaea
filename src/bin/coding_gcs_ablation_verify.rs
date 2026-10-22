@@ -545,10 +545,9 @@ fn audit(
             .and_then(Value::as_array)
             .is_some_and(|tiers| {
                 tiers.iter().all(|tier| {
-                    str_field(tier, "unused").is_none()
-                        || tier.as_str().is_some_and(|name| {
-                            matches!(name, "Native" | "LocalLLM" | "CloudLLM" | "Simulated")
-                        })
+                    tier.as_str().is_some_and(|name| {
+                        matches!(name, "Native" | "LocalLLM" | "CloudLLM" | "Simulated")
+                    })
                 })
             });
         push_check(
