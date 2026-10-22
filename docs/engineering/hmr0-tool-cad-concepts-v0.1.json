@@ -162,6 +162,15 @@
               8
             ],
             "nominal_candidate": -2
+          },
+          {
+            "name": "jaw_pad_overlap",
+            "unit": "mm",
+            "candidate_range": [
+              0.25,
+              2
+            ],
+            "nominal_candidate": 1
           }
         ],
         "design_constraints": [
