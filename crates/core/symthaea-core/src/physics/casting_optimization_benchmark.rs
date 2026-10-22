@@ -477,6 +477,13 @@ fn gp_cholesky(matrix: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, GaussianProcessErro
     if matrix.iter().flatten().any(|value| !value.is_finite()) {
         return Err(GaussianProcessError::NonFiniteInput);
     }
+    for row in 0..n {
+        for column in 0..row {
+            if (matrix[row][column] - matrix[column][row]).abs() > 1e-12 {
+                return Err(GaussianProcessError::InvalidMatrix);
+            }
+        }
+    }
 
     let mut lower = vec![vec![0.0; n]; n];
     for row in 0..n {
@@ -1216,6 +1223,27 @@ mod tests {
     }
 
     #[test]
+    fn gp_covariance_jitter_handles_duplicate_observation_locations() {
+        let point = Point { x: 0.5, y: 0.5 };
+        let posterior = GaussianProcessPosterior::fit(&[
+            ProposalObservation {
+                point,
+                status: TrialStatus::Feasible,
+                observed_objective: Some(0.1),
+            },
+            ProposalObservation {
+                point,
+                status: TrialStatus::Feasible,
+                observed_objective: Some(0.11),
+            },
+        ])
+        .unwrap();
+        let (mean, variance) = posterior.predict(point).unwrap();
+        assert!(mean.is_finite());
+        assert!(variance.is_finite() && variance >= 0.0);
+    }
+
+    #[test]
     fn gp_rejects_non_finite_observations_and_non_positive_covariance() {
         let result = GaussianProcessPosterior::fit(&[ProposalObservation {
             point: Point { x: 0.1, y: 0.2 },
@@ -1227,6 +1255,10 @@ mod tests {
         assert_eq!(
             gp_cholesky(&[vec![1.0, 2.0], vec![2.0, 1.0]]),
             Err(GaussianProcessError::NotPositiveDefinite)
+        );
+        assert_eq!(
+            gp_cholesky(&[vec![1.0, 0.3], vec![0.4, 1.0]]),
+            Err(GaussianProcessError::InvalidMatrix)
         );
         assert_eq!(
             gp_cholesky(&[vec![f64::INFINITY]]),
