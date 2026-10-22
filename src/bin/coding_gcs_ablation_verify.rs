@@ -306,7 +306,7 @@ fn audit(
             push_check(
                 &mut errors,
                 str_field(control, "reference_blake3").is_some_and(|s| {
-                    is_hex(s, 64) && reference_hashes.get(id).is_some_and(|expected_hash| expected_hash == s)
+                    is_hex(s, 64) && reference_hashes.get(id).is_some_and(|expected_hash| expected_hash.as_str() == s)
                 }),
                 format!("reference digest is malformed or differs from manifest for task {id}"),
             );
