@@ -1326,6 +1326,8 @@ fn main() {
                 "tests_passed": r.tests_passed,
                 "tests_failed": r.tests_failed,
                 "oracle_status": r.oracle_status(),
+                "assessed": r.is_assessed(),
+                "unverified": r.is_unverified(),
                 "correct": r.is_correct(),
                 "auto_fix_attempted": r.auto_fix_attempted,
                 "auto_fix_succeeded": r.auto_fix_succeeded,
