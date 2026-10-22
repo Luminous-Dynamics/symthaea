@@ -159,6 +159,48 @@ pub fn verify_sequence(
     })
 }
 
+/// Failure returned when a leased action is checked against its current
+/// context and an independent sequence witness.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum LeasedVerificationFailure {
+    LeaseInvalid(super::certificate_lease::CertificateRejection),
+    WitnessActionMismatch,
+    WitnessHorizonMismatch,
+    WitnessRejected(VerificationFailure),
+}
+
+/// Verify both certificate freshness and the action's complete interval witness.
+/// This is the composition point between lifecycle validity and independent
+/// transition checking. The caller must apply the action only on Ok(receipt).
+pub fn verify_leased_witness(
+    lease: super::certificate_lease::CertificateLease,
+    current_context: super::certificate_lease::CertificateContext,
+    initial_state: StateEnvelope,
+    actions: &[Action],
+    dynamics: DynamicsBounds,
+    limits: ViabilityLimits,
+    shield_can_recover: bool,
+) -> Result<VerificationReceipt, LeasedVerificationFailure> {
+    lease
+        .validate(current_context)
+        .map_err(LeasedVerificationFailure::LeaseInvalid)?;
+    if actions.first().copied() != Some(lease.action()) {
+        return Err(LeasedVerificationFailure::WitnessActionMismatch);
+    }
+    if actions.len() != lease.horizon() {
+        return Err(LeasedVerificationFailure::WitnessHorizonMismatch);
+    }
+    verify_sequence(
+        initial_state,
+        actions,
+        dynamics,
+        limits,
+        shield_can_recover,
+        lease.horizon(),
+    )
+    .map_err(LeasedVerificationFailure::WitnessRejected)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
