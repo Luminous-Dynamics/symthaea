@@ -343,6 +343,17 @@ impl EnhancedKnowledgeGraph {
         if !from_has_evidence || !to_has_evidence {
             return Err("adjudication evidence must reference both claim contexts".into());
         }
+        let context_evidence: HashSet<&str> = from_context
+            .evidence_ids
+            .iter()
+            .chain(to_context.evidence_ids.iter())
+            .map(String::as_str)
+            .collect();
+        if !supplied.is_subset(&context_evidence) {
+            return Err(
+                "adjudication evidence contains IDs not declared by either claim context".into(),
+            );
+        }
 
         match relation {
             EvidenceRelation::SemanticNeighbor | EvidenceRelation::SameWitnessVariant => {
@@ -1303,6 +1314,66 @@ mod tests {
         ).unwrap();
         assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 1);
         assert_eq!(graph.get_fact(id_a).unwrap().confidence, 0.75);
+    }
+
+    #[test]
+    fn adjudication_rejects_unbound_extra_evidence_ids() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let context_a = make_claim_context(
+            "witness-a",
+            "family-a",
+            "evidence-a",
+            "renewal",
+            ClaimPolarity::Positive,
+            Some(1),
+        );
+        let context_b = make_claim_context(
+            "witness-b",
+            "family-b",
+            "evidence-b",
+            "renewal",
+            ClaimPolarity::Positive,
+            Some(1),
+        );
+        let (id_a, _) = graph
+            .insert_grounded(
+                make_encoding("same proposition", 0.7),
+                1,
+                None,
+                false,
+                context_a,
+            )
+            .unwrap();
+        let (id_b, _) = graph
+            .insert_grounded(
+                make_encoding("same proposition", 0.7),
+                2,
+                None,
+                false,
+                context_b,
+            )
+            .unwrap();
+
+        let error = graph
+            .adjudicate_evidence_relation(
+                id_a,
+                id_b,
+                EvidenceRelation::Corroborates,
+                vec![
+                    "evidence-a".into(),
+                    "evidence-b".into(),
+                    "unbound-evidence".into(),
+                ],
+                "Attempt to attach an evidence ID absent from either claim context".into(),
+                None,
+                None,
+                3,
+            )
+            .unwrap_err();
+        assert!(error.contains("not declared by either claim context"));
+        assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 0);
+        assert_eq!(graph.get_fact(id_b).unwrap().corroboration_count, 0);
+        assert!(graph.evidence_links().is_empty());
     }
 
     #[test]
