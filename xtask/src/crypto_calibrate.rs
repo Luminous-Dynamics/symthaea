@@ -129,7 +129,10 @@ pub(super) fn run(
                     .with_context(|| format!("validate {} / {}", task.task_id, regression.test))?;
             }
         }
-        println!("suite_id={} schema={} sha256={}", suite.suite_id, suite.schema_version, suite_sha256);
+        println!(
+            "suite_id={} schema={} sha256={}",
+            suite.suite_id, suite.schema_version, suite_sha256
+        );
         for task in &suite.tasks {
             println!(
                 "{}\tcategory={}\tregressions={}\tsecurity_notion={}",
@@ -160,7 +163,8 @@ pub(super) fn run(
     let working_tree_clean = tree_status.is_empty();
     if !dry_run && !working_tree_clean {
         bail!(
-            "refusing to execute calibration from a dirty/unverifiable working tree (status digest {}); commit or clean the tree first",
+            "refusing to execute calibration from a dirty/unverifiable working tree "
+                .to_owned() + "(status digest " + &sha256_hex(tree_status.as_bytes()) + "); commit or clean the tree first",
             sha256_hex(tree_status.as_bytes())
         );
     }
@@ -195,7 +199,10 @@ pub(super) fn run(
         }
     }
 
-    let reproduced_known_breaks = task_results.iter().filter(|r| r.outcome == "reproduced_known_break").count();
+    let reproduced_known_breaks = task_results
+        .iter()
+        .filter(|r| r.outcome == "reproduced_known_break")
+        .count();
     let command_failures = task_results.iter().filter(|r| r.outcome == "command_failed").count();
     let launch_errors = task_results.iter().filter(|r| r.outcome == "launch_error").count();
     let planned_commands = task_results.iter().filter(|r| r.outcome == "planned").count();
@@ -267,7 +274,8 @@ fn validate_suite(suite: &Suite) -> Result<()> {
         }
         if !task.quarantined || task.production_use_allowed || task.novel_discovery {
             bail!(
-                "task {} violates calibration safety flags; expected quarantined=true, production_use_allowed=false, novel_discovery=false",
+                "task {} violates calibration safety flags; expected quarantined=true, "
+                    .to_owned() + "production_use_allowed=false, novel_discovery=false",
                 task.task_id
             );
         }
@@ -281,9 +289,17 @@ fn validate_suite(suite: &Suite) -> Result<()> {
 fn validate_regression(root: &Path, regression: &Regression) -> Result<ParsedCommand> {
     let relative = Path::new(&regression.path);
     if relative.is_absolute()
-        || relative.components().any(|c| matches!(c, Component::ParentDir | Component::RootDir | Component::Prefix(_)))
+        || relative.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
     {
-        bail!("regression source path must be repository-relative and cannot traverse: {}", regression.path);
+        bail!(
+            "regression source path must be repository-relative and cannot traverse: {}",
+            regression.path
+        );
     }
     let source_path = root.join(relative);
     let source = fs::read_to_string(&source_path)
@@ -335,7 +351,12 @@ fn parse_command_for_test(command: &str, expected_test: &str) -> Result<ParsedCo
         })
 }
 
-fn execute_regression(root: &Path, task: &Task, regression: &Regression, parsed: ParsedCommand) -> TaskResult {
+fn execute_regression(
+    root: &Path,
+    task: &Task,
+    regression: &Regression,
+    parsed: ParsedCommand,
+) -> TaskResult {
     let started = Instant::now();
     let output = Command::new("cargo")
         .args(&parsed.cargo_args)
@@ -359,7 +380,10 @@ fn execute_regression(root: &Path, task: &Task, regression: &Regression, parsed:
             stderr_sha256: sha256_hex(error.to_string().as_bytes()),
             stdout_excerpt: String::new(),
             stderr_excerpt: clip(&error.to_string()),
-            note: format!("Cargo could not be started ({}); no attack result inferred", regression.command),
+            note: format!(
+                "Cargo could not be started ({}); no attack result inferred",
+                regression.command
+            ),
         },
     }
 }
@@ -394,17 +418,26 @@ fn task_result_from_output(
         stdout_excerpt: clip(&stdout),
         stderr_excerpt: clip(&stderr),
         note: if output.status.success() {
-            format!("known-break regression passed for package {}; this is calibration, not novelty", parsed.package)
+            format!(
+                "known-break regression passed for package {}; this is calibration, not novelty",
+                parsed.package
+            )
         } else {
-            "command exited nonzero; this may be a compile, environment, or witness failure and requires triage".to_owned()
+            "command exited nonzero; this may be a compile, environment, or witness failure "
+                .to_owned()
+                + "and requires triage"
         },
     }
 }
 
 fn resolve_in_root(root: &Path, path: &Path) -> Result<PathBuf> {
     let resolved = if path.is_absolute() { path.to_path_buf() } else { root.join(path) };
-    let canonical_root = root.canonicalize().with_context(|| format!("canonicalize {}", root.display()))?;
-    let canonical_path = resolved.canonicalize().with_context(|| format!("resolve {}", resolved.display()))?;
+    let canonical_root = root
+        .canonicalize()
+        .with_context(|| format!("canonicalize {}", root.display()))?;
+    let canonical_path = resolved
+        .canonicalize()
+        .with_context(|| format!("resolve {}", resolved.display()))?;
     if !canonical_path.starts_with(&canonical_root) {
         bail!("path must remain inside repository root: {}", path.display());
     }
@@ -479,7 +512,11 @@ mod tests {
 
     #[test]
     fn accepts_only_approved_cargo_test_shapes() {
-        let parsed = parse_command_for_test("cargo test -p symthaea-core --lib legacy_attack_known_pair_forges_hdc_mac", "legacy_attack_known_pair_forges_hdc_mac").unwrap();
+        let parsed = parse_command_for_test(
+            "cargo test -p symthaea-core --lib legacy_attack_known_pair_forges_hdc_mac",
+            "legacy_attack_known_pair_forges_hdc_mac",
+        )
+        .unwrap();
         assert_eq!(parsed.package, "symthaea-core");
         assert_eq!(parsed.test_filter, "legacy_attack_known_pair_forges_hdc_mac");
         assert_eq!(
@@ -496,7 +533,9 @@ mod tests {
 
     #[test]
     fn rejects_shell_or_arbitrary_arguments() {
-        assert!(parse_command_for_test("cargo test -p symthaea-core test; rm -rf /", "test").is_err());
+        assert!(
+            parse_command_for_test("cargo test -p symthaea-core test; rm -rf /", "test").is_err()
+        );
         assert!(parse_command_for_test("sh -c cargo test", "test").is_err());
         assert!(parse_command_for_test("cargo test -p unknown-package test", "test").is_err());
     }
