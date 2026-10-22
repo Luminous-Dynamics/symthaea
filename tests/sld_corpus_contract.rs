@@ -641,7 +641,8 @@ fn validate_evaluation_receipt(receipt: &Value) -> Vec<String> {
         }
     }
 
-    match receipt["run_status"].as_str().unwrap_or("") {
+    let run_status = receipt["run_status"].as_str().unwrap_or("");
+    match run_status {
         "COMPLETE" if missing != 0 || observed != expected || duplicate_count != 0 => {
             errors.push("COMPLETE run must account for every expected case exactly once".to_owned());
         }
@@ -650,6 +651,28 @@ fn validate_evaluation_receipt(receipt: &Value) -> Vec<String> {
         }
         "COMPLETE" | "PARTIAL" | "FAILED" => {}
         status => errors.push(format!("invalid run_status {status}")),
+    }
+
+    // A complete census may still be non-comparable when a case was skipped,
+    // errored, or could not be adjudicated. Behavior failures remain comparable
+    // evidence and are handled by the non-compensable release gates.
+    let incomparable_outcomes = counts.get("ERROR").copied().unwrap_or(0)
+        + counts.get("SKIPPED").copied().unwrap_or(0)
+        + counts.get("INDETERMINATE").copied().unwrap_or(0);
+    let expected_eligibility = if run_status == "COMPLETE"
+        && missing == 0
+        && observed == expected
+        && duplicate_count == 0
+        && incomparable_outcomes == 0
+    {
+        "COMPARABLE"
+    } else {
+        "NOT_COMPARABLE"
+    };
+    if receipt["comparison_eligibility"].as_str() != Some(expected_eligibility) {
+        errors.push(format!(
+            "comparison_eligibility must be {expected_eligibility} for this receipt"
+        ));
     }
 
     if receipt["started_at"].as_str().is_none() {
@@ -678,6 +701,7 @@ fn valid_evaluation_receipt() -> Value {
         "receipt_id": "SLD-RUN-20261022-BASELINE01",
         "schema_version": "sld-evaluation-receipt-0.1",
         "run_status": "COMPLETE",
+        "comparison_eligibility": "COMPARABLE",
         "evaluation_mode": "MODEL_BEHAVIOR",
         "started_at": "2026-10-22T10:00:00Z",
         "finished_at": "2026-10-22T10:01:00Z",
@@ -775,6 +799,8 @@ fn evaluation_receipt_fails_closed_on_missing_skipped_and_duplicate_cases() {
     missing["summary"]["observed"] = Value::from(1);
     missing["summary"]["pass"] = Value::from(1);
     missing["summary"]["missing"] = Value::from(1);
+    missing["run_status"] = Value::String("PARTIAL".to_owned());
+    missing["comparison_eligibility"] = Value::String("NOT_COMPARABLE".to_owned());
     let errors = validate_evaluation_receipt(&missing);
     assert!(errors.iter().any(|error| error.contains("COMPLETE run must account")));
 
@@ -782,6 +808,7 @@ fn evaluation_receipt_fails_closed_on_missing_skipped_and_duplicate_cases() {
     duplicate["case_results"][1]["case_id"] = Value::String("SLD-TEST-001".to_owned());
     duplicate["summary"]["duplicate_ids"] = Value::from(0);
     duplicate["summary"]["missing"] = Value::from(1);
+    duplicate["comparison_eligibility"] = Value::String("NOT_COMPARABLE".to_owned());
     let errors = validate_evaluation_receipt(&duplicate);
     assert!(errors.iter().any(|error| error.contains("duplicate case result ID")));
 
@@ -789,6 +816,7 @@ fn evaluation_receipt_fails_closed_on_missing_skipped_and_duplicate_cases() {
     skipped["case_results"][0]["status"] = Value::String("SKIPPED".to_owned());
     skipped["summary"]["pass"] = Value::from(1);
     skipped["summary"]["skipped"] = Value::from(1);
+    skipped["comparison_eligibility"] = Value::String("NOT_COMPARABLE".to_owned());
     let errors = validate_evaluation_receipt(&skipped);
     assert!(errors.is_empty(), "a fully accounted skipped case is not a pass, but can be a complete census: {errors:#?}");
     assert_eq!(skipped["summary"]["pass"], 1);
