@@ -189,6 +189,7 @@ fn audit(
     }
 
     let mut expected_counts: HashMap<String, u64> = HashMap::new();
+    let mut reference_hashes: HashMap<String, String> = HashMap::new();
     let mut task_order: HashMap<String, usize> = HashMap::new();
     for (index, task) in manifest.iter().enumerate() {
         let id = str_field(task, "task_id").unwrap_or("");
@@ -213,6 +214,7 @@ fn audit(
             format!("duplicate task_id {id} in task_manifest"),
         );
         expected_counts.insert(id.to_string(), expected);
+        reference_hashes.insert(id.to_string(), reference_digest.to_string());
         task_order.insert(id.to_string(), index);
     }
 
@@ -302,8 +304,10 @@ fn audit(
             );
             push_check(
                 &mut errors,
-                str_field(control, "reference_blake3").is_some_and(|s| is_hex(s, 64)),
-                format!("bad reference digest for task {id}"),
+                str_field(control, "reference_blake3").is_some_and(|s| {
+                    is_hex(s, 64) && reference_hashes.get(id).is_some_and(|expected_hash| expected_hash == s)
+                }),
+                format!("reference digest is malformed or differs from manifest for task {id}"),
             );
         }
         for id in expected_counts.keys() {
@@ -331,8 +335,10 @@ fn audit(
             );
             push_check(
                 &mut errors,
-                str_field(control, "empty_patch_blake3").is_some_and(|s| is_hex(s, 64)),
-                format!("bad empty-patch digest for task {id}"),
+                str_field(control, "empty_patch_blake3").is_some_and(|s| {
+                    is_hex(s, 64) && s == blake3::hash(b"").to_hex().as_str()
+                }),
+                format!("empty-patch digest is malformed or differs from the empty source for task {id}"),
             );
         }
         for id in expected_counts.keys() {
@@ -377,6 +383,15 @@ fn audit(
             format!("runs[{index}] has malformed generated-source digest"),
         );
 
+        push_check(
+            &mut errors,
+            bool_field(run, "compiled").is_some()
+                && bool_field(run, "simulated").is_some()
+                && u64_field(run, "tests_passed").is_some()
+                && u64_field(run, "tests_failed").is_some()
+                && run.get("runtime_error").is_some(),
+            format!("runs[{index}] is missing compile/oracle status fields"),
+        );
         let complete = oracle_complete(run, expected);
         push_check(
             &mut errors,
