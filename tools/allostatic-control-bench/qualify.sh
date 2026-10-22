@@ -698,6 +698,193 @@ if ! awk -F, -v raw="$tmpdir/task-risk-a.csv" -v summary="$tmpdir/task-risk-summ
   exit 1
 fi
 
+# Monte Carlo validation of risk-null calibration and wide bet-grid power.
+# Every method consumes the same deterministic Bernoulli trace per cohort/monitor.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-risk-eprocess-null-monte-carlo -- \
+  "$tmpdir/bet-grid-a.csv" "$tmpdir/bet-grid-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-risk-eprocess-null-monte-carlo -- \
+  "$tmpdir/bet-grid-b.csv" "$tmpdir/bet-grid-summary-b.csv"
+if ! cmp -s "$tmpdir/bet-grid-a.csv" "$tmpdir/bet-grid-b.csv" ||
+   ! cmp -s "$tmpdir/bet-grid-summary-a.csv" "$tmpdir/bet-grid-summary-b.csv"; then
+  printf 'FAIL: repeated bet-grid Monte Carlo outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summary-a.csv" '
+  BEGIN {
+    rate_names[1] = "0.010"; rate_values[1] = 0.01
+    rate_names[2] = "0.050"; rate_values[2] = 0.05
+    rate_names[3] = "0.075"; rate_values[3] = 0.075
+    rate_names[4] = "0.100"; rate_values[4] = 0.10
+    rate_names[5] = "0.200"; rate_values[5] = 0.20
+    rate_names[6] = "0.400"; rate_values[6] = 0.40
+    method_names[1] = "fixed"; method_names[2] = "mix3"; method_names[3] = "mix7"
+    threshold = log(100)
+    z = 1.959963984540054
+  }
+
+  FILENAME == raw {
+    if (FNR == 1) { if (NF != 12) failed = 1; next }
+    if (NF != 12) failed = 1
+    ri = 0
+    for (i = 1; i <= 6; i++) if ($1 == rate_names[i]) ri = i
+    if (ri == 0) failed = 1
+    if ($2 !~ /^[0-9]+$/ || $2 < 0 || $2 >= 1000) failed = 1
+    if ($3 !~ /^[0-9]+$/ || $3 < 0 || $3 >= 5) failed = 1
+    if ($4 !~ /^[0-9]+$/ || $4 > 300) failed = 1
+    trace = $5
+    if (length(trace) != 300 || trace ~ /[^01]/) failed = 1
+    if ($6 != "NA" && ($6 !~ /^[0-9]+$/ || $6 >= 300)) failed = 1
+    for (i = 7; i <= 9; i++) if ($i !~ /^[0-9]+$/ || $i > 300) failed = 1
+    for (i = 10; i <= 12; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    key = ri SUBSEP $2 SUBSEP $3
+    if (seen[key]++) failed = 1
+
+    count = 0
+    first_event = 300
+    fixed_log = 0
+    first_fixed = 300
+    c3[1] = c3[2] = c3[3] = 0
+    c7[1] = c7[2] = c7[3] = c7[4] = c7[5] = c7[6] = c7[7] = 0
+    first3 = first7 = 300
+    l3 = l7 = 0
+    for (step = 0; step < 300; step++) {
+      loss = (substr(trace, step + 1, 1) == "1") ? 1 : 0
+      if (loss == 1) {
+        count++
+        if (first_event == 300) first_event = step
+      }
+      factor_fixed = 1 + 10 * (loss - 0.05)
+      fixed_log += log(factor_fixed)
+      if (fixed_log >= threshold && first_fixed == 300) first_fixed = step
+
+      lambda3[1] = 5; lambda3[2] = 10; lambda3[3] = 15
+      for (j = 1; j <= 3; j++) c3[j] += log(1 + lambda3[j] * (loss - 0.05))
+      max3 = c3[1]
+      for (j = 2; j <= 3; j++) if (c3[j] > max3) max3 = c3[j]
+      l3 = max3 + log((exp(c3[1] - max3) + exp(c3[2] - max3) + exp(c3[3] - max3)) / 3)
+      if (l3 >= threshold && first3 == 300) first3 = step
+
+      lambda7[1] = 0.5; lambda7[2] = 1; lambda7[3] = 2; lambda7[4] = 5
+      lambda7[5] = 10; lambda7[6] = 15; lambda7[7] = 19
+      for (j = 1; j <= 7; j++) c7[j] += log(1 + lambda7[j] * (loss - 0.05))
+      max7 = c7[1]
+      for (j = 2; j <= 7; j++) if (c7[j] > max7) max7 = c7[j]
+      sum7 = 0
+      for (j = 1; j <= 7; j++) sum7 += exp(c7[j] - max7)
+      l7 = max7 + log(sum7 / 7)
+      if (l7 >= threshold && first7 == 300) first7 = step
+    }
+
+    if (count != $4) failed = 1
+    if ((first_event == 300 && $6 != "NA") ||
+        (first_event < 300 && $6 != first_event)) failed = 1
+    if ($7 != first_fixed || $8 != first3 || $9 != first7) failed = 1
+    if (($10 - fixed_log > 0.000003) || (fixed_log - $10 > 0.000003) ||
+        ($11 - l3 > 0.000003) || (l3 - $11 > 0.000003) ||
+        ($12 - l7 > 0.000003) || (l7 - $12 > 0.000003)) failed = 1
+
+    risk_by_key[ri] = rate_names[ri]
+    streams[ri SUBSEP $2] = 1
+    event_sum[ri] += count
+    for (j = 1; j <= 3; j++) {
+      method = method_names[j]
+      if ((j == 1 ? first_fixed : (j == 2 ? first3 : first7)) < 300) {
+        monitor_alarms[ri SUBSEP method]++
+        monitor_step_sum[ri SUBSEP method] += (j == 1 ? first_fixed : (j == 2 ? first3 : first7))
+        alarm_steps[ri SUBSEP method SUBSEP monitor_alarms[ri SUBSEP method]] = (j == 1 ? first_fixed : (j == 2 ? first3 : first7))
+        cohort_alarm[ri SUBSEP $2 SUBSEP method] = 1
+      }
+    }
+    raw_rows++
+    next
+  }
+
+  FILENAME == summary {
+    if (FNR == 1) { if (NF != 20) failed = 1; next }
+    if (NF != 20) failed = 1
+    ri = 0
+    for (i = 1; i <= 6; i++) if ($1 == rate_names[i]) ri = i
+    if (ri == 0) failed = 1
+    method = $2
+    if (method != "fixed" && method != "mix3" && method != "mix7") failed = 1
+    if ($3 != 1000 || $4 != 5 || $5 != 300) failed = 1
+    if ($6 !~ /^[0-9]+$/ || $6 > 1000) failed = 1
+    if ($7 !~ /^[0-9]*[.]?[0-9]+$/ || $8 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        $9 !~ /^[0-9]*[.]?[0-9]+$/ || $10 !~ /^[0-9]+$/ || $10 > 5000 ||
+        $11 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($12 != "NA" && ($12 !~ /^[0-9]*[.]?[0-9]+$/ || $12 < 0 || $12 >= 300)) failed = 1
+    if ($13 != "NA" && ($13 !~ /^[0-9]+$/ || $13 < 0 || $13 >= 300)) failed = 1
+    if ($14 != "NA" && ($14 !~ /^[0-9]+$/ || $14 < 0 || $14 >= 300)) failed = 1
+    if ($13 != "NA" && $14 != "NA" && $13 < $14) failed = 1
+    if ($15 !~ /^[0-9]*[.]?[0-9]+$/ || $16 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        $17 != 0.05 || $18 != 0.05 || $20 == "") failed = 1
+    if (($19 - log(100) > 0.000001) || (log(100) - $19 > 0.000001)) failed = 1
+
+    calculated_fwer = 0
+    for (cohort = 0; cohort < 1000; cohort++)
+      if (cohort_alarm[ri SUBSEP cohort SUBSEP method]) calculated_fwer++
+    if ($6 != calculated_fwer) failed = 1
+    if (($7 - calculated_fwer / 1000 > 0.000001) ||
+        (calculated_fwer / 1000 - $7 > 0.000001)) failed = 1
+    phat = calculated_fwer / 1000
+    denominator = 1 + z*z/1000
+    center = (phat + z*z/(2*1000)) / denominator
+    half = z * sqrt(phat*(1-phat)/1000 + z*z/(4*1000*1000)) / denominator
+    lower = (center-half > 0 ? center-half : 0)
+    upper = (center+half < 1 ? center+half : 1)
+    if (($8 - lower > 0.000002) || (lower - $8 > 0.000002) ||
+        ($9 - upper > 0.000002) || (upper - $9 > 0.000002)) failed = 1
+
+    counted_alarms = monitor_alarms[ri SUBSEP method] + 0
+    if ($10 != counted_alarms) failed = 1
+    if (($11 - counted_alarms/5000 > 0.000002) ||
+        (counted_alarms/5000 - $11 > 0.000002)) failed = 1
+    if (counted_alarms == 0 && ($12 != "NA" || $13 != "NA" || $14 != "NA")) failed = 1
+    if (counted_alarms > 0) {
+      computed_mean = monitor_step_sum[ri SUBSEP method] / counted_alarms
+      if ($12 == "NA" || ($12 - computed_mean > 0.000002) ||
+          (computed_mean - $12 > 0.000002)) failed = 1
+    }
+    if (($15 - event_sum[ri]/5000 > 0.000002) ||
+        (event_sum[ri]/5000 - $15 > 0.000002)) failed = 1
+    expected_count = rate_values[ri] * 300
+    if (($16 - expected_count > 0.000002) ||
+        (expected_count - $16 > 0.000002)) failed = 1
+    grid_key = ri SUBSEP method
+    if (summary_seen[grid_key]++) failed = 1
+    fwer_rate[grid_key] = $7
+    fwer_upper[grid_key] = $9
+    summary_rows++
+    next
+  }
+
+  END {
+    if (raw_rows != 30000 || summary_rows != 18 || failed) exit 1
+    for (i = 1; i <= 6; i++) for (cohort = 0; cohort < 1000; cohort++)
+      for (monitor = 0; monitor < 5; monitor++)
+        if (!streams[i SUBSEP cohort] || !seen[i SUBSEP cohort SUBSEP monitor]) exit 1
+
+    if (fwer_rate[1 SUBSEP "fixed"] > 0.02 ||
+        fwer_rate[1 SUBSEP "mix3"] > 0.02 ||
+        fwer_rate[1 SUBSEP "mix7"] > 0.02 ||
+        fwer_upper[2 SUBSEP "fixed"] > 0.08 ||
+        fwer_upper[2 SUBSEP "mix3"] > 0.08 ||
+        fwer_upper[2 SUBSEP "mix7"] > 0.08) exit 1
+    if (fwer_rate[3 SUBSEP "mix7"] < fwer_rate[3 SUBSEP "mix3"] + 0.15 ||
+        fwer_rate[4 SUBSEP "mix7"] < fwer_rate[4 SUBSEP "mix3"] + 0.20) exit 1
+    if (fwer_rate[5 SUBSEP "fixed"] < 0.95 ||
+        fwer_rate[5 SUBSEP "mix3"] < 0.95 ||
+        fwer_rate[5 SUBSEP "mix7"] < 0.95 ||
+        fwer_rate[6 SUBSEP "fixed"] < 0.99 ||
+        fwer_rate[6 SUBSEP "mix3"] < 0.99 ||
+        fwer_rate[6 SUBSEP "mix7"] < 0.99) exit 1
+  }
+' "$tmpdir/bet-grid-a.csv" "$tmpdir/bet-grid-summary-a.csv"; then
+  printf 'FAIL: risk-null Monte Carlo schema, component recurrence, confidence intervals, calibration or power gates are invalid\n' >&2
+  exit 1
+fi
+
 # Calibrated sequential CUSUM over residuals. Pointwise and cumulative
 # thresholds are independently calibrated from nominal episode maxima.
 cargo run --locked --release --manifest-path "$manifest" --bin allostatic-sequential-scope-bench -- \
