@@ -426,12 +426,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         });
         let feasible = metrics.protected_false_activation_rate <= MAX_TRAIN_FALSE_ACTIVATION_RATE;
         let candidate_key = (lambda, metrics.clone(), metrics.protected_false_activation_rate);
-        match &chosen {
-            None => chosen = Some(candidate_key),
+        let should_replace = match chosen.as_ref() {
+            None => true,
             Some((_, best_metrics, best_false_rate)) => {
                 let best_feasible =
                     *best_false_rate <= MAX_TRAIN_FALSE_ACTIVATION_RATE;
-                let better = if feasible && !best_feasible {
+                if feasible && !best_feasible {
                     true
                 } else if feasible == best_feasible && feasible {
                     metrics.intended_token_global_top1_fraction
@@ -447,11 +447,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                                 > best_metrics.intended_token_global_top1_fraction)
                 } else {
                     false
-                };
-                if better {
-                    chosen = Some(candidate_key);
                 }
             }
+        };
+        if should_replace {
+            chosen = Some(candidate_key);
         }
     }
     let (selected_lambda, selected_train_metrics, _) =
