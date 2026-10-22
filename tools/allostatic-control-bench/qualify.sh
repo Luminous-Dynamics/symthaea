@@ -480,8 +480,16 @@ fi
 
 if ! awk -F, '
   NR == 1 { if (NF != 14) failed = 1; next }
+  NR == 2 {
+    pointwise_threshold = $6
+    cusum_threshold = $10
+  }
   {
     if (NF != 14) failed = 1
+    if (($6 - pointwise_threshold > 0.000001) ||
+        (pointwise_threshold - $6 > 0.000001) ||
+        ($10 - cusum_threshold > 0.000001) ||
+        (cusum_threshold - $10 > 0.000001)) failed = 1
     if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
         $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
     if ($2 != "nominal" && $2 != "gradual_shift" &&
@@ -490,7 +498,7 @@ if ! awk -F, '
     if ($4 !~ /^[0-7]$/) failed = 1
     if ($5 !~ /^[0-9]*[.]?[0-9]+$/ || $6 !~ /^[0-9]*[.]?[0-9]+$/ ||
         $9 !~ /^[0-9]*[.]?[0-9]+$/ || $10 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
-    for (i = 7; i <= 7; i++) if ($i != "true" && $i != "false") failed = 1
+    if ($7 != "true" && $7 != "false") failed = 1
     if ($11 != "true" && $11 != "false") failed = 1
     if ($8 !~ /^[0-8]$/ || $12 !~ /^[0-8]$/) failed = 1
     if ($13 != "true" && $13 != "false") failed = 1
@@ -555,7 +563,7 @@ if ! awk -F, '
     for (key in next_step) {
       if (next_step[key] != 8 || first_point[key] != recorded_point_first[key] ||
           first_cusum[key] != recorded_cusum_first[key]) exit 1
-      if ((episode_max[key] <= $6) != (episode_below[key] == "true")) exit 1
+      if ((episode_max[key] <= pointwise_threshold) != (episode_below[key] == "true")) exit 1
     }
   }
 ' "$tmpdir/sequential-a.csv"; then
@@ -573,7 +581,11 @@ if ! awk -F, '
         $2 != "abrupt_shift" && $2 != "stealth_shift") failed = 1
     if ($3 != 300) failed = 1
     for (i = 4; i <= 9; i++) if ($i !~ /^[0-9]+$/ || $i > 300) failed = 1
-    if ($4 < $6 || $5 < $7 || $6 > $4 || $7 > $5) failed = 1
+    if ($6 > $4 || $7 > $5) failed = 1
+    if ($2 == "nominal" &&
+        ($6 != $4 || $7 != $5 || $8 != 0 || $9 != 0)) failed = 1
+    if ($2 != "nominal" &&
+        ($6 != 0 || $7 != 0 || $4 + $8 != 300 || $5 + $9 != 300)) failed = 1
     if ($10 != "NA" && $10 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
     if ($11 != "NA" && $11 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
     if ($12 != "NA" && $12 !~ /^[0-9]+$/) failed = 1
