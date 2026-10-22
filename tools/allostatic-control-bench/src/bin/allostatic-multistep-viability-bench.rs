@@ -98,8 +98,11 @@ impl SummaryBucket {
 }
 
 fn deterministic_trit(seed: u64, dimension: u64) -> f64 {
-    let mut value =
-        seed.wrapping_add(dimension.wrapping_add(1).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+    let mut value = seed.wrapping_add(
+        dimension
+            .wrapping_add(1)
+            .wrapping_mul(0x9E37_79B9_7F4A_7C15),
+    );
     value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
     value ^= value >> 31;
@@ -121,8 +124,9 @@ fn shifted_effect(
     let load_shift = deterministic_trit(seed, action_index * 2 + 1) * 0.010;
     let reserve_interval = interval(reserve.0 + reserve_shift, reserve.1 + reserve_shift)?;
     let load_interval = interval(load.0 + load_shift, load.1 + load_shift)?;
-    ActionEffectBounds::new(reserve_interval, load_interval)
-        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid action-effect envelope").into())
+    ActionEffectBounds::new(reserve_interval, load_interval).ok_or_else(|| {
+        IoError::new(ErrorKind::InvalidData, "invalid action-effect envelope").into()
+    })
 }
 
 fn dynamics_for(seed: u64) -> Result<DynamicsBounds, Box<dyn Error>> {
@@ -172,7 +176,10 @@ fn percentile95(values: &[usize]) -> usize {
 }
 
 fn maximum(values: &[usize]) -> usize {
-    *values.iter().max().expect("each summary bucket has profiles")
+    *values
+        .iter()
+        .max()
+        .expect("each summary bucket has profiles")
 }
 
 fn raw_row(
