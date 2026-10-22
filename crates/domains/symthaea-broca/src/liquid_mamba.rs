@@ -1143,60 +1143,34 @@ impl LiquidMambaGenerator {
         let uses_temporal_projection =
             self.config.temporal_projection && self.temporal_proj.is_some();
 
-        // Prepare the true projected context once. The live pass computes the
-        // reported teacher-forced loss. A separate cloned backend computes the
-        // full sequence gradient in one differentiable recurrent unroll.
+        // Project context once. The isolated backend computes the mean next-token
+        // loss and all requested context gradients from the SAME differentiable
+        // recurrent unroll; no separate live pass is needed just to report loss.
         let gradient_sequence = if uses_temporal_projection {
-            let sequence = self
-                .temporal_proj
+            self.temporal_proj
                 .as_ref()
                 .expect("temporal projection checked above")
-                .project_to_ssm_sequence(thought_hv);
-            self.mamba.inject_context_sequence(&sequence)?;
-            sequence
+                .project_to_ssm_sequence(thought_hv)
         } else {
-            let ssm_context = self.projection.project_to_ssm(thought_hv);
-            self.mamba.inject_initial_context(&ssm_context)?;
-            vec![ssm_context]
+            vec![self.projection.project_to_ssm(thought_hv)]
         };
         if gradient_sequence.is_empty() {
             anyhow::bail!("cannot distill from an empty projected context sequence");
         }
 
-        // First pass: teacher-force the complete target sequence once and report
-        // its mean next-token cross-entropy using the same fixed projection weights.
-        let mut total_loss = 0.0f32;
-        let mut previous_token = self.mamba.eos_token_id();
-        for (target_position, &target_id) in target_ids.iter().enumerate() {
-            let (logits, _hidden) = self.mamba.forward_with_state(previous_token)?;
-            anyhow::ensure!(
-                (target_id as usize) < logits.len(),
-                "teacher target token {target_id} is outside logits vocabulary of size {}",
-                logits.len()
-            );
-            anyhow::ensure!(
-                logits.iter().all(|value| value.is_finite()),
-                "teacher-forced logits contain a non-finite value at target position {target_position}"
-            );
-            let token_loss = crate::evaluation::cross_entropy_loss(&logits, target_id as usize);
-            anyhow::ensure!(
-                token_loss.is_finite(),
-                "teacher-forced cross-entropy is non-finite at target position {target_position}"
-            );
-            total_loss += token_loss;
-            previous_token = target_id;
-        }
-
-        // One differentiable replay accumulates all target-token losses, rather
-        // than replaying EOS + each growing prefix separately for every target.
-        // Ask for every projected-context position so the returned gradient is
-        // the full context Jacobian, not a rotating single-anchor approximation.
         let gradient_positions: Vec<usize> = (0..gradient_sequence.len()).collect();
-        let context_gradients = self.mamba.compute_e2e_sequence_loss_gradients_isolated(
+        let sequence_result = self.mamba.compute_e2e_sequence_loss_and_gradients_isolated(
             &gradient_sequence,
             target_ids,
             &gradient_positions,
         )?;
+        anyhow::ensure!(
+            sequence_result.mean_loss.is_finite(),
+            "sequence-gradient backend returned a non-finite mean loss"
+        );
+        let mean_loss = sequence_result.mean_loss;
+        let context_gradients = sequence_result.context_gradients;
+
         anyhow::ensure!(
             context_gradients.len() == gradient_sequence.len(),
             "sequence-gradient backend returned {} positions; expected {}",
@@ -1214,6 +1188,10 @@ impl LiquidMambaGenerator {
             anyhow::ensure!(
                 gradients_by_position[position].is_none(),
                 "sequence-gradient backend returned duplicate position {position}"
+            );
+            anyhow::ensure!(
+                gradient.iter().all(|value| value.is_finite()),
+                "sequence-gradient backend returned a non-finite gradient at position {position}"
             );
             gradients_by_position[position] = Some(gradient);
         }
@@ -1253,7 +1231,7 @@ impl LiquidMambaGenerator {
         }
 
         self.generation_count += 1;
-        Ok(total_loss / target_ids.len() as f32)
+        Ok(mean_loss)
     }
 
     /// Local FEP learning step (Predictive Coding).
