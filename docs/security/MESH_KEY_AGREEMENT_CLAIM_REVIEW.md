@@ -150,6 +150,20 @@ Before this change, `receive_kem_public_key` copied arbitrary-length public-key 
 
 Regression coverage is in `test_kem_public_key_length_and_peer_id_are_validated_before_storage`, `test_pending_kem_exchange_count_is_bounded`, `test_pending_candidate_count_is_bounded_before_kem_work`, and `test_invalid_kem_ciphertext_lengths_do_not_create_candidates`. The public-key-length check confirms only the encoding size; it does not authenticate the key or prove it is cryptographically valid. `TaggedPublicKey` construction/encapsulation can still reject malformed contents at the crypto boundary. Identity/transcript binding and rate limits at the transport edge remain mandatory. The new tests have not been compiled or run locally.
 
+## K-10 — The feature resolves to an all-zero compile stub, not real ML-KEM
+
+The root `Cargo.toml` binds `mycelix-crypto` to the local path `stubs/mycelix-crypto`. That stub's `MlKem768KeyPair::generate()` returns an all-zero public key and secret-key byte vector; `encapsulate()` returns an all-zero 1,088-byte ciphertext plus an all-zero 32-byte shared secret; `decapsulate()` returns an all-zero shared secret for every 1,088-byte ciphertext. It is explicitly described as a compilation stub. Therefore, test outputs from the previous `PqcHandshakeManager` tests were deterministic stand-ins, **not ML-KEM security, interoperability, or even genuine KEM agreement evidence**.
+
+**Mitigation now present in this branch:**
+- The stub exports `CRYPTO_BACKEND_IS_STUB: bool = true`.
+- `PqcHandshakeManager::ensure_real_kem_backend` rejects KEM public-key export, accepted public-key storage, encapsulation, and decapsulation while that marker is set.
+- `kem_public_key_bytes()` returns `SwarmResult<Vec<u8>>`; the supported public API no longer leaks the all-zero test public key.
+- The established-session key map/type was removed from this unimplemented path. `session_key()` returns `None` and `session_count()` returns zero; only private, non-cloneable candidate state exists for internal test/plumbing.
+- Former tests that asserted successful fake KEM exchange or implicit-rejection behavior were replaced with tests that assert the stub fails closed. The remaining BLAKE3 tests test only derivation determinism on explicitly synthetic input; they say nothing about ML-KEM.
+- `Cargo.toml`, the feature guide and module docs now identify the feature as stub-backed and not a usable post-quantum handshake.
+
+This intentionally leaves the feature nonfunctional until the dependency is replaced with a reviewed implementation of ML-KEM (FIPS 203) and end-to-end transcript/key-confirmation protocol tests. Do **not** flip the marker to false in the stub or treat the marker as a substitute for package/provenance review. Backend selection should become an explicit build feature with a fail-closed compile-time boundary, and the production dependency path should be validated by lockfile, feature-graph and known-answer tests.
+
 ## Immediate disposition
 
 - The X25519 store now rejects non-contributory shared secrets before deriving or storing keys; exact-head tests and review are still required.
@@ -195,4 +209,4 @@ A model discovery counts only when the issue is independently reproducible again
 
 ## Validation status
 
-Source review and regression-test authoring only. Tests were not compiled or run in this environment. The regression/limitation tests are `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse`, `legacy_static_x25519_derivation_does_not_bind_peer_source_id`, `x25519_low_order_peer_keys_are_rejected_without_storing_keys`, `legacy_pqc_candidate_key_derives_without_verified_classical_handshake_state`, and `legacy_pqc_session_derivation_does_not_bind_peer_id`; the implicit-rejection test is `test_invalid_ciphertext_uses_implicit_rejection_and_needs_key_confirmation`. Additional tests ensure KEM outputs remain pending until confirmation exists, encoded lengths are checked before KEM operations, and pending state is bounded. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
+Source review and regression-test authoring only. Tests were not compiled or run in this environment. The X25519 tests include `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse`, `legacy_static_x25519_derivation_does_not_bind_peer_source_id`, and `x25519_low_order_peer_keys_are_rejected_without_storing_keys`. PQC tests now verify the bundled backend marker and fail-closed operations (`test_workspace_crypto_stub_is_never_accepted_as_ml_kem`, `test_stub_backend_cannot_create_candidate_or_active_session`), along with input length/identifier validation, pending-state bounds, cleanup and synthetic BLAKE3 determinism. They no longer count all-zero stub outputs as successful KEM operations. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
