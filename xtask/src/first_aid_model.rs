@@ -93,9 +93,7 @@ mod tests {
         match connectivity {
             Connectivity::Online => None,
             Connectivity::Offline => Some(Violation::OfflineCoreNetworkDependency),
-            Connectivity::Intermittent => {
-                Some(Violation::IntermittentCoreNetworkDependency)
-            }
+            Connectivity::Intermittent => Some(Violation::IntermittentCoreNetworkDependency),
         }
     }
 
@@ -447,9 +445,7 @@ mod tests {
             for core_network_required in [false, true] {
                 network_cases += 1;
                 let expected = match (connectivity, core_network_required) {
-                    (Connectivity::Offline, true) => {
-                        Some(Violation::OfflineCoreNetworkDependency)
-                    }
+                    (Connectivity::Offline, true) => Some(Violation::OfflineCoreNetworkDependency),
                     (Connectivity::Intermittent, true) => {
                         Some(Violation::IntermittentCoreNetworkDependency)
                     }
@@ -503,7 +499,7 @@ mod tests {
                 assert_eq!(
                     egress_policy_violation(sensitive_payload, consent_scoped),
                     expected,
-                    "egress policy mismatch: sensitive={sensitive_payload}, consent={consent_scoped}"
+                    "egress mismatch: sensitive={sensitive_payload}, consent={consent_scoped}"
                 );
             }
         }
@@ -515,6 +511,4 @@ mod tests {
             Some(Violation::UnknownNormalized)
         );
     }
-
-
 }
