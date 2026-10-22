@@ -157,6 +157,77 @@ def graph_scores(true_edges: tuple[tuple[int, int], ...] | list[tuple[int, int]]
     }
 
 
+def layered_graph_scores(true_dag_edges, true_cpdag_directed_edges,
+                         predicted_directed_edges, predicted_undirected_edges,
+                         node_count: int, minimum_intervention_count: int,
+                         interventions_used: int) -> dict:
+    """Score skeleton, observationally compelled directions, full DAG, and budget separately.
+
+    Undirected predictions recover an adjacency but not its direction. This is an
+    ACDB-inspired layered contract; budget efficiency is reported as raw counts and
+    a count ratio, not as a reproduction of ACDB's published scalar implementation.
+    """
+    true_dag = set(tuple(edge) for edge in true_dag_edges)
+    cpdag_directed = set(tuple(edge) for edge in true_cpdag_directed_edges)
+    pred_directed = set(tuple(edge) for edge in predicted_directed_edges)
+    pred_undirected = set(tuple(edge) for edge in predicted_undirected_edges)
+    # Reuse the strict directed-edge validation and duplicate checks.
+    _ = graph_scores(list(true_dag), list(pred_directed), node_count)
+    if (len(true_dag) != len(true_dag_edges) or len(cpdag_directed) != len(true_cpdag_directed_edges)
+            or len(pred_directed) != len(predicted_directed_edges)):
+        raise ValueError("duplicate truth or CPDAG directed edges are not allowed")
+    if len(pred_undirected) != len(predicted_undirected_edges):
+        raise ValueError("duplicate undirected predictions are not allowed")
+    if not cpdag_directed.issubset(true_dag):
+        raise ValueError("CPDAG compelled arrows must agree with the true DAG")
+    for u, v in pred_undirected:
+        if not (0 <= u < node_count and 0 <= v < node_count) or u >= v:
+            raise ValueError("undirected edges must be in-range canonical pairs (u, v) with u < v")
+    pred_directed_skeleton = {tuple(sorted(edge)) for edge in pred_directed}
+    overlap = pred_directed_skeleton & pred_undirected
+    if overlap:
+        raise ValueError(f"a predicted adjacency cannot be both directed and undirected: {sorted(overlap)}")
+    true_skeleton = {tuple(sorted(edge)) for edge in true_dag}
+    pred_skeleton = pred_directed_skeleton | pred_undirected
+    sk_tp = len(true_skeleton & pred_skeleton)
+    sk_fp = len(pred_skeleton - true_skeleton)
+    sk_fn = len(true_skeleton - pred_skeleton)
+    def ratio(num: int, den: int) -> float: return num / den if den else 0.0
+    def f1(p: float, r: float) -> float: return 2*p*r/(p+r) if p+r else 0.0
+    sk_p, sk_r = ratio(sk_tp, sk_tp + sk_fp), ratio(sk_tp, sk_tp + sk_fn)
+    directed_tp = len(true_dag & pred_directed)
+    directed_fp, directed_fn = len(pred_directed - true_dag), len(true_dag - pred_directed)
+    directed_p = ratio(directed_tp, directed_tp + directed_fp)
+    directed_r = ratio(directed_tp, directed_tp + directed_fn)
+    compelled_tp = len(cpdag_directed & pred_directed)
+    compelled_fp, compelled_fn = len(pred_directed - cpdag_directed), len(cpdag_directed - pred_directed)
+    compelled_p = ratio(compelled_tp, compelled_tp + compelled_fp)
+    compelled_r = ratio(compelled_tp, compelled_tp + compelled_fn)
+    reversals = sum(1 for u, v in true_dag if (v, u) in pred_directed)
+    unresolved = len(pred_undirected & true_skeleton)
+    dag_shd = sk_fp + sk_fn + reversals + unresolved
+    if minimum_intervention_count < 0 or interventions_used < 0:
+        raise ValueError("intervention counts must be nonnegative")
+    ratio_to_minimum = (interventions_used / minimum_intervention_count
+                        if minimum_intervention_count > 0 else (0.0 if interventions_used == 0 else None))
+    return {
+        "skeleton_tp": sk_tp, "skeleton_fp": sk_fp, "skeleton_fn": sk_fn,
+        "skeleton_precision": sk_p, "skeleton_recall": sk_r, "skeleton_f1": f1(sk_p, sk_r),
+        "compelled_tp": compelled_tp, "compelled_fp": compelled_fp, "compelled_fn": compelled_fn,
+        "compelled_precision": compelled_p, "compelled_recall": compelled_r,
+        "compelled_f1": f1(compelled_p, compelled_r),
+        "directed_tp": directed_tp, "directed_fp": directed_fp, "directed_fn": directed_fn,
+        "directed_precision": directed_p, "directed_recall": directed_r,
+        "directed_f1": f1(directed_p, directed_r),
+        "dag_shd": dag_shd, "orientation_reversals": reversals,
+        "unresolved_true_adjacencies": unresolved,
+        "orientation_coverage": ratio(len(pred_directed), len(pred_skeleton)),
+        "minimum_intervention_count": minimum_intervention_count,
+        "interventions_used": interventions_used,
+        "intervention_count_to_minimum_ratio": ratio_to_minimum,
+    }
+
+
 def validate_scm(scm: SCM) -> None:
     if len(scm.parents) != scm.node_count or len(scm.truth_tables) != scm.node_count:
         raise AssertionError("node-array length mismatch")
