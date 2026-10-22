@@ -23,10 +23,11 @@ use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 const BASE_VOCAB_SIZE: usize = 64;
 const NEW_TOKEN_COUNT: usize = 8;
 const TRAIN_QUERY_COUNT: usize = 8;
-const HELDOUT_QUERY_COUNT: usize = 32;
+const HELDOUT_QUERY_COUNT: usize = 64;
 const LOGIT_SCALE: f32 = 20.0;
 const GENESIS_PHRASE: &str = "broca-angular-calibration-smoke-v1";
 const MAX_TRAIN_FALSE_ACTIVATION_RATE: f64 = 0.01;
+const CONFIDENCE_ALPHA: f64 = 0.05;
 const LAMBDA_GRID: [f32; 11] = [0.0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0];
 
 #[derive(Debug)]
@@ -55,7 +56,9 @@ struct Evaluation {
     intended_token_beats_old_vocab_fraction: f64,
     intended_token_global_top1_fraction: f64,
     protected_contexts: usize,
+    protected_false_activation_count: usize,
     protected_false_activation_rate: f64,
+    protected_false_activation_upper_95: f64,
     mean_positive_margin_over_old_vocab: f64,
     mean_protected_old_best_margin_over_new_vocab: f64,
 }
@@ -65,6 +68,7 @@ struct LambdaTrial {
     lambda: f32,
     train_positive_global_top1_fraction: f64,
     train_protected_false_activation_rate: f64,
+    train_protected_false_activation_upper_95: f64,
     train_mean_positive_margin: f64,
 }
 
@@ -92,11 +96,67 @@ struct Receipt {
     selected_lambda: f32,
     maximum_allowed_train_false_activation_rate: f64,
     selected_train_false_activation_rate: f64,
+    selected_train_false_activation_upper_95: f64,
     calibration_constraint_met: bool,
+    heldout_false_activation_confidence: &'static str,
     lambda_trials: Vec<LambdaTrial>,
     results: Vec<StrategyResult>,
     fixture_spec_digest_sha256: String,
     claim_boundary: &'static str,
+}
+
+
+/// Log-sum-exp for two log probabilities.
+fn log_add_exp(a: f64, b: f64) -> f64 {
+    if !a.is_finite() {
+        return b;
+    }
+    if !b.is_finite() {
+        return a;
+    }
+    let max = a.max(b);
+    max + ((a - max).exp() + (b - max).exp()).ln()
+}
+
+/// Binomial CDF P[X <= observed] evaluated in log space.
+fn binomial_cdf_log(observed: usize, trials: usize, probability: f64) -> f64 {
+    if probability <= 0.0 {
+        return 1.0;
+    }
+    if probability >= 1.0 {
+        return if observed >= trials { 1.0 } else { 0.0 };
+    }
+    let mut log_probability = (trials as f64) * (-probability).ln_1p();
+    let mut log_cdf = log_probability;
+    for k in 1..=observed.min(trials) {
+        log_probability += ((trials - k + 1) as f64).ln()
+            - (k as f64).ln()
+            + probability.ln()
+            - (-probability).ln_1p();
+        log_cdf = log_add_exp(log_cdf, log_probability);
+    }
+    log_cdf.exp().clamp(0.0, 1.0)
+}
+
+/// One-sided exact Clopper-Pearson upper confidence bound for a binomial rate.
+fn clopper_pearson_upper(observed: usize, trials: usize, alpha: f64) -> f64 {
+    if trials == 0 || observed >= trials {
+        return 1.0;
+    }
+    if observed == 0 {
+        return 1.0 - alpha.powf(1.0 / trials as f64);
+    }
+    let mut low = observed as f64 / trials as f64;
+    let mut high = 1.0;
+    for _ in 0..80 {
+        let middle = (low + high) * 0.5;
+        if binomial_cdf_log(observed, trials, middle) > alpha {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    high
 }
 
 fn make_controller(genesis: &GenesisSeed) -> LanguageController {
@@ -364,7 +424,13 @@ fn evaluate(
         intended_token_beats_old_vocab_fraction: counts.positive_target_beats_old as f64 / pos_n,
         intended_token_global_top1_fraction: counts.positive_target_is_global_top1 as f64 / pos_n,
         protected_contexts: counts.protected_count,
+        protected_false_activation_count: counts.protected_false_activations,
         protected_false_activation_rate: counts.protected_false_activations as f64 / protected_n,
+        protected_false_activation_upper_95: clopper_pearson_upper(
+            counts.protected_false_activations,
+            counts.protected_count,
+            CONFIDENCE_ALPHA,
+        ),
         mean_positive_margin_over_old_vocab: counts.positive_margin_sum / pos_n,
         mean_protected_old_best_margin_over_new_vocab: counts.protected_safety_margin_sum / protected_n,
     };
@@ -390,7 +456,7 @@ fn digest_fixture() -> String {
     let fixture = [
         format!("schema=1;genesis={GENESIS_PHRASE};dimension={HDC_DIMENSION};base_vocab={BASE_VOCAB_SIZE}"),
         format!("new_tokens={NEW_TOKEN_COUNT};train={TRAIN_QUERY_COUNT}"),
-        format!("heldout={HELDOUT_QUERY_COUNT};noise=0.25;logit_scale={LOGIT_SCALE}"),
+        format!("heldout={HELDOUT_QUERY_COUNT};noise=0.25;logit_scale={LOGIT_SCALE};cp_alpha={CONFIDENCE_ALPHA}"),
         format!("lambda_grid={LAMBDA_GRID:?}"),
     ]
     .join(";");
@@ -422,6 +488,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             lambda,
             train_positive_global_top1_fraction: metrics.intended_token_global_top1_fraction,
             train_protected_false_activation_rate: metrics.protected_false_activation_rate,
+            train_protected_false_activation_upper_95: metrics.protected_false_activation_upper_95,
             train_mean_positive_margin: metrics.mean_positive_margin_over_old_vocab,
         });
         let feasible = metrics.protected_false_activation_rate <= MAX_TRAIN_FALSE_ACTIVATION_RATE;
@@ -498,8 +565,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         selected_lambda,
         maximum_allowed_train_false_activation_rate: MAX_TRAIN_FALSE_ACTIVATION_RATE,
         selected_train_false_activation_rate: selected_train_metrics.protected_false_activation_rate,
+        selected_train_false_activation_upper_95: selected_train_metrics.protected_false_activation_upper_95,
         calibration_constraint_met: selected_train_metrics.protected_false_activation_rate
             <= MAX_TRAIN_FALSE_ACTIVATION_RATE,
+        heldout_false_activation_confidence: "one-sided exact Clopper-Pearson 95% upper bound",
         lambda_trials: trials,
         results,
         fixture_spec_digest_sha256: digest_fixture(),
