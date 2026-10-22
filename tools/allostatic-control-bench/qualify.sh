@@ -908,7 +908,9 @@ if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summar
         fwer_upper[2 SUBSEP "mix7"] > 0.08 ||
         fwer_upper[2 SUBSEP "adaptive"] > 0.08) exit 1
     if (fwer_rate[3 SUBSEP "mix7"] < fwer_rate[3 SUBSEP "mix3"] + 0.15 ||
-        fwer_rate[4 SUBSEP "mix7"] < fwer_rate[4 SUBSEP "mix3"] + 0.20) exit 1
+        fwer_rate[4 SUBSEP "mix7"] < fwer_rate[4 SUBSEP "mix3"] + 0.20 ||
+        fwer_rate[3 SUBSEP "adaptive"] < fwer_rate[3 SUBSEP "mix3"] + 0.10 ||
+        fwer_rate[4 SUBSEP "adaptive"] < fwer_rate[4 SUBSEP "mix3"] + 0.40) exit 1
     if (fwer_rate[5 SUBSEP "fixed"] < 0.95 ||
         fwer_rate[5 SUBSEP "mix3"] < 0.95 ||
         fwer_rate[5 SUBSEP "mix7"] < 0.95 ||
