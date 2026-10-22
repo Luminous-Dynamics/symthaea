@@ -333,7 +333,7 @@ mod tests {
         let losses = [0.12, 0.20, 0.24, 0.08, 0.31];
         let mut expected_components = [0.0_f64; 3];
         for loss in losses {
-            let _ = process.observe(loss);
+            assert!(process.observe(loss).is_some());
             for (index, fraction) in fractions.iter().copied().enumerate() {
                 let factor = 1.0 + (fraction / risk_bound) * (loss - risk_bound);
                 expected_components[index] += factor.ln();
@@ -373,7 +373,7 @@ mod tests {
         assert_eq!(process.component_log_e_values(), initial);
 
         for _ in 0..8 {
-            let _ = process.observe(0.65);
+            assert!(process.observe(0.65).is_some());
         }
         assert!(process.alarmed());
         process.reset();
@@ -438,7 +438,7 @@ mod tests {
         let mut process = BoundedRiskEProcess::new(0.2, 2.0, 0.05, 1)
             .expect("valid process");
         for loss in [0.05, 0.10, 0.05, 0.10, 0.05, 0.10] {
-            let _ = process.observe(loss);
+            assert!(process.observe(loss).is_some());
         }
         assert!(process.e_value() > 0.0);
     }
@@ -448,7 +448,7 @@ mod tests {
         let mut process =
             BoundedRiskEProcess::new(0.15, 0.5 / 0.15, 0.05, 1).expect("valid process");
         for _ in 0..8 {
-            let _ = process.observe(0.65);
+            assert!(process.observe(0.65).is_some());
         }
         assert!(process.alarmed());
         process.reset();
