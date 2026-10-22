@@ -659,6 +659,62 @@ impl Rk45Controller {
         self.try_step_validated(integrator, system, state, t, maximum_dt, tolerances)
     }
 
+    /// Execute a controller call with a hard cap on internal Cash–Karp attempts.
+    ///
+    /// Unlike `try_step`, this API preserves the accepted input state/time and exact
+    /// work counters on failure. `maximum_attempts` includes accepted and
+    /// error-test-rejected substeps. A zero budget fails before evaluating the RHS.
+    /// The persisted next-step proposal is updated only after an accepted step.
+    pub fn try_step_with_receipt(
+        &mut self,
+        integrator: &Rk45Integrator,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        maximum_dt: f64,
+        tolerances: &Rk45Tolerances,
+        maximum_attempts: usize,
+    ) -> Rk45StepOutcome {
+        let mut progress = Rk45StepProgress::default();
+        let result = (|| {
+            if !t.is_finite() {
+                return Err(SimulationError::NonFiniteTimeBounds);
+            }
+            if !maximum_dt.is_finite() || maximum_dt <= 0.0 {
+                return Err(SimulationError::InvalidTimeStep);
+            }
+            tolerances.validate(system.state_dim())?;
+            let requested_dt = self.next_step_size.unwrap_or(maximum_dt).min(maximum_dt);
+            integrator.try_adaptive_step_impl(
+                system,
+                state,
+                t,
+                requested_dt,
+                Rk45ErrorControl::Scaled(tolerances),
+                Rk45ErrorNorm::WeightedRms,
+                &mut progress,
+                maximum_attempts,
+            )
+        })();
+
+        match result {
+            Ok(report) => {
+                self.next_step_size = Some(report.proposed_next_dt);
+                Rk45StepOutcome::Accepted(report)
+            }
+            Err(error) => Rk45StepOutcome::Failed(Rk45StepFailure {
+                error,
+                last_accepted_state: state.to_vec(),
+                last_accepted_time: t,
+                attempted_steps: progress.attempted_steps,
+                rejected_steps: progress.rejected_steps,
+                derivative_evaluations: progress.derivative_evaluations,
+                min_attempted_dt: progress.min_attempted_dt,
+                last_attempted_dt: progress.last_attempted_dt,
+            }),
+        }
+    }
+
     fn try_step_validated(
         &mut self,
         integrator: &Rk45Integrator,
@@ -675,6 +731,7 @@ impl Rk45Controller {
             return Err(SimulationError::InvalidTimeStep);
         }
         let requested_dt = self.next_step_size.unwrap_or(maximum_dt).min(maximum_dt);
+        let mut progress = Rk45StepProgress::default();
         let report = integrator.try_adaptive_step_impl(
             system,
             state,
@@ -682,6 +739,8 @@ impl Rk45Controller {
             requested_dt,
             Rk45ErrorControl::Scaled(tolerances),
             Rk45ErrorNorm::WeightedRms,
+            &mut progress,
+            usize::MAX,
         )?;
         self.next_step_size = Some(report.proposed_next_dt);
         Ok(report)
@@ -981,6 +1040,7 @@ impl Rk45Integrator {
                 actual: state.len(),
             });
         }
+        let mut progress = Rk45StepProgress::default();
         let report = self.try_adaptive_step_impl(
             system,
             state,
@@ -988,6 +1048,8 @@ impl Rk45Integrator {
             dt,
             Rk45ErrorControl::LegacyScalarAbsolute(self.tol),
             Rk45ErrorNorm::WeightedInfinity,
+            &mut progress,
+            usize::MAX,
         )?;
         Ok((report.state, report.accepted_dt, report.max_absolute_error))
     }
@@ -1007,6 +1069,7 @@ impl Rk45Integrator {
         tolerances: &Rk45Tolerances,
     ) -> Result<Rk45StepReport, SimulationError> {
         tolerances.validate(system.state_dim())?;
+        let mut progress = Rk45StepProgress::default();
         self.try_adaptive_step_impl(
             system,
             state,
@@ -1014,6 +1077,8 @@ impl Rk45Integrator {
             dt,
             Rk45ErrorControl::Scaled(tolerances),
             Rk45ErrorNorm::WeightedRms,
+            &mut progress,
+            usize::MAX,
         )
     }
 
