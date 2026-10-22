@@ -2037,3 +2037,43 @@ fn legacy_static_x25519_derivation_does_not_bind_peer_source_id() {
     assert_eq!(local.peer_key(&claimed_peer_a), Some(&key_a));
     assert_eq!(local.peer_key(&claimed_peer_b), Some(&key_b));
 }
+
+
+/// Intentional legacy vulnerability witness: X25519 with an all-zero peer
+/// public input yields the all-zero shared secret. Because `PeerKeyStore::agree`
+/// does not check contributory behavior and uses fixed HKDF info labels, any
+/// caller can derive the same traffic key without either private key.
+#[cfg(feature = "mesh-key-exchange")]
+#[test]
+fn legacy_x25519_low_order_peer_key_produces_publicly_predictable_traffic_key() {
+    let zero_peer_public = [0u8; 32];
+    let peer_a = [0xA1u8; 8];
+    let peer_b = [0xB2u8; 8];
+
+    let mut local_a = PeerKeyStore::new([0x11u8; 32]);
+    let mut local_b = PeerKeyStore::new([0x22u8; 32]);
+
+    let key_a = local_a.agree(peer_a, &zero_peer_public);
+    let key_b = local_b.agree(peer_b, &zero_peer_public);
+
+    // Different local private keys and lookup labels do not help: the
+    // non-contributory DH result is zero for both sides.
+    assert_eq!(key_a, key_b);
+
+    // Anyone can reproduce the resulting encryption key from the known-zero
+    // shared secret and the public, fixed HKDF context used by PeerKeyStore.
+    let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, &[0u8; 32]);
+    let mut attacker_computable_key = [0u8; 32];
+    hk.expand(
+        b"symthaea-mesh-chacha20-v1",
+        &mut attacker_computable_key,
+    )
+    .expect("32-byte HKDF-SHA256 output is valid");
+    assert_eq!(key_a, attacker_computable_key);
+
+    let source_id = [0x33u8; 8];
+    let ciphertext = encrypt_packet(b"confidential mesh payload", &key_a, &source_id, 0, 1);
+    let recovered = decrypt_packet(&ciphertext, &attacker_computable_key)
+        .expect("publicly reconstructed key decrypts the ciphertext");
+    assert_eq!(recovered, b"confidential mesh payload");
+}
