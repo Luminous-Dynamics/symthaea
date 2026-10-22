@@ -31,11 +31,31 @@ struct OperatingPoint {
 }
 
 const OPERATING_POINTS: [OperatingPoint; 5] = [
-    OperatingPoint { name: "critical_low_reserve_high_load", reserve: 0.22, load: 0.80 },
-    OperatingPoint { name: "reserve_limited", reserve: 0.20, load: 0.45 },
-    OperatingPoint { name: "load_limited", reserve: 0.50, load: 0.78 },
-    OperatingPoint { name: "balanced", reserve: 0.40, load: 0.55 },
-    OperatingPoint { name: "high_margin", reserve: 0.65, load: 0.30 },
+    OperatingPoint {
+        name: "critical_low_reserve_high_load",
+        reserve: 0.22,
+        load: 0.80,
+    },
+    OperatingPoint {
+        name: "reserve_limited",
+        reserve: 0.20,
+        load: 0.45,
+    },
+    OperatingPoint {
+        name: "load_limited",
+        reserve: 0.50,
+        load: 0.78,
+    },
+    OperatingPoint {
+        name: "balanced",
+        reserve: 0.40,
+        load: 0.55,
+    },
+    OperatingPoint {
+        name: "high_margin",
+        reserve: 0.65,
+        load: 0.30,
+    },
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -125,12 +145,10 @@ impl CellSummary {
         self.cusum_alarms += usize::from(cusum_detected);
         self.pointwise_false_alarms +=
             usize::from(!outcome.condition.is_shifted() && pointwise_detected);
-        self.cusum_false_alarms +=
-            usize::from(!outcome.condition.is_shifted() && cusum_detected);
+        self.cusum_false_alarms += usize::from(!outcome.condition.is_shifted() && cusum_detected);
         self.pointwise_missed_shifts +=
             usize::from(outcome.condition.is_shifted() && !pointwise_detected);
-        self.cusum_missed_shifts +=
-            usize::from(outcome.condition.is_shifted() && !cusum_detected);
+        self.cusum_missed_shifts += usize::from(outcome.condition.is_shifted() && !cusum_detected);
 
         if pointwise_detected {
             self.pointwise_detection_steps
@@ -153,9 +171,8 @@ impl CellSummary {
         self.max_cusum_statistics.push(outcome.max_cusum_statistic);
         self.episodes_all_scores_below_point_threshold +=
             usize::from(outcome.all_scores_below_pointwise_threshold);
-        self.cusum_caught_below_point_threshold += usize::from(
-            outcome.all_scores_below_pointwise_threshold && cusum_detected,
-        );
+        self.cusum_caught_below_point_threshold +=
+            usize::from(outcome.all_scores_below_pointwise_threshold && cusum_detected);
     }
 }
 
@@ -427,7 +444,9 @@ fn summary_row(
             .copied()
             .reduce(f64::max)
             .map_or_else(|| "NA".to_string(), |value| format!("{value:.6}")),
-        summary.episodes_all_scores_below_point_threshold.to_string(),
+        summary
+            .episodes_all_scores_below_point_threshold
+            .to_string(),
         summary.cusum_caught_below_point_threshold.to_string(),
     ];
     output.push_str(&fields.join(","));
