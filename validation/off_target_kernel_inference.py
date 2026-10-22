@@ -12,6 +12,7 @@ import hashlib
 import itertools
 import json
 import math
+from functools import lru_cache
 from pathlib import Path
 from intervention_reliability_audit import SCM, Action, entropy, weighted_auc
 
@@ -60,6 +61,7 @@ def mechanism_probability(model, assignment, node, noise):
     expected = (model.truth_tables[node] >> parent_assignment) & 1
     return (1.0 - noise) if assignment[node] == expected else noise
 
+@lru_cache(maxsize=None)
 def outcome_distribution_kernel(model, action, noise, q, r):
     """Exact P(y | attempted action, compliance q, spill conditional probability r).
 
@@ -230,8 +232,7 @@ def config_for(policy, actual_q, actual_r):
 
 def evaluate(models, refs, ood_world, actions, policy, noise, actual_q, actual_r):
     q_values, r_values, kind = config_for(policy, actual_q, actual_r)
-    graph_info = q_info = r_info = 0.0
-    zero_support = valid_mass = expected_actions = graph_error_mass = 0.0
+    graph_info = q_info = r_info = zero_support = valid_mass = expected_actions = graph_error_mass = 0.0
     q_sq = r_sq = 0.0
     in_scores = []
     hq0 = entropy([1.0 / len(q_values)] * len(q_values))
