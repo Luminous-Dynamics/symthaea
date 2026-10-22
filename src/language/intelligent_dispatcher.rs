@@ -111,12 +111,13 @@ fn record_backend_attempt(
     success: bool,
     elapsed_ms: u128,
 ) {
+    let effective_tier = effective_backend_tier(backend_name, selected_tier);
     attempts.push(BackendAttempt {
-        tier: effective_backend_tier(backend_name, selected_tier),
+        tier: effective_tier,
         backend_name: backend_name.to_string(),
         success,
         elapsed_ms,
-        estimated_energy_cost: selected_tier.estimated_energy_cost(),
+        estimated_energy_cost: effective_tier.estimated_energy_cost(),
     });
 }
 
@@ -869,6 +870,10 @@ mod tests {
         assert_eq!(result.backend_attempts[1].backend_name, "Simulated");
         assert_eq!(result.backend_attempts[1].tier, BackendTier::Simulated);
         assert!(result.backend_attempts[1].success);
+        assert_eq!(result.backend_attempts[0].estimated_energy_cost, COST_CLOUD_LLM);
+        assert_eq!(result.backend_attempts[1].estimated_energy_cost, 0.0);
+        assert_eq!(result.energy_cost, COST_CLOUD_LLM + COST_LOCAL_LLM);
+        assert_eq!(dispatcher.total_energy(), COST_CLOUD_LLM + COST_LOCAL_LLM);
     }
 
     #[test]
