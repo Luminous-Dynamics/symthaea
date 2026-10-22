@@ -149,7 +149,7 @@ fn audit(
     );
     push_check(
         &mut errors,
-        str_field(report, "benchmark") == Some("symthaea-coding-gcs-ablation-v1"),
+        str_field(report, "benchmark") == Some("symthaea_gcs_runtime_ablation"),
         "unexpected benchmark identifier",
     );
     let source_sha = str_field(report, "source_revision").unwrap_or("");
