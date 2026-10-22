@@ -377,7 +377,7 @@ mod tests {
     #[test]
     fn current_registry_is_integral_but_blocks_all_clinical_claims() {
         let result = validate_registry(&registry()).expect("metadata registry should validate");
-        assert_eq!(result.source_count, 3);
+        assert_eq!(result.source_count, 4);
         assert_eq!(result.claim_count, 0);
         assert_eq!(result.approved_claim_count, 0);
         assert_eq!(sha256_hex(AUDITOR_SOURCE).len(), 64);
