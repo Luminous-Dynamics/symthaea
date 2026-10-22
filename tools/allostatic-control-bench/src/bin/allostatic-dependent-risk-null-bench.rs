@@ -171,7 +171,9 @@ fn make_monitor(
     } else {
         MixtureBoundedRiskEProcess::new(RISK_BOUND, bet_fractions, GLOBAL_DELTA, 1)
     };
-    monitor.ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "invalid monitor configuration").into())
+    monitor.ok_or_else(|| {
+        IoError::new(ErrorKind::InvalidInput, "invalid monitor configuration").into()
+    })
 }
 
 fn to_hex_trace(bits: &[bool]) -> String {
@@ -427,7 +429,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(IoError::new(
             ErrorKind::InvalidData,
             format!(
-                "dependent-risk statistical gates failed: null rates high-persistent={persistent_false_alarm_rate:.4}, high-reset={high_reset_false_alarm_rate:.4}, low-persistent={low_persistent_false_alarm_rate:.4}, low-reset={low_reset_false_alarm_rate:.4}; shifted power high-persistent={:.4}, high-reset={:.4}, low-persistent={:.4}",
+                concat!(
+                    "dependent-risk gates failed: null high-persistent={persistent_false_alarm_rate:.4}, ",
+                    "high-reset={high_reset_false_alarm_rate:.4}, ",
+                    "low-persistent={low_persistent_false_alarm_rate:.4}, ",
+                    "low-reset={low_reset_false_alarm_rate:.4}; ",
+                    "shifted power high-persistent={:.4}, high-reset={:.4}, low-persistent={:.4}"
+                ),
                 shift_summary.high_persistent.alarm_rate(),
                 shift_summary.high_reset.alarm_rate(),
                 shift_summary.low_persistent.alarm_rate()
