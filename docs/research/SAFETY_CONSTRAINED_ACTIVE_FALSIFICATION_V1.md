@@ -49,7 +49,20 @@ This score is a conservative geometric proxy for worst-pair distinguishability, 
 
 The unit tests also check that the model hull contains every declared candidate effect interval. They do not prove that the actual system is inside that hull.
 
-## 5. Next benchmark beyond this fixture
+## 5. Closed-loop hypothesis update experiment
+
+The branch now includes a small follow-on benchmark that connects a safe probe to its measured outcome and then recomputes the viability set:
+
+1. Build the common model hull and count the initially certified horizon-3 actions.
+2. Select the probe using the common-hull multi-step safety certificate.
+3. Feed the observed transition effects and a predeclared measurement radius to an interval-consistency update. A hypothesis is retained only if both its predicted reserve-effect and load-effect intervals intersect the observation box.
+4. Recompute the viable-action set from the retained model hull. If no hypothesis is compatible, mark the candidate family falsified and return no posterior hull; do not quietly restore the prior or issue a certificate.
+
+The deterministic panel covers four evaluator-only cases: an actual plant exactly matching each of the two candidate hypotheses, an intermediate unmodeled plant whose noisy observation is compatible with both, and an observation outside all candidate envelopes. The intended result is to make all of these differ visibly in the output. In this fixture the safe Maintain probe distinguishes model 0, after which the Push action becomes horizon-3 certifiable; under model 1, Push remains excluded. Ambiguous evidence leaves both hypotheses, while out-of-family evidence empties the candidate set.
+
+These are hand-constructed contract cases, not a statistical claim. The interval update is a consistency filter, not a posterior probability calculation. An observation box that overlaps a candidate does not prove the candidate is the real plant, and a finite family can omit the real system. Actual safety is scored separately from the model-membership result.
+
+## 6. Next benchmark beyond this fixture
 
 Use a pinned physics environment and task-specific models. For each probe, the external evaluator should record:
 
@@ -65,7 +78,7 @@ Compare at least: task-greedy safe action, random safe probe, maximum-disagreeme
 
 A meaningful success criterion is not "probe selected." It is a better safety–capability frontier after a fixed interaction budget: lower subsequent false-veto rate or better task reward, while preserving the same predeclared violation bound. Report no-probe rate and cases where the model family stays unidentifiable. Never charge the experiment for expected information as if it were realized information; measure actual uncertainty reduction on held-out data.
 
-## 6. Limitations and claim boundaries
+## 7. Limitations and claim boundaries
 
 - The reserve/load state and three discrete actions are synthetic engineering abstractions.
 - Interval hulls are conservative but discard correlations among model parameters and effects.
