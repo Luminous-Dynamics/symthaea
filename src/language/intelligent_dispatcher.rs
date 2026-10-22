@@ -73,6 +73,9 @@ pub struct BackendAttempt {
     pub backend_name: String,
     /// Whether the backend returned a non-empty response.
     pub success: bool,
+    /// Whether an internal backend verifier accepted the candidate, when applicable.
+    /// `None` means this backend does not report internal verification.
+    pub verification_passed: Option<bool>,
     /// Wall-clock time spent in this backend invocation, including failures.
     pub elapsed_ms: u128,
     /// Internal metabolic estimate assigned to the invocation's dispatch tier; not billing.
@@ -116,6 +119,7 @@ fn record_backend_attempt(
         tier: effective_tier,
         backend_name: backend_name.to_string(),
         success,
+        verification_passed: None,
         elapsed_ms,
         estimated_energy_cost: effective_tier.estimated_energy_cost(),
     });
