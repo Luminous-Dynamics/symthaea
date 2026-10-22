@@ -434,6 +434,9 @@ impl MixtureBoundedRiskEProcess {
         restored.component_log_e_values = component_log_e_values;
         restored.log_e_value = saved_log_e_value;
         restored.alarmed = alarmed;
+        if restored.encode_checkpoint() != encoded {
+            return None;
+        }
         Some(restored)
     }
 
@@ -657,6 +660,7 @@ mod tests {
         let encoded = uninterrupted.encode_checkpoint();
         let mut resumed =
             MixtureBoundedRiskEProcess::from_checkpoint(&encoded).expect("valid checkpoint");
+        assert_eq!(resumed.encode_checkpoint(), encoded);
         assert_eq!(resumed.episode_budget_index(), Some(37));
         assert_eq!(
             resumed.component_log_e_values(),
