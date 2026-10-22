@@ -1,0 +1,155 @@
+name: First-Aid Independent Reference Oracle (Synthetic Only)
+
+on:
+  push:
+    branches:
+      - research/first-aid-reference-oracle-impl-v0
+    paths:
+      - ".github/workflows/first-aid-reference-oracle.yml"
+      - "docs/research/first-aid/trajectory-corpus-v0.json"
+      - "docs/research/first-aid/REFERENCE_ORACLE_CONTRACT_V0.md"
+      - "docs/research/first-aid/reference-oracle-contract-v0.json"
+      - "xtask/src/main.rs"
+      - "xtask/src/first_aid_reference.rs"
+      - "xtask/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  pull_request:
+    branches:
+      - research/first-aid-safety-bench-v0
+    paths:
+      - ".github/workflows/first-aid-reference-oracle.yml"
+      - "docs/research/first-aid/trajectory-corpus-v0.json"
+      - "docs/research/first-aid/REFERENCE_ORACLE_CONTRACT_V0.md"
+      - "docs/research/first-aid/reference-oracle-contract-v0.json"
+      - "xtask/src/main.rs"
+      - "xtask/src/first_aid_reference.rs"
+      - "xtask/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: first-aid-reference-oracle-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  reference-oracle:
+    name: Synthetic reference-oracle differential checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify tested source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+
+      - name: Install pinned Rust toolchain
+        id: toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup default 1.96.0
+          echo "rustc_version=$(rustc --version)" >> "$GITHUB_OUTPUT"
+          echo "cargo_version=$(cargo --version)" >> "$GITHUB_OUTPUT"
+
+      - name: Check formatting for changed Rust source
+        run: rustfmt --edition 2024 --check xtask/src/main.rs xtask/src/first_aid_reference.rs
+
+      - name: Check reference contract and frozen corpus structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '
+            .schema_version == "first-aid-reference-oracle-contract-v0" and
+            .status == "proposed_synthetic_process_contract" and
+            .clinical_use_authorized == false and
+            .provenance.implementation_independence_required == true and
+            .provenance.external_domain_review_status == "not_yet_performed" and
+            .provenance.blinded_holdout_status == "not_available_in_public_repo" and
+            (.event_contract | length) == 15 and
+            ([.event_contract[].kind] | length) == ([.event_contract[].kind] | unique | length) and
+            ([.violation_codes[]] | length) == ([.violation_codes[]] | unique | length)
+          ' docs/research/first-aid/reference-oracle-contract-v0.json > /dev/null
+          jq -e '
+            .schema_version == "first-aid-trajectory-corpus-v0" and
+            .clinical_use_authorized == false and
+            (.scenarios | length) == 12 and
+            ([.scenarios[].trace_id] | length) == ([.scenarios[].trace_id] | unique | length)
+          ' docs/research/first-aid/trajectory-corpus-v0.json > /dev/null
+
+      - name: Run independent reference and differential tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/first-aid
+          cargo test -p xtask first_aid_reference::tests -- --nocapture 2>&1 | tee target/first-aid/reference-oracle-tests.log
+          grep -Fq 'reference_oracle_frozen_traces=12' target/first-aid/reference-oracle-tests.log
+          grep -Fq 'reference_oracle_differential_cases=2048' target/first-aid/reference-oracle-tests.log
+
+      - name: Lint xtask with warnings denied
+        run: cargo clippy -p xtask --all-targets -- -D warnings
+
+      - name: Emit exact-head non-clinical receipt
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          RUSTC_VERSION: ${{ steps.toolchain.outputs.rustc_version }}
+          CARGO_VERSION: ${{ steps.toolchain.outputs.cargo_version }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/first-aid
+          jq -n             --arg status "synthetic_reference_oracle_tests_passed"             --arg claim_ceiling "synthetic process-integrity differential tests only; no clinical validation"             --arg source_revision "$EXPECTED_HEAD"             --arg rustc_version "$RUSTC_VERSION"             --arg cargo_version "$CARGO_VERSION"             --arg reference_source_sha256 "$(sha256sum xtask/src/first_aid_reference.rs | awk '{print $1}')"             --arg entrypoint_sha256 "$(sha256sum xtask/src/main.rs | awk '{print $1}')"             --arg corpus_sha256 "$(sha256sum docs/research/first-aid/trajectory-corpus-v0.json | awk '{print $1}')"             --arg contract_sha256 "$(sha256sum docs/research/first-aid/reference-oracle-contract-v0.json | awk '{print $1}')"             --arg specification_sha256 "$(sha256sum docs/research/first-aid/REFERENCE_ORACLE_CONTRACT_V0.md | awk '{print $1}')"             --arg lock_sha256 "$(sha256sum Cargo.lock | awk '{print $1}')"             --arg workflow_sha256 "$(sha256sum .github/workflows/first-aid-reference-oracle.yml | awk '{print $1}')"             --arg test_log_sha256 "$(sha256sum target/first-aid/reference-oracle-tests.log | awk '{print $1}')"             '{
+              receipt_version: "first-aid-reference-oracle-receipt-v0",
+              status: $status,
+              claim_ceiling: $claim_ceiling,
+              source_revision: $source_revision,
+              rustc_version: $rustc_version,
+              cargo_version: $cargo_version,
+              reference_source_sha256: $reference_source_sha256,
+              entrypoint_sha256: $entrypoint_sha256,
+              corpus_sha256: $corpus_sha256,
+              contract_sha256: $contract_sha256,
+              specification_sha256: $specification_sha256,
+              cargo_lock_sha256: $lock_sha256,
+              workflow_sha256: $workflow_sha256,
+              test_log_sha256: $test_log_sha256,
+              test_scope: {
+                frozen_trace_count: 12,
+                deterministic_generated_suffix_cases: 2048,
+                production_differential_check: true,
+                external_domain_adjudication: false,
+                blind_holdout: false
+              }
+            }' > target/first-aid/reference-oracle-receipt.json
+          jq -e --arg head "$EXPECTED_HEAD" '
+            .source_revision == $head and
+            .status == "synthetic_reference_oracle_tests_passed" and
+            .claim_ceiling == "synthetic process-integrity differential tests only; no clinical validation" and
+             .test_scope.frozen_trace_count == 12 and
+            .test_scope.deterministic_generated_suffix_cases == 2048 and
+            .test_scope.external_domain_adjudication == false and
+            .test_scope.blind_holdout == false
+          ' target/first-aid/reference-oracle-receipt.json > /dev/null
+          jq . target/first-aid/reference-oracle-receipt.json
+
+      - name: Publish exact-head receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: first-aid-reference-oracle-${{ github.event.pull_request.head.sha || github.sha }}
+          path: target/first-aid/reference-oracle-receipt.json
+          if-no-files-found: error
+          retention-days: 30
