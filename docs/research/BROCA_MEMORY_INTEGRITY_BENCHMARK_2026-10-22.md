@@ -3,7 +3,7 @@
 **Status:** preregistration proposal; no benchmark has been executed  
 **Date:** 2026-10-22  
 **Scope:** controlled memory behavior for Symthaea Liquid Broca and its recurrent/HDC memory alternatives  
-**Related work:** [architecture bake-off protocol](BROCA_ARCHITECTURE_BAKEOFF_PROTOCOL_2026-10-22.md), [#8308 training/evaluation validity](https://github.com/Luminous-Dynamics/symthaea/issues/8308), [#8330 bake-off protocol PR](https://github.com/Luminous-Dynamics/symthaea/pull/8330), [#8364 LoRA update isolation](https://github.com/Luminous-Dynamics/symthaea/issues/8364)
+**Related work:** [architecture bake-off protocol](BROCA_ARCHITECTURE_BAKEOFF_PROTOCOL_2026-10-22.md), [#8308 training/evaluation validity](https://github.com/Luminous-Dynamics/symthaea/issues/8308), [#8330 bake-off protocol PR](https://github.com/Luminous-Dynamics/symthaea/pull/8330), [#8364 LoRA update isolation](https://github.com/Luminous-Dynamics/symthaea/issues/8364), [#8392 selective memory intervention](https://github.com/Luminous-Dynamics/symthaea/issues/8392)
 
 This document proposes a separate benchmark for **memory integrity over time**. It complements ordinary retrieval and long-context QA. It does not replace them and does not claim results for Liquid Broca.
 
@@ -187,3 +187,22 @@ The receipt must make it possible for an independent reviewer to establish exact
 Do not select a memory design using only a weighted score. First eliminate configurations that fail correctness, deletion-policy, state-isolation, or language non-inferiority gates. Then compare the surviving systems on the quality/storage/latency Pareto frontier for each workload.
 
 The intended result is not proof that HDC memory or liquid state is inherently superior. It is a reproducible map of when persistent associative state helps, when a simple versioned store is enough, when full-context retrieval is better, and where extra cognitive machinery adds cost without capability.
+
+## 11. Selective memory intervention experiment
+
+MIRE is intentionally complementary to external suites such as [MemoryAgentBench](https://mlanthology.org/iclr/2026/hu2026iclr-evaluating/) and [BEAM](https://proceedings.iclr.cc/paper_files/paper/2026/hash/d7f0cfa0fe759b033d5262e1bb7d4065-Abstract-Conference.html); it does not claim to replace or outperform them. Reuse compatible task definitions and keep any MIRE-specific results separately labelled.
+
+A separate follow-up, [issue #8392](https://github.com/Luminous-Dynamics/symthaea/issues/8392), tests whether retrieval should alter the current thought at all for each query. Compare:
+
+1. never retrieve/blend;
+2. always retrieve/blend (current bridge behavior);
+3. a development-calibrated top-similarity threshold;
+4. a top-similarity plus top-two margin gate;
+5. a calibrated intervention-utility gate using only inference-visible retrieval metadata;
+6. a label-informed oracle gate, reported only as an upper bound.
+
+Hold the aggregation rule fixed when evaluating gating policy. Then, in a separate experiment, compare rank-aware bundling, unweighted mean, and similarity-weighted aggregation. Include paired relevant/irrelevant queries, high-similarity distractors, moderate-similarity relevant examples, shuffled-value and wrong-namespace controls, and no-memory controls.
+
+A gate is useful only if it preserves relevant-query performance and improves the actual quality/cost frontier after accounting for false negatives, retrieval cost, blending cost, latency, memory traffic, and answer generation. Fewer interventions alone is not a success criterion. Tune on development data, freeze the gate, and evaluate on the held-out split with paired confidence intervals.
+
+This section specifies an experiment; it does not assert that a gating policy or weighted aggregator currently improves Broca.
