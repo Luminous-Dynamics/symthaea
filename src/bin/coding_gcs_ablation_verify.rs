@@ -565,7 +565,7 @@ fn audit(
             .is_some_and(|tiers| {
                 tiers.iter().all(|tier| {
                     tier.as_str().is_some_and(|name| {
-                        matches!(name, "Native" | "LocalLLM" | "CloudLLM" | "Simulated")
+                        matches!(name, "Native" | "Hardware" | "LocalLLM" | "CloudLLM" | "Simulated")
                     })
                 })
             });
@@ -1073,7 +1073,7 @@ mod tests {
             "iterations": 1,
             "energy": energy,
             "final_phase": "Testing",
-            "generation_tiers": if enabled { vec!["CloudLLM"] } else { vec!["Native"] }
+            "generation_tiers": vec!["Native"]
         })
     }
 
