@@ -316,6 +316,11 @@ pub struct CodingAgentConfig {
     /// this is a self-modification pipeline and must never silently mutate the agent's
     /// own fix repertoire without an explicit, separate promotion step.
     pub enable_self_modification: bool,
+    /// Enable GCS topology-derived advisory diagnostics at runtime.
+    /// Set to false for paired ablation runs; this never changes compiler/test verification.
+    /// Has effect only when built with `geodesic_synthesis`; defaults to true to preserve
+    /// the advisory-on research path when that optional feature is enabled.
+    pub enable_gcs_advisories: bool,
 }
 
 impl Default for CodingAgentConfig {
@@ -332,6 +337,7 @@ impl Default for CodingAgentConfig {
             use_cloud_llm: false,
             use_orchestrator: false,
             enable_self_modification: false,
+            enable_gcs_advisories: true,
         }
     }
 }

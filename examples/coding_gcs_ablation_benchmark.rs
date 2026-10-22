@@ -1,0 +1,446 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Paired runtime ablation for GCS topology advisories.
+//!
+//! The same fixed tasks are evaluated with GCS advisories disabled and enabled.
+//! Every task has a hand-authored reference implementation and external tests.
+//! Reference-pass + empty-patch-fail controls are required before agent trials.
+//!
+//! Run with: cargo run --release --example coding_gcs_ablation_benchmark --features 'code_generation geodesic_synthesis' -- --repeats 3
+
+use std::path::PathBuf;
+use std::time::Instant;
+use symthaea::coding_agent::{CodingAgent, CodingAgentConfig};
+use symthaea::language::code_executor::CodeExecutor;
+
+const BENCHMARK_ID: &str = "symthaea_gcs_runtime_ablation";
+const SCHEMA_VERSION: u32 = 1;
+
+struct TaskCase {
+    id: &'static str,
+    description: &'static str,
+    expected_symbol: &'static str,
+    reference_source: &'static str,
+    test_source: &'static str,
+}
+
+#[derive(Debug, Clone)]
+struct OracleRun {
+    compiled: bool,
+    simulated: bool,
+    tests_passed: usize,
+    tests_failed: usize,
+    runtime_error: Option<String>,
+    compile_errors: Vec<String>,
+    elapsed_ms: u128,
+}
+
+#[derive(Debug, Clone)]
+struct EvalResult {
+    task_id: String,
+    repeat: usize,
+    gcs_advisories_enabled: bool,
+    execution_order: String,
+    code_written: bool,
+    expected_symbol_found: bool,
+    generated_source_blake3: String,
+    compiled: bool,
+    simulated: bool,
+    expected_test_functions: usize,
+    tests_passed: usize,
+    tests_failed: usize,
+    oracle_complete: bool,
+    behavioral_success: bool,
+    runtime_error: Option<String>,
+    compile_errors: Vec<String>,
+    agent_elapsed_ms: u128,
+    verification_elapsed_ms: u128,
+    iterations: usize,
+    energy: f64,
+    final_phase: String,
+}
+
+fn task_suite() -> Vec<TaskCase> {
+    vec![
+        TaskCase {
+            id: "add_numbers",
+            description: "Implement `pub fn add_numbers(a: i32, b: i32) -> i32` that adds two integers.",
+            expected_symbol: "add_numbers",
+            reference_source: "pub fn add_numbers(a: i32, b: i32) -> i32 { a + b }",
+            test_source: r#"
+#[test] fn add_positive() { assert_eq!(add_numbers(2, 3), 5); }
+#[test] fn add_negative() { assert_eq!(add_numbers(-4, -7), -11); }
+#[test] fn add_zero() { assert_eq!(add_numbers(9, 0), 9); }
+"#,
+        },
+        TaskCase {
+            id: "factorial",
+            description: "Implement `pub fn factorial(n: u64) -> u64` with factorial(0) equal to 1.",
+            expected_symbol: "factorial",
+            reference_source: "pub fn factorial(n: u64) -> u64 { (1..=n).product() }",
+            test_source: r#"
+#[test] fn factorial_zero() { assert_eq!(factorial(0), 1); }
+#[test] fn factorial_five() { assert_eq!(factorial(5), 120); }
+#[test] fn factorial_eight() { assert_eq!(factorial(8), 40320); }
+"#,
+        },
+        TaskCase {
+            id: "gcd",
+            description: "Implement `pub fn gcd(a: u64, b: u64) -> u64` using the Euclidean algorithm.",
+            expected_symbol: "gcd",
+            reference_source: "pub fn gcd(mut a: u64, mut b: u64) -> u64 { while b != 0 { let r = a % b; a = b; b = r; } a }",
+            test_source: r#"
+#[test] fn gcd_common_factor() { assert_eq!(gcd(12, 8), 4); }
+#[test] fn gcd_coprime() { assert_eq!(gcd(7, 13), 1); }
+#[test] fn gcd_zero_left() { assert_eq!(gcd(0, 5), 5); }
+#[test] fn gcd_zero_right() { assert_eq!(gcd(9, 0), 9); }
+"#,
+        },
+        TaskCase {
+            id: "is_even",
+            description: "Implement `pub fn is_even(n: i64) -> bool` for positive, zero, and negative integers.",
+            expected_symbol: "is_even",
+            reference_source: "pub fn is_even(n: i64) -> bool { n % 2 == 0 }",
+            test_source: r#"
+#[test] fn even_positive() { assert!(is_even(4)); }
+#[test] fn odd_positive() { assert!(!is_even(7)); }
+#[test] fn even_negative() { assert!(is_even(-8)); }
+#[test] fn even_zero() { assert!(is_even(0)); }
+"#,
+        },
+        TaskCase {
+            id: "reverse_string",
+            description: "Implement `pub fn reverse_string(s: &str) -> String` by reversing Unicode scalar values.",
+            expected_symbol: "reverse_string",
+            reference_source: "pub fn reverse_string(s: &str) -> String { s.chars().rev().collect() }",
+            test_source: r#"
+#[test] fn reverse_word() { assert_eq!(reverse_string("hello"), "olleh"); }
+#[test] fn reverse_empty() { assert_eq!(reverse_string(""), ""); }
+#[test] fn reverse_unicode() { assert_eq!(reverse_string("hé🙂"), "🙂éh"); }
+"#,
+        },
+        TaskCase {
+            id: "sum_slice",
+            description: "Implement `pub fn sum_slice(values: &[i32]) -> i32` that sums all elements.",
+            expected_symbol: "sum_slice",
+            reference_source: "pub fn sum_slice(values: &[i32]) -> i32 { values.iter().copied().sum() }",
+            test_source: r#"
+#[test] fn sum_values() { assert_eq!(sum_slice(&[1, 2, 3, 4]), 10); }
+#[test] fn sum_empty() { assert_eq!(sum_slice(&[]), 0); }
+#[test] fn sum_negative() { assert_eq!(sum_slice(&[-2, 5, -3]), 0); }
+"#,
+        },
+        TaskCase {
+            id: "binary_search",
+            description: "Implement `pub fn binary_search(values: &[i32], needle: i32) -> Option<usize>` on sorted slices.",
+            expected_symbol: "binary_search",
+            reference_source: "pub fn binary_search(values: &[i32], needle: i32) -> Option<usize> { values.binary_search(&needle).ok() }",
+            test_source: r#"
+#[test] fn search_found_middle() { assert_eq!(binary_search(&[1, 3, 5, 7], 5), Some(2)); }
+#[test] fn search_found_first() { assert_eq!(binary_search(&[1, 3, 5, 7], 1), Some(0)); }
+#[test] fn search_missing() { assert_eq!(binary_search(&[1, 3, 5, 7], 4), None); }
+#[test] fn search_empty() { assert_eq!(binary_search(&[], 1), None); }
+"#,
+        },
+        TaskCase {
+            id: "is_palindrome",
+            description: "Implement `pub fn is_palindrome(s: &str) -> bool` with exact, case-sensitive character comparison.",
+            expected_symbol: "is_palindrome",
+            reference_source: "pub fn is_palindrome(s: &str) -> bool { s.chars().eq(s.chars().rev()) }",
+            test_source: r#"
+#[test] fn palindrome_racecar() { assert!(is_palindrome("racecar")); }
+#[test] fn palindrome_even_length() { assert!(is_palindrome("abba")); }
+#[test] fn not_palindrome() { assert!(!is_palindrome("hello")); }
+#[test] fn palindrome_empty() { assert!(is_palindrome("")); }
+"#,
+        },
+    ]
+}
+
+fn expected_test_functions(test_source: &str) -> usize {
+    test_source.matches("#[test]").count()
+}
+
+fn source_digest(source: &str) -> String {
+    blake3::hash(source.as_bytes()).to_hex().to_string()
+}
+
+fn task_digest(task: &TaskCase) -> String {
+    let canonical = format!(
+        "{}\n{}\n{}\n{}\n{}",
+        task.id, task.description, task.expected_symbol, task.reference_source, task.test_source
+    );
+    source_digest(&canonical)
+}
+
+fn manifest_digest(tasks: &[TaskCase]) -> String {
+    let canonical = tasks.iter().map(|task| format!("{}:{}", task.id, task_digest(task))).collect::<Vec<_>>().join("\n");
+    source_digest(&canonical)
+}
+
+fn evaluate_source(source: &str, test_source: &str) -> OracleRun {
+    // Even an empty patch is sent to the real compiler with the same external oracle.
+    // This is essential to the reference-pass / empty-patch-fail control; do not treat
+    // an empty source string as a synthetic failure without exercising the test harness.
+    let start = Instant::now();
+    let mut executor = CodeExecutor::with_real_execution();
+    let result = executor.execute_rust(source, Some(test_source));
+    OracleRun {
+        compiled: result.compiled,
+        simulated: result.simulated,
+        tests_passed: result.tests_passed,
+        tests_failed: result.tests_failed,
+        runtime_error: result.runtime_error,
+        compile_errors: result.compile_errors.into_iter().take(5).collect(),
+        elapsed_ms: start.elapsed().as_millis(),
+    }
+}
+
+fn is_behaviorally_successful(run: &OracleRun, expected: usize) -> bool {
+    expected > 0
+        && !run.simulated
+        && run.compiled
+        && run.runtime_error.is_none()
+        && run.tests_passed == expected
+        && run.tests_failed == 0
+        && run.tests_passed + run.tests_failed == expected
+}
+
+fn run_candidate(
+    task: &TaskCase, repeat: usize, gcs_advisories_enabled: bool, execution_order: &str,
+    use_llm: bool, use_cloud: bool,
+) -> EvalResult {
+    let temp_dir = tempfile::tempdir().expect("temporary work directory");
+    let config = CodingAgentConfig {
+        max_iterations: 8,
+        working_dir: temp_dir.path().to_path_buf(),
+        target_file: Some(PathBuf::from("generated.rs")),
+        use_local_llm: use_llm,
+        use_cloud_llm: use_cloud,
+        enable_real_exec: false,
+        enable_gcs_advisories: gcs_advisories_enabled,
+        ..Default::default()
+    };
+    let start = Instant::now();
+    let mut agent = CodingAgent::new(config).expect("coding agent creation");
+    let result = agent.run(task.description);
+    let agent_elapsed_ms = start.elapsed().as_millis();
+    let output_path = temp_dir.path().join("generated.rs");
+    let source = std::fs::read_to_string(&output_path).unwrap_or_default();
+    let code_written = !source.trim().is_empty();
+    let expected_symbol_found = source.contains(task.expected_symbol);
+    let expected = expected_test_functions(task.test_source);
+    let oracle = evaluate_source(&source, task.test_source);
+    let verification_elapsed_ms = oracle.elapsed_ms;
+    let oracle_complete = expected > 0
+        && !oracle.simulated
+        && oracle.compiled
+        && oracle.runtime_error.is_none()
+        && oracle.tests_passed + oracle.tests_failed == expected;
+    let behavioral_success = oracle_complete && is_behaviorally_successful(&oracle, expected);
+    EvalResult {
+        task_id: task.id.to_string(), repeat, gcs_advisories_enabled,
+        execution_order: execution_order.to_string(), code_written, expected_symbol_found,
+        generated_source_blake3: source_digest(&source), compiled: oracle.compiled,
+        simulated: oracle.simulated, expected_test_functions: expected,
+        tests_passed: oracle.tests_passed, tests_failed: oracle.tests_failed,
+        oracle_complete, behavioral_success, runtime_error: oracle.runtime_error,
+        compile_errors: oracle.compile_errors, agent_elapsed_ms, verification_elapsed_ms,
+        iterations: result.iterations_used, energy: result.total_energy,
+        final_phase: format!("{}", result.final_phase),
+    }
+}
+
+fn eval_json(result: &EvalResult) -> serde_json::Value {
+    serde_json::json!({
+        "task_id": result.task_id,
+        "repeat": result.repeat,
+        "gcs_advisories_enabled": result.gcs_advisories_enabled,
+        "execution_order": result.execution_order,
+        "code_written": result.code_written,
+        "expected_symbol_found": result.expected_symbol_found,
+        "generated_source_blake3": result.generated_source_blake3,
+        "compiled": result.compiled,
+        "simulated": result.simulated,
+        "expected_test_functions": result.expected_test_functions,
+        "tests_passed": result.tests_passed,
+        "tests_failed": result.tests_failed,
+        "oracle_complete": result.oracle_complete,
+        "behavioral_success": result.behavioral_success,
+        "runtime_error": result.runtime_error,
+        "compile_errors": result.compile_errors,
+        "agent_elapsed_ms": result.agent_elapsed_ms,
+        "verification_elapsed_ms": result.verification_elapsed_ms,
+        "iterations": result.iterations,
+        "energy": result.energy,
+        "final_phase": result.final_phase
+    })
+}
+
+fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
+    let mode: Vec<&EvalResult> = results.iter().filter(|r| r.gcs_advisories_enabled == enabled).collect();
+    let total = mode.len();
+    let passed = mode.iter().filter(|r| r.behavioral_success).count();
+    let compiled = mode.iter().filter(|r| r.compiled && !r.simulated).count();
+    let complete = mode.iter().filter(|r| r.oracle_complete).count();
+    let agent_ms: u128 = mode.iter().map(|r| r.agent_elapsed_ms).sum();
+    let energy: f64 = mode.iter().map(|r| r.energy).sum();
+    serde_json::json!({
+        "gcs_advisories_enabled": enabled,
+        "runs": total,
+        "behavioral_successes": passed,
+        "pass_rate": if total == 0 { 0.0 } else { passed as f64 / total as f64 },
+        "real_compiles": compiled,
+        "complete_oracles": complete,
+        "complete_oracle_rate": if total == 0 { 0.0 } else { complete as f64 / total as f64 },
+        "agent_elapsed_ms_total": agent_ms,
+        "agent_elapsed_ms_mean": if total == 0 { 0.0 } else { agent_ms as f64 / total as f64 },
+        "energy_total": energy,
+        "energy_mean": if total == 0 { 0.0 } else { energy / total as f64 }
+    })
+}
+
+fn paired_summary(pairs: &[(EvalResult, EvalResult)]) -> serde_json::Value {
+    let n = pairs.len();
+    let on_wins = pairs.iter().filter(|(off, on)| !off.behavioral_success && on.behavioral_success).count();
+    let off_wins = pairs.iter().filter(|(off, on)| off.behavioral_success && !on.behavioral_success).count();
+    let ties = n.saturating_sub(on_wins + off_wins);
+    serde_json::json!({
+        "paired_task_trials": n,
+        "gcs_on_wins": on_wins,
+        "gcs_off_wins": off_wins,
+        "ties": ties,
+        "net_pass_delta_percentage_points": if n == 0 { 0.0 } else { (on_wins as f64 - off_wins as f64) / n as f64 * 100.0 },
+        "interpretation": "Descriptive pilot only; do not claim statistical significance from this small fixed task suite."
+    })
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let use_llm = args.iter().any(|arg| arg == "--llm");
+    let use_cloud = args.iter().any(|arg| arg == "--cloud");
+    let repeats = args.windows(2).find(|pair| pair[0] == "--repeats")
+        .and_then(|pair| pair[1].parse::<usize>().ok()).unwrap_or(3);
+    if repeats == 0 || repeats > 20 {
+        eprintln!("--repeats must be in 1..=20");
+        std::process::exit(2);
+    }
+    let output_path = args.windows(2).find(|pair| pair[0] == "--json-out")
+        .map(|pair| PathBuf::from(&pair[1]))
+        .unwrap_or_else(|| std::env::temp_dir().join("symthaea_gcs_ablation_v1.json"));
+    let tasks = task_suite();
+    if tasks.iter().any(|task| expected_test_functions(task.test_source) == 0) {
+        eprintln!("Invalid task suite: every task must have at least one declared test function");
+        std::process::exit(2);
+    }
+    let manifest = manifest_digest(&tasks);
+
+    // Two-sided oracle controls run before any agent trials.
+    let mut reference_controls = Vec::new();
+    let mut empty_patch_controls = Vec::new();
+    for task in &tasks {
+        let expected = expected_test_functions(task.test_source);
+        let reference = evaluate_source(task.reference_source, task.test_source);
+        let reference_passes = is_behaviorally_successful(&reference, expected);
+        let empty = evaluate_source("", task.test_source);
+        let empty_patch_fails = !is_behaviorally_successful(&empty, expected);
+        reference_controls.push(serde_json::json!({
+            "task_id": task.id, "reference_blake3": source_digest(task.reference_source),
+            "reference_passes": reference_passes, "tests_expected": expected,
+            "tests_passed": reference.tests_passed, "tests_failed": reference.tests_failed,
+            "oracle_complete": reference.tests_passed + reference.tests_failed == expected
+                && reference.runtime_error.is_none() && !reference.simulated
+        }));
+        empty_patch_controls.push(serde_json::json!({
+            "task_id": task.id, "empty_patch_blake3": source_digest(""),
+            "empty_patch_fails": empty_patch_fails, "compiled": empty.compiled,
+            "compile_errors": empty.compile_errors.iter().take(2).collect::<Vec<_>>()
+        }));
+        if !reference_passes || !empty_patch_fails {
+            eprintln!("Oracle control failed for task {}: reference_passes={}, empty_patch_fails={}", task.id, reference_passes, empty_patch_fails);
+            std::process::exit(3);
+        }
+    }
+
+    let mut all_results = Vec::new();
+    let mut pairs = Vec::new();
+    for (task_idx, task) in tasks.iter().enumerate() {
+        for repeat_idx in 0..repeats {
+            let order = if (task_idx + repeat_idx) % 2 == 0 { "off_then_on" } else { "on_then_off" };
+            let (off, on) = if order == "off_then_on" {
+                let off = run_candidate(task, repeat_idx + 1, false, order, use_llm, use_cloud);
+                let on = run_candidate(task, repeat_idx + 1, true, order, use_llm, use_cloud);
+                (off, on)
+            } else {
+                let on = run_candidate(task, repeat_idx + 1, true, order, use_llm, use_cloud);
+                let off = run_candidate(task, repeat_idx + 1, false, order, use_llm, use_cloud);
+                (off, on)
+            };
+            eprintln!(
+                "[{}/{}] task={} repeat={} off={} on={} order={}",
+                task_idx + 1, tasks.len(), task.id, repeat_idx + 1,
+                off.behavioral_success, on.behavioral_success, order
+            );
+            all_results.push(off.clone());
+            all_results.push(on.clone());
+            pairs.push((off, on));
+        }
+    }
+
+    let model_mode = if use_cloud { "cloud" } else if use_llm { "ollama" } else { "native" };
+    let model_label = if use_cloud {
+        std::env::var("ANTHROPIC_MODEL").unwrap_or_else(|_| "claude-sonnet-4-20250514 (repository default)".to_string())
+    } else if use_llm {
+        std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "qwen2.5-coder:7b (repository default)".to_string())
+    } else {
+        "native dispatcher / no external LLM requested".to_string()
+    };
+    let report = serde_json::json!({
+        "schema_version": SCHEMA_VERSION,
+        "benchmark": BENCHMARK_ID,
+        "source_revision": std::env::var("GIT_COMMIT_SHA").ok(),
+        "model_mode": model_mode,
+        "model_label": model_label,
+        "runtime_configuration": {
+            "compiled_with_geodesic_synthesis": cfg!(feature = "geodesic_synthesis"),
+            "gcs_toggle": "CodingAgentConfig.enable_gcs_advisories",
+            "agent_internal_real_exec": false,
+            "external_oracle_real_exec": true
+        },
+        "task_count": tasks.len(),
+        "repeats": repeats,
+        "task_manifest_blake3": manifest,
+        "task_manifest": tasks.iter().map(|task| serde_json::json!({
+            "task_id": task.id, "task_digest_blake3": task_digest(task),
+            "expected_test_functions": expected_test_functions(task.test_source),
+            "reference_source_blake3": source_digest(task.reference_source),
+            "test_source_blake3": source_digest(task.test_source)
+        })).collect::<Vec<_>>(),
+        "oracle_controls": {
+            "reference_controls": reference_controls,
+            "empty_patch_controls": empty_patch_controls,
+            "all_references_pass": true,
+            "all_empty_patches_fail": true
+        },
+        "summary": {
+            "gcs_off": mode_summary(&all_results, false),
+            "gcs_on": mode_summary(&all_results, true),
+            "paired": paired_summary(&pairs)
+        },
+        "runs": all_results.iter().map(eval_json).collect::<Vec<_>>()
+    });
+    if let Some(parent) = output_path.parent() {
+        if let Err(error) = std::fs::create_dir_all(parent) {
+            eprintln!("Failed to create JSON output directory: {error}");
+            std::process::exit(4);
+        }
+    }
+    match serde_json::to_string_pretty(&report) {
+        Ok(json) => match std::fs::write(&output_path, json) {
+            Ok(()) => eprintln!("GCS ablation receipt: {}", output_path.display()),
+            Err(error) => { eprintln!("Failed to write receipt: {error}"); std::process::exit(4); }
+        },
+        Err(error) => { eprintln!("Failed to serialize receipt: {error}"); std::process::exit(4); }
+    }
+}

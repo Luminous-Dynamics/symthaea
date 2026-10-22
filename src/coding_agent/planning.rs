@@ -497,7 +497,11 @@ impl CodingAgent {
                     // GCS output is a topology-derived heuristic, not a semantic proof.
                     // Record it as context, but always reach the independent behavioral-test phase.
                     if let Some(ref code) = self.generated_code {
-                        let advisories = self.collect_gcs_advisories(code, &self.task);
+                        let advisories = if self.config.enable_gcs_advisories {
+                            self.collect_gcs_advisories(code, &self.task)
+                        } else {
+                            Vec::new()
+                        };
                         if !advisories.is_empty() {
                             tracing::info!(
                                 target: "symthaea::coding_agent::gcs",
