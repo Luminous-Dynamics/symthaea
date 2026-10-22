@@ -20,6 +20,8 @@ The patch adds a checked API, preserves the old API as a compatibility wrapper t
 
 Moral reasoning evaluation is moving beyond one-answer accuracy:
 
+- **ImpactBench (October 2026)** adds an outcome-oriented industry comparison. Its public preprint reports 809 metrics from 26 benchmark families, evaluated over 48,540 simulated conversations across ten frontier models; the reported pass rates were 68.7% for desired behaviors and 53.1% for avoiding harms. Those numbers summarize its protocol and should not be equated to Symthaea's moral-reasoning score. We should adopt relevant autonomy, agency, dependence, relational-health and harm metrics, then report matching protocol versions and per-metric results: https://arxiv.org/abs/2610.20690 and https://impactbench.media.mit.edu/
+
 - **MoReBench (January 2026)** emphasizes reasoning process and pluralism rather than simple verdict matching: https://labs.scale.com/blog/morebench
 - **Beyond Verdicts (AAAI 2026)** identifies gaps in moral sensitivity to noisy contexts, reasoning quality, steerability, and evaluations that assume a single ground truth: https://ojs.aaai.org/index.php/AAAI/article/view/41131
 - **PluriHarms (ICLR 2026)** measures both perceived harm and human disagreement, using 150 prompts and 15,000 ratings from 100 annotators: https://proceedings.iclr.cc/paper_files/paper/2026/hash/04cea5800f4d71fe0d89d5f64e33408e-Abstract-Conference.html
