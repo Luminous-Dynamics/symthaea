@@ -289,6 +289,7 @@ impl PipelineConfig {
 enum ActiveSelector {
     RawVariance,
     ExpectedInformationGain,
+    InformationGainWithAudits,
 }
 
 struct TrialOutcome {
@@ -296,6 +297,10 @@ struct TrialOutcome {
     success: bool,
     final_live: usize,
     selection_failed: bool,
+    audit_queries: usize,
+    model_discrepancy_detected: bool,
+    singleton_decision: bool,
+    overconfident_under_misspecification: bool,
 }
 
 const POOL_SIZE: usize = 6;
@@ -388,6 +393,16 @@ fn run_trial_with_selector(
     max_rounds: usize,
     active_selector: ActiveSelector,
 ) -> TrialOutcome {
+    run_trial_with_discrepancy(seed, config, max_rounds, active_selector, 0.0)
+}
+
+fn run_trial_with_discrepancy(
+    seed: u64,
+    config: PipelineConfig,
+    max_rounds: usize,
+    active_selector: ActiveSelector,
+    systematic_discrepancy: f64,
+) -> TrialOutcome {
     let mut setup_rng = seed ^ 0x5EED_0000_0000_0001;
     let probes: Vec<Experiment> = (0..GT_SANITY_PROBES)
         .map(|_| random_experiment(&mut setup_rng))
@@ -443,7 +458,9 @@ fn run_trial_with_selector(
     let mut used: Vec<Experiment> = Vec::new();
     let mut noise_rng = seed ^ 0xAAAA_BBBB_CCCC_DDDD;
     let mut dt_rng = seed ^ 0xDDDD_CCCC_BBBB_AAAA;
+    let mut audit_rng = seed ^ 0xA0D1_7000_51E1_0001;
     let mut selection_failed = false;
+    let mut audit_queries = 0usize;
 
     let mut round = 0usize;
     while round < max_rounds && live.len() > 1 {
@@ -458,23 +475,32 @@ fn run_trial_with_selector(
                 selection_failed = true;
                 break;
             }
-            let selected = match active_selector {
-                ActiveSelector::RawVariance => {
-                    select_most_informative_experiment(&remaining, &live, predict)
+            let scheduled_audit = active_selector == ActiveSelector::InformationGainWithAudits
+                && (round + 1) % 2 == 0;
+            if scheduled_audit {
+                audit_queries += 1;
+                Some(remaining[rand_index(&mut audit_rng, remaining.len())].clone())
+            } else {
+                let selected = match active_selector {
+                    ActiveSelector::RawVariance => {
+                        select_most_informative_experiment(&remaining, &live, predict)
+                            .map(|(experiment, _)| experiment.clone())
+                    }
+                    ActiveSelector::ExpectedInformationGain
+                    | ActiveSelector::InformationGainWithAudits => {
+                        let noise_std_dev = selection_noise_std_dev(&remaining, &live, &hypotheses);
+                        select_experiment_by_information_gain_per_cost(
+                            &remaining,
+                            &live,
+                            noise_std_dev,
+                            predict,
+                            |_: &Experiment| 1.0,
+                        )
                         .map(|(experiment, _)| experiment.clone())
-                }
-                ActiveSelector::ExpectedInformationGain => {
-                    let noise_std_dev = selection_noise_std_dev(&remaining, &live, &hypotheses);
-                    select_experiment_by_information_gain_per_cost(
-                        &remaining,
-                        &live,
-                        noise_std_dev,
-                        predict,
-                        |_: &Experiment| 1.0,
-                    )
-                    .map(|(experiment, _)| experiment.clone())
-                }
-            };
+                    }
+                };
+                selected
+            }
             let Some(selected) = selected else {
                 selection_failed = true;
                 break;
@@ -488,8 +514,20 @@ fn run_trial_with_selector(
         };
         used.push(chosen.clone());
 
-        let true_val =
+        let base_true_val =
             eval_at(&ground_truth, &chosen).expect("filtered pool guarantees finiteness");
+        // This controlled additive term is hidden from every candidate and selector.
+        // A nonzero amplitude makes the observation-generating process misspecified
+        // relative to the candidate class; selectors must not read this term.
+        let coordinates: Vec<f64> = chosen.iter().map(|(_, value)| *value).collect();
+        let discrepancy_wave = coordinates
+            .iter()
+            .enumerate()
+            .map(|(index, value)| (value * (3.0 + index as f64)).sin())
+            .sum::<f64>()
+            / coordinates.len().max(1) as f64;
+        let true_val = base_true_val
+            + systematic_discrepancy * (1.0 + base_true_val.abs()) * discrepancy_wave;
         // `smoothing`'s real question: is it worth taking K_REPEATS repeated noisy readings at
         // this SAME chosen point and blending them (CfC, dt-aware, irregular gaps between
         // readings), vs. a single one-shot reading? Deliberately NOT smoothing across
@@ -534,9 +572,13 @@ fn run_trial_with_selector(
 
     TrialOutcome {
         rounds_used: round,
-        success: live.len() == 1 && live[0] == 0,
+        success: systematic_discrepancy == 0.0 && live.len() == 1 && live[0] == 0,
         final_live: live.len(),
         selection_failed,
+        audit_queries,
+        model_discrepancy_detected: systematic_discrepancy != 0.0 && live.is_empty(),
+        singleton_decision: live.len() == 1,
+        overconfident_under_misspecification: systematic_discrepancy != 0.0 && live.len() == 1,
     }
 }
 
