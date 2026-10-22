@@ -96,8 +96,9 @@ impl AuthenticatedSequenceWindow {
     /// Expire an idle stream only after its packets must fail the independent
     /// timestamp freshness gate, including the allowed future clock skew.
     pub(super) fn is_expired(&self, now: std::time::Instant) -> bool {
+        // Add one second for the packet's integer-second timestamp truncation.
         let retention = std::time::Duration::from_secs(
-            (MESH_MAX_PACKET_AGE_S + MESH_MAX_FUTURE_SKEW_S) as u64,
+            (MESH_MAX_PACKET_AGE_S + MESH_MAX_FUTURE_SKEW_S + 1) as u64,
         );
         self.last_accepted_at
             .is_some_and(|last| now.saturating_duration_since(last) > retention)
