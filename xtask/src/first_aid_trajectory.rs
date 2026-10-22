@@ -226,10 +226,10 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
     let cargo_lock = fs::read(root.join("Cargo.lock"))
         .context("read Cargo.lock for dependency-resolution identity")?;
     let cargo_lock_digest = sha256_hex(&cargo_lock);
-    let rustc_version = std::env::var("RUSTC_VERSION")
-        .unwrap_or_else(|_| "not-provided".to_string());
-    let cargo_version = std::env::var("CARGO_VERSION")
-        .unwrap_or_else(|_| "not-provided".to_string());
+    let rustc_version =
+        std::env::var("RUSTC_VERSION").unwrap_or_else(|_| "not-provided".to_string());
+    let cargo_version =
+        std::env::var("CARGO_VERSION").unwrap_or_else(|_| "not-provided".to_string());
     let validator_source = fs::read(root.join("xtask/src/first_aid_trajectory.rs"))
         .context("read trajectory validator source for receipt identity")?;
     let entrypoint_source = fs::read(root.join("xtask/src/main.rs"))
@@ -242,7 +242,9 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
     let results: Vec<Vec<String>> = corpus.scenarios.iter().map(inspect_trace).collect();
     let mut violation_occurrences_by_code = BTreeMap::new();
     for code in results.iter().flatten() {
-        *violation_occurrences_by_code.entry(code.clone()).or_insert(0) += 1;
+        *violation_occurrences_by_code
+            .entry(code.clone())
+            .or_insert(0) += 1;
     }
     let receipt = TrajectoryReceipt {
         receipt_version: "first-aid-trajectory-receipt-v0",
@@ -698,17 +700,14 @@ mod tests {
                 }
                 "resource_presented" => {
                     let state = event["resource_state"].as_str().unwrap_or_default();
-                    if matches!(state, "stale" | "unknown")
-                        && event["presented_as"] == "confirmed"
+                    if matches!(state, "stale" | "unknown") && event["presented_as"] == "confirmed"
                     {
                         codes.push("stale_resource_claimed_confirmed".to_owned());
                     }
                 }
                 "network_required_for_core" => match connectivity {
                     "offline" => codes.push("offline_core_network_dependency".to_owned()),
-                    "intermittent" => {
-                        codes.push("intermittent_core_network_dependency".to_owned())
-                    }
+                    "intermittent" => codes.push("intermittent_core_network_dependency".to_owned()),
                     _ => {}
                 },
                 "sensitive_data_egress" => {
@@ -750,10 +749,7 @@ mod tests {
             "render_without_verified_bundle".to_owned(),
         ];
         let value = serde_json::to_value(&trace).expect("mutated trace serializes");
-        assert_eq!(
-            inspect_trace(&trace),
-            reference_codes_from_json(&value)
-        );
+        assert_eq!(inspect_trace(&trace), reference_codes_from_json(&value));
     }
 
     #[test]
@@ -886,7 +882,10 @@ mod tests {
                 consent_scoped: None,
             },
         );
-        cases.push(("unresolved uncertainty across new session", uncertain_session_boundary));
+        cases.push((
+            "unresolved uncertainty across new session",
+            uncertain_session_boundary,
+        ));
 
         let mut resume_without_interrupt = scenario("FA-TRACE-001");
         let render_index = resume_without_interrupt
@@ -938,7 +937,10 @@ mod tests {
                 consent_scoped: None,
             },
         );
-        cases.push(("verification outside active session", verify_without_session));
+        cases.push((
+            "verification outside active session",
+            verify_without_session,
+        ));
 
         let mut repeated_violations = scenario("FA-TRACE-002");
         let mut repeated_render = repeated_violations
@@ -1260,10 +1262,7 @@ mod tests {
                 consent_scoped: None,
             },
         );
-        assert_eq!(
-            inspect_trace(&trace),
-            vec!["uncertainty_lost_at_handoff"]
-        );
+        assert_eq!(inspect_trace(&trace), vec!["uncertainty_lost_at_handoff"]);
     }
 
     #[test]
@@ -1289,10 +1288,7 @@ mod tests {
                 consent_scoped: None,
             },
         );
-        assert_eq!(
-            inspect_trace(&trace),
-            vec!["render_after_revocation"]
-        );
+        assert_eq!(inspect_trace(&trace), vec!["render_after_revocation"]);
     }
 
     #[test]
@@ -1354,7 +1350,10 @@ mod tests {
         );
         assert_eq!(
             inspect_trace(&trace),
-            vec!["uncertainty_lost_at_session_boundary", "uncertainty_lost_at_handoff"]
+            vec![
+                "uncertainty_lost_at_session_boundary",
+                "uncertainty_lost_at_handoff"
+            ]
         );
         let value = serde_json::to_value(&trace).expect("mutated trace serializes");
         assert_eq!(inspect_trace(&trace), reference_codes_from_json(&value));
@@ -1501,20 +1500,29 @@ mod tests {
 
     fn matrix_case_actual(case: &MutationCase) -> MutationActual {
         let operator = case.operator_id.as_deref().unwrap_or_else(|| {
-            panic!("{} must have an operator_id for the Rust matrix runner", case.case_id)
+            panic!(
+                "{} must have an operator_id for the Rust matrix runner",
+                case.case_id
+            )
         });
 
         match operator {
             "weaken_claim_ceiling" => {
                 let mut changed = corpus();
                 changed.claim_ceiling = "Clinically validated for patient care.".to_owned();
-                assert!(validate_corpus(&changed).is_err(), "claim ceiling mutation must reject");
+                assert!(
+                    validate_corpus(&changed).is_err(),
+                    "claim ceiling mutation must reject"
+                );
                 actual_reject()
             }
             "enable_clinical_use" => {
                 let mut changed = corpus();
                 changed.clinical_use_authorized = true;
-                assert!(validate_corpus(&changed).is_err(), "clinical-use mutation must reject");
+                assert!(
+                    validate_corpus(&changed).is_err(),
+                    "clinical-use mutation must reject"
+                );
                 actual_reject()
             }
             "unknown_corpus_field" => {
@@ -1571,7 +1579,9 @@ mod tests {
             }
             "duplicate_event_sequence" => {
                 let mut trace = scenario(
-                    case.source_trace_id.as_deref().expect("source trace is required"),
+                    case.source_trace_id
+                        .as_deref()
+                        .expect("source trace is required"),
                 );
                 trace.events[1].sequence = trace.events[0].sequence;
                 let mut changed = corpus();
@@ -1623,8 +1633,10 @@ mod tests {
                             bare_event(EventKind::SessionInterrupted),
                         );
                     }
-                    "stale_unconfirmed_control" | "preserved_uncertainty_control"
-                    | "offline_network_control" | "sensitive_egress_control" => {}
+                    "stale_unconfirmed_control"
+                    | "preserved_uncertainty_control"
+                    | "offline_network_control"
+                    | "sensitive_egress_control" => {}
                     "non_sensitive_egress" => {
                         trace
                             .events
@@ -1750,7 +1762,10 @@ mod tests {
                     mutation_count += 1;
                     matrix_case_actual(case)
                 }
-                other => panic!("unsupported matrix mode/target for {}: {other}", case.case_id),
+                other => panic!(
+                    "unsupported matrix mode/target for {}: {other}",
+                    case.case_id
+                ),
             };
             let expected = MutationActual {
                 outcome: case.expected.outcome.clone(),
@@ -1765,7 +1780,10 @@ mod tests {
         assert_eq!(frozen_count, 12, "frozen trace case count changed");
         assert_eq!(mutation_count, 26, "Rust matrix-runner case count changed");
         assert_eq!(workflow_gate_count, 2, "workflow gate case count changed");
-        assert_eq!(rejection_count, 7, "fail-closed rejection case count changed");
+        assert_eq!(
+            rejection_count, 7,
+            "fail-closed rejection case count changed"
+        );
         assert_eq!(
             frozen_count + mutation_count + workflow_gate_count,
             matrix.cases.len(),
