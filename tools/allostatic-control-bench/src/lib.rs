@@ -9,6 +9,7 @@
 
 pub mod calibration;
 pub mod model_mismatch;
+pub mod multistep_viability;
 pub mod robust_viability;
 
 pub const HORIZON: usize = 48;
