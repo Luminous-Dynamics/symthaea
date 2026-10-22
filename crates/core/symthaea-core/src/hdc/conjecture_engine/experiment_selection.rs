@@ -479,13 +479,21 @@ mod tests {
     #[test]
     fn information_gain_fails_closed_on_invalid_noise_or_incomplete_predictions() {
         let hypotheses = [0_i32, 1, 2];
-        assert!(expected_information_gain_nats(&(), &hypotheses, 0.0, |h, _| Some(*h as f64)).is_none());
-        assert!(expected_information_gain_nats(&(), &hypotheses, f64::NAN, |h, _| Some(*h as f64)).is_none());
+        assert!(
+            expected_information_gain_nats(&(), &hypotheses, 0.0, |h, _| Some(*h as f64))
+                .is_none()
+        );
+        assert!(
+            expected_information_gain_nats(&(), &hypotheses, f64::NAN, |h, _| Some(*h as f64))
+                .is_none()
+        );
         assert!(expected_information_gain_nats(&(), &hypotheses, 1.0, |h, _| {
             (*h != 1).then_some(*h as f64)
         })
         .is_none());
-        assert!(expected_information_gain_nats(&(), &[1_i32], 1.0, |h, _| Some(*h as f64)).is_none());
+        assert!(
+            expected_information_gain_nats(&(), &[1_i32], 1.0, |h, _| Some(*h as f64)).is_none()
+        );
     }
 
     #[test]
