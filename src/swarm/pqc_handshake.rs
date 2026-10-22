@@ -120,8 +120,10 @@ pub struct PqcHandshakeManager {
     classical: crate::swarm::handshake::HybridHandshake,
     /// This node's ML-KEM-768 keypair.
     kem_keypair: MlKem768KeyPair,
-    /// Per-peer PQC session keys (derived after successful handshake).
+    /// Session keys usable by callers only after a future key-confirmation protocol.
     session_keys: HashMap<String, PqcSessionKey>,
+    /// Candidate keys derived from KEM but not yet transcript-confirmed.
+    pending_session_keys: HashMap<String, PqcSessionKey>,
     /// Pending KEM exchanges (peer_id → their KEM public key).
     pending_kem: HashMap<String, Vec<u8>>,
 }
@@ -133,6 +135,7 @@ impl PqcHandshakeManager {
             classical: crate::swarm::handshake::HybridHandshake::new(config),
             kem_keypair: MlKem768KeyPair::generate(),
             session_keys: HashMap::new(),
+            pending_session_keys: HashMap::new(),
             pending_kem: HashMap::new(),
         }
     }
@@ -153,19 +156,29 @@ impl PqcHandshakeManager {
         &mut self.classical
     }
 
-    /// Get a session key for a peer (if PQC handshake completed).
+    /// Get an established session key for a peer.
+    ///
+    /// KEM output alone is not an established session. Until authenticated
+    /// transcript binding and explicit key confirmation are implemented, this
+    /// returns `None` for candidate keys.
     pub fn session_key(&self, peer_id: &str) -> Option<&[u8; 32]> {
         self.session_keys.get(peer_id).map(|sk| sk.key())
     }
 
-    /// Number of active PQC sessions.
+    /// Number of established sessions.
     pub fn session_count(&self) -> usize {
         self.session_keys.len()
     }
 
-    /// Remove a peer's session key (on disconnect).
+    /// Number of derived candidate keys awaiting transcript/key confirmation.
+    pub fn pending_session_count(&self) -> usize {
+        self.pending_session_keys.len()
+    }
+
+    /// Remove a peer's active and pending key material (e.g., on disconnect).
     pub fn remove_session(&mut self, peer_id: &str) {
         self.session_keys.remove(peer_id);
+        self.pending_session_keys.remove(peer_id);
         self.pending_kem.remove(peer_id);
     }
 
@@ -189,7 +202,9 @@ impl PqcHandshakeManager {
     /// handshake succeeded or that this KEM public key is authenticated for
     /// `peer_id`; the caller must enforce those conditions before use.
     ///
-    /// Returns the KEM ciphertext and stores the locally derived session key.
+    /// Returns the KEM ciphertext and stores only a pending candidate key.
+    /// The candidate is not returned by `session_key` until a future reviewed
+    /// protocol supplies authenticated transcript binding and key confirmation.
     /// The current KEM private key is reused across sessions, so this API does
     /// not provide forward secrecy against later compromise of that key.
     pub fn encapsulate_for_peer(
@@ -222,7 +237,7 @@ impl PqcHandshakeManager {
         // Derive using BLAKE3 context-based derivation; the nonce is public context.
         let session_key = Self::blake3_derive_session_key(classical_nonce, &kem_shared_secret);
 
-        self.session_keys.insert(
+        self.pending_session_keys.insert(
             peer_id.to_string(),
             PqcSessionKey {
                 session_key,
@@ -237,18 +252,18 @@ impl PqcHandshakeManager {
     // RESPONDER SIDE
     // ════════════════════════════════════════════════════════════════════
 
-    /// Decapsulate a KEM ciphertext and derive the session key.
+    /// Decapsulate a KEM ciphertext and derive a pending candidate key.
     ///
-    /// The caller must bind the ciphertext, KEM key identity, peer identities,
-    /// protocol version and classical handshake transcript in an authenticated
-    /// protocol. This helper accepts a caller-supplied `peer_id` and public
-    /// challenge bytes; it does not enforce that binding or handshake state.
+    /// The candidate is not exposed as an established session and this method
+    /// returns no key bytes. A future reviewed protocol must bind the ciphertext,
+    /// KEM key identity, peer identities, protocol version and classical
+    /// transcript, then complete explicit key confirmation before activation.
     pub fn decapsulate_and_derive(
         &mut self,
         peer_id: &str,
         kem_ciphertext: &[u8],
         classical_nonce: &[u8],
-    ) -> SwarmResult<[u8; 32]> {
+    ) -> SwarmResult<()> {
         // Decapsulate shared secret
         let kem_shared_secret = self.kem_keypair.decapsulate(kem_ciphertext).map_err(|e| {
             SwarmError::TrustVerificationError {
@@ -259,7 +274,7 @@ impl PqcHandshakeManager {
         // Derive using BLAKE3 context-based derivation; the nonce is public context.
         let session_key = Self::blake3_derive_session_key(classical_nonce, &kem_shared_secret);
 
-        self.session_keys.insert(
+        self.pending_session_keys.insert(
             peer_id.to_string(),
             PqcSessionKey {
                 session_key,
@@ -267,7 +282,7 @@ impl PqcHandshakeManager {
             },
         );
 
-        Ok(session_key)
+        Ok(())
     }
 
     // ════════════════════════════════════════════════════════════════════
