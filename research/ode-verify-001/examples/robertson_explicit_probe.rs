@@ -56,6 +56,10 @@ fn json_number(value: f64) -> String {
     }
 }
 
+fn json_optional_number(value: Option<f64>) -> String {
+    value.map(json_number).unwrap_or_else(|| "null".to_owned())
+}
+
 fn json_string(value: &str) -> String {
     let mut escaped = String::with_capacity(value.len() + 2);
     for ch in value.chars() {
@@ -157,6 +161,8 @@ fn main() {
     let mut rejected_steps = 0usize;
     let mut attempted_steps = 0usize;
     let mut derivative_evaluations = system.derivative_evaluations.load(Ordering::Relaxed);
+    let mut min_attempted_dt: Option<f64> = None;
+    let mut last_attempted_dt: Option<f64> = None;
     let mut min_state = INITIAL_STATE;
     let mut max_negative_excursion = [0.0_f64; 3];
     let mut max_invariant_defect = 0.0_f64;
@@ -220,6 +226,13 @@ fn main() {
                     break;
                 }
 
+                // Rejected Cash–Karp attempts shrink h monotonically, so the
+                // accepted dt is the smallest attempt within a successful call.
+                last_attempted_dt = Some(step.accepted_dt);
+                min_attempted_dt = Some(
+                    min_attempted_dt.map_or(step.accepted_dt, |previous| previous.min(step.accepted_dt)),
+                );
+
                 let previous_time = time;
                 time += step.accepted_dt;
                 if !time.is_finite() || time <= previous_time {
@@ -260,6 +273,14 @@ fn main() {
             Rk45StepOutcome::Failed(receipt) => {
                 attempted_steps = attempted_steps.saturating_add(receipt.attempted_steps);
                 rejected_steps = rejected_steps.saturating_add(receipt.rejected_steps);
+                if let Some(observed_min) = receipt.min_attempted_dt {
+                    min_attempted_dt = Some(
+                        min_attempted_dt.map_or(observed_min, |previous| previous.min(observed_min)),
+                    );
+                }
+                if let Some(observed_last) = receipt.last_attempted_dt {
+                    last_attempted_dt = Some(observed_last);
+                }
                 if rhs_delta != receipt.derivative_evaluations {
                     status = "rhs_counter_mismatch";
                     status_detail = format!(
@@ -296,7 +317,11 @@ fn main() {
         status = "completed";
         status_detail.clear();
     } else if attempted_steps >= MAX_ATTEMPTS && status == "attempt_budget_exceeded" {
-        status_detail = "fixed attempt budget reached before the final sample time".to_owned();
+        if status_detail.is_empty() {
+            status_detail = "fixed attempt budget reached before the final sample time".to_owned();
+        } else {
+            status_detail.push_str("; fixed global attempt budget reached before the final sample time");
+        }
     }
 
     let nonnegative_within_tolerance =
@@ -312,7 +337,7 @@ fn main() {
 
     println!(
         concat!(
-            "{{\"schema_version\":\"0.1.0\",",
+            "{{\"schema_version\":\"0.2.0\",",
             "\"benchmark_id\":\"ODE-ROBERTSON-EXPLICIT-PROBE-001\",",
             "\"source_sha\":\"{}\",\"checkout_sha\":\"{}\",",
             "\"qualification_status\":\"{}\",\"solver\":\"SymthaeaCashKarpRK45\",",
@@ -322,6 +347,7 @@ fn main() {
             "\"attempt_budget\":{},\"attempted_steps_reported\":{},",
             "\"accepted_steps_reported\":{},\"rejected_steps_reported\":{},",
             "\"derivative_evaluations_reported\":{},",
+            "\"min_attempted_dt\":{},\"last_attempted_dt\":{},",
             "\"rhs_callback_count_exact\":true,",
             "\"failed_step_work_complete\":{},",
             "\"reached_final_time\":{},\"state_is_finite\":{},",
@@ -346,6 +372,8 @@ fn main() {
         accepted_steps,
         rejected_steps,
         derivative_evaluations,
+        json_optional_number(min_attempted_dt),
+        json_optional_number(last_attempted_dt),
         failed_step_work_complete,
         reached_final_time,
         state_is_finite,
@@ -360,7 +388,7 @@ fn main() {
 
 fn print_failure_receipt(source_sha: &str, checkout_sha: &str, status: &str, detail: &str) {
     println!(
-        "{{\"schema_version\":\"0.1.0\",\"benchmark_id\":\"ODE-ROBERTSON-EXPLICIT-PROBE-001\",\"source_sha\":\"{}\",\"checkout_sha\":\"{}\",\"qualification_status\":\"UNQUALIFIED_DIAGNOSTIC_ONLY\",\"solver\":\"SymthaeaCashKarpRK45\",\"status\":\"{}\",\"status_detail\":\"{}\",\"output_target_count\":{},\"output_sample_count\":1,\"attempt_budget\":{},\"attempted_steps_reported\":0,\"accepted_steps_reported\":0,\"rejected_steps_reported\":0,\"derivative_evaluations_reported\":0,\"rhs_callback_count_exact\":true,\"failed_step_work_complete\":true,\"reached_final_time\":false,\"state_is_finite\":true,\"nonnegative_within_tolerance_at_accepted_endpoints\":true,\"max_invariant_defect_at_accepted_endpoints\":0.0,\"min_state_at_accepted_endpoints\":[1.0,0.0,0.0],\"max_negative_excursion_at_accepted_endpoints\":[0.0,0.0,0.0],\"final_state\":[1.0,0.0,0.0],\"output_samples\":[{{\"time\":0.0,\"state\":[1.0,0.0,0.0]}}]}}",
+        "{{\"schema_version\":\"0.2.0\",\"benchmark_id\":\"ODE-ROBERTSON-EXPLICIT-PROBE-001\",\"source_sha\":\"{}\",\"checkout_sha\":\"{}\",\"qualification_status\":\"UNQUALIFIED_DIAGNOSTIC_ONLY\",\"solver\":\"SymthaeaCashKarpRK45\",\"status\":\"{}\",\"status_detail\":\"{}\",\"output_target_count\":{},\"output_sample_count\":1,\"attempt_budget\":{},\"attempted_steps_reported\":0,\"accepted_steps_reported\":0,\"rejected_steps_reported\":0,\"derivative_evaluations_reported\":0,\"rhs_callback_count_exact\":true,\"failed_step_work_complete\":true,\"reached_final_time\":false,\"state_is_finite\":true,\"nonnegative_within_tolerance_at_accepted_endpoints\":true,\"max_invariant_defect_at_accepted_endpoints\":0.0,\"min_state_at_accepted_endpoints\":[1.0,0.0,0.0],\"max_negative_excursion_at_accepted_endpoints\":[0.0,0.0,0.0],\"final_state\":[1.0,0.0,0.0],\"output_samples\":[{{\"time\":0.0,\"state\":[1.0,0.0,0.0]}}]}}",
         json_string(source_sha),
         json_string(checkout_sha),
         status,
