@@ -4,10 +4,10 @@ These targets fuzz Symthaea's public Dilithium wrapper boundaries. They are inte
 
 ## Targets
 
-- `fuzz_keypair_import`: feeds arbitrary byte strings at the exact public/secret key lengths into `DilithiumKeypair::from_bytes`, exercising key encodings and the import-time pair-consistency check.
-- `fuzz_signature_verification`: feeds correctly sized arbitrary public-key bytes and bounded attached-signature/message bytes into `verify_signature`, exercising parsers and the underlying verifier when parsing succeeds.
+- `fuzz_signature_verification`: feeds correctly sized arbitrary public-key bytes and bounded attached-signature/message bytes into `verify_signature`, exercising the public-key and signed-message parsers and the verifier when parsing succeeds.
+- `fuzz_authenticated_signature`: builds an authenticated-proof envelope whose `client_id` matches the public key, then calls `verify_authenticated_signature`. It intentionally passes the identity guard to exercise the cryptographic parsing path. This checks signature authentication only; it does not verify the underlying zero-knowledge proof.
 
-The targets cap source input at 8 KiB and bound generated message suffixes. Fuzzing is not a replacement for known-answer vectors, the matching-key positive control, or the mismatched-key regression test. The keypair-import target is intentionally deferred until the importer hardening change is part of its tested base.
+The targets cap source input at 8 KiB and use domain-separated SHA-256 expansion to avoid low-diversity repeated-byte patterns. Fuzzing is complementary to the unit tests and is not a replacement for known-answer vectors, the matching-key positive control, or the mismatched-key regression test. Keypair-import fuzzing is deferred until the import-hardening change in PR #8299 is part of its tested base.
 
 ## Prerequisites
 
