@@ -198,6 +198,33 @@ fn print_metrics(name: &str, metrics: &Metrics, total: usize) {
         }
         println!();
     }
+
+    let unknown_column = STATES.len() - 1;
+    let actual_unknown: usize = metrics.confusion.iter().map(|row| row[unknown_column]).sum();
+    let expected_unknown: usize = metrics.confusion[unknown_column].iter().sum();
+    let correctly_unknown = metrics.confusion[unknown_column][unknown_column];
+    println!("actual_unknown_count={actual_unknown}");
+    println!("actual_unknown_rate={:.4}", actual_unknown as f64 / total as f64);
+    println!("expected_unknown_count={expected_unknown}");
+    println!("correctly_unknown_count={correctly_unknown}");
+
+    println!("per_class_metrics=precision_recall_f1_support");
+    for (i, state) in STATES.iter().enumerate() {
+        let true_positive = metrics.confusion[i][i];
+        let support: usize = metrics.confusion[i].iter().sum();
+        let predicted: usize = metrics.confusion.iter().map(|row| row[i]).sum();
+        let precision = true_positive as f64 / predicted.max(1) as f64;
+        let recall = true_positive as f64 / support.max(1) as f64;
+        let f1 = if precision + recall > 0.0 {
+            2.0 * precision * recall / (precision + recall)
+        } else {
+            0.0
+        };
+        println!(
+            "class_{} precision={:.4} recall={:.4} f1={:.4} support={}",
+            label(*state), precision, recall, f1, support
+        );
+    }
 }
 
 fn main() {
