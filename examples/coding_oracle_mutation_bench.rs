@@ -422,7 +422,7 @@ fn main() {
     let total_tests: usize = CASES.iter().map(|case| count_expected_tests(case.tests)).sum();
     let source_revision = std::env::var("GIT_COMMIT_SHA")
         .ok()
-        .or_else(|| option_env!("GIT_COMMIT_SHA").map(str::to_string));
+        .or_else(|| option_env!("GIT_COMMIT_SHA").map(|value| value.to_string()));
 
     let receipt = serde_json::json!({
         "schema_version": 1,
