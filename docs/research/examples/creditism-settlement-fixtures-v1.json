@@ -1,0 +1,181 @@
+{
+  "schema_version": "creditism-settlement-fixtures-v1",
+  "purpose": "Synthetic conformance corpus for mechanism-native Personal Credit settlement.",
+  "nonclaims": [
+    "does not establish empirical macroeconomic accuracy",
+    "does not establish policy desirability",
+    "does not establish legal currency status"
+  ],
+  "valid": [
+    {
+      "id": "PC-001",
+      "name": "marketplace deletion without seller payment",
+      "opening_balances": {},
+      "events": [
+        {
+          "type": "PersonalCreditIssuedForExistence",
+          "account": "buyer",
+          "amount": 100
+        },
+        {
+          "type": "MarketplaceCreditDeleted",
+          "buyer": "buyer",
+          "amount": 30
+        }
+      ],
+      "expected_observables": {
+        "buyer_balance": 70,
+        "seller_balance": 0,
+        "deleted": 30
+      }
+    },
+    {
+      "id": "PC-002",
+      "name": "independent contribution recognition",
+      "opening_balances": {},
+      "events": [
+        {
+          "type": "PersonalCreditIssuedForExistence",
+          "account": "buyer",
+          "amount": 100
+        },
+        {
+          "type": "MarketplaceCreditDeleted",
+          "buyer": "buyer",
+          "amount": 30
+        },
+        {
+          "type": "PersonalCreditIssuedForContribution",
+          "account": "producer",
+          "amount": 25
+        }
+      ],
+      "expected_observables": {
+        "buyer_balance": 70,
+        "producer_balance": 25,
+        "issued": 125,
+        "deleted": 30
+      }
+    },
+    {
+      "id": "PC-003",
+      "name": "exchange premium deletes rather than becoming seller income",
+      "opening_balances": {
+        "buyer": 100,
+        "seller": 10
+      },
+      "events": [
+        {
+          "type": "Exchange",
+          "buyer": "buyer",
+          "seller": "seller",
+          "purchase_price": 100,
+          "seller_acquisition_cost": 10
+        }
+      ],
+      "expected_observables": {
+        "buyer_balance": 0,
+        "seller_balance": 20,
+        "issued": 10,
+        "deleted": 100,
+        "seller_recognized": 10
+      }
+    },
+    {
+      "id": "PC-004",
+      "name": "forbidden transfer capability",
+      "opening_balances": {
+        "alice": 50,
+        "bob": 0
+      },
+      "events": [
+        {
+          "type": "AttemptPersonalCreditTransfer",
+          "from": "alice",
+          "to": "bob",
+          "amount": 10
+        }
+      ],
+      "expected_disposition": "NonTransferable"
+    }
+  ],
+  "invalid_or_rejected": [
+    {
+      "id": "PC-X01",
+      "name": "negative issuance",
+      "event": {
+        "type": "PersonalCreditIssuedForExistence",
+        "account": "alice",
+        "amount": -1
+      },
+      "expected_disposition": "NonPositiveAmount"
+    },
+    {
+      "id": "PC-X02",
+      "name": "non-finite issuance",
+      "event": {
+        "type": "PersonalCreditIssuedForExistence",
+        "account": "alice",
+        "amount": "NaN"
+      },
+      "expected_disposition": "NonFiniteAmount"
+    },
+    {
+      "id": "PC-X03",
+      "name": "overspend",
+      "opening_balances": {
+        "buyer": 5
+      },
+      "event": {
+        "type": "MarketplaceCreditDeleted",
+        "buyer": "buyer",
+        "amount": 6
+      },
+      "expected_disposition": "InsufficientPersonalCredit"
+    },
+    {
+      "id": "PC-X04",
+      "name": "empty account in opening state",
+      "opening_balances": {
+        "": 10
+      },
+      "expected_disposition": "UnknownAccount"
+    },
+    {
+      "id": "PC-X05",
+      "name": "duplicate opening account",
+      "opening_entries": [
+        [
+          "alice",
+          10
+        ],
+        [
+          "alice",
+          20
+        ]
+      ],
+      "expected_disposition": "DuplicateAccount"
+    },
+    {
+      "id": "PC-X06",
+      "name": "self exchange",
+      "opening_balances": {
+        "alice": 100
+      },
+      "event": {
+        "type": "Exchange",
+        "buyer": "alice",
+        "seller": "alice",
+        "purchase_price": 50,
+        "seller_acquisition_cost": 10
+      },
+      "expected_disposition": "SelfExchange"
+    }
+  ],
+  "invariants": [
+    "closing_personal_credit = opening_personal_credit + issuance - deletion",
+    "consumer settlement is distinct from contribution recognition",
+    "forbidden capabilities fail closed",
+    "failed transactions do not partially mutate state"
+  ]
+}

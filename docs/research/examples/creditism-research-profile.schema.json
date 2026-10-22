@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Creditism Research Profile",
+  "type": "object",
+  "required": [
+    "profile_id",
+    "status",
+    "semantics_source",
+    "mechanisms",
+    "policy_dimensions",
+    "governance",
+    "information_channels",
+    "accounting",
+    "scientific_boundary",
+    "semantic_frontier"
+  ],
+  "properties": {
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "research",
+        "qualified",
+        "superseded"
+      ]
+    },
+    "semantics_source": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      },
+      "minItems": 1
+    },
+    "mechanisms": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "policy_dimensions": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "governance": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "information_channels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "accounting": {
+      "type": "object",
+      "required": [
+        "native_credit_semantics",
+        "forced_conventional_financial_asset_equivalence",
+        "unknown_mapping_allowed"
+      ],
+      "properties": {
+        "native_credit_semantics": {
+          "type": "boolean"
+        },
+        "forced_conventional_financial_asset_equivalence": {
+          "type": "boolean",
+          "const": false
+        },
+        "unknown_mapping_allowed": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "scientific_boundary": {
+      "type": "object",
+      "required": [
+        "claims_are_conditional_simulations",
+        "political_recommendation_authority",
+        "universal_optimality_claim"
+      ],
+      "properties": {
+        "claims_are_conditional_simulations": {
+          "type": "boolean",
+          "const": true
+        },
+        "political_recommendation_authority": {
+          "type": "boolean",
+          "const": false
+        },
+        "universal_optimality_claim": {
+          "type": "boolean",
+          "const": false
+        }
+      },
+      "additionalProperties": true
+    },
+    "semantic_frontier": {
+      "type": "object",
+      "required": [
+        "id",
+        "retrieved_on",
+        "primary_current_sources",
+        "historical_sources",
+        "rule",
+        "known_divergence",
+        "unresolved_semantics"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retrieved_on": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "primary_current_sources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          },
+          "minItems": 1
+        },
+        "historical_sources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "rule": {
+          "type": "string",
+          "const": "historical_profiles_are_not_silently_merged_into_current_profile"
+        },
+        "known_divergence": {
+          "type": "object"
+        },
+        "unresolved_semantics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}
