@@ -8,11 +8,12 @@ on:
       - ".github/workflows/levin-pattern-experiments.yml"
       - "crates/core/symthaea-core/src/hdc/pattern_interaction.rs"
       - "crates/core/symthaea-core/src/hdc/hrr_baseline.rs"
-      - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/identity_evidence.rs"
+      - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/examples/platonic_pattern_interaction.rs"
       - "crates/core/symthaea-core/examples/platonic_selective_retrieval.rs"
       - "crates/core/symthaea-core/examples/identity_evidence_boundary.rs"
+      - "crates/core/symthaea-core/examples/platonic_multiview_evidence_budget.rs"
       - "crates/core/symthaea-core/Cargo.toml"
       - "crates/domains/symthaea-cell-foundry/**"
       - "crates/core/symthaea-observation-attestation/**"
@@ -23,6 +24,7 @@ on:
       - "docs/research/PLATONIC_PATTERN_INTERACTION_BENCHMARK.md"
       - "docs/research/SELECTIVE_RETRIEVAL_AND_ABSTENTION_BENCHMARK.md"
       - "docs/research/IDENTITY_EVIDENCE_GATED_RETRIEVAL.md"
+      - "docs/research/PLATONIC_MULTIVIEW_EVIDENCE_BUDGET.md"
   push:
     branches: [main]
     paths:
@@ -128,6 +130,15 @@ jobs:
 
       - name: Run calibrated selective retrieval benchmark
         run: cargo run --locked --release -p symthaea-core --example platonic_selective_retrieval 2>&1 | tee research-results/platonic-selective-retrieval.log
+
+      - name: Check multi-view evidence budget formatting
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/examples/platonic_multiview_evidence_budget.rs
+
+      - name: Test multi-view evidence budget invariants
+        run: cargo test --locked --release -p symthaea-core --example platonic_multiview_evidence_budget -- --nocapture
+
+      - name: Run multi-view evidence budget benchmark
+        run: cargo run --locked --release -p symthaea-core --example platonic_multiview_evidence_budget 2>&1 | tee research-results/platonic-multiview-evidence-budget.log
 
       - name: Check identity-evidence API and example formatting
         if: hashFiles('crates/core/symthaea-core/src/hdc/identity_evidence.rs') != ''
