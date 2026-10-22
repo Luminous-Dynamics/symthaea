@@ -617,7 +617,8 @@ mod tests {
 
     #[test]
     fn bundled_annotation_fixture_retains_intended_disagreement() {
-        let bytes = include_bytes!("../../../../benchmarks/knowledge-annotation/v0/synthetic-fixtures.jsonl");
+        let bytes =
+            include_bytes!("../../../../benchmarks/knowledge-annotation/v0/synthetic-fixtures.jsonl");
         let annotations = parse_annotations(bytes).unwrap();
         assert!(validate_review_set(&annotations).unwrap());
         let metric = agreement_metric(
