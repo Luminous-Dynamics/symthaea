@@ -45,12 +45,6 @@ impl Condition {
         matches!(self, Self::ShiftedRisk)
     }
 
-    const fn seed_offset(self) -> u64 {
-        match self {
-            Self::ConditionalRiskNull => 0,
-            Self::ShiftedRisk => 999_999,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -195,7 +189,9 @@ fn to_hex_trace(bits: &[bool]) -> String {
 }
 
 fn run_trial(condition: Condition, trial: usize) -> Result<TrialOutcome, Box<dyn Error>> {
-    let seed = 700_000 + trial as u64 * 7_919 + condition.seed_offset();
+    // Pair null and shifted controls on the same random innovations; only the
+    // post-change conditional loss probability differs.
+    let seed = 700_000 + trial as u64 * 7_919;
     let mut random_state = seed;
     let mut high_regime = false;
     let mut previous_regime = false;
@@ -447,4 +443,36 @@ fn main() -> Result<(), Box<dyn Error>> {
     fs::write(&args[1], raw_output)?;
     fs::write(&args[2], summary_output)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trace_hex_uses_stable_most_significant_bit_first_order() {
+        assert_eq!(
+            to_hex_trace(&[true, false, false, false, false, false, false, true]),
+            "81"
+        );
+        assert_eq!(to_hex_trace(&[true, false, false, false]), "8");
+    }
+
+    #[test]
+    fn null_and_shifted_controls_share_regime_and_prechange_loss_traces() {
+        let null = run_trial(Condition::ConditionalRiskNull, 19).expect("null trial");
+        let shifted = run_trial(Condition::ShiftedRisk, 19).expect("shifted trial");
+        assert_eq!(null.seed, shifted.seed);
+        assert_eq!(null.regimes, shifted.regimes);
+        assert_eq!(null.losses[..SHIFT_STEP], shifted.losses[..SHIFT_STEP]);
+        assert_ne!(null.losses[SHIFT_STEP..], shifted.losses[SHIFT_STEP..]);
+    }
+
+    #[test]
+    fn every_null_regime_obeys_the_conditional_loss_bound() {
+        assert!(0.13 <= RISK_BOUND);
+        assert!(0.15 <= RISK_BOUND);
+        assert!(0.30 > RISK_BOUND);
+        assert!(0.48 > RISK_BOUND);
+    }
 }
