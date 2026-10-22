@@ -8,6 +8,7 @@
 //! experience. Oracle and shuffled-forecast policies are diagnostic controls.
 
 pub mod calibration;
+pub mod certificate_lease;
 pub mod model_mismatch;
 pub mod multistep_viability;
 pub mod robust_viability;
