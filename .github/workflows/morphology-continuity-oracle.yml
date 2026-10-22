@@ -43,10 +43,10 @@ jobs:
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
 
       - name: Reference tests
-        run: cargo test --manifest-path tools/morphology-continuity-oracle/Cargo.toml
+        run: cargo test --locked --manifest-path tools/morphology-continuity-oracle/Cargo.toml
 
       - name: Clippy with warnings denied
-        run: cargo clippy --manifest-path tools/morphology-continuity-oracle/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path tools/morphology-continuity-oracle/Cargo.toml --all-targets -- -D warnings
 
       - name: Verify deterministic receipt and semantic gates
         shell: bash
@@ -57,7 +57,7 @@ jobs:
           set -euo pipefail
           temp_dir="$(mktemp -d)"
           trap 'rm -rf "$temp_dir"' EXIT
-          cargo run --quiet --manifest-path tools/morphology-continuity-oracle/Cargo.toml > "$temp_dir/first.json"
+          cargo run --locked --quiet --manifest-path tools/morphology-continuity-oracle/Cargo.toml > "$temp_dir/first.json"
           cargo run --quiet --manifest-path tools/morphology-continuity-oracle/Cargo.toml > "$temp_dir/second.json"
           cmp "$temp_dir/first.json" "$temp_dir/second.json"
           jq -e --arg commit "$SOURCE_COMMIT" --arg tree "$SOURCE_TREE_SHA" '
