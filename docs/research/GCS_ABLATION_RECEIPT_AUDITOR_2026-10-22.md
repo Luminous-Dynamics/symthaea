@@ -9,7 +9,7 @@ The goal is *proof-carrying measurement*: make an evaluation artifact independen
 ## Checks performed
 
 - Schema and benchmark identifier; valid source-revision and BLAKE3 digest shapes.
-- Requested backend/model metadata must be non-empty and internally consistent. Every run must include a list of recognized observed generation tiers (`Native`, `LocalLLM`, `CloudLLM`, `Simulated`) captured from the agent result; unknown or missing values are rejected.
+- Requested backend/model metadata must be non-empty and internally consistent. Every run must include a list of recognized observed generation tiers (`Native`, `Hardware`, `LocalLLM`, `CloudLLM`, `Simulated`) captured from the agent result; unknown or missing values are rejected.
 - Ordered task-manifest digest recomputation from task IDs and per-task digests.
 - The receipt includes task description, expected symbol, reference source, explicit expected test count, test fixture and semantic mutants. Schema v2 binds the count into the length-prefixed task digest; schema v3 adds requested model identity plus observed generation tiers to every run. The auditor independently hashes reference/test/mutant source content and checks the declared count against each run's actual observed pass+fail total; the producer's reference/mutant preflight checks actual execution before trials.
 - Unique task IDs and nonzero expected test counts.
