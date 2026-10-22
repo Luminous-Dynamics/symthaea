@@ -266,7 +266,7 @@ fn actual_dynamics_for(seed: u64, condition: Condition) -> Result<DynamicsBounds
     let estimate = predictive_dynamics_for(seed)?;
     let offsets = match condition.name {
         "nominal" => [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
-        "moderate_shift" => [(-0.025, 0.050), (-0.015, 0.035), (-0.030, 0.060)],
+        "moderate_shift" => [(-0.025, 0.050), (-0.020, 0.035), (-0.030, 0.060)],
         "strong_shift" => [(-0.055, 0.100), (-0.025, 0.070), (-0.035, 0.080)],
         _ => return Err(IoError::new(ErrorKind::InvalidInput, "unknown shift condition").into()),
     };
