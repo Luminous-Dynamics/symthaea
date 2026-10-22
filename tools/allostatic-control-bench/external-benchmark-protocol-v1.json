@@ -138,6 +138,34 @@
       "status": "research_prototype_not_external_validated",
       "safety_rule": "candidate action must be horizon-certified under a common hull of every retained model",
       "update_rule": "remove only hypotheses inconsistent with the observed transition noise set; empty retained set means model-family falsification and uncertified state"
+    },
+    {
+      "id": "B9",
+      "name": "task_native_mpsc_safety_filter",
+      "deployable_baseline": true,
+      "status": "reproduce_only_for_supported_pinned_task",
+      "reference": "Safe-Control-Gym MPSC safety filter"
+    },
+    {
+      "id": "B10",
+      "name": "task_native_cbf_or_neural_cbf_filter",
+      "deployable_baseline": true,
+      "status": "reproduce_only_when_task_constraints_match",
+      "reference": "Safe-Control-Gym CBF / neural network CBF safety filters"
+    },
+    {
+      "id": "B11",
+      "name": "conformalized_sls_mpc",
+      "deployable_baseline": true,
+      "status": "external_reference_requires_pinned_reproduction_or_documented_adaptation",
+      "reference": "https://proceedings.mlr.press/v331/srinivasan26a.html"
+    },
+    {
+      "id": "B12",
+      "name": "gpu_sls_robust_mpc",
+      "deployable_baseline": true,
+      "status": "external_reference_requires_pinned_reproduction_or_documented_adaptation_and_hardware_disclosure",
+      "reference": "https://arxiv.org/abs/2604.07644"
     }
   ],
   "conditions": [
@@ -284,5 +312,10 @@
       "requested_horizon_exceeds_certified_horizon"
     ],
     "rule": "A rejected lease requires recertification; never downgrade an invalidation to a warning and continue using the cached permission."
-  }
+  },
+  "comparison_rules": [
+    "Native MPSC/CBF and neural-CBF filters must be compared only on tasks/configurations where their constraints and action semantics match.",
+    "Modern conformal SLS-MPC and GPU-SLS references count as headline comparators only after pinned reproduction or documented mathematical adaptation.",
+    "Hardware-accelerated runtime comparisons must publish hardware, solver, precision, deadline and compute budgets; do not infer speed superiority from different hardware."
+  ]
 }
