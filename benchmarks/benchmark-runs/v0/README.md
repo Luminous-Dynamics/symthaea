@@ -79,6 +79,12 @@ These are hypotheses for a pilot, not reported performance:
 
 Set or revise thresholds using a pilot and power analysis **before opening the final test**. The initial 10 synthetic pairs cannot support statistical superiority.
 
+## Cluster uncertainty policy
+
+The scorer resamples connected source-family clusters, not individual questions, with one shared bootstrap draw per candidate/baseline comparison. If a pair bridges two families, it connects them; observations inside the resulting component are not treated as independent. This approach is intentionally conservative about leakage, though a heavily connected source graph can leave few effective clusters.
+
+The current **30 independent-cluster minimum** is a provisional eligibility gate, not a universal theorem or a guarantee of power. General clustered-inference guidance warns that few clusters can distort uncertainty; suggested sample thresholds differ across analysis designs and study characteristics ([small-cluster analysis comparison](https://academic.oup.com/ije/article/47/1/321/4091562); [cluster-robust inference guide](https://doi.org/10.1016/j.jeconom.2022.04.001)). Those studies do not validate this particular benchmark. Therefore any real held-out evaluation must preregister a pilot power/sample-size rationale, report cluster-size distribution and effective cluster count, and test sensitivity to cluster definitions. Do not interpret a positive percentile-bootstrap interval as enough by itself for an SOTA claim.
+
 ## What would count as beating the state of the art?
 
 A defensible claim needs all of the following: a source-family-held-out set with transparent inclusion/exclusion rules; rights review; independent subject-expert annotation; a published baseline ladder; equal budgets; frozen model/retriever/index/prompt/decoding revisions; preregistered primary endpoint; uncertainty intervals; ablations showing which component caused the gain; worst-group and critical-gate reporting; and third-party reproduction where feasible. If improvements disappear when source-family split or evidence budgets are enforced, the claimed advance does not survive.
