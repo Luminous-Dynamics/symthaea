@@ -45,7 +45,7 @@ jobs:
           jq empty schemas/landscape-review-validation-report-v0.schema.json
           jq empty fixtures/landscape/review-unranked-v0.json
       - name: Format contract crate
-        run: cargo fmt --manifest-path crates/domains/symthaea-landscape-review/Cargo.toml --all -- --check
+        run: cargo fmt --manifest-path crates/domains/symthaea-landscape-review/Cargo.toml -- --check
       - name: Test structural-policy gates
         run: cargo test --manifest-path crates/domains/symthaea-landscape-review/Cargo.toml --all-targets
       - name: Validate canonical unranked fixture through CLI
