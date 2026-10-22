@@ -32,7 +32,7 @@ const SHIFT_MAGNITUDES: [f64; 4] = [0.02, 0.05, 0.10, 0.20];
 const HAZARD_LEADS: [usize; 5] = [0, 1, 2, 4, 8];
 
 const RAW_HEADER: &str = "operating_point,signal_mode,shift_magnitude,hazard_lead_steps,episode_seed,shift_step,first_unsafe_action_step,score_threshold,score_alarm_step,residual_threshold,residual_alarm_step,score_pre_hazard_intervention,residual_pre_hazard_intervention,score_late_alarm,residual_late_alarm";
-const SUMMARY_HEADER: &str = "operating_point,signal_mode,shift_magnitude,hazard_lead_steps,episodes,score_pre_shift_false_alarms,residual_pre_shift_false_alarms,score_post_shift_detections,residual_post_shift_detections,score_misses,residual_misses,score_pre_hazard_interventions,residual_pre_hazard_interventions,score_late_alarms,residual_late_alarms,mean_score_detection_delay,mean_residual_detection_delay";
+const SUMMARY_HEADER: &str = "operating_point,signal_mode,shift_magnitude,hazard_lead_steps,episodes,score_pre_shift_alarms,residual_pre_shift_alarms,score_post_shift_alarms,residual_post_shift_alarms,score_no_post_shift_alarm,residual_no_post_shift_alarm,score_pre_hazard_interventions,residual_pre_hazard_interventions,score_late_alarms,residual_late_alarms,mean_score_post_shift_alarm_delay,mean_residual_post_shift_alarm_delay";
 
 #[derive(Clone, Copy, Debug)]
 struct Thresholds {
@@ -212,7 +212,7 @@ fn write_raw(path: &str, records: &[EpisodeRecord]) -> Result<(), Box<dyn Error>
     Ok(())
 }
 
-fn mean_detection_delay(records: &[EpisodeRecord], score: bool) -> String {
+fn mean_post_shift_alarm_delay(records: &[EpisodeRecord], score: bool) -> String {
     let mut total_delay = 0_usize;
     let mut detections = 0_usize;
     for record in records {
@@ -304,8 +304,8 @@ fn write_summary(path: &str, records: &[EpisodeRecord]) -> Result<(), Box<dyn Er
                         residual_pre_hazard,
                         score_late,
                         residual_late,
-                        mean_detection_delay(&cell, true),
-                        mean_detection_delay(&cell, false),
+                        mean_post_shift_alarm_delay(&cell, true),
+                        mean_post_shift_alarm_delay(&cell, false),
                     ));
                 }
             }
