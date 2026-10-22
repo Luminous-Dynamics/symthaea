@@ -2042,6 +2042,20 @@ mod tests {
         assert_eq!(parsed.consent_assessment.basis, ConsentEvidenceBasis::StructuredField);
         assert!(!parsed.consent_assessment.has_affirmative_cue());
 
+        let structured_given = parser
+            .parse_with_llm_response(
+                "A consent-sensitive action was described.",
+                Some("AGENT: Alice\nACTION: share records\nPATIENT: Bob\nINTENT: good\nCONSENT: given"),
+            )
+            .expect("structured response with an affirmative field has enough extracted fields");
+        assert_eq!(structured_given.consent, ConsentState::Given);
+        assert_eq!(structured_given.consent_assessment.state, ConsentState::Given);
+        assert_eq!(structured_given.consent_assessment.basis, ConsentEvidenceBasis::StructuredField);
+        assert!(
+            !structured_given.consent_assessment.has_affirmative_cue(),
+            "an LLM-supplied field is not a verified lexical or authorization signal"
+        );
+
         let omitted = parser
             .parse_with_llm_response(
                 "A consent-sensitive action was described.",
