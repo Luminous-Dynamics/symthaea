@@ -102,6 +102,11 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
     {
         errors.push("claim_admission_policy.approved_claim_status is unsupported".to_owned());
     }
+    if field_str(policy, "source_reference_model")
+        != Some("one_primary_source_per_atomic_claim;source_edition_must_match_registry")
+    {
+        errors.push("claim_admission_policy.source_reference_model is unsupported".to_owned());
+    }
 
     let sources: &[Value] = match root.get("sources").and_then(Value::as_array) {
         Some(sources) if !sources.is_empty() => sources.as_slice(),
@@ -431,6 +436,26 @@ mod tests {
         }]);
         let errors = validate_registry(&input).expect_err("unknown source must fail");
         assert!(errors.iter().any(|error| error.contains("unknown source_id")));
+    }
+
+    #[test]
+    fn claim_source_edition_must_match_registry() {
+        let mut input = registry();
+        input["claims"] = json!([{
+            "claim_id": "TEST-003",
+            "topic": "synthetic_topic_only",
+            "population": "must_be_reviewed",
+            "setting": "must_be_reviewed",
+            "target_jurisdiction": "ZA",
+            "locale": "en-ZA",
+            "source_edition": "2024",
+            "source_locator": "not_a_real_clinical_claim",
+            "limitations": "synthetic gate test",
+            "claim_status": "unreviewed",
+            "source_ids": ["IFRC-IFA-2025"]
+        }]);
+        let errors = validate_registry(&input).expect_err("source edition mismatch must fail");
+        assert!(errors.iter().any(|error| error.contains("source_edition must match")));
     }
 
     #[test]
