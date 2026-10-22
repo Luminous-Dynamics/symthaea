@@ -21,7 +21,7 @@ exclude = [
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
-    # Directory placeholder has no Cargo.toml yet; keep workspace metadata fail-closed.
+    # Do not glob-discover this directory until it has a Cargo.toml; otherwise cargo metadata/fmt fails.
     "crates/core/symthaea-observation-attestation",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
