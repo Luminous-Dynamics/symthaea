@@ -173,7 +173,8 @@ impl AgentResult {
                         "tier": attempt.tier.to_string(),
                         "backend_name": attempt.backend_name,
                         "success": attempt.success,
-                        "elapsed_ms": attempt.elapsed_ms
+                        "elapsed_ms": attempt.elapsed_ms,
+                        "estimated_energy_cost": attempt.estimated_energy_cost
                     })
                 }).collect::<Vec<_>>(),
                 "total_energy": self.total_energy,
