@@ -132,7 +132,7 @@ impl MisInformerSignal {
     /// The vector index is the vertex index. Every count must be at most the total
     /// sample count. At least one sample is required: an empty sample population
     /// is missing evidence, not evidence that every vertex has probability zero.
-    pub fn new(
+    pub fn from_unverified_digest(
         instance_id: impl Into<String>,
         graph_sha256: [u8; 32],
         vertex_count: usize,
@@ -182,7 +182,7 @@ impl MisInformerSignal {
         sample_count: u64,
         inclusion_counts: Vec<u64>,
     ) -> Result<Self, MisSignalError> {
-        Self::new(
+        Self::from_unverified_digest(
             instance_id,
             graph.sha256(),
             graph.vertex_count(),
@@ -198,7 +198,7 @@ impl MisInformerSignal {
         graph: &MisGraphIdentity,
         mode: MisSelectionMode,
     ) -> Result<MisVertexRecommendation, MisSignalError> {
-        self.recommend_vertex(
+        self.recommend_vertex_for_unverified_digest(
             expected_instance_id,
             graph.sha256(),
             graph.vertex_count(),
@@ -232,7 +232,7 @@ impl MisInformerSignal {
     /// the caller's validated graph manifest. Ties are resolved by the lowest index,
     /// making this recommendation deterministic. The caller remains responsible
     /// for recording signal provenance and verifying the final solution.
-    pub fn recommend_vertex(
+    pub fn recommend_vertex_for_unverified_digest(
         &self,
         expected_instance_id: &str,
         expected_graph_sha256: [u8; 32],
@@ -294,11 +294,11 @@ mod tests {
     #[test]
     fn rejects_empty_or_control_character_instance_ids() {
         assert_eq!(
-            MisInformerSignal::new("  ", [0; 32], 2, 1, vec![0, 0]).expect_err("blank id is invalid"),
+            MisInformerSignal::from_unverified_digest("  ", [0; 32], 2, 1, vec![0, 0]).expect_err("blank id is invalid"),
             MisSignalError::InvalidInstanceId
         );
         assert_eq!(
-            MisInformerSignal::new("graph\nwrong", [0; 32], 2, 1, vec![0, 0])
+            MisInformerSignal::from_unverified_digest("graph\nwrong", [0; 32], 2, 1, vec![0, 0])
                 .expect_err("control character is invalid"),
             MisSignalError::InvalidInstanceId
         );
@@ -307,7 +307,7 @@ mod tests {
     #[test]
     fn rejects_missing_samples_instead_of_inventing_zero_frequency() {
         assert_eq!(
-            MisInformerSignal::new("mis-case-a", [1; 32], 2, 0, vec![0, 0])
+            MisInformerSignal::from_unverified_digest("mis-case-a", [1; 32], 2, 0, vec![0, 0])
                 .expect_err("no samples are not negative evidence"),
             MisSignalError::NoSamples
         );
@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn rejects_vector_length_mismatch() {
         assert_eq!(
-            MisInformerSignal::new("mis-case-a", [1; 32], 3, 4, vec![0, 1])
+            MisInformerSignal::from_unverified_digest("mis-case-a", [1; 32], 3, 4, vec![0, 1])
                 .expect_err("one vertex is missing"),
             MisSignalError::VertexCountMismatch {
                 expected: 3,
@@ -328,7 +328,7 @@ mod tests {
     #[test]
     fn rejects_inclusion_count_greater_than_sample_count() {
         assert_eq!(
-            MisInformerSignal::new("mis-case-a", [1; 32], 2, 4, vec![2, 5])
+            MisInformerSignal::from_unverified_digest("mis-case-a", [1; 32], 2, 4, vec![2, 5])
                 .expect_err("count cannot exceed sample total"),
             MisSignalError::InclusionCountExceedsSamples {
                 vertex: 1,
@@ -341,9 +341,9 @@ mod tests {
     #[test]
     fn recommend_in_set_picks_highest_frequency_and_breaks_ties_by_index() {
         let signal =
-            MisInformerSignal::new("mis-case-a", [1; 32], 4, 10, vec![2, 8, 8, 4]).expect("valid signal");
+            MisInformerSignal::from_unverified_digest("mis-case-a", [1; 32], 4, 10, vec![2, 8, 8, 4]).expect("valid signal");
         let result = signal
-            .recommend_vertex("mis-case-a", [1; 32], 4, MisSelectionMode::PreferInSet)
+            .recommend_vertex_for_unverified_digest("mis-case-a", [1; 32], 4, MisSelectionMode::PreferInSet)
             .expect("matching graph identity");
         assert_eq!(result.vertex, 1);
         assert_eq!(result.inclusion_count, 8);
@@ -354,9 +354,9 @@ mod tests {
     #[test]
     fn recommend_out_set_picks_lowest_frequency_and_breaks_ties_by_index() {
         let signal =
-            MisInformerSignal::new("mis-case-a", [1; 32], 4, 10, vec![0, 8, 0, 4]).expect("valid signal");
+            MisInformerSignal::from_unverified_digest("mis-case-a", [1; 32], 4, 10, vec![0, 8, 0, 4]).expect("valid signal");
         let result = signal
-            .recommend_vertex("mis-case-a", [1; 32], 4, MisSelectionMode::PreferOutSet)
+            .recommend_vertex_for_unverified_digest("mis-case-a", [1; 32], 4, MisSelectionMode::PreferOutSet)
             .expect("matching graph identity");
         assert_eq!(result.vertex, 0);
         assert_eq!(result.inclusion_count, 0);
@@ -366,10 +366,10 @@ mod tests {
     #[test]
     fn rejects_signal_from_wrong_instance() {
         let signal =
-            MisInformerSignal::new("mis-case-a", [1; 32], 2, 5, vec![4, 1]).expect("valid signal");
+            MisInformerSignal::from_unverified_digest("mis-case-a", [1; 32], 2, 5, vec![4, 1]).expect("valid signal");
         assert_eq!(
             signal
-                .recommend_vertex("mis-case-b", [1; 32], 2, MisSelectionMode::PreferInSet)
+                .recommend_vertex_for_unverified_digest("mis-case-b", [1; 32], 2, MisSelectionMode::PreferInSet)
                 .expect_err("signal is stale or belongs to another graph"),
             MisSignalError::InstanceIdMismatch
         );
@@ -378,11 +378,11 @@ mod tests {
     #[test]
     fn rejects_signal_from_different_graph_digest_even_if_instance_id_and_size_match() {
         let signal =
-            MisInformerSignal::new("mis-case-a", [1; 32], 2, 5, vec![4, 1])
+            MisInformerSignal::from_unverified_digest("mis-case-a", [1; 32], 2, 5, vec![4, 1])
                 .expect("valid signal");
         assert_eq!(
             signal
-                .recommend_vertex("mis-case-a", [9; 32], 2, MisSelectionMode::PreferInSet)
+                .recommend_vertex_for_unverified_digest("mis-case-a", [9; 32], 2, MisSelectionMode::PreferInSet)
                 .expect_err("graph content digest differs"),
             MisSignalError::GraphDigestMismatch
         );
@@ -391,10 +391,10 @@ mod tests {
     #[test]
     fn rejects_wrong_graph_size() {
         let signal =
-            MisInformerSignal::new("mis-case-a", [1; 32], 3, 5, vec![4, 1, 2]).expect("valid signal");
+            MisInformerSignal::from_unverified_digest("mis-case-a", [1; 32], 3, 5, vec![4, 1, 2]).expect("valid signal");
         assert_eq!(
             signal
-                .recommend_vertex("mis-case-a", [1; 32], 4, MisSelectionMode::PreferOutSet)
+                .recommend_vertex_for_unverified_digest("mis-case-a", [1; 32], 4, MisSelectionMode::PreferOutSet)
                 .expect_err("graph size does not match"),
             MisSignalError::GraphSizeMismatch {
                 signal_vertices: 3,
@@ -406,9 +406,9 @@ mod tests {
     #[test]
     fn zero_frequency_is_a_real_observation_when_samples_exist() {
         let signal =
-            MisInformerSignal::new("mis-case-a", [1; 32], 3, 100, vec![0, 1, 0]).expect("valid signal");
+            MisInformerSignal::from_unverified_digest("mis-case-a", [1; 32], 3, 100, vec![0, 1, 0]).expect("valid signal");
         let result = signal
-            .recommend_vertex("mis-case-a", [1; 32], 3, MisSelectionMode::PreferOutSet)
+            .recommend_vertex_for_unverified_digest("mis-case-a", [1; 32], 3, MisSelectionMode::PreferOutSet)
             .expect("matching graph identity");
         assert_eq!(result.sample_count, 100);
         assert_eq!(result.inclusion_count, 0);
@@ -454,9 +454,9 @@ mod tests {
     #[test]
     fn all_vertices_tied_is_reported_as_tie_not_hidden_confidence() {
         let signal =
-            MisInformerSignal::new("mis-case-a", [1; 32], 3, 7, vec![4, 4, 4]).expect("valid signal");
+            MisInformerSignal::from_unverified_digest("mis-case-a", [1; 32], 3, 7, vec![4, 4, 4]).expect("valid signal");
         let result = signal
-            .recommend_vertex("mis-case-a", [1; 32], 3, MisSelectionMode::PreferInSet)
+            .recommend_vertex_for_unverified_digest("mis-case-a", [1; 32], 3, MisSelectionMode::PreferInSet)
             .expect("matching graph identity");
         assert_eq!(result.vertex, 0);
         assert_eq!(result.tie_count, 3);
