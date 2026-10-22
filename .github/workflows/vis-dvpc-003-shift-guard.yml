@@ -1,0 +1,60 @@
+name: VIS-DVPC-003 shift-guard benchmark
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-shift-guard.rs"
+      - "docs/research/VIS_DVPC_003_SHIFT_GUARD_V1.md"
+      - ".github/workflows/vis-dvpc-003-shift-guard.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-shift-guard.rs"
+      - "docs/research/VIS_DVPC_003_SHIFT_GUARD_V1.md"
+      - ".github/workflows/vis-dvpc-003-shift-guard.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust with rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check tools/vision-dvpc-shift-guard.rs
+
+      - name: Compile and run focused tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-shift-guard.rs -o /tmp/vis-dvpc-003-tests
+          /tmp/vis-dvpc-003-tests
+
+      - name: Build optimized report generator
+        run: rustc --edition=2024 -O tools/vision-dvpc-shift-guard.rs -o /tmp/vis-dvpc-003
+
+      - name: Require byte-identical replay
+        run: |
+          /tmp/vis-dvpc-003 > /tmp/vis-dvpc-003-a.tsv
+          /tmp/vis-dvpc-003 > /tmp/vis-dvpc-003-b.tsv
+          cmp /tmp/vis-dvpc-003-a.tsv /tmp/vis-dvpc-003-b.tsv
+          sha256sum /tmp/vis-dvpc-003-a.tsv
+
+      - name: Validate report schema and row counts
+        run: |
+          awk -F '\t' '
+            $1 == "RUN_HEADER" { if (NF != 25) exit 2; run_header = 1 }
+            $1 == "RUN" { if (NF != 25) exit 3; runs += 1 }
+            $1 == "SUMMARY_HEADER" { if (NF != 15) exit 4; summary_header = 1 }
+            $1 == "SUMMARY" { if (NF != 15) exit 5; summaries += 1 }
+            END {
+              if (!run_header || !summary_header || runs != 360 || summaries != 45) exit 6
+              printf "validated run_rows=%d summary_rows=%d\n", runs, summaries
+            }
+          ' /tmp/vis-dvpc-003-a.tsv
