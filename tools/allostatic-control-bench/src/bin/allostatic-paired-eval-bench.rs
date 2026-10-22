@@ -208,7 +208,9 @@ fn run() -> Result<(), String> {
             .map_err(|error| format!("cannot sync report: {error}"))?;
         drop(report);
         fs::rename(&temporary, target)
-            .map_err(|error| format!("cannot atomically publish report {}: {error}", target.display()))?;
+            .map_err(|error| {
+                format!("cannot atomically publish report {}: {error}", target.display())
+            })?;
         Ok(())
     })();
     if let Err(error) = write_result {
@@ -223,7 +225,9 @@ fn ensure_distinct_paths(input: &Path, output: &Path) -> Result<(), String> {
         .map_err(|error| format!("cannot resolve input CSV {}: {error}", input.display()))?;
     let canonical_output = canonical_output_path(output)?;
     if canonical_input == canonical_output {
-        return Err("input and output resolve to the same file; refusing to overwrite source data".to_owned());
+        return Err(
+            "input and output resolve to the same file; refusing to overwrite source data".to_owned(),
+        );
     }
     Ok(())
 }
@@ -302,7 +306,12 @@ fn is_slug(value: &str) -> bool {
     !value.is_empty()
         && value
             .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-' || byte == b'.')
+            .all(|byte| {
+                byte.is_ascii_alphanumeric()
+                    || byte == b'_'
+                    || byte == b'-'
+                    || byte == b'.'
+            })
 }
 
 fn write_summary_row(
@@ -368,7 +377,10 @@ mod tests {
 
     #[test]
     fn bootstrap_seed_is_stable_and_order_sensitive() {
-        assert_eq!(stable_scenario_seed("cartpole", false), stable_scenario_seed("cartpole", false));
+        assert_eq!(
+            stable_scenario_seed("cartpole", false),
+            stable_scenario_seed("cartpole", false)
+        );
         assert_ne!(stable_scenario_seed("ab", false), stable_scenario_seed("ba", false));
         assert_ne!(stable_scenario_seed("cartpole", false), stable_scenario_seed("cartpole", true));
     }
