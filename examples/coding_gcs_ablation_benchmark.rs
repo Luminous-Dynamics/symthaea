@@ -286,10 +286,12 @@ fn run_candidate(
     let expected = expected_test_functions(task.test_source);
     let oracle = evaluate_source(&source, task.test_source);
     let verification_elapsed_ms = oracle.elapsed_ms;
+    // CodeExecutor stores a nonzero test-process exit in runtime_error even when
+    // ordinary assertions fail. Exact test counts distinguish a completed failing
+    // oracle from an incomplete/crashed test run; success still requires no error.
     let oracle_complete = expected > 0
         && !oracle.simulated
         && oracle.compiled
-        && oracle.runtime_error.is_none()
         && oracle.tests_passed + oracle.tests_failed == expected;
     let behavioral_success = oracle_complete && is_behaviorally_successful(&oracle, expected);
     EvalResult {
@@ -585,7 +587,6 @@ fn main() {
         let reference_oracle_complete = expected > 0
             && reference.compiled
             && !reference.simulated
-            && reference.runtime_error.is_none()
             && reference.tests_passed + reference.tests_failed == expected;
         let empty = evaluate_source("", task.test_source);
         // This benchmark's empty patch should fail specifically as a real
@@ -625,10 +626,12 @@ fn main() {
         }
         for (mutation_index, mutant_source) in task.mutant_sources.iter().enumerate() {
             let mutant = evaluate_source(mutant_source, task.test_source);
+            // A failed assertion makes rustc's test binary exit nonzero. Count
+            // it as a killed mutant only when the full test catalogue was observed;
+            // runtime/infrastructure crashes with missing counts stay unresolved.
             let mutant_oracle_complete = expected > 0
                 && !mutant.simulated
                 && mutant.compiled
-                && mutant.runtime_error.is_none()
                 && mutant.tests_passed + mutant.tests_failed == expected;
             let mutant_killed = mutant_oracle_complete && mutant.tests_failed > 0;
             mutation_controls.push(serde_json::json!({
