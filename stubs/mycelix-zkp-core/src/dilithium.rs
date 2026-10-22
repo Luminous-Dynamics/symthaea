@@ -81,7 +81,7 @@ impl DilithiumKeypair {
             b"mycelix-zkp-core Dilithium5 keypair consistency check v1";
         let signed_check = dilithium5::sign(KEYPAIR_CHECK, &secret_key_obj);
         match dilithium5::open(&signed_check, &public_key_obj) {
-            Ok(message) if message == KEYPAIR_CHECK => {}
+            Ok(message) if message.as_slice() == KEYPAIR_CHECK => {}
             _ => {
                 return Err(ZkpError::InvalidKeyMaterial(
                     "public and secret keys do not form a valid pair".to_string(),
