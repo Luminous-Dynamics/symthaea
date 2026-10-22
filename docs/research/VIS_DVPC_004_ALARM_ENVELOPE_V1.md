@@ -67,7 +67,8 @@ Per-run and across-seed output retains:
 - number of shift episodes, detected/undetected episodes and mean detection delay;
 - false-alarm-blocked candidates and beneficial opportunities actually blocked by false alarms;
 - total decision benefit, task loss and CVaR95 of per-trial incremental decision loss;
-- total charged units, detector units, budget, reservation overruns and run-budget overruns.
+- total charged units, detector units, budget, reservation overruns and run-budget overruns;
+- same-seed paired deltas in total benefit, CVaR95 and shifted-stratum harmful escalations relative to LCB-only, so each guard’s change is visible for the same condition and budget.
 
 CVaR95 averages the worst ceil(5% of per-trial incremental losses), with positive loss for harmful escalation, negative loss for beneficial escalation, and zero for choosing the cheap path. It is a risk diagnostic, not a safety guarantee. No single weighted score is reported.
 
