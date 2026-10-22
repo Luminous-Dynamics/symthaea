@@ -24,9 +24,10 @@
 //!
 //! ## Payload type assignments
 //!
-//! The `packet_crypto::build_nonce` layout includes a `payload_type` byte that
-//! prevents cross-stream nonce collisions even when the same session key is
-//! reused across message types. These are the RDP-layer assignments:
+//! The nonce's `payload_type` byte separates replay streams. Each opener also
+//! enforces its expected payload type before AEAD decryption and decoding, so
+//! an envelope cannot be accidentally routed into the wrong message decoder.
+//! These are the RDP-layer assignments:
 //!
 //! | Value | Meaning                               |
 //! |-------|---------------------------------------|
@@ -119,10 +120,12 @@ pub fn seal_frame(frame: &RdpFrame, session: &mut RdpSession) -> Result<Vec<u8>,
 /// Open a sealed envelope produced by [`seal_frame`] and decode the `RdpFrame`.
 ///
 /// Mutates `session` to advance the replay window on accepted messages.
-/// Returns `Err(WireError::OpenFailed)` for AEAD failure, replay duplicate,
-/// or out-of-window sequence.
+/// Returns `Err(WireError::OpenFailed)` for payload-type mismatch, AEAD
+/// failure, replay duplicate, or out-of-window sequence.
 pub fn open_frame(bytes: &[u8], session: &mut RdpSession) -> Result<RdpFrame, WireError> {
-    let plaintext = session.open(bytes).ok_or(WireError::OpenFailed)?;
+    let plaintext = session
+        .open_with_payload_type(bytes, PAYLOAD_TYPE_RDP_FRAME)
+        .ok_or(WireError::OpenFailed)?;
     let frame = RdpFrame::from_bin(&plaintext)?;
     Ok(frame)
 }
@@ -140,10 +143,8 @@ pub fn open_frame(bytes: &[u8], session: &mut RdpSession) -> Result<RdpFrame, Wi
 ///   → RdpSession::seal             (ChaCha20-Poly1305 with PAYLOAD_TYPE_RDP_FRAME_LZ4)
 /// ```
 ///
-/// Receivers MUST use [`open_frame_lz4`] to open. Mixing with
-/// [`open_frame`] will fail at bincode deserialize (the decompressed
-/// output is bincode, the raw `open_frame` would skip decompression and
-/// try to deserialize the LZ4 block header as bincode — `WireError::Codec`).
+/// Receivers MUST use [`open_frame_lz4`] to open. The raw `open_frame`
+/// rejects the LZ4 payload type before decrypting or handing bytes to bincode.
 ///
 /// The `PAYLOAD_TYPE_RDP_FRAME_LZ4` value also separates the AEAD
 /// nonce stream from the raw `RdpFrame` stream, so a session can
@@ -170,18 +171,20 @@ pub fn seal_frame_lz4(frame: &RdpFrame, session: &mut RdpSession) -> Result<Vec<
 ///
 /// ```text
 /// sealed bytes
-///   → RdpSession::open              (AEAD verify, replay window check)
+///   → RdpSession::open_with_payload_type (type check, AEAD verify, replay window check)
 ///   → lz4_flex::decompress_size_prepended  (reads 4-byte length, decompresses)
 ///   → bincode::deserialize          (RdpFrame::from_bin)
 /// ```
 ///
-/// Returns `WireError::OpenFailed` for AEAD failure (wrong key,
-/// tampered ciphertext, replay duplicate), LZ4 decompression failure,
-/// or malformed length prefix. Mutates `session` to advance the
+/// Returns `WireError::OpenFailed` for payload-type mismatch, AEAD failure
+/// (wrong key, tampered ciphertext, replay duplicate), LZ4 decompression
+/// failure, or malformed length prefix. Mutates `session` to advance the
 /// replay window on accepted messages.
 #[cfg(feature = "holon-lz4")]
 pub fn open_frame_lz4(bytes: &[u8], session: &mut RdpSession) -> Result<RdpFrame, WireError> {
-    let compressed = session.open(bytes).ok_or(WireError::OpenFailed)?;
+    let compressed = session
+        .open_with_payload_type(bytes, PAYLOAD_TYPE_RDP_FRAME_LZ4)
+        .ok_or(WireError::OpenFailed)?;
     let plaintext = lz4_flex::block::decompress_size_prepended(&compressed)
         .map_err(|_| WireError::OpenFailed)?;
     let frame = RdpFrame::from_bin(&plaintext)?;
@@ -201,7 +204,9 @@ pub fn seal_input(input: &InputFrame, session: &mut RdpSession) -> Result<Vec<u8
 /// Mutates `session` to advance the replay window. See [`open_frame`] for
 /// the full set of failure conditions.
 pub fn open_input(bytes: &[u8], session: &mut RdpSession) -> Result<InputFrame, WireError> {
-    let plaintext = session.open(bytes).ok_or(WireError::OpenFailed)?;
+    let plaintext = session
+        .open_with_payload_type(bytes, PAYLOAD_TYPE_RDP_INPUT)
+        .ok_or(WireError::OpenFailed)?;
     let input = InputFrame::from_bin(&plaintext)?;
     Ok(input)
 }
@@ -334,29 +339,39 @@ mod tests {
     #[cfg(feature = "holon-lz4")]
     #[test]
     fn lz4_sealed_cannot_be_opened_by_raw_path() {
-        // Safety test: if a sender uses seal_frame_lz4 but a receiver
-        // mistakenly uses open_frame, decryption succeeds (same session
-        // key, different payload_type in nonce — but AEAD doesn't care)
-        // then bincode::deserialize on the LZ4 block fails gracefully.
-        // The inverse (seal_frame opened by open_frame_lz4) fails at
-        // the LZ4 size-prefix-decode step.
         let mut sender = test_session(0x33);
         let mut receiver = test_session(0x33);
 
         let frame = sample_delta_frame();
         let lz4_sealed = seal_frame_lz4(&frame, &mut sender).expect("seal lz4");
 
-        // Wrong opener: open_frame on a seal_frame_lz4 envelope.
-        // Note: payload_type differs (0x12 vs 0x10) which means the
-        // AEAD nonce's payload_type byte differs. `session.open` extracts
-        // the payload_type from the nonce and uses it for replay window
-        // indexing, but the AEAD verifies regardless. So decryption
-        // succeeds; bincode deserialization of the LZ4 block fails.
-        let wrong = open_frame(&lz4_sealed, &mut receiver);
-        assert!(
-            wrong.is_err(),
-            "open_frame must reject LZ4 envelope at bincode deserialize"
-        );
+        // The payload type is rejected before AEAD opening and before bincode
+        // deserialization sees compressed bytes as though they were a frame.
+        assert!(matches!(
+            open_frame(&lz4_sealed, &mut receiver),
+            Err(WireError::OpenFailed)
+        ));
+    }
+
+    #[test]
+    fn frame_and_input_payload_types_cannot_be_swapped() {
+        let mut frame_sender = test_session(0x45);
+        let mut input_receiver = test_session(0x45);
+        let frame_envelope = seal_frame(&sample_delta_frame(), &mut frame_sender)
+            .expect("seal frame");
+        assert!(matches!(
+            open_input(&frame_envelope, &mut input_receiver),
+            Err(WireError::OpenFailed)
+        ));
+
+        let mut input_sender = test_session(0x46);
+        let mut frame_receiver = test_session(0x46);
+        let input_envelope = seal_input(&sample_input_frame(), &mut input_sender)
+            .expect("seal input");
+        assert!(matches!(
+            open_frame(&input_envelope, &mut frame_receiver),
+            Err(WireError::OpenFailed)
+        ));
     }
 
     #[test]
