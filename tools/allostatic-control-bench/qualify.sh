@@ -624,16 +624,15 @@ if ! awk -F, '
   exit 1
 fi
 
-# Apply a bounded-risk e-process to the exact same sequential residual rows.
-# This is a fixed predictable bet with a risk bound; it is not a pointwise
-# conformal threshold and is valid only if the conditional-mean risk null holds.
+# Apply a predeclared mixture of bounded-risk e-processes to the exact same
+# sequential residual rows. The three bet fractions are fixed before evaluation.
 cargo run --locked --release --manifest-path "$manifest" --bin allostatic-risk-eprocess-bench -- \
   "$tmpdir/sequential-a.csv" "$tmpdir/eprocess-a.csv" "$tmpdir/eprocess-summary-a.csv"
 cargo run --locked --release --manifest-path "$manifest" --bin allostatic-risk-eprocess-bench -- \
   "$tmpdir/sequential-a.csv" "$tmpdir/eprocess-b.csv" "$tmpdir/eprocess-summary-b.csv"
 if ! cmp -s "$tmpdir/eprocess-a.csv" "$tmpdir/eprocess-b.csv" ||
    ! cmp -s "$tmpdir/eprocess-summary-a.csv" "$tmpdir/eprocess-summary-b.csv"; then
-  printf 'FAIL: repeated bounded-risk e-process outputs are not byte-identical\n' >&2
+  printf 'FAIL: repeated bounded-risk mixture e-process outputs are not byte-identical\n' >&2
   exit 1
 fi
 if ! cmp -s "$tmpdir/sequential-a.csv" <(cut -d, -f1-14 "$tmpdir/eprocess-a.csv"); then
@@ -642,14 +641,16 @@ if ! cmp -s "$tmpdir/sequential-a.csv" <(cut -d, -f1-14 "$tmpdir/eprocess-a.csv"
 fi
 
 if ! awk -F, '
-  NR == 1 { if (NF != 21) failed = 1; next }
+  NR == 1 { if (NF != 26) failed = 1; next }
   NR == 2 {
     log_threshold = $19
     risk_bound = $20
-    bet = $21
+    fraction_1 = $21
+    fraction_2 = $22
+    fraction_3 = $23
   }
   {
-    if (NF != 21) failed = 1
+    if (NF != 26) failed = 1
     if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
         $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
     if ($2 != "nominal" && $2 != "gradual_shift" &&
@@ -674,27 +675,55 @@ if ! awk -F, '
     if (($19 - log(100) > 0.000001) || (log(100) - $19 > 0.000001)) failed = 1
     if (($19 - log_threshold > 0.000001) || (log_threshold - $19 > 0.000001)) failed = 1
     if (($20 - 0.15 > 0.000001) || (0.15 - $20 > 0.000001)) failed = 1
-    if (($21 - (0.5 / 0.15) > 0.000001) || ((0.5 / 0.15) - $21 > 0.000001)) failed = 1
+    if (($21 - 0.25 > 0.000001) || (0.25 - $21 > 0.000001)) failed = 1
+    if (($22 - 0.50 > 0.000001) || (0.50 - $22 > 0.000001)) failed = 1
+    if (($23 - 0.75 > 0.000001) || (0.75 - $23 > 0.000001)) failed = 1
     if (($20 - risk_bound > 0.000001) || (risk_bound - $20 > 0.000001)) failed = 1
-    if (($21 - bet > 0.000001) || (bet - $21 > 0.000001)) failed = 1
-    if (1 + $21 * ($15 - $20) <= 0) failed = 1
+    if (($21 - fraction_1 > 0.000001) || (fraction_1 - $21 > 0.000001) ||
+        ($22 - fraction_2 > 0.000001) || (fraction_2 - $22 > 0.000001) ||
+        ($23 - fraction_3 > 0.000001) || (fraction_3 - $23 > 0.000001)) failed = 1
+    for (i = 24; i <= 26; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
 
     key = $1 SUBSEP $2 SUBSEP $3
     if ($4 == 0) {
       next_step[key] = 0
-      previous_log_e[key] = 0
+      previous_1[key] = 0
+      previous_2[key] = 0
+      previous_3[key] = 0
       first_alarm[key] = 8
       recorded_first_alarm[key] = $18
       recorded_below[key] = $14
       latched[key] = "false"
       episode_max_score[key] = 0
       episode_all_below[key] = "true"
+      threshold_by_episode[key] = $6
     } else if ($4 != next_step[key]) failed = 1
+    if (($6 - threshold_by_episode[key] > 0.000001) ||
+        (threshold_by_episode[key] - $6 > 0.000001)) failed = 1
 
-    factor = 1 + $21 * ($15 - $20)
-    expected_log_e = previous_log_e[key] + log(factor)
-    if (($16 - expected_log_e > 0.000001) || (expected_log_e - $16 > 0.000001)) failed = 1
-    previous_log_e[key] = $16
+    factor_1 = 1 + (fraction_1 / risk_bound) * ($15 - risk_bound)
+    factor_2 = 1 + (fraction_2 / risk_bound) * ($15 - risk_bound)
+    factor_3 = 1 + (fraction_3 / risk_bound) * ($15 - risk_bound)
+    if (factor_1 <= 0 || factor_2 <= 0 || factor_3 <= 0) failed = 1
+    expected_1 = previous_1[key] + log(factor_1)
+    expected_2 = previous_2[key] + log(factor_2)
+    expected_3 = previous_3[key] + log(factor_3)
+    if (($24 - expected_1 > 0.000001) || (expected_1 - $24 > 0.000001)) failed = 1
+    if (($25 - expected_2 > 0.000001) || (expected_2 - $25 > 0.000001)) failed = 1
+    if (($26 - expected_3 > 0.000001) || (expected_3 - $26 > 0.000001)) failed = 1
+    previous_1[key] = $24
+    previous_2[key] = $25
+    previous_3[key] = $26
+
+    max_component = $24
+    if ($25 > max_component) max_component = $25
+    if ($26 > max_component) max_component = $26
+    expected_mix = max_component + log((
+      exp($24 - max_component) +
+      exp($25 - max_component) +
+      exp($26 - max_component)) / 3)
+    if (($16 - expected_mix > 0.000002) || (expected_mix - $16 > 0.000002)) failed = 1
+
     expected_alarm = (latched[key] == "true" || $16 >= log_threshold) ? "true" : "false"
     if ($17 != expected_alarm) failed = 1
     if ($17 == "true" && first_alarm[key] == 8) first_alarm[key] = $4
@@ -708,18 +737,24 @@ if ! awk -F, '
     if ($2 == "nominal") {
       nominal_score[pair_key] = $5
       nominal_loss[pair_key] = $15
-      nominal_log_e[pair_key] = $16
+      nominal_mix[pair_key] = $16
       nominal_alarm[pair_key] = $17
       nominal_first_alarm[pair_key] = $18
+      nominal_1[pair_key] = $24
+      nominal_2[pair_key] = $25
+      nominal_3[pair_key] = $26
     }
     if ($2 == "stealth_shift" &&
         (nominal_score[pair_key] != $5 ||
          nominal_loss[pair_key] != $15 ||
-         nominal_log_e[pair_key] != $16 ||
+         nominal_mix[pair_key] != $16 ||
          nominal_alarm[pair_key] != $17 ||
-         nominal_first_alarm[pair_key] != $18)) failed = 1
+         nominal_first_alarm[pair_key] != $18 ||
+         nominal_1[pair_key] != $24 ||
+         nominal_2[pair_key] != $25 ||
+         nominal_3[pair_key] != $26)) failed = 1
 
-    if ($4 == 7 && ($14 == "true") != (episode_max_score[key] <= $6)) failed = 1
+    if ($4 == 7 && ($14 == "true") != (episode_max_score[key] <= threshold_by_episode[key])) failed = 1
     if ($4 == 7 && (episode_all_below[key] == "true") != ($14 == "true")) failed = 1
     row_key = key SUBSEP $4
     if (seen[row_key]++) failed = 1
@@ -734,14 +769,14 @@ if ! awk -F, '
     }
   }
 ' "$tmpdir/eprocess-a.csv"; then
-  printf 'FAIL: bounded-risk e-process schema, log-e recurrence, threshold or stealth pairing is invalid\n' >&2
+  printf 'FAIL: bounded-risk mixture e-process schema, component recurrence, log-mixture, threshold or stealth pairing is invalid\n' >&2
   exit 1
 fi
 
 if ! awk -F, '
-  NR == 1 { if (NF != 17) failed = 1; next }
+  NR == 1 { if (NF != 19) failed = 1; next }
   {
-    if (NF != 17) failed = 1
+    if (NF != 19) failed = 1
     if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
         $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
     if ($2 != "nominal" && $2 != "gradual_shift" &&
@@ -760,9 +795,12 @@ if ! awk -F, '
     if ($12 !~ /^-?[0-9]*[.]?[0-9]+$/ || $13 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
     if (($14 - log(100) > 0.000001) || (log(100) - $14 > 0.000001)) failed = 1
     if (($15 - 0.15 > 0.000001) || (0.15 - $15 > 0.000001)) failed = 1
-    if (($16 - (0.5 / 0.15) > 0.000001) || ((0.5 / 0.15) - $16 > 0.000001)) failed = 1
-    if (($17 - 0.05 > 0.000001) || (0.05 - $17 > 0.000001)) failed = 1
+    if (($16 - 0.25 > 0.000001) || (0.25 - $16 > 0.000001) ||
+        ($17 - 0.50 > 0.000001) || (0.50 - $17 > 0.000001) ||
+        ($18 - 0.75 > 0.000001) || (0.75 - $18 > 0.000001)) failed = 1
+    if (($19 - 0.05 > 0.000001) || (0.05 - $19 > 0.000001)) failed = 1
 
+    if ($2 == "nominal" && ($4 > 30 || $5 != $4 || $6 != 0)) failed = 1
     if ($2 == "gradual_shift" &&
         ($4 < 240 || $6 > 60 || $10 != 300 || $11 < 240)) failed = 1
     if ($2 == "abrupt_shift" && ($4 < 270 || $6 > 30)) failed = 1
@@ -779,7 +817,7 @@ if ! awk -F, '
   }
   END { if (NR != 21 || rows != 20 || failed) exit 1 }
 ' "$tmpdir/eprocess-summary-a.csv"; then
-  printf 'FAIL: bounded-risk e-process summary schema, detection behavior or matched stealth-control gates are invalid\n' >&2
+  printf 'FAIL: mixture e-process summary schema, detection behavior or matched stealth-control gates are invalid\n' >&2
   exit 1
 fi
 
