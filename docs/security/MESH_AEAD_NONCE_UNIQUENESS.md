@@ -13,7 +13,7 @@ The current helper forms a 96-bit ChaCha20-Poly1305 nonce as:
 source_id[0..6] | payload_type[1] | epoch[1] | sequence_le[4]
 ```
 
-The implementation and its comments previously described an 8-bit random epoch as preventing nonce reuse across restarts. That statement is too strong. Under a reused key, the tuple can repeat when a restarted sender reuses the same one-byte epoch and sequence. Two independent uniform 8-bit epochs match with probability **1/256**. The nonce also uses only the first 48 bits of the packet's 64-bit `source_id`, and the 32-bit sequence repeats after wrap if the key and epoch remain unchanged.
+The implementation and its comments previously described an 8-bit epoch as preventing nonce reuse across restarts. That statement is too strong. `RotatingKeyPair::new` draws a random 8-bit epoch, but `DualLayerMesh::new` initializes `encryption_epoch` to **zero** and does not randomize it; the ordinary `with_encryption_key` builder does not change that field. In that path, a restart with the same key/source/sequence namespace can repeat a nonce deterministically. Where independent uniform one-byte epochs are used, they match with probability **1/256**. The nonce also uses only the first 48 bits of the packet's 64-bit `source_id`, and the 32-bit sequence repeats after wrap if the key and epoch remain unchanged.
 
 RFC 8439 requires a different 96-bit nonce for each invocation under the same key and explains that nonce reuse repeats both the keystream and the one-time Poly1305 key. RFC 8439 also highlights the multiple-sender case: nonce namespaces must not collide when senders share a key. See https://www.rfc-editor.org/rfc/rfc8439.html and https://www.rfc-editor.org/rfc/rfc5116.html.
 
