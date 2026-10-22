@@ -9,8 +9,7 @@
 
 use crate::basis::{BasisSet, ContractedGaussian};
 use crate::constants::{
-    CANONICAL_ORTH_THRESHOLD, MAX_SCF_ITERATIONS, SCF_DENSITY_THRESHOLD,
-    SCF_ENERGY_THRESHOLD,
+    CANONICAL_ORTH_THRESHOLD, MAX_SCF_ITERATIONS, SCF_DENSITY_THRESHOLD, SCF_ENERGY_THRESHOLD,
 };
 use crate::dft::grid::{DftGrid, GridQuality};
 use crate::dft::lda::lda_exchange_correlation;
@@ -22,12 +21,12 @@ use crate::integrals::overlap::overlap_matrix;
 use crate::molecule::Molecule;
 use crate::scf::density::{build_density_matrix, density_rms_change};
 use crate::scf::diis::Diis;
+#[cfg(test)]
+use crate::scf::generalized_eigen::CheckedGeneralizedEigenError;
 use crate::scf::generalized_eigen::{
     ScfSolveError, ScfSolverDiagnostics, canonical_orthogonalization_checked,
     solve_generalized_eigen_checked,
 };
-#[cfg(test)]
-use crate::scf::generalized_eigen::CheckedGeneralizedEigenError;
 
 /// Available exchange-correlation functionals.
 #[derive(Debug, Clone, Copy)]
@@ -79,6 +78,13 @@ pub struct DftResult {
     /// Number of grid points used by a successful numerical result.
     /// Zero in a fail-closed compatibility result with `solver_error = Some(...)`.
     pub n_grid_points: usize,
+    /// Electron count integrated from the final density on the actual DFT grid.
+    /// This is a quadrature diagnostic, not an SCF convergence or chemical-accuracy claim.
+    /// NaN indicates the checked solver failed before a final density was available.
+    pub integrated_electron_count: f64,
+    /// Absolute difference between the integrated grid electron count and the
+    /// integer electron count from the molecular charge/nuclear charges.
+    pub integrated_electron_count_abs_error: f64,
     /// Error emitted by the fallible solver when the legacy wrapper must fail closed.
     /// If set, energies are NaN, orbital vectors are empty, `converged` is false,
     /// `n_iterations` and `n_grid_points` are zero, and diagnostics are absent.
@@ -164,6 +170,8 @@ fn kohn_sham_dft_with_eigensolver_budget(
             converged: false,
             n_basis: basis.n_basis(),
             n_grid_points: 0,
+            integrated_electron_count: f64::NAN,
+            integrated_electron_count_abs_error: f64::NAN,
             solver_error: Some(error.to_string()),
             solver_diagnostics: None,
         },
@@ -239,12 +247,9 @@ fn try_kohn_sham_dft_with_eigensolver_budget(
         }
     }
 
-    for (index, value) in [
-        config.energy_convergence,
-        config.density_convergence,
-    ]
-    .iter()
-    .enumerate()
+    for (index, value) in [config.energy_convergence, config.density_convergence]
+        .iter()
+        .enumerate()
     {
         if !value.is_finite() || *value < 0.0 {
             return Err(ScfSolveError::InvalidNumericInput {
@@ -331,14 +336,8 @@ fn try_kohn_sham_dft_with_eigensolver_budget(
     );
 
     // Initial guess: the core-Hamiltonian solve is checked independently.
-    let initial = solve_generalized_eigen_checked(
-        &h_core,
-        &s_mat,
-        &x_mat,
-        n,
-        n_ind,
-        eigensolver_iterations,
-    )?;
+    let initial =
+        solve_generalized_eigen_checked(&h_core, &s_mat, &x_mat, n, n_ind, eigensolver_iterations)?;
     solver_diagnostics.record_generalized_solve(&initial);
     let mut coefficients = initial.generalized.coefficients;
     let mut orbital_energies = initial.generalized.eigenvalues;
@@ -375,10 +374,8 @@ fn try_kohn_sham_dft_with_eigensolver_budget(
         for (g, pt) in grid.points.iter().enumerate() {
             let rho_g = rho[g];
             if rho_g > 1e-20 {
-                xc_energy += pt.weight
-                    * crate::dft::lda::SlaterExchange::energy_per_point(rho_g)
-                    + pt.weight
-                        * crate::dft::lda::VwnCorrelation::energy_per_point(rho_g);
+                xc_energy += pt.weight * crate::dft::lda::SlaterExchange::energy_per_point(rho_g)
+                    + pt.weight * crate::dft::lda::VwnCorrelation::energy_per_point(rho_g);
             }
         }
         if !xc_energy.is_finite() {
@@ -402,17 +399,13 @@ fn try_kohn_sham_dft_with_eigensolver_budget(
         }
         ensure_finite_values("DFT KS Fock matrix after DIIS", &fock)?;
 
-        let e_one: f64 = (0..n * n)
-            .map(|i| density[i] * h_core[i])
-            .sum::<f64>();
+        let e_one: f64 = (0..n * n).map(|i| density[i] * h_core[i]).sum::<f64>();
         if !e_one.is_finite() {
             return Err(ScfSolveError::NonFiniteEnergy {
                 stage: "DFT one-electron energy during SCF",
             });
         }
-        let e_j: f64 = (0..n * n)
-            .map(|i| density[i] * j_matrix[i])
-            .sum::<f64>();
+        let e_j: f64 = (0..n * n).map(|i| density[i] * j_matrix[i]).sum::<f64>();
         if !e_j.is_finite() {
             return Err(ScfSolveError::NonFiniteEnergy {
                 stage: "DFT Coulomb energy during SCF",
@@ -468,12 +461,30 @@ fn try_kohn_sham_dft_with_eigensolver_budget(
     // validate each component. Fixed-point convergence remains a separate flag.
     let rho_final = compute_density_at_grid(&density, &basis_at_grid, n, grid.n_points());
     ensure_finite_values("DFT final electron density on grid", &rho_final)?;
+    let integrated_electron_count: f64 = rho_final
+        .iter()
+        .zip(&grid.points)
+        .map(|(rho, point)| rho * point.weight)
+        .sum();
+    if !integrated_electron_count.is_finite() {
+        return Err(ScfSolveError::NonFiniteNumericValue {
+            stage: "DFT integrated electron count",
+            index: 0,
+        });
+    }
+    let integrated_electron_count_abs_error =
+        (integrated_electron_count - electron_count as f64).abs();
+    if !integrated_electron_count_abs_error.is_finite() {
+        return Err(ScfSolveError::NonFiniteNumericValue {
+            stage: "DFT integrated electron-count error",
+            index: 0,
+        });
+    }
     let mut e_xc_final = 0.0;
     for (g, pt) in grid.points.iter().enumerate() {
         let rho_g = rho_final[g];
         if rho_g > 1e-20 {
-            e_xc_final += pt.weight
-                * crate::dft::lda::SlaterExchange::energy_per_point(rho_g)
+            e_xc_final += pt.weight * crate::dft::lda::SlaterExchange::energy_per_point(rho_g)
                 + pt.weight * crate::dft::lda::VwnCorrelation::energy_per_point(rho_g);
         }
     }
@@ -484,12 +495,8 @@ fn try_kohn_sham_dft_with_eigensolver_budget(
     }
     let j_final = build_coulomb_matrix(&density, &eri, n);
     ensure_finite_values("DFT final Coulomb matrix", &j_final)?;
-    let e_one: f64 = (0..n * n)
-        .map(|i| density[i] * h_core[i])
-        .sum::<f64>();
-    let e_j: f64 = (0..n * n)
-        .map(|i| density[i] * j_final[i])
-        .sum::<f64>();
+    let e_one: f64 = (0..n * n).map(|i| density[i] * h_core[i]).sum::<f64>();
+    let e_j: f64 = (0..n * n).map(|i| density[i] * j_final[i]).sum::<f64>();
     if !e_one.is_finite() || !e_j.is_finite() {
         return Err(ScfSolveError::NonFiniteEnergy {
             stage: "final DFT energy components",
@@ -519,6 +526,8 @@ fn try_kohn_sham_dft_with_eigensolver_budget(
         converged,
         n_basis: n,
         n_grid_points: grid.n_points(),
+        integrated_electron_count,
+        integrated_electron_count_abs_error,
         solver_error: None,
         solver_diagnostics: Some(solver_diagnostics),
     })
@@ -963,22 +972,16 @@ mod tests {
 
     #[test]
     fn try_dft_rejects_open_shell_and_invalid_charge() {
-        let open_shell = Molecule::with_charge(
-            vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)],
-            0,
-            2,
-        );
+        let open_shell =
+            Molecule::with_charge(vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)], 0, 2);
         let open_basis = Sto3g::build(&open_shell);
         assert!(matches!(
             try_kohn_sham_dft(&open_shell, &open_basis, &DftConfig::default()),
             Err(ScfSolveError::UnsupportedMultiplicity { .. })
         ));
 
-        let invalid_charge = Molecule::with_charge(
-            vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)],
-            2,
-            1,
-        );
+        let invalid_charge =
+            Molecule::with_charge(vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)], 2, 1);
         let invalid_basis = Sto3g::build(&invalid_charge);
         assert!(matches!(
             try_kohn_sham_dft(&invalid_charge, &invalid_basis, &DftConfig::default()),
@@ -989,11 +992,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "invalid molecule: charge 2 exceeds total nuclear charge 1")]
     fn legacy_dft_preserves_invalid_charge_panic_contract() {
-        let molecule = Molecule::with_charge(
-            vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)],
-            2,
-            1,
-        );
+        let molecule =
+            Molecule::with_charge(vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)], 2, 1);
         let basis = Sto3g::build(&molecule);
         let _ = kohn_sham_dft(&molecule, &basis, &DftConfig::default());
     }
@@ -1010,9 +1010,9 @@ mod tests {
             .expect_err("zero rotation budget must not produce an unchecked DFT result");
         assert!(matches!(
             error,
-            ScfSolveError::GeneralizedEigen(
-                CheckedGeneralizedEigenError::EigensolverNotConverged(_)
-            )
+            ScfSolveError::GeneralizedEigen(CheckedGeneralizedEigenError::EigensolverNotConverged(
+                _
+            ))
         ));
 
         let legacy = kohn_sham_dft_with_eigensolver_budget(&mol, &basis, &config, Some(0));
