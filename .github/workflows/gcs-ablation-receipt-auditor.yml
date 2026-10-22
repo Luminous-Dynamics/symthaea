@@ -55,6 +55,8 @@ jobs:
         run: cargo test --locked --lib --features "code_generation geodesic_synthesis" backend_attempts
       - name: Test fallback cost and effective-backend energy accounting
         run: cargo test --locked --lib --features "code_generation geodesic_synthesis" cloud_failure
+      - name: Verify hardware dispatch cannot emit placeholder code
+        run: cargo test --locked --lib --features "code_generation geodesic_synthesis" hardware_tier_does_not_claim_driver_emitter_ran
       - name: Compile the paired benchmark producer
         run: cargo check --locked --example coding_gcs_ablation_benchmark --features "code_generation geodesic_synthesis"
       - name: Run strict Clippy on the auditor
