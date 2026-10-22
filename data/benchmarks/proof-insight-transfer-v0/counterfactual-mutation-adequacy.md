@@ -129,7 +129,7 @@ The primary outcome for this track is **strategy applicability and action select
 
 Report (a) sensitivity to genuinely absent prerequisites, (b) stability on alpha-renamed/equivalent context presentations, (c) correct non-abstention after irrelevant facts are removed, (d) alternative-plan recovery and exact kernel-checked closure when achieved, and (e) action/call/token/time/cost by paired state. Keep these metrics separate from theorem-level transfer selectivity and exact-target proof utility. A system should fail if it either applies a premise-dependent move after its premise vanished or abstains on every altered context.
 
-This design isolates a cleaner causal question than statement mutation alone: **does the system track the prerequisite in the actual proof state, or does it only react to surface similarity and mutation labels?** It is a proposed next track, not yet an implemented schema, executed state replayer, dataset, or measured result. The existing statement-mutation suite remains necessary for testing formal-equivalence handling and statement fidelity.
+This design isolates a cleaner causal question than statement mutation alone: **does the system track the prerequisite in the actual proof state, or does it only react to surface similarity and mutation labels?** The schema, synthetic CI fixture, and a small Lean elaboration example for the `clear h` transition are now implemented. A replayable proof-state dataset, instrumented transition-receipt generator, independently adjudicated pairs, and model outcomes remain unimplemented. The existing statement-mutation suite remains necessary for testing formal-equivalence handling and statement fidelity.
 
 ## Fixed-theorem proof-state intervention contract
 
