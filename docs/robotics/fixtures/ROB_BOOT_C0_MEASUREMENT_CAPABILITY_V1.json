@@ -1,0 +1,156 @@
+{
+  "schema_id": "symthaea.rob-boot.c0-measurement-capability-fixture.v1",
+  "authority": "qualification-reference-only",
+  "production_import_forbidden": true,
+  "purpose": "synthetic policy-plumbing known answers for ENG-MEAS-C0-001; not a real instrument qualification",
+  "fixture_policy": {
+    "mass_effect_threshold_mg": 5000,
+    "mass_contrast_capability_bound_mg": 1250,
+    "deflection_noninferiority_margin_um": 50,
+    "deflection_contrast_capability_bound_um": 20,
+    "probe_backaction_bound_um": 5,
+    "remount_shift_bound_um": 15,
+    "session_drift_bound_um": 10
+  },
+  "shared_uncertainty_known_answer": {
+    "description": "synthetic additive common-offset example only",
+    "baseline_common_offset_bound_mg": 800,
+    "candidate_common_offset_bound_mg": 800,
+    "baseline_independent_bound_mg": 300,
+    "candidate_independent_bound_mg": 300,
+    "common_offset_identity_same": true,
+    "expected_contrast_bound_with_shared_common_mode_mg": 600,
+    "expected_contrast_bound_if_common_terms_wrongly_treated_independent_mg": 2200,
+    "claim_ceiling": "demonstrates dependence bookkeeping; not a physical scale model"
+  },
+  "cases": [
+    {
+      "name": "clean_supported",
+      "calibration_current": true,
+      "reference_stable": true,
+      "mass_contrast_bound_mg": 600,
+      "deflection_contrast_bound_um": 12,
+      "probe_backaction_um": 2,
+      "remount_shift_um": 8,
+      "session_drift_um": 4,
+      "dependence_model_complete": true,
+      "expected_disposition": "MeasurementCapabilitySupported"
+    },
+    {
+      "name": "high_resolution_but_remount_dominates",
+      "calibration_current": true,
+      "reference_stable": true,
+      "mass_contrast_bound_mg": 500,
+      "deflection_contrast_bound_um": 8,
+      "probe_backaction_um": 1,
+      "remount_shift_um": 40,
+      "session_drift_um": 3,
+      "dependence_model_complete": true,
+      "expected_disposition": "RemountSensitivityTooLarge"
+    },
+    {
+      "name": "stale_calibration",
+      "calibration_current": false,
+      "reference_stable": true,
+      "mass_contrast_bound_mg": 400,
+      "deflection_contrast_bound_um": 8,
+      "probe_backaction_um": 1,
+      "remount_shift_um": 5,
+      "session_drift_um": 3,
+      "dependence_model_complete": true,
+      "expected_disposition": "CalibrationNotCurrent"
+    },
+    {
+      "name": "probe_backaction_too_large",
+      "calibration_current": true,
+      "reference_stable": true,
+      "mass_contrast_bound_mg": 600,
+      "deflection_contrast_bound_um": 10,
+      "probe_backaction_um": 9,
+      "remount_shift_um": 7,
+      "session_drift_um": 4,
+      "dependence_model_complete": true,
+      "expected_disposition": "BackActionTooLarge"
+    },
+    {
+      "name": "drift_unresolved",
+      "calibration_current": true,
+      "reference_stable": true,
+      "mass_contrast_bound_mg": 600,
+      "deflection_contrast_bound_um": 12,
+      "probe_backaction_um": 2,
+      "remount_shift_um": 8,
+      "session_drift_um": 25,
+      "dependence_model_complete": true,
+      "expected_disposition": "DriftUnresolved"
+    },
+    {
+      "name": "reference_surveillance_failed",
+      "calibration_current": true,
+      "reference_stable": false,
+      "mass_contrast_bound_mg": 600,
+      "deflection_contrast_bound_um": 12,
+      "probe_backaction_um": 2,
+      "remount_shift_um": 8,
+      "session_drift_um": 4,
+      "dependence_model_complete": true,
+      "expected_disposition": "ReferenceSurveillanceUnstable"
+    },
+    {
+      "name": "uncertainty_model_incomplete",
+      "calibration_current": true,
+      "reference_stable": true,
+      "mass_contrast_bound_mg": 600,
+      "deflection_contrast_bound_um": 12,
+      "probe_backaction_um": 2,
+      "remount_shift_um": 8,
+      "session_drift_um": 4,
+      "dependence_model_complete": false,
+      "expected_disposition": "UncertaintyModelIncomplete"
+    },
+    {
+      "name": "mass_chain_cannot_resolve_target",
+      "calibration_current": true,
+      "reference_stable": true,
+      "mass_contrast_bound_mg": 1800,
+      "deflection_contrast_bound_um": 12,
+      "probe_backaction_um": 2,
+      "remount_shift_um": 8,
+      "session_drift_um": 4,
+      "dependence_model_complete": true,
+      "expected_disposition": "MassChainInsufficient"
+    },
+    {
+      "name": "deflection_chain_cannot_resolve_margin",
+      "calibration_current": true,
+      "reference_stable": true,
+      "mass_contrast_bound_mg": 600,
+      "deflection_contrast_bound_um": 32,
+      "probe_backaction_um": 2,
+      "remount_shift_um": 8,
+      "session_drift_um": 4,
+      "dependence_model_complete": true,
+      "expected_disposition": "DeflectionChainInsufficient"
+    }
+  ],
+  "required_reference_checks": [
+    "all_cases_have_deterministic_disposition",
+    "resolution_alone_cannot_create_supported_capability",
+    "shared_common_mode_is_not_double_counted_as_independent",
+    "stale_calibration_blocks_capability",
+    "probe_backaction_can_block_capability",
+    "remount_variation_can_block_capability",
+    "session_drift_can_block_capability",
+    "reference_surveillance_failure_can_block_capability",
+    "incomplete_dependence_model_blocks_capability",
+    "candidate_outcomes_cannot_relax_fixture_policy"
+  ],
+  "nonclaims": [
+    "real_instrument_accuracy",
+    "si_traceability",
+    "fixture_ideality",
+    "physical_candidate_improvement",
+    "physical_safety",
+    "r2_success"
+  ]
+}

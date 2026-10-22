@@ -1,0 +1,131 @@
+{
+  "schema_id": "symthaea.rob-boot.c0-reducer-fixture.v1",
+  "authority": "qualification-reference-only",
+  "production_import_forbidden": true,
+  "purpose": "known-answer raw-to-run-to-contrast-to-disposition fixture for ROB-BOOT-000B; not physical evidence",
+  "units": {
+    "mass": "mg",
+    "deflection": "um"
+  },
+  "analysis_plan": {
+    "mass_run_estimator": "median_of_three_stabilized_integer_readings",
+    "deflection_run_estimator": "median_of_three_post_settle_integer_readings",
+    "article_deflection_estimator": "median_of_run_level_estimates",
+    "filtering": "none",
+    "missing_policy": "reject_fixture_case",
+    "outlier_policy": "none",
+    "unblinding": "after_all_run_level_metrics_and_exclusions_are_sealed"
+  },
+  "opaque_articles": ["article_alpha", "article_beta"],
+  "raw_clean_case": {
+    "mass_readings_mg": {
+      "article_alpha": [100000, 100010, 99990],
+      "article_beta": [93000, 93010, 92990]
+    },
+    "deflection_runs_um": {
+      "article_alpha": {
+        "alpha_run_1": [219, 220, 221],
+        "alpha_run_2": [220, 221, 219]
+      },
+      "article_beta": {
+        "beta_run_1": [173, 174, 175],
+        "beta_run_2": [175, 174, 173]
+      }
+    },
+    "expected_pre_unblind_metrics": {
+      "article_alpha": {
+        "mass_mg": 100000,
+        "deflection_run_estimates_um": [220, 220],
+        "deflection_article_estimate_um": 220
+      },
+      "article_beta": {
+        "mass_mg": 93000,
+        "deflection_run_estimates_um": [174, 174],
+        "deflection_article_estimate_um": 174
+      }
+    },
+    "sealed_codebook": {
+      "article_alpha": "baseline",
+      "article_beta": "candidate"
+    },
+    "decision_profile": {
+      "minimum_mass_reduction_mg": 5000,
+      "maximum_admitted_deflection_regression_um": 0,
+      "mass_contrast_interval_mg": [-7600, -6400],
+      "deflection_contrast_interval_um": [-58, -34]
+    },
+    "expected_post_unblind": {
+      "mass_contrast_candidate_minus_baseline_mg": -7000,
+      "deflection_contrast_candidate_minus_baseline_um": -46,
+      "mass_target_supported": true,
+      "deflection_protection_supported": true,
+      "final_disposition": "HeldOutImprovementSupportedExactArticles"
+    }
+  },
+  "hostile_cases": [
+    {
+      "name": "mass_interval_crosses_engineering_threshold",
+      "point_mass_contrast_mg": -7000,
+      "mass_contrast_interval_mg": [-9500, -4500],
+      "minimum_mass_reduction_mg": 5000,
+      "expected_mass_target_supported": false,
+      "expected_disposition": "TargetImprovementTooSmall"
+    },
+    {
+      "name": "deflection_interval_crosses_noninferiority_boundary",
+      "point_deflection_contrast_um": 10,
+      "deflection_contrast_interval_um": [-2, 22],
+      "maximum_admitted_deflection_regression_um": 0,
+      "expected_deflection_protection_supported": false,
+      "expected_disposition": "DeflectionProtectionNotEstablished"
+    },
+    {
+      "name": "run_membership_disagreement",
+      "primary_included_runs": ["alpha_run_1", "alpha_run_2", "beta_run_1", "beta_run_2"],
+      "independent_included_runs": ["alpha_run_1", "alpha_run_2", "beta_run_1"],
+      "expected_crosscheck": "FAIL",
+      "expected_disposition": "AnalysisCrosscheckFailed"
+    },
+    {
+      "name": "same_numeric_output_different_input_root",
+      "primary_input_root": "sha256:fixture-input-a",
+      "independent_input_root": "sha256:fixture-input-b",
+      "numeric_outputs_equal": true,
+      "expected_crosscheck": "FAIL",
+      "expected_reason": "InputIdentityMismatch"
+    },
+    {
+      "name": "same_raw_data_changed_analysis_plan",
+      "primary_analysis_plan": "median-v1",
+      "independent_analysis_plan": "mean-v1",
+      "expected_crosscheck": "FAIL",
+      "expected_reason": "AnalysisPlanIdentityMismatch"
+    },
+    {
+      "name": "sample_count_pseudoreplication",
+      "raw_samples_per_run": 1000,
+      "physical_runs": 2,
+      "expected_physical_run_count": 2,
+      "expected_rule": "raw_sample_count_cannot_replace_run_or_article_count"
+    }
+  ],
+  "required_reference_checks": [
+    "opaque_labels_remain_opaque_through_run_level_reduction",
+    "all_clean_run_level_integer_medians_match_exactly",
+    "codebook_reveal_occurs_only_after_metrics_are_sealed",
+    "clean_contrasts_match_known_answers",
+    "guard_banded_mass_decision_uses_interval_upper_bound",
+    "guard_banded_deflection_decision_uses_interval_upper_bound",
+    "crosscheck_requires_identical_input_and_analysis_plan_roots",
+    "crosscheck_requires_identical_run_membership_and_exclusions",
+    "raw_sample_count_does_not_inflate_physical_replication",
+    "reference_fixture_pass_creates_no_physical_claim"
+  ],
+  "nonclaims": [
+    "real_measurement_capability",
+    "real_article_improvement",
+    "physical_safety",
+    "independent_physical_replication",
+    "r2_success"
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "schema_id": "symthaea.rob-boot.c0-oracle-fixture.v1",
+  "authority": "qualification-reference-only",
+  "production_import_forbidden": true,
+  "profile": {
+    "section_family": "solid_rectangular",
+    "support_condition": "simply_supported",
+    "load_case": "center_point_load",
+    "measurement": "midspan_incremental_deflection",
+    "orientation_semantic": true,
+    "fixed_across_candidates": [
+      "span",
+      "load",
+      "youngs_modulus",
+      "density",
+      "material_state",
+      "support_profile",
+      "section_orientation"
+    ]
+  },
+  "normalized_parameter_encoding": {
+    "bw": "bw_tenths / 10",
+    "hh": "hh_tenths / 10",
+    "domain_tenths": [8, 9, 10, 11, 12]
+  },
+  "exact_ratio_equations": {
+    "mass_ratio": {
+      "numerator": "bw_tenths * hh_tenths",
+      "denominator": "100",
+      "canonicalize": "reduce_by_gcd"
+    },
+    "deflection_ratio": {
+      "numerator": "10000",
+      "denominator": "bw_tenths * hh_tenths^3",
+      "canonicalize": "reduce_by_gcd"
+    },
+    "stress_ratio": {
+      "numerator": "1000",
+      "denominator": "bw_tenths * hh_tenths^2",
+      "canonicalize": "reduce_by_gcd"
+    }
+  },
+  "candidate_count": 25,
+  "expected_candidate_vectors": [
+    {"bw_tenths":8,"hh_tenths":8,"mass_ratio":[16,25],"deflection_ratio":[625,256],"stress_ratio":[125,64]},
+    {"bw_tenths":8,"hh_tenths":9,"mass_ratio":[18,25],"deflection_ratio":[1250,729],"stress_ratio":[125,81]},
+    {"bw_tenths":8,"hh_tenths":10,"mass_ratio":[4,5],"deflection_ratio":[5,4],"stress_ratio":[5,4]},
+    {"bw_tenths":8,"hh_tenths":11,"mass_ratio":[22,25],"deflection_ratio":[1250,1331],"stress_ratio":[125,121]},
+    {"bw_tenths":8,"hh_tenths":12,"mass_ratio":[24,25],"deflection_ratio":[625,864],"stress_ratio":[125,144]},
+    {"bw_tenths":9,"hh_tenths":8,"mass_ratio":[18,25],"deflection_ratio":[625,288],"stress_ratio":[125,72]},
+    {"bw_tenths":9,"hh_tenths":9,"mass_ratio":[81,100],"deflection_ratio":[10000,6561],"stress_ratio":[1000,729]},
+    {"bw_tenths":9,"hh_tenths":10,"mass_ratio":[9,10],"deflection_ratio":[10,9],"stress_ratio":[10,9]},
+    {"bw_tenths":9,"hh_tenths":11,"mass_ratio":[99,100],"deflection_ratio":[10000,11979],"stress_ratio":[1000,1089]},
+    {"bw_tenths":9,"hh_tenths":12,"mass_ratio":[27,25],"deflection_ratio":[625,972],"stress_ratio":[125,162]},
+    {"bw_tenths":10,"hh_tenths":8,"mass_ratio":[4,5],"deflection_ratio":[125,64],"stress_ratio":[25,16]},
+    {"bw_tenths":10,"hh_tenths":9,"mass_ratio":[9,10],"deflection_ratio":[1000,729],"stress_ratio":[100,81]},
+    {"bw_tenths":10,"hh_tenths":10,"mass_ratio":[1,1],"deflection_ratio":[1,1],"stress_ratio":[1,1]},
+    {"bw_tenths":10,"hh_tenths":11,"mass_ratio":[11,10],"deflection_ratio":[1000,1331],"stress_ratio":[100,121]},
+    {"bw_tenths":10,"hh_tenths":12,"mass_ratio":[6,5],"deflection_ratio":[125,216],"stress_ratio":[25,36]},
+    {"bw_tenths":11,"hh_tenths":8,"mass_ratio":[22,25],"deflection_ratio":[625,352],"stress_ratio":[125,88]},
+    {"bw_tenths":11,"hh_tenths":9,"mass_ratio":[99,100],"deflection_ratio":[10000,8019],"stress_ratio":[1000,891]},
+    {"bw_tenths":11,"hh_tenths":10,"mass_ratio":[11,10],"deflection_ratio":[10,11],"stress_ratio":[10,11]},
+    {"bw_tenths":11,"hh_tenths":11,"mass_ratio":[121,100],"deflection_ratio":[10000,14641],"stress_ratio":[1000,1331]},
+    {"bw_tenths":11,"hh_tenths":12,"mass_ratio":[33,25],"deflection_ratio":[625,1188],"stress_ratio":[125,198]},
+    {"bw_tenths":12,"hh_tenths":8,"mass_ratio":[24,25],"deflection_ratio":[625,384],"stress_ratio":[125,96]},
+    {"bw_tenths":12,"hh_tenths":9,"mass_ratio":[27,25],"deflection_ratio":[2500,2187],"stress_ratio":[250,243]},
+    {"bw_tenths":12,"hh_tenths":10,"mass_ratio":[6,5],"deflection_ratio":[5,6],"stress_ratio":[5,6]},
+    {"bw_tenths":12,"hh_tenths":11,"mass_ratio":[33,25],"deflection_ratio":[2500,3993],"stress_ratio":[250,363]},
+    {"bw_tenths":12,"hh_tenths":12,"mass_ratio":[36,25],"deflection_ratio":[625,1296],"stress_ratio":[125,216]}
+  ],
+  "expected_frontier_cardinality": 9,
+  "expected_frontier_tenths": [
+    {"bw_tenths": 8, "hh_tenths": 8},
+    {"bw_tenths": 8, "hh_tenths": 9},
+    {"bw_tenths": 8, "hh_tenths": 10},
+    {"bw_tenths": 8, "hh_tenths": 11},
+    {"bw_tenths": 8, "hh_tenths": 12},
+    {"bw_tenths": 9, "hh_tenths": 12},
+    {"bw_tenths": 10, "hh_tenths": 12},
+    {"bw_tenths": 11, "hh_tenths": 12},
+    {"bw_tenths": 12, "hh_tenths": 12}
+  ],
+  "spot_checks": [
+    {"name":"baseline","bw_tenths":10,"hh_tenths":10,"mass_ratio":[1,1],"deflection_ratio":[1,1],"stress_ratio":[1,1]},
+    {"name":"candidate_a","bw_tenths":8,"hh_tenths":11,"mass_ratio":[22,25],"deflection_ratio":[1250,1331],"stress_ratio":[125,121]},
+    {"name":"grid_0p8_1p2","bw_tenths":8,"hh_tenths":12,"mass_ratio":[24,25],"deflection_ratio":[625,864],"stress_ratio":[125,144]},
+    {"name":"candidate_c_lighter_but_more_flexible","bw_tenths":9,"hh_tenths":10,"mass_ratio":[9,10],"deflection_ratio":[10,9],"stress_ratio":[10,9]}
+  ],
+  "required_reference_checks": [
+    "enumerate_all_25_candidates_exactly_once",
+    "candidate_identity_independent_of_parameter_insertion_order",
+    "width_height_orientation_not_commuted",
+    "all_25_exact_objective_vectors_match_reference",
+    "all_reference_rationals_are_gcd_reduced_with_positive_denominator",
+    "equivalent_unreduced_fraction_canonicalizes_to_reference_fraction",
+    "expected_frontier_cardinality_is_9",
+    "expected_frontier_coordinates_match",
+    "dominated_candidates_excluded",
+    "search_order_cannot_mutate_objective_vector",
+    "production_code_does_not_import_or_call_reference_oracle",
+    "oracle_pass_creates_no_physical_claim"
+  ],
+  "nonclaims": [
+    "absolute_material_properties",
+    "absolute_load_calibration",
+    "fixture_ideality",
+    "physical_beam_model_applicability",
+    "fabrication_repeatability",
+    "measurement_capability",
+    "physical_safety",
+    "r2_improvement",
+    "search_method_superiority",
+    "c1_jointcarrier_competence",
+    "humanoid_competence"
+  ]
+}
