@@ -1,6 +1,6 @@
 # Broca governed-consolidation reference harness
 
-This dependency-free Rust harness is the first executable slice for [issue #8445](https://github.com/Luminous-Dynamics/symthaea/issues/8445). It creates deterministic synthetic evidence profiles, separates policy-visible evidence features from evaluator-only ground truth, scores candidate consolidation actions with an explicit utility/storage-cost table, and emits per-candidate JSONL receipts.
+This dependency-free Rust harness is the first executable slice for [issue #8445](https://github.com/Luminous-Dynamics/symthaea/issues/8445). It creates deterministic synthetic evidence profiles with seed-controlled noise in observable features, separates policy-visible evidence features from evaluator-only ground truth, scores candidate consolidation actions with an explicit utility/storage-cost table, and emits per-candidate JSONL receipts. Protocol `GMCv2` differs from the first prototype because seeds now change evidence features, not just candidate order.
 
 **It is not the published ConsolidationBench, is not an evaluation of Liquid Broca, and does not establish generalization or SOTA.** The oracle is constructed from the harness's own synthetic utility contract. Results are valid only as tests of policies on this generator.
 
@@ -57,9 +57,11 @@ Per-policy summaries report mean decision regret, total net utility, storage uni
 ## Output and limitations
 
 Output is deterministic JSONL with:
-- one `run` receipt containing source SHA, seed, candidate count, action/utility version, and non-cryptographic fixture fingerprint;
+- one `GMCv2` `run` receipt containing source SHA, seed, candidate count, action/utility version, and non-cryptographic fixture fingerprint;
 - per-candidate decision records and a separate oracle diagnostic;
 - per-policy summaries and explicit anti-control results.
+
+Seeded feature noise perturbs repeat count, distinct episodes, contradictions, recency, independent successes, provenance diversity and occasionally the observed correction signal. Policy-visible features can therefore differ within one ground-truth class; the generator remains synthetic and its class-conditioned templates are still hand-specified. This is a useful stress test, not realistic distributional coverage.
 
 The FNV-1a fixture fingerprint is non-cryptographic and is not a dataset-integrity proof. Replace it with the repository's canonical cryptographic digest when integrating with production benchmark tooling.
 
