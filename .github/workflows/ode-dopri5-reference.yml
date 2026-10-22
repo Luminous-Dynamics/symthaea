@@ -124,4 +124,23 @@ jobs:
           test "$GENERATION_OUTCOME" = "success"
           test "$FIRST_STATUS" = "0"
           test "$SECOND_STATUS" = "0"
-          jq -e 'all(.observations[]; .custom_pass == true and .dopri5_pass == true)' research/ode-dopri5-reference/ode-dopri5-comparison.json
+          jq -e '
+            .schema_version == "0.1.0"
+            and .benchmark_id == "ODE-WP-DOPRI5-COMPARISON-001"
+            and .common_output_grid.start == 0
+            and .common_output_grid.end == 10
+            and .common_output_grid.intervals == 100
+            and .common_output_grid.step == 0.1
+            and .common_output_grid.samples == 101
+            and (.observations | length == 9)
+            and all(.observations[];
+              .custom_pass == true
+              and .dopri5_pass == true
+              and .custom_common_grid_complete == true
+              and .custom_output_samples == 101
+              and .dopri5_output_samples == 101
+              and .common_grid_matches == true
+              and (.max_common_grid_disagreement_scaled | type == "number" and . >= 0)
+              and (.max_common_grid_disagreement_scaled <= 2 * .global_endpoint_error_limit)
+            )
+          ' research/ode-dopri5-reference/ode-dopri5-comparison.json
