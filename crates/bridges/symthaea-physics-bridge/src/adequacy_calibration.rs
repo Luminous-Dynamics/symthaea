@@ -403,6 +403,43 @@ pub fn multi_view_standardized_residual_score(
         .map(ResidualDiagnosticScores::maximum)
 }
 
+/// Fisher-like score fusion from component-calibrated tail p-values.
+///
+/// Returns `sum(-ln(p_i))` over the predeclared component family. This is a score, *not* a
+/// Fisher-reference p-value: the component p-values may be dependent and discrete. For finite-sample
+/// marginal validity, calibrate these fused scores on an untouched second set of clean batches
+/// using `ConformalAdequacyCalibrator`, then use that outer calibrator for the final audit.
+/// The two-stage protocol avoids independence assumptions between residual diagnostics at the cost
+/// of a separate normalization and aggregate-calibration split.
+///
+/// Larger values mean more combined tail evidence. Freeze the component set/order and split roles
+/// before viewing audit data; never use the audit batch to tune components or fusion weights.
+pub fn sum_log_component_p_fusion_score(
+    component_calibrators: &[ConformalAdequacyCalibrator],
+    component_scores: &[f64],
+    independent_audit: bool,
+) -> Result<f64, CalibrationError> {
+    if !independent_audit {
+        return Err(CalibrationError::AuditNotIndependent);
+    }
+    if component_calibrators.is_empty() || component_calibrators.len() != component_scores.len() {
+        return Err(CalibrationError::InvalidAuditScore);
+    }
+
+    let mut aggregate = 0.0_f64;
+    for (calibrator, score) in component_calibrators
+        .iter()
+        .zip(component_scores.iter().copied())
+    {
+        let component_p = calibrator.audit_p_value(score, true)?;
+        aggregate -= component_p.ln();
+    }
+    if !aggregate.is_finite() || aggregate < 0.0 {
+        return Err(CalibrationError::InvalidAuditScore);
+    }
+    Ok(aggregate)
+}
+
 /// Combine already-calibrated component scores into one score for a *second* conformal calibration.
 ///
 /// The component calibrators must be fitted on an independent normalization split. This function
@@ -583,6 +620,46 @@ mod tests {
             minimum_component_p_fusion_score(&components, &[1.0; 4], false),
             Err(CalibrationError::AuditNotIndependent)
         );
+    }
+
+    #[test]
+    fn sum_log_fusion_accumulates_multiple_component_tail_signals() {
+        let components = component_calibrators();
+        let usual = sum_log_component_p_fusion_score(&components, &[10.0; 4], true).unwrap();
+        let one_unusual =
+            sum_log_component_p_fusion_score(&components, &[100.0, 10.0, 10.0, 10.0], true)
+                .unwrap();
+        let all_unusual =
+            sum_log_component_p_fusion_score(&components, &[100.0; 4], true).unwrap();
+        assert!(one_unusual > usual);
+        assert!(all_unusual > one_unusual);
+        assert_eq!(
+            sum_log_component_p_fusion_score(&components, &[1.0], true),
+            Err(CalibrationError::InvalidAuditScore)
+        );
+    }
+
+    #[test]
+    fn sum_log_fusion_requires_its_own_outer_calibration_split() {
+        let components = component_calibrators();
+        let aggregate_reference = (1..=19)
+            .map(|value| {
+                sum_log_component_p_fusion_score(
+                    &components,
+                    &[value as f64, 0.0, 0.0, 0.0],
+                    true,
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let final_calibrator =
+            ConformalAdequacyCalibrator::new(&aggregate_reference, 0.05).unwrap();
+        let audit_aggregate =
+            sum_log_component_p_fusion_score(&components, &[100.0, 0.0, 0.0, 0.0], true)
+                .unwrap();
+        let result = final_calibrator.assess_audit_score(audit_aggregate, true).unwrap();
+        assert!((result.p_value - 0.05).abs() < 1e-12);
+        assert!(matches!(result.assessment, AdequacyAssessment::Alarm { .. }));
     }
 
     #[test]
