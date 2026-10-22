@@ -405,6 +405,9 @@ fn main() {
             "fixture_digest_blake3": test_digest,
             "reference_source_digest_blake3": reference_digest,
             "mutant_source_digest_blake3": mutant_digest,
+            "reference_source": case.reference,
+            "mutant_source": case.mutant,
+            "test_source": case.tests,
             "tests_expected": expected,
             "reference": reference.to_json(),
             "mutant": mutant.to_json(),
@@ -423,6 +426,7 @@ fn main() {
 
     let receipt = serde_json::json!({
         "schema_version": 1,
+        "schema_id": "symthaea.coding-oracle-mutation.v1",
         "benchmark": "symthaea_coding_oracle_mutation",
         "source_revision": source_revision,
         "fixture_digest_blake3": digest(&aggregate),
