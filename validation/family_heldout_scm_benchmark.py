@@ -123,6 +123,61 @@ def make_scm(node_count: int, topology: str, mechanism: str, seed: int) -> SCM:
     return SCM(digest[:20], seed, node_count, topology, mechanism, parents, tables)
 
 
+def mechanism_output(scm: SCM, node: int, assignment: tuple[int, ...]) -> int:
+    parent_assignment = 0
+    for bit, parent in enumerate(scm.parents[node]):
+        parent_assignment |= (assignment[parent] & 1) << bit
+    return (scm.truth_tables[node] >> parent_assignment) & 1
+
+
+def topological_order(parents: tuple[tuple[int, ...], ...]) -> tuple[int, ...]:
+    remaining = set(range(len(parents)))
+    order = []
+    while remaining:
+        ready = sorted(node for node in remaining if not (set(parents[node]) & remaining))
+        if not ready:
+            raise ValueError("cannot simulate a cyclic SCM")
+        order.extend(ready)
+        remaining -= set(ready)
+    return tuple(order)
+
+
+def sample_scm(scm: SCM, sample_count: int, seed: int, noise_probability: float = 0.0,
+               intervention: tuple[int, int] | None = None) -> dict:
+    """Sample observational rows or rows under one hard do(X_i=value) intervention."""
+    if sample_count < 1:
+        raise ValueError("sample_count must be positive")
+    if not 0.0 <= noise_probability < 0.5:
+        raise ValueError("noise_probability must be in [0, 0.5)")
+    if intervention is not None:
+        target, value = intervention
+        if not 0 <= target < scm.node_count or value not in (0, 1):
+            raise ValueError("intervention must be (valid_node, binary_value)")
+    order = topological_order(scm.parents)
+    rng = random.Random(seed)
+    rows = []
+    for _ in range(sample_count):
+        values = [0] * scm.node_count
+        for node in order:
+            if intervention is not None and node == intervention[0]:
+                values[node] = intervention[1]
+                continue
+            predicted = mechanism_output(scm, node, tuple(values))
+            if rng.random() < noise_probability:
+                predicted ^= 1
+            values[node] = predicted
+        rows.append(values)
+    identity = {
+        "schema": "symthaea-scm-samples-v1", "world_id": scm.world_id,
+        "sample_count": sample_count, "seed": seed,
+        "noise_probability": noise_probability,
+        "intervention": None if intervention is None else list(intervention),
+        "rows": rows,
+    }
+    canonical = json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
+    return {**identity, "samples_sha256": hashlib.sha256(canonical).hexdigest()}
+
+
 def graph_scores(true_edges: tuple[tuple[int, int], ...] | list[tuple[int, int]],
                  predicted_edges: tuple[tuple[int, int], ...] | list[tuple[int, int]], node_count: int) -> dict:
     """Score a fully directed graph. A reversal is one SHD edit but one FP + one FN."""
