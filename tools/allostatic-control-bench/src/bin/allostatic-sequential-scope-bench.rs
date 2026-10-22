@@ -20,7 +20,7 @@ const EVALUATION_EPISODES: usize = 300;
 const HORIZON: usize = 8;
 const CUSUM_ALLOWANCE: f64 = 0.010;
 
-const RAW_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,outside_predictor_envelope,all_episode_scores_below_pointwise_threshold";
+const RAW_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,ground_truth_outside_predictor_envelope,all_episode_scores_below_pointwise_threshold";
 const SUMMARY_HEADER: &str = "operating_point,condition,episodes,pointwise_alarms,cusum_alarms,pointwise_false_alarms,cusum_false_alarms,pointwise_missed_shifts,cusum_missed_shifts,pointwise_mean_detection_step,cusum_mean_detection_step,pointwise_p95_detection_step,cusum_p95_detection_step,pointwise_median_detection_step,cusum_median_detection_step,cusum_earlier_episodes,pointwise_earlier_episodes,tied_detection_episodes,mean_episode_max_point_score,max_episode_point_score,mean_episode_max_cusum_statistic,max_episode_cusum_statistic,episodes_all_scores_below_point_threshold,cusum_caught_below_point_threshold";
 
 #[derive(Clone, Copy, Debug)]
@@ -74,7 +74,8 @@ impl Condition {
         }
     }
 
-    const fn outside_predictor_envelope(self) -> bool {
+    /// Ground-truth label for benchmark scoring only; never a runtime detector.
+    const fn ground_truth_outside_predictor_envelope(self) -> bool {
         !matches!(self, Self::Nominal)
     }
 }
@@ -484,7 +485,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         format!("{:.9}", cusum_threshold.score_threshold()),
                         csv_bool(cusum_alarm).to_string(),
                         outcome.first_cusum_alarm_step.to_string(),
-                        csv_bool(condition.outside_predictor_envelope()).to_string(),
+                        csv_bool(condition.ground_truth_outside_predictor_envelope()).to_string(),
                         csv_bool(outcome.all_scores_below_pointwise_threshold).to_string(),
                     ];
                     raw.push_str(&fields.join(","));
