@@ -302,9 +302,10 @@ mod tests {
         .expect("valid active-probe request");
 
         assert!(!recommendation.safe_actions().push());
+        assert!(recommendation.safe_actions().maintain());
         assert_ne!(recommendation.selected_action(), Some(Action::Push));
-        assert!(recommendation.selected_action_is_certified());
-        assert_eq!(recommendation.selected_action(), Some(Action::Maintain));
+        assert_eq!(recommendation.selected_action(), None);
+        assert!(!recommendation.selected_action_is_certified());
     }
 
     #[test]
