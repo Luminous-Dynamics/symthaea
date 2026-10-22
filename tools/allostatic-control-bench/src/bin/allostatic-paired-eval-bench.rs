@@ -57,12 +57,7 @@ fn run() -> Result<(), String> {
     if !Path::new(input_path).is_file() {
         return Err(format!("input CSV does not exist: {input_path}"));
     }
-    let canonical_input = fs::canonicalize(input_path)
-        .map_err(|error| format!("cannot resolve input CSV {input_path}: {error}"))?;
-    let canonical_output = canonical_output_path(Path::new(output_path))?;
-    if canonical_input == canonical_output {
-        return Err("input and output resolve to the same file; refusing to overwrite source data".to_owned());
-    }
+    ensure_distinct_paths(Path::new(input_path), Path::new(output_path))?;
 
     let content = fs::read_to_string(input_path)
         .map_err(|error| format!("cannot read input CSV {input_path}: {error}"))?;
@@ -221,6 +216,16 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
+fn ensure_distinct_paths(input: &Path, output: &Path) -> Result<(), String> {
+    let canonical_input = fs::canonicalize(input)
+        .map_err(|error| format!("cannot resolve input CSV {}: {error}", input.display()))?;
+    let canonical_output = canonical_output_path(output)?;
+    if canonical_input == canonical_output {
+        return Err("input and output resolve to the same file; refusing to overwrite source data".to_owned());
+    }
+    Ok(())
+}
+
 fn canonical_output_path(path: &Path) -> Result<std::path::PathBuf, String> {
     if path.exists() {
         return fs::canonicalize(path)
@@ -323,7 +328,27 @@ fn write_summary_row(
 
 #[cfg(test)]
 mod tests {
-    use super::{csv_fields, is_slug, parse_bool};
+    use super::{csv_fields, ensure_distinct_paths, is_slug, parse_bool};
+    use std::fs;
+    use std::path::Path;
+
+    #[test]
+    fn equivalent_input_output_paths_are_rejected() {
+        let source = std::env::temp_dir().join(format!(
+            "allostatic-paired-eval-same-path-{}.csv",
+            std::process::id()
+        ));
+        fs::write(&source, "scenario,seed,policy,shielded\n")
+            .expect("write temporary source fixture");
+        let alias = source
+            .parent()
+            .expect("temp file has parent")
+            .join(".")
+            .join(source.file_name().expect("temp file has name"));
+        let result = ensure_distinct_paths(&source, &alias);
+        fs::remove_file(&source).expect("remove temporary source fixture");
+        assert!(result.expect_err("same path must be rejected").contains("same file"));
+    }
 
     #[test]
     fn metric_columns_must_be_safe_unquoted_slugs() {
