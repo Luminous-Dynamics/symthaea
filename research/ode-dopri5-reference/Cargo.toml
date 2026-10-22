@@ -1,0 +1,13 @@
+[package]
+name = "ode-dopri5-reference-bench"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Matched analytical work-precision comparison between Symthaea RK45 and ode_solvers Dopri5"
+
+[workspace]
+
+[dependencies]
+ode-verify-001-harness = { path = "../ode-verify-001" }
+ode_solvers = "=0.6.2"

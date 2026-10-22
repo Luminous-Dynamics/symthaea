@@ -1,0 +1,148 @@
+name: ODE Dopri5 Reference Comparison
+
+on:
+  pull_request:
+    paths:
+      - "research/ode-dopri5-reference/**"
+      - "research/ode-verify-001/**"
+      - "crates/core/symthaea-core/src/hdc/dynamical_system.rs"
+      - ".github/workflows/ode-dopri5-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ode-dopri5-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  external-reference:
+    name: Matched analytical comparison with ode_solvers Dopri5
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify reviewed dependency lockfile is committed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files --error-unmatch research/ode-dopri5-reference/Cargo.lock
+          test -s research/ode-dopri5-reference/Cargo.lock
+          sha256sum research/ode-dopri5-reference/Cargo.lock
+          cargo metadata --locked --no-deps --manifest-path research/ode-dopri5-reference/Cargo.toml > /tmp/ode-dopri5-metadata.json
+
+      - name: Diagnose dependency-lock drift without weakening the committed-lock gate
+        id: lock_refresh
+        shell: bash
+        run: |
+          set -uo pipefail
+          lock_path="research/ode-dopri5-reference/Cargo.lock"
+          before="$(sha256sum "$lock_path" | cut -d ' ' -f 1)"
+          set +e
+          cargo metadata --manifest-path research/ode-dopri5-reference/Cargo.toml --format-version 1 > /tmp/ode-dopri5-metadata-resolved.json
+          metadata_status=$?
+          set -e
+          after="$(sha256sum "$lock_path" | cut -d ' ' -f 1)"
+          changed=false
+          if [ "$before" != "$after" ]; then changed=true; fi
+          echo "lock_sha_before=$before" >> "$GITHUB_OUTPUT"
+          echo "lock_sha_after=$after" >> "$GITHUB_OUTPUT"
+          echo "lock_changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "metadata_status=$metadata_status" >> "$GITHUB_OUTPUT"
+          printf 'lock_sha_before=%s\nlock_sha_after=%s\nlock_changed=%s\nmetadata_status=%s\n' "$before" "$after" "$changed" "$metadata_status"
+          # This step emits a reviewed candidate lockfile as evidence when drift is found.
+          # The final gate still rejects any uncommitted lockfile mutation.
+          exit 0
+
+      - name: Format
+        run: cargo fmt --manifest-path research/ode-dopri5-reference/Cargo.toml -- --check
+
+      - name: Compile and run reference harness tests
+        run: cargo test --locked --manifest-path research/ode-dopri5-reference/Cargo.toml
+
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/ode-dopri5-reference/Cargo.toml --all-targets -- -D warnings
+
+      - name: Generate matched solver comparison twice
+        id: comparison
+        shell: bash
+        run: |
+          set -uo pipefail
+          source_sha="${{ github.event.pull_request.head.sha || github.sha }}"
+          checkout_sha="$(git rev-parse HEAD)"
+          lock_sha="$(sha256sum research/ode-dopri5-reference/Cargo.lock | cut -d ' ' -f 1)"
+          set +e
+          ODE_BENCH_SOURCE_SHA="$source_sha" ODE_BENCH_CHECKOUT_SHA="$checkout_sha" ODE_BENCH_LOCK_SHA="$lock_sha" cargo run --locked --release --manifest-path research/ode-dopri5-reference/Cargo.toml > /tmp/ode-dopri5-comparison-1.json
+          first_status=$?
+          ODE_BENCH_SOURCE_SHA="$source_sha" ODE_BENCH_CHECKOUT_SHA="$checkout_sha" ODE_BENCH_LOCK_SHA="$lock_sha" cargo run --locked --release --manifest-path research/ode-dopri5-reference/Cargo.toml > /tmp/ode-dopri5-comparison-2.json
+          second_status=$?
+          set -e
+          echo "first_status=$first_status" >> "$GITHUB_OUTPUT"
+          echo "second_status=$second_status" >> "$GITHUB_OUTPUT"
+          cmp /tmp/ode-dopri5-comparison-1.json /tmp/ode-dopri5-comparison-2.json
+          jq -e '
+            .schema_version == "0.1.0"
+            and .benchmark_id == "ODE-WP-DOPRI5-COMPARISON-001"
+            and (.source_sha | test("^[0-9a-f]{40}$"))
+            and (.checkout_sha | test("^[0-9a-f]{40}$"))
+            and (.lock_sha | test("^[0-9a-f]{64}$"))
+            and (.observations | length == 9)
+          ' /tmp/ode-dopri5-comparison-1.json
+          cp /tmp/ode-dopri5-comparison-1.json research/ode-dopri5-reference/ode-dopri5-comparison.json
+          sha256sum research/ode-dopri5-reference/Cargo.lock research/ode-dopri5-reference/ode-dopri5-comparison.json
+
+      - name: Upload comparison receipt and candidate lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ode-dopri5-reference-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            research/ode-dopri5-reference/Cargo.lock
+            research/ode-dopri5-reference/ode-dopri5-comparison.json
+          if-no-files-found: warn
+
+      - name: Enforce source and numerical comparison gates
+        if: always()
+        env:
+          GENERATION_OUTCOME: ${{ steps.comparison.outcome }}
+          FIRST_STATUS: ${{ steps.comparison.outputs.first_status }}
+          SECOND_STATUS: ${{ steps.comparison.outputs.second_status }}
+          LOCK_CHANGED: ${{ steps.lock_refresh.outputs.lock_changed }}
+          LOCK_METADATA_STATUS: ${{ steps.lock_refresh.outputs.metadata_status }}
+        run: |
+          set -euo pipefail
+          test "$LOCK_METADATA_STATUS" = "0"
+          test "$LOCK_CHANGED" = "false"
+          test "$GENERATION_OUTCOME" = "success"
+          test "$FIRST_STATUS" = "0"
+          test "$SECOND_STATUS" = "0"
+          jq -e '
+            .schema_version == "0.1.0"
+            and .benchmark_id == "ODE-WP-DOPRI5-COMPARISON-001"
+            and .common_output_grid.start == 0
+            and .common_output_grid.end == 10
+            and .common_output_grid.intervals == 100
+            and .common_output_grid.step == 0.1
+            and .common_output_grid.samples == 101
+            and (.observations | length == 9)
+            and all(.observations[];
+              .custom_pass == true
+              and .dopri5_pass == true
+              and .custom_common_grid_complete == true
+              and .custom_output_samples == 101
+              and .custom_integration_samples >= 2
+              and .dopri5_output_samples == 101
+              and .dopri5_integration_samples >= 2
+              and .common_grid_matches == true
+              and (.max_common_grid_disagreement_scaled | type == "number" and . >= 0)
+              and (.max_common_grid_disagreement_scaled <= 2 * .global_endpoint_error_limit)
+            )
+          ' research/ode-dopri5-reference/ode-dopri5-comparison.json
