@@ -20,6 +20,18 @@ The goal is *proof-carrying measurement*: make an evaluation artifact independen
 - Prints a deterministic 10,000-resample percentile bootstrap interval over task-identity clusters. Repeated trials are averaged within each task before resampling; the seed derives from the frozen manifest digest. Small task-cluster counts are explicitly labelled descriptive.
 - Optional external pins for the exact source SHA and frozen task-manifest digest.
 
+## Pre-register an external manifest pin
+
+Generate the frozen source/task digest without running oracle controls or model trials:
+
+```bash
+GIT_COMMIT_SHA="$(git rev-parse HEAD)" cargo run --release \
+  --example coding_gcs_ablation_benchmark \
+  --features 'code_generation geodesic_synthesis' -- --print-manifest
+```
+
+Capture the printed source SHA and task-manifest BLAKE3 digest in a separately reviewed, versioned preregistration record. Do not derive the supposedly external pin from the receipt under audit.
+
 ## Run
 
 Build and execute the ablation producer from the target checkout, binding the receipt to that exact revision:
