@@ -1,0 +1,71 @@
+name: Recursive Cognitive Architecture Contract
+
+on:
+  pull_request:
+    paths:
+      - "docs/architecture/RECURSIVE_COGNITIVE_ARCHITECTURE_V1.md"
+      - ".github/workflows/recursive-cognitive-architecture-contract.yml"
+      - "crates/core/symthaea-types/src/cognitive_evidence.rs"
+      - "crates/core/symthaea-types/src/lib.rs"
+  push:
+    branches: [main]
+    paths:
+      - "docs/architecture/RECURSIVE_COGNITIVE_ARCHITECTURE_V1.md"
+      - ".github/workflows/recursive-cognitive-architecture-contract.yml"
+      - "crates/core/symthaea-types/src/cognitive_evidence.rs"
+      - "crates/core/symthaea-types/src/lib.rs"
+
+permissions:
+  contents: read
+
+jobs:
+  architecture-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Freeze RCA constitutional boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          DOC=docs/architecture/RECURSIVE_COGNITIVE_ARCHITECTURE_V1.md
+          test -f "$DOC"
+
+          require() {
+            local pattern="$1"
+            if ! grep -Fq -- "$pattern" "$DOC"; then
+              echo "Missing RCA contract text: $pattern" >&2
+              exit 1
+            fi
+          }
+
+          require "cognitive production"
+          require "epistemic admission"
+          require "action authority"
+          require "self-improvement promotion"
+          require "Global-workspace victory means global availability, not truth."
+          require "internal simulation != empirical observation"
+          require "self-generated candidate"
+          require "external promotion authorization"
+          require "Live arbitrary source-code self-modification is out of scope for RCA v1."
+          require "RCA-002 — Shadow epistemic evidence plane"
+          require "RCA-007 — Bounded recursive closure"
+
+      - name: Guard canonical shared-type placement when RCA types exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          TYPE_FILE=crates/core/symthaea-types/src/cognitive_evidence.rs
+          if [[ -e "$TYPE_FILE" ]]; then
+            grep -Fq 'pub mod cognitive_evidence;' crates/core/symthaea-types/src/lib.rs
+          fi
+
+          # RCA v1 deliberately forbids a parallel core cognitive-evidence crate.
+          if find crates/core -mindepth 1 -maxdepth 1 -type d \
+              \( -name 'symthaea-cognitive-evidence' -o -name 'cognitive-evidence' \) \
+              | grep -q .; then
+            echo "RCA cognitive evidence belongs in symthaea-types, not a duplicate core crate" >&2
+            exit 1
+          fi
