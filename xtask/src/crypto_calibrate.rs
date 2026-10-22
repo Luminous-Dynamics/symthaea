@@ -588,6 +588,48 @@ mod tests {
         );
     }
 
+    fn sample_suite() -> Suite {
+        let regression = Regression {
+            path: "xtask/src/main.rs".to_owned(),
+            test: "main".to_owned(),
+            command: "cargo test -p symthaea-core main".to_owned(),
+        };
+        Suite {
+            schema_version: SUITE_SCHEMA.to_owned(),
+            suite_id: "test-suite".to_owned(),
+            status: "calibration-only".to_owned(),
+            tasks: vec![Task {
+                task_id: "TEST-001".to_owned(),
+                category: "test".to_owned(),
+                security_notion: "test property".to_owned(),
+                quarantined: true,
+                production_use_allowed: false,
+                novel_discovery: false,
+                source_regressions: vec![regression.clone()],
+                positive_controls: vec![regression],
+            }],
+        }
+    }
+
+    #[test]
+    fn accepts_only_explicit_research_calibration_suites() {
+        assert!(validate_suite(&sample_suite()).is_ok());
+    }
+
+    #[test]
+    fn refuses_calibration_tasks_marked_for_production_use() {
+        let mut suite = sample_suite();
+        suite.tasks[0].production_use_allowed = true;
+        assert!(validate_suite(&suite).is_err());
+    }
+
+    #[test]
+    fn refuses_tasks_without_positive_controls() {
+        let mut suite = sample_suite();
+        suite.tasks[0].positive_controls.clear();
+        assert!(validate_suite(&suite).is_err());
+    }
+
     #[test]
     fn rejects_shell_or_arbitrary_arguments() {
         assert!(
