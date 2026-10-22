@@ -681,8 +681,8 @@ fn audit(
             u64_field(run, "expected_test_functions") == Some(expected),
             format!("runs[{index}] expected test count differs from manifest"),
         );
-        let valid_generation_tiers = run
-            .get("generation_tiers")
+        let valid_selected_tiers = run
+            .get("selected_generation_tiers")
             .and_then(Value::as_array)
             .is_some_and(|tiers| {
                 tiers.iter().all(|tier| {
@@ -693,23 +693,52 @@ fn audit(
             });
         push_check(
             &mut errors,
-            valid_generation_tiers,
-            format!("runs[{index}] has missing or invalid observed generation_tiers"),
+            valid_selected_tiers,
+            format!("runs[{index}] has missing or invalid selected_generation_tiers"),
         );
-        let tiers = run.get("generation_tiers").and_then(Value::as_array);
-        let has_tier = |target: &str| {
-            tiers.is_some_and(|values| values.iter().any(|tier| tier.as_str() == Some(target)))
+
+        let backend_attempts = run.get("backend_attempts").and_then(Value::as_array);
+        let valid_backend_attempts = backend_attempts.is_some_and(|attempts| {
+            attempts.iter().all(|attempt| {
+                let tier = str_field(attempt, "tier");
+                let backend_name = str_field(attempt, "backend_name").unwrap_or("");
+                let success = bool_field(attempt, "success");
+                let tier_valid = tier.is_some_and(|name| {
+                    matches!(name, "Native" | "Hardware" | "LocalLLM" | "CloudLLM" | "Simulated")
+                });
+                let backend_name_valid = !backend_name.trim().is_empty();
+                let success_valid = success.is_some();
+                let identity_consistent = match backend_name.to_ascii_lowercase().as_str() {
+                    "simulated" => tier == Some("Simulated"),
+                    "ollama" => tier == Some("LocalLLM"),
+                    "anthropic" => tier == Some("CloudLLM"),
+                    _ => true,
+                };
+                tier_valid && backend_name_valid && success_valid && identity_consistent
+            })
+        });
+        push_check(
+            &mut errors,
+            valid_backend_attempts,
+            format!("runs[{index}] has missing or invalid backend_attempts"),
+        );
+
+        let attempts = backend_attempts;
+        let has_attempt = |target: &str| {
+            attempts.is_some_and(|values| {
+                values.iter().any(|attempt| str_field(attempt, "tier") == Some(target))
+            })
         };
-        let tiers_compatible_with_requested_backend = match model_mode {
-            "native" => !has_tier("LocalLLM") && !has_tier("CloudLLM"),
-            "ollama" => !has_tier("CloudLLM"),
-            "cloud" => !has_tier("LocalLLM"),
+        let actual_attempts_compatible_with_requested_backend = match model_mode {
+            "native" => !has_attempt("LocalLLM") && !has_attempt("CloudLLM"),
+            "ollama" => !has_attempt("CloudLLM"),
+            "cloud" => !has_attempt("LocalLLM"),
             _ => false,
         };
         push_check(
             &mut errors,
-            tiers_compatible_with_requested_backend,
-            format!("runs[{index}] observed generation_tiers conflict with requested model_mode {model_mode}"),
+            actual_attempts_compatible_with_requested_backend,
+            format!("runs[{index}] actual backend attempts conflict with requested model_mode {model_mode}"),
         );
 
         push_check(
