@@ -1,0 +1,131 @@
+diff --git a/crates/core/symthaea-fep/src/agent.rs b/crates/core/symthaea-fep/src/agent.rs
+--- a/crates/core/symthaea-fep/src/agent.rs
++++ b/crates/core/symthaea-fep/src/agent.rs
+@@ -376,18 +376,13 @@ impl ActiveInferenceAgent {
+     /// Learn from action outcome
+     pub fn learn_from_outcome(&mut self, action: usize, actual_observation: &Observation) {
+         // Track action for TD learning
+         self.last_action = Some(action);
+ 
+         // Update belief to incorporate new observation
+-        // This will trigger TD learning internally
++        // This owns the configured model-learning path: TD when enabled,
++        // otherwise direct model learning when enabled.
+         let _ = self.perceive(actual_observation);
+ 
+-        // Update generative model with action information
+-        if self.config.enable_model_learning {
+-            self.model
+-                .learn(&self.belief, actual_observation, Some(action));
+-        }
+-
+         // Update action precision
+         let expected = self.model.predict_observation(&self.belief);
+         let expected_phi = expected.first().copied().unwrap_or(0.5);
+diff --git a/crates/core/symthaea-fep/tests/learning_mode_exclusivity.rs b/crates/core/symthaea-fep/tests/learning_mode_exclusivity.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/core/symthaea-fep/tests/learning_mode_exclusivity.rs
+@@ -0,0 +1,102 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++//! Regression tests for single-owner FEP learning-mode semantics.
++
++use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
++
++fn config(enable_td_learning: bool, enable_model_learning: bool) -> ActiveInferenceAgentConfig {
++    ActiveInferenceAgentConfig {
++        state_dim: 4,
++        obs_dim: 4,
++        num_actions: 2,
++        inference_iterations: 1,
++        enable_td_learning,
++        enable_model_learning,
++        ..Default::default()
++    }
++}
++
++fn observation(step: usize) -> Observation {
++    let x = 0.2 + 0.1 * step as f64;
++    Observation::new(vec![x, 0.8 - x, 0.4 + 0.05 * step as f64, 0.6], 1.0, "learning-mode")
++}
++
++fn assert_model_eq(a: &ActiveInferenceAgent, b: &ActiveInferenceAgent) {
++    assert_eq!(a.model.likelihood_matrix, b.model.likelihood_matrix);
++    assert_eq!(a.model.transition_matrices, b.model.transition_matrices);
++    assert_eq!(a.model.transition_bias, b.model.transition_bias);
++    assert_eq!(a.model.prior_mean, b.model.prior_mean);
++    assert_eq!(a.model.prior_precision, b.model.prior_precision);
++}
++
++#[test]
++fn learn_from_outcome_respects_four_learning_mode_combinations() {
++    for (td, direct) in [(false, false), (false, true), (true, false), (true, true)] {
++        let mut agent = ActiveInferenceAgent::new(config(td, direct));
++
++        for step in 0..3 {
++            let obs = observation(step);
++            agent.learn_from_outcome(step % 2, &obs);
++        }
++
++        let expected_td = if td { 2 } else { 0 };
++        let expected_direct = if !td && direct { 3 } else { 0 };
++
++        assert_eq!(
++            agent.stats.td_updates, expected_td,
++            "unexpected TD update count for td={td}, direct={direct}"
++        );
++        assert_eq!(
++            agent.stats.model_updates, expected_direct,
++            "unexpected direct update count for td={td}, direct={direct}"
++        );
++    }
++}
++
++#[test]
++fn learn_from_outcome_matches_perceive_owned_model_learning_policy() {
++    for (td, direct) in [(false, false), (false, true), (true, false), (true, true)] {
++        let mut via_outcome = ActiveInferenceAgent::new(config(td, direct));
++        let mut via_perceive = ActiveInferenceAgent::new(config(td, direct));
++
++        for step in 0..3 {
++            let action = step % 2;
++            let obs = observation(step);
++
++            via_outcome.learn_from_outcome(action, &obs);
++
++            // `learn_from_outcome()` binds the action before delegating the
++            // evidence-bearing model update to `perceive()`. Reproduce that
++            // owning learning path without the outcome-only precision update;
++            // action precision is not a generative-model learning input.
++            via_perceive.last_action = Some(action);
++            let _ = via_perceive.perceive(&obs);
++
++            assert_model_eq(&via_outcome, &via_perceive);
++            assert_eq!(via_outcome.stats.td_updates, via_perceive.stats.td_updates);
++            assert_eq!(
++                via_outcome.stats.model_updates,
++                via_perceive.stats.model_updates
++            );
++        }
++    }
++}
++
++#[test]
++fn identical_outcome_sequences_remain_deterministic() {
++    let mut a = ActiveInferenceAgent::new(config(true, true));
++    let mut b = ActiveInferenceAgent::new(config(true, true));
++
++    for step in 0..8 {
++        let action = step % 2;
++        let obs = observation(step);
++        a.learn_from_outcome(action, &obs);
++        b.learn_from_outcome(action, &obs);
++    }
++
++    assert_model_eq(&a, &b);
++    assert_eq!(a.belief.mean, b.belief.mean);
++    assert_eq!(a.belief.precision, b.belief.precision);
++    assert_eq!(a.stats.td_updates, b.stats.td_updates);
++    assert_eq!(a.stats.model_updates, b.stats.model_updates);
++}

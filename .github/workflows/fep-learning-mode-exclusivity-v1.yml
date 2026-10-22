@@ -1,0 +1,68 @@
+name: FEP Learning Mode Exclusivity V1
+
+on:
+  pull_request:
+    paths:
+      - "docs/release/evidence/fep-learning-mode-exclusivity-v1.patch"
+      - ".github/workflows/fep-learning-mode-exclusivity-v1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/release/evidence/fep-learning-mode-exclusivity-v1.patch"
+      - ".github/workflows/fep-learning-mode-exclusivity-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qualification toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+
+      - name: Freeze patch ownership and single-owner learning theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          PATCH=docs/release/evidence/fep-learning-mode-exclusivity-v1.patch
+
+          grep -Fq 'crates/core/symthaea-fep/src/agent.rs' "$PATCH"
+          grep -Fq 'crates/core/symthaea-fep/tests/learning_mode_exclusivity.rs' "$PATCH"
+          grep -Fq -- '-        if self.config.enable_model_learning {' "$PATCH"
+          grep -Fq 'learn_from_outcome_respects_four_learning_mode_combinations' "$PATCH"
+          grep -Fq 'learn_from_outcome_matches_perceive_owned_model_learning_policy' "$PATCH"
+          grep -Fq 'identical_outcome_sequences_remain_deterministic' "$PATCH"
+          grep -Fq 'expected_direct = if !td && direct { 3 } else { 0 }' "$PATCH"
+          grep -Fq 'expected_td = if td { 2 } else { 0 }' "$PATCH"
+
+      - name: Apply exact candidate patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          PATCH=docs/release/evidence/fep-learning-mode-exclusivity-v1.patch
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          test -f crates/core/symthaea-fep/tests/learning_mode_exclusivity.rs
+          git diff --check
+          echo '=== APPLIED PRODUCT DIFF ==='
+          git diff -- \
+            crates/core/symthaea-fep/src/agent.rs \
+            crates/core/symthaea-fep/tests/learning_mode_exclusivity.rs
+
+      - name: Rustfmt candidate
+        run: cargo fmt --check -p symthaea-fep
+
+      - name: Focused learning-mode regressions
+        run: cargo test --locked -p symthaea-fep --test learning_mode_exclusivity
+
+      - name: Existing FEP tests
+        run: cargo test --locked -p symthaea-fep
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-fep --all-targets -- -D warnings
