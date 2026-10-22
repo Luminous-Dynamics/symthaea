@@ -183,5 +183,19 @@
     "physical_tool_design_validated": false,
     "independent_hazard_analysis_complete": false
   },
-  "claim_ceiling": "Concept and synthetic qualification architecture only; no medical correctness, clinical safety, physical robot performance, standard conformity or deployment claim."
+  "claim_ceiling": "Concept and synthetic qualification architecture only; no medical correctness, clinical safety, physical robot performance, standard conformity or deployment claim.",
+  "artifact_handoff": {
+    "schema_version": "hmr0-artifact-manifest-v0.1",
+    "verification_pr": "https://github.com/Luminous-Dynamics/symtropy/pull/2704",
+    "generator_workflow": ".github/workflows/hmr0-tool-envelope-preview.yml",
+    "output_evidence_class": "concept_preview_only",
+    "manifests": [
+      "sealed_tote_gripper.manifest.json",
+      "passive_tray_dock.manifest.json"
+    ],
+    "manifest_digests_computed_from_actual_output_bytes": true,
+    "geometry_quality_verified": false,
+    "manufacturing_ready": false,
+    "physical_use_authorized": false
+  }
 }
