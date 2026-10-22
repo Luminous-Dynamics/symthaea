@@ -310,6 +310,38 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
         }
         let value: Value = serde_json::from_str(line).with_context(|| format!("parse outcome JSONL line {}", index + 1))?;
         let context = format!("outcome line {}", index + 1);
+        require_exact_keys(
+            &value,
+            &["schema_version", "pair_id", "split", "component_id", "source", "target", "adjudication", "prediction", "run"],
+            &[],
+            &context,
+        )?;
+        for (field, required, optional) in [
+            ("source", &["record_id", "family_id", "source_commit", "artifact_sha256", "insight_sha256"][..], &[][..]),
+            ("target", &["theorem_id", "family_id", "source_commit", "artifact_path", "artifact_sha256", "statement_sha256", "obligation_sha256"][..], &["domain_labels"][..]),
+            ("adjudication", &["status", "label", "rubric_version", "reviewer_decisions", "receipt_sha256"][..], &["adjudication_note"][..]),
+            ("prediction", &["decision", "predicted_label", "confidence", "compatibility_probability", "mismatch_codes", "precondition_checks", "receipt_sha256"][..], &[][..]),
+            ("run", &["model_id", "model_version", "prompt_sha256", "config_sha256", "input_sha256", "output_sha256", "budget"][..], &["actual_model_calls", "actual_tokens", "actual_wall_ms", "actual_cost_microusd"][..]),
+        ] {
+            let object = value.get(field).with_context(|| format!("{context}.{field} missing"))?;
+            require_exact_keys(object, required, optional, &format!("{context}.{field}"))?;
+        }
+        let reviewer_rows = value.get("adjudication").and_then(|x| x.get("reviewer_decisions")).and_then(Value::as_array)
+            .with_context(|| format!("{context}.adjudication.reviewer_decisions must be an array"))?;
+        for (reviewer_index, reviewer) in reviewer_rows.iter().enumerate() {
+            require_exact_keys(reviewer, &["reviewer_id", "label", "reason_codes", "evidence_sha256"], &[], &format!("{context}.reviewer_decisions[{reviewer_index}]"))?;
+        }
+        let check_rows = value.get("prediction").and_then(|x| x.get("precondition_checks")).and_then(Value::as_array)
+            .with_context(|| format!("{context}.prediction.precondition_checks must be an array"))?;
+        for (check_index, check) in check_rows.iter().enumerate() {
+            require_exact_keys(check, &["check_id", "outcome", "evidence_sha256"], &[], &format!("{context}.precondition_checks[{check_index}]"))?;
+        }
+        require_exact_keys(
+            value.get("run").and_then(|x| x.get("budget")).context("run budget missing")?,
+            &["max_model_calls", "max_tokens", "max_wall_ms", "max_cost_microusd"],
+            &[],
+            &format!("{context}.run.budget"),
+        )?;
         if required_string(&value, "schema_version", &context)? != OUTCOME_VERSION {
             bail!("{context} has unsupported schema_version");
         }
@@ -622,6 +654,21 @@ fn validate_run_budgets(row: &Value, context: &str) -> Result<()> {
             if amount > cap {
                 bail!("{context}.run.{actual} exceeds {limit}");
             }
+        }
+    }
+    Ok(())
+}
+
+fn require_exact_keys(value: &Value, required: &[&str], optional: &[&str], context: &str) -> Result<()> {
+    let object = value.as_object().with_context(|| format!("{context} must be an object"))?;
+    for key in required {
+        if !object.contains_key(*key) {
+            bail!("{context}.{key} is required");
+        }
+    }
+    for key in object.keys() {
+        if !required.contains(&key.as_str()) && !optional.contains(&key.as_str()) {
+            bail!("{context} has unexpected field {key:?}");
         }
     }
     Ok(())
