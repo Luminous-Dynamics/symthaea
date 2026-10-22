@@ -838,14 +838,27 @@ impl NetworkService {
         })
     }
 
-    /// Stub handshake for non-swarm builds (returns LocalTrust).
-    #[cfg(not(feature = "swarm"))]
+    /// Stub handshake for builds without transport support.
+    #[cfg(all(not(feature = "swarm"), not(feature = "pqc-handshake")))]
     async fn run_handshake_for_peer(
         &self,
         _peer_id: &str,
         _channel: &super::iroh::IrohChannel,
     ) -> SwarmResult<TrustLevel> {
         Ok(TrustLevel::LocalTrust)
+    }
+
+    /// PQC handshake must never fall back to LocalTrust if transport support
+    /// is accidentally omitted from the feature graph.
+    #[cfg(all(not(feature = "swarm"), feature = "pqc-handshake"))]
+    async fn run_handshake_for_peer(
+        &self,
+        _peer_id: &str,
+        _channel: &super::iroh::IrohChannel,
+    ) -> SwarmResult<TrustLevel> {
+        Err(SwarmError::FeatureNotEnabled {
+            feature: "swarm transport required by pqc-handshake".to_string(),
+        })
     }
 
     /// Respond to an incoming handshake challenge on a connected channel.
@@ -1116,14 +1129,26 @@ impl NetworkService {
         }
     }
 
-    /// Stub for non-swarm builds.
-    #[cfg(not(feature = "swarm"))]
+    /// Stub for non-swarm builds that do not require PQC.
+    #[cfg(all(not(feature = "swarm"), not(feature = "pqc-handshake")))]
     async fn run_inbound_handshake(
         &self,
         _peer_id: &str,
         _channel: &super::iroh::IrohChannel,
     ) -> SwarmResult<TrustLevel> {
         Ok(TrustLevel::LocalTrust)
+    }
+
+    /// Fail closed if PQC was enabled without its required transport feature.
+    #[cfg(all(not(feature = "swarm"), feature = "pqc-handshake"))]
+    async fn run_inbound_handshake(
+        &self,
+        _peer_id: &str,
+        _channel: &super::iroh::IrohChannel,
+    ) -> SwarmResult<TrustLevel> {
+        Err(SwarmError::FeatureNotEnabled {
+            feature: "swarm transport required by pqc-handshake".to_string(),
+        })
     }
 
     /// Broadcast our consciousness state to all connected peers
