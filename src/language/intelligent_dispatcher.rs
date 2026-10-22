@@ -424,10 +424,10 @@ impl IntelligentDispatcher {
         let mut backend_attempts = Vec::new();
         let (output, success, nominal_cost) = match tier {
             BackendTier::Native => {
-                // Native generation is handled externally by CodeGenerator.
-                // The selected tier is tracked separately from LLM backend attempts.
-                self.native_stats.record(true);
-                ("[NATIVE: use CodeGenerator]".to_string(), true, COST_NATIVE)
+                // This is a routing signal only: CodeGenerator runs in the caller.
+                // Do not train native success statistics until actual generation
+                // and external verification report an outcome.
+                ("[NATIVE: use CodeGenerator]".to_string(), false, COST_NATIVE)
             }
             BackendTier::Hardware => {
                 // Tier selection is not hardware generation. The specialized
@@ -1108,8 +1108,10 @@ mod tests {
             .await;
 
         assert_eq!(result.tier, BackendTier::Native);
-        assert!(result.success);
+        assert!(!result.success, "a selected route is not a generated-code success");
+        assert_eq!(result.backend_attempts.len(), 0, "CodeGenerator has not run inside the dispatcher");
         assert_eq!(result.energy_cost, COST_NATIVE);
+        assert_eq!(dispatcher.success_rate(BackendTier::Native), 0.5, "selection must not train native success");
         assert!(result.output.contains("NATIVE"));
     }
 
