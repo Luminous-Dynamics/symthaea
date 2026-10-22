@@ -171,10 +171,17 @@ impl BoundedRiskEProcess {
         }
 
         let next_log_value = self.log_e_value + factor.ln();
-        if !next_log_value.is_finite() {
+        if next_log_value.is_nan() {
+            return None;
+        }
+        if next_log_value == f64::INFINITY {
             self.log_e_value = f64::MAX;
             self.alarmed = true;
             return Some(true);
+        }
+        if next_log_value == f64::NEG_INFINITY {
+            self.log_e_value = -f64::MAX;
+            return Some(self.alarmed);
         }
 
         self.log_e_value = next_log_value;
@@ -323,14 +330,31 @@ impl MixtureBoundedRiskEProcess {
             return None;
         }
 
+        let mut next_components = self.component_log_e_values;
         for (index, fraction) in self.bet_fractions.iter().copied().enumerate() {
             let bet = fraction / self.risk_bound;
             let factor = 1.0 + bet * (loss - self.risk_bound);
             if !factor.is_finite() || factor <= 0.0 {
                 return None;
             }
-            self.component_log_e_values[index] += factor.ln();
+            let candidate = next_components[index] + factor.ln();
+            if candidate.is_nan() {
+                return None;
+            }
+            if candidate == f64::INFINITY {
+                next_components[index] = f64::MAX;
+                self.component_log_e_values = next_components;
+                self.log_e_value = f64::MAX;
+                self.alarmed = true;
+                return Some(true);
+            }
+            next_components[index] = if candidate == f64::NEG_INFINITY {
+                -f64::MAX
+            } else {
+                candidate
+            };
         }
+        self.component_log_e_values = next_components;
 
         let max_log_value = self
             .component_log_e_values
@@ -356,6 +380,8 @@ impl MixtureBoundedRiskEProcess {
         Some(self.alarmed)
     }
 
+    /// Reset evidence within the same episode budget only. A fresh episode must
+    /// construct a new monitor with its newly allocated alpha-spending index.
     pub fn reset(&mut self) {
         self.component_log_e_values = [0.0; 3];
         self.log_e_value = 0.0;
