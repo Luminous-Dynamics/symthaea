@@ -23,7 +23,7 @@ Empty scenarios, invalid noise scales, incomplete/non-finite model predictions, 
 
 The `WorstCaseInformationGain` policy in `symthaea-physics-bridge` now scores each candidate against three predeclared *bundled stress scenarios*: (a) nominal predicted laws with a lower noise scale, (b) a first smooth prediction-discrepancy variant at nominal noise, and (c) a second smooth discrepancy variant at a higher noise scale. The predictive variants use smooth sinusoidal basis perturbations with frequencies different from the hidden benchmark discrepancy; the selector cannot read the simulator's ground-truth expression or the hidden discrepancy amplitude.
 
-This is a deliberately small diagnostic, not a full factorial study. The paired pilot compares nominal EIG to scenario-robust EIG over shared deterministic seeds, in clean and systematically misspecified regimes. It reports recovery, false confident-singleton rates, detected candidate-set collapse, unresolved candidates, and paired percentile-bootstrap intervals. It does not assert that robustness must win.
+This is a deliberately small diagnostic, not a full factorial study. The paired pilot compares nominal EIG to scenario-robust EIG over shared deterministic seeds, in clean and systematically misspecified regimes. It reports clean recovery, false confident-singleton rates, detected candidate-set collapse, unresolved candidates, selector failures, mean rounds used, and paired percentile-bootstrap intervals for key deltas. It does not assert that robustness must win.
 
 ## Regression coverage
 
