@@ -3,11 +3,11 @@
   "status": "DRAFT_CANDIDATE",
   "hash_algorithm": "SHA-256",
   "encoding": "UTF-8 bytes of exact repository file content",
-  "source_commit_before_manifest": "4fd9f82d5296c2eef1390d328e157fd3b57016aa",
+  "source_commit_before_manifest": "361467fe953e6f49e538fab8a55c681af6bef77d",
   "generated_date": "2026-10-22",
   "self_digest_excluded": true,
   "notes": [
-    "Binds core and trajectory datasets, schemas, receipt contract, Rust tests, research protocols, verifier source, and xtask dependencies at the source commit above.",
+    "Binds core and trajectory datasets, all relevant schemas including the run receipt, Rust tests, research protocols, verifier source, and xtask dependencies at the source commit above.",
     "The manifest itself is excluded from its own digest set. Any subsequent change to a listed file requires regeneration against a new pre-manifest source commit.",
     "Digests establish artifact identity only, not correctness, oracle validity, model behavior, or benchmark passage."
   ],
@@ -26,15 +26,15 @@
     },
     {
       "path": "docs/research/structural-love-dynamics/trajectory-cases.schema.json",
-      "sha256": "919df7e99a310733610c9137e9b79248c50a3d1ed7e589a3aadd598fecc949e9",
-      "utf8_bytes": 3283,
-      "git_blob_sha1": "e9b15a19fbfbbd7d4201acd5cb159eae162fee5a"
+      "sha256": "9b0cd9c6d412a5107dbd1e9a28be69fe3f19507ea364a789c193820bc4905a29",
+      "utf8_bytes": 3311,
+      "git_blob_sha1": "910317cc5ec0edcf26574f93bb90c492e6a5fe8a"
     },
     {
       "path": "docs/research/structural-love-dynamics/trajectory-cases.json",
-      "sha256": "61d1f2b08216f622773a9f6928841a61d7ce1c9ad2682420411d56eff3d0c64e",
-      "utf8_bytes": 19490,
-      "git_blob_sha1": "56b86c3cb2bfed3957393d5d5477009532779434"
+      "sha256": "73c5859dd7b9b28d6c545b5ba8e109b5be84f38321e6cc53d52c5403ce4f1e38",
+      "utf8_bytes": 23158,
+      "git_blob_sha1": "ac1bdc924bc4b9f90fd492cbeda30a9b5128fef3"
     },
     {
       "path": "docs/research/structural-love-dynamics/evaluation-receipt.schema.json",
@@ -44,21 +44,21 @@
     },
     {
       "path": "tests/sld_corpus_contract.rs",
-      "sha256": "54f168d0537f16508ebf9d61a213dafae326e1e7f87d633b21ea43a8688ea169",
-      "utf8_bytes": 34992,
-      "git_blob_sha1": "82b18771bf2a5d6639ee586fd492fc7678355aeb"
+      "sha256": "05410c47602f57c31c32889cd95eb6c238b87cbd5dce4726ee8aa7fcaf4b353c",
+      "utf8_bytes": 35195,
+      "git_blob_sha1": "17d3f1319564d65cf48431bda2032ce32367bc86"
     },
     {
       "path": "docs/research/STRUCTURAL_LOVE_DYNAMICS.md",
-      "sha256": "a8dc7a3da7ab84271b6d8cfb0906c7ab60902046f4adf76a5725049f4f9b1a0e",
-      "utf8_bytes": 26831,
-      "git_blob_sha1": "ec7cc0d20c0993926c928ecf1e8adbce877053f2"
+      "sha256": "475604ff5bfa5bd4883573bd4a56053ca53ab0d6993ff246b3e2b291352ee5a6",
+      "utf8_bytes": 26932,
+      "git_blob_sha1": "d041673be247cb1d83810393529fd5aae5ce03cc"
     },
     {
       "path": "docs/research/structural-love-dynamics/BASELINE_PROTOCOL.md",
-      "sha256": "a0e76faa775842ef1400de2a6708306738b2c0cd0d5842271ee7de17db6b125c",
-      "utf8_bytes": 35586,
-      "git_blob_sha1": "e54245bd418a7992e2cf2c6dd59f0daee2ff156c"
+      "sha256": "cc78153ad3251a2289d317590b0f97f400d68376ba7b752be07631e787d22dcd",
+      "utf8_bytes": 36069,
+      "git_blob_sha1": "005ef3c99a59ea8f85221ebdb34a1ebabb0482f5"
     },
     {
       "path": "docs/research/structural-love-dynamics/MEASUREMENT_INTEGRITY_RED_TEAM.md",
