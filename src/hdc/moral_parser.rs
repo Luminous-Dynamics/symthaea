@@ -1019,21 +1019,55 @@ impl MoralParser {
         scenario
     }
 
-    /// Detect consent state from explicit textual evidence.
+    /// Remove quoted material before assigning consent semantics. Quoted claims
+    /// may be examples, reports, disputed statements, or adversarial payloads;
+    /// this heuristic parser cannot reliably establish who asserted them.
+    /// Unmatched opening quotes mask the remainder (conservative fallback).
+    fn strip_quoted_consent_text(text: &str) -> String {
+        let mut result = String::with_capacity(text.len());
+        let mut closing_quote: Option<char> = None;
+        for ch in text.chars() {
+            if let Some(end) = closing_quote {
+                if ch == end {
+                    closing_quote = None;
+                }
+                result.push(' ');
+                continue;
+            }
+            match ch {
+                '"' => {
+                    closing_quote = Some('"');
+                    result.push(' ');
+                }
+                '“' => {
+                    closing_quote = Some('”');
+                    result.push(' ');
+                }
+                '”' => result.push(' '),
+                _ => result.push(ch),
+            }
+        }
+        result
+    }
+
+    /// Detect consent state from explicit, unquoted textual evidence.
     ///
     /// Positive consent is never inferred merely because the scenario mentions
-    /// asking, permission, or consent as a topic. Silence maps to Unknown.
+    /// asking, permission, or consent as a topic. Questions and quoted claims do
+    /// not establish affirmative consent. Silence maps to Unknown.
     fn detect_consent(&self, text: &str) -> ConsentState {
+        let evidence_text = Self::strip_quoted_consent_text(text);
+
         // Check explicit refusal/withdrawal before other signals.
         for phrase in &self.consent_denied_words {
-            if text.contains(phrase.as_str()) {
+            if evidence_text.contains(phrase.as_str()) {
                 return ConsentState::Denied;
             }
         }
 
         // Stated failure to obtain consent is distinct from explicit refusal.
         for phrase in &self.consent_absent_words {
-            if text.contains(phrase.as_str()) {
+            if evidence_text.contains(phrase.as_str()) {
                 return ConsentState::Absent;
             }
         }
@@ -1041,14 +1075,20 @@ impl MoralParser {
         // Assumption is recorded before shorter overlapping positive cues, so
         // "I assumed she agreed" cannot be mistaken for explicit agreement.
         for phrase in &self.consent_implied_words {
-            if text.contains(phrase.as_str()) {
+            if evidence_text.contains(phrase.as_str()) {
                 return ConsentState::Implied;
             }
         }
 
-        // Only affirmative wording counts as given consent.
+        // Questions can contain the surface form of a positive cue (for
+        // example, "Who gave permission?") without asserting that it happened.
+        if evidence_text.contains('?') {
+            return ConsentState::Unknown;
+        }
+
+        // Only affirmative wording outside quotes and interrogatives counts.
         for phrase in &self.consent_given_words {
-            if text.contains(phrase.as_str()) {
+            if evidence_text.contains(phrase.as_str()) {
                 return ConsentState::Given;
             }
         }
@@ -1809,6 +1849,28 @@ mod tests {
         assert_eq!(result.consent, ConsentState::Unknown);
         assert!(result.consent.requires_clarification());
         assert!(!result.consent.is_explicitly_given());
+    }
+
+    #[test]
+    fn consent_positive_surface_forms_in_questions_and_quotes_stay_unknown() {
+        let parser = MoralParser::new();
+        for text in [
+            "Who gave permission?",
+            "Would permission be needed here?",
+            "The note says \"she gave consent\"; I have not verified it.",
+            "The report says “she gave consent” but its source is unclear.",
+        ] {
+            assert_eq!(
+                parser.parse(text).consent,
+                ConsentState::Unknown,
+                "unverified question/quote must not become affirmative consent: {text}"
+            );
+        }
+
+        assert_eq!(
+            parser.parse("She gave consent to share the report.").consent,
+            ConsentState::Given
+        );
     }
 
     #[test]
