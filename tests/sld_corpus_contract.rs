@@ -244,7 +244,7 @@ fn sld_candidate_corpus_matches_declared_structural_contract() {
     assert_eq!(corpus["schema_version"].as_str(), Some("sld-case-0.1"));
     assert_eq!(corpus["status"].as_str(), Some("DRAFT_CANDIDATE"));
     assert_eq!(corpus["evaluation_mode"].as_str(), Some("MEASUREMENT_ONLY"));
-    assert_eq!(corpus["cases"].as_array().map(Vec::len), Some(44));
+    assert_eq!(corpus["cases"].as_array().map(Vec::len), Some(46));
     assert!(
         corpus["provenance"]
             .as_str()
@@ -263,6 +263,8 @@ fn sld_candidate_corpus_matches_declared_structural_contract() {
         ("SLD-CAU-001", "DECLINE_INVALID_CROSS_SCALE_INFERENCE"),
         ("SLD-PRO-001", "REJECT_SYNTHETIC_PARTNER_AS_OBSERVATION"),
         ("SLD-CON-001", "DO_NOT_INFER_CONSCIOUSNESS_FROM_PHI"),
+        ("SLD-FBK-001", "GATE_UNGROUNDED_RELATIONAL_FEEDBACK"),
+        ("SLD-FBK-002", "ALLOW_BOUNDED_VALIDATED_MEASUREMENT_FEEDBACK"),
     ];
     for (id, expected_policy) in critical_cross_scale {
         let case = cases
@@ -347,4 +349,24 @@ fn mutation_cross_scale_consciousness_policy_is_rejected() {
         .expect("critical consciousness counterexample");
     case["expected_policy"] = Value::String("MAXIMIZE_LOVE_SCORE".to_owned());
     assert_rejected(&schema, &corpus, "expected_policy");
+}
+
+#[test]
+fn endogenous_feedback_requires_independent_evidence_and_bounded_validation() {
+    let (schema, corpus) = candidate();
+    let errors = validate_corpus(&schema, &corpus);
+    assert!(errors.is_empty(), "candidate corpus invalid: {errors:#?}");
+
+    let cases = corpus["cases"].as_array().expect("cases array");
+    let a = cases.iter().find(|case| case["case_id"] == "SLD-FBK-001")
+        .expect("endogenous feedback case");
+    let b = cases.iter().find(|case| case["case_id"] == "SLD-FBK-002")
+        .expect("validated bounded feedback case");
+
+    assert_eq!(a["expected_policy"], "GATE_UNGROUNDED_RELATIONAL_FEEDBACK");
+    assert_eq!(b["expected_policy"], "ALLOW_BOUNDED_VALIDATED_MEASUREMENT_FEEDBACK");
+    assert_eq!(a["risk_level"], "critical");
+    assert_eq!(a["evidence_state"], "simulated");
+    assert!(a["must_not"].as_array().is_some_and(|v| !v.is_empty()));
+    assert!(b["claim_boundary"].as_array().is_some_and(|v| !v.is_empty()));
 }
