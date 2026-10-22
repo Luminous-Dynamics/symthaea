@@ -433,12 +433,14 @@ pub struct CodingAgent {
     /// When enabled, generated code is verified for structural invariants (Betti numbers,
     /// convergence prediction) and violations are fed back as hard constraints on the next prompt.
     /// Geodesic Code Synthesis verifier for topological/oracle post-generation checks.
-    /// When enabled, generated code is verified for structural invariants (Betti numbers,
-    /// convergence prediction) and violations are fed back as hard constraints on the next prompt.
+    /// When enabled, the agent records exploratory topology fingerprints and abstract
+    /// convergence predictions. These are advisory signals, not semantic proofs, and
+    /// must not override compiler or behavioral-test evidence.
     #[cfg(feature = "geodesic_synthesis")]
     geodesic_verifier: Option<symthaea_geodesic::GeodesicSynthesizer>,
-    /// Cached GCS violations from the last verification pass, injected into the next prompt.
-    gcs_violations: Vec<String>,
+    /// Cached topology-derived hypotheses, injected as advisory context only rather
+    /// than as mandatory repair instructions.
+    gcs_advisories: Vec<String>,
     /// Unified code orchestrator (CodeGenerator + analogy + LLM, all compiler-verified
     /// before acceptance). Populated only when `config.use_orchestrator` is true — see
     /// `try_orchestrator_generation()` in `generation.rs` for the live call site.
@@ -563,7 +565,7 @@ impl CodingAgent {
             error_knowledge: error_knowledge::CodeErrorKnowledge::new(),
             #[cfg(feature = "geodesic_synthesis")]
             geodesic_verifier: None,
-            gcs_violations: Vec::new(),
+            gcs_advisories: Vec::new(),
             #[cfg(feature = "code_generation")]
             orchestrator: if use_orchestrator {
                 let orch = CodeOrchestrator::new();
@@ -643,7 +645,7 @@ impl CodingAgent {
         self.quality_rejections = 0;
         self.consciousness_deferrals = 0;
         self.stuck_detected = false;
-        self.gcs_violations.clear();
+        self.gcs_advisories.clear();
 
         // Auto-index the project if CodebaseMemory hasn't been populated yet.
         // This gives the agent codebase-aware context on every run without
