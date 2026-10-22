@@ -1404,6 +1404,31 @@ mod tests {
         .expect("each candidate has positive gain over the complete prior envelope");
         assert_eq!(*robust.0, 0);
 
+        let base_envelope = expected_information_gain_over_prior_scenarios_nats(
+            &0_u8,
+            &hypotheses,
+            &scenarios,
+            predict,
+        )
+        .expect("base prior envelope is valid");
+        let mut extended = scenarios.to_vec();
+        extended.push(PriorInformationGainScenario {
+            observation_std_dev: 0.05,
+            prediction_model: 0,
+            prior_weights: vec![0.99, 0.003, 0.003, 0.004],
+        });
+        let extended_envelope = expected_information_gain_over_prior_scenarios_nats(
+            &0_u8,
+            &hypotheses,
+            &extended,
+            predict,
+        )
+        .expect("extended prior envelope is valid");
+        assert!(
+            extended_envelope <= base_envelope + 1.0e-12,
+            "adding a prior scenario cannot increase the minimum information gain"
+        );
+
         let reversed = [scenarios[1].clone(), scenarios[0].clone()];
         let robust_reversed = select_experiment_by_prior_robust_information_gain_per_cost(
             &candidates,
