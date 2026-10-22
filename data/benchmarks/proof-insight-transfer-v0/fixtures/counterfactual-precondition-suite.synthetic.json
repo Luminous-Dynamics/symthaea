@@ -535,6 +535,69 @@
       },
       "base_outcome_pair_id": "outcome-cf-p6-predicate-base",
       "counterfactual_outcome_pair_id": "outcome-cf-p6-predicate-cf"
+    },
+    {
+      "pair_id": "cf-pending-unknown",
+      "component_id": "component-pending-unknown",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-pending",
+        "family_id": "synthetic-source-family-pending",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "source_artifact_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      "target": {
+        "target_id": "synthetic-target-pending",
+        "family_id": "synthetic-target-family-pending",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "artifact_path": "synthetic/TargetPending.lean",
+        "base_statement_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_statement_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "base_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "counterfactual_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "counterfactual_artifact_path": "synthetic/TargetPending-counterfactual.lean"
+      },
+      "mutation": {
+        "kind": "precondition_removed",
+        "semantic_change": "changed",
+        "changed_field": "precondition",
+        "before_fragment_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "after_fragment_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "mutation_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "description": "Synthetic pending-label row, used to verify denominator accounting only."
+      },
+      "base_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          }
+        ],
+        "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "note": "Synthetic structural fixture only for p0-noop; reviewer labels are placeholders, not expert judgments."
+      },
+      "counterfactual_adjudication": {
+        "status": "pending",
+        "label": "unknown",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [],
+        "receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "note": "Synthetic pending example; unknown must remain unknown and is excluded from scored pairs."
+      },
+      "base_outcome_pair_id": "outcome-cf-pending-unknown-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-pending-unknown-counterfactual"
     }
   ]
 }
