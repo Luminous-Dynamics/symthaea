@@ -139,7 +139,7 @@ jobs:
             .source_revision == $head and
             .status == "synthetic_reference_oracle_tests_passed" and
             .claim_ceiling == "synthetic process-integrity differential tests only; no clinical validation" and
-            (.frozen_trace_count // 12) == 12 and
+             .test_scope.frozen_trace_count == 12 and
             .test_scope.deterministic_generated_suffix_cases == 2048 and
             .test_scope.external_domain_adjudication == false and
             .test_scope.blind_holdout == false
