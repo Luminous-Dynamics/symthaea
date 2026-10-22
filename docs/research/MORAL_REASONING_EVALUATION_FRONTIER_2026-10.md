@@ -13,6 +13,9 @@ The current Love Coherence implementation contained two contract defects address
 
 The patch adds a checked API, preserves the old API as a compatibility wrapper that defaults to a zero score on invalid input, and records mathematical invariants. This improves score hygiene; it is not evidence that the score tracks actual care or moral competence.
 
+**Important residual risk:** the existing EthicsEngine still uses Love Coherence to modulate confidence. This change makes the score's neutral/invalid behavior more conservative, but does not independently validate that coupling or remove the feedback path. The exact-head review must inspect downstream effects, and confidence-boosting should remain disabled or separately gated until an ablation shows calibrated benefit on held-out outcomes.
+
+
 ## What recent evaluation work changes
 
 Moral reasoning evaluation is moving beyond one-answer accuracy:
