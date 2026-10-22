@@ -58,7 +58,7 @@ The ethics pipeline (MoralParser → MoralAlgebra → ValueEvaluator → Harmoni
 | Consent violation detection via explicit ConsentState | Partial | Denied/Absent have deterministic handling; draft `fix/moral-consent-unknown-v1` separates Unknown from Implied/Given. Exact-head validation and action-specific consent-required policy remain open. |
 | Moral topology anomaly detection | Done | `moral_topology.rs` — detects embedding space anomalies |
 | Property-based testing of moral algebra | Done | Proptest suite verifies cross-equation consistency |
-| 91.1% moral classification accuracy baseline | Done | Validated against moral scenario benchmark |
+| Historical 91.1% moral classification accuracy claim | Unqualified; not valid for current headline use | Baseline provenance reconciliation remains open in [MORAL-PLURALISM-001](https://github.com/Luminous-Dynamics/symthaea/issues/7254) and [PR #7263](https://github.com/Luminous-Dynamics/symthaea/pull/7263); split, metric, exact revision and artifact must be reconciled before reuse |
 
 ### Residual Risk
 **Low-Medium**. The multi-stage pipeline with adversarial testing provides strong coverage. Edge cases in novel moral scenarios remain possible but are mitigated by the Warn (rather than silent Allow) default for ambiguous cases.
