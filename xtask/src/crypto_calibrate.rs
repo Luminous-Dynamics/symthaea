@@ -58,8 +58,8 @@ struct Receipt {
     schema_version: &'static str,
     suite_id: String,
     suite_sha256: String,
-    workspace_manifest_sha256: Option<String>,
-    cargo_lock_sha256: Option<String>,
+    workspace_manifest_sha256: String,
+    cargo_lock_sha256: String,
     source_revision: Option<String>,
     working_tree_clean: bool,
     working_tree_status_sha256: String,
@@ -173,6 +173,9 @@ pub(super) fn run(
 
     let started_at = unix_seconds();
     let source_revision = command_text(root, "git", &["rev-parse", "HEAD"]);
+    if !dry_run && source_revision.is_none() {
+        bail!("refusing to execute calibration without a verifiable Git HEAD");
+    }
     let status_output = command_output(root, "git", &["status", "--porcelain"]);
     let tree_status = status_output.unwrap_or_else(|| "git status unavailable".to_owned());
     let working_tree_clean = tree_status.is_empty();
@@ -185,8 +188,8 @@ pub(super) fn run(
     let rustc_version = command_text(root, "rustc", &["--version"]);
     let rustc_verbose_version = command_text(root, "rustc", &["-vV"]);
     let cargo_version = command_text(root, "cargo", &["--version"]);
-    let workspace_manifest_sha256 = file_sha256(&root.join("Cargo.toml"));
-    let cargo_lock_sha256 = file_sha256(&root.join("Cargo.lock"));
+    let workspace_manifest_sha256 = required_file_sha256(&root.join("Cargo.toml"))?;
+    let cargo_lock_sha256 = required_file_sha256(&root.join("Cargo.lock"))?;
 
     // Preflight every selected task before running any command. A stale source
     // path or disallowed invocation must not leave a partially executed suite.
@@ -613,8 +616,9 @@ fn unix_seconds() -> u64 {
         .as_secs()
 }
 
-fn file_sha256(path: &Path) -> Option<String> {
-    fs::read(path).ok().map(|bytes| sha256_hex(&bytes))
+fn required_file_sha256(path: &Path) -> Result<String> {
+    let bytes = fs::read(path).with_context(|| format!("read provenance file {}", path.display()))?;
+    Ok(sha256_hex(&bytes))
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
