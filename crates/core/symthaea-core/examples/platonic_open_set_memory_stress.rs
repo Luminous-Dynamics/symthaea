@@ -88,10 +88,16 @@ fn main() -> BenchResult<()> {
     for seed in SEEDS {
         for prototype_budget in PROTOTYPE_BUDGETS {
             for mode in [BankMode::Independent, BankMode::CorrelatedShadows] {
+                let build_started = Instant::now();
                 let (bank, bases) = build_bank(DIMENSION, prototype_budget, mode, seed)?;
+                let bank_build_ms = build_started.elapsed().as_secs_f64() * 1_000.0;
+
+                let generation_started = Instant::now();
                 let queries = build_queries(&bases, seed, DIMENSION)?;
+                let query_generation_ms = generation_started.elapsed().as_secs_f64() * 1_000.0;
                 let mut grouped: BTreeMap<String, Vec<Observation>> = BTreeMap::new();
 
+                let search_started = Instant::now();
                 for query in &queries {
                     let started_query = Instant::now();
                     let (best_label, best_similarity, top_two_margin) = rank(&bank, &query.vector)?;
@@ -114,6 +120,12 @@ fn main() -> BenchResult<()> {
                             latency_us,
                         });
                 }
+                let search_wall_ms = search_started.elapsed().as_secs_f64() * 1_000.0;
+                let search_qps = if search_wall_ms > 0.0 {
+                    queries.len() as f64 / (search_wall_ms / 1_000.0)
+                } else {
+                    0.0
+                };
 
                 let vector_payload_bytes = bank.len() * DIMENSION * std::mem::size_of::<i8>();
                 for (stratum, observations) in grouped {
@@ -126,6 +138,11 @@ fn main() -> BenchResult<()> {
                         vector_payload_bytes,
                     );
                 }
+                println!(
+                    "# bank_summary=seed:{seed},prototype_budget:{prototype_budget},bank_mode:{},query_n:{},bank_build_ms:{bank_build_ms:.3},query_generation_ms:{query_generation_ms:.3},search_wall_ms:{search_wall_ms:.3},search_qps:{search_qps:.2},vector_payload_bytes:{vector_payload_bytes}",
+                    mode.as_str(),
+                    queries.len()
+                );
             }
         }
     }
