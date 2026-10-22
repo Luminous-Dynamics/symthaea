@@ -126,6 +126,7 @@ impl CodingAgent {
         // Process the dispatch result
         if let Some(result) = dispatch_result {
             self.generation_tiers.push(result.tier);
+            self.selected_generation_tiers.push(result.tier);
             self.actual_backend_attempts.extend(result.backend_attempts.iter().cloned());
             self.energy_budget -= result.energy_cost as f32;
 
@@ -224,6 +225,7 @@ impl CodingAgent {
                             0.5, // bypass consciousness < 0.2 check
                         );
                         self.generation_tiers.push(llm_result.tier);
+                        self.selected_generation_tiers.push(llm_result.tier);
                         self.actual_backend_attempts.extend(llm_result.backend_attempts.iter().cloned());
                         tracing::info!(
                             target: "symthaea::coding_agent",
