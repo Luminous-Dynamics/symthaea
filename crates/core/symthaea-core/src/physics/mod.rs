@@ -10,6 +10,8 @@ mod advanced_materials;
 pub mod chemistry;
 pub mod casting;
 pub mod casting_evidence;
+#[cfg(test)]
+mod casting_golden_tests;
 mod consciousness_bridge;
 pub mod constants;
 mod coupled_physics;
