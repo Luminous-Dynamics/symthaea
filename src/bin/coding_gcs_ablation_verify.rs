@@ -1559,19 +1559,112 @@ mod tests {
     }
 
     #[test]
-    fn missing_generation_tiers_are_rejected() {
+    fn missing_selected_generation_tiers_are_rejected() {
         let mut report = valid_fixture();
-        report["runs"][0].as_object_mut().unwrap().remove("generation_tiers");
+        report["runs"][0].as_object_mut().unwrap().remove("selected_generation_tiers");
         let errors = audit(&report, None, None);
-        assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+        assert!(errors.iter().any(|error| error.contains("selected_generation_tiers")));
     }
 
     #[test]
-    fn unknown_generation_tier_is_rejected() {
+    fn unknown_selected_tier_is_rejected() {
         let mut report = valid_fixture();
-        report["runs"][0]["generation_tiers"] = serde_json::json!(["ImaginaryLLM"]);
+        report["runs"][0]["selected_generation_tiers"] = serde_json::json!(["ImaginaryLLM"]);
         let errors = audit(&report, None, None);
-        assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+        assert!(errors.iter().any(|error| error.contains("selected_generation_tiers")));
+    }
+
+    #[test]
+    fn missing_backend_attempts_are_rejected() {
+        let mut report = valid_fixture();
+        report["runs"][0].as_object_mut().unwrap().remove("backend_attempts");
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempts")));
+    }
+
+    #[test]
+    fn unknown_backend_attempt_tier_is_rejected() {
+        let mut report = valid_fixture();
+        report["runs"][0]["backend_attempts"] = serde_json::json!([{
+            "tier": "ImaginaryLLM",
+            "backend_name": "SomeBackend",
+            "success": true
+        }]);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempts")));
+    }
+
+    #[test]
+    fn backend_name_and_effective_tier_must_agree_for_known_implementations() {
+        let mut report = valid_fixture();
+        report["runs"][0]["backend_attempts"] = serde_json::json!([{
+            "tier": "CloudLLM",
+            "backend_name": "Ollama",
+            "success": true
+        }]);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempts")));
+    }
+
+    #[test]
+    fn tampered_selected_tier_summary_is_rejected() {
+        let mut report = valid_fixture();
+        report["summary"]["gcs_off"]["selected_tier_decisions"]["CloudLLM"] = Value::from(9);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("selected_tier_decisions")));
+    }
+
+    #[test]
+    fn actual_cloud_backend_attempt_is_rejected_for_native_requested_backend() {
+        let mut report = valid_fixture();
+        report["runs"][0]["backend_attempts"] = serde_json::json!([{
+            "tier": "CloudLLM",
+            "backend_name": "Anthropic",
+            "success": true
+        }]);
+        report["summary"]["gcs_off"]["backend_attempts_by_tier"] = serde_json::json!({
+            "Native": 0, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 1, "Simulated": 0
+        });
+        report["summary"]["gcs_off"]["backend_attempts_by_name"] = serde_json::json!({"Anthropic": 1});
+        report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["runs_with_external_backend_attempts"] = Value::from(1);
+        report["summary"]["gcs_off"]["runs_with_simulated_backend_attempts"] = Value::from(0);
+        report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| {
+            error.contains("actual backend attempts conflict with requested model_mode native")
+        }));
+    }
+
+    #[test]
+    fn selected_tier_and_actual_fallback_attempts_are_distinct_and_auditable() {
+        let mut report = valid_fixture();
+        report["model_mode"] = Value::String("ollama".to_string());
+        report["model_label"] = Value::String("gemma4:e2b".to_string());
+        report["runtime_configuration"]["requested_backend"] = Value::String("ollama".to_string());
+        report["runtime_configuration"]["requested_model"] = Value::String("gemma4:e2b".to_string());
+
+        report["runs"][0]["selected_generation_tiers"] = serde_json::json!(["LocalLLM", "LocalLLM"]);
+        report["runs"][0]["backend_attempts"] = serde_json::json!([
+            {"tier": "Simulated", "backend_name": "Simulated", "success": true},
+            {"tier": "LocalLLM", "backend_name": "Ollama", "success": true}
+        ]);
+        report["summary"]["gcs_off"]["selected_tier_decisions"] = serde_json::json!({
+            "Native": 0, "Hardware": 0, "LocalLLM": 2, "CloudLLM": 0, "Simulated": 0
+        });
+        report["summary"]["gcs_off"]["backend_attempts_by_tier"] = serde_json::json!({
+            "Native": 0, "Hardware": 0, "LocalLLM": 1, "CloudLLM": 0, "Simulated": 1
+        });
+        report["summary"]["gcs_off"]["backend_attempts_by_name"] = serde_json::json!({
+            "Ollama": 1, "Simulated": 1
+        });
+        report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(2);
+        report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["runs_with_external_backend_attempts"] = Value::from(1);
+        report["summary"]["gcs_off"]["runs_with_simulated_backend_attempts"] = Value::from(1);
+        report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
+        assert!(audit(&report, None, None).is_empty());
     }
 
     #[test]
