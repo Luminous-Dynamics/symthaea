@@ -17,7 +17,7 @@ pub struct BoundedRiskEProcess {
     bet: f64,
     total_delta: f64,
     simultaneous_monitors: usize,
-    e_value: f64,
+    log_e_value: f64,
     alarmed: bool,
 }
 
@@ -54,7 +54,7 @@ impl BoundedRiskEProcess {
             bet,
             total_delta,
             simultaneous_monitors,
-            e_value: 1.0,
+            log_e_value: 0.0,
             alarmed: false,
         })
     }
@@ -77,11 +77,17 @@ impl BoundedRiskEProcess {
 
     /// Per-monitor threshold after a Bonferroni allocation of the global delta.
     pub fn alarm_threshold(self) -> f64 {
-        self.simultaneous_monitors as f64 / self.total_delta
+        (self.simultaneous_monitors as f64 / self.total_delta).ln()
     }
 
-    pub const fn e_value(self) -> f64 {
-        self.e_value
+    pub const fn log_e_value(self) -> f64 {
+        self.log_e_value
+    }
+
+    /// Exponentiated e-value for reporting. The monitor itself works in log
+    /// space so very long streams do not silently underflow or overflow.
+    pub fn e_value(self) -> f64 {
+        self.log_e_value.exp()
     }
 
     pub const fn alarmed(self) -> bool {
@@ -101,21 +107,21 @@ impl BoundedRiskEProcess {
             return None;
         }
 
-        let next_value = self.e_value * factor;
-        if !next_value.is_finite() {
-            self.e_value = f64::MAX;
+        let next_log_value = self.log_e_value + factor.ln();
+        if !next_log_value.is_finite() {
+            self.log_e_value = f64::MAX;
             self.alarmed = true;
             return Some(true);
         }
 
-        self.e_value = next_value;
-        self.alarmed |= self.e_value >= self.alarm_threshold();
+        self.log_e_value = next_log_value;
+        self.alarmed |= self.log_e_value >= self.alarm_threshold();
         Some(self.alarmed)
     }
 
     /// Reset the evidence stream, for example when starting a distinct episode.
     pub fn reset(&mut self) {
-        self.e_value = 1.0;
+        self.log_e_value = 0.0;
         self.alarmed = false;
     }
 }
@@ -134,17 +140,17 @@ mod tests {
 
         let mut process = BoundedRiskEProcess::new(0.2, 2.0, 0.05, 1)
             .expect("valid process");
-        let before = process.e_value();
+        let before = process.log_e_value();
         assert!(process.observe(f64::NAN).is_none());
         assert!(process.observe(-0.01).is_none());
         assert!(process.observe(1.01).is_none());
-        assert_eq!(process.e_value(), before);
+        assert_eq!(process.log_e_value(), before);
     }
 
     #[test]
     fn allocates_global_delta_across_parallel_monitors() {
         let process = BoundedRiskEProcess::new(0.2, 2.0, 0.05, 5).expect("valid process");
-        assert!((process.alarm_threshold() - 100.0).abs() < f64::EPSILON);
+        assert!((process.alarm_threshold().exp() - 100.0).abs() < 1e-10);
         assert_eq!(process.simultaneous_monitors(), 5);
         assert_eq!(process.total_delta(), 0.05);
     }
@@ -156,7 +162,7 @@ mod tests {
         for _ in 0..30 {
             assert_eq!(process.observe(0.05), Some(false));
         }
-        assert!(process.e_value() < 1.0);
+        assert!(process.log_e_value() < 0.0);
         assert!(!process.alarmed());
     }
 
@@ -171,7 +177,7 @@ mod tests {
             }
         }
         assert!(first_alarm.is_some());
-        assert!(process.e_value() >= process.alarm_threshold());
+        assert!(process.log_e_value() >= process.alarm_threshold());
         assert!(process.alarmed());
     }
 
@@ -194,7 +200,7 @@ mod tests {
         }
         assert!(process.alarmed());
         process.reset();
-        assert_eq!(process.e_value(), 1.0);
+        assert_eq!(process.log_e_value(), 0.0);
         assert!(!process.alarmed());
     }
 }
