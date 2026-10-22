@@ -8,6 +8,7 @@ on:
       - "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
       - "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
       - "docs/research/OOD_REACHABILITY_FALLBACK_V1.md"
+      - "docs/research/SEQUENTIAL_RESIDUAL_MONITOR_V1.md"
       - ".github/workflows/allostatic-control-bench.yml"
   workflow_dispatch:
 
@@ -57,3 +58,5 @@ jobs:
             allostatic-control-v1-multistep-horizon-summary.csv
             allostatic-control-v1-ood-fallback.csv
             allostatic-control-v1-ood-fallback-summary.csv
+            allostatic-control-v1-residual-monitor.csv
+            allostatic-control-v1-residual-monitor-summary.csv

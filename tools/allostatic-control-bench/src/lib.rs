@@ -9,6 +9,7 @@
 
 pub mod calibration;
 pub mod drift_monitor;
+pub mod innovation_monitor;
 pub mod model_mismatch;
 pub mod multistep_viability;
 pub mod robust_viability;
