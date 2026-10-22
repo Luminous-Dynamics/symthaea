@@ -439,6 +439,21 @@ fn validate_event_fields(trace: &TrajectoryScenario, event: &TraceEvent) -> Resu
     Ok(())
 }
 
+#[cfg(test)]
+pub(super) fn inspect_trace_json(trace_json: &serde_json::Value) -> Result<Vec<String>> {
+    let trace: TrajectoryScenario =
+        serde_json::from_value(trace_json.clone()).context("parse generated model trace")?;
+    let mut previous_sequence = None;
+    for event in &trace.events {
+        if previous_sequence.is_some_and(|previous| event.sequence <= previous) {
+            bail!("generated model trace event sequence must increase strictly");
+        }
+        previous_sequence = Some(event.sequence);
+        validate_event_fields(&trace, event)?;
+    }
+    Ok(inspect_trace(&trace))
+}
+
 fn inspect_trace(trace: &TrajectoryScenario) -> Vec<String> {
     let mut violations = Vec::new();
     let mut session_active = false;
