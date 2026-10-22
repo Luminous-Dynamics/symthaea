@@ -171,7 +171,6 @@ impl DetectorStats {
         scenario: Scenario,
         first_alarm_step: usize,
         final_log_e: f64,
-        peak_log_e: f64,
     ) {
         let detected = first_alarm_step < NO_ALARM_STEP;
         let successful = scenario.change_start.is_some_and(|start| {
@@ -197,7 +196,7 @@ impl DetectorStats {
                 first_alarm_step - scenario.change_start.expect("successful start"),
             );
         }
-        self.final_log_values.push(final_log_e.max(peak_log_e.min(final_log_e)));
+        self.final_log_values.push(final_log_e);
     }
 
     fn observe_changepoint(&mut self, scenario: Scenario, alarm: Option<ChangePointAlarm>, peak_candidates: usize) {
@@ -278,7 +277,7 @@ fn simulate_episode(
 ) -> Result<EpisodeOutcome, Box<dyn Error>> {
     // Same episode seed and step hash across scenarios make null/stealth rows
     // exactly paired, and make changes compare on common random numbers.
-    let seed = 0xC4A_N6E_0000_0000_u64.wrapping_add(episode as u64);
+    let seed = 0xC4A_06E0_0000_0000_u64.wrapping_add(episode as u64);
     let mut global = make_global()?;
     let mut changepoint = make_changepoint()?;
     let mut global_first_alarm_step = NO_ALARM_STEP;
@@ -391,7 +390,10 @@ fn summary_fields(output: &mut String, scenario: Scenario, summary: &ScenarioSum
         format!("{:.9}", summary.observed_loss_sum / episodes),
     ];
 
-    for detector in [&summary.global, &summary.changepoint] {
+    for (is_global, detector) in [
+        (true, &summary.global),
+        (false, &summary.changepoint),
+    ] {
         let rate = detector.alarms as f64 / episodes;
         let (lower, upper) = wilson_interval(detector.alarms, summary.episodes);
         fields.extend([
@@ -408,7 +410,7 @@ fn summary_fields(output: &mut String, scenario: Scenario, summary: &ScenarioSum
             optional_usize(percentile(&detector.detection_steps, 50)),
             optional_float(mean_usize(&detector.detection_delays)),
         ]);
-        if std::ptr::eq(detector, &summary.global) {
+        if is_global {
             fields.push(optional_float(mean_f64(&detector.final_log_values)));
         } else {
             fields.extend([
@@ -481,7 +483,7 @@ fn raw_fields(
         optional_usize(global_delay),
         optional_usize(cp_delay),
         optional_usize(cp_start_error),
-        cp_within_8.map_or_else(|| "NA".to_string(), csv_bool).to_string(),
+        cp_within_8.map_or_else(|| "NA".to_string(), |value| csv_bool(value).to_string()),
         outcome.peak_active_candidates.to_string(),
         format!("{global_log_threshold:.9}"),
         format!("{GLOBAL_DELTA:.9}"),
@@ -537,7 +539,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 scenario,
                 outcome.global_first_alarm_step,
                 outcome.global_final_log_e,
-                outcome.global_peak_log_e,
             );
             summary.changepoint.observe_changepoint(
                 scenario,
