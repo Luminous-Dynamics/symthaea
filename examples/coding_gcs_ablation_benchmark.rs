@@ -9,13 +9,14 @@
 //!
 //! Run with: cargo run --release --example coding_gcs_ablation_benchmark --features 'code_generation geodesic_synthesis' -- --repeats 3
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::Instant;
 use symthaea::coding_agent::{CodingAgent, CodingAgentConfig};
 use symthaea::language::code_executor::CodeExecutor;
 
 const BENCHMARK_ID: &str = "symthaea_gcs_runtime_ablation";
-const SCHEMA_VERSION: u32 = 3;
+const SCHEMA_VERSION: u32 = 4;
 
 struct TaskCase {
     id: &'static str,
@@ -62,7 +63,15 @@ struct EvalResult {
     iterations: usize,
     energy: f64,
     final_phase: String,
-    generation_tiers: Vec<String>,
+    selected_generation_tiers: Vec<String>,
+    backend_attempts: Vec<BackendAttemptRecord>,
+}
+
+#[derive(Debug, Clone)]
+struct BackendAttemptRecord {
+    tier: String,
+    backend_name: String,
+    success: bool,
 }
 
 fn task_suite() -> Vec<TaskCase> {
@@ -317,7 +326,12 @@ fn run_candidate(
         compile_errors: oracle.compile_errors, agent_elapsed_ms, verification_elapsed_ms,
         iterations: result.iterations_used, energy: result.total_energy,
         final_phase: format!("{}", result.final_phase),
-        generation_tiers: result.generation_tiers.iter().map(ToString::to_string).collect(),
+        selected_generation_tiers: result.generation_tiers.iter().map(ToString::to_string).collect(),
+        backend_attempts: result.actual_backend_attempts.iter().map(|attempt| BackendAttemptRecord {
+            tier: attempt.tier.to_string(),
+            backend_name: attempt.backend_name.clone(),
+            success: attempt.success,
+        }).collect(),
     }
 }
 
@@ -344,7 +358,12 @@ fn eval_json(result: &EvalResult) -> serde_json::Value {
         "iterations": result.iterations,
         "energy": result.energy,
         "final_phase": result.final_phase,
-        "generation_tiers": result.generation_tiers
+        "selected_generation_tiers": result.selected_generation_tiers,
+        "backend_attempts": result.backend_attempts.iter().map(|attempt| serde_json::json!({
+            "tier": attempt.tier,
+            "backend_name": attempt.backend_name,
+            "success": attempt.success
+        })).collect::<Vec<_>>()
     })
 }
 
@@ -571,7 +590,7 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
             use_llm: false,
             use_cloud: false,
             repeats: 3,
-            output_path: std::env::temp_dir().join("symthaea_gcs_ablation_v3.json"),
+            output_path: std::env::temp_dir().join("symthaea_gcs_ablation_v4.json"),
             print_manifest: true,
         }));
     }
@@ -589,7 +608,7 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
     let mut use_cloud = false;
     let mut repeats = 3_usize;
     let mut repeats_seen = false;
-    let mut output_path = std::env::temp_dir().join("symthaea_gcs_ablation_v3.json");
+    let mut output_path = std::env::temp_dir().join("symthaea_gcs_ablation_v4.json");
     let mut output_seen = false;
     let mut index = 0;
 
@@ -876,7 +895,7 @@ mod provenance_tests {
         assert!(!parsed.use_llm);
         assert!(!parsed.use_cloud);
         assert_eq!(parsed.repeats, 3);
-        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v3.json"));
+        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v4.json"));
     }
 
     #[test]
