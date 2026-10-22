@@ -1,0 +1,160 @@
+{
+  "schema_version": "usgs-larsen-basin-assessment-v0.1",
+  "assessment_id": "usgs-larsen-basin-reservoirs-au-fs20263063",
+  "status": "published_table_transcription_raw_release_not_yet_ingested",
+  "evidence_class": "published_geological_resource_assessment",
+  "sources": {
+    "fact_sheet": {
+      "publisher": "U.S. Geological Survey",
+      "title": "Assessment of undiscovered conventional oil and gas resources of the Larsen Basin, Antarctica, 2025",
+      "publication_number": "Fact Sheet 2026-3063",
+      "publication_date": "2026-02-25",
+      "doi": "10.3133/fs20263063",
+      "html_url": "https://pubs.usgs.gov/publication/fs20263063/full",
+      "record_url": "https://pubs.usgs.gov/publication/fs20263063"
+    },
+    "data_release": {
+      "title": "USGS National and Global Oil and Gas Assessment Project—Larsen Basin, Antarctica: Assessment Unit Boundaries, Assessment Input Data, and Fact Sheet Data Tables",
+      "doi": "10.5066/P14LT9DY",
+      "url": "https://www.usgs.gov/data/usgs-national-and-global-oil-and-gas-assessment-project-larsen-basin-antarctica-assessment",
+      "declared_license": "CC0 1.0 Universal",
+      "described_contents": [
+        "assessment unit boundaries",
+        "assessment input data",
+        "machine-readable fact-sheet result tables"
+      ],
+      "raw_bytes_downloaded_by_this_workstream": false,
+      "raw_sha256": null
+    }
+  },
+  "assessment_definition": {
+    "total_petroleum_system": "Mesozoic Composite Total Petroleum System",
+    "assessment_unit": "Larsen Basin Reservoirs AU",
+    "assessment_unit_probability": 0.9,
+    "resource_class": "undiscovered_technically_recoverable_conventional_resources",
+    "estimates_are_fully_risked": true,
+    "proved_reserves": false,
+    "discoveries": false,
+    "economically_recoverable_reserves": false,
+    "commercial_viability_assessed": false,
+    "fractile_semantics": {
+      "F95": "95-percent chance of at least the amount tabulated",
+      "F50": "50-percent chance of at least the amount tabulated",
+      "F5": "5-percent chance of at least the amount tabulated"
+    },
+    "important_limitations": [
+      "The assessment is a geology-based estimate of undiscovered resources, not a discovery, proved reserve, project forecast or economic-viability assessment.",
+      "The source states that geological inputs to the burial-history model are uncertain and that the model gives only a general indication of thermal maturity.",
+      "Do not apply the assessment-unit probability a second time to the table's fully risked estimates.",
+      "A zero F95 value is a reported quantile; by itself it does not specify the exact probability of zero resources."
+    ]
+  },
+  "assessment_inputs": {
+    "oil_field_count": {
+      "minimum": 1,
+      "median": 20,
+      "maximum": 80,
+      "calculated_mean": 22.1,
+      "unit": "fields"
+    },
+    "gas_field_count": {
+      "minimum": 1,
+      "median": 50,
+      "maximum": 200,
+      "calculated_mean": 55.1,
+      "unit": "fields"
+    },
+    "oil_field_size": {
+      "minimum": 5,
+      "median": 8,
+      "maximum": 300,
+      "calculated_mean": 13.6,
+      "unit": "MMBO"
+    },
+    "gas_field_size": {
+      "minimum": 30,
+      "median": 48,
+      "maximum": 30000,
+      "calculated_mean": 272.6,
+      "unit": "BCFG"
+    }
+  },
+  "results": {
+    "oil_accumulations": {
+      "oil": {
+        "unit": "MMBO",
+        "F95": 0,
+        "F50": 245,
+        "F5": 591,
+        "mean": 269
+      },
+      "gas": {
+        "unit": "BCFG",
+        "F95": 0,
+        "F50": 637,
+        "F5": 1538,
+        "mean": 698
+      },
+      "ngl": {
+        "unit": "MMBNGL",
+        "F95": 0,
+        "F50": 29,
+        "F5": 71,
+        "mean": 32
+      }
+    },
+    "gas_accumulations": {
+      "oil": null,
+      "gas": {
+        "unit": "BCFG",
+        "F95": 0,
+        "F50": 10702,
+        "F5": 36266,
+        "mean": 13559
+      },
+      "ngl": {
+        "unit": "MMBNGL",
+        "F95": 0,
+        "F50": 321,
+        "F5": 1089,
+        "mean": 407
+      }
+    },
+    "total_undiscovered_conventional_resources": {
+      "oil": {
+        "unit": "MMBO",
+        "F95": 0,
+        "F50": 245,
+        "F5": 591,
+        "mean": 269
+      },
+      "gas": {
+        "unit": "BCFG",
+        "F95": 0,
+        "F50": 11339,
+        "F5": 37804,
+        "mean": 14257
+      },
+      "ngl": {
+        "unit": "MMBNGL",
+        "F95": 0,
+        "F50": 350,
+        "F5": 1160,
+        "mean": 439
+      }
+    }
+  },
+  "verification_scope": {
+    "completed": [
+      "Published HTML/Factsheet table transcription",
+      "Units and row labels recorded explicitly",
+      "Published total row included for independent comparison"
+    ],
+    "not_completed": [
+      "Raw CC0 data release download and SHA-256 pinning",
+      "Independent reproduction of the USGS geological model",
+      "Independent calculation of the published resource distributions",
+      "Any extraction, project economics, or commerciality assessment"
+    ]
+  }
+}
