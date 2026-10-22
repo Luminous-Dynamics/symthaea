@@ -485,16 +485,19 @@ mod tests {
             let pit = approximate_standard_normal_cdf(observed);
             accumulated_observations += observed;
 
-            let pooled = intercept.observe(pit, &[]).expect("finite PIT");
-            let conditional = contextual
-                .observe(pit, &[action])
-                .expect("finite PIT and predictable action context");
-
-            if pooled.decision == PrequentialPitDecision::Alarm {
-                intercept_alarm = Some(observation_index);
+            if intercept_alarm.is_none() {
+                let pooled = intercept.observe(pit, &[]).expect("finite PIT");
+                if pooled.decision == PrequentialPitDecision::Alarm {
+                    intercept_alarm = Some(observation_index);
+                }
             }
-            if conditional.decision == PrequentialPitDecision::Alarm {
-                contextual_alarm = Some(observation_index);
+            if contextual_alarm.is_none() {
+                let conditional = contextual
+                    .observe(pit, &[action])
+                    .expect("finite PIT and predictable action context");
+                if conditional.decision == PrequentialPitDecision::Alarm {
+                    contextual_alarm = Some(observation_index);
+                }
             }
             if intercept_alarm.is_some() && contextual_alarm.is_some() {
                 break;
