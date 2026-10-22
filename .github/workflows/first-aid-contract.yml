@@ -150,6 +150,7 @@ jobs:
         run: cargo test -p xtask first_aid::tests -- --nocapture
 
       - name: Verify first-aid trajectory validator unit tests
+        id: trajectory-tests
         run: cargo test -p xtask first_aid_trajectory::tests -- --nocapture
 
       - name: Verify independent finite-state model tests
@@ -170,6 +171,7 @@ jobs:
           RUSTC_VERSION: ${{ steps.toolchain.outputs.rustc_version }}
           CARGO_VERSION: ${{ steps.toolchain.outputs.cargo_version }}
           STATE_MODEL_TEST_OUTCOME: ${{ steps.state-model-tests.outcome }}
+          TRAJECTORY_TEST_OUTCOME: ${{ steps.trajectory-tests.outcome }}
         run: cargo run -p xtask -- first-aid-trajectory-validate --out target/first-aid-trajectory-receipt.json
 
       - name: Run the synthetic guideline change-impact validator
@@ -225,6 +227,7 @@ jobs:
               .validator_source_sha256, .entrypoint_source_sha256,
               .executable_sha256] | all(test("^[0-9a-f]{64}$"))) and
             .state_model_test_outcome == "success" and
+            .trajectory_test_outcome == "success" and
             (.rustc_version | startswith("rustc 1.96.0 ")) and
             (.cargo_version | startswith("cargo 1.96.0 "))
           ' target/first-aid-trajectory-receipt.json
