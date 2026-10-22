@@ -6,13 +6,13 @@
   "branch": "research/entropy-causal-cut-benchmark-v1",
   "source": {
     "path": "validation/family_heldout_scm_benchmark.py",
-    "git_blob": "48f7a9e1e6b25ec9be7e8f90f10f1bfa3418b94f"
+    "git_blob": "a67b65fe34fe40533bd3425f818b94b152c21acc"
   },
   "tests": {
     "path": "validation/test_family_heldout_scm_benchmark.py",
-    "git_blob": "5cd2c2d7adc3caa78f6bc87b9903f35b2525c7c3",
-    "count": 11,
-    "result": "11/11_PASS_LOCAL"
+    "git_blob": "9879240cd7bc4e64f19d76350f263c0af8642160",
+    "count": 14,
+    "result": "14/14_PASS_LOCAL"
   },
   "run": {
     "command": "python3 validation/family_heldout_scm_benchmark.py --nodes 6 --cases-per-cell 4 --output family_heldout_scm_suite.json",
@@ -30,7 +30,20 @@
     "embedded_self_test": "PASS_LOCAL",
     "artifact_bytes": 31607,
     "artifact_sha256": "aeb54c62299144e28013be786d9311f0b8e6d92c2d95bf749f514419dd0f9117",
-    "layered_score_covered": true
+    "layered_score_covered": true,
+    "sampler_smoke": {
+      "world": "5-node chain with AND mechanisms",
+      "sample_counts": {
+        "observational": 32,
+        "do_x0_0": 32,
+        "do_x0_1": 32
+      },
+      "noise_probability": 0.1,
+      "artifact_path": "/mnt/data/family_heldout_scm_sample_smoke_2026-10-22.json",
+      "artifact_bytes": 2316,
+      "artifact_sha256": "b3647893810cac0fa74e557885ea953c7e26ad8787341c9552058b33fd171cd5",
+      "source_git_blob": "a67b65fe34fe40533bd3425f818b94b152c21acc"
+    }
   },
   "scoring": {
     "metrics": [
@@ -54,7 +67,14 @@
     "No sample simulator, latent confounding, intervention failure, or statistical intervals",
     "No direct ACDB/CausalArena/CauScale comparison",
     "Local test receipt is not a GitHub Actions result; skipped is not pass",
-    "Layered scoring requires externally provided CPDAG compelled arrows and minimum intervention set; exact ACDB parity remains unverified."
+    "Layered scoring requires externally provided CPDAG compelled arrows and minimum intervention set; exact ACDB parity remains unverified.",
+    "Sample simulator has no graph-inference algorithm; no method performance or confidence intervals are yet reported."
   ],
-  "next_gate": "Build observation/intervention simulator and contract-matched ACDB scoring adapter; then evaluate family-held-out baselines."
+  "next_gate": "Build observation/intervention simulator and contract-matched ACDB scoring adapter; then evaluate family-held-out baselines.",
+  "capabilities": [
+    "deterministic family-held-out SCM generator",
+    "strict parent-list DAG validation",
+    "skeleton/directed/CPDAG-inspired layered graph scoring",
+    "deterministic observational and single-hard-do sample simulator"
+  ]
 }
