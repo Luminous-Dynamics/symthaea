@@ -345,7 +345,10 @@ mod tests {
             {
                 assert!((actual - expected).abs() < 1e-12);
             }
-            let max_component = expected_components.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+            let max_component = expected_components
+                .iter()
+                .copied()
+                .fold(f64::NEG_INFINITY, f64::max);
             let expected_mix = max_component
                 + ((expected_components[0] - max_component).exp()
                     + (expected_components[1] - max_component).exp()
@@ -387,8 +390,8 @@ mod tests {
         assert!(BoundedRiskEProcess::new(0.2, 1.0, 1.0, 1).is_none());
         assert!(BoundedRiskEProcess::new(0.2, 1.0, 0.05, 0).is_none());
 
-        let mut process = BoundedRiskEProcess::new(0.2, 2.0, 0.05, 1)
-            .expect("valid process");
+        let mut process =
+            BoundedRiskEProcess::new(0.2, 2.0, 0.05, 1).expect("valid process");
         let before = process.log_e_value();
         assert!(process.observe(f64::NAN).is_none());
         assert!(process.observe(-0.01).is_none());
@@ -406,8 +409,8 @@ mod tests {
 
     #[test]
     fn repeated_low_losses_reduce_evidence_without_alarms() {
-        let mut process = BoundedRiskEProcess::new(0.2, 2.0, 0.05, 1)
-            .expect("valid process");
+        let mut process =
+            BoundedRiskEProcess::new(0.2, 2.0, 0.05, 1).expect("valid process");
         for _ in 0..30 {
             assert_eq!(process.observe(0.05), Some(false));
         }
@@ -417,8 +420,8 @@ mod tests {
 
     #[test]
     fn sustained_high_losses_cross_the_anytime_alarm_boundary() {
-        let mut process = BoundedRiskEProcess::new(0.15, 0.5 / 0.15, 0.05, 5)
-            .expect("valid process");
+        let mut process =
+            BoundedRiskEProcess::new(0.15, 0.5 / 0.15, 0.05, 5).expect("valid process");
         let mut first_alarm = None;
         for step in 0..8 {
             if process.observe(0.65) == Some(true) {
@@ -442,8 +445,8 @@ mod tests {
 
     #[test]
     fn reset_starts_a_fresh_evidence_stream() {
-        let mut process = BoundedRiskEProcess::new(0.15, 0.5 / 0.15, 0.05, 1)
-            .expect("valid process");
+        let mut process =
+            BoundedRiskEProcess::new(0.15, 0.5 / 0.15, 0.05, 1).expect("valid process");
         for _ in 0..8 {
             let _ = process.observe(0.65);
         }
