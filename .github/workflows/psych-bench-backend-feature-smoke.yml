@@ -1,0 +1,120 @@
+name: Psych-Bench Backend Feature Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/psych-bench-backend-feature-smoke.yml'
+      - 'crates/domains/symthaea-psych-bench/tests/full_backend_smoke.rs'
+      - 'crates/domains/symthaea-psych-bench/Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-feature-smoke:
+    name: Exact-subject backend-feature smoke theorem
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact PR subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Bind exact subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test -z "$(git status --porcelain)"
+          echo "sha=$actual" >> "$GITHUB_OUTPUT"
+          printf 'qualified_subject=%s\n' "$actual"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+          rustup default 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Install backend feature system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libasound2-dev libdbus-1-dev
+
+      - name: Enforce feature-smoke claim ceiling
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('crates/domains/symthaea-psych-bench/tests/full_backend_smoke.rs')
+          text = path.read_text()
+          code = '\n'.join(
+              line for line in text.splitlines()
+              if not line.lstrip().startswith('//')
+          )
+
+          required = [
+              'feature_smoke_test!',
+              'let result = $bench.run(&config);',
+              'assert_metrics_finite(&result);',
+          ]
+          forbidden = [
+              'harness::live_runner',
+              'CognitiveLoopBenchmarkRunner',
+              'CognitiveLoopService',
+              'ContinuousMind',
+              'cycle_with_hv',
+          ]
+
+          for marker in required:
+              if marker not in code:
+                  raise SystemExit(f'missing feature-smoke execution marker: {marker}')
+          for marker in forbidden:
+              if marker in code:
+                  raise SystemExit(
+                      f'feature-smoke theorem crossed into live-backend execution: {marker}'
+                  )
+
+          count = code.count('feature_smoke_test!(')
+          if count != 22:
+              raise SystemExit(f'expected 22 explicit smoke invocations, found {count}')
+          PY
+
+      - name: Source format diagnostic
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-psych-bench/tests/full_backend_smoke.rs
+
+      - name: Execute feature-enabled smoke battery
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench \
+            --features symthaea-backend \
+            --test full_backend_smoke -- --nocapture
+
+      - name: Postflight exact-subject immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '${{ steps.subject.outputs.sha }}'
+          git diff --exit-code
+          test -z "$(git status --porcelain)"

@@ -1,10 +1,20 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Smoke tests for the full Symthaea backend.
+//! Feature-enabled benchmark implementation smoke tests.
 //!
-//! Runs all 22 benchmarks with the real ContinuousMind backend
-//! and verifies no panics, all metrics finite.
+//! Historical note: this target is named `full_backend_smoke`, but it does **not**
+//! instantiate `CognitiveLoopBenchmarkRunner`, `ContinuousMind`, or another live
+//! cognitive-loop backend. Its actual theorem is narrower:
+//!
+//! - compile the psych-bench crate with `symthaea-backend` enabled;
+//! - call each listed benchmark's ordinary `PsychBenchmark::run()` implementation;
+//! - require non-empty, finite metrics.
+//!
+//! A passing target therefore establishes feature-compatible benchmark execution,
+//! not that 22 tasks were solved through the live Symthaea cognitive backend.
+//! Live-backend evidence belongs to `harness::live_runner` / explicit execution
+//! contracts and must be qualified separately.
 #![cfg(feature = "symthaea-backend")]
 
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
@@ -55,7 +65,7 @@ fn assert_metrics_finite(result: &BenchmarkResult) {
     }
 }
 
-macro_rules! full_smoke_test {
+macro_rules! feature_smoke_test {
     ($name:ident, $bench:expr) => {
         #[test]
         fn $name() {
@@ -72,36 +82,36 @@ macro_rules! full_smoke_test {
 }
 
 // WorM
-full_smoke_test!(full_nback, NBackBenchmark);
-full_smoke_test!(full_change_detection, ChangeDetectionBenchmark);
-full_smoke_test!(full_serial_recall, SerialRecallBenchmark);
-full_smoke_test!(full_spatial_updating, SpatialUpdatingBenchmark);
-full_smoke_test!(full_binding, BindingBenchmark);
+feature_smoke_test!(feature_nback, NBackBenchmark);
+feature_smoke_test!(feature_change_detection, ChangeDetectionBenchmark);
+feature_smoke_test!(feature_serial_recall, SerialRecallBenchmark);
+feature_smoke_test!(feature_spatial_updating, SpatialUpdatingBenchmark);
+feature_smoke_test!(feature_binding, BindingBenchmark);
 
 // CogBench
-full_smoke_test!(
-    full_probabilistic_reasoning,
+feature_smoke_test!(
+    feature_probabilistic_reasoning,
     ProbabilisticReasoningBenchmark
 );
-full_smoke_test!(full_horizon, HorizonBenchmark);
-full_smoke_test!(full_restless_bandit, RestlessBanditBenchmark);
-full_smoke_test!(full_instrumental, InstrumentalLearningBenchmark);
-full_smoke_test!(full_two_step, TwoStepBenchmark);
-full_smoke_test!(full_temporal_discounting, TemporalDiscountingBenchmark);
-full_smoke_test!(full_bart, BartBenchmark);
+feature_smoke_test!(feature_horizon, HorizonBenchmark);
+feature_smoke_test!(feature_restless_bandit, RestlessBanditBenchmark);
+feature_smoke_test!(feature_instrumental, InstrumentalLearningBenchmark);
+feature_smoke_test!(feature_two_step, TwoStepBenchmark);
+feature_smoke_test!(feature_temporal_discounting, TemporalDiscountingBenchmark);
+feature_smoke_test!(feature_bart, BartBenchmark);
 
 // Butlin
-full_smoke_test!(full_butlin, ButlinIndicatorSuite);
+feature_smoke_test!(feature_butlin, ButlinIndicatorSuite);
 
 // ToMBench
-full_smoke_test!(full_false_belief, FalseBeliefBenchmark);
-full_smoke_test!(full_faux_pas, FauxPasBenchmark);
-full_smoke_test!(full_persuasion, PersuasionBenchmark);
-full_smoke_test!(full_strange_story, StrangeStoryBenchmark);
-full_smoke_test!(full_hinting, HintingBenchmark);
+feature_smoke_test!(feature_false_belief, FalseBeliefBenchmark);
+feature_smoke_test!(feature_faux_pas, FauxPasBenchmark);
+feature_smoke_test!(feature_persuasion, PersuasionBenchmark);
+feature_smoke_test!(feature_strange_story, StrangeStoryBenchmark);
+feature_smoke_test!(feature_hinting, HintingBenchmark);
 
 // MemoryAgent
-full_smoke_test!(full_accurate_retrieval, AccurateRetrievalBenchmark);
-full_smoke_test!(full_test_time_learning, TestTimeLearningBenchmark);
-full_smoke_test!(full_long_range, LongRangeBenchmark);
-full_smoke_test!(full_conflict_resolution, ConflictResolutionBenchmark);
+feature_smoke_test!(feature_accurate_retrieval, AccurateRetrievalBenchmark);
+feature_smoke_test!(feature_test_time_learning, TestTimeLearningBenchmark);
+feature_smoke_test!(feature_long_range, LongRangeBenchmark);
+feature_smoke_test!(feature_conflict_resolution, ConflictResolutionBenchmark);
