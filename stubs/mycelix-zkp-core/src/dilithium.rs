@@ -10,16 +10,22 @@
 //! - Signature: 4,595 bytes
 
 use pqcrypto_dilithium::dilithium5;
-use pqcrypto_traits::sign::{PublicKey as PQPublicKey, SecretKey as PQSecretKey, SignedMessage};
+use pqcrypto_traits::sign::{
+    DetachedSignature as PQDetachedSignature, PublicKey as PQPublicKey,
+    SecretKey as PQSecretKey, SignedMessage,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::error::{ZkpError, ZkpResult};
 use crate::types::AuthenticatedProof;
 
-/// Dilithium5 exact sizes (empirically verified).
+/// Dilithium5 encoded public-key size (bytes).
 pub const PUBLIC_KEY_SIZE: usize = 2_592;
+/// Dilithium5 encoded secret-key size (bytes).
 pub const SECRET_KEY_SIZE: usize = 4_896;
+/// Detached Dilithium5 signature size (bytes). The legacy `sign` method
+/// returns an attached SignedMessage containing both the signature and message.
 pub const SIGNATURE_SIZE: usize = 4_595;
 
 /// A Dilithium5 keypair for proof authentication.
@@ -95,6 +101,18 @@ impl DilithiumKeypair {
         Ok(signed.as_bytes().to_vec())
     }
 
+    /// Sign a message and return only the detached signature bytes.
+    ///
+    /// New protocol formats should prefer detached signatures when the message
+    /// is already carried separately. The legacy `sign` method intentionally
+    /// retains PQCrypto's attached SignedMessage format for compatibility.
+    pub fn sign_detached(&self, message: &[u8]) -> ZkpResult<Vec<u8>> {
+        let sk = dilithium5::SecretKey::from_bytes(&self.secret_key)
+            .map_err(|e| ZkpError::InvalidKeyMaterial(format!("secret key: {:?}", e)))?;
+        let signature = dilithium5::detached_sign(message, &sk);
+        Ok(signature.as_bytes().to_vec())
+    }
+
     /// Sign an AuthenticatedProof in place (fills the signature field).
     pub fn sign_proof(&self, proof: &mut AuthenticatedProof) -> ZkpResult<()> {
         let message = proof.construct_signed_message();
@@ -110,7 +128,11 @@ impl DilithiumKeypair {
     }
 }
 
-/// Verify a Dilithium5 signature (standalone, no keypair needed).
+/// Verify a legacy PQCrypto attached SignedMessage.
+///
+/// The `signature` argument must contain the encoded message plus its
+/// signature, as returned by `DilithiumKeypair::sign`. For new protocols,
+/// prefer `verify_detached_signature`.
 pub fn verify_signature(message: &[u8], signature: &[u8], public_key: &[u8]) -> ZkpResult<bool> {
     if public_key.len() != PUBLIC_KEY_SIZE {
         return Err(ZkpError::InvalidKeyMaterial(format!(
@@ -128,6 +150,37 @@ pub fn verify_signature(message: &[u8], signature: &[u8], public_key: &[u8]) -> 
 
     match dilithium5::open(&signed_msg, &pk) {
         Ok(verified_msg) => Ok(verified_msg == message),
+        Err(_) => Ok(false),
+    }
+}
+
+/// Verify a detached Dilithium5 signature against a separately supplied message.
+///
+/// Returns `Ok(false)` for a cryptographically invalid signature and a
+/// structured error for malformed key/signature encodings.
+pub fn verify_detached_signature(
+    message: &[u8],
+    signature: &[u8],
+    public_key: &[u8],
+) -> ZkpResult<bool> {
+    if public_key.len() != PUBLIC_KEY_SIZE {
+        return Err(ZkpError::InvalidKeyMaterial(format!(
+            "public key: expected {} bytes, got {}",
+            PUBLIC_KEY_SIZE,
+            public_key.len()
+        )));
+    }
+    if signature.len() != SIGNATURE_SIZE {
+        return Err(ZkpError::SignatureInvalid);
+    }
+
+    let pk = dilithium5::PublicKey::from_bytes(public_key)
+        .map_err(|e| ZkpError::InvalidKeyMaterial(format!("public key parse: {:?}", e)))?;
+    let sig = dilithium5::DetachedSignature::from_bytes(signature)
+        .map_err(|_| ZkpError::SignatureInvalid)?;
+
+    match dilithium5::verify_detached_signature(&sig, message, &pk) {
+        Ok(()) => Ok(true),
         Err(_) => Ok(false),
     }
 }
@@ -180,6 +233,75 @@ mod tests {
     }
 
     #[test]
+    fn test_detached_signature_roundtrip_and_exact_size() {
+        let kp = DilithiumKeypair::generate();
+        let message = b"detached signature test";
+        let signature = kp.sign_detached(message).unwrap();
+
+        assert_eq!(signature.len(), SIGNATURE_SIZE);
+        assert!(verify_detached_signature(message, &signature, kp.public_key()).unwrap());
+    }
+
+    #[test]
+    fn test_detached_signature_rejects_mutated_message() {
+        let kp = DilithiumKeypair::generate();
+        let signature = kp.sign_detached(b"original statement").unwrap();
+        assert!(
+            !verify_detached_signature(b"changed statement", &signature, kp.public_key())
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_detached_signature_rejects_mutated_signature() {
+        let kp = DilithiumKeypair::generate();
+        let message = b"mutation test";
+        let signature = kp.sign_detached(message).unwrap();
+
+        for index in [0, signature.len() / 2, signature.len() - 1] {
+            let mut mutated = signature.clone();
+            mutated[index] ^= 0x01;
+            assert!(
+                !matches!(
+                    verify_detached_signature(message, &mutated, kp.public_key()),
+                    Ok(true)
+                ),
+                "mutated detached signature at byte {index} was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn test_detached_signature_rejects_truncation_and_wrong_key() {
+        let signer = DilithiumKeypair::generate();
+        let other = DilithiumKeypair::generate();
+        let message = b"key and length negative controls";
+        let signature = signer.sign_detached(message).unwrap();
+
+        assert!(matches!(
+            verify_detached_signature(
+                message,
+                &signature[..signature.len() - 1],
+                signer.public_key()
+            ),
+            Err(ZkpError::SignatureInvalid)
+        ));
+        assert!(!verify_detached_signature(message, &signature, other.public_key()).unwrap());
+    }
+
+    #[test]
+    fn test_detached_signature_rejects_wrong_public_key_length() {
+        assert!(matches!(
+            verify_detached_signature(
+                b"message",
+                &[0; SIGNATURE_SIZE],
+                &[0; PUBLIC_KEY_SIZE - 1]
+            ),
+            Err(ZkpError::InvalidKeyMaterial(_))
+        ));
+    }
+
+    #[test]
     fn test_verify_rejects_tampered_message() {
         let kp = DilithiumKeypair::generate();
         let sig = kp.sign(b"original").unwrap();
@@ -189,12 +311,17 @@ mod tests {
 
     #[test]
     fn test_client_id_deterministic() {
-        let kp1 =
-            DilithiumKeypair::from_bytes(vec![0u8; PUBLIC_KEY_SIZE], vec![0u8; SECRET_KEY_SIZE])
-                .unwrap();
-        let kp2 =
-            DilithiumKeypair::from_bytes(vec![0u8; PUBLIC_KEY_SIZE], vec![0u8; SECRET_KEY_SIZE])
-                .unwrap();
+        let generated = DilithiumKeypair::generate();
+        let kp1 = DilithiumKeypair::from_bytes(
+            generated.public_key().to_vec(),
+            generated.secret_key.clone(),
+        )
+        .unwrap();
+        let kp2 = DilithiumKeypair::from_bytes(
+            generated.public_key().to_vec(),
+            generated.secret_key.clone(),
+        )
+        .unwrap();
         assert_eq!(kp1.client_id(), kp2.client_id());
     }
 }
