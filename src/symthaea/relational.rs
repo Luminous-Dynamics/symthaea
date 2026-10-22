@@ -162,7 +162,7 @@ impl PartnershipState {
     /// Evidence status of the dyadic Phi estimate. Never infer availability
     /// from the numeric value, since a valid estimate could also equal zero.
     pub fn phi_dyad_status(&self) -> PhiDyadStatus {
-        PhiDyadStatus::UnavailableNoIndependentPartnerObservations
+        PhiDyadStatus::UnavailableNoIndependentPairedStreams
     }
 }
 
