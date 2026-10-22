@@ -482,11 +482,11 @@ fn run_trial_with_discrepancy(
             // second round to reduce greedy over-exploitation.
             let scheduled_audit = active_selector == ActiveSelector::InformationGainWithAudits
                 && (live.len() == 1 || (round + 1) % 2 == 0);
-            if scheduled_audit {
+            let selected = if scheduled_audit {
                 audit_queries += 1;
                 Some(remaining[rand_index(&mut audit_rng, remaining.len())].clone())
             } else {
-                let selected = match active_selector {
+                match active_selector {
                     ActiveSelector::RawVariance => {
                         select_most_informative_experiment(&remaining, &live, predict)
                             .map(|(experiment, _)| experiment.clone())
@@ -503,9 +503,8 @@ fn run_trial_with_discrepancy(
                         )
                         .map(|(experiment, _)| experiment.clone())
                     }
-                };
-                selected
-            }
+                }
+            };
             let Some(selected) = selected else {
                 selection_failed = true;
                 break;
