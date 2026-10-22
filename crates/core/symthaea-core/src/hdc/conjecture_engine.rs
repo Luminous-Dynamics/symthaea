@@ -83,10 +83,12 @@ use dynamics::*;
 /// FEP-flavored active experiment selection. See
 /// `experiment_selection.rs` module docs.
 pub use experiment_selection::{
-    EpistemicAssessment, InformationGainScenario, assess_epistemic_value, epistemic_value,
-    expected_information_gain_nats, expected_information_gain_over_scenarios_nats,
+    EpistemicAssessment, InformationGainScenario, PriorInformationGainScenario,
+    assess_epistemic_value, epistemic_value, expected_information_gain_nats,
+    expected_information_gain_over_prior_scenarios_nats, expected_information_gain_over_scenarios_nats,
     expected_information_gain_weighted_nats, expected_information_gain_weighted_over_scenarios_nats,
     expected_information_gain_worst_case_nats, select_experiment_by_information_gain_per_cost,
+    select_experiment_by_prior_robust_information_gain_per_cost,
     select_experiment_by_scenario_robust_information_gain_per_cost,
     select_experiment_by_weighted_information_gain_per_cost,
     select_experiment_by_weighted_scenario_robust_information_gain_per_cost,
