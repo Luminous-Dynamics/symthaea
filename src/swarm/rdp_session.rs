@@ -194,7 +194,10 @@ impl RdpSession {
             }
             self.session_key = Some(key);
             self.key_established_at = Some(Instant::now());
-            self.nonce_counter = 0;
+            // Keep the counter monotonic across rekeys. Resetting it while
+            // retaining source_id, epoch, and the same replay-window stream
+            // would reuse sequence values and cause accepted fresh frames to
+            // collide with entries from the previous key's grace period.
             if self.state == SessionState::Handshaking {
                 self.state = SessionState::Authenticating;
             } else {
@@ -285,20 +288,13 @@ impl RdpSession {
         self.session_key.as_ref()
     }
 
-    /// Allocate the next nonce for AEAD encryption.
+    /// Allocate the next monotonic nonce counter value.
     ///
-    /// Uses `wrapping_add` to match the project convention (see
-    /// `peer_registry.rs:242`, `rdp_codec.rs:318`, etc.) and to avoid a
-    /// debug-build panic on overflow. In release builds the previous
-    /// `+= 1` form silently wrapped, which is the same observable
-    /// behavior as `wrapping_add`; the change makes the wrap explicit
-    /// and prevents debug crashes.
-    ///
-    /// Note: u64 monotonic counter at 50 Hz wraps in ~5.8 billion years.
-    /// At 30 fps RDP frame rate, the low 32 bits used in the AEAD nonce
-    /// wrap in ~4.5 years of continuous operation. Real session lifetime
-    /// is governed by `KEY_ROTATION_GRACE_SECS` rekey cadence (typically
-    /// 30 minutes), so wraparound is not a security concern in practice.
+    /// This generic counter uses `wrapping_add` so debug and release builds
+    /// have the same overflow behavior. The AEAD wire format has a narrower
+    /// 32-bit sequence field, so `seal` separately refuses to encrypt once
+    /// that field is exhausted. The counter is preserved across key rotation
+    /// so the replay window does not see a reset sequence in the same stream.
     pub fn next_nonce(&mut self) -> u64 {
         let n = self.nonce_counter;
         self.nonce_counter = self.nonce_counter.wrapping_add(1);
@@ -314,8 +310,10 @@ impl RdpSession {
     ///
     /// Wire format: `[ nonce (12 bytes) | ciphertext | poly1305 tag (16 bytes) ]`
     ///
-    /// Returns `None` if the session has no key (handshake not complete) or
-    /// the underlying AEAD call fails (should not happen with valid inputs).
+    /// Returns `None` if no key is established, the 32-bit nonce sequence
+    /// is exhausted, or the underlying AEAD call fails. A new session is
+    /// required after sequence exhaustion; the function never truncates and
+    /// wraps the sequence field.
     ///
     /// `payload_type` must differ between RdpFrame (`0x10`) and InputFrame (`0x11`)
     /// and any other stream type to prevent nonce collisions. See `rdp_wire` for
@@ -324,7 +322,14 @@ impl RdpSession {
     pub fn seal(&mut self, plaintext: &[u8], payload_type: u8) -> Option<Vec<u8>> {
         use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, aead::Aead};
         let key = *self.session_key.as_ref()?;
-        let seq = (self.next_nonce() & 0xFFFF_FFFF) as u32;
+
+        // Never silently truncate a larger counter and repeat a 32-bit nonce
+        // sequence under the same source/epoch stream. Rotation preserves the
+        // counter; after exhaustion the caller must establish a fresh session.
+        if self.nonce_counter > u32::MAX as u64 {
+            return None;
+        }
+        let seq = self.next_nonce() as u32;
 
         // Nonce layout mirrors `swarm::mesh::packet_crypto::build_nonce` so
         // future reuse of those primitives remains straightforward:
@@ -750,6 +755,78 @@ mod tests {
         assert_eq!(s.encryption_key(), Some(&[2u8; 32]));
         // Old key still available during grace period.
         assert!(s.prev_session_key.is_some());
+    }
+
+    #[test]
+    fn test_nonce_counter_remains_monotonic_across_rekey() {
+        let mut s = RdpSession::new("s1".into(), "peer1".into(), default_config(), true);
+        s.on_connected();
+        s.on_handshake_complete([1u8; 32]);
+        s.nonce_counter = 9;
+        s.on_attestation(0.5, &[0u8; 32], &[]);
+        s.start_rekey();
+        s.on_handshake_complete([2u8; 32]);
+
+        assert_eq!(s.nonce_counter, 9);
+        assert_eq!(s.next_nonce(), 9);
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_rekey_keeps_aead_sequence_monotonic_for_replay_window() {
+        let mut sender = RdpSession::new("sender".into(), "peer".into(), default_config(), true);
+        let mut receiver = RdpSession::new("receiver".into(), "peer".into(), default_config(), false);
+
+        // The two endpoints must model the same sender nonce namespace so the
+        // receiver's replay window observes the exact wire stream.
+        sender.source_id = [0xA1; 8];
+        receiver.source_id = sender.source_id;
+        sender.epoch = 0x52;
+        receiver.epoch = sender.epoch;
+
+        sender.on_connected();
+        receiver.on_connected();
+        sender.on_handshake_complete([1u8; 32]);
+        receiver.on_handshake_complete([1u8; 32]);
+        sender.on_attestation(0.5, &[0u8; 32], &[]);
+        receiver.on_attestation(0.5, &[0u8; 32], &[]);
+
+        let before = sender.seal(b"before rekey", 0x10).expect("seal before rekey");
+        assert_eq!(
+            receiver.open_with_payload_type(&before, 0x10).as_deref(),
+            Some(b"before rekey".as_slice())
+        );
+
+        sender.start_rekey();
+        receiver.start_rekey();
+        sender.on_handshake_complete([2u8; 32]);
+        receiver.on_handshake_complete([2u8; 32]);
+
+        let after = sender.seal(b"after rekey", 0x10).expect("seal after rekey");
+        let sequence = u32::from_le_bytes(after[8..12].try_into().unwrap());
+        assert_eq!(sequence, 1, "rekey must not reset the wire sequence to zero");
+        assert_eq!(
+            receiver.open_with_payload_type(&after, 0x10).as_deref(),
+            Some(b"after rekey".as_slice()),
+            "fresh post-rekey traffic must not collide with the previous replay-window sequence"
+        );
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_seal_fails_closed_before_32_bit_nonce_sequence_wrap() {
+        let mut s = RdpSession::new("s1".into(), "peer1".into(), default_config(), true);
+        s.on_connected();
+        s.on_handshake_complete([0x42; 32]);
+        s.nonce_counter = u32::MAX as u64;
+
+        // The final representable sequence number can be used exactly once.
+        assert!(s.seal(b"last allowed sequence", 0x10).is_some());
+        assert_eq!(s.nonce_counter, u32::MAX as u64 + 1);
+
+        // Never mask the larger counter back to sequence zero.
+        assert!(s.seal(b"must fail", 0x10).is_none());
+        assert_eq!(s.nonce_counter, u32::MAX as u64 + 1);
     }
 
     #[test]
