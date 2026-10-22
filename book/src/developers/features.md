@@ -39,7 +39,7 @@ Symthaea uses ~120 Cargo feature flags with **all defaults disabled**. This enab
 |------|---------|------------|
 | `mesh` | 3-tier radio spectrum awareness (Local/Metro/Regional) | ~10K |
 | `swarm` | Peer consciousness synchronization (SwarmManager) | ~5K |
-| `pqc-handshake` | Experimental ML-KEM exchange scaffolding; currently fails closed (no active session) | ~2K |
+| `pqc-handshake` | Compile-only scaffold: bundled KEM backend returns all-zero data; APIs fail closed; no real PQC | ~2K |
 | `secure-mesh` | Encrypted mesh networking | ~3K |
 
 ### Embodiment
