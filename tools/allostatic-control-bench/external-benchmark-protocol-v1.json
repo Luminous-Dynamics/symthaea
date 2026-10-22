@@ -1,6 +1,6 @@
 {
-  "protocol_version": "1.0.0",
-  "status": "protocol_only_not_executed",
+  "protocol_version": "1.1.0",
+  "status": "protocol_and_analysis_utility_not_external_executed",
   "repository": "Luminous-Dynamics/symthaea",
   "benchmark_plan": "external_runtime_assurance",
   "revision_pinning": {
@@ -242,7 +242,10 @@
     "false_acceptance_rate_for_stale_certificates",
     "certificate_validation_p50_p95_p99_latency",
     "noise_adjusted_pairwise_model_separation",
-    "guaranteed_probe_discriminability_under_declared_measurement_bounds"
+    "guaranteed_probe_discriminability_under_declared_measurement_bounds",
+    "paired_mean_delta_with_95_percent_paired_bootstrap_interval",
+    "exact_one_sided_clopper_pearson_violation_rate_upper_bound",
+    "exact_mcnemar_test_for_paired_episode_violations"
   ],
   "mandatory_gates": [
     "invalid_input_or_missing_calibration_is_uncertified",
@@ -262,7 +265,12 @@
     "stale_certificate_rejected_after_any_bound_context_change",
     "certificate_validation_and_action_application_are_atomic_or_toctou_tested",
     "certificate_horizon_and_expiry_are_checked_at_use",
-    "active_probe_discrimination_is_discounted_by_declared_observation_noise_bounds"
+    "active_probe_discrimination_is_discounted_by_declared_observation_noise_bounds",
+    "paired_policy_comparisons_have_identical_episode_seed_coverage_per_condition",
+    "paired_inference_fails_closed_on_duplicate_or_missing_policy_seed_pairs",
+    "no_silent_pooling_across_scenarios_or_shield_settings",
+    "episode_level_pairs_not_control_ticks_are_bootstrap_resampling_units",
+    "zero_observed_violations_are_not_reported_as_zero_underlying_risk"
   ],
   "proposed_targets_not_results": {
     "in_envelope_false_certificates": 0,
@@ -330,7 +338,10 @@
     "Modern conformal SLS-MPC and GPU-SLS references count as headline comparators only after pinned reproduction or documented mathematical adaptation.",
     "Hardware-accelerated runtime comparisons must publish hardware, solver, precision, deadline and compute budgets; do not infer speed superiority from different hardware.",
     "A-SLS (2026-10-14 preprint) is a priority comparator for active learning because it plans with guaranteed future parameter-uncertainty reduction; do not describe interval-gap active probing as equivalent to A-SLS.",
-    "A geometric pairwise-separation probe may claim guaranteed one-step distinguishability only when all candidate observation sets are disjoint after declared measurement-noise expansion."
+    "A geometric pairwise-separation probe may claim guaranteed one-step distinguishability only when all candidate observation sets are disjoint after declared measurement-noise expansion.",
+    "Report matched episode-pair effect estimates with uncertainty; use exact one-sided binomial upper confidence limits for episode violation rates.",
+    "Analyze each scenario and shielded setting separately before any predeclared cross-task aggregation; do not claim universal superiority from one pairwise p-value.",
+    "The paired-inference CLI synthetic self-test artifact is qualification evidence for the analysis tool only, not external control-performance evidence."
   ],
   "published_reference_points": {
     "a_sls_2026_preprint": {
@@ -355,5 +366,37 @@
       },
       "comparability_rule": "Do not compare these numbers directly with Symthaea scalar synthetic runs; pin the implementation and match task, assumptions, sensing, constraints, hardware and deadlines."
     }
+  },
+  "paired_inference": {
+    "status": "implemented_analysis_utility_synthetic_selftest_only",
+    "input_contract": "unquoted episode CSV with scenario, seed, policy, shielded, a finite numeric metric and a binary episode-level violation field",
+    "pairing_unit": "complete episode keyed by scenario, seed and shielded setting",
+    "effects": [
+      "baseline_mean",
+      "candidate_mean",
+      "candidate_minus_baseline_mean",
+      "median_paired_delta"
+    ],
+    "uncertainty": {
+      "method": "percentile paired bootstrap of episode-level differences",
+      "confidence_level": 0.95,
+      "default_replicates": 10000,
+      "replicates_must_be_at_least": 1000,
+      "deterministic_prng": true
+    },
+    "violation_risk": {
+      "rate": "observed episode-level violations / paired episode count",
+      "upper_confidence_bound": "one-sided 95% exact Clopper-Pearson",
+      "paired_test": "exact two-sided McNemar on discordant paired episode outcomes"
+    },
+    "fail_closed_on": [
+      "missing_columns",
+      "duplicate_header_or_policy_episode_row",
+      "missing_baseline_or_candidate_seed_pair",
+      "non_finite_metric",
+      "invalid_episode_violation_flag",
+      "quoted_csv_field"
+    ],
+    "interpretation_rule": "No automatic winner label; metric direction must be preregistered and per-condition outcomes must remain visible."
   }
 }
