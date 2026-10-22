@@ -254,7 +254,7 @@ fn make_trials(regime: Regime, seed: u64) -> Vec<EvaluatorTrial> {
         } else {
             match regime {
                 Regime::CalibratedIid | Regime::RareTailHidden | Regime::RareTailObservableCue => {
-                    estimated_net_benefit = true_dvpc + rng.symmetric(0.85);
+                    estimated_net_benefit = true_dvpc + rng.symmetric(0.75);
                     reported_uncertainty = 0.75;
                 }
                 Regime::OverconfidentErrors => {
@@ -267,14 +267,14 @@ fn make_trials(regime: Regime, seed: u64) -> Vec<EvaluatorTrial> {
                 }
                 Regime::SignReversalOnOod => {
                     estimated_net_benefit = if is_ood {
-                        -true_dvpc + rng.symmetric(0.25)
+                        -true_dvpc + rng.symmetric(0.15)
                     } else {
-                        true_dvpc + rng.symmetric(0.60)
+                        true_dvpc + rng.symmetric(0.15)
                     };
                     reported_uncertainty = 0.20;
                 }
                 Regime::CostUnderestimate => {
-                    estimated_net_benefit = true_dvpc + rng.symmetric(0.70);
+                    estimated_net_benefit = true_dvpc + rng.symmetric(0.60);
                     reported_uncertainty = 0.60;
                     if rng.unit() < 0.75 {
                         declared_cost_units = Some(actual_cost_units.saturating_sub(1).max(1));
