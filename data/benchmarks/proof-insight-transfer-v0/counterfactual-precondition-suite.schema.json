@@ -121,6 +121,7 @@
             "source_commit",
             "artifact_path",
             "base_artifact_sha256",
+            "counterfactual_artifact_path",
             "counterfactual_artifact_sha256",
             "base_statement_sha256",
             "counterfactual_statement_sha256"
@@ -153,6 +154,11 @@
             },
             "counterfactual_artifact_sha256": {
               "$ref": "#/$defs/sha256"
+            },
+            "counterfactual_artifact_path": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
             }
           }
         },
