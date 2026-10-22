@@ -1185,7 +1185,7 @@ impl LiquidMambaGenerator {
                 } else {
                     gradient_sequence.len() - 1
                 };
-                let d_ssm = self.mamba.compute_e2e_token_loss_at(
+                let d_ssm = self.mamba.compute_e2e_token_loss_at_isolated(
                     &gradient_sequence,
                     &[prev_token, target_id],
                     gradient_pos,
