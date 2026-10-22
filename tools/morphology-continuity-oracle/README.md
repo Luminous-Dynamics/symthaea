@@ -17,14 +17,14 @@ This is a tiny evaluator, not a learned controller. The canonical table has 17 o
 
 Given that table-shaped observation and a deletion budget of four cells, both the table and chair are compatible histories. An exact observation-only classifier returns `table`, but that does not prove the historical target was a table. With no target evidence, the evaluator returns `AbstainAmbiguousHistory`. A claimed identity is separately scored against evaluator-only ground truth, so a compatible but false claim cannot hide behind a perfect current-shape score.
 
-The command-line receipt is deterministic JSON using integer parts-per-million metrics. The perfect-template restoration value is explicitly labelled an oracle upper bound in the library result; the CLI's no-memory fixture does not invoke that oracle.
+The deterministic JSON receipt includes the source commit, source tree SHA, and pinned request SHA-256. The fixture request is frozen in `canonical_request_v0_1.txt`; the dedicated workflow independently checks its SHA-256 before tests. The target-conditioned template score is an upper-bound oracle, not a learned result; the CLI's no-memory fixture does not invoke it.
 
 ## Scope and limitations
 
 - Compatibility assumes cell deletions only, under an explicit maximum missing-cell budget. It is not a posterior probability.
-- This fixture proves a narrow identifiability fact; it does not solve target memory integrity, learn a repair policy, or certify constraints.
+- This fixture proves a narrow identifiability fact; it does not solve target-memory integrity, learn a repair policy, or certify constraints.
 - Later controllers should compare observation-only graph/WL, local NCA, target-conditioned template oracle, symbolic identity memory, and HDC-bound target memory using the same inputs and resource budgets.
-- Report current-shape classification, target identity, restoration quality, unsafe additions/deletions, abstention and resource use separately.
+- Report current-shape classification, target identity, restoration quality, unsafe additions/deletions, abstention, and resource use separately.
 - This is not a biological model, physical robot validation, or a claim of state-of-the-art performance.
 
 ## Research basis
