@@ -231,6 +231,19 @@ Proposed transfer-gate adoption targets are: reject every item in the frozen fin
 
 
 ## Mutation-qualification prerequisite
+### Kernel-checkable calibration pilot
+
+The isolated package at [`lean-pilot/`](lean-pilot/PITBCounterfactualPilot.lean) provides a small, pinned formal calibration set that is independent of the synthetic JSON fixture:
+
+- `alpha_renaming_same_type`: a proof by reflexivity that alpha-renamed binders define equal proposition terms.
+- `identity_statement_iff_true_function`: a kernel-checked propositionally-equivalent reformulation with an explicit `↔` proof.
+- `successor_monotonicity_with_premise`: the exact proof move `Nat.succ_le_succ h` when the required order premise is present.
+- `premise_removed_variant_is_false`: a kernel-checked contradiction demonstrating that the unconditional successor-order statement is false.
+
+The isolated workflow pins Lean 4.34.1, builds the package, invokes Nanoda with `sorry` disallowed, and emits a content-addressed receipt binding the commit, source bytes, toolchain, Lean/Lake versions, compiled `.olean`, and build log. The receipt is evidence only for these toy declarations under this pinned environment. It is not an outcome row for an AI system; the model has not attempted these pairs, and the pilot does not establish transfer utility or benchmark-scale sensitivity.
+
+**Promotion rule:** after this workflow produces a successful exact-head artifact, use it to test the mutation-qualification data path and reviewer rubric before authoring a real train/validation/test set. Do not backfill the synthetic suite with the Lean pilot and call it a scored result; keep fixtures, formal harness examples, and model outcome datasets separate.
+
 
 Before counterfactual pairs enter a confirmatory denominator, apply [the mutation adequacy protocol](counterfactual-mutation-adequacy.md) and validate a versioned [mutation-qualification record](counterfactual-mutation-qualification.schema.json). This record separates elaboration validity, formal statement relation, strategy-contract applicability, theorem truth evidence, and actual checked strategy outcome. In particular, a parser/elaborator failure is an invalid mutant—not evidence that the system correctly rejected an inapplicable mathematical strategy. The checked-in qualification fixture and CI controls are synthetic only. Freeze the schema, rubric, receipts, and current protocol digests in every run manifest; no confirmatory claim is permitted until a real pinned Lean pilot supplies the corresponding evidence.
 
