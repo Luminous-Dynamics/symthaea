@@ -89,6 +89,34 @@ fn test_distillation_modifies_weights() {
     );
 }
 
+/// The reported distillation loss must depend on the supervised target IDs.
+#[test]
+fn test_distillation_loss_tracks_target_cross_entropy() {
+    let config = LiquidMambaConfig {
+        warmup_steps: 0,
+        accumulation_steps: 1,
+        enable_consciousness_gating: false,
+        ..Default::default()
+    };
+    let channels = ThoughtChannels::with_intent(3);
+    let mut first = mock_gen(config.clone());
+    let mut second = mock_gen(config);
+
+    let first_loss = first
+        .train_step(&channels, &[1, 2, 3, 4])
+        .expect("first mock distillation should succeed");
+    let second_loss = second
+        .train_step(&channels, &[101, 102, 103, 104])
+        .expect("second mock distillation should succeed");
+
+    assert!(first_loss.is_finite() && first_loss > 0.0);
+    assert!(second_loss.is_finite() && second_loss > 0.0);
+    assert!(
+        (first_loss - second_loss).abs() > 1e-6,
+        "distinct targets should produce distinct teacher-forced losses, got {first_loss} and {second_loss}"
+    );
+}
+
 /// After 20 rounds, pe_stats() returns finite values.
 #[test]
 fn test_pe_trend_after_distillation() {
