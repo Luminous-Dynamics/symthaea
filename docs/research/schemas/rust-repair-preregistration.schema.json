@@ -48,7 +48,10 @@
         "language_slice",
         "task_count",
         "task_ids_sha256",
-        "manifest_sha256"
+        "manifest_sha256",
+        "candidate_row_count",
+        "data_file_path",
+        "data_file_sha256"
       ],
       "properties": {
         "provider": {
@@ -96,6 +99,18 @@
             "string",
             "null"
           ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "candidate_row_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "data_file_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data_file_sha256": {
+          "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         }
       }
