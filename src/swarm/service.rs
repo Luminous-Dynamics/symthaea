@@ -187,11 +187,11 @@ pub struct NetworkService {
     /// Service start time
     start_time: std::time::Instant,
 
-    /// Optional experimental PQC exchange manager.
+    /// Optional PQC compile-time scaffold.
     ///
-    /// The bidirectional KEM transport and key-confirmation protocol is
-    /// incomplete; with this feature enabled, handshakes fail closed until
-    /// responder-side decapsulation and transcript-bound key confirmation exist.
+    /// The workspace dependency currently resolves to an all-zero compile stub,
+    /// and bidirectional KEM, transcript binding, and key confirmation are
+    /// incomplete. With this feature enabled, handshakes fail closed.
     #[cfg(feature = "pqc-handshake")]
     pqc_manager: Option<Arc<RwLock<super::pqc_handshake::PqcHandshakeManager>>>,
 
