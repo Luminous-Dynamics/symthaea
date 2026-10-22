@@ -133,7 +133,6 @@ impl SplitMix64 {
 /// Only pre-escalation fields and alarms computed within the budget are visible.
 #[derive(Debug, Clone)]
 struct ProducerInput {
-    trial_id: u64,
     estimated_net_benefit: f64,
     reported_uncertainty: f64,
     declared_action_cost_units: Option<u64>,
@@ -281,7 +280,6 @@ fn make_trials(scenario: &Scenario, seed: u64) -> Vec<EvaluatorTrial> {
 
         trials.push(EvaluatorTrial {
             producer: ProducerInput {
-                trial_id: index as u64 + 1,
                 estimated_net_benefit,
                 reported_uncertainty,
                 declared_action_cost_units,
@@ -640,7 +638,7 @@ fn render_report() -> String {
 
     for row in &results {
         report.push_str(&format!(
-            "RUN\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}\n",
+            "RUN\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}\n",
             row.scenario,
             row.policy.label(),
             row.budget_percent,
