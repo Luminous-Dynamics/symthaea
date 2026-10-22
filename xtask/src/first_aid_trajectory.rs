@@ -693,7 +693,11 @@ mod tests {
     fn differential_json_reference_agrees_on_session_mutations() {
         let mut trace = corpus().scenarios.remove(0);
         trace.events.remove(0);
-        trace.expected_violation_codes = vec!["render_without_active_session".to_owned()];
+        trace.expected_violation_codes = vec![
+            "invalid_bundle_verification".to_owned(),
+            "render_without_active_session".to_owned(),
+            "render_without_verified_bundle".to_owned(),
+        ];
         let value = serde_json::to_value(&trace).expect("mutated trace serializes");
         assert_eq!(
             inspect_trace(&trace),
@@ -1050,7 +1054,11 @@ mod tests {
         let mut value = corpus();
         let mut trace = value.scenarios.remove(0);
         trace.events.remove(0);
-        trace.expected_violation_codes = vec!["render_without_active_session".to_string()];
+        trace.expected_violation_codes = vec![
+            "invalid_bundle_verification".to_string(),
+            "render_without_active_session".to_string(),
+            "render_without_verified_bundle".to_string(),
+        ];
         value.scenarios = vec![trace];
         validate_corpus(&value).expect("render without session must fail its frozen oracle");
     }
