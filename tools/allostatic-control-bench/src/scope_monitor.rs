@@ -164,9 +164,14 @@ pub fn score_prediction_error(
         scales.min_margin_scale,
     ];
     if values.iter().any(|v| !v.is_finite())
-        || [predicted_reserve, predicted_load, observed_reserve, observed_load]
-            .iter()
-            .any(|v| !(0.0..=1.0).contains(v))
+        || [
+            predicted_reserve,
+            predicted_load,
+            observed_reserve,
+            observed_load,
+        ]
+        .iter()
+        .any(|v| !(0.0..=1.0).contains(v))
         || scales.reserve_scale <= 0.0
         || scales.load_scale <= 0.0
         || scales.min_margin_scale <= 0.0
@@ -176,8 +181,7 @@ pub fn score_prediction_error(
 
     let normalized_reserve_error =
         (predicted_reserve - observed_reserve).abs() / scales.reserve_scale;
-    let normalized_load_error =
-        (predicted_load - observed_load).abs() / scales.load_scale;
+    let normalized_load_error = (predicted_load - observed_load).abs() / scales.load_scale;
     let normalized_absolute_error = normalized_reserve_error.max(normalized_load_error);
 
     // Only errors that move reserve/load in the unsafe direction consume a
@@ -362,47 +366,27 @@ mod tests {
     }
 
     fn nominal_scores() -> Vec<f64> {
-        (0..159)
-            .map(|i| (i + 1) as f64 / 160.0 * 0.20)
-            .collect()
+        (0..159).map(|i| (i + 1) as f64 / 160.0 * 0.20).collect()
     }
 
     #[test]
     fn rejects_invalid_state_values_and_scales() {
         assert!(PredictionErrorScales::new(0.0, 0.02, 0.02).is_none());
         assert!(PredictionErrorScales::new(0.02, f64::NAN, 0.02).is_none());
-        assert!(score_prediction_error(
-            1.01, 0.5, 0.99, 0.5, limits(), scales()
-        )
-        .is_none());
-        assert!(score_prediction_error(
-            0.5, 0.5, f64::NAN, 0.5, limits(), scales()
-        )
-        .is_none());
+        assert!(score_prediction_error(1.01, 0.5, 0.99, 0.5, limits(), scales()).is_none());
+        assert!(score_prediction_error(0.5, 0.5, f64::NAN, 0.5, limits(), scales()).is_none());
     }
 
     #[test]
     fn margin_consuming_errors_score_higher_than_equally_sized_safe_direction_errors() {
         let margin_sensitive_scales =
             PredictionErrorScales::new(0.05, 0.05, 0.02).expect("valid scales");
-        let harmful = score_prediction_error(
-            0.17,
-            0.86,
-            0.149,
-            0.881,
-            limits(),
-            margin_sensitive_scales,
-        )
-        .expect("finite harmful residual");
-        let benign = score_prediction_error(
-            0.40,
-            0.50,
-            0.38,
-            0.52,
-            limits(),
-            margin_sensitive_scales,
-        )
-        .expect("finite benign residual");
+        let harmful =
+            score_prediction_error(0.17, 0.86, 0.149, 0.881, limits(), margin_sensitive_scales)
+                .expect("finite harmful residual");
+        let benign =
+            score_prediction_error(0.40, 0.50, 0.38, 0.52, limits(), margin_sensitive_scales)
+                .expect("finite benign residual");
         assert!(harmful.score() > benign.score());
         assert!(harmful.false_safe_prediction());
         assert!(!benign.false_safe_prediction());
@@ -422,18 +406,10 @@ mod tests {
     #[test]
     fn false_safe_prediction_overrides_a_non_alarm_statistical_score() {
         let high_scores = vec![10.0; 159];
-        let threshold =
-            calibrate_scope_threshold(&high_scores, 0.05).expect("high threshold");
-        let result = assess_prediction_scope(
-            0.151,
-            0.879,
-            0.149,
-            0.881,
-            limits(),
-            scales(),
-            threshold,
-        )
-        .expect("valid prediction pair");
+        let threshold = calibrate_scope_threshold(&high_scores, 0.05).expect("high threshold");
+        let result =
+            assess_prediction_scope(0.151, 0.879, 0.149, 0.881, limits(), scales(), threshold)
+                .expect("valid prediction pair");
         assert!(result.false_safe_override());
         assert!(result.alarm());
         assert!(!result.statistical_assessment().drift_detected());
