@@ -97,6 +97,21 @@ Therefore, the two hybrid key-share directions alone imply at least **14 fragmen
 
 Benchmark the real trade-off: setup latency and completion probability across loss rates; bytes/fragments per successful session; radio airtime and energy; peak memory; CPU and wall-clock cost on the intended embedded hardware; and session recovery after loss/restart. Compare the secure protocol against itself under link conditions, and against a reviewed implementation on a comparable platform.
 
+## K-8 — The service was marking a one-sided KEM exchange as complete
+
+The service implementation of `run_pqc_exchange` originally sent the local ML-KEM public key and attempted to read the peer's public key, then called `encapsulate_for_peer`. It explicitly discarded the resulting KEM ciphertext in `_ciphertext`, left peer-side decapsulation as a TODO, and nevertheless returned `Ok(())`. The outer handshake then logged `PQC key exchange complete — hybrid session key derived`. That is not a completed shared-key exchange: the peer has not received the encapsulation ciphertext, decapsulated it, or confirmed possession of the same key.
+
+The partial service path also treated PQC failure as non-fatal and continued using classical-only trust when the `pqc-handshake` feature was enabled. That allows an attacker who can reliably disrupt the PQC phase to induce a downgrade unless the caller has an explicit, authenticated policy permitting fallback.
+
+**Fail-closed changes in this branch:**
+- `run_pqc_exchange` now returns a specific error instead of performing a one-sided exchange whose key cannot be confirmed.
+- If PQC establishment fails while the feature is enabled, `run_handshake_for_peer` removes the just-verified classical trust entry and returns the error rather than silently falling back. The `TrustChanged::Verified` event is emitted only after enabled handshake requirements pass.
+- `PqcHandshakeManager` stores KEM-derived values in `pending_session_keys`; `session_key()` and `session_count()` now report established sessions only. There is currently no activation/key-confirmation API, so a candidate remains pending and is not exposed as an active session.
+- `decapsulate_and_derive` returns `()`, not raw key bytes. A future protocol must implement canonical authenticated transcript binding and key confirmation before a session can be activated.
+- The candidate timestamp is named `created_at`, not `established_at`, to avoid misrepresenting its lifecycle.
+
+These are intentional API behavior changes: with `pqc-handshake` enabled, the service will now fail closed until the complete bidirectional exchange, transcript binding and key confirmation are implemented. That is safer than claiming a protection it does not provide; deployments requiring uninterrupted service must make an explicit policy decision before enabling the incomplete feature.
+
 ## K-7 — X25519 low-order input can produce a publicly known traffic key (mitigated in this branch)
 
 The original `PeerKeyStore::agree` derived encryption/authentication keys from the X25519 shared secret without checking `SharedSecret::was_contributory()`. RFC 7748 §6.1 explains that a small-order input can produce an all-zero shared secret and describes checking for that result; §7 explains that non-contributory behavior can eliminate the other party's private-key contribution. The `x25519-dalek` API exposes `SharedSecret::was_contributory()`. References:
@@ -111,7 +126,9 @@ This is a source-level mitigation and regression-test addition; it has **not** b
 
 ## Immediate disposition
 
-- The X25519 store now rejects a non-contributory shared secret before deriving or storing keys, but this mitigation still needs exact-head test evidence and review.
+- The X25519 store now rejects non-contributory shared secrets before deriving or storing keys; exact-head tests and review are still required.
+- The service no longer presents the incomplete one-sided PQC exchange as complete and no longer silently falls back to classical-only when the enabled PQC phase fails.
+- KEM outputs remain pending until transcript-bound key confirmation is implemented; the present manager cannot establish an active session.
 - The existing X25519 helper should be described as **static pairwise key derivation**, not forward-secret key exchange.
 - The public challenge nonce must be described as public transcript context, not a secret classical input.
 - The KDF name and comments must match the implemented BLAKE3 derive-key function.
@@ -152,4 +169,4 @@ A model discovery counts only when the issue is independently reproducible again
 
 ## Validation status
 
-Source review and regression-test authoring only. Tests were not compiled or run in this environment. The regression/limitation tests are `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse`, `legacy_static_x25519_derivation_does_not_bind_peer_source_id`, `x25519_low_order_peer_keys_are_rejected_without_storing_keys`, `legacy_pqc_derivation_succeeds_without_verified_classical_handshake_state`, and `legacy_pqc_session_derivation_does_not_bind_peer_id`; the implicit-rejection test is `test_invalid_ciphertext_uses_implicit_rejection_and_needs_key_confirmation`. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
+Source review and regression-test authoring only. Tests were not compiled or run in this environment. The regression/limitation tests are `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse`, `legacy_static_x25519_derivation_does_not_bind_peer_source_id`, `x25519_low_order_peer_keys_are_rejected_without_storing_keys`, `legacy_pqc_candidate_key_derives_without_verified_classical_handshake_state`, and `legacy_pqc_session_derivation_does_not_bind_peer_id`; the implicit-rejection test is `test_invalid_ciphertext_uses_implicit_rejection_and_needs_key_confirmation`. Additional tests now ensure KEM outputs remain pending rather than active until confirmation exists. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
