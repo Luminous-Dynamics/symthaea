@@ -42,11 +42,11 @@ This is the **first executable baseline tranche**, not the complete CASTING-002A
 
 The synthetic objective is not a casting-physics model. No observed objective, regret score, cost unit, or synthetic failure corresponds to real material, equipment, energy, yield, defect rate, or production cost. The ground-truth objective is retained in evaluation receipts for the evaluator; query selection does not use unqueried candidate truth. The adaptive proposer is explicitly checked not to read the evaluation-only truth field from prior records.
 
-The GP-LCB constants are deliberately fixed: RBF length scale 0.25, signal variance 1.0, observation-noise variance 1e-6, diagonal jitter 1e-10 and LCB exploration coefficient 1.5. These are benchmark constants, not tuned results. The arbitrary cost schedule is deliberately explicit: one unit per low-fidelity call and ten per high-fidelity call. These are normalized experimental design weights, **not currency, compute-energy measurements, or a realistic foundry cost model**. Future work must use a preregistered schedule grounded in the actual comparison.
+The GP-LCB constants are deliberately fixed: RBF length scale 0.25, signal variance 1.0, standardized-output observation-noise variance 1e-6, diagonal jitter 1e-10 and LCB exploration coefficient 1.5. Objective targets are standardized by their observed mean and population standard deviation (unit scale for constant outputs) before fitting, then posterior mean/variance are transformed back to objective units. This avoids acquisition behavior changing solely because an objective is reported in different units or has a different numerical magnitude. These are benchmark constants, not tuned results. The arbitrary cost schedule is deliberately explicit: one unit per low-fidelity call and ten per high-fidelity call. These are normalized experimental design weights, **not currency, compute-energy measurements, or a realistic foundry cost model**. Future work must use a preregistered schedule grounded in the actual comparison.
 
 ## Test inventory
 
-The 24 authored tests cover:
+The 25 authored tests cover:
 - known-answer minima and feasibility at each declared optimum;
 - equal query budgets, complete status counts, cumulative cost accounting and non-negative regret;
 - exact replay of records, metrics and transcript digest at a fixed seed;
@@ -63,6 +63,7 @@ The 24 authored tests cover:
 - explicit exhaustion of the finite candidate lattice;
 - RBF-kernel, Cholesky factorization and triangular-solve known answers;
 - one-observation GP posterior mean/variance known answer;
+- GP-LCB proposal invariance under positive affine rescaling of objective outputs;
 - duplicate-location covariance regularization and non-finite/asymmetric covariance rejection;
 - GP acquisition deterministic replay and truth-leakage negative control;
 - rejection of non-finite observations, malformed/non-positive-definite covariance and accidental use of sequential strategies as fixed samplers;
