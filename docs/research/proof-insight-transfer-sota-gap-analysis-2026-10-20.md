@@ -213,6 +213,17 @@ These are distinct strengths, not one leaderboard. PITB should not claim that an
 
 The potential contribution is not another claimed best percentage. It is a **falsifiable strategy applicability test** that connects preconditions to controlled statement changes and kernel-checked target outcomes. This could complement large whole-proof systems and proof-state feedback methods if an actual, replicated experiment demonstrates incremental value. No such value is measured yet.
 
+
+## 22 October 2026 update: executable paired counterfactual analysis
+
+The counterfactual suite has advanced from a dataset schema to a Rust outcome-join analyzer. It reads base/variant IDs from each contrast and joins them to already-recorded transfer-selectivity outcomes. It refuses missing or duplicate row links, source/target/statement drift, changed component IDs, adjudication status/label disagreement, reviewer receipt mismatches and actual resource use beyond the declared cap. The report includes per-mutation false acceptance and sensitivity, paired contract adherence, no-op decision stability, Brier score, probability shift, and component-clustered percentile intervals; its confirmatory decision remains explicitly unevaluated.
+
+This addresses a gap left by statement-mutation benchmarks: robustness should be evaluated on matched pairs with an explicit, reviewed applicability hypothesis, not only as aggregate pass-rate degradation on automatically generated variants. The seven pairs/fourteen outcome rows checked into CI are synthetic fixtures; their high scores verify the analysis wiring, not model behavior. The first real experiment should use a small reviewed set, with two experts verifying every changed premise and target statement, and retain uncertainty or ambiguity as unknown.
+
+A second current-industry comparison underscores why task separation is important. Pythagoras-Prover reports MiniF2F-Test 89.8% at Pass@32 and 93.0% at Pass@2048 for the 32B model, along with a MiniF2F-ALF statement-variation benchmark. These are whole-proof results under the authors' protocol, not counterfactual transfer metrics ([paper](https://arxiv.org/abs/2606.12594), [project results](https://pythagoras-lm.github.io/)). RLMEval's 613 theorems across six real Lean projects report a best pass rate of 10.3%, exposing a large gap between curated benchmarks and research-level projects ([ACL Anthology](https://aclanthology.org/2025.findings-emnlp.581/)). PITB should therefore retain separate strata for competition-style exact-target proofs, counterfactual applicability, constructive infrastructure building, and repository-scale work.
+
+The next credible advancement is to have the real prover/checker emit matched base and counterfactual outcomes plus receipts, then compare insight treatment with lexical, typed-syntax, dependency and raw-proof retrieval at equal budgets. Until that experiment and an external replication pass, no claim of improved transfer or state-of-the-art performance is justified.
+
 ## Research references
 
 - Kim, Han & Hwang, [Benchmarking Testing in Automated Theorem Proving](https://aclanthology.org/2026.acl-industry.150/), ACL 2026 Industry Track.
