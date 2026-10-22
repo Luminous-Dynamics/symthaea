@@ -5,6 +5,18 @@ use super::*;
 use std::path::PathBuf;
 
 #[test]
+fn test_gcs_advisories_default_on_and_runtime_toggle_exists() {
+    let default = CodingAgentConfig::default();
+    assert!(default.enable_gcs_advisories);
+
+    let off = CodingAgentConfig {
+        enable_gcs_advisories: false,
+        ..Default::default()
+    };
+    assert!(!off.enable_gcs_advisories);
+}
+
+#[test]
 fn test_coding_agent_creation() {
     let config = CodingAgentConfig::default();
     let agent = CodingAgent::new(config);
