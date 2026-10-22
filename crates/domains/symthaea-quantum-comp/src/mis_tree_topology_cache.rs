@@ -9,6 +9,8 @@
 use core::fmt;
 use std::collections::VecDeque;
 
+const ROOTED_TREE_FORMAT_VERSION: u16 = 1;
+
 /// Error while validating a graph used to extract a rooted neighborhood.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MisTreeTopologyError {
@@ -48,6 +50,7 @@ impl std::error::Error for MisTreeTopologyError {}
 /// artifacts; a future encoding change must invalidate old keys.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RootedTreeSignature {
+    format_version: u16,
     radius: usize,
     vertex_count: usize,
     edge_count: usize,
@@ -55,6 +58,11 @@ pub struct RootedTreeSignature {
 }
 
 impl RootedTreeSignature {
+    /// Canonical encoding version, used to invalidate persisted cache keys on change.
+    pub fn format_version(&self) -> u16 {
+        self.format_version
+    }
+
     /// Graph-distance radius used to extract the neighborhood.
     pub fn radius(&self) -> usize {
         self.radius
@@ -78,8 +86,8 @@ impl RootedTreeSignature {
     /// Versioned key payload suitable for storage or hashing by a caller.
     pub fn versioned_form(&self) -> String {
         format!(
-            "symthaea-rooted-tree-v1|radius={}|vertices={}|edges={}|{}",
-            self.radius, self.vertex_count, self.edge_count, self.canonical_form
+            "symthaea-rooted-tree-v{}|radius={}|vertices={}|edges={}|{}",
+            self.format_version, self.radius, self.vertex_count, self.edge_count, self.canonical_form
         )
     }
 }
@@ -199,6 +207,7 @@ pub fn rooted_tree_neighborhood_signature(
     }
 
     Ok(Some(RootedTreeSignature {
+        format_version: ROOTED_TREE_FORMAT_VERSION,
         radius,
         vertex_count: traversal_order.len(),
         edge_count,
@@ -219,6 +228,7 @@ pub fn rooted_tree_neighborhood_signature(
 pub struct MisTreeCacheContext {
     qaoa_depth: usize,
     angle_manifest_sha256: [u8; 32],
+    circuit_model_id: String,
     observable_id: String,
     evaluator_version: String,
     numerical_precision: String,
@@ -230,16 +240,19 @@ impl MisTreeCacheContext {
     pub fn new(
         qaoa_depth: usize,
         angle_manifest_sha256: [u8; 32],
+        circuit_model_id: impl Into<String>,
         observable_id: impl Into<String>,
         evaluator_version: impl Into<String>,
         numerical_precision: impl Into<String>,
         execution_profile_id: impl Into<String>,
     ) -> Result<Self, MisTreeCacheContextError> {
+        let circuit_model_id = circuit_model_id.into();
         let observable_id = observable_id.into();
         let evaluator_version = evaluator_version.into();
         let numerical_precision = numerical_precision.into();
         let execution_profile_id = execution_profile_id.into();
         for (field, value) in [
+            ("circuit_model_id", circuit_model_id.as_str()),
             ("observable_id", observable_id.as_str()),
             ("evaluator_version", evaluator_version.as_str()),
             ("numerical_precision", numerical_precision.as_str()),
@@ -252,6 +265,7 @@ impl MisTreeCacheContext {
         Ok(Self {
             qaoa_depth,
             angle_manifest_sha256,
+            circuit_model_id,
             observable_id,
             evaluator_version,
             numerical_precision,
@@ -267,6 +281,11 @@ impl MisTreeCacheContext {
     /// Caller-supplied digest of the exact angle manifest.
     pub fn angle_manifest_sha256(&self) -> [u8; 32] {
         self.angle_manifest_sha256
+    }
+
+    /// Identifier for the QAOA Hamiltonian, ansatz, and penalty formulation.
+    pub fn circuit_model_id(&self) -> &str {
+        &self.circuit_model_id
     }
 
     /// Identifier for the scored observable and sign/normalization convention.
@@ -348,6 +367,7 @@ mod tests {
         MisTreeCacheContext::new(
             3,
             angle_digest,
+            "mis-qaoa-model/v1",
             "root-inclusion/v1",
             evaluator,
             precision,
@@ -534,15 +554,32 @@ mod tests {
     #[test]
     fn refuses_empty_or_control_character_context_identifiers() {
         assert_eq!(
-            MisTreeCacheContext::new(1, [0; 32], " ", "eval/v1", "f64", "sim")
+            MisTreeCacheContext::new(1, [0; 32], "mis-qaoa-model/v1", " ", "eval/v1", "f64", "sim")
                 .expect_err("blank observable is invalid"),
             MisTreeCacheContextError::InvalidField { field: "observable_id" }
         );
         assert_eq!(
-            MisTreeCacheContext::new(1, [0; 32], "root\nvalue", "eval/v1", "f64", "sim")
+            MisTreeCacheContext::new(1, [0; 32], "mis-qaoa-model/v1", "root\nvalue", "eval/v1", "f64", "sim")
                 .expect_err("control chars are invalid"),
             MisTreeCacheContextError::InvalidField { field: "observable_id" }
         );
+    }
+
+    #[test]
+    fn cache_keys_distinguish_circuit_model_formulation() {
+        let tree = rooted_tree_neighborhood_signature(2, &[(0, 1)], 0, 1)
+            .expect("valid edge").expect("tree");
+        let base = MisTreeCacheKey::new(
+            tree.clone(), context([1; 32], "eval/v1", "f64", "profile-A")
+        );
+        let other_model = MisTreeCacheKey::new(
+            tree,
+            MisTreeCacheContext::new(
+                3, [1; 32], "mw-mis-hamiltonian-v2", "root-inclusion/v1",
+                "eval/v1", "f64", "profile-A"
+            ).expect("valid model-specific context"),
+        );
+        assert_ne!(base, other_model);
     }
 
     #[test]
@@ -554,22 +591,22 @@ mod tests {
         );
         let different_evaluator = MisTreeCacheKey::new(
             tree.clone(),
-            MisTreeCacheContext::new(3, [1; 32], "root-inclusion/v1", "eval/v2", "f64", "profile-A")
+            MisTreeCacheContext::new(3, [1; 32], "mis-qaoa-model/v1", "root-inclusion/v1", "eval/v2", "f64", "profile-A")
                 .expect("valid context"),
         );
         let different_precision = MisTreeCacheKey::new(
             tree.clone(),
-            MisTreeCacheContext::new(3, [1; 32], "root-inclusion/v1", "eval/v1", "f32", "profile-A")
+            MisTreeCacheContext::new(3, [1; 32], "mis-qaoa-model/v1", "root-inclusion/v1", "eval/v1", "f32", "profile-A")
                 .expect("valid context"),
         );
         let different_observable = MisTreeCacheKey::new(
             tree.clone(),
-            MisTreeCacheContext::new(3, [1; 32], "root-cost/v1", "eval/v1", "f64", "profile-A")
+            MisTreeCacheContext::new(3, [1; 32], "mis-qaoa-model/v1", "root-cost/v1", "eval/v1", "f64", "profile-A")
                 .expect("valid context"),
         );
         let different_depth = MisTreeCacheKey::new(
             tree.clone(),
-            MisTreeCacheContext::new(4, [1; 32], "root-inclusion/v1", "eval/v1", "f64", "profile-A")
+            MisTreeCacheContext::new(4, [1; 32], "mis-qaoa-model/v1", "root-inclusion/v1", "eval/v1", "f64", "profile-A")
                 .expect("valid context"),
         );
         assert_ne!(base, different_evaluator);
