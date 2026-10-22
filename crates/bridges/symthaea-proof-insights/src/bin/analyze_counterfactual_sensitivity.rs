@@ -85,20 +85,36 @@ struct Counts {
 impl Counts {
     fn add(&mut self, observation: &PairObservation) {
         self.paired_rows += 1;
-        self.base_model_calls_sum = self.base_model_calls_sum.saturating_add(observation.base_model_calls);
-        self.variant_model_calls_sum = self.variant_model_calls_sum.saturating_add(observation.variant_model_calls);
+        self.base_model_calls_sum = self
+            .base_model_calls_sum
+            .saturating_add(observation.base_model_calls);
+        self.variant_model_calls_sum = self
+            .variant_model_calls_sum
+            .saturating_add(observation.variant_model_calls);
         self.base_tokens_sum = self.base_tokens_sum.saturating_add(observation.base_tokens);
-        self.variant_tokens_sum = self.variant_tokens_sum.saturating_add(observation.variant_tokens);
+        self.variant_tokens_sum = self
+            .variant_tokens_sum
+            .saturating_add(observation.variant_tokens);
         self.base_wall_ms_sum = self.base_wall_ms_sum.saturating_add(observation.base_wall_ms);
-        self.variant_wall_ms_sum = self.variant_wall_ms_sum.saturating_add(observation.variant_wall_ms);
-        self.base_cost_microusd_sum = self.base_cost_microusd_sum.saturating_add(observation.base_cost_microusd);
-        self.variant_cost_microusd_sum = self.variant_cost_microusd_sum.saturating_add(observation.variant_cost_microusd);
-        self.model_call_delta_sum += observation.variant_model_calls as f64 - observation.base_model_calls as f64;
+        self.variant_wall_ms_sum = self
+            .variant_wall_ms_sum
+            .saturating_add(observation.variant_wall_ms);
+        self.base_cost_microusd_sum = self
+            .base_cost_microusd_sum
+            .saturating_add(observation.base_cost_microusd);
+        self.variant_cost_microusd_sum = self
+            .variant_cost_microusd_sum
+            .saturating_add(observation.variant_cost_microusd);
+        self.model_call_delta_sum +=
+            observation.variant_model_calls as f64 - observation.base_model_calls as f64;
         self.token_delta_sum += observation.variant_tokens as f64 - observation.base_tokens as f64;
-        self.wall_ms_delta_sum += observation.variant_wall_ms as f64 - observation.base_wall_ms as f64;
-        self.cost_delta_sum += observation.variant_cost_microusd as f64 - observation.base_cost_microusd as f64;
+        self.wall_ms_delta_sum +=
+            observation.variant_wall_ms as f64 - observation.base_wall_ms as f64;
+        self.cost_delta_sum +=
+            observation.variant_cost_microusd as f64 - observation.base_cost_microusd as f64;
         if observation.base_cost_microusd > 0 {
-            self.cost_ratio_sum += observation.variant_cost_microusd as f64 / observation.base_cost_microusd as f64;
+            self.cost_ratio_sum +=
+                observation.variant_cost_microusd as f64 / observation.base_cost_microusd as f64;
             self.cost_ratio_count += 1;
         }
         if observation.base_tokens > 0 {
@@ -175,14 +191,24 @@ impl Counts {
         self.brier_count += other.brier_count;
         self.noop_probability_delta_sum += other.noop_probability_delta_sum;
         self.noop_probability_delta_count += other.noop_probability_delta_count;
-        self.base_model_calls_sum = self.base_model_calls_sum.saturating_add(other.base_model_calls_sum);
-        self.variant_model_calls_sum = self.variant_model_calls_sum.saturating_add(other.variant_model_calls_sum);
+        self.base_model_calls_sum = self
+            .base_model_calls_sum
+            .saturating_add(other.base_model_calls_sum);
+        self.variant_model_calls_sum = self
+            .variant_model_calls_sum
+            .saturating_add(other.variant_model_calls_sum);
         self.base_tokens_sum = self.base_tokens_sum.saturating_add(other.base_tokens_sum);
         self.variant_tokens_sum = self.variant_tokens_sum.saturating_add(other.variant_tokens_sum);
         self.base_wall_ms_sum = self.base_wall_ms_sum.saturating_add(other.base_wall_ms_sum);
-        self.variant_wall_ms_sum = self.variant_wall_ms_sum.saturating_add(other.variant_wall_ms_sum);
-        self.base_cost_microusd_sum = self.base_cost_microusd_sum.saturating_add(other.base_cost_microusd_sum);
-        self.variant_cost_microusd_sum = self.variant_cost_microusd_sum.saturating_add(other.variant_cost_microusd_sum);
+        self.variant_wall_ms_sum = self
+            .variant_wall_ms_sum
+            .saturating_add(other.variant_wall_ms_sum);
+        self.base_cost_microusd_sum = self
+            .base_cost_microusd_sum
+            .saturating_add(other.base_cost_microusd_sum);
+        self.variant_cost_microusd_sum = self
+            .variant_cost_microusd_sum
+            .saturating_add(other.variant_cost_microusd_sum);
         self.model_call_delta_sum += other.model_call_delta_sum;
         self.token_delta_sum += other.token_delta_sum;
         self.wall_ms_delta_sum += other.wall_ms_delta_sum;
@@ -268,38 +294,62 @@ impl Counts {
         );
         metrics.insert(
             "mean_counterfactual_to_base_cost_ratio",
-            (self.cost_ratio_count, self.cost_ratio_count,
-             (self.cost_ratio_count > 0).then_some(self.cost_ratio_sum / self.cost_ratio_count as f64)),
+            (
+                self.cost_ratio_count,
+                self.cost_ratio_count,
+                (self.cost_ratio_count > 0)
+                    .then_some(self.cost_ratio_sum / self.cost_ratio_count as f64),
+            ),
         );
         metrics.insert(
             "mean_counterfactual_to_base_token_ratio",
-            (self.token_ratio_count, self.token_ratio_count,
-             (self.token_ratio_count > 0).then_some(self.token_ratio_sum / self.token_ratio_count as f64)),
+            (
+                self.token_ratio_count,
+                self.token_ratio_count,
+                (self.token_ratio_count > 0)
+                    .then_some(self.token_ratio_sum / self.token_ratio_count as f64),
+            ),
         );
         metrics.insert(
             "mean_counterfactual_to_base_wall_time_ratio",
-            (self.wall_ratio_count, self.wall_ratio_count,
-             (self.wall_ratio_count > 0).then_some(self.wall_ratio_sum / self.wall_ratio_count as f64)),
+            (
+                self.wall_ratio_count,
+                self.wall_ratio_count,
+                (self.wall_ratio_count > 0)
+                    .then_some(self.wall_ratio_sum / self.wall_ratio_count as f64),
+            ),
         );
         metrics.insert(
             "mean_counterfactual_model_call_delta",
-            (observations_count(self), observations_count(self),
-             Some(self.model_call_delta_sum / observations_count(self).max(1) as f64)),
+            (
+                observations_count(self),
+                observations_count(self),
+                Some(self.model_call_delta_sum / observations_count(self).max(1) as f64),
+            ),
         );
         metrics.insert(
             "mean_counterfactual_token_delta",
-            (observations_count(self), observations_count(self),
-             Some(self.token_delta_sum / observations_count(self).max(1) as f64)),
+            (
+                observations_count(self),
+                observations_count(self),
+                Some(self.token_delta_sum / observations_count(self).max(1) as f64),
+            ),
         );
         metrics.insert(
             "mean_counterfactual_wall_time_delta_ms",
-            (observations_count(self), observations_count(self),
-             Some(self.wall_ms_delta_sum / observations_count(self).max(1) as f64)),
+            (
+                observations_count(self),
+                observations_count(self),
+                Some(self.wall_ms_delta_sum / observations_count(self).max(1) as f64),
+            ),
         );
         metrics.insert(
             "mean_counterfactual_cost_delta_microusd",
-            (observations_count(self), observations_count(self),
-             Some(self.cost_delta_sum / observations_count(self).max(1) as f64)),
+            (
+                observations_count(self),
+                observations_count(self),
+                Some(self.cost_delta_sum / observations_count(self).max(1) as f64),
+            ),
         );
         metrics
     }
@@ -481,16 +531,20 @@ fn main() -> Result<()> {
                 "cost_microusd": counts.variant_cost_microusd_sum
             },
             "base_mean_per_pair": {
-                "model_calls": counts.base_model_calls_sum as f64 / counts.paired_rows.max(1) as f64,
+                "model_calls": counts.base_model_calls_sum as f64
+                    / counts.paired_rows.max(1) as f64,
                 "tokens": counts.base_tokens_sum as f64 / counts.paired_rows.max(1) as f64,
                 "wall_ms": counts.base_wall_ms_sum as f64 / counts.paired_rows.max(1) as f64,
-                "cost_microusd": counts.base_cost_microusd_sum as f64 / counts.paired_rows.max(1) as f64
+                "cost_microusd": counts.base_cost_microusd_sum as f64
+                    / counts.paired_rows.max(1) as f64
             },
             "counterfactual_mean_per_pair": {
-                "model_calls": counts.variant_model_calls_sum as f64 / counts.paired_rows.max(1) as f64,
+                "model_calls": counts.variant_model_calls_sum as f64
+                    / counts.paired_rows.max(1) as f64,
                 "tokens": counts.variant_tokens_sum as f64 / counts.paired_rows.max(1) as f64,
                 "wall_ms": counts.variant_wall_ms_sum as f64 / counts.paired_rows.max(1) as f64,
-                "cost_microusd": counts.variant_cost_microusd_sum as f64 / counts.paired_rows.max(1) as f64
+                "cost_microusd": counts.variant_cost_microusd_sum as f64
+                    / counts.paired_rows.max(1) as f64
             }
         },
         "metrics": metrics,
@@ -1578,7 +1632,11 @@ fn join_pairs(
             base_wall_ms: required_u64_at(base, &["run", "actual_wall_ms"], &ctx)?,
             variant_wall_ms: required_u64_at(variant, &["run", "actual_wall_ms"], &ctx)?,
             base_cost_microusd: required_u64_at(base, &["run", "actual_cost_microusd"], &ctx)?,
-            variant_cost_microusd: required_u64_at(variant, &["run", "actual_cost_microusd"], &ctx)?,
+            variant_cost_microusd: required_u64_at(
+                variant,
+                &["run", "actual_cost_microusd"],
+                &ctx,
+            )?,
         });
     }
     if observations.is_empty() {
