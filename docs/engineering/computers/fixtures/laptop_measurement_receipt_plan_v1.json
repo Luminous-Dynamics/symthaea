@@ -1,0 +1,82 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "LAPTOP-PLAN-FRAMEWORK13PRO-X7-358H-BASELINE-V1",
+  "evidence_status": "planned",
+  "pairing": {
+    "comparison_id": "L13-REFSET-001",
+    "pair_index": null,
+    "execution_order": "not_run"
+  },
+  "candidate": {
+    "manufacturer": "Framework Computer",
+    "model_family": "Framework Laptop 13 Pro",
+    "configuration_label": "Publicly reviewed Core Ultra X7 358H configuration; independent-review configuration only",
+    "sku_identity_status": "review_configuration_only",
+    "exact_sku": null,
+    "unit_token_sha256": null,
+    "cpu": "Intel Core Ultra X7 358H",
+    "gpu": "Intel Arc B390 integrated graphics",
+    "npu": "Integrated NPU; exact device/runtime path not yet qualified",
+    "memory_gib": 64,
+    "memory_type": "LPDDR5X-7467 LPCAMM2",
+    "storage": "2 TB WD Black SN7100 PCIe SSD",
+    "battery_wh": 74.45,
+    "mass_g": null,
+    "source_urls": [
+      "https://www.tomshardware.com/laptops/framework-laptop-13-pro-review"
+    ]
+  },
+  "software": {
+    "os_image": null,
+    "kernel": null,
+    "bios_version": null,
+    "embedded_controller_version": null,
+    "driver_stack": null,
+    "runtime_stack": null,
+    "source_or_build_digest": null,
+    "secure_boot_state": "not_checked"
+  },
+  "workload": {
+    "workload_id": "nixos-build-cold-cache-v1",
+    "version": "1.0-preregistered",
+    "input_sha256": null,
+    "scorer_sha256": null,
+    "quality_gate": "Not yet executed. Freeze repository revision, flake/closure, build command, cache state, and success oracle before measurement.",
+    "model_artifact_sha256": null,
+    "model_runtime_backend": null
+  },
+  "condition": {
+    "power_source": "not_set",
+    "battery_state_pct": null,
+    "display_brightness_nits": null,
+    "cache_state": "not_set",
+    "power_profile": null,
+    "ambient_c": null,
+    "initial_thermal_state": "not_checked",
+    "wireless_state": "not_checked"
+  },
+  "energy": {
+    "method": "planned",
+    "boundary": "not_set",
+    "joules": null,
+    "includes_display_and_memory": null
+  },
+  "meter": {
+    "instrument_model": null,
+    "instrument_token": null,
+    "calibration_status": "not_checked",
+    "calibration_reference": null,
+    "sample_rate_hz": null
+  },
+  "sample": null,
+  "sources": [
+    {
+      "url": "https://www.tomshardware.com/laptops/framework-laptop-13-pro-review",
+      "supports": "Published review configuration and component identities only; does not establish Linux compatibility, workload performance, system energy, or measured Symthaea benchmark results."
+    },
+    {
+      "url": "https://mlcommons.org/benchmarks/client/",
+      "supports": "External standard for supported client LLM and agentic workloads; this planned NixOS build workload is not an MLPerf Client result."
+    }
+  ]
+}
