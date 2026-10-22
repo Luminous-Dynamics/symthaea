@@ -532,9 +532,10 @@ pub fn select_experiment_by_weighted_information_gain_per_cost<'a, H, E>(
 /// under the nominal prior; callers should report per-scenario scores and include a nominal
 /// weighted-EIG arm.
 ///
-/// Every scenario must be valid and score every candidate completely. If the scenario set is
-/// empty, has a malformed prior, or cannot score a candidate, the robust selector fails closed
-/// rather than silently dropping the adverse scenario. Ties preserve input order.
+/// Every prior scenario must be valid; a malformed scenario invalidates the entire request
+/// rather than silently dropping an adverse prior. Individual experiments with invalid cost,
+/// incomplete predictions, or an invalid score are ineligible. If no experiment has a valid
+/// positive score across every scenario, the selector returns None. Ties preserve input order.
 pub fn select_experiment_by_minimum_weighted_information_gain_per_cost<'a, H, E>(
     candidates: &'a [E],
     hypotheses: &[H],
@@ -1060,10 +1061,7 @@ mod tests {
     #[test]
     fn scenario_robust_selector_avoids_prior_fragile_partition() {
         let hypotheses = [0_usize, 1, 2];
-        let scenarios = vec![
-            vec![0.7, 0.2, 0.1],
-            vec![0.6, 0.05, 0.35],
-        ];
+        let scenarios = vec![vec![0.7, 0.2, 0.1], vec![0.6, 0.05, 0.35]];
         let experiments = [0_usize, 1_usize];
         let prediction_table = [[0.0_f64, 10.0, 0.0], [0.0, 0.0, 10.0]];
         let predict = |hypothesis: &usize, experiment: &usize| {
