@@ -22,7 +22,7 @@ Each state is the tuple:
 - `uncertainty_pending`: an uncertainty was observed and remains unresolved for handoff.
 - `uncertainty_preserved`: the pending uncertainty has been explicitly preserved for a handoff.
 
-The two bundle identities are a finite abstraction for identity mismatch, not a model of actual CPIC or first-aid content. Verification actions vary validity state and digest verification. Session start, load, verify, revoke, interrupt, resume, uncertainty detection/preservation, handoff, render, connectivity changes, and a core-network-dependent action comprise the 20-action alphabet.
+The two bundle identities are a finite abstraction for identity mismatch, not a model of actual CPIC or first-aid content. Verification actions vary validity state and digest verification. Session start, load, verify, revoke, interrupt, resume, uncertainty detection/preservation, handoff, render, connectivity changes, a core-network-dependent action, six resource freshness/presentation combinations, four sensitive-data/consent combinations, and unknown normalization comprise the 31-action alphabet.
 
 ## Required invariants
 
@@ -36,7 +36,7 @@ The two bundle identities are a finite abstraction for identity mismatch, not a 
 
 ## Explicit state invariants checked on every edge
 
-For every reachable state and every one of the 20 actions, the test checks both the state before the action and the successor state:
+For every reachable state and every one of the 31 actions, the test checks both the state before the action and the successor state:
 
 - The revocation mask contains only the two modeled identity bits and is monotonic across every transition.
 - A verified identity can exist only in an active session, must equal the currently loaded identity, and must not be revoked.
@@ -46,15 +46,15 @@ For every reachable state and every one of the 20 actions, the test checks both 
 - Every render action is checked against exact violation precedence: inactive-session violation can co-occur with the render's identity/trust violation; a revoked render reports revocation rather than also emitting the generic missing-verification violation.
 - Load clears prior verification, and revocation immediately invalidates verification for the same bundle.
 
-These assertions strengthen the transition checker beyond a reachable-state count. The fixed count (252 states / 5,040 edges) is still used as a review trigger—not as a substitute for the invariant checks.
+These assertions strengthen the transition checker beyond a reachable-state count. The fixed count (252 states / 7,812 edges) is still used as a review trigger—not as a substitute for the invariant checks.
 
 ## Exploration method
 
-The checker performs breadth-first exploration from the initial state. For each distinct reachable state it applies each of the 20 declared abstract actions, checks the next state and violations against the invariants, and enqueues newly discovered states until reaching a fixed point. A finite fixed-point traversal avoids relying on sampled traces for this abstract model.
+The checker performs breadth-first exploration from the initial state. For each distinct reachable state it applies each of the 31 declared abstract actions, checks the next state and violations against the invariants, and enqueues newly discovered states until reaching a fixed point. A finite fixed-point traversal avoids relying on sampled traces for this abstract model.
 
-The exact lifecycle/connectivity graph is pinned at 252 reachable abstract states and 5,040 state/action transitions; the Rust test prints both counts and fails if either changes. A changed count requires reviewing the state/action space rather than silently accepting a smaller graph.
+The exact lifecycle/connectivity graph is pinned at 252 reachable abstract states and 7,812 state/action transitions; the Rust test prints both counts and fails if either changes. A changed count requires reviewing the state/action space rather than silently accepting a smaller graph.
 
-The test suite now stores a breadth-first shortest event-history witness for each reachable abstract state. For every state it appends every one of the 20 actions, feeds each resulting history through the production JSON trace checker, and compares the ordered violation codes to those returned by replaying the abstract model. This gives 252 × 20 = 5,040 model-to-production edge comparisons, in addition to state invariants and the 18 orthogonal policy truth tables. A further bounded-sequence test appends every ordered pair of actions to each state's shortest witness, compares the full ordered violation list against the production checker, and covers 252 × 20 × 20 = 100,800 two-action suffix sequences. The CI test step extracts the actual comparison counts from test output, asserts 5,040 edges, 100,800 two-action suffixes, and 18 policy cases, and passes those values into trajectory receipt schema v1. The receipt gate rejects missing or wrong counts and requires `first-aid-trajectory-receipt-v1`. This instrumented evidence is still pending successful exact-head execution. It is a same-repository differential check: a matching result catches implementation divergence, but shared requirements and abstractions mean it is not an independent clinical oracle. The newest exact-head workflow must pass before these comparisons count as verified evidence.
+The test suite now stores a breadth-first shortest event-history witness for each reachable abstract state. For every state it appends every one of the 31 actions, feeds each resulting history through the production JSON trace checker, and compares the ordered violation codes to those returned by replaying the abstract model. This gives 252 × 31 = 7,812 model-to-production edge comparisons, in addition to state invariants and the 18 orthogonal policy truth tables. A further bounded-sequence test appends every ordered pair of actions to each state's shortest witness, compares the full ordered violation list against the production checker, and covers 252 × 31 × 31 = 242,172 two-action suffix sequences. The CI test step extracts the actual comparison counts from test output, asserts 7,812 edges, 242,172 two-action suffixes, and 18 policy cases, and passes those values into trajectory receipt schema v1. The receipt gate rejects missing or wrong counts and requires `first-aid-trajectory-receipt-v1`. This instrumented evidence is still pending successful exact-head execution. It is a same-repository differential check: a matching result catches implementation divergence, but shared requirements and abstractions mean it is not an independent clinical oracle. The newest exact-head workflow must pass before these comparisons count as verified evidence.
 
 A second exhaustive truth-table test covers 18 **orthogonal policy combinations** that are deliberately kept outside the lifecycle product graph to prevent a Cartesian state-space explosion. A further differential test feeds each of those 18 combinations to the production JSON trace checker and compares its result with the abstract policy helper:
 
