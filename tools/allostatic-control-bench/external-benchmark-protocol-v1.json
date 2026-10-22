@@ -1,5 +1,5 @@
 {
-  "protocol_version": "1.1.0",
+  "protocol_version": "1.2.0",
   "status": "protocol_and_analysis_utility_not_external_executed",
   "repository": "Luminous-Dynamics/symthaea",
   "benchmark_plan": "external_runtime_assurance",
@@ -245,7 +245,13 @@
     "guaranteed_probe_discriminability_under_declared_measurement_bounds",
     "paired_mean_delta_with_95_percent_paired_bootstrap_interval",
     "exact_one_sided_clopper_pearson_violation_rate_upper_bound",
-    "exact_mcnemar_test_for_paired_episode_violations"
+    "exact_mcnemar_test_for_paired_episode_violations",
+    "macro_task_mean_delta_on_predeclared_normalized_utility",
+    "macro_task_interquartile_mean_delta",
+    "macro_task_paired_win_rate",
+    "fraction_of_tasks_with_positive_mean_delta",
+    "stratified_bootstrap_95_percent_confidence_intervals",
+    "task_normalization_and_anchor_provenance"
   ],
   "mandatory_gates": [
     "invalid_input_or_missing_calibration_is_uncertified",
@@ -270,7 +276,13 @@
     "paired_inference_fails_closed_on_duplicate_or_missing_policy_seed_pairs",
     "no_silent_pooling_across_scenarios_or_shield_settings",
     "episode_level_pairs_not_control_ticks_are_bootstrap_resampling_units",
-    "zero_observed_violations_are_not_reported_as_zero_underlying_risk"
+    "zero_observed_violations_are_not_reported_as_zero_underlying_risk",
+    "cross_task_scores_are_normalized_to_a_predeclared_common_higher_is_better_scale",
+    "task_specific_results_are_reported_alongside_equal_task_weight_macro_aggregates",
+    "stratified_bootstrap_resamples_episodes_within_each_task_not_tasks_as_episodes",
+    "paired_win_rate_counts_ties_as_half_and_is_not_mislabeled_as_independent_probability_of_improvement",
+    "cross_task_aggregate_cannot_hide_task_regressions_or_replace_task_level_safety_bounds",
+    "fixed_task_suite_bootstrap_interval_is_not_claimed_as_generalization_to_unseen_tasks"
   ],
   "proposed_targets_not_results": {
     "in_envelope_false_certificates": 0,
@@ -341,7 +353,11 @@
     "A geometric pairwise-separation probe may claim guaranteed one-step distinguishability only when all candidate observation sets are disjoint after declared measurement-noise expansion.",
     "Report matched episode-pair effect estimates with uncertainty; use exact one-sided binomial upper confidence limits for episode violation rates.",
     "Analyze each scenario and shielded setting separately before any predeclared cross-task aggregation; do not claim universal superiority from one pairwise p-value.",
-    "The paired-inference CLI synthetic self-test artifact is qualification evidence for the analysis tool only, not external control-performance evidence."
+    "The paired-inference CLI synthetic self-test artifact is qualification evidence for the analysis tool only, not external control-performance evidence.",
+    "Never pool raw return, violation cost, latency, or other quantities with incompatible units; normalize each performance score using fixed task-specific anchors before task-stratified aggregation.",
+    "Report task rows and equal-task-weight macro summaries together; task-level safety rates and exact upper limits remain separately visible.",
+    "The stratified bootstrap resamples matched episode pairs within each task and treats the selected task suite as fixed; it does not establish generalization to unseen tasks.",
+    "The stratified CLI's paired win rate is a within-seed outcome comparison with half credit for ties and is not RLiable's independent-sample probability-of-improvement estimator."
   ],
   "published_reference_points": {
     "a_sls_2026_preprint": {
@@ -437,5 +453,49 @@
         "note": "Exact zero-event binomial planning formula; assumes independent Bernoulli episodes and says nothing about untested distributions or dependent sampling."
       }
     ]
+  },
+  "stratified_aggregation": {
+    "status": "implemented_analysis_utility_synthetic_selftest_only",
+    "input_schema": "task,seed,baseline_score,candidate_score",
+    "score_contract": {
+      "finite": true,
+      "lower": 0,
+      "upper": 1,
+      "direction": "higher_is_better",
+      "normalization": "task-specific fixed anchors and mapping must be preregistered before evaluation",
+      "raw_incompatible_units_may_not_be_pooled": true
+    },
+    "required_tasks_min": 2,
+    "required_pairs_per_task_min": 2,
+    "weighting": "equal task weight independent of episode count",
+    "metrics": [
+      "per_task_baseline_and_candidate_mean_score",
+      "per_task_mean_paired_delta",
+      "per_task_interquartile_mean_of_paired_deltas",
+      "per_task_paired_win_rate_ties_half",
+      "macro_baseline_and_candidate_mean_score",
+      "macro_mean_delta_with_95_percent_stratified_bootstrap_interval",
+      "macro_task_iqm_delta_with_95_percent_stratified_bootstrap_interval",
+      "macro_paired_win_rate_with_95_percent_stratified_bootstrap_interval",
+      "fraction_tasks_with_positive_mean_delta"
+    ],
+    "bootstrap": {
+      "replicates_min": 1000,
+      "qualification_replicates": 10000,
+      "resampling_unit": "matched episode pairs within each task",
+      "task_suite": "fixed_during_bootstrap",
+      "seed_reported": true
+    },
+    "fail_closed_on": [
+      "quoted_csv_fields",
+      "wrong_or_duplicate_headers",
+      "duplicate_task_seed_rows",
+      "fewer_than_two_tasks",
+      "fewer_than_two_episode_pairs_per_task",
+      "non_finite_or_out_of_range_normalized_scores",
+      "input_output_path_alias"
+    ],
+    "qualification_artifact": "allostatic-control-v1-stratified-aggregate.csv",
+    "interpretation_rule": "Report task-level values with equal-task-weight macro statistics; aggregate intervals are conditional on the fixed task suite and do not establish external safety."
   }
 }
