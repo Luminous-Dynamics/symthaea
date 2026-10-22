@@ -234,6 +234,21 @@ pub fn compute_action_information_gains(
     Ok(gains)
 }
 
+/// Compute the expected information gain for one candidate action.
+///
+/// The full model set is validated before the requested row is returned.
+pub fn compute_action_information_gain(
+    hypotheses: &[ModelHypothesis],
+    action_index: usize,
+) -> Result<ActionInformationGain, InformationGainError> {
+    let gains = compute_action_information_gains(hypotheses)?;
+    let action_count = gains.len();
+    gains.get(action_index).cloned().ok_or(InformationGainError::InvalidActionIndex {
+        action_index,
+        action_count,
+    })
+}
+
 /// Return the index of the action that most reduces uncertainty about model identity.
 ///
 /// This selects only on epistemic value; it ignores pragmatic reward, action cost,
@@ -436,13 +451,14 @@ mod tests {
     #[test]
     fn impossible_outcomes_do_not_generate_nan() {
         let hypotheses = vec![
-            ModelHypothesis::new("deterministic-a", 0.5, vec![vec![1.0, 0.0]]),
-            ModelHypothesis::new("deterministic-b", 0.5, vec![vec![0.0, 1.0]]),
+            ModelHypothesis::new("deterministic-a", 0.5, vec![vec![1.0, 0.0, 0.0]]),
+            ModelHypothesis::new("deterministic-b", 0.5, vec![vec![0.0, 1.0, 0.0]]),
         ];
         let gains = compute_action_information_gains(&hypotheses).unwrap();
         assert!((gains[0].information_gain_nats - std::f64::consts::LN_2).abs() < 1e-12);
         assert!(gains[0].posterior_model_probabilities_by_outcome[0].is_some());
         assert!(gains[0].posterior_model_probabilities_by_outcome[1].is_some());
+        assert!(gains[0].posterior_model_probabilities_by_outcome[2].is_none());
     }
 
     #[test]
@@ -525,10 +541,21 @@ mod tests {
     }
 
     #[test]
+    fn invalid_action_index_fails_closed() {
+        assert!(matches!(
+            compute_action_information_gain(&discriminating_hypotheses(), 9),
+            Err(InformationGainError::InvalidActionIndex {
+                action_index: 9,
+                action_count: 2
+            })
+        ));
+    }
+
+    #[test]
     fn equal_information_gain_ties_choose_lowest_action_index() {
         let hypotheses = vec![
-            ModelHypothesis::new("a", 0.5, vec![vec![0.9, 0.1], vec![0.99, 0.01]]),
-            ModelHypothesis::new("b", 0.5, vec![vec![0.1, 0.9], vec![0.01, 0.99]]),
+            ModelHypothesis::new("a", 0.5, vec![vec![0.9, 0.1], vec![0.9, 0.1]]),
+            ModelHypothesis::new("b", 0.5, vec![vec![0.1, 0.9], vec![0.1, 0.9]]),
         ];
         assert_eq!(most_informative_action(&hypotheses).unwrap(), 0);
     }
