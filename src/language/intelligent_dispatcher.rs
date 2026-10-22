@@ -888,8 +888,9 @@ mod tests {
         assert!(result.backend_attempts[1].success);
         assert_eq!(result.backend_attempts[0].estimated_energy_cost, COST_CLOUD_LLM);
         assert_eq!(result.backend_attempts[1].estimated_energy_cost, 0.0);
-        assert_eq!(result.energy_cost, COST_CLOUD_LLM + COST_LOCAL_LLM);
-        assert_eq!(dispatcher.total_energy(), COST_CLOUD_LLM + COST_LOCAL_LLM);
+        // The cloud attempt is charged; simulated fallback adds no real-backend cost.
+        assert_eq!(result.energy_cost, COST_CLOUD_LLM);
+        assert_eq!(dispatcher.total_energy(), COST_CLOUD_LLM);
     }
 
     #[test]
@@ -1002,7 +1003,8 @@ mod tests {
 
         assert_eq!(result.tier, BackendTier::LocalLlm);
         assert!(result.success);
-        assert_eq!(result.energy_cost, COST_LOCAL_LLM);
+        assert_eq!(result.backend_attempts[0].tier, BackendTier::Simulated);
+        assert_eq!(result.energy_cost, 0.0, "simulated output must not be charged as an Ollama invocation");
     }
 
     #[tokio::test]
@@ -1017,7 +1019,7 @@ mod tests {
             .generate("b", &params, EpistemicStatus::Probable, 0.5, 0.8)
             .await;
 
-        assert_eq!(dispatcher.total_energy(), COST_NATIVE + COST_LOCAL_LLM);
+        assert_eq!(dispatcher.total_energy(), COST_NATIVE, "simulated local fallback has zero estimated backend cost");
     }
 
     #[test]
