@@ -1230,14 +1230,17 @@ jobs:
                   for pair in pairs:
                       if pair["base_adjudication"]["label"] != "compatible":
                           raise ValueError("synthetic counterfactual base must be the compatible control")
-                      expected = "compatible" if pair["mutation"]["kind"] == "no_semantic_change" else "incompatible"
+                      if pair["counterfactual_adjudication"]["status"] == "adjudicated":
+                          expected = "compatible" if pair["mutation"]["kind"] == "no_semantic_change" else "incompatible"
+                      else:
+                          expected = "unknown"
                       if pair["counterfactual_adjudication"]["label"] != expected:
                           raise ValueError(f"{pair['pair_id']}: synthetic expected counterfactual label {expected}")
               return len(pairs)
 
           count = validate_suite(fixture)
-          if count != 7:
-              raise SystemExit(f"expected 7 synthetic counterfactual pairs; found {count}")
+          if count != 8:
+              raise SystemExit(f"expected 8 synthetic counterfactual pairs; found {count}")
 
           mutants = []
           duplicate_pair = copy.deepcopy(fixture)
@@ -1304,7 +1307,7 @@ jobs:
                   continue
               raise SystemExit(f"counterfactual suite negative control {index} unexpectedly passed")
 
-          print("PITB_COUNTERFACTUAL_SUITE_PASS: 7 synthetic pairs validated; paired reviewers and split/component integrity enforced; 13 negative controls rejected")
+          print("PITB_COUNTERFACTUAL_SUITE_PASS: 8 synthetic pairs validated including one unknown pending row; paired reviewers and split/component integrity enforced; 13 negative controls rejected")
           PY
       - name: Run paired counterfactual outcome analyzer and mutation controls
         shell: bash
@@ -1332,11 +1335,11 @@ jobs:
           Draft202012Validator(suite_schema, format_checker=FormatChecker()).validate(suite)
           row_validator = Draft202012Validator(outcome_schema, format_checker=FormatChecker())
           rows = [json.loads(line) for line in outcomes_path.read_text().splitlines() if line.strip()]
-          if len(rows) != 14:
-              raise SystemExit(f"expected 14 synthetic paired outcomes; found {len(rows)}")
+          if len(rows) != 16:
+              raise SystemExit(f"expected 16 synthetic paired outcomes; found {len(rows)}")
           for index, row in enumerate(rows, start=1):
               row_validator.validate(row)
-          print("PITB_COUNTERFACTUAL_INPUT_SCHEMA_PASS: 7 pairs and 14 synthetic outcome rows")
+          print("PITB_COUNTERFACTUAL_INPUT_SCHEMA_PASS: 8 pairs and 16 synthetic outcome rows, including one pending contrast")
           PY
 
           cd "$(dirname "$PITB_MANIFEST")"
@@ -1358,8 +1361,13 @@ jobs:
           validator = Draft202012Validator(schema, format_checker=FormatChecker())
           validator.validate(report)
           assert report["dataset_kind"] == "synthetic_fixture"
-          assert report["counts"]["suite_pairs_in_requested_split"] == 7
+          assert report["counts"]["suite_pairs_in_requested_split"] == 8
           assert report["counts"]["adjudicated_pairs_analyzed"] == 7
+          assert report["counts"]["unresolved_or_pending_pairs"] == 1
+          assert report["counts"]["suite_pairs_in_requested_split"] == (
+              report["counts"]["adjudicated_pairs_analyzed"]
+              + report["counts"]["unresolved_or_pending_pairs"]
+          )
           assert report["counts"]["base_compatible_pairs"] == 7
           assert report["counts"]["counterfactual_compatible_pairs"] == 1
           assert report["counts"]["counterfactual_incompatible_pairs"] == 6
@@ -1521,7 +1529,7 @@ jobs:
           if result.returncode == 0:
               raise SystemExit("counterfactual analyzer unexpectedly accepted one pinned commit/path with conflicting artifact digests")
 
-          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, 11 malformed-outcome controls and 7 suite-integrity controls")
+          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, explicit pending denominator, component bootstrap, report schema, 11 malformed-outcome controls and 7 suite-integrity controls")
           PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
