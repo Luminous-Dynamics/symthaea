@@ -3,7 +3,7 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path};
 
 const EXPECTED_FORMAT: &str = "SLD-ARTIFACT-MANIFEST-1";
 
@@ -125,6 +125,7 @@ pub fn verify(root: &Path, manifest_path: &Path) -> Result<usize> {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temporary_root() -> PathBuf {
