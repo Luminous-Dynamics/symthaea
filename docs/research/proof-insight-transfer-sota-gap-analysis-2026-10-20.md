@@ -1,6 +1,6 @@
 # Proof Insight Transfer: state-of-the-art gap analysis and next experiments
 
-**Date:** 2026-10-20  
+**Date:** 2026-10-22  
 **Status:** literature-informed research plan; the figures below are published reference results from their stated setups, not PITB results. **Symthaea has no measured insight-transfer result yet.**
 
 ## Executive decision
