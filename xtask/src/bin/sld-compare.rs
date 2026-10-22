@@ -113,6 +113,26 @@ struct Evaluator {
     independent_adjudication_status: String,
 }
 
+#[derive(Debug, Deserialize, PartialEq)]
+struct OracleAdjudication {
+    status: String,
+    ledger_sha256: Option<String>,
+    protocol_sha256: String,
+    rubric_sha256: String,
+    reviewer_count: usize,
+    expected_case_count: usize,
+    cases_with_two_independent_initial_reviews: usize,
+    cases_adjudicated: usize,
+    cases_indeterminate: usize,
+    unresolved_disagreements: usize,
+    critical_cases_reviewed: usize,
+    blind_initial_reviews: bool,
+    case_assignment_randomized: bool,
+    case_authors_excluded_from_adjudication: bool,
+    conflicts_disclosed: bool,
+    completed_at: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 struct CaseResult {
     case_id: String,
@@ -144,6 +164,7 @@ struct Receipt {
     subject: Subject,
     generation: Generation,
     evaluator: Evaluator,
+    oracle_adjudication: OracleAdjudication,
     case_results: Vec<CaseResult>,
     summary: Summary,
     comparison_eligibility: String,
@@ -324,6 +345,40 @@ fn validate_receipt<'r>(
         is_lower_hex(&receipt.evaluator.rubric_sha256, 64),
         "{label}: rubric digest is malformed"
     );
+    let oracle = &receipt.oracle_adjudication;
+    ensure!(oracle.status == "COMPLETE", "{label}: independent oracle adjudication status must be COMPLETE");
+    let ledger_digest = oracle.ledger_sha256.as_deref()
+        .context(format!("{label}: complete oracle adjudication lacks ledger_sha256"))?;
+    ensure!(is_lower_hex(ledger_digest, 64), "{label}: oracle ledger digest is malformed");
+    ensure!(
+        is_lower_hex(&oracle.protocol_sha256, 64) && is_lower_hex(&oracle.rubric_sha256, 64),
+        "{label}: oracle protocol/rubric digest is malformed"
+    );
+    ensure!(
+        oracle.rubric_sha256 == receipt.evaluator.rubric_sha256,
+        "{label}: oracle ledger rubric digest does not match evaluator rubric"
+    );
+    ensure!(
+        oracle.expected_case_count == receipt.case_set.expected_case_count
+            && oracle.cases_with_two_independent_initial_reviews == oracle.expected_case_count
+            && oracle.cases_adjudicated == oracle.expected_case_count
+            && oracle.cases_indeterminate == 0
+            && oracle.unresolved_disagreements == 0,
+        "{label}: oracle ledger does not cover the full frozen case set with resolved dispositions"
+    );
+    ensure!(
+        oracle.reviewer_count >= 2
+            && oracle.blind_initial_reviews
+            && oracle.case_assignment_randomized
+            && oracle.case_authors_excluded_from_adjudication
+            && oracle.conflicts_disclosed
+            && oracle.completed_at.as_ref().is_some_and(|at| !at.trim().is_empty()),
+        "{label}: oracle independence/blinding/conflict/completion evidence is incomplete"
+    );
+    ensure!(
+        receipt.evaluator.independent_adjudication_status == "COMPLETE",
+        "{label}: evaluator status conflicts with oracle adjudication evidence"
+    );
     if let Some(tool_digest) = &receipt.generation.tool_versions_sha256 {
         ensure!(is_lower_hex(tool_digest, 64), "{label}: tool_versions_sha256 is malformed");
     }
@@ -471,6 +526,10 @@ fn validate_compatibility(a: &Receipt, b: &Receipt) -> Result<()> {
         a.evaluator.independent_adjudication_status == "COMPLETE"
             && b.evaluator.independent_adjudication_status == "COMPLETE",
         "independent oracle adjudication must be COMPLETE before model comparison"
+    );
+    ensure!(
+        a.oracle_adjudication == b.oracle_adjudication,
+        "oracle adjudication ledger/protocol/rubric/count metadata mismatch"
     );
     ensure!(
         !a.evaluator.judge_panel.is_empty(),
@@ -840,8 +899,27 @@ mod tests {
                     "snapshot": "fixture-1",
                     "implementation_sha256": digest
                 }],
-                "human_review_status": "NOT_PERFORMED",
-                "independent_adjudication_status": "NOT_PERFORMED"
+                "human_review_status": "COMPLETE",
+                "human_rater_count": 3,
+                "independent_adjudication_status": "COMPLETE"
+            },
+            "oracle_adjudication": {
+                "status": "COMPLETE",
+                "ledger_sha256": digest,
+                "protocol_sha256": digest,
+                "rubric_sha256": digest,
+                "reviewer_count": 3,
+                "expected_case_count": 2,
+                "cases_with_two_independent_initial_reviews": 2,
+                "cases_adjudicated": 2,
+                "cases_indeterminate": 0,
+                "unresolved_disagreements": 0,
+                "critical_cases_reviewed": 1,
+                "blind_initial_reviews": true,
+                "case_assignment_randomized": true,
+                "case_authors_excluded_from_adjudication": true,
+                "conflicts_disclosed": true,
+                "completed_at": "2026-10-22T12:02:00Z"
             },
             "environment": {
                 "os_arch": "fixture",
