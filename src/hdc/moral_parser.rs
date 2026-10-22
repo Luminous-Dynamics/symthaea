@@ -1053,10 +1053,17 @@ impl MoralParser {
     /// Detect consent state from explicit, unquoted textual evidence.
     ///
     /// Positive consent is never inferred merely because the scenario mentions
-    /// asking, permission, or consent as a topic. Questions and quoted claims do
-    /// not establish affirmative consent. Silence maps to Unknown.
+    /// asking, permission, or consent as a topic. An interrogative unquoted
+    /// input does not establish a consent state. Silence maps to Unknown.
     fn detect_consent(&self, text: &str) -> ConsentState {
         let evidence_text = Self::strip_quoted_consent_text(text);
+
+        // A question asks whether a proposition holds; it does not assert that
+        // it holds. This conservative whole-input fallback avoids turning
+        // "Did she refuse consent?" into an asserted refusal from surface cues.
+        if evidence_text.contains('?') {
+            return ConsentState::Unknown;
+        }
 
         // Check explicit refusal/withdrawal before other signals.
         for phrase in &self.consent_denied_words {
@@ -1078,12 +1085,6 @@ impl MoralParser {
             if evidence_text.contains(phrase.as_str()) {
                 return ConsentState::Implied;
             }
-        }
-
-        // Questions can contain the surface form of a positive cue (for
-        // example, "Who gave permission?") without asserting that it happened.
-        if evidence_text.contains('?') {
-            return ConsentState::Unknown;
         }
 
         // Only affirmative wording outside quotes and interrogatives counts.
@@ -1859,6 +1860,9 @@ mod tests {
             "Would permission be needed here?",
             "The note says \"she gave consent\"; I have not verified it.",
             "The report says “she gave consent” but its source is unclear.",
+            "Did she refuse consent?",
+            "Did I proceed without consent?",
+            "The note says “she refused consent” but the source is unverified.",
         ] {
             assert_eq!(
                 parser.parse(text).consent,
