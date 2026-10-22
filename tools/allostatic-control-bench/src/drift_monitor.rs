@@ -200,8 +200,8 @@ mod tests {
     }
 
     fn test_sets() -> (RobustActionSet, HorizonViableActionSet) {
-        let state =
-            StateEnvelope::new(interval(0.17, 0.17), interval(0.81, 0.81)).expect("valid state");
+        let state = StateEnvelope::new(interval(0.17, 0.17), interval(0.81, 0.81))
+            .expect("valid state");
         let dynamics = DynamicsBounds::new(
             effect((-0.005, -0.005), (0.06, 0.06)),
             effect((0.005, 0.005), (0.02, 0.02)),
@@ -238,8 +238,8 @@ mod tests {
         assert!(calibrate_drift_threshold(&[0.1, -0.1], 0.05).is_none());
         assert!(calibrate_drift_threshold(&[0.1, 0.2], 0.0).is_none());
         assert!(calibrate_drift_threshold(&[0.1, 0.2], 1.0).is_none());
-        let threshold =
-            calibrate_drift_threshold(&nominal_scores(19), 0.05).expect("valid threshold");
+        let threshold = calibrate_drift_threshold(&nominal_scores(19), 0.05)
+            .expect("valid threshold");
         assert!(assess_drift(f64::NAN, threshold).is_none());
         assert!(assess_drift(-0.1, threshold).is_none());
     }
