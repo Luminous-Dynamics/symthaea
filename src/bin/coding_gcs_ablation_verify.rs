@@ -910,4 +910,24 @@ mod tests {
             .iter()
             .any(|error| error.contains("--expected-source-sha")));
     }
+
+    #[test]
+    fn tampered_test_fixture_is_rejected_even_before_external_pin_check() {
+        let mut report = valid_fixture();
+        report["task_manifest"][0]["test_source"] =
+            Value::String("#[test] fn task_a_is_true() { assert!(!task_a()); }".to_string());
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("test-source digest")));
+        assert!(errors.iter().any(|error| error.contains("task digest")));
+    }
+
+    #[test]
+    fn tampered_task_digest_is_rejected_even_if_outer_digest_is_recomputed() {
+        let mut report = valid_fixture();
+        report["task_manifest"][0]["task_digest_blake3"] = Value::String("d".repeat(64));
+        let new_outer = manifest_digest(report["task_manifest"].as_array().unwrap()).unwrap();
+        report["task_manifest_blake3"] = Value::String(new_outer);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("task digest does not match")));
+    }
 }
