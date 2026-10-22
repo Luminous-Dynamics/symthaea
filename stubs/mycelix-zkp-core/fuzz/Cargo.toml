@@ -13,8 +13,8 @@ sha2 = "0.10"
 mycelix-zkp-core = { path = "..", features = ["dilithium"] }
 
 [[bin]]
-name = "fuzz_keypair_import"
-path = "fuzz_targets/fuzz_keypair_import.rs"
+name = "fuzz_authenticated_signature"
+path = "fuzz_targets/fuzz_authenticated_signature.rs"
 test = false
 doc = false
 bench = false
