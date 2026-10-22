@@ -308,8 +308,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                     if let Some(reference_samples) = interpolated_reference {
                         common_grid_samples = reference_samples.len();
-                        let endpoint = reference_samples.last().map(|sample| sample.1);
-                        if let Some(endpoint) = endpoint {
+                        if let Some(endpoint) = reference_samples.last().map(|sample| sample.1) {
                             endpoint_error = scaled_state_error(endpoint, scale, T_END);
                         }
                         trajectory_error = max_sampled_scaled_trajectory_error(
@@ -367,81 +366,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                         "\"dopri5_integration_samples\":0,\"dopri5_output_samples\":0,\"common_grid_matches\":false,\"max_common_grid_disagreement_scaled\":null,\"dopri5_pass\":false,\"dopri5_error\":\"{:?}\"",
                         error
                     )
-                }
-            };
-
-            observations.push(format!(
-                            "{{\"scale\":{:.17e},\"rtol\":{:.17e},\"atol\":{:.17e},\"global_endpoint_error_limit\":{:.17e},\"global_energy_drift_limit\":{:.17e},{},\"dopri5_pass\":false,\"dopri5_error\":\"no_output_states\"}}",
-                            scale,
-                            rtol,
-                            atol,
-                            endpoint_error_limit,
-                            energy_drift_limit,
-                            custom_fields
-                        ));
-                        continue;
-                    };
-                    let endpoint_time = reference_times.last().copied().unwrap_or(f64::NAN);
-                    let endpoint_error =
-                        scaled_state_error([endpoint[0], endpoint[1]], scale, T_END);
-                    let reference_samples: Vec<(f64, [f64; 2])> = reference_times
-                        .iter()
-                        .copied()
-                        .zip(reference_states.iter().map(|state| [state[0], state[1]]))
-                        .collect();
-                    let trajectory_error = max_sampled_scaled_trajectory_error(
-                        reference_samples.iter().copied(),
-                        scale,
-                    );
-                    let common_grid_disagreement = custom_samples.as_deref().and_then(|custom| {
-                        max_common_grid_disagreement(custom, &reference_samples, scale)
-                    });
-                    let common_grid_matches = common_grid_disagreement.is_some();
-                    let energy_drift = max_relative_energy_drift(
-                        reference_samples.iter().map(|sample| sample.1),
-                        scale,
-                    );
-                    // `ode_solvers` output times are accumulated floating-point samples;
-                    // terminal-time validation needs a roundoff envelope, not a single ULP.
-                    let terminal_time_tolerance = 32.0 * f64::EPSILON * T_END.abs().max(1.0);
-                    let completed = endpoint_time.is_finite()
-                        && (endpoint_time - T_END).abs() <= terminal_time_tolerance;
-                    let finite = endpoint_error.is_finite()
-                        && energy_drift.is_finite()
-                        && reference_states
-                            .iter()
-                            .all(|state| state.iter().all(|value| value.is_finite()));
-                    let pass = completed
-                        && finite
-                        && common_grid_matches
-                        && endpoint_error <= endpoint_error_limit
-                        && trajectory_error <= endpoint_error_limit
-                        && common_grid_disagreement
-                            .is_some_and(|error| error <= 2.0 * endpoint_error_limit)
-                        && energy_drift <= energy_drift_limit;
-                    all_passed &= pass;
-                    format!(
-                        "\"dopri5_terminal_time\":{:.17e},\"dopri5_terminal_time_error\":{:.17e},\"dopri5_terminal_time_tolerance\":{:.17e},\"dopri5_endpoint_error_scaled\":{:.17e},\"dopri5_max_sampled_scaled_trajectory_error\":{:.17e},\"dopri5_sampled_energy_drift\":{:.17e},\"dopri5_accepted_steps\":{},\"dopri5_rejected_steps\":{},\"dopri5_rhs_evaluations\":{},\"dopri5_output_samples\":{},\"common_grid_matches\":{},\"max_common_grid_disagreement_scaled\":{},\"dopri5_complete\":{},\"dopri5_finite\":{},\"dopri5_pass\":{}",
-                        endpoint_time,
-                        (endpoint_time - T_END).abs(),
-                        terminal_time_tolerance,
-                        endpoint_error,
-                        trajectory_error,
-                        energy_drift,
-                        stats.accepted_steps,
-                        stats.rejected_steps,
-                        stats.num_eval,
-                        reference_states.len(),
-                        common_grid_matches,
-                        format_optional_f64(common_grid_disagreement),
-                        completed,
-                        finite,
-                        pass
-                    )
-                }
-                Err(error) => {
-                    all_passed = false;
-                    format!("\"dopri5_pass\":false,\"dopri5_error\":\"{:?}\"", error)
                 }
             };
 
