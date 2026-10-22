@@ -1,4 +1,4 @@
-//! HMR-0 block-out geometry previews through Symthaea's fabrication kernel.
+//! HMR-0 block-out geometry previews from Symthaea's versioned tool concept catalog.
 //!
 //! These are coarse collision-envelope models only, not manufacturable designs.
 //! Dimensions are millimetres. The generated STL files must not be fabricated
@@ -8,18 +8,78 @@
 //!   cargo run -p symthaea-fabrication-kernel --example hmr0_tool_envelope_preview
 //!   cargo run -p symthaea-fabrication-kernel --example hmr0_tool_envelope_preview -- target/hmr0-previews
 //!
-//! Output geometry uses the existing CSG -> mesh -> STL pipeline and is checked
-//! for basic mesh validity and STL round-trip integrity.
+//! Geometry parameters are read from docs/engineering/hmr0-tool-cad-concepts-v0.1.json.
+//! Before export, every nominal parameter is checked against its declared range;
+//! each STL is then checked for mesh validity and round-trip parse integrity.
 
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use serde_json::Value;
 use symthaea_fabrication_kernel::csg::CSGNode;
 use symthaea_fabrication_kernel::export::export_stl;
 use symthaea_fabrication_kernel::import::parse_stl;
 use symthaea_fabrication_kernel::mesh::resolve_to_mesh;
 use symthaea_fabrication_kernel::validate::validate_mesh;
+
+const CONCEPT_CATALOG: &[u8] =
+    include_bytes!("../../../../docs/engineering/hmr0-tool-cad-concepts-v0.1.json");
+
+fn find_concept<'a>(catalog: &'a Value, tool_id: &str) -> Result<&'a Value, String> {
+    catalog
+        .get("concepts")
+        .and_then(Value::as_array)
+        .and_then(|concepts| {
+            concepts
+                .iter()
+                .find(|concept| concept.get("tool_id").and_then(Value::as_str) == Some(tool_id))
+        })
+        .ok_or_else(|| format!("tool concept '{tool_id}' was not found in the versioned catalog"))
+}
+
+fn nominal_parameter(catalog: &Value, tool_id: &str, name: &str) -> Result<f64, String> {
+    let concept = find_concept(catalog, tool_id)?;
+    let parameter = concept
+        .get("geometry")
+        .and_then(|geometry| geometry.get("parameters"))
+        .and_then(Value::as_array)
+        .and_then(|parameters| {
+            parameters
+                .iter()
+                .find(|parameter| parameter.get("name").and_then(Value::as_str) == Some(name))
+        })
+        .ok_or_else(|| format!("{tool_id}: required geometry parameter '{name}' is missing"))?;
+
+    let range = parameter
+        .get("candidate_range")
+        .and_then(Value::as_array)
+        .filter(|range| range.len() == 2)
+        .ok_or_else(|| format!("{tool_id}.{name}: candidate_range must have two numbers"))?;
+    let minimum = range[0]
+        .as_f64()
+        .ok_or_else(|| format!("{tool_id}.{name}: range minimum is not numeric"))?;
+    let maximum = range[1]
+        .as_f64()
+        .ok_or_else(|| format!("{tool_id}.{name}: range maximum is not numeric"))?;
+    let nominal = parameter
+        .get("nominal_candidate")
+        .and_then(Value::as_f64)
+        .ok_or_else(|| format!("{tool_id}.{name}: nominal_candidate is not numeric"))?;
+
+    if !minimum.is_finite()
+        || !maximum.is_finite()
+        || !nominal.is_finite()
+        || minimum > maximum
+        || nominal < minimum
+        || nominal > maximum
+    {
+        return Err(format!(
+            "{tool_id}.{name}: nominal {nominal} is outside the declared finite range [{minimum}, {maximum}]"
+        ));
+    }
+    Ok(nominal)
+}
 
 fn cuboid(dimensions_mm: [f64; 3], center_mm: [f64; 3]) -> CSGNode {
     CSGNode::cube()
@@ -27,37 +87,96 @@ fn cuboid(dimensions_mm: [f64; 3], center_mm: [f64; 3]) -> CSGNode {
         .translate(center_mm[0], center_mm[1], center_mm[2])
 }
 
-/// Simplified collision envelope, with rigid rectangular proxies for the pads.
-fn sealed_tote_gripper_envelope() -> CSGNode {
-    // Mount/bridge rail; simplified as a box.
-    let rail = cuboid([320.0, 40.0, 20.0], [0.0, 0.0, -50.0]);
+/// Simplified collision envelope driven by the named parameters in the catalog.
+/// Pads are rigid rectangular proxies: no compliance, friction or material model
+/// is implied by this geometry.
+fn sealed_tote_gripper_envelope(catalog: &Value) -> Result<CSGNode, String> {
+    const ID: &str = "SEALED_TOTE_GRIPPER";
+    let opening = nominal_parameter(catalog, ID, "jaw_opening_max")?;
+    let pad_width = nominal_parameter(catalog, ID, "pad_width")?;
+    let pad_height = nominal_parameter(catalog, ID, "pad_contact_height")?;
+    let finger_length = nominal_parameter(catalog, ID, "finger_length")?;
+    let jaw_thickness = nominal_parameter(catalog, ID, "jaw_thickness")?;
+    let pad_thickness = nominal_parameter(catalog, ID, "pad_thickness")?;
+    let bridge_depth = nominal_parameter(catalog, ID, "bridge_depth")?;
+    let bridge_thickness = nominal_parameter(catalog, ID, "bridge_thickness")?;
+    let bridge_margin = nominal_parameter(catalog, ID, "bridge_end_margin")?;
+    let vertical_overlap = nominal_parameter(catalog, ID, "bridge_to_jaw_overlap")?;
+    let jaw_center_z = nominal_parameter(catalog, ID, "jaw_center_z")?;
 
-    // Parallel jaw envelopes; the 2 mm vertical overlap with the rail is
-    // deliberate for a single fused CSG solid.
-    let left_jaw = cuboid([20.0, 90.0, 80.0], [-144.0, 0.0, -2.0]);
-    let right_jaw = cuboid([20.0, 90.0, 80.0], [144.0, 0.0, -2.0]);
+    let jaw_height = pad_height
+        + nominal_parameter(catalog, ID, "jaw_height_margin")?;
+    let pad_center_x = opening / 2.0 + pad_thickness / 2.0;
+    let jaw_center_x = opening / 2.0 + pad_thickness + jaw_thickness / 2.0
+        - nominal_parameter(catalog, ID, "bridge_to_jaw_overlap")? / 2.0;
+    let bridge_length = 2.0 * (jaw_center_x + jaw_thickness / 2.0 + bridge_margin);
+    let jaw_bottom = jaw_center_z - jaw_height / 2.0;
+    let bridge_center_z = jaw_bottom + vertical_overlap - bridge_thickness / 2.0;
 
-    // Pad envelopes are placeholders: no elastomer, texture, compliance or
-    // friction model is implied by these rigid cuboids.
-    let left_pad = cuboid([5.0, 60.0, 70.0], [-132.5, 0.0, -2.0]);
-    let right_pad = cuboid([5.0, 60.0, 70.0], [132.5, 0.0, -2.0]);
+    let rail = cuboid(
+        [bridge_length, bridge_depth, bridge_thickness],
+        [0.0, 0.0, bridge_center_z],
+    );
+    let left_jaw = cuboid(
+        [jaw_thickness, finger_length, jaw_height],
+        [-jaw_center_x, 0.0, jaw_center_z],
+    );
+    let right_jaw = cuboid(
+        [jaw_thickness, finger_length, jaw_height],
+        [jaw_center_x, 0.0, jaw_center_z],
+    );
+    let left_pad = cuboid(
+        [pad_thickness, pad_width, pad_height],
+        [-pad_center_x, 0.0, jaw_center_z],
+    );
+    let right_pad = cuboid(
+        [pad_thickness, pad_width, pad_height],
+        [pad_center_x, 0.0, jaw_center_z],
+    );
 
-    rail.union(left_jaw)
+    Ok(rail
+        .union(left_jaw)
         .union(right_jaw)
         .union(left_pad)
-        .union(right_pad)
+        .union(right_pad))
 }
 
-/// Simplified passive tray docking envelope; rails and end stop are fused.
-fn passive_tray_dock_envelope() -> CSGNode {
-    let base = cuboid([380.0, 280.0, 8.0], [0.0, 0.0, -24.0]);
-    let left_guide = cuboid([8.0, 260.0, 36.0], [-184.0, 0.0, -2.5]);
-    let right_guide = cuboid([8.0, 260.0, 36.0], [184.0, 0.0, -2.5]);
-    let end_stop = cuboid([380.0, 8.0, 36.0], [0.0, 126.0, -2.5]);
+/// Simplified passive tray docking envelope driven by catalog nominal parameters.
+fn passive_tray_dock_envelope(catalog: &Value) -> Result<CSGNode, String> {
+    const ID: &str = "PASSIVE_TRAY_DOCK";
+    let tray_width = nominal_parameter(catalog, ID, "tray_width")?;
+    let tray_depth = nominal_parameter(catalog, ID, "tray_depth")?;
+    let guide_thickness = nominal_parameter(catalog, ID, "guide_thickness")?;
+    let guide_height = nominal_parameter(catalog, ID, "guide_height")?;
+    let base_thickness = nominal_parameter(catalog, ID, "base_thickness")?;
+    let edge_margin = nominal_parameter(catalog, ID, "base_edge_margin")?;
+    let front_margin = nominal_parameter(catalog, ID, "base_front_margin")?;
+    let rear_margin = nominal_parameter(catalog, ID, "base_rear_margin")?;
+    let guide_overlap = nominal_parameter(catalog, ID, "guide_base_overlap")?;
+    let stop_thickness = nominal_parameter(catalog, ID, "end_stop_thickness")?;
 
-    base.union(left_guide)
+    let base_width = tray_width + 2.0 * (guide_thickness + edge_margin);
+    let base_depth = tray_depth + front_margin + rear_margin;
+    let base = cuboid([base_width, base_depth, base_thickness], [0.0, 0.0, 0.0]);
+    let guide_z = base_thickness / 2.0 + guide_height / 2.0 - guide_overlap;
+    let guide_x = tray_width / 2.0 + guide_thickness / 2.0;
+    let left_guide = cuboid(
+        [guide_thickness, tray_depth, guide_height],
+        [-guide_x, 0.0, guide_z],
+    );
+    let right_guide = cuboid(
+        [guide_thickness, tray_depth, guide_height],
+        [guide_x, 0.0, guide_z],
+    );
+    let end_stop = cuboid(
+        [base_width, stop_thickness, guide_height],
+        [0.0, tray_depth / 2.0 - stop_thickness / 2.0, guide_z],
+    );
+
+    Ok(base
+        .union(left_guide)
         .union(right_guide)
-        .union(end_stop)
+        .union(end_stop))
 }
 
 fn export_validated(name: &str, model: &CSGNode, output_dir: &Path) -> Result<(), String> {
@@ -73,7 +192,8 @@ fn export_validated(name: &str, model: &CSGNode, output_dir: &Path) -> Result<()
     }
 
     let stl = export_stl(&mesh);
-    let parsed = parse_stl(&stl).map_err(|error| format!("{name}: STL round-trip parse failed: {error:?}"))?;
+    let parsed =
+        parse_stl(&stl).map_err(|error| format!("{name}: STL round-trip parse failed: {error:?}"))?;
     let round_trip_report = validate_mesh(&parsed);
     if !round_trip_report.is_valid() {
         return Err(format!("{name}: exported STL failed round-trip mesh validation"));
@@ -102,9 +222,31 @@ fn main() {
         std::process::exit(2);
     }
 
+    let catalog: Value = match serde_json::from_slice(CONCEPT_CATALOG) {
+        Ok(catalog) => catalog,
+        Err(error) => {
+            eprintln!("HMR-0 parameter catalog is invalid JSON: {error}");
+            std::process::exit(2);
+        }
+    };
+    let gripper = match sealed_tote_gripper_envelope(&catalog) {
+        Ok(model) => model,
+        Err(error) => {
+            eprintln!("HMR-0 gripper parameter binding failed: {error}");
+            std::process::exit(2);
+        }
+    };
+    let dock = match passive_tray_dock_envelope(&catalog) {
+        Ok(model) => model,
+        Err(error) => {
+            eprintln!("HMR-0 tray dock parameter binding failed: {error}");
+            std::process::exit(2);
+        }
+    };
+
     for (name, model) in [
-        ("sealed_tote_gripper_envelope", sealed_tote_gripper_envelope()),
-        ("passive_tray_dock_envelope", passive_tray_dock_envelope()),
+        ("sealed_tote_gripper_envelope", gripper),
+        ("passive_tray_dock_envelope", dock),
     ] {
         if let Err(error) = export_validated(name, &model, &output_dir) {
             eprintln!("{error}");
@@ -119,15 +261,33 @@ fn main() {
 mod tests {
     use super::*;
 
-    #[test]
-    fn gripper_collision_envelope_is_a_valid_mesh() {
-        let mesh = resolve_to_mesh(&sealed_tote_gripper_envelope());
-        assert!(validate_mesh(&mesh).is_valid());
+    fn catalog() -> Value {
+        serde_json::from_slice(CONCEPT_CATALOG).expect("HMR-0 concept catalog parses")
     }
 
     #[test]
-    fn passive_tray_collision_envelope_is_a_valid_mesh() {
-        let mesh = resolve_to_mesh(&passive_tray_dock_envelope());
-        assert!(validate_mesh(&mesh).is_valid());
+    fn gripper_collision_envelope_is_generated_from_catalog_parameters() {
+        let model = sealed_tote_gripper_envelope(&catalog()).expect("gripper parameters in range");
+        assert!(validate_mesh(&resolve_to_mesh(&model)).is_valid());
+    }
+
+    #[test]
+    fn passive_tray_collision_envelope_is_generated_from_catalog_parameters() {
+        let model = passive_tray_dock_envelope(&catalog()).expect("dock parameters in range");
+        assert!(validate_mesh(&resolve_to_mesh(&model)).is_valid());
+    }
+
+    #[test]
+    fn out_of_range_nominal_parameter_fails_closed_before_geometry_generation() {
+        let mut source = catalog();
+        let parameters = source["concepts"][0]["geometry"]["parameters"]
+            .as_array_mut()
+            .expect("gripper parameter list");
+        let jaw = parameters
+            .iter_mut()
+            .find(|parameter| parameter["name"] == "jaw_opening_max")
+            .expect("jaw_opening_max parameter");
+        jaw["candidate_range"] = serde_json::json!([250.0, 255.0]);
+        assert!(sealed_tote_gripper_envelope(&source).is_err());
     }
 }
