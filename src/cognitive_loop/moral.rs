@@ -9,6 +9,20 @@
 use super::{CognitiveLoopService, MoralJudgmentSummary};
 
 impl CognitiveLoopService {
+    /// Inspect current-input consent evidence without waiting for the ethics
+    /// engine's scheduled moral-score cycle.
+    ///
+    /// This returns a text-level evidence trace only. It does not authenticate
+    /// a person or consent record, determine whether consent is required, or
+    /// authorize an action. Sensitive side effects must call an independent
+    /// scope-bound policy gate synchronously before execution.
+    pub fn assess_consent_evidence(
+        &self,
+        input: &str,
+    ) -> crate::hdc::moral_parser::ConsentTextAssessment {
+        self.ethics_engine.assess_consent_evidence(input)
+    }
+
     /// Evaluate the moral alignment of an input text.
     ///
     /// Delegates to `EthicsEngine::evaluate_moral_input()` (Stage 1) for
