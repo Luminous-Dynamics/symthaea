@@ -58,7 +58,7 @@ fn run() -> Result<(), String> {
         return Err("input CSV contains duplicate header names".to_owned());
     }
     let expected = ["task", "seed", "baseline_score", "candidate_score"];
-    if headers != expected {
+    if headers.as_slice() != &expected[..] {
         return Err(format!(
             "expected exact input header {}, found {}",
             expected.join(","),
@@ -257,7 +257,6 @@ fn atomic_write(target: &Path, content: &[u8]) -> Result<(), String> {
 mod tests {
     use super::{csv_fields, ensure_distinct_paths, is_slug};
     use std::fs;
-    use std::path::Path;
 
     #[test]
     fn strict_csv_rejects_quoted_fields() {
@@ -286,6 +285,5 @@ mod tests {
         let result = ensure_distinct_paths(&source, &alias);
         fs::remove_file(&source).expect("remove temporary source fixture");
         assert!(result.expect_err("same path must be rejected").contains("same file"));
-        let _ = Path::new(".");
     }
 }
