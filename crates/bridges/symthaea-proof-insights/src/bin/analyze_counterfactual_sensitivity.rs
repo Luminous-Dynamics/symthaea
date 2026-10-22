@@ -128,23 +128,38 @@ impl Counts {
         );
         metrics.insert(
             "counterfactual_compatible_accept_recall",
-            (self.variant_accept, self.variant_positive, ratio(self.variant_accept, self.variant_positive)),
+            (
+                self.variant_accept,
+                self.variant_positive,
+                ratio(self.variant_accept, self.variant_positive),
+            ),
         );
         metrics.insert(
             "counterfactual_incompatible_sensitivity",
-            (self.variant_nonaccept, self.variant_negative, ratio(self.variant_nonaccept, self.variant_negative)),
+            (
+                self.variant_nonaccept,
+                self.variant_negative,
+                ratio(self.variant_nonaccept, self.variant_negative),
+            ),
         );
         metrics.insert(
             "counterfactual_false_accept_rate",
             (
                 self.variant_negative.saturating_sub(self.variant_nonaccept),
                 self.variant_negative,
-                ratio(self.variant_negative.saturating_sub(self.variant_nonaccept), self.variant_negative),
+                ratio(
+                    self.variant_negative.saturating_sub(self.variant_nonaccept),
+                    self.variant_negative,
+                ),
             ),
         );
         metrics.insert(
             "paired_contract_adherence",
-            (self.paired_correct, self.paired_eligible, ratio(self.paired_correct, self.paired_eligible)),
+            (
+                self.paired_correct,
+                self.paired_eligible,
+                ratio(self.paired_correct, self.paired_eligible),
+            ),
         );
         metrics.insert(
             "semantics_preserving_decision_stability",
@@ -198,7 +213,9 @@ fn main() -> Result<()> {
     let outcome_bytes = fs::read(&args[2]).with_context(|| format!("read outcomes {}", args[2]))?;
     let requested_split = args[3].as_str();
     if !matches!(requested_split, "test" | "external_challenge") {
-        bail!("confirmatory analysis accepts only test or external_challenge, found {requested_split:?}");
+        bail!(
+            "confirmatory analysis accepts only test or external_challenge, found {requested_split:?}"
+        );
     }
     let bootstrap_replicates = args
         .get(5)
@@ -208,14 +225,22 @@ fn main() -> Result<()> {
     if bootstrap_replicates < 1_000 {
         bail!("at least 1000 bootstrap replicates are required");
     }
-    let seed = args.get(6).map(|x| x.parse::<u64>().context("parse seed")).transpose()?.unwrap_or(DEFAULT_SEED);
+    let seed = args
+        .get(6)
+        .map(|x| x.parse::<u64>().context("parse seed"))
+        .transpose()?
+        .unwrap_or(DEFAULT_SEED);
 
-    let suite: Value = serde_json::from_slice(&suite_bytes).context("parse counterfactual suite JSON")?;
+    let suite: Value = serde_json::from_slice(&suite_bytes)
+        .context("parse counterfactual suite JSON")?;
     let suite_id = required_string(&suite, "suite_id", "suite")?.to_owned();
     if required_string(&suite, "schema_version", "suite")? != SUITE_VERSION {
         bail!("unsupported suite schema_version");
     }
-    let pairs = suite.get("pairs").and_then(Value::as_array).context("suite.pairs must be an array")?;
+    let pairs = suite
+        .get("pairs")
+        .and_then(Value::as_array)
+        .context("suite.pairs must be an array")?;
     if pairs.is_empty() {
         bail!("suite contains no pairs");
     }
@@ -235,16 +260,27 @@ fn main() -> Result<()> {
         mutation_kinds.insert(observation.mutation_kind.clone());
     }
     for kind in mutation_kinds {
-        let subset: Vec<_> = observations.iter().filter(|x| x.mutation_kind == kind).cloned().collect();
+        let subset: Vec<_> = observations
+            .iter()
+            .filter(|x| x.mutation_kind == kind)
+            .cloned()
+            .collect();
         let subset_counts = aggregate(&subset);
         per_mutation.insert(kind, json!({
             "pair_count": subset.len(),
             "incompatible_variant_count": subset_counts.variant_negative,
-            "sensitivity": metric_json(subset_counts.variant_nonaccept, subset_counts.variant_negative, ratio(subset_counts.variant_nonaccept, subset_counts.variant_negative)),
+            "sensitivity": metric_json(
+                subset_counts.variant_nonaccept,
+                subset_counts.variant_negative,
+                ratio(subset_counts.variant_nonaccept, subset_counts.variant_negative)
+            ),
             "false_accept_rate": metric_json(
                 subset_counts.variant_negative.saturating_sub(subset_counts.variant_nonaccept),
                 subset_counts.variant_negative,
-                ratio(subset_counts.variant_negative.saturating_sub(subset_counts.variant_nonaccept), subset_counts.variant_negative)
+                ratio(
+                    subset_counts.variant_negative.saturating_sub(subset_counts.variant_nonaccept),
+                    subset_counts.variant_negative
+                )
             )
         }));
     }
@@ -259,7 +295,10 @@ fn main() -> Result<()> {
         "suite_sha256": suite_sha256,
         "outcomes_sha256": outcomes_sha256,
         "counts": {
-            "suite_pairs_in_requested_split": pairs.iter().filter(|p| p.get("split").and_then(Value::as_str) == Some(requested_split)).count(),
+            "suite_pairs_in_requested_split": pairs
+                .iter()
+                .filter(|p| p.get("split").and_then(Value::as_str) == Some(requested_split))
+                .count(),
             "adjudicated_pairs_analyzed": observations.len(),
             "base_compatible_pairs": counts.base_positive,
             "counterfactual_compatible_pairs": counts.variant_positive,
@@ -267,7 +306,11 @@ fn main() -> Result<()> {
             "paired_contract_eligible_pairs": counts.paired_eligible,
             "semantics_preserving_pairs": counts.noop_eligible,
             "probability_scored_rows": counts.brier_count,
-            "components": observations.iter().map(|o| o.component_id.as_str()).collect::<BTreeSet<_>>().len()
+            "components": observations
+                .iter()
+                .map(|o| o.component_id.as_str())
+                .collect::<BTreeSet<_>>()
+                .len()
         },
         "metrics": metrics,
         "by_mutation_kind": per_mutation,
@@ -292,7 +335,8 @@ fn main() -> Result<()> {
     });
 
     let output = serde_json::to_string_pretty(&report)?;
-    fs::write(&args[4], format!("{output}\n")).with_context(|| format!("write report {}", args[4]))?;
+    fs::write(&args[4], format!("{output}\n"))
+        .with_context(|| format!("write report {}", args[4]))?;
     println!(
         "PITB_COUNTERFACTUAL_ANALYSIS_WRITTEN: {} adjudicated pairs, {} components, report {}",
         observations.len(),
@@ -308,11 +352,22 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
         if line.trim().is_empty() {
             bail!("outcomes JSONL line {} is empty", index + 1);
         }
-        let value: Value = serde_json::from_str(line).with_context(|| format!("parse outcome JSONL line {}", index + 1))?;
+        let value: Value = serde_json::from_str(line)
+            .with_context(|| format!("parse outcome JSONL line {}", index + 1))?;
         let context = format!("outcome line {}", index + 1);
         require_exact_keys(
             &value,
-            &["schema_version", "pair_id", "split", "component_id", "source", "target", "adjudication", "prediction", "run"],
+            &[
+                "schema_version",
+                "pair_id",
+                "split",
+                "component_id",
+                "source",
+                "target",
+                "adjudication",
+                "prediction",
+                "run",
+            ],
             &[],
             &context,
         )?;
