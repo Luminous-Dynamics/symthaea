@@ -120,8 +120,8 @@ pub fn seal_frame(frame: &RdpFrame, session: &mut RdpSession) -> Result<Vec<u8>,
 /// Open a sealed envelope produced by [`seal_frame`] and decode the `RdpFrame`.
 ///
 /// Mutates `session` to advance the replay window on accepted messages.
-/// Returns `Err(WireError::OpenFailed)` for AEAD failure, replay duplicate,
-/// or out-of-window sequence.
+/// Returns `Err(WireError::OpenFailed)` for payload-type mismatch, AEAD
+/// failure, replay duplicate, or out-of-window sequence.
 pub fn open_frame(bytes: &[u8], session: &mut RdpSession) -> Result<RdpFrame, WireError> {
     let plaintext = session
         .open_with_payload_type(bytes, PAYLOAD_TYPE_RDP_FRAME)
@@ -143,10 +143,8 @@ pub fn open_frame(bytes: &[u8], session: &mut RdpSession) -> Result<RdpFrame, Wi
 ///   → RdpSession::seal             (ChaCha20-Poly1305 with PAYLOAD_TYPE_RDP_FRAME_LZ4)
 /// ```
 ///
-/// Receivers MUST use [`open_frame_lz4`] to open. Mixing with
-/// [`open_frame`] will fail at bincode deserialize (the decompressed
-/// output is bincode, the raw `open_frame` would skip decompression and
-/// try to deserialize the LZ4 block header as bincode — `WireError::Codec`).
+/// Receivers MUST use [`open_frame_lz4`] to open. The raw `open_frame`
+/// rejects the LZ4 payload type before decrypting or handing bytes to bincode.
 ///
 /// The `PAYLOAD_TYPE_RDP_FRAME_LZ4` value also separates the AEAD
 /// nonce stream from the raw `RdpFrame` stream, so a session can
@@ -173,14 +171,14 @@ pub fn seal_frame_lz4(frame: &RdpFrame, session: &mut RdpSession) -> Result<Vec<
 ///
 /// ```text
 /// sealed bytes
-///   → RdpSession::open              (AEAD verify, replay window check)
+///   → RdpSession::open_with_payload_type (type check, AEAD verify, replay window check)
 ///   → lz4_flex::decompress_size_prepended  (reads 4-byte length, decompresses)
 ///   → bincode::deserialize          (RdpFrame::from_bin)
 /// ```
 ///
-/// Returns `WireError::OpenFailed` for AEAD failure (wrong key,
-/// tampered ciphertext, replay duplicate), LZ4 decompression failure,
-/// or malformed length prefix. Mutates `session` to advance the
+/// Returns `WireError::OpenFailed` for payload-type mismatch, AEAD failure
+/// (wrong key, tampered ciphertext, replay duplicate), LZ4 decompression
+/// failure, or malformed length prefix. Mutates `session` to advance the
 /// replay window on accepted messages.
 #[cfg(feature = "holon-lz4")]
 pub fn open_frame_lz4(bytes: &[u8], session: &mut RdpSession) -> Result<RdpFrame, WireError> {
