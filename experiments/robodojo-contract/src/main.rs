@@ -6,6 +6,7 @@ use std::path::Path;
 
 use symthaea_robodojo_contract::{
     calibration::{summarize_calibration, SuccessForecast},
+    sensing_benchmark::{audit_sensing_trials, SensingArm, SensingEvidenceClass, SensingSplit, SensingTrial},
     shift::{audit_shift_robustness, ShiftAssignment, ShiftFamily, ShiftSeverity, SHIFT_PLAN_HEADER},
     compare_paired_trials, summarize_trials, ActionProposal, ActionRejection, AxisLimit,
     EpisodeGuard, FailureClass, GateConfig, ObservationDecision, ObservationFrame, TrialRecord,
@@ -13,6 +14,7 @@ use symthaea_robodojo_contract::{
 
 const TRIALS_HEADER: &str = "task_id\tvariant_id\ttrial_id\tprogress\tcompleted\tvalid_run\ttimed_out\tfailure_class\telapsed_seconds\tmodel_calls\taction_steps\testimated_cost_usd\tsafety_events";
 const FORECASTS_HEADER: &str = "task_id\tvariant_id\ttrial_id\tpredicted_success_probability";
+const SENSING_HEADER: &str = "scenario_id\tscenario_family\ttask_id\ttrial_id\tseed\tsplit\tevidence_class\tarm\tprogress\tvalid_run\tcompleted\tsafety_violation\tsafety_event_count\tsensor_requests\tsensor_acquisitions\tsensing_energy_j\tsensing_latency_ms\ttotal_energy_j\telapsed_ms\tpredicted_success_probability";
 
 #[derive(Debug, Clone, PartialEq)]
 struct ForecastProbability {
@@ -87,6 +89,69 @@ fn run() -> Result<(), Box<dyn Error>> {
                     row.expected_calibration_error, row.high_confidence_trials,
                     optional_pct(row.high_confidence_failure_rate), row.risk_coverage_auc
                 );
+            }
+            Ok(())
+        }
+        Some("--sensing-audit") => {
+            if !(2..=4).contains(&args.len()) {
+                return Err(invalid_input("usage: --sensing-audit SENSING_TRIALS.tsv [BOOTSTRAPS] [SEED]").into());
+            }
+            let records = read_sensing_trials(&args[1])?;
+            let replicates = parse_optional(&args, 2, 10_000usize, "bootstrap count")?;
+            let seed = parse_optional(&args, 3, 42u64, "seed")?;
+            let audit = audit_sensing_trials(&records, replicates, seed)
+                .map_err(|errors| invalid_input(format!("invalid sensing trial ledger: {}", errors.join("; "))))?;
+
+            println!("audit_result\tpassed={}\ttrials={}\tscenarios={}\tfamilies={}\tsafety_violations={}",
+                audit.passed, audit.trial_count, audit.scenario_count, audit.scenario_family_count,
+                audit.safety_violation_count);
+            for finding in &audit.findings {
+                println!("audit_finding\t{}", finding.replace('\t', " ").replace('\n', " "));
+            }
+            println!("summary_type\tsplit\tevidence_class\tarm\ttrials\tscenarios\tfamilies\tvalid_run_pct\tcompletion_pct\tmean_scored_progress_pct\tforecast_count\tbrier_score\tmean_sensor_requests\tmean_sensor_acquisitions\tsensing_energy_measured\tsensing_energy_missing\tmean_sensing_energy_j\tsensing_latency_measured\tsensing_latency_missing\tmean_sensing_latency_ms\ttotal_energy_measured\tmean_total_energy_j\tsafety_events\tsafety_violations\tmean_elapsed_ms");
+            for row in &audit.arm_summaries {
+                println!(
+                    "arm\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                    row.split.as_str(), row.evidence_class.as_str(), row.arm.as_str(),
+                    row.trial_count, row.scenario_count, row.scenario_family_count,
+                    row.valid_run_rate * 100.0, row.completion_rate * 100.0,
+                    row.mean_scored_progress.map(|x| format!("{:.4}", x * 100.0)).unwrap_or_else(|| "NA".to_owned()),
+                    row.forecast_count,
+                    row.brier_score.map(|x| format!("{x:.6}")).unwrap_or_else(|| "NA".to_owned()),
+                    row.mean_sensor_requests, row.mean_sensor_acquisitions,
+                    row.sensing_energy_measured_count, row.sensing_energy_missing_count,
+                    row.mean_sensing_energy_j.map(|x| format!("{x:.4}")).unwrap_or_else(|| "NA".to_owned()),
+                    row.sensing_latency_measured_count, row.sensing_latency_missing_count,
+                    row.mean_sensing_latency_ms.map(|x| format!("{x:.4}")).unwrap_or_else(|| "NA".to_owned()),
+                    row.total_energy_measured_count,
+                    row.mean_total_energy_j.map(|x| format!("{x:.4}")).unwrap_or_else(|| "NA".to_owned()),
+                    row.safety_event_count, row.safety_violation_count,
+                    row.mean_elapsed_ms.map(|x| format!("{x:.4}")).unwrap_or_else(|| "NA".to_owned())
+                );
+            }
+            println!("comparison_type\tsplit\tevidence_class\tarm\treference_arm\tpaired_episodes\tscenarios\tfamilies\tpaired_progress_delta_pp\tcompletion_delta_pp\tmean_sensor_acquisition_delta\tsensing_energy_pairs\tmean_sensing_energy_delta_j\tsensing_latency_pairs\tmean_sensing_latency_delta_ms\ttotal_energy_pairs\tmean_total_energy_delta_j\tfamily_macro_progress_delta_pp\tci95_low_pp\tci95_high_pp\tinference_status");
+            for row in &audit.comparisons_to_fixed_rate {
+                println!(
+                    "comparison\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                    row.split.as_str(), row.evidence_class.as_str(), row.arm.as_str(),
+                    row.reference_arm.as_str(), row.paired_episode_count, row.scenario_count,
+                    row.scenario_family_count,
+                    row.paired_progress_delta.map(|x| format!("{:.4}", x * 100.0)).unwrap_or_else(|| "NA".to_owned()),
+                    row.completion_rate_delta * 100.0, row.mean_sensor_acquisition_delta,
+                    row.sensing_energy_pair_count,
+                    row.mean_sensing_energy_delta_j.map(|x| format!("{x:.4}")).unwrap_or_else(|| "NA".to_owned()),
+                    row.sensing_latency_pair_count,
+                    row.mean_sensing_latency_delta_ms.map(|x| format!("{x:.4}")).unwrap_or_else(|| "NA".to_owned()),
+                    row.total_energy_pair_count,
+                    row.mean_total_energy_delta_j.map(|x| format!("{x:.4}")).unwrap_or_else(|| "NA".to_owned()),
+                    row.family_macro_progress_delta.map(|x| format!("{:.4}", x * 100.0)).unwrap_or_else(|| "NA".to_owned()),
+                    row.bootstrap_95_ci_lower.map(|x| format!("{:.4}", x * 100.0)).unwrap_or_else(|| "NA".to_owned()),
+                    row.bootstrap_95_ci_upper.map(|x| format!("{:.4}", x * 100.0)).unwrap_or_else(|| "NA".to_owned()),
+                    row.inference_status
+                );
+            }
+            if !audit.passed {
+                return Err(invalid_input("sensing benchmark recorded safety violations; qualification fails").into());
             }
             Ok(())
         }
@@ -259,6 +324,109 @@ fn read_trials(path: impl AsRef<Path>) -> Result<Vec<TrialRecord>, Box<dyn Error
     Ok(records)
 }
 
+fn parse_optional_metric(value: &str, label: &str, line: usize) -> Result<Option<f64>, Box<dyn Error>> {
+    if value.is_empty() || value == "NA" {
+        return Ok(None);
+    }
+    let number = value.parse::<f64>().map_err(|_| invalid_input(format!(
+        "line {line} invalid {label}: {value:?}"
+    )))?;
+    if !number.is_finite() {
+        return Err(invalid_input(format!("line {line} {label} must be finite")).into());
+    }
+    Ok(Some(number))
+}
+
+fn parse_bool_column(value: &str, label: &str, line: usize) -> Result<bool, Box<dyn Error>> {
+    match value {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err(invalid_input(format!("line {line} invalid {label}: {value:?}; use true or false")).into()),
+    }
+}
+
+fn read_sensing_trials(path: impl AsRef<Path>) -> Result<Vec<SensingTrial>, Box<dyn Error>> {
+    let contents = fs::read_to_string(path.as_ref())?;
+    let mut lines = contents.lines();
+    let header = lines.next().ok_or_else(|| invalid_input("sensing trial file is empty"))?;
+    if header.trim_end_matches('\r') != SENSING_HEADER {
+        return Err(invalid_input(format!("unexpected sensing header; expected: {SENSING_HEADER}")).into());
+    }
+
+    let mut records = Vec::new();
+    for (zero_based_line, line) in lines.enumerate() {
+        let line = line.trim_end_matches('\r');
+        if line.is_empty() || line.starts_with('#') { continue; }
+        let line_number = zero_based_line + 2;
+        let columns: Vec<&str> = line.split('\t').collect();
+        if columns.len() != 20 {
+            return Err(invalid_input(format!(
+                "{}:{} expected 20 tab-separated fields, got {}",
+                path.as_ref().display(), line_number, columns.len()
+            )).into());
+        }
+        let seed = columns[4].parse::<u64>()
+            .map_err(|_| invalid_input(format!("line {line_number} invalid seed: {:?}", columns[4])))?;
+        let split = match columns[5] {
+            "test_id" => SensingSplit::InDistribution,
+            "test_ood" => SensingSplit::OutOfDistribution,
+            "test_adversarial" => SensingSplit::Adversarial,
+            value => return Err(invalid_input(format!("line {line_number} unknown sensing split: {value:?}")).into()),
+        };
+        let evidence_class = match columns[6] {
+            "synthetic_contract_fixture" => SensingEvidenceClass::SyntheticContractFixture,
+            "simulator" => SensingEvidenceClass::Simulator,
+            "hardware_in_loop" => SensingEvidenceClass::HardwareInLoop,
+            "physical_field" => SensingEvidenceClass::PhysicalField,
+            "independently_reviewed" => SensingEvidenceClass::IndependentlyReviewed,
+            value => return Err(invalid_input(format!("line {line_number} unknown evidence class: {value:?}")).into()),
+        };
+        let arm = match columns[7] {
+            "no_extra_sensing" => SensingArm::NoExtraSensing,
+            "fixed_rate" => SensingArm::FixedRate,
+            "uncertainty_triggered" => SensingArm::UncertaintyTriggered,
+            "value_of_information" => SensingArm::ValueOfInformation,
+            "placebo_cost" => SensingArm::PlaceboCost,
+            value => return Err(invalid_input(format!("line {line_number} unknown sensing arm: {value:?}")).into()),
+        };
+        let parse_u32 = |index: usize, label: &str| -> Result<u32, Box<dyn Error>> {
+            columns[index].parse::<u32>().map_err(|_| invalid_input(format!(
+                "line {line_number} invalid {label}: {:?}", columns[index]
+            )).into())
+        };
+        let trial = SensingTrial {
+            scenario_id: columns[0].to_owned(),
+            scenario_family: columns[1].to_owned(),
+            task_id: columns[2].to_owned(),
+            trial_id: columns[3].to_owned(),
+            seed,
+            split,
+            evidence_class,
+            arm,
+            progress: parse_optional_metric(columns[8], "progress", line_number)?,
+            valid_run: parse_bool_column(columns[9], "valid_run", line_number)?,
+            completed: parse_bool_column(columns[10], "completed", line_number)?,
+            safety_violation: parse_bool_column(columns[11], "safety_violation", line_number)?,
+            safety_event_count: parse_u32(12, "safety_event_count")?,
+            sensor_requests: parse_u32(13, "sensor_requests")?,
+            sensor_acquisitions: parse_u32(14, "sensor_acquisitions")?,
+            sensing_energy_j: parse_optional_metric(columns[15], "sensing_energy_j", line_number)?,
+            sensing_latency_ms: parse_optional_metric(columns[16], "sensing_latency_ms", line_number)?,
+            total_energy_j: parse_optional_metric(columns[17], "total_energy_j", line_number)?,
+            elapsed_ms: parse_optional_metric(columns[18], "elapsed_ms", line_number)?,
+            predicted_success_probability: parse_optional_metric(columns[19], "predicted_success_probability", line_number)?,
+        };
+        trial.validate().map_err(|error| invalid_input(format!(
+            "line {line_number} invalid sensing trial: {error}"
+        )))?;
+        records.push(trial);
+    }
+    if records.is_empty() {
+        return Err(invalid_input("sensing trial file contains no records").into());
+    }
+    Ok(records)
+}
+
 fn read_shift_plan(path: impl AsRef<Path>) -> Result<Vec<ShiftAssignment>, Box<dyn Error>> {
     let contents = fs::read_to_string(path.as_ref())?;
     let mut lines = contents.lines();
@@ -406,10 +574,13 @@ fn print_help() {
     println!("      Compare matched trials; report task-macro partial-progress delta and reliability/cost deltas.");
     println!("  cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --calibrate FORECASTS.tsv TRIALS.tsv [BIN_COUNT] [HIGH_CONFIDENCE_THRESHOLD]");
     println!("  cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --shift-audit TRIALS.tsv SHIFT_PLAN.tsv BASELINE CANDIDATE [BOOTSTRAPS] [SEED]");
+    println!("  cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --sensing-audit SENSING_TRIALS.tsv [BOOTSTRAPS] [SEED]");
+    println!("      Audit five matched sensing arms, cost/missingness, safety violations, and family-cluster intervals.");
     println!("      Score pre-trial completion-probability forecasts with Brier, log loss, ECE, high-confidence failure rate, and risk-coverage AUC.");
     println!("      Audit matched outcomes per shift family, severity, and perturbation configuration digest.");
     println!();
     println!("TRIALS.tsv must use the exact header documented in README.md. FORECASTS.tsv contains only pre-trial probabilities; outcomes are joined from TRIALS.tsv by task/variant/trial ID. SHIFT_PLAN.tsv must match selected task/trial pairs exactly.");
+    println!("SENSING_TRIALS.tsv must use the exact header documented in README.md; each scenario/seed/split/evidence cell needs one row per sensing arm.");
 }
 
 fn run_contract_smoke() -> Result<(), Box<dyn Error>> {
