@@ -106,7 +106,6 @@ pub struct RankMartingale {
     feature_min: f64,
     feature_max: f64,
     base_feature_sum: f64,
-    rank_counts: Vec<u64>,
     observed_feature_sum: f64,
     observations_seen: u64,
     lambda: f64,
@@ -151,7 +150,6 @@ impl RankMartingale {
             feature_min,
             feature_max,
             base_feature_sum,
-            rank_counts: vec![0; n + 1],
             observed_feature_sum: 0.0,
             observations_seen: 0,
             lambda: 0.0,
@@ -222,7 +220,6 @@ impl RankMartingale {
 
         let gradient = centered_payoff / betting_factor;
         self.accumulated_squared_gradients += gradient * gradient;
-        self.rank_counts[rank_index] += 1;
         self.observed_feature_sum += feature_value;
         self.observations_seen += 1;
 
