@@ -801,8 +801,11 @@ fn clustered_bootstrap_summary(report: &Value) -> Option<Value> {
     for (task_id, expected) in &expected_counts {
         let mut paired_deltas = Vec::new();
         for repeat in 1..=repeats {
-            let pair = slots.get(&(task_id.clone(), repeat));
-            let Some([Some(off), Some(on)]) = pair else {
+            let Some(pair) = slots.get(&(task_id.clone(), repeat)) else {
+                unresolved_pairs += 1;
+                continue;
+            };
+            let (Some(off), Some(on)) = (pair[0], pair[1]) else {
                 unresolved_pairs += 1;
                 continue;
             };
@@ -953,6 +956,26 @@ fn main() {
             "External manifest pin: {}",
             if expected_manifest_sha.is_some() { "matched" } else { "not supplied" }
         );
+        if let Some(statistics) = clustered_bootstrap_summary(&report) {
+            let clusters = u64_field(&statistics, "task_cluster_count").unwrap_or(0);
+            let comparable = u64_field(&statistics, "comparable_repeat_pairs").unwrap_or(0);
+            let unresolved = u64_field(&statistics, "unresolved_repeat_pairs").unwrap_or(0);
+            println!(
+                "Task-cluster bootstrap: {clusters} task clusters; {comparable} comparable pairs; {unresolved} unresolved pairs."
+            );
+            if let (Some(estimate), Some(lower), Some(upper)) = (
+                read_f64(&statistics, "mean_task_level_delta_percentage_points"),
+                read_f64(&statistics, "ci95_lower_percentage_points"),
+                read_f64(&statistics, "ci95_upper_percentage_points"),
+            ) {
+                println!(
+                    "Equal-task GCS effect: {estimate:.2} percentage points (descriptive 95% percentile bootstrap CI [{lower:.2}, {upper:.2}])."
+                );
+            }
+            if let Some(warning) = str_field(&statistics, "warning") {
+                println!("Statistical caveat: {warning}");
+            }
+        }
         println!("Caveat: consistency checks are not independent execution or authenticated attestation.");
     } else {
         eprintln!("RECEIPT REJECTED: {} problem(s)", errors.len());
@@ -1201,6 +1224,36 @@ mod tests {
         let manifest_sha = str_field(&report, "task_manifest_blake3").unwrap();
         let expected_source_sha = "1".repeat(40);
         assert!(audit(&report, Some(expected_source_sha.as_str()), Some(manifest_sha)).is_empty());
+    }
+
+    #[test]
+    fn task_cluster_bootstrap_is_deterministic_and_bounded() {
+        let deltas = [-1.0, 0.0, 1.0];
+        let first = bootstrap_task_cluster_interval(&deltas, 0x1234_5678, 2_000).unwrap();
+        let second = bootstrap_task_cluster_interval(&deltas, 0x1234_5678, 2_000).unwrap();
+        assert_eq!(first, second);
+        assert!((first.0 - 0.0).abs() < 1.0e-12);
+        assert!(first.1 >= -1.0 && first.1 <= 1.0);
+        assert!(first.2 >= -1.0 && first.2 <= 1.0);
+        assert!(first.1 <= first.2);
+    }
+
+    #[test]
+    fn task_cluster_bootstrap_rejects_empty_or_nonfinite_deltas() {
+        assert!(bootstrap_task_cluster_interval(&[], 1, 1_000).is_none());
+        assert!(bootstrap_task_cluster_interval(&[f64::NAN], 1, 1_000).is_none());
+        assert!(bootstrap_task_cluster_interval(&[0.0], 1, 0).is_none());
+    }
+
+    #[test]
+    fn valid_receipt_gets_explicit_descriptive_cluster_interval() {
+        let report = valid_fixture();
+        let summary = clustered_bootstrap_summary(&report).unwrap();
+        assert_eq!(u64_field(&summary, "task_cluster_count"), Some(1));
+        assert_eq!(read_f64(&summary, "mean_task_level_delta_percentage_points"), Some(-100.0));
+        assert_eq!(read_f64(&summary, "ci95_lower_percentage_points"), Some(-100.0));
+        assert_eq!(read_f64(&summary, "ci95_upper_percentage_points"), Some(-100.0));
+        assert!(str_field(&summary, "warning").unwrap().contains("Small number of task clusters"));
     }
 
     #[test]
