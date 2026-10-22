@@ -423,6 +423,19 @@
       "candidate_violation_rate",
       "baseline_violation_upper95_exact",
       "candidate_violation_upper95_exact"
+    ],
+    "risk_precision_examples": [
+      {
+        "target_one_sided_95_upper_rate": 0.01,
+        "required_independent_zero_violation_episodes": 299
+      },
+      {
+        "target_one_sided_95_upper_rate": 0.001,
+        "required_independent_zero_violation_episodes": 2995
+      },
+      {
+        "note": "Exact zero-event binomial planning formula; assumes independent Bernoulli episodes and says nothing about untested distributions or dependent sampling."
+      }
     ]
   }
 }
