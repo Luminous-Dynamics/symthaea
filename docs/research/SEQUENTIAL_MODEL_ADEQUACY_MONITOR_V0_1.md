@@ -1,112 +1,119 @@
 # Finite-Horizon Sequential Model-Adequacy Monitoring v0.1
 
-**Status:** research baseline added in a stacked draft PR; exact-head Rust validation is pending. No empirical performance or SOTA claim is made.
+**Status:** research implementation in a stacked draft PR; exact-head Rust validation is pending. The risk-weighted alpha allocation is a predeclared baseline, not a new distribution-free guarantee, and no empirical performance or SOTA claim is made.
 
-This follow-on builds on the calibrated batch audit in PR #8439 and joint prior/model/noise robust acquisition in PR #8361. It adds a policy for repeated audits; it does not replace either component.
+This follow-on builds on the calibrated batch audit in PR #8439 and joint prior/model/noise robust acquisition in PR #8361. It adds explicit fixed-horizon error-budget allocation; it does not replace either component.
 
-## 1. Why sequential monitoring is a different problem
+## 1. Research problem and paradigm shift
 
-A batch conformal p-value at level 0.05 is not permission to run the same test indefinitely at level 0.05. Repeated thresholding inflates the probability of at least one false alarm. A detector that continually adds post-change observations to its reference set can also dilute evidence for a real shift.
+Scientific discovery often audits a model more than once: after new experiments, new conditions, or changes in instrument state. A single batch conformal p-value at level 0.05 is not permission to repeat the same test indefinitely at level 0.05. Repeated thresholding inflates the probability of at least one false alarm. A detector that keeps appending post-change observations to its reference can also dilute evidence of real shift.
 
-This baseline keeps the null calibration reference fixed and allocates an explicit fraction of the total error budget to each audit. It prioritizes a small, auditable contract over adaptivity or power.
+The baseline therefore makes three things explicit and auditable:
+
+1. Keep the null calibration reference and score definition fixed during one monitoring epoch.
+2. Declare the finite audit horizon and allocate one portion of a total false-alarm budget to each audit before observing audit scores.
+3. Stop after an alarm or after the declared horizon. A no-alarm horizon is unresolved, not proof of adequacy.
+
+The new optional risk-weighted schedule lets a domain protocol spend more error budget at audits that are especially costly to delay. It does **not** guarantee greater power overall: the allocation must be justified and selected before evaluation. Equal Bonferroni spending remains the default.
 
 ## 2. Contract and bound
 
-Let (H) be the declared maximum number of audit batches and (alphain(0,1)) the total family-wise false-alarm budget. At audit (t), compute a conservative batch-level conformal rank p-value against the frozen calibration scores and alarm only if:
+Let \(H\) be the predeclared maximum audit count and \(\alpha\in(0,1)\) the family-wise false-alarm budget. Choose fixed weights \(w_1,\ldots,w_H>0\) satisfying \(\sum_{t=1}^{H} w_t\leq 1\). At audit \(t\), compute a conservative batch-level conformal rank p-value against the frozen calibration scores and alarm only if
 
-[
-p_t leq alpha/H.
-]
+\[
+p_t \leq \alpha_t, \qquad \alpha_t=\alpha w_t.
+\]
 
-If every (p_t) is marginally super-uniform under the clean null, then by the union bound:
+If each audit p-value is marginally super-uniform under the clean null, the union bound gives
 
-[
-Pr(	ext{one or more false alarms in }1,ldots,H)
-leq sum_{t=1}^{H}Pr(p_tleqalpha/H)
-leq alpha.
-]
+\[
+\Pr(\text{one or more false alarms by }H)
+\leq \sum_{t=1}^{H}\Pr(p_t\leq\alpha_t)
+\leq \sum_{t=1}^{H}\alpha_t
+\leq \alpha.
+\]
 
-The bound does **not** require independence among alarms. It does require each marginal p-value to be valid. That means the calibration scores and each fresh audit score must obey the same exchangeability/null protocol with the same predeclared score function. A changed target distribution, adaptive score tuning, model refit using audit data, or audit selection that breaks this protocol invalidates the stated claim. Start a new epoch and collect fresh calibration data when the model, scorer, or target population changes.
+This bound does **not** require independence among audit p-values. It does require their marginal validity. Calibration scores and each fresh audit score must follow the same exchangeability/null protocol under the same predeclared score function. Changed target distributions, adaptive score tuning, model refitting using audit data, or audit selection that breaks the protocol invalidates the claim. Start a new epoch and collect fresh calibration data when the model, scorer, or target population changes.
 
-This is a finite-horizon Bonferroni guarantee, not an e-process, not a conformal test martingale, and not an anytime-valid conditional guarantee. It is intentionally conservative.
+For equal spending, \(w_t=1/H\), so \(\alpha_t=\alpha/H\). For a risk-weighted schedule such as \([0.5,0.25,0.15,0.1]\), half the error budget is allocated to the first audit and the remaining half is distributed later. Such a schedule can improve early detection for some alternatives, but reduces the thresholds available later. It is only appropriate if the risk profile is declared in advance and the calibration resolution can attain every allocated threshold. A schedule whose smallest threshold is below \(1/(n+1)\), with \(n\) calibration batches, is rejected because that audit could never alarm.
+
+This is a finite-horizon union-bound guarantee, not an e-process, not a conformal test martingale, and not an anytime-valid conditional guarantee. It is an auditable baseline against which more powerful methods should be compared.
 
 ## 3. Implementation
 
 `sequential_adequacy.rs` provides:
 
-- a monitor with a fixed reference, total alpha and maximum audit count;
-- an explicit resolution precondition: the smallest attainable rank p-value (1/(n+1)) must be no larger than (alpha/H);
+- equal alpha spending using `SequentialAdequacyMonitor::new`;
+- risk-weighted spending via `new_with_alpha_spending`, with fixed positive weights summing to at most one;
+- an explicit resolution precondition: every allocated threshold must be at least the smallest attainable conservative rank p-value \(1/(n+1)\);
 - a typed state machine: `Monitoring`, `Alarmed`, or `HorizonExhausted`;
-- a sticky terminal alarm (no continued testing inside the same epoch);
-- errors for non-independent or numerically invalid audits, and for attempting to reuse an exhausted/alarmed monitor;
-- per-audit results containing the p-value, threshold, audit index, and cumulative Bonferroni bound.
+- a sticky terminal alarm, and terminal inconclusive outcome after the horizon;
+- errors for invalid/non-independent audit input, invalid schedules, inadequate p-value resolution, and attempted reuse of an exhausted/alarmed monitor;
+- per-audit results containing the p-value, the actual audit threshold, the audit index, and cumulative union-bound spending.
 
-For (alpha=0.05), (H=5), the per-audit threshold is 0.01. At least 99 calibration batches are necessary just to make that threshold attainable. **This is a resolution floor, not a power recommendation.** In practice, the calibration count must be selected from a preregistered power study; a minimally attainable p-value does not imply useful detection probability.
+For \(\alpha=0.05\), equal spending over five audits requires at least 99 calibration batches just to make the threshold \(0.01\) attainable. The example weighted schedule above ends at threshold \(0.005\), requiring at least 199 calibration batches to make every threshold attainable. These are **resolution floors, not power recommendations**. In practice, calibration size and allocation must be selected from a preregistered power study.
 
-A non-alarm is not a model-adequacy certificate. If the horizon expires without an alarm, the outcome is inconclusive and the calling policy should remain unresolved or run a separately predeclared validation step. The monitor currently uses a single RMS standardized-residual score; it can miss structured residuals, autocorrelation, subgroup failures, and regime-specific errors.
+The monitor currently uses one RMS standardized-residual score. It can miss structured residuals, autocorrelation, subgroup failures, and regime-specific errors. A non-alarm never certifies the model.
 
-## 4. Test and protocol obligations
+## 4. Contract tests and receipt requirements
 
-The focused Rust tests cover constructor resolution, invalid budgets/horizons, correct alpha spending through the horizon, terminal behavior after an alarm, terminal behavior after a non-alarming horizon, and the rule that invalid audit input does not consume the budget.
+Focused Rust tests cover equal-spending resolution, invalid budgets/horizons, weighted schedule validation, threshold ordering, early-versus-late decision semantics, cumulative budget bounds, terminal behavior, and the rule that invalid audit input does not consume the horizon. A fixed-seed 20,000-stream null smoke test compares the corrected policy against repeatedly reusing an unadjusted 0.05 threshold with the same calibration sizes and audit scores. This is a regression check, not a confidence interval, distribution-free proof, or substitute for a larger preregistered evaluation.
 
-A fixed-seed 20,000-stream null smoke test also compares the corrected policy against repeatedly reusing an unadjusted 0.05 threshold with the same calibration sizes and audit scores. It is a regression check for the expected false-alarm gap, not a confidence interval, a distribution-free proof, or a substitute for the larger preregistered evaluation.
-
-The caller still has to provide auditable provenance. A real run receipt should record the epoch ID; source commit; candidate/model digest; score-function version; fixed calibration-batch IDs and digest; target distribution; audit-batch IDs; sample/measurement costs; alpha and horizon; audit order; seeds; terminal decision; and a digest of the policy-visible receipt. Hidden simulated truth belongs in a separate evaluator artifact.
-
-Before a scientific deployment, expand the score family and include explicit negative controls. Tests of decision-state semantics are not evidence of detection quality.
+A real run receipt should record the epoch ID; source commit; candidate/model digest; score-function version; fixed calibration-batch IDs and digest; target distribution; audit-batch IDs; sample and measurement costs; alpha and the full spending schedule; audit order; seeds; terminal decision; and a digest of the policy-visible receipt. Hidden simulated truth belongs in a separate evaluator artifact and must never influence model selection or audit policy.
 
 ## 5. Benchmark plan and external comparators
 
-Freeze candidate pools, scoring statistics, calibration policy, target distribution, and seeds before confirmatory evaluation. Split by held-out *structural world families*, not merely new random seeds from the same generator.
+Freeze candidate pools, score statistics, calibration policy, target distribution, alpha schedule, and seeds before confirmatory evaluation. Split by held-out **structural world families**, not merely new seeds from the same generator.
 
-Compare at matched total audit/measurement budgets:
+Compare under matched total audit/measurement budgets:
 
-1. one-shot batch conformal at a single predeclared endpoint;
-2. the finite-horizon Bonferroni-spent baseline implemented here;
-3. standard residual CUSUM/Page-Hinkley-style monitors, labeled as non-distribution-free comparators unless separately justified;
-4. conditional conformal test martingales (CCTM), particularly fixed-reference conditional testing;
-5. predictive-rank martingales (PRM), which account for dependence induced by repeated ranks against a fixed calibration set;
-6. if available, a preregistered multi-statistic or weighted conformal detector with its own calibration and multiplicity rules.
+1. one-shot conformal audit at a single predeclared endpoint;
+2. equal-spending finite-horizon Bonferroni baseline;
+3. risk-weighted finite-horizon spending, with weights preregistered for an explicitly stated risk/time-to-signal objective;
+4. residual CUSUM/Page-Hinkley-style monitors, clearly labeled as non-distribution-free unless separately justified;
+5. conditional conformal test martingales (CCTM), which target anytime-valid control using a fixed reference;
+6. predictive-rank martingales (PRM), which account for dependence in repeated ranks against a fixed calibration reference;
+7. recent parameter-free conditional conformal martingales for shifts at unknown times.
 
-Relevant research:
-- Callahan & Catanach, AISTATS 2026, [On the Misinformation in a Statistical Experiment](https://proceedings.mlr.press/v300/callahan26a.html): information maximization can amplify inferential bias under misspecification.
-- Tang, Sloman & Kaski, AISTATS 2026, [Representative, Informative, and De-Amplifying (R-IDeA)](https://proceedings.mlr.press/v300/tang26d.html): an acquisition design that separates representativeness, informativeness, and error amplification.
-- Shaer et al., ICML 2026, [Testing For Distribution Shifts with Conditional Conformal Test Martingales](https://proceedings.mlr.press/v306/shaer26a.html): fixed-reference conditional shift testing with anytime-valid guarantees under its assumptions.
-- Kuang & Xia, September 2026 preprint, [Anytime-Valid Distribution Shift Detection via Predictive Rank Martingales](https://arxiv.org/abs/2609.00536): models conditional dependence of reused fixed-reference ranks and reports comparisons against CCTM.
+Relevant research frontiers:
 
-These papers are comparators and research targets, not methods implemented in this PR. First reproduce their evaluation protocols and confirm licenses/dependencies before porting code.
+- Shaer et al., ICML 2026, [Testing For Distribution Shifts with Conditional Conformal Test Martingales](https://proceedings.mlr.press/v306/shaer26a.html): a fixed-reference conditional method designed to avoid test-time reference contamination, with anytime-valid type-I control under its assumptions.
+- Kuang & Xia, September 2026, [Anytime-Valid Distribution Shift Detection via Predictive Rank Martingales](https://arxiv.org/abs/2609.00536): derives the conditional null distribution of reused fixed-reference ranks, constructs a predictive-rank martingale, and reports stronger detection performance than CCTM in its own experiments. Reproduce its protocol before comparing results.
+- Liu, Prinster & Orabona, October 12, 2026, [Monitoring for Shifts at Unknown Times: Parameter-Free Conditional Conformal Martingales](https://arxiv.org/abs/2610.17343): proposes a restarting universal portfolio approach intended to avoid slow adaptation after long stationary periods, with reported computational improvements over a naive implementation.
+- [Optimal Alpha Spending for Sequential Analysis with Binomial Data](https://academic.oup.com/jrsssb/article/82/4/1141/7056022): shows that spending shape should be selected for a predeclared operating objective such as power, expected sample size, or expected time to signal.
 
-### Metrics
+These are comparators and research targets, **not methods implemented by this PR**. Risk-weighted alpha spending is established statistical practice; our contribution here is the typed Rust contract, resolution/terminal-state checks, audit receipts, and a benchmark interface aligned to scientific model-adequacy decisions. Any implementation of CCTM/PRM/restarting methods needs mathematical review, reproducible reference cases, dependency/license review, and tests against its published algorithm—not a name-only approximation.
 
-Report separately, never as one blended score:
+### Report separately
 
 - family-wise false-alarm rate over the declared horizon, with binomial confidence intervals;
 - sensitivity by predeclared discrepancy family and magnitude;
-- median and 90th-percentile detection delay in audit batches and in actual query cost;
+- median and 90th-percentile detection delay in audit batches **and** query/measurement cost;
 - missed-shift and unresolved rates;
-- clean-world structural recovery after an alarm and after no alarm;
-- calibration batch count, query budget, runtime, and recalibration overhead;
-- performance under heteroscedastic/heavy-tailed noise, covariate shift, score-distribution shift, rare-region failures, and change points;
-- contamination resistance: post-change observations must never silently enter the fixed null reference.
+- structural law recovery on hidden truth after alarm and after no alarm;
+- calibration count, query budget, runtime, memory, and recalibration overhead;
+- performance under heteroscedastic/heavy-tailed noise, covariate shift, score-distribution shift, rare-region failure, and change points;
+- contamination resistance: post-change observations must never silently enter the frozen null reference;
+- family- and world-clustered confidence intervals, with every paired run and negative control retained.
 
-Suggested confirmatory program: at least 60 held-out worlds across 6 or more structural families, 20 paired seeds per world, and at least 10,000 independent clean-null streams for Monte Carlo evaluation of the family-wise false-alarm rate. Keep all paired runs, negative controls, confidence intervals, protocol versions, and raw receipts. Detection sensitivity targets should be set for a domain-relevant discrepancy before opening the held-out set; do not tune the target after seeing benchmark outcomes.
+Suggested confirmatory program: at least 60 held-out worlds across 6 or more structural families, 20 paired seeds per world, and at least 10,000 independent clean-null streams for Monte Carlo evaluation of family-wise false alarms. Keep raw receipts and protocol versions. Set a domain-relevant discrepancy and target sensitivity before opening the held-out set.
 
-### Advancement gates
+### Proposed advancement gates (targets, not results)
 
-Proposed targets, not results:
+- empirical family-wise false-alarm probability at or below 0.05 under the preregistered null, with uncertainty intervals and no hidden retuning;
+- at least 80% sensitivity for the preregistered practically relevant shift on held-out structural families at matched cost;
+- no more than a 5-percentage-point regression in clean-world structural recovery versus the one-shot audit policy;
+- lower median total cost to a valid recovery/explicit unresolved outcome than the best simple baseline, with paired world-clustered uncertainty intervals;
+- no claim that a no-alarm result proves adequacy or that the method covers arbitrary non-exchangeable shift.
 
-- empirical family-wise false-alarm probability at or below 0.05 under the predeclared null, with uncertainty intervals and no hidden retuning;
-- at least 80% sensitivity for the preregistered practically relevant shift on held-out structural families, at matched total cost;
-- no more than a 5-percentage-point regression in clean-world structural recovery relative to the batch-audit policy;
-- lower median total cost to a valid recovery/explicit unresolved outcome than the best simple baseline, with paired world-clustered uncertainty intervals reported;
-- no false statement that a no-alarm result proves adequacy or that the detector handles arbitrary non-exchangeable shift.
-
-If it cannot meet these gates, retain it as an explicit conservative baseline and report the limitation rather than weakening the protocol.
+If these gates fail, retain the method as an explicit conservative baseline rather than weakening the protocol.
 
 ## 6. Next paradigm shift
 
-The strongest next implementation is not another threshold wrapper. It is to reproduce a true fixed-reference CCTM and PRM comparator behind the same monitor interface, then benchmark multi-statistic detectors and connect alarms to a typed discovery transition:
+The highest-value next step is a reproducible head-to-head implementation of fixed-reference PRM and CCTM, then the October 2026 restart/parameter-free method, under one `SequentialMonitor` interface. Benchmark at matched false-alarm budget, calibration size, and measurement cost; evaluate both early and late shifts, while keeping exact conditional-rank dependence and reference uncertainty intact.
 
-**select experiment → collect independent batch → audit adequacy → continue / reopen model family / validate / report unresolved**.
+The long-term scientific-discovery loop should be:
 
-Only the policy-visible score may affect the decision. Hidden truth, discrepancy amplitude, and evaluator labels must remain isolated. An alarm should trigger a predeclared model-expansion or validation protocol, not automatic selection of whichever law fits the audit batch.
+**select experiment → collect independent batch → audit model adequacy → continue / reopen model family / validate / report unresolved**.
+
+Only policy-visible measurements and a predeclared score may affect decisions. Hidden truth and evaluator labels stay isolated. An alarm should trigger a predeclared model-expansion or validation protocol, not automatic selection of whichever law fits the audit batch.
