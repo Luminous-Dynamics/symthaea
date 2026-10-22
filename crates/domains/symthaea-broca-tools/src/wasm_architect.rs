@@ -187,6 +187,7 @@ impl WasmArchitect {
 
     /// Register a synthesized WASM tool as a permanent system extension.
     pub fn register_system_extension(&self, code_hash: &str) -> Result<()> {
+        Self::validate_cache_key(code_hash)?;
         println!(
             "🚀 Wasm Architect: Registering system extension {:?}...",
             code_hash
@@ -250,19 +251,73 @@ impl WasmArchitect {
         hasher.0.finalize().into()
     }
 
-    /// Compute a simple hash for code indexing.
-    fn compute_hash(code: &str) -> String {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-        let mut hasher = DefaultHasher::new();
-        code.hash(&mut hasher);
-        format!("{:x}", hasher.finish())
+    /// Restrict plugin names before using them as directory and Cargo manifest
+    /// components. Disallow separators, dots, quotes, whitespace, and TOML syntax.
+    fn validate_plugin_name(plugin_name: &str) -> Result<()> {
+        let bytes = plugin_name.as_bytes();
+        if bytes.is_empty()
+            || bytes.len() > 64
+            || !bytes[0].is_ascii_alphanumeric()
+            || !bytes
+                .iter()
+                .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'-' || *byte == b'_')
+        {
+            return Err(anyhow::anyhow!(
+                "Invalid plugin name: use 1-64 ASCII letters/digits, '-' or '_' and start with a letter or digit"
+            ));
+        }
+        Ok(())
+    }
+
+    /// Artifact cache keys are stable SHA-256 hex digests, never path fragments.
+    fn validate_cache_key(code_hash: &str) -> Result<()> {
+        if code_hash.len() != 64
+            || !code_hash
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err(anyhow::anyhow!(
+                "Invalid artifact cache key: expected 64 lowercase hexadecimal SHA-256 characters"
+            ));
+        }
+        Ok(())
+    }
+
+    /// Deterministic, domain-separated cache identity. Include the plugin name
+    /// as well as source and build target/profile so different named crate builds
+    /// can never accidentally reuse the same artifact key merely because source
+    /// text is identical. Length-prefix the variable-size inputs.
+    fn compute_hash(code: &str, plugin_name: &str) -> String {
+        use sha2::{Digest, Sha256};
+
+        const DOMAIN: &[u8] = b"SYMTHAEA-WASM-CACHE-KEY/v2\\0";
+        const TARGET: &[u8] = b"wasm32-unknown-unknown";
+        const PROFILE: &[u8] = b"release";
+
+        let mut hasher = Sha256::new();
+        hasher.update(DOMAIN);
+        hasher.update((plugin_name.len() as u64).to_le_bytes());
+        hasher.update(plugin_name.as_bytes());
+        hasher.update((code.len() as u64).to_le_bytes());
+        hasher.update(code.as_bytes());
+        hasher.update((TARGET.len() as u64).to_le_bytes());
+        hasher.update(TARGET);
+        hasher.update((PROFILE.len() as u64).to_le_bytes());
+        hasher.update(PROFILE);
+        hasher.update(SIGNED_ARTIFACT_FORMAT_V2.to_le_bytes());
+
+        hasher
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect()
     }
 
     /// Compile a synthesized Rust code block into a .wasm binary.
     /// Uses LRU AOT caching to skip compilation if the code has been seen before.
     pub fn compile_to_wasm(&self, code: &str, plugin_name: &str) -> Result<Vec<u8>> {
-        let code_hash = Self::compute_hash(code);
+        Self::validate_plugin_name(plugin_name)?;
+        let code_hash = Self::compute_hash(code, plugin_name);
 
         // 1. Check AOT Cache (LRU)
         {
@@ -552,6 +607,46 @@ mod tests {
             public_key: signer.public_key().to_vec(),
             compat_hash,
             format_version: SIGNED_ARTIFACT_FORMAT_V2,
+        }
+    }
+
+    #[test]
+    fn cache_key_is_deterministic_and_binds_name_and_source() {
+        let key = WasmArchitect::compute_hash("fn main() {}", "plugin-one");
+        assert_eq!(key, WasmArchitect::compute_hash("fn main() {}", "plugin-one"));
+        assert_eq!(key.len(), 64);
+        assert!(key.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)));
+        assert_ne!(key, WasmArchitect::compute_hash("fn main() {}", "plugin-two"));
+        assert_ne!(key, WasmArchitect::compute_hash("fn main() { 1 }", "plugin-one"));
+    }
+
+    #[test]
+    fn plugin_name_validation_rejects_path_and_manifest_injection() {
+        for invalid in [
+            "",
+            "../escape",
+            "plugin/name",
+            "plugin\\name",
+            "plugin.name",
+            "plugin\"\n[dependencies]",
+            "plugin name",
+            "-starts-with-dash",
+        ] {
+            assert!(
+                WasmArchitect::validate_plugin_name(invalid).is_err(),
+                "unexpectedly accepted plugin name {invalid:?}"
+            );
+        }
+        assert!(WasmArchitect::validate_plugin_name("solver_v2").is_ok());
+        assert!(WasmArchitect::validate_plugin_name("plugin-7").is_ok());
+    }
+
+    #[test]
+    fn artifact_cache_key_validation_rejects_path_fragments() {
+        let valid = WasmArchitect::compute_hash("fn main() {}", "plugin-one");
+        assert!(WasmArchitect::validate_cache_key(&valid).is_ok());
+        for invalid in ["../outside", "deadbeef", &"A".repeat(64)] {
+            assert!(WasmArchitect::validate_cache_key(invalid).is_err());
         }
     }
 
