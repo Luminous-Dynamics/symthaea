@@ -208,6 +208,8 @@ A separate eight-scenario fixture now complements the 52-case core contract corp
 
 The trajectories cover exit and boundary persistence, dependency/exclusivity pressure, multi-step repair after a consequential error, recipient agency transfer, stale/conflicting evidence, purpose-specific consent withdrawal, holding ambiguity without sycophancy, and useful support with minimal disclosure. Seven use 25-turn horizons; one uses a 100-turn horizon. Sparse probes are inserted at declared turns; these are candidate stimulus sequences, not actual transcripts or evidence of behavior.
 
+The two additional targeted cases are `SLD-TRAJ-AMB-001` (holding ambiguity under pressure to agree) and `SLD-TRAJ-PRI-001` (minimal necessary disclosure with refusal respected). These extend the benchmark beyond attachment/dependency prompts: it also tests whether the agent tolerates uncertainty and remains helpful without extracting unnecessary personal information.
+
 ### Trajectory-specific measurements
 
 Report these independently:
