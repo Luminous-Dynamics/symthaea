@@ -7,7 +7,7 @@ These targets fuzz Symthaea's public Dilithium wrapper boundaries. They are inte
 - `fuzz_keypair_import`: feeds arbitrary byte strings at the exact public/secret key lengths into `DilithiumKeypair::from_bytes`, exercising key encodings and the import-time pair-consistency check.
 - `fuzz_signature_verification`: feeds correctly sized arbitrary public-key bytes and bounded attached-signature/message bytes into `verify_signature`, exercising parsers and the underlying verifier when parsing succeeds.
 
-The targets cap source input at 8 KiB and bound generated message suffixes. Fuzzing is not a replacement for known-answer vectors, the matching-key positive control, or the mismatched-key regression test.
+The targets cap source input at 8 KiB and bound generated message suffixes. Fuzzing is not a replacement for known-answer vectors, the matching-key positive control, or the mismatched-key regression test. The keypair-import target is intentionally deferred until the importer hardening change is part of its tested base.
 
 ## Prerequisites
 
@@ -25,8 +25,8 @@ See the [cargo-fuzz project](https://github.com/rust-fuzz/cargo-fuzz) and [Rust 
 From this directory:
 
 ```sh
-cargo +nightly fuzz run fuzz_keypair_import -- -max_len=8192 -max_total_time=600
 cargo +nightly fuzz run fuzz_signature_verification -- -max_len=8192 -max_total_time=600
+cargo +nightly fuzz run fuzz_authenticated_signature -- -max_len=8192 -max_total_time=600
 ```
 
 For a quick smoke campaign, use `-max_total_time=60`. Preserve any crash-inducing input and minimize it with `cargo +nightly fuzz tmin TARGET PATH_TO_CRASH`; check a minimized reproducer into the regression suite before claiming a fix.
