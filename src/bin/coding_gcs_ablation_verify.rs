@@ -31,6 +31,15 @@ fn nearly_equal(a: f64, b: f64) -> bool {
         && (a - b).abs() <= 1.0e-8_f64.max(a.abs().max(b.abs()) * 1.0e-8)
 }
 
+fn nearest_rank_percentile(values: &mut [u64], quantile: f64) -> Option<u64> {
+    if values.is_empty() || !quantile.is_finite() || !(0.0..=1.0).contains(&quantile) {
+        return None;
+    }
+    values.sort_unstable();
+    let rank = ((quantile * values.len() as f64).ceil() as usize).clamp(1, values.len());
+    values.get(rank - 1).copied()
+}
+
 fn push_check(errors: &mut Vec<String>, condition: bool, message: impl Into<String>) {
     if !condition {
         errors.push(message.into());
@@ -135,6 +144,18 @@ fn verify_mode_summary(
         .iter()
         .map(|run| u64_field(run, "agent_elapsed_ms").unwrap_or(0))
         .fold(0_u64, u64::saturating_add);
+    let mut agent_times: Vec<u64> = selected_runs
+        .iter()
+        .map(|run| u64_field(run, "agent_elapsed_ms").unwrap_or(0))
+        .collect();
+    let mut verification_times: Vec<u64> = selected_runs
+        .iter()
+        .map(|run| u64_field(run, "verification_elapsed_ms").unwrap_or(0))
+        .collect();
+    let agent_elapsed_ms_p50 = nearest_rank_percentile(&mut agent_times.clone(), 0.50).unwrap_or(0);
+    let agent_elapsed_ms_p95 = nearest_rank_percentile(&mut agent_times.clone(), 0.95).unwrap_or(0);
+    let verification_elapsed_ms_p50 = nearest_rank_percentile(&mut verification_times.clone(), 0.50).unwrap_or(0);
+    let verification_elapsed_ms_p95 = nearest_rank_percentile(&mut verification_times.clone(), 0.95).unwrap_or(0);
     let energy_total: f64 = selected_runs
         .iter()
         .map(|run| read_f64(run, "energy").unwrap_or(0.0))
@@ -197,6 +218,10 @@ fn verify_mode_summary(
         ("real_compiles", compiles),
         ("complete_oracles", complete),
         ("agent_elapsed_ms_total", time_total),
+        ("agent_elapsed_ms_p50", agent_elapsed_ms_p50),
+        ("agent_elapsed_ms_p95", agent_elapsed_ms_p95),
+        ("verification_elapsed_ms_p50", verification_elapsed_ms_p50),
+        ("verification_elapsed_ms_p95", verification_elapsed_ms_p95),
         ("runs_with_external_llm_tier", runs_with_external_llm_tier),
         ("runs_with_simulated_tier", runs_with_simulated_tier),
         ("runs_with_no_generation_attempts", runs_with_no_generation_attempts),
@@ -656,8 +681,12 @@ fn audit(
                 && bool_field(run, "simulated").is_some()
                 && u64_field(run, "tests_passed").is_some()
                 && u64_field(run, "tests_failed").is_some()
+                && u64_field(run, "agent_elapsed_ms").is_some()
+                && u64_field(run, "verification_elapsed_ms").is_some()
+                && u64_field(run, "iterations").is_some()
+                && read_f64(run, "energy").is_some_and(|energy| energy >= 0.0)
                 && run.get("runtime_error").is_some(),
-            format!("runs[{index}] is missing compile/oracle status fields"),
+            format!("runs[{index}] is missing compile/oracle/runtime/energy metrics"),
         );
         let complete = oracle_complete(run, expected);
         push_check(
@@ -1254,6 +1283,10 @@ mod tests {
                     "complete_oracle_rate": 1.0,
                     "agent_elapsed_ms_total": 100,
                     "agent_elapsed_ms_mean": 100.0,
+                    "agent_elapsed_ms_p50": 100,
+                    "agent_elapsed_ms_p95": 100,
+                    "verification_elapsed_ms_p50": 20,
+                    "verification_elapsed_ms_p95": 20,
                     "energy_total": 1.0,
                     "energy_mean": 1.0
                 },
@@ -1271,6 +1304,10 @@ mod tests {
                     "complete_oracle_rate": 1.0,
                     "agent_elapsed_ms_total": 120,
                     "agent_elapsed_ms_mean": 120.0,
+                    "agent_elapsed_ms_p50": 120,
+                    "agent_elapsed_ms_p95": 120,
+                    "verification_elapsed_ms_p50": 20,
+                    "verification_elapsed_ms_p95": 20,
                     "energy_total": 1.5,
                     "energy_mean": 1.5
                 },
@@ -1454,6 +1491,25 @@ mod tests {
         report["runs"][0]["generation_tiers"] = serde_json::json!(["ImaginaryLLM"]);
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+    }
+
+    #[test]
+    fn latency_percentiles_use_nearest_rank_and_reject_invalid_input() {
+        let mut values = vec![120_u64, 10, 100, 20];
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.50), Some(20));
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.95), Some(120));
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 1.0), Some(120));
+        assert_eq!(nearest_rank_percentile(&mut [], 0.50), None);
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), f64::NAN), None);
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 1.5), None);
+    }
+
+    #[test]
+    fn tampered_latency_percentile_is_rejected() {
+        let mut report = valid_fixture();
+        report["summary"]["gcs_off"]["agent_elapsed_ms_p95"] = Value::from(999);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("agent_elapsed_ms_p95")));
     }
 
     #[test]
