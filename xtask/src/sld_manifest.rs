@@ -176,7 +176,7 @@ mod tests {
         let root = temporary_root();
         fs::create_dir_all(&root).expect("create temporary root");
         let manifest_path = root.join("manifest.json");
-        let bytes = b"{}\\n";
+        let bytes = b"{}\n";
         let document = json!({
             "manifest_format": EXPECTED_FORMAT,
             "status": "DRAFT_CANDIDATE",
@@ -193,4 +193,5 @@ mod tests {
             .expect("write manifest");
         assert!(verify(&root, &manifest_path).is_err(), "parent traversal must be rejected");
         fs::remove_dir_all(&root).expect("remove temporary root");
-    }}
+    }
+}
