@@ -319,6 +319,205 @@ fn expected_information_gain_with_steps<H, E>(
     Some(information_gain.clamp(0.0, (predictions.len() as f64).ln()))
 }
 
+/// Normalize finite non-negative prior masses. At least two hypotheses must retain
+/// positive mass so the result measures discrimination rather than a degenerate prior.
+fn normalized_prior_probabilities(prior_weights: &[f64], hypothesis_count: usize) -> Option<Vec<f64>> {
+    if hypothesis_count < 2
+        || prior_weights.len() != hypothesis_count
+        || prior_weights
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight < 0.0)
+    {
+        return None;
+    }
+    let total = prior_weights.iter().sum::<f64>();
+    if !total.is_finite() || total <= 0.0 {
+        return None;
+    }
+    let probabilities: Vec<f64> = prior_weights.iter().map(|weight| weight / total).collect();
+    (probabilities.iter().filter(|probability| **probability > 0.0).count() >= 2)
+        .then_some(probabilities)
+}
+
+/// Zero-noise limit when observationally identical prediction means form a single group.
+fn noiseless_weighted_information_gain(predictions: &[f64], prior: &[f64]) -> f64 {
+    let mut groups: Vec<(f64, f64)> = Vec::new();
+    for (&prediction, &probability) in predictions.iter().zip(prior) {
+        if probability == 0.0 {
+            continue;
+        }
+        if let Some((_, group_probability)) =
+            groups.iter_mut().find(|(value, _)| *value == prediction)
+        {
+            *group_probability += probability;
+        } else {
+            groups.push((prediction, probability));
+        }
+    }
+    groups
+        .iter()
+        .filter(|(_, probability)| *probability > 0.0)
+        .map(|(_, probability)| -probability * probability.ln())
+        .sum()
+}
+
+/// Estimate expected information gain under caller-supplied prior masses.
+///
+/// Prior masses are normalized internally; zero-mass hypotheses do not contribute to the
+/// mixture, but predictions must still be complete and finite for every supplied hypothesis.
+/// Splitting one hypothesis' prior mass across observationally identical duplicates leaves the
+/// score unchanged. This avoids making the score depend on how many times a candidate was
+/// inserted into the list, provided callers supply equivalent prior mass. It does not infer
+/// calibrated posterior weights or establish structural equivalence between expressions.
+///
+/// Uses the same deterministic Gaussian midpoint quadrature as the uniform-prior API. Returns
+/// None for a malformed prior, fewer than two positive-mass hypotheses, invalid noise, or
+/// incomplete/non-finite predictions. Scores are in nats and bounded by the entropy of the
+/// normalized prior over observationally distinguishable prediction groups.
+pub fn expected_information_gain_weighted_nats<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    observation_std_dev: f64,
+    predict: impl Fn(&H, &E) -> Option<f64>,
+) -> Option<f64> {
+    if hypotheses.len() < 2
+        || !observation_std_dev.is_finite()
+        || observation_std_dev <= 0.0
+    {
+        return None;
+    }
+    let prior = normalized_prior_probabilities(prior_weights, hypotheses.len())?;
+    let predictions: Vec<f64> = hypotheses
+        .iter()
+        .map(|hypothesis| predict(hypothesis, experiment))
+        .collect::<Option<Vec<_>>>()?;
+    if predictions.iter().any(|prediction| !prediction.is_finite()) {
+        return None;
+    }
+
+    let mean_scale = predictions
+        .iter()
+        .zip(&prior)
+        .filter(|(_, probability)| **probability > 0.0)
+        .map(|(prediction, _)| prediction.abs())
+        .fold(observation_std_dev, f64::max);
+    let scaled_means: Vec<f64> = predictions
+        .iter()
+        .zip(&prior)
+        .map(|(prediction, probability)| {
+            if *probability > 0.0 {
+                prediction / mean_scale
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    let scaled_noise = observation_std_dev / mean_scale;
+    if scaled_noise == 0.0 {
+        return Some(noiseless_weighted_information_gain(&predictions, &prior));
+    }
+
+    let step_width = 2.0 * INFORMATION_GAIN_Z_LIMIT / INFORMATION_GAIN_QUADRATURE_STEPS as f64;
+    let mut quadrature = Vec::with_capacity(INFORMATION_GAIN_QUADRATURE_STEPS);
+    for step_index in 0..INFORMATION_GAIN_QUADRATURE_STEPS {
+        let z = -INFORMATION_GAIN_Z_LIMIT + (step_index as f64 + 0.5) * step_width;
+        quadrature.push((z, (-0.5 * z * z).exp() * step_width));
+    }
+    let weight_sum: f64 = quadrature.iter().map(|(_, weight)| weight).sum();
+    let prior_entropy = prior
+        .iter()
+        .filter(|probability| **probability > 0.0)
+        .map(|probability| -probability * probability.ln())
+        .sum::<f64>();
+    if !weight_sum.is_finite() || weight_sum <= 0.0 || !prior_entropy.is_finite() {
+        return None;
+    }
+
+    let prior_log_probabilities: Vec<f64> = prior
+        .iter()
+        .map(|probability| {
+            if *probability > 0.0 {
+                probability.ln()
+            } else {
+                f64::NEG_INFINITY
+            }
+        })
+        .collect();
+    let mut log_terms = Vec::with_capacity(predictions.len());
+    let mut information_gain = 0.0;
+
+    for (index, true_mean) in scaled_means.iter().copied().enumerate() {
+        let true_prior = prior[index];
+        if true_prior == 0.0 {
+            continue;
+        }
+        for &(z, weight) in &quadrature {
+            log_terms.clear();
+            for (other_index, other_mean) in scaled_means.iter().copied().enumerate() {
+                let separation = (true_mean - other_mean) / scaled_noise;
+                let log_likelihood_ratio = if separation == 0.0 {
+                    0.0
+                } else if !separation.is_finite() || separation.abs() > 1.0e6 {
+                    f64::NEG_INFINITY
+                } else {
+                    -0.5 * separation * separation - z * separation
+                };
+                log_terms.push(prior_log_probabilities[other_index] + log_likelihood_ratio);
+            }
+            let log_mixture_ratio = log_sum_exp(&log_terms);
+            information_gain -= (weight / weight_sum) * true_prior * log_mixture_ratio;
+        }
+    }
+
+    if !information_gain.is_finite() {
+        return None;
+    }
+    Some(information_gain.clamp(0.0, prior_entropy))
+}
+
+/// Select by weighted expected information gain divided by positive finite experiment cost.
+///
+/// This opt-in API leaves the uniform-prior selector unchanged. Candidate predictions must be
+/// complete, and invalid costs or non-informative candidates are skipped. Ties preserve input
+/// order. The prior is supplied by the caller; it is not automatically calibrated by this code.
+pub fn select_experiment_by_weighted_information_gain_per_cost<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    observation_std_dev: f64,
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if normalized_prior_probabilities(prior_weights, hypotheses.len()).is_none() {
+        return None;
+    }
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let Some(information_gain) = expected_information_gain_weighted_nats(
+            experiment,
+            hypotheses,
+            prior_weights,
+            observation_std_dev,
+            predict,
+        ) else {
+            continue;
+        };
+        let score = information_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
 /// Select the candidate maximizing expected information gain per unit cost.
 ///
 /// Candidates with non-positive/non-finite costs, incomplete predictions, or zero
@@ -543,6 +742,103 @@ pub fn select_experiment_by_scenario_robust_information_gain_per_cost<'a, H, E>(
 mod tests {
     use super::*;
     use crate::hdc::conjecture_engine::Expr;
+
+    #[test]
+    fn weighted_information_gain_matches_uniform_api_for_equal_masses() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let prediction = |hypothesis: &usize, _: &u8| {
+            Some([0.0_f64, 0.25, 1.5, 3.0][*hypothesis])
+        };
+        let uniform = expected_information_gain_nats(&0_u8, &hypotheses, 0.4, prediction).unwrap();
+        let weighted = expected_information_gain_weighted_nats(
+            &0_u8,
+            &hypotheses,
+            &[7.0, 7.0, 7.0, 7.0],
+            0.4,
+            prediction,
+        )
+        .unwrap();
+        assert!((uniform - weighted).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn weighted_information_gain_is_invariant_to_splitting_duplicate_prior_mass() {
+        let hypotheses = [0_usize, 1];
+        let base = expected_information_gain_weighted_nats(
+            &(),
+            &hypotheses,
+            &[0.5, 0.5],
+            0.3,
+            |hypothesis, _| Some([0.0_f64, 1.0][*hypothesis]),
+        )
+        .unwrap();
+
+        let duplicated_hypotheses = [0_usize, 1, 2];
+        let duplicated = expected_information_gain_weighted_nats(
+            &(),
+            &duplicated_hypotheses,
+            &[0.25, 0.25, 0.5],
+            0.3,
+            |hypothesis, _| Some([0.0_f64, 0.0, 1.0][*hypothesis]),
+        )
+        .unwrap();
+        assert!((base - duplicated).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn weighted_information_gain_rejects_malformed_priors_and_predictions() {
+        let hypotheses = [0_i32, 1, 2];
+        let prediction = |hypothesis: &i32, _: &()| Some(*hypothesis as f64);
+        for weights in [
+            &[][..],
+            &[1.0, 1.0][..],
+            &[1.0, -1.0, 1.0][..],
+            &[1.0, f64::NAN, 1.0][..],
+            &[0.0, 0.0, 0.0][..],
+            &[f64::MAX, f64::MAX, 1.0][..],
+            &[1.0, 0.0, 0.0][..],
+        ] {
+            assert!(
+                expected_information_gain_weighted_nats(&(), &hypotheses, weights, 1.0, prediction)
+                    .is_none()
+            );
+        }
+        assert!(expected_information_gain_weighted_nats(
+            &(),
+            &hypotheses,
+            &[1.0, 1.0, 1.0],
+            1.0,
+            |hypothesis, _| if *hypothesis == 1 { None } else { Some(*hypothesis as f64) },
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn weighted_cost_selector_fails_closed_on_invalid_prior_and_cost() {
+        let hypotheses = [0_i32, 1];
+        let candidates = [0_u8, 1_u8];
+        let prediction = |hypothesis: &i32, candidate: &u8| {
+            Some(*hypothesis as f64 * *candidate as f64)
+        };
+        assert!(select_experiment_by_weighted_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[1.0, -1.0],
+            1.0,
+            prediction,
+            |_| 1.0,
+        )
+        .is_none());
+        assert!(select_experiment_by_weighted_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[1.0, 1.0],
+            1.0,
+            prediction,
+            |_| f64::NAN,
+        )
+        .is_none());
+    }
 
     #[test]
     fn scenario_robust_selector_accounts_for_prediction_discrepancy_not_only_noise() {
