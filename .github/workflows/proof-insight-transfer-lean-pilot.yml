@@ -1,0 +1,130 @@
+name: Proof Insight Transfer Lean Pilot
+
+on:
+  pull_request:
+    paths:
+      - "data/benchmarks/proof-insight-transfer-v0/lean-pilot/**"
+      - ".github/workflows/proof-insight-transfer-lean-pilot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lean-counterfactual-pilot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact proposed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Build with pinned Lean and independent checker
+        id: lean-check
+        uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1
+        with:
+          lake-package-directory: data/benchmarks/proof-insight-transfer-v0/lean-pilot
+          auto-config: false
+          build: true
+          test: false
+          lint: false
+          use-mathlib-cache: false
+          nanoda: true
+          nanoda-allow-sorry: false
+
+      - name: Produce content-addressed Lean pilot receipt
+        shell: bash
+        env:
+          PITB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PITB_WORKFLOW_RUN_ID: ${{ github.run_id }}
+          PITB_WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+          PITB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cd data/benchmarks/proof-insight-transfer-v0/lean-pilot
+          mkdir -p "$RUNNER_TEMP/pitb-lean-pilot-receipt"
+          log="$RUNNER_TEMP/pitb-lean-pilot-receipt/lake-build.log"
+          lake build 2>&1 | tee "$log"
+          olean=".lake/build/lib/lean/PITBCounterfactualPilot.olean"
+          test -s "$olean"
+          lean --version > "$RUNNER_TEMP/pitb-lean-pilot-receipt/lean-version.txt"
+          lake --version > "$RUNNER_TEMP/pitb-lean-pilot-receipt/lake-version.txt"
+          python - "$RUNNER_TEMP/pitb-lean-pilot-receipt" "$olean" <<'PY'
+          import hashlib
+          import json
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          out = Path(sys.argv[1])
+          olean = Path(sys.argv[2])
+
+          def digest(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+          source = Path("PITBCounterfactualPilot.lean")
+          lakefile = Path("lakefile.lean")
+          toolchain = Path("lean-toolchain")
+          manifest = Path("lake-manifest.json")
+          receipt = {
+              "schema_version": "pitb.lean-pilot-ci-receipt.v0",
+              "repository": os.environ["PITB_REPOSITORY"],
+              "commit_sha": os.environ["PITB_HEAD_SHA"],
+              "workflow_run_id": int(os.environ["PITB_WORKFLOW_RUN_ID"]),
+              "workflow_run_attempt": int(os.environ["PITB_WORKFLOW_RUN_ATTEMPT"]),
+              "toolchain": toolchain.read_text().strip(),
+              "lean_version": (out / "lean-version.txt").read_text().strip(),
+              "lake_version": (out / "lake-version.txt").read_text().strip(),
+              "source": {
+                  "path": str(source),
+                  "sha256": digest(source),
+                  "lakefile_sha256": digest(lakefile),
+                  "toolchain_file_sha256": digest(toolchain),
+                  "lake_manifest_sha256": digest(manifest) if manifest.exists() else None,
+              },
+              "checked_artifact": {
+                  "path": str(olean),
+                  "sha256": digest(olean),
+              },
+              "build_log_sha256": digest(out / "lake-build.log"),
+              "checks": {
+                  "lake_build": "passed",
+                  "lean_kernel_checked_examples": "passed",
+                  "nanoda_independent_type_check": "passed",
+                  "sorry_disallowed_by_nanoda": True,
+              },
+              "declared_pilot_cases": [
+                  "alpha_renaming_same_type",
+                  "identity_statement_iff_true_function",
+                  "successor_monotonicity_with_premise",
+                  "premise_removed_variant_is_false",
+              ],
+              "limitations": [
+                  "This validates only the checked-in small Lean examples under the pinned environment.",
+                  "It is not a model transfer experiment, does not adjudicate an insight dataset, and does not establish general utility.",
+              ],
+          }
+          encoded = json.dumps(receipt, sort_keys=True, indent=2) + "\n"
+          (out / "receipt.json").write_text(encoded)
+          (out / "receipt.sha256").write_text(
+              hashlib.sha256(encoded.encode("utf-8")).hexdigest() + "  receipt.json\n"
+          )
+          print("PITB_LEAN_PILOT_RECEIPT_PASS")
+          print(f"source_sha256={receipt['source']['sha256']}")
+          print(f"olean_sha256={receipt['checked_artifact']['sha256']}")
+          print(f"receipt_sha256={hashlib.sha256(encoded.encode('utf-8')).hexdigest()}")
+          PY
+
+      - name: Upload reproducible pilot evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-lean-pilot-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/pitb-lean-pilot-receipt/receipt.json
+            ${{ runner.temp }}/pitb-lean-pilot-receipt/receipt.sha256
+            ${{ runner.temp }}/pitb-lean-pilot-receipt/lean-version.txt
+            ${{ runner.temp }}/pitb-lean-pilot-receipt/lake-version.txt
+            ${{ runner.temp }}/pitb-lean-pilot-receipt/lake-build.log
+          if-no-files-found: error
+          retention-days: 90
