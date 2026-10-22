@@ -19,11 +19,11 @@ const GLOBAL_DELTA: f64 = 0.05;
 const PARALLEL_STREAMS: usize = 5;
 const LOW_BET_FRACTIONS: [f64; 3] = [0.02, 0.10, 0.25];
 const HIGH_BET_FRACTIONS: [f64; 3] = [0.25, 0.50, 0.75];
-const FIXED_BET_FRACTIONS: [f64; 3] = [0.10, 0.50, 0.75];
+const FIXED_BET_FRACTIONS: [f64; 5] = [0.02, 0.10, 0.25, 0.50, 0.75];
 const ALARM_SENTINEL: usize = HORIZON;
 
-const RAW_HEADER: &str = "scenario,latent_shift,risk_violating,pure_null,episode,seed,horizon,mean_expected_loss,max_expected_loss,observed_mean_loss,observed_events,low_mix_first_alarm,low_mix_detected,low_mix_final_log_e,low_mix_peak_log_e,low_component_log_e_002,low_component_log_e_010,low_component_log_e_025,high_mix_first_alarm,high_mix_detected,high_mix_final_log_e,high_mix_peak_log_e,high_component_log_e_025,high_component_log_e_050,high_component_log_e_075,fixed_010_first_alarm,fixed_010_detected,fixed_010_final_log_e,fixed_050_first_alarm,fixed_050_detected,fixed_050_final_log_e,fixed_075_first_alarm,fixed_075_detected,fixed_075_final_log_e,log_alarm_threshold,risk_bound,global_delta,parallel_streams";
-const SUMMARY_HEADER: &str = "scenario,latent_shift,risk_violating,pure_null,episodes,mean_expected_loss,mean_observed_loss,max_expected_loss,low_mix_faster_than_best_fixed,high_mix_faster_than_best_fixed,low_mix_alarms,low_mix_alarm_rate,low_mix_rate_l95,low_mix_rate_u95,low_mix_false_alarms,low_mix_risk_misses,low_mix_latent_misses,low_mix_mean_delay,low_mix_p95_delay,low_mix_median_delay,low_mix_mean_final_log_e,high_mix_alarms,high_mix_alarm_rate,high_mix_rate_l95,high_mix_rate_u95,high_mix_false_alarms,high_mix_risk_misses,high_mix_latent_misses,high_mix_mean_delay,high_mix_p95_delay,high_mix_median_delay,high_mix_mean_final_log_e,fixed_010_alarms,fixed_010_alarm_rate,fixed_010_rate_l95,fixed_010_rate_u95,fixed_010_false_alarms,fixed_010_risk_misses,fixed_010_latent_misses,fixed_010_mean_delay,fixed_010_p95_delay,fixed_010_median_delay,fixed_010_mean_final_log_e,fixed_050_alarms,fixed_050_alarm_rate,fixed_050_rate_l95,fixed_050_rate_u95,fixed_050_false_alarms,fixed_050_risk_misses,fixed_050_latent_misses,fixed_050_mean_delay,fixed_050_p95_delay,fixed_050_median_delay,fixed_050_mean_final_log_e,fixed_075_alarms,fixed_075_alarm_rate,fixed_075_rate_l95,fixed_075_rate_u95,fixed_075_false_alarms,fixed_075_risk_misses,fixed_075_latent_misses,fixed_075_mean_delay,fixed_075_p95_delay,fixed_075_median_delay,fixed_075_mean_final_log_e";
+const RAW_HEADER: &str = "scenario,latent_shift,risk_violating,pure_null,episode,seed,horizon,mean_expected_loss,max_expected_loss,observed_mean_loss,observed_events,low_mix_first_alarm,low_mix_detected,low_mix_final_log_e,low_mix_peak_log_e,low_component_log_e_002,low_component_log_e_010,low_component_log_e_025,high_mix_first_alarm,high_mix_detected,high_mix_final_log_e,high_mix_peak_log_e,high_component_log_e_025,high_component_log_e_050,high_component_log_e_075,fixed_002_first_alarm,fixed_002_detected,fixed_002_final_log_e,fixed_010_first_alarm,fixed_010_detected,fixed_010_final_log_e,fixed_025_first_alarm,fixed_025_detected,fixed_025_final_log_e,fixed_050_first_alarm,fixed_050_detected,fixed_050_final_log_e,fixed_075_first_alarm,fixed_075_detected,fixed_075_final_log_e,log_alarm_threshold,risk_bound,global_delta,parallel_streams";
+const SUMMARY_HEADER: &str = "scenario,latent_shift,risk_violating,pure_null,episodes,mean_expected_loss,mean_observed_loss,max_expected_loss,low_mix_faster_than_best_fixed,high_mix_faster_than_best_fixed,low_mix_alarms,low_mix_alarm_rate,low_mix_rate_l95,low_mix_rate_u95,low_mix_false_alarms,low_mix_risk_misses,low_mix_latent_misses,low_mix_mean_delay,low_mix_p95_delay,low_mix_median_delay,low_mix_mean_final_log_e,high_mix_alarms,high_mix_alarm_rate,high_mix_rate_l95,high_mix_rate_u95,high_mix_false_alarms,high_mix_risk_misses,high_mix_latent_misses,high_mix_mean_delay,high_mix_p95_delay,high_mix_median_delay,high_mix_mean_final_log_e,fixed_002_alarms,fixed_002_alarm_rate,fixed_002_rate_l95,fixed_002_rate_u95,fixed_002_false_alarms,fixed_002_risk_misses,fixed_002_latent_misses,fixed_002_mean_delay,fixed_002_p95_delay,fixed_002_median_delay,fixed_002_mean_final_log_e,fixed_010_alarms,fixed_010_alarm_rate,fixed_010_rate_l95,fixed_010_rate_u95,fixed_010_false_alarms,fixed_010_risk_misses,fixed_010_latent_misses,fixed_010_mean_delay,fixed_010_p95_delay,fixed_010_median_delay,fixed_010_mean_final_log_e,fixed_025_alarms,fixed_025_alarm_rate,fixed_025_rate_l95,fixed_025_rate_u95,fixed_025_false_alarms,fixed_025_risk_misses,fixed_025_latent_misses,fixed_025_mean_delay,fixed_025_p95_delay,fixed_025_median_delay,fixed_025_mean_final_log_e,fixed_050_alarms,fixed_050_alarm_rate,fixed_050_rate_l95,fixed_050_rate_u95,fixed_050_false_alarms,fixed_050_risk_misses,fixed_050_latent_misses,fixed_050_mean_delay,fixed_050_p95_delay,fixed_050_median_delay,fixed_050_mean_final_log_e,fixed_075_alarms,fixed_075_alarm_rate,fixed_075_rate_l95,fixed_075_rate_u95,fixed_075_false_alarms,fixed_075_risk_misses,fixed_075_latent_misses,fixed_075_mean_delay,fixed_075_p95_delay,fixed_075_median_delay,fixed_075_mean_final_log_e";
 
 #[derive(Clone, Copy, Debug)]
 enum Profile {
@@ -189,7 +189,7 @@ struct EpisodeOutcome {
     mean_observed_loss: f64,
     mean_expected_loss: f64,
     max_expected_loss: f64,
-    outcomes: [DetectorOutcome; 5],
+    outcomes: [DetectorOutcome; 7],
     low_component_logs: [f64; 3],
     high_component_logs: [f64; 3],
     low_faster_than_best_fixed: bool,
@@ -228,7 +228,7 @@ struct ScenarioSummary {
     max_expected_loss: f64,
     low_faster_than_best_fixed: usize,
     high_faster_than_best_fixed: usize,
-    detectors: [DetectorStats; 5],
+    detectors: [DetectorStats; 7],
 }
 
 impl Default for ScenarioSummary {
@@ -293,8 +293,8 @@ fn simulate_episode(
         create_fixed(FIXED_BET_FRACTIONS[2])?,
     ];
 
-    let mut first_alarm_steps = [ALARM_SENTINEL; 5];
-    let mut peak_logs = [0.0_f64; 5];
+    let mut first_alarm_steps = [ALARM_SENTINEL; 7];
+    let mut peak_logs = [0.0_f64; 7];
     let mut observed_events = 0_usize;
     let mut expected_sum = 0.0_f64;
     let mut observed_sum = 0.0_f64;
@@ -316,6 +316,8 @@ fn simulate_episode(
             fixed[0].observe(observed_loss),
             fixed[1].observe(observed_loss),
             fixed[2].observe(observed_loss),
+            fixed[3].observe(observed_loss),
+            fixed[4].observe(observed_loss),
         ];
         for (index, alarm_result) in alarms.into_iter().enumerate() {
             let alarm = alarm_result.ok_or_else(|| {
@@ -332,6 +334,8 @@ fn simulate_episode(
             fixed[0].log_e_value(),
             fixed[1].log_e_value(),
             fixed[2].log_e_value(),
+            fixed[3].log_e_value(),
+            fixed[4].log_e_value(),
         ];
         for (index, log_e) in logs.into_iter().enumerate() {
             peak_logs[index] = peak_logs[index].max(log_e);
@@ -350,7 +354,7 @@ fn simulate_episode(
     let best_fixed_step = *first_alarm_steps[2..]
         .iter()
         .min()
-        .expect("three fixed comparators");
+        .expect("five fixed comparators");
     Ok(EpisodeOutcome {
         seed,
         observed_events,
@@ -365,6 +369,8 @@ fn simulate_episode(
                 fixed[0].log_e_value(),
                 fixed[1].log_e_value(),
                 fixed[2].log_e_value(),
+                fixed[3].log_e_value(),
+                fixed[4].log_e_value(),
             ][index],
             peak_log_e: peak_logs[index],
         }),
@@ -484,9 +490,11 @@ fn raw_fields(scenario: Scenario, episode: usize, outcome: EpisodeOutcome, log_t
     ];
     let low = outcome.outcomes[0];
     let high = outcome.outcomes[1];
-    let fixed010 = outcome.outcomes[2];
-    let fixed050 = outcome.outcomes[3];
-    let fixed075 = outcome.outcomes[4];
+    let fixed002 = outcome.outcomes[2];
+    let fixed010 = outcome.outcomes[3];
+    let fixed025 = outcome.outcomes[4];
+    let fixed050 = outcome.outcomes[5];
+    let fixed075 = outcome.outcomes[6];
     fields.extend([
         low.first_alarm_step.to_string(),
         (low.first_alarm_step < ALARM_SENTINEL).to_string(),
@@ -501,7 +509,7 @@ fn raw_fields(scenario: Scenario, episode: usize, outcome: EpisodeOutcome, log_t
         format!("{:.9}", high.peak_log_e),
     ]);
     fields.extend(outcome.high_component_logs.map(|value| format!("{value:.9}")));
-    for fixed in [fixed010, fixed050, fixed075] {
+    for fixed in [fixed002, fixed010, fixed025, fixed050, fixed075] {
         fields.extend([
             fixed.first_alarm_step.to_string(),
             (fixed.first_alarm_step < ALARM_SENTINEL).to_string(),
@@ -600,6 +608,7 @@ mod tests {
         assert!(LOW_BET_FRACTIONS.iter().all(|x| *x > 0.0 && *x < 1.0));
         assert!(HIGH_BET_FRACTIONS.iter().all(|x| *x > 0.0 && *x < 1.0));
         assert_ne!(LOW_BET_FRACTIONS, HIGH_BET_FRACTIONS);
+        assert_eq!(FIXED_BET_FRACTIONS, [0.02, 0.10, 0.25, 0.50, 0.75]);
     }
 
     #[test]
