@@ -12,6 +12,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/identity_evidence.rs"
       - "crates/core/symthaea-core/examples/platonic_pattern_interaction.rs"
       - "crates/core/symthaea-core/examples/platonic_selective_retrieval.rs"
+      - "crates/core/symthaea-core/examples/platonic_multiview_evidence_budget.rs"
       - "crates/core/symthaea-core/examples/identity_evidence_boundary.rs"
       - "crates/core/symthaea-core/Cargo.toml"
       - "crates/domains/symthaea-cell-foundry/**"
@@ -22,6 +23,7 @@ on:
       - "docs/research/LEVIN_MULTISCALE_EXPERIMENT_PROTOCOL.md"
       - "docs/research/PLATONIC_PATTERN_INTERACTION_BENCHMARK.md"
       - "docs/research/SELECTIVE_RETRIEVAL_AND_ABSTENTION_BENCHMARK.md"
+      - "docs/research/PLATONIC_MULTIVIEW_EVIDENCE_BUDGET.md"
       - "docs/research/IDENTITY_EVIDENCE_GATED_RETRIEVAL.md"
   push:
     branches: [main]
@@ -32,6 +34,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/identity_evidence.rs"
       - "crates/core/symthaea-core/examples/platonic_pattern_interaction.rs"
       - "crates/core/symthaea-core/examples/platonic_selective_retrieval.rs"
+      - "crates/core/symthaea-core/examples/platonic_multiview_evidence_budget.rs"
       - "crates/core/symthaea-core/examples/identity_evidence_boundary.rs"
       - "crates/core/symthaea-core/Cargo.toml"
       - "crates/domains/symthaea-cell-foundry/**"
@@ -132,6 +135,15 @@ jobs:
       - name: Check identity-evidence API and example formatting
         if: hashFiles('crates/core/symthaea-core/src/hdc/identity_evidence.rs') != ''
         run: rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/identity_evidence.rs crates/core/symthaea-core/examples/identity_evidence_boundary.rs
+
+      - name: Check multi-view evidence benchmark formatting
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/examples/platonic_multiview_evidence_budget.rs
+
+      - name: Test multi-view evidence benchmark invariants
+        run: cargo test --locked --release -p symthaea-core --example platonic_multiview_evidence_budget -- --nocapture
+
+      - name: Run multi-view evidence budget benchmark
+        run: cargo run --locked --release -p symthaea-core --example platonic_multiview_evidence_budget 2>&1 | tee research-results/platonic-multiview-evidence-budget.log
 
       - name: Test fail-closed identity evidence resolution
         if: hashFiles('crates/core/symthaea-core/src/hdc/identity_evidence.rs') != ''
