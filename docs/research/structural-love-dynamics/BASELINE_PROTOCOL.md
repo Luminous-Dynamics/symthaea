@@ -255,3 +255,9 @@ This snapshot is a planning reference, not an SLD head-to-head result. Capture t
 
 The first responsible benchmark milestone is therefore not "score above 89%". It is a same-protocol baseline with reproducible uncertainty and a non-compensable critical-failure report. Only then can an aspirational target be chosen without tuning to noise.
 
+## 15. Artifact digest manifest
+
+The companion `ARTIFACT_MANIFEST.json` records SHA-256 digests for the exact source artifacts in a pre-manifest commit. It covers the core and trajectory schemas/corpora, Rust contract tests, research specification, benchmark protocol, measurement-integrity plan, and adjudication protocol. The manifest names the source commit it covers so its scope cannot be mistaken for the later commit that adds the manifest itself.
+
+The manifest deliberately excludes its own bytes to avoid a self-referential digest. Any edit to a covered file invalidates the relevant receipt until the digest manifest is regenerated. The manifest is a reproducibility aid, not proof that labels are correct or a suite has passed. A final freeze still requires independent oracle adjudication, an immutable hidden split, and executable test/baseline receipts.
+
