@@ -196,13 +196,10 @@ impl Counters {
         self.feature_alarms += usize::from(result.feature_alarm);
         self.scope_alarms += usize::from(result.scope_alarm);
         self.combined_alarms += usize::from(result.combined_alarm);
-        self.feature_false_alarms +=
-            usize::from(!condition.is_shifted() && result.feature_alarm);
+        self.feature_false_alarms += usize::from(!condition.is_shifted() && result.feature_alarm);
         self.scope_false_alarms += usize::from(!condition.is_shifted() && result.scope_alarm);
-        self.combined_false_alarms +=
-            usize::from(!condition.is_shifted() && result.combined_alarm);
-        self.feature_missed_shifts +=
-            usize::from(condition.is_shifted() && !result.feature_alarm);
+        self.combined_false_alarms += usize::from(!condition.is_shifted() && result.combined_alarm);
+        self.feature_missed_shifts += usize::from(condition.is_shifted() && !result.feature_alarm);
         self.scope_missed_shifts += usize::from(condition.is_shifted() && !result.scope_alarm);
         self.combined_missed_shifts +=
             usize::from(condition.is_shifted() && !result.combined_alarm);
@@ -308,8 +305,7 @@ fn trace_episode(
     let mut trace = Vec::with_capacity(HORIZON);
 
     for (step, action) in ACTION_PLAN.iter().copied().enumerate() {
-        let (predicted_reserve, predicted_load) =
-            predict_step(actual_reserve, actual_load, action);
+        let (predicted_reserve, predicted_load) = predict_step(actual_reserve, actual_load, action);
         let (observed_reserve, observed_load) =
             observe_step(actual_reserve, actual_load, action, condition, seed, step);
         let score = score_prediction_error(
@@ -406,21 +402,19 @@ fn run_episode(
         if first_scope_alarm_step == HORIZON && assessment.alarm() {
             first_scope_alarm_step = step;
         }
-        if first_false_safe_step == HORIZON
-            && assessment.prediction_error().false_safe_prediction()
-        {
+        if first_false_safe_step == HORIZON && assessment.prediction_error().false_safe_prediction() {
             first_false_safe_step = step;
         }
         scope_false_safe_override |= assessment.false_safe_override();
     }
 
     let first_combined_alarm_step = first_feature_alarm_step.min(first_scope_alarm_step);
-    let feature_flagged_by_false_safe_step = first_false_safe_step < HORIZON
-        && first_feature_alarm_step <= first_false_safe_step;
-    let scope_flagged_by_false_safe_step = first_false_safe_step < HORIZON
-        && first_scope_alarm_step <= first_false_safe_step;
-    let combined_flagged_by_false_safe_step = first_false_safe_step < HORIZON
-        && first_combined_alarm_step <= first_false_safe_step;
+    let feature_flagged_by_false_safe_step =
+        first_false_safe_step < HORIZON && first_feature_alarm_step <= first_false_safe_step;
+    let scope_flagged_by_false_safe_step =
+        first_false_safe_step < HORIZON && first_scope_alarm_step <= first_false_safe_step;
+    let combined_flagged_by_false_safe_step =
+        first_false_safe_step < HORIZON && first_combined_alarm_step <= first_false_safe_step;
 
     Ok(EpisodeResult {
         feature_score,
@@ -441,7 +435,11 @@ fn run_episode(
 }
 
 fn csv_bool(value: bool) -> &'static str {
-    if value { "true" } else { "false" }
+    if value {
+        "true"
+    } else {
+        "false"
+    }
 }
 
 fn summary_row(output: &mut String, point: OperatingPoint, condition: Condition, c: Counters) {

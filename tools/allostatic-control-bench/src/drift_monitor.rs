@@ -200,8 +200,8 @@ mod tests {
     }
 
     fn test_sets() -> (RobustActionSet, HorizonViableActionSet) {
-        let state =
-            StateEnvelope::new(interval(0.17, 0.17), interval(0.81, 0.81)).expect("valid state");
+        let state = StateEnvelope::new(interval(0.17, 0.17), interval(0.81, 0.81))
+            .expect("valid state");
         let dynamics = DynamicsBounds::new(
             effect((-0.005, -0.005), (0.06, 0.06)),
             effect((0.005, 0.005), (0.02, 0.02)),
