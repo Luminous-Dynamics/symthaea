@@ -76,3 +76,45 @@ Keep official RoboDojo simulation, RoboDojo-RC physical adapted tasks, and resul
 3. Add adapter-side perturbation controls and provenance receipts.
 4. Run simulator screening, then preregister a small physical confirmation campaign.
 5. Publish all trials, including failed and ungraded attempts, with uncertainty.
+
+
+## Active-sensing value-of-information experiment
+
+The standalone Rust module `experiments/robodojo-contract/src/active_sensing.rs` now provides a pure decision primitive for choosing whether to acquire another observation. It estimates the expected change in task/risk utility and subtracts the declared energy and latency costs of sensing. This is an experimental adapter boundary—not a sensor driver, collision checker, or movement authorization.
+
+### Paired arms
+
+Use the same task, seed, setup, and perturbation assignments for each arm:
+
+1. **No-extra-sensing control:** continue from the current accepted observation unless an independent hard gate requires stopping.
+2. **Fixed-rate sensing:** request an additional observation at a preregistered interval, independent of state uncertainty.
+3. **Uncertainty-triggered sensing:** request a sensor observation when the calibrated success/risk estimate crosses a frozen threshold.
+4. **Cost-sensitive value-of-information:** request an observation when its estimated net benefit exceeds a frozen utility threshold, with hard risk/confidence gates overriding optional cost optimization.
+5. **Placebo-cost control:** run the decision logic with matched latency/accounting overhead but without using the observation's task-relevant posterior, where feasible.
+
+Keep policy checkpoint, vision/action adapter, action budget, and the set of available sensor channels fixed. Randomize arm order within paired blocks. Freeze the forecasting model, calibration split, utility units, resource budget, safety thresholds, and hypotheses before the held-out test. Do not tune the cost or confidence thresholds on test results.
+
+### Required measurements
+
+Record per episode: sensor requests and successful acquisitions, observation freshness, task progress/completion, expected and realized unsafe events, success/risk probabilities before and after sensing, observation energy, latency, replanning count, total episode energy/time, interventions, safe stops/escalations, and all missing/invalid runs. Report these by task, shift family/severity, evidence class, and whether sensing was optional or required by a declared gate.
+
+Primary comparison: paired task-macro progress/completion and episode resource cost versus fixed-rate sensing. Secondary: calibration (Brier/log loss/ECE), unsafe-risk-gate decisions, risk/coverage, observations per successful task, and sensing energy per useful-work unit. Do not convert a hard safety gate into a weighted average metric.
+
+### Negative and adversarial controls
+
+- No-value observation: the additional sensor provides no change to a task-relevant estimate; optional sensing should not spend resources without a justified benefit.
+- Required risk evidence available: if the current risk forecast violates the gate and the observation can restore it inside the declared bound, the policy should request it even if optional ROI is small.
+- Required sensor unavailable, posterior forecast missing, risk remains too high after sensing, or resource budget insufficient: stop/escalate; never silently treat unknown as clear.
+- Conflicting/stale observation: require explicit resolution or remain unresolved; do not average away a critical hazard.
+- Forecast shift: perturb calibration under held-out lighting, occlusion, sensor delay, terrain and tool-fault families; report when the active-sensing rule itself becomes miscalibrated.
+- Decision-order invariance: replay identical inputs and seed with scenario rows permuted; canonical decisions and receipts must be invariant.
+
+### Proposed screening targets (not achieved)
+
+- Zero cases in the declared synthetic adversarial suite where an above-limit risk proceeds without an admissible observation or safe escalation.
+- At least 20% lower *sensing-only* energy-plus-latency cost than fixed-rate sensing, while task-success non-inferiority is within a preregistered 2 percentage-point margin; report separate physical units as well as any explicitly declared common utility.
+- No more than 2% false required-sensing/escalation decisions on held-out in-domain controls where the required disposition is run and sufficient evidence is already available.
+- Report results only when there are enough independent scenario families for a useful paired interval; otherwise label them screening or inconclusive.
+- Track the cost of a wrong confident continue decision separately from an unnecessary observation. A low average cost must not hide a single violation of a hard gate.
+
+These are prospective hypotheses. The 2025 ICLR study *The Value of Sensory Information to a Robot* found sensing criticality varies with task stochasticity and policy, and specifically motivates controlled observation-withholding and sensing-budget comparisons. This code and these proposed arms do not reproduce that study or claim an improvement. Reference: https://proceedings.iclr.cc/paper_files/paper/2025/hash/e1126028d9f1f69c13571ec462084d31-Abstract-Conference.html.
