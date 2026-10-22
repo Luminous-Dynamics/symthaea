@@ -445,6 +445,8 @@ fn join_pairs(pairs: &[Value], outcomes: &BTreeMap<String, Value>, requested_spl
                 || required_string_at(row, &["adjudication", "status"], &row_ctx)? != status {
                 bail!("{row_ctx} split or gold adjudication mismatch");
             }
+            let suite_adjudication = if side == "base" { base_adj } else { variant_adj };
+            validate_adjudication_link(suite_adjudication, row, &row_ctx)?;
             validate_run_budgets(row, &row_ctx)?;
         }
         if base_status != "adjudicated" || variant_status != "adjudicated"
@@ -550,6 +552,53 @@ fn metric_json_value(metric: &Metric) -> Value {
         "ci_95": metric.ci_95,
         "defined_bootstrap_replicates": metric.defined_bootstrap_replicates
     })
+}
+
+fn validate_adjudication_link(suite_adj: &Value, outcome: &Value, context: &str) -> Result<()> {
+    let outcome_adj = outcome.get("adjudication").context("outcome adjudication missing")?;
+    for field in ["status", "label", "rubric_version", "receipt_sha256"] {
+        if required_string(suite_adj, field, &format!("{context}.suite_adjudication"))?
+            != required_string(outcome_adj, field, &format!("{context}.outcome_adjudication"))? {
+            bail!("{context}: adjudication {field} does not match the paired suite record");
+        }
+    }
+    let suite_reviewers = suite_adj.get("reviewer_decisions").and_then(Value::as_array)
+        .with_context(|| format!("{context}: suite reviewer_decisions must be an array"))?;
+    let outcome_reviewers = outcome_adj.get("reviewer_decisions").and_then(Value::as_array)
+        .with_context(|| format!("{context}: outcome reviewer_decisions must be an array"))?;
+    if suite_reviewers.len() != outcome_reviewers.len() {
+        bail!("{context}: suite/outcome reviewer counts differ");
+    }
+    let mut expected = BTreeMap::<String, (&str, &str, &str)>::new();
+    for reviewer in suite_reviewers {
+        let id = required_string(reviewer, "reviewer_id", context)?.to_owned();
+        let label = required_string(reviewer, "label", context)?;
+        let reason = required_string(reviewer, "reason_code", context)?;
+        let evidence = required_string(reviewer, "evidence_sha256", context)?;
+        validate_digest(evidence, 64, &format!("{context}.reviewer.evidence_sha256"))?;
+        if expected.insert(id, (label, reason, evidence)).is_some() {
+            bail!("{context}: duplicate suite reviewer ID");
+        }
+    }
+    let mut observed_ids = BTreeSet::new();
+    for reviewer in outcome_reviewers {
+        let id = required_string(reviewer, "reviewer_id", context)?.to_owned();
+        if !observed_ids.insert(id.clone()) {
+            bail!("{context}: duplicate outcome reviewer ID");
+        }
+        let (label, reason, evidence) = expected.get(&id)
+            .with_context(|| format!("{context}: outcome contains unregistered reviewer {id}"))?;
+        if required_string(reviewer, "label", context)? != *label
+            || required_string(reviewer, "evidence_sha256", context)? != *evidence {
+            bail!("{context}: outcome reviewer label/evidence differs from suite adjudication");
+        }
+        let reasons = reviewer.get("reason_codes").and_then(Value::as_array)
+            .with_context(|| format!("{context}: reviewer reason_codes must be an array"))?;
+        if !reasons.iter().any(|value| value.as_str() == Some(reason)) {
+            bail!("{context}: outcome reviewer reason_codes omit the suite reason code");
+        }
+    }
+    Ok(())
 }
 
 fn validate_run_budgets(row: &Value, context: &str) -> Result<()> {
