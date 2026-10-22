@@ -205,6 +205,18 @@ fn verify_mode_summary(
         .iter()
         .filter(|attempt| bool_field(attempt, "success") == Some(false))
         .count() as u64;
+    let backend_attempts_verifier_accepted = backend_attempts
+        .iter()
+        .filter(|attempt| bool_field(attempt, "verification_passed") == Some(true))
+        .count() as u64;
+    let backend_attempts_verifier_rejected = backend_attempts
+        .iter()
+        .filter(|attempt| bool_field(attempt, "verification_passed") == Some(false))
+        .count() as u64;
+    let backend_attempts_without_verifier_result = backend_attempts
+        .iter()
+        .filter(|attempt| attempt.get("verification_passed").is_some_and(Value::is_null))
+        .count() as u64;
     let runs_with_external_backend_attempts = selected_runs
         .iter()
         .filter(|run| {
@@ -279,6 +291,9 @@ fn verify_mode_summary(
         ("verification_elapsed_ms_p95", verification_elapsed_ms_p95),
         ("backend_attempts_succeeded", backend_attempts_succeeded),
         ("backend_attempts_failed", backend_attempts_failed),
+        ("backend_attempts_verifier_accepted", backend_attempts_verifier_accepted),
+        ("backend_attempts_verifier_rejected", backend_attempts_verifier_rejected),
+        ("backend_attempts_without_verifier_result", backend_attempts_without_verifier_result),
         ("backend_attempt_elapsed_ms_total", backend_attempt_elapsed_ms_total),
         ("backend_attempt_elapsed_ms_p50", backend_attempt_elapsed_ms_p50),
         ("backend_attempt_elapsed_ms_p95", backend_attempt_elapsed_ms_p95),
@@ -721,6 +736,7 @@ fn audit(
                 let tier = str_field(attempt, "tier");
                 let backend_name = str_field(attempt, "backend_name").unwrap_or("");
                 let success = bool_field(attempt, "success");
+                let verification_valid = attempt.get("verification_passed").is_some_and(|value| value.is_null() || value.is_boolean());
                 let tier_valid = tier.is_some_and(|name| {
                     matches!(name, "Native" | "Hardware" | "LocalLLM" | "CloudLLM" | "Simulated")
                 });
@@ -734,7 +750,7 @@ fn audit(
                     "anthropic" => tier == Some("CloudLLM"),
                     _ => true,
                 };
-                tier_valid && backend_name_valid && success_valid && elapsed_valid && energy_valid && identity_consistent
+                tier_valid && backend_name_valid && success_valid && verification_valid && elapsed_valid && energy_valid && identity_consistent
             })
         });
         push_check(
@@ -1369,6 +1385,9 @@ mod tests {
                     "backend_attempts_by_name": {},
                     "backend_attempts_succeeded": 0,
                     "backend_attempts_failed": 0,
+                    "backend_attempts_verifier_accepted": 0,
+                    "backend_attempts_verifier_rejected": 0,
+                    "backend_attempts_without_verifier_result": 0,
                     "backend_attempt_elapsed_ms_total": 0,
                     "backend_attempt_elapsed_ms_p50": 0,
                     "backend_attempt_elapsed_ms_p95": 0,
@@ -1398,6 +1417,9 @@ mod tests {
                     "backend_attempts_by_name": {},
                     "backend_attempts_succeeded": 0,
                     "backend_attempts_failed": 0,
+                    "backend_attempts_verifier_accepted": 0,
+                    "backend_attempts_verifier_rejected": 0,
+                    "backend_attempts_without_verifier_result": 0,
                     "backend_attempt_elapsed_ms_total": 0,
                     "backend_attempt_elapsed_ms_p50": 0,
                     "backend_attempt_elapsed_ms_p95": 0,
