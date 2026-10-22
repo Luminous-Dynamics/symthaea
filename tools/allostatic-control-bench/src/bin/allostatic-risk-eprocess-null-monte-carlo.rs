@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn splitmix64_uses_the_frozen_known_answer() {
-        assert_eq!(splitmix64(0), 0xE220_A839_7B1D_CD AF_u64);
+        assert_eq!(splitmix64(0), 0xE220_A839_7B1D_CDAF_u64);
     }
 
     #[test]
