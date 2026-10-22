@@ -6,7 +6,7 @@
 //! is the primary calibration statistic; power is evaluated at risks above epsilon.
 
 use allostatic_control_bench::bounded_risk_eprocess::{
-    BoundedRiskEProcess, MixtureBoundedRiskEProcess,
+    BoundedRiskEProcess, MixtureBoundedRiskEProcess, PredictableRiskEProcess,
 };
 use std::error::Error;
 use std::fs;
@@ -23,9 +23,11 @@ const FIXED_FRACTION: f64 = 0.50;
 const FIXED_BET: f64 = FIXED_FRACTION / EPSILON;
 const MIX3: [f64; 3] = [0.25, 0.50, 0.75];
 const MIX7: [f64; 7] = [0.025, 0.05, 0.10, 0.25, 0.50, 0.75, 0.95];
+const ADAPTIVE_MAX_BET_FRACTION: f64 = 0.50;
+const ADAPTIVE_MIN_HISTORY: usize = 20;
 const Z_975: f64 = 1.959_963_984_540_054;
 
-const RAW_HEADER: &str = "risk_rate,cohort,monitor,events,event_trace,first_event_step,fixed_first_alarm_step,mix3_first_alarm_step,mix7_first_alarm_step,fixed_final_log_e,mix3_final_log_e,mix7_final_log_e";
+const RAW_HEADER: &str = "risk_rate,cohort,monitor,events,event_trace,first_event_step,fixed_first_alarm_step,mix3_first_alarm_step,mix7_first_alarm_step,fixed_final_log_e,mix3_final_log_e,mix7_final_log_e,adaptive_first_alarm_step,adaptive_final_log_e";
 const SUMMARY_HEADER: &str = "risk_rate,method,cohorts,monitors_per_cohort,horizon,cohort_fwer_count,cohort_fwer_rate,wilson_95_lower,wilson_95_upper,per_monitor_alarm_count,per_monitor_alarm_rate,mean_first_alarm_step,p95_first_alarm_step,median_first_alarm_step,mean_event_count,expected_event_count,epsilon,delta,log_alarm_threshold,bet_grid";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -38,9 +40,11 @@ struct StreamRecord {
     fixed_first_alarm_step: usize,
     mix3_first_alarm_step: usize,
     mix7_first_alarm_step: usize,
+    adaptive_first_alarm_step: usize,
     fixed_final_log_e: f64,
     mix3_final_log_e: f64,
     mix7_final_log_e: f64,
+    adaptive_final_log_e: f64,
 }
 
 fn splitmix64(mut value: u64) -> u64 {
@@ -114,6 +118,14 @@ fn run_stream(
         .ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "invalid three-bet e-process"))?;
     let mut mix7 = MixtureBoundedRiskEProcess::new(EPSILON, MIX7, DELTA, MONITORS)
         .ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "invalid wide-grid e-process"))?;
+    let mut adaptive = PredictableRiskEProcess::new(
+        EPSILON,
+        ADAPTIVE_MAX_BET_FRACTION,
+        DELTA,
+        MONITORS,
+        ADAPTIVE_MIN_HISTORY,
+    )
+    .ok_or_else(|| IoError::new(ErrorKind::InvalidInput, "invalid adaptive e-process"))?;
 
     let mut events = 0_usize;
     let mut event_trace = String::with_capacity(HORIZON);
@@ -121,6 +133,7 @@ fn run_stream(
     let mut fixed_first_alarm_step = HORIZON;
     let mut mix3_first_alarm_step = HORIZON;
     let mut mix7_first_alarm_step = HORIZON;
+    let mut adaptive_first_alarm_step = HORIZON;
     for step in 0..HORIZON {
         let seed = 0xD1B5_4A32_D192_ED03_u64
             ^ (rate_index as u64).wrapping_mul(0x9E37_79B9)
@@ -146,6 +159,9 @@ fn run_stream(
         if mix7.observe(loss) == Some(true) && mix7_first_alarm_step == HORIZON {
             mix7_first_alarm_step = step;
         }
+        if adaptive.observe(loss) == Some(true) && adaptive_first_alarm_step == HORIZON {
+            adaptive_first_alarm_step = step;
+        }
     }
     Ok(StreamRecord {
         cohort,
@@ -156,9 +172,11 @@ fn run_stream(
         fixed_first_alarm_step,
         mix3_first_alarm_step,
         mix7_first_alarm_step,
+        adaptive_first_alarm_step,
         fixed_final_log_e: fixed.log_e_value(),
         mix3_final_log_e: mix3.log_e_value(),
         mix7_final_log_e: mix7.log_e_value(),
+        adaptive_final_log_e: adaptive.log_e_value(),
     })
 }
 
@@ -178,6 +196,11 @@ fn method_fields(record: StreamRecord, method: &str) -> (usize, f64, &'static st
             record.mix7_first_alarm_step,
             record.mix7_final_log_e,
             "0.025;0.050;0.100;0.250;0.500;0.750;0.950",
+        ),
+        "adaptive" => (
+            record.adaptive_first_alarm_step,
+            record.adaptive_final_log_e,
+            "predictable_mean_variance;max_fraction=0.500;min_history=20",
         ),
         _ => unreachable!("static method name"),
     }
@@ -270,6 +293,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                     format!("{:.9}", record.fixed_final_log_e),
                     format!("{:.9}", record.mix3_final_log_e),
                     format!("{:.9}", record.mix7_final_log_e),
+                    record.adaptive_first_alarm_step.to_string(),
+                    format!("{:.9}", record.adaptive_final_log_e),
                 ];
                 raw.push_str(&fields.join(","));
                 raw.push('\n');
@@ -280,6 +305,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             ("fixed", fixed_threshold),
             ("mix3", mix3_threshold),
             ("mix7", mix7_threshold),
+            ("adaptive", fixed_threshold),
         ] {
             summary_row(
                 &mut summary,
@@ -307,7 +333,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let expected_raw = RISK_RATES.len() * COHORTS * MONITORS;
-    let expected_summary = RISK_RATES.len() * 3;
+    let expected_summary = RISK_RATES.len() * 4;
     if all_rate_summaries.len() != expected_summary || raw.lines().count() != expected_raw + 1 {
         return Err(IoError::new(ErrorKind::InvalidData, "Monte Carlo output coverage mismatch").into());
     }
@@ -351,6 +377,7 @@ mod tests {
         assert!(first.fixed_first_alarm_step < HORIZON);
         assert!(first.mix3_first_alarm_step < HORIZON);
         assert!(first.mix7_first_alarm_step < HORIZON);
+        assert!(first.adaptive_first_alarm_step < HORIZON);
         assert_eq!(first.event_trace.len(), HORIZON);
     }
 }
@@ -366,17 +393,21 @@ fn validate_monte_carlo_gates(
     };
     if fwer(0, "fixed") > 0.02
         || fwer(0, "mix3") > 0.02
+        || fwer(0, "adaptive") > 0.02
         || fwer(0, "mix7") > 0.02
         || fwer(1, "fixed") > 0.08
         || fwer(1, "mix3") > 0.08
+        || fwer(1, "adaptive") > 0.08
         || fwer(1, "mix7") > 0.08
         || fwer(2, "mix7") < fwer(2, "mix3") + 0.15
         || fwer(3, "mix7") < fwer(3, "mix3") + 0.20
         || fwer(4, "fixed") < 0.95
         || fwer(4, "mix3") < 0.95
+        || fwer(4, "adaptive") < 0.95
         || fwer(4, "mix7") < 0.95
         || fwer(5, "fixed") < 0.99
         || fwer(5, "mix3") < 0.99
+        || fwer(5, "adaptive") < 0.99
         || fwer(5, "mix7") < 0.99
     {
         return Err(IoError::new(
