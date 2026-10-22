@@ -27,6 +27,7 @@ A 2026 review of casting computation/AI/digital twins identifies reproducible be
 
 References:
 - Pei et al. (2025), *Optimizing casting process using a combination of small data machine learning and phase-field simulations*, npj Computational Materials 11, 27: https://www.nature.com/articles/s41524-025-01524-6
+- Bayesian optimization-driven CFD optimization for continuous casting (30 August 2026) reports performance on par with commercial CAESES for submerged-entry-nozzle geometry optimization using a single-phase water approximation. It is an algorithm-comparison baseline, not physical validation of molten-metal casting: https://www.sciencedirect.com/science/article/pii/S0045793026002276
 - Essam et al. (2026), *A review of computational modeling, artificial intelligence, and digital twins in metal casting and foundry operations*: https://link.springer.com/article/10.1007/s43939-026-00685-5
 - NISTIR 8620 (2026), *Digital Twins Workshops Summary Report*: https://www.nist.gov/publications/digital-twins-workshops-summary-report
 - NIST AMS 100-85 (2026), *On Methods of Uncertainty Quantification in Computational Modeling and Simulation: Harmonizing Modeling and Metrology Practices*: https://www.nist.gov/publications/methods-uncertainty-quantification-computational-modeling-and-simulation-harmonizing
