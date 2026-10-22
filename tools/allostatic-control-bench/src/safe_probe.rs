@@ -24,6 +24,8 @@ pub struct SafeProbeRecommendation {
     minimum_discrimination: f64,
     measurement_radius: f64,
     action_scores: [f64; 3],
+    worst_case_remaining_hypotheses: [usize; 3],
+    guaranteed_hypothesis_eliminations: [usize; 3],
     selected_action: Option<Action>,
     selected_score: f64,
 }
@@ -55,6 +57,26 @@ impl SafeProbeRecommendation {
     /// after expansion by the declared measurement uncertainty.
     pub const fn selected_action_guarantees_pairwise_distinguishability(self) -> bool {
         self.selected_action.is_some() && self.selected_score > 0.0
+    }
+
+    /// Maximum number of hypotheses that may remain after any observation for
+    /// each action, assuming the declared prediction and measurement boxes hold.
+    /// Scores are ordered Push, Maintain, EmergencyRecover.
+    pub const fn worst_case_remaining_hypotheses(self) -> [usize; 3] {
+        self.worst_case_remaining_hypotheses
+    }
+
+    /// Minimum number of hypotheses guaranteed to be eliminated by each action.
+    pub const fn guaranteed_hypothesis_eliminations(self) -> [usize; 3] {
+        self.guaranteed_hypothesis_eliminations
+    }
+
+    /// True when every observation compatible with the selected action is
+    /// compatible with fewer than the original number of candidate hypotheses.
+    pub fn selected_action_guarantees_hypothesis_reduction(self) -> bool {
+        self.selected_action.is_some_and(|action| {
+            self.guaranteed_hypothesis_eliminations[action_index(action)] > 0
+        })
     }
 
     /// Scores are ordered Push, Maintain, EmergencyRecover. A score measures the
@@ -119,6 +141,59 @@ fn pairwise_effect_separation(
 /// A value of zero means at least one model pair has overlapping prediction
 /// boxes for this action, so that action cannot distinguish every hypothesis pair
 /// under the present interval information.
+/// Maximum number of candidate observation sets that can contain the same
+/// measured transition. This is the worst-case posterior cardinality under
+/// interval/set-membership updating with the declared bounded observation noise.
+fn worst_case_remaining_hypotheses(
+    hypotheses: &[DynamicsBounds],
+    action: Action,
+    measurement_radius: f64,
+) -> usize {
+    if hypotheses.is_empty() {
+        return 0;
+    }
+    // Effect coordinates are bounded by [-1, 1]. With radius >= 2 every
+    // candidate observation box necessarily overlaps every other one.
+    if measurement_radius >= 2.0 {
+        return hypotheses.len();
+    }
+
+    let mut boxes = Vec::with_capacity(hypotheses.len());
+    let mut x_edges = Vec::with_capacity(hypotheses.len() * 2);
+    let mut y_edges = Vec::with_capacity(hypotheses.len() * 2);
+    for hypothesis in hypotheses {
+        let effect = hypothesis.effect_for_action(action);
+        let reserve = effect.reserve_delta();
+        let load = effect.load_delta();
+        let x_lower = reserve.lower() - measurement_radius;
+        let x_upper = reserve.upper() + measurement_radius;
+        let y_lower = load.lower() - measurement_radius;
+        let y_upper = load.upper() + measurement_radius;
+        boxes.push((x_lower, x_upper, y_lower, y_upper));
+        x_edges.push(x_lower);
+        x_edges.push(x_upper);
+        y_edges.push(y_lower);
+        y_edges.push(y_upper);
+    }
+
+    // For axis-aligned closed rectangles, a maximum overlap depth is attained
+    // at the product of rectangle-edge coordinates; evaluating those points
+    // includes both positive-area overlaps and boundary-only intersections.
+    let mut maximum = 0;
+    for x in &x_edges {
+        for y in &y_edges {
+            let overlap = boxes
+                .iter()
+                .filter(|(x_lower, x_upper, y_lower, y_upper)| {
+                    *x >= *x_lower && *x <= *x_upper && *y >= *y_lower && *y <= *y_upper
+                })
+                .count();
+            maximum = maximum.max(overlap);
+        }
+    }
+    maximum
+}
+
 fn maximin_discrimination(
     hypotheses: &[DynamicsBounds],
     action: Action,
@@ -308,27 +383,44 @@ pub fn recommend_safe_probe_with_noise(
         evaluate_horizon_action_set(state, hull, limits, shield_can_recover, horizon)?;
     let action_scores =
         ACTIONS.map(|action| maximin_discrimination(hypotheses, action, measurement_radius));
+    let worst_case_remaining_hypotheses = ACTIONS
+        .map(|action| self::worst_case_remaining_hypotheses(hypotheses, action, measurement_radius));
+    let guaranteed_hypothesis_eliminations = worst_case_remaining_hypotheses
+        .map(|remaining| hypotheses.len().saturating_sub(remaining));
 
     let mut selected_action = None;
     let mut selected_score = 0.0_f64;
+    let mut selected_eliminations = 0_usize;
     for action in ACTIONS {
-        let score = action_scores[action_index(action)];
-        if !safe_actions.contains(action) || score <= minimum_discrimination {
+        let index = action_index(action);
+        let score = action_scores[index];
+        let eliminations = guaranteed_hypothesis_eliminations[index];
+        let meets_separation_threshold = score > minimum_discrimination;
+        // Full pairwise separation is not required for every useful probe: a
+        // safe action may still guarantee elimination of at least one model.
+        if !safe_actions.contains(action)
+            || (!meets_separation_threshold && eliminations == 0)
+        {
             continue;
         }
         match selected_action {
             None => {
                 selected_action = Some(action);
                 selected_score = score;
+                selected_eliminations = eliminations;
             }
             Some(current) => {
-                if score > selected_score + SCORE_EPSILON
-                    || ((score - selected_score).abs() <= SCORE_EPSILON
+                if eliminations > selected_eliminations
+                    || (eliminations == selected_eliminations
+                        && score > selected_score + SCORE_EPSILON)
+                    || (eliminations == selected_eliminations
+                        && (score - selected_score).abs() <= SCORE_EPSILON
                         && action == preferred_action
                         && current != preferred_action)
                 {
                     selected_action = Some(action);
                     selected_score = score;
+                    selected_eliminations = eliminations;
                 }
             }
         }
@@ -341,6 +433,8 @@ pub fn recommend_safe_probe_with_noise(
         minimum_discrimination,
         measurement_radius,
         action_scores,
+        worst_case_remaining_hypotheses,
+        guaranteed_hypothesis_eliminations,
         selected_action,
         selected_score,
     })
