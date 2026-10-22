@@ -58,8 +58,7 @@ sha256sum /tmp/noisy-scm-probe.json
 - Embedded self-test passed on the local execution copy.
 - All **10 unittest tests passed** locally. They cover determinism, hard-do behavior (including invariance to the target's replaced mechanism), exact probability normalization, parent essentiality, cost bounds, input validation, and the oracle's declared graph-entropy objective.
 - Test file Git blob on the branch: `c69e398b53170d355fcbb9f834cd79b4e175f09f`. The locally run test file matched that blob.
-- The locally executed source mirror had Git blob `a13fc392ff169c6bc14854b7ee0bb56bbdccc1f9`; the current branch source file has a different blob. Therefore these results are **not an exact-blob execution receipt**. The source-copy mismatch must be resolved and both commands rerun against exact repository bytes before treating the run as qualified.
-- Exploratory JSON: 87,383 bytes; SHA-256 `881ab1b557593e580e22970d8c5bfaa504b4e72df22da5752defe26211323c78`. It intentionally records source binding as `UNBOUND`, because of the mismatch above.
+- The earlier local mirror/artifact listed in the initial draft has been superseded by the **Receipt update** below. Use the later source-mirror blob and JSON digest there; both entries preserve the same qualification caveat that the execution mirror differs from the branch source.
 
 ## Limits and next gates
 
