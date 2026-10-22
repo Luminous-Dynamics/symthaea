@@ -6,7 +6,8 @@
 
 use risc0_zkvm::guest::env;
 use symthaea_zkproof_core::{
-    BalanceProofInput, BalanceProofOutput, EvolutionInput, EvolutionOutput,
+    AccountabilityThresholdInput, AccountabilityThresholdOutput, BalanceProofInput,
+    BalanceProofOutput, EvolutionInput, EvolutionOutput,
 };
 
 risc0_zkvm::guest::entry!(main);
@@ -15,11 +16,13 @@ fn main() {
     // Tag-dispatched entry point:
     //   tag 0 = consciousness attestation (EvolutionInput → EvolutionOutput)
     //   tag 1 = balance proof            (BalanceProofInput → BalanceProofOutput)
+    //   tag 2 = SIF threshold predicate  (AccountabilityThresholdInput → Output)
     let tag: u8 = env::read();
 
     match tag {
         0 => run_consciousness_attestation(),
         1 => run_balance_proof(),
+        2 => run_accountability_threshold(),
         _ => panic!("unknown guest program tag"),
     }
 }
@@ -67,6 +70,26 @@ fn run_balance_proof() {
         sufficient: input.balance >= input.required_minimum,
         required_minimum: input.required_minimum,
         nonce: input.nonce,
+    };
+
+    env::commit(&output);
+}
+
+/// Tag 2: SIF accountability predicate.
+///
+/// The sensitive scalar never leaves the guest. The public journal proves the
+/// minimum-disclosure boolean and binds it to one exact receipt/query/policy
+/// statement, preventing a valid proof from being replayed for another lookup.
+fn run_accountability_threshold() {
+    let input: AccountabilityThresholdInput = env::read();
+
+    let output = AccountabilityThresholdOutput {
+        statement_digest: input.statement_digest,
+        query_digest: input.query_digest,
+        policy_digest: input.policy_digest,
+        threshold: input.threshold,
+        satisfied: input.private_value >= input.threshold,
+        operation_nonce: input.operation_nonce,
     };
 
     env::commit(&output);
