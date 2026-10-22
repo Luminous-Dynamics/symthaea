@@ -6,8 +6,9 @@
 `timescale 1ns/1ps
 `default_nettype none
 
-module tb_hdc_bind_xor;
-    localparam int unsigned DATA_W = 256;
+module tb_hdc_bind_xor #(
+    parameter int unsigned DATA_W = 256
+);
 
     logic clk = 1'b0;
     logic rst_n;
@@ -22,6 +23,11 @@ module tb_hdc_bind_xor;
     logic [31:0] rng_b;
     logic [DATA_W-1:0] random_a;
     logic [DATA_W-1:0] random_b;
+    logic [DATA_W-1:0] pattern_a;
+    logic [DATA_W-1:0] pattern_b;
+    logic [DATA_W-1:0] second_a;
+    logic [DATA_W-1:0] second_b;
+    logic [DATA_W-1:0] held_result;
 
     hdc_bind_xor #(.DATA_W(DATA_W)) dut (
         .clk,
@@ -35,7 +41,9 @@ module tb_hdc_bind_xor;
         .result
     );
 
-    always #5 clk = ~clk;
+    initial begin
+        forever #5 clk = ~clk;
+    end
 
     task automatic check_xor(
         input logic [DATA_W-1:0] a,
@@ -76,9 +84,12 @@ module tb_hdc_bind_xor;
         check_xor('0, '0, "zero-zero");
         check_xor({DATA_W{1'b1}}, '0, "ones-zero");
         check_xor({DATA_W{1'b1}}, {DATA_W{1'b1}}, "ones-ones");
-        check_xor(256'h0123456789abcdef_fedcba9876543210_0123456789abcdef_fedcba9876543210,
-                  256'hffff0000ffff0000_0000ffff0000ffff_aaaa5555aaaa5555_5555aaaa5555aaaa,
-                  "structured-pattern");
+        if ((DATA_W % 32) != 0) $fatal(1, "DATA_W must be a multiple of 32");
+        for (int bit_index = 0; bit_index < DATA_W; bit_index++) begin
+            pattern_a[bit_index] = ((bit_index % 7) < 3);
+            pattern_b[bit_index] = ((bit_index % 11) < 5);
+        end
+        check_xor(pattern_a, pattern_b, "structured-pattern");
 
         // Deterministic LCG-generated word pairs. This exercises many bit
         // combinations without relying on simulator-specific $urandom state.
@@ -95,25 +106,35 @@ module tb_hdc_bind_xor;
         end
 
         // Backpressure must hold the first result and refuse a second input.
+        for (int bit_index = 0; bit_index < DATA_W; bit_index++) begin
+            pattern_a[bit_index] = ((bit_index % 3) == 0);
+            pattern_b[bit_index] = ((bit_index % 5) == 1);
+        end
+        held_result = pattern_a ^ pattern_b;
+        second_a = ~pattern_a;
+        second_b = ~pattern_b;
+
         out_ready = 1'b0;
         @(negedge clk);
-        operand_a = 256'h1111111111111111_2222222222222222_3333333333333333_4444444444444444;
-        operand_b = 256'h0101010101010101_0202020202020202_0303030303030303_0404040404040404;
+        operand_a = pattern_a;
+        operand_b = pattern_b;
         in_valid = 1'b1;
 
         @(posedge clk); // accept first word
         @(negedge clk);
         if (out_valid !== 1'b1) $fatal(1, "backpressure-first: missing valid");
-        if (result !== (operand_a ^ operand_b)) $fatal(1, "backpressure-first: wrong result");
-        
-        operand_a = 256'hffffffff00000000_ffffffff00000000_ffffffff00000000_ffffffff00000000;
-        operand_b = 256'h00000000ffffffff_00000000ffffffff_00000000ffffffff_00000000ffffffff;
+        if (result !== held_result) $fatal(1, "backpressure-first: wrong result");
+
+        // Replace the input pins while stalled. A compliant elastic stage
+        // must hold the already accepted output word unchanged.
+        operand_a = second_a;
+        operand_b = second_b;
         if (in_ready !== 1'b0) $fatal(1, "backpressure: accepted while output was blocked");
 
         @(posedge clk); // output still blocked; second input must not replace it
         @(negedge clk);
         if (out_valid !== 1'b1) $fatal(1, "backpressure: valid dropped while stalled");
-        if (result !== 256'h1010101010101010_2020202020202020_3030303030303030_4040404040404040)
+        if (result !== held_result)
             $fatal(1, "backpressure: result changed while stalled");
         if (in_ready !== 1'b0) $fatal(1, "backpressure: ready asserted while full");
 
@@ -121,7 +142,7 @@ module tb_hdc_bind_xor;
         @(posedge clk);
         @(negedge clk);
         if (out_valid !== 1'b1) $fatal(1, "backpressure-second: missing valid");
-        if (result !== (operand_a ^ operand_b)) $fatal(1, "backpressure-second: wrong result");
+        if (result !== (second_a ^ second_b)) $fatal(1, "backpressure-second: wrong result");
 
         in_valid = 1'b0;
         @(posedge clk);
