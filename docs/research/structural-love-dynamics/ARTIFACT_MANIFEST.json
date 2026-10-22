@@ -2,14 +2,13 @@
   "manifest_format": "SLD-ARTIFACT-MANIFEST-1",
   "status": "DRAFT_CANDIDATE",
   "hash_algorithm": "SHA-256",
-  "encoding": "UTF-8 bytes of the exact repository file content",
-  "source_commit_before_manifest": "109ca42aa20fb193ef408bf66b9be7eaf77f0b9d",
+  "encoding": "UTF-8 bytes of exact repository file content",
+  "source_commit_before_manifest": "4fd9f82d5296c2eef1390d328e157fd3b57016aa",
   "generated_date": "2026-10-22",
   "self_digest_excluded": true,
   "notes": [
-    "Binds schemas, corpora, Rust tests, research protocols, verifier source, and xtask dependencies at the source commit above.",
-    "The manifest itself is excluded from its own digest set to avoid self-reference.",
-    "Any change to a listed artifact requires regenerating the manifest against the new pre-manifest source commit.",
+    "Binds core and trajectory datasets, schemas, receipt contract, Rust tests, research protocols, verifier source, and xtask dependencies at the source commit above.",
+    "The manifest itself is excluded from its own digest set. Any subsequent change to a listed file requires regeneration against a new pre-manifest source commit.",
     "Digests establish artifact identity only, not correctness, oracle validity, model behavior, or benchmark passage."
   ],
   "artifacts": [
@@ -38,22 +37,28 @@
       "git_blob_sha1": "56b86c3cb2bfed3957393d5d5477009532779434"
     },
     {
+      "path": "docs/research/structural-love-dynamics/evaluation-receipt.schema.json",
+      "sha256": "734efc3e88a9f6868b649c08b2860a7e5c871638496be7ce9f3445a331b7d613",
+      "utf8_bytes": 12336,
+      "git_blob_sha1": "bf6b2fccf44f455a00fd9b9ede397b909d19d120"
+    },
+    {
       "path": "tests/sld_corpus_contract.rs",
-      "sha256": "fff08cf599a64ddd1b8090efb56cea3c0f7647a47ef11cc51a53d1951dc2b5ce",
-      "utf8_bytes": 22646,
-      "git_blob_sha1": "dbf7db8fd863b935ff37203c72a83479ed95f0a7"
+      "sha256": "54f168d0537f16508ebf9d61a213dafae326e1e7f87d633b21ea43a8688ea169",
+      "utf8_bytes": 34992,
+      "git_blob_sha1": "82b18771bf2a5d6639ee586fd492fc7678355aeb"
     },
     {
       "path": "docs/research/STRUCTURAL_LOVE_DYNAMICS.md",
-      "sha256": "ccc41867b1cbd7504a83cc72d232b73439ea604c53884ae64a41c0ea5dfc330e",
-      "utf8_bytes": 26524,
-      "git_blob_sha1": "97bdfce405339b5ca445b2e000eb151947815ee6"
+      "sha256": "a8dc7a3da7ab84271b6d8cfb0906c7ab60902046f4adf76a5725049f4f9b1a0e",
+      "utf8_bytes": 26831,
+      "git_blob_sha1": "ec7cc0d20c0993926c928ecf1e8adbce877053f2"
     },
     {
       "path": "docs/research/structural-love-dynamics/BASELINE_PROTOCOL.md",
-      "sha256": "2cfaf89cba583232558fee24553fca543e02cc1d89dfd756e45ae004f9577804",
-      "utf8_bytes": 31453,
-      "git_blob_sha1": "5c9da17f8bf6fb4c85fb1a45c050c449a295e541"
+      "sha256": "a0e76faa775842ef1400de2a6708306738b2c0cd0d5842271ee7de17db6b125c",
+      "utf8_bytes": 35586,
+      "git_blob_sha1": "e54245bd418a7992e2cf2c6dd59f0daee2ff156c"
     },
     {
       "path": "docs/research/structural-love-dynamics/MEASUREMENT_INTEGRITY_RED_TEAM.md",
