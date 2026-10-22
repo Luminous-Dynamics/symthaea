@@ -1,0 +1,222 @@
+name: Qualification Artifact Identity V1
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/qualification-artifact-identity-v1.yml'
+      - 'patches/science/qualification-artifact-identity-v1.patch'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PATCH: patches/science/qualification-artifact-identity-v1.patch
+  WORKTREE: /tmp/symthaea-q3-artifact-identity
+
+jobs:
+  qualify:
+    name: Qualify exact candidate artifact identity semantics
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only branch scope
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          test -n "$BASE"
+          mapfile -t changed < <(git diff --name-only "$BASE"...HEAD | sort)
+          expected=(
+            '.github/workflows/qualification-artifact-identity-v1.yml'
+            'patches/science/qualification-artifact-identity-v1.patch'
+          )
+          test "${#changed[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do
+            test "${changed[$i]}" = "${expected[$i]}"
+          done
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Prepare exact-base detached worktree
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          rm -rf "$WORKTREE"
+          git worktree add --detach "$WORKTREE" "$BASE"
+          test ! -e "$WORKTREE/crates/core/symthaea-evidence-plane/src/qualification_artifact_identity.rs"
+          ! grep -F 'pub mod qualification_artifact_identity;' "$WORKTREE/crates/core/symthaea-evidence-plane/src/lib.rs"
+
+      - name: Validate patch scope and derive exact artifact observations
+        run: |
+          PATCH_ABS="$GITHUB_WORKSPACE/$PATCH"
+          WORKFLOW_ABS="$GITHUB_WORKSPACE/.github/workflows/qualification-artifact-identity-v1.yml"
+
+          git -C "$WORKTREE" apply --check "$PATCH_ABS"
+          git -C "$WORKTREE" apply --index "$PATCH_ABS"
+          git -C "$WORKTREE" diff --cached --check
+
+          mapfile -t product_paths < <(git -C "$WORKTREE" diff --cached --name-only | sort)
+          expected=(
+            'crates/core/symthaea-evidence-plane/src/lib.rs'
+            'crates/core/symthaea-evidence-plane/src/qualification_artifact_identity.rs'
+          )
+          test "${#product_paths[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do
+            test "${product_paths[$i]}" = "${expected[$i]}"
+          done
+
+          profile_fixture='qualification-artifact-identity-v1|premise:exact-base|scientific:identity-mismatch-rejection|admissibility:fmt,check,clippy'
+
+          {
+            echo "Q_REPOSITORY=$GITHUB_REPOSITORY"
+            echo "Q_BASE=$(git -C "$WORKTREE" rev-parse HEAD)"
+            echo "Q_PATCH_SHA256=$(sha256sum "$PATCH_ABS" | cut -d' ' -f1)"
+            echo "Q_RESULT_TREE=$(git -C "$WORKTREE" write-tree)"
+            echo "Q_WORKFLOW_SHA256=$(sha256sum "$WORKFLOW_ABS" | cut -d' ' -f1)"
+            echo "Q_PROFILE_SHA256=$(printf '%s' "$profile_fixture" | sha256sum | cut -d' ' -f1)"
+          } >> "$GITHUB_ENV"
+
+      - name: Ratchet identity-provenance-authority separation
+        run: |
+          FILE="$WORKTREE/crates/core/symthaea-evidence-plane/src/qualification_artifact_identity.rs"
+          grep -F 'Identity != provenance != execution != authority.' "$FILE"
+          grep -F 'pub enum DigestDomain' "$FILE"
+          grep -F 'CandidatePatchBytes' "$FILE"
+          grep -F 'WorkflowBytes' "$FILE"
+          grep -F 'QualificationProfileSemantics' "$FILE"
+          grep -F 'pub enum GitHashAlgorithm' "$FILE"
+          grep -F 'pub enum GitObjectKind' "$FILE"
+          grep -F 'pub struct QualificationArtifactIdentityV1' "$FILE"
+          grep -F 'pub struct VerifiedArtifactIdentity' "$FILE"
+          grep -F 'pub fn verify_artifact_identity(' "$FILE"
+          ! grep -F 'MaterializationAuthorized' "$FILE"
+          ! grep -F 'std::collections::hash_map::DefaultHasher' "$FILE"
+          ! grep -F 'sha2::' "$FILE"
+
+      - name: Prove exact hosted identity and adversarial mismatch rejection
+        run: |
+          TEST_DIR="$WORKTREE/crates/core/symthaea-evidence-plane/tests"
+          TEST_FILE="$TEST_DIR/qualification_artifact_identity_hosted.rs"
+          mkdir -p "$TEST_DIR"
+          cat > "$TEST_FILE" <<'RS'
+          use symthaea_evidence_plane::qualification_artifact_identity::{
+              ArtifactIdentityError, ContentDigestV1, DigestDomain, GitHashAlgorithm,
+              GitObjectIdV1, GitObjectKind, QualificationArtifactIdentityV1,
+              verify_artifact_identity,
+          };
+
+          fn git_oid(kind: GitObjectKind, value: String) -> GitObjectIdV1 {
+              let algorithm = match value.len() {
+                  40 => GitHashAlgorithm::Sha1,
+                  64 => GitHashAlgorithm::Sha256,
+                  other => panic!("unexpected Git OID length: {other}"),
+              };
+              GitObjectIdV1::new(algorithm, kind, value).unwrap()
+          }
+
+          fn actual() -> QualificationArtifactIdentityV1 {
+              QualificationArtifactIdentityV1 {
+                  repository: std::env::var("Q_REPOSITORY").unwrap(),
+                  base_commit: git_oid(GitObjectKind::Commit, std::env::var("Q_BASE").unwrap()),
+                  candidate_patch: ContentDigestV1::sha256(
+                      DigestDomain::CandidatePatchBytes,
+                      std::env::var("Q_PATCH_SHA256").unwrap(),
+                  ).unwrap(),
+                  result_tree: git_oid(GitObjectKind::Tree, std::env::var("Q_RESULT_TREE").unwrap()),
+                  workflow: ContentDigestV1::sha256(
+                      DigestDomain::WorkflowBytes,
+                      std::env::var("Q_WORKFLOW_SHA256").unwrap(),
+                  ).unwrap(),
+                  profile_semantics: ContentDigestV1::sha256(
+                      DigestDomain::QualificationProfileSemantics,
+                      std::env::var("Q_PROFILE_SHA256").unwrap(),
+                  ).unwrap(),
+                  changed_paths: vec![
+                      "crates/core/symthaea-evidence-plane/src/lib.rs".into(),
+                      "crates/core/symthaea-evidence-plane/src/qualification_artifact_identity.rs".into(),
+                  ],
+              }
+          }
+
+          #[test]
+          fn exact_hosted_candidate_identity_verifies() {
+              let value = actual();
+              let witness = verify_artifact_identity(&value, &value).unwrap();
+              assert_eq!(witness.identity(), &value);
+          }
+
+          #[test]
+          fn every_hosted_coordinate_is_required() {
+              let expected = actual();
+              let mut cases = Vec::new();
+
+              let mut x = expected.clone();
+              x.repository = "Luminous-Dynamics/not-symthaea".into();
+              cases.push(x);
+
+              let mut x = expected.clone();
+              x.base_commit.hex.replace_range(0..1, if &x.base_commit.hex[0..1] == "a" { "b" } else { "a" });
+              cases.push(x);
+
+              let mut x = expected.clone();
+              x.candidate_patch.hex.replace_range(0..1, if &x.candidate_patch.hex[0..1] == "a" { "b" } else { "a" });
+              cases.push(x);
+
+              let mut x = expected.clone();
+              x.result_tree.hex.replace_range(0..1, if &x.result_tree.hex[0..1] == "a" { "b" } else { "a" });
+              cases.push(x);
+
+              let mut x = expected.clone();
+              x.workflow.hex.replace_range(0..1, if &x.workflow.hex[0..1] == "a" { "b" } else { "a" });
+              cases.push(x);
+
+              let mut x = expected.clone();
+              x.profile_semantics.hex.replace_range(0..1, if &x.profile_semantics.hex[0..1] == "a" { "b" } else { "a" });
+              cases.push(x);
+
+              let mut x = expected.clone();
+              x.changed_paths.push("extra".into());
+              x.changed_paths.sort();
+              cases.push(x);
+
+              for x in cases {
+                  assert_eq!(
+                      verify_artifact_identity(&x, &expected),
+                      Err(ArtifactIdentityError::IdentityMismatch),
+                  );
+              }
+          }
+          RS
+
+          cargo test --manifest-path "$WORKTREE/crates/core/symthaea-evidence-plane/Cargo.toml" \
+            --test qualification_artifact_identity_hosted -- --nocapture
+          rm "$TEST_FILE"
+
+      - name: Prove candidate adversarial unit cases
+        run: |
+          cargo test --manifest-path "$WORKTREE/crates/core/symthaea-evidence-plane/Cargo.toml" \
+            qualification_artifact_identity::tests -- --nocapture
+
+      - name: Format
+        run: cargo fmt --manifest-path "$WORKTREE/Cargo.toml" --check -p symthaea-evidence-plane
+
+      - name: Check
+        run: cargo check --manifest-path "$WORKTREE/Cargo.toml" --locked -p symthaea-evidence-plane
+
+      - name: Clippy
+        run: cargo clippy --manifest-path "$WORKTREE/Cargo.toml" --locked -p symthaea-evidence-plane --lib -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes that a qualification candidate identity can fail closed over repository context, exact base Git commit, exact candidate patch SHA-256, independently derived result-tree Git OID, exact workflow SHA-256, externally supplied profile-semantic SHA-256, and canonical changed-path scope.'
+          echo 'PASS does not establish provenance/authentication, canonical profile hashing, execution/toolchain/environment identity, scientific truth, or materialization authority. VerifiedArtifactIdentity is an identity witness only.'
