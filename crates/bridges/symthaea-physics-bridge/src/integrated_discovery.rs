@@ -415,10 +415,16 @@ fn run_trial(seed: u64, config: PipelineConfig, max_rounds: usize) -> TrialOutco
             if remaining.is_empty() {
                 break;
             }
-            select_most_informative_experiment(&remaining, &live, predict)
-                .expect("nonempty remaining pool")
-                .0
-                .clone()
+            let Some((chosen, _score)) =
+                select_most_informative_experiment(&remaining, &live, predict)
+            else {
+                // A nonempty pool can still have no candidate with positive,
+                // finite disagreement across two valid live hypotheses. Preserve
+                // that epistemic limit as unresolved; do not panic or pretend a
+                // zero-information query is active selection.
+                break;
+            };
+            chosen.clone()
         } else {
             if round >= fixed_order.len() {
                 break;

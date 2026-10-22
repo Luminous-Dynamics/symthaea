@@ -39,61 +39,143 @@
 //! Deliberately generic over the hypothesis and experiment representations
 //! (via a `predict` closure) rather than hardcoded to `Expr` -- this makes
 //! it reusable for whatever the next discovery task looks like, not just
-//! the closed M2 wave-chain problem. [`epistemic_value`] scores a single
-//! candidate experiment; [`select_most_informative_experiment`] picks the
-//! best of a candidate pool. `predict` returning `None` for a hypothesis
-//! (e.g. the expression is undefined/non-finite at that experiment) means
-//! that hypothesis contributes no signal for this experiment, not that the
-//! experiment is uninformative -- it's simply excluded from that
-//! experiment's variance computation.
+//! the closed M2 wave-chain problem. `None` and non-finite predictions are
+//! excluded from the variance calculation. If fewer than two finite
+//! predictions remain, the typed assessment reports insufficient support and
+//! the selector will not rank the experiment as a zero-score tie.
+//!
+//! The score remains prediction variance (query-by-committee), not a Bayesian
+//! posterior, calibrated expected information gain, or a cost-normalized
+//! experiment utility. Decision-bearing callers should use
+//! `assess_epistemic_value` instead of the compatibility scalar API when they
+//! need to distinguish agreement, insufficient support, and unrepresentable
+//! scores.
 
-/// Population variance (not sample variance -- deliberate: this scores
-/// *disagreement across the hypothesis set itself*, not an estimate of a
-/// variance parameter from a sample of some larger population).
+/// A typed result for scoring a candidate experiment against live hypotheses.
+///
+/// Keeping unsupported and unrepresentable scores distinct prevents callers
+/// from mistaking an invalid experiment for a legitimate zero-disagreement one.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum EpistemicAssessment {
+    /// Finite, representable population variance over at least two predictions.
+    Score {
+        value: f64,
+        valid_predictions: usize,
+    },
+    /// Fewer than two hypotheses produced finite predictions for this experiment.
+    InsufficientValidPredictions { valid_predictions: usize },
+    /// Predictions were finite, but the variance was not representable as f64.
+    UnrepresentableScore { valid_predictions: usize },
+}
+
+/// Population variance (not sample variance). Scaling before reduction avoids
+/// overflowing the mean when several large finite predictions share a sign.
 fn variance(values: &[f64]) -> f64 {
     if values.len() < 2 {
         return 0.0;
     }
-    let mean = values.iter().sum::<f64>() / values.len() as f64;
-    values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64
+
+    let scale = values
+        .iter()
+        .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+    if scale == 0.0 {
+        return 0.0;
+    }
+
+    let normalized: Vec<f64> = values.iter().map(|value| value / scale).collect();
+    let mean = normalized.iter().sum::<f64>() / normalized.len() as f64;
+    let normalized_variance = normalized
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>()
+        / normalized.len() as f64;
+
+    // Multiplication order matters: normalized_variance * scale * scale can
+    // retain a representable result when scale*scale alone would overflow.
+    normalized_variance * scale * scale
 }
 
-/// How informative would running `experiment` be for discriminating among
-/// `hypotheses`? Scored as the variance of their predictions for that
-/// experiment -- high variance means the hypotheses disagree a lot, so
-/// whichever one turns out to match reality, this experiment clearly rules
-/// out the others; low variance (including the degenerate case where every
-/// hypothesis predicts the same thing) means this experiment teaches
-/// nothing about which hypothesis is right.
+/// Score a candidate experiment while preserving validity information.
 ///
-/// Returns `0.0` if fewer than 2 hypotheses produce a prediction for this
-/// experiment (nothing to disagree about).
+/// Non-finite predictions are excluded from the comparison. Fewer than two
+/// finite predictions return `InsufficientValidPredictions`; an overflowed
+/// variance returns `UnrepresentableScore` instead of silently becoming a
+/// high score or contaminating the candidate ranking.
+pub fn assess_epistemic_value<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    predict: impl Fn(&H, &E) -> Option<f64>,
+) -> EpistemicAssessment {
+    let predictions: Vec<f64> = hypotheses
+        .iter()
+        .filter_map(|hypothesis| predict(hypothesis, experiment))
+        .filter(|prediction| prediction.is_finite())
+        .collect();
+
+    if predictions.len() < 2 {
+        return EpistemicAssessment::InsufficientValidPredictions {
+            valid_predictions: predictions.len(),
+        };
+    }
+
+    let valid_predictions = predictions.len();
+    let value = variance(&predictions);
+    if !value.is_finite() || value < 0.0 {
+        EpistemicAssessment::UnrepresentableScore { valid_predictions }
+    } else {
+        EpistemicAssessment::Score {
+            value,
+            valid_predictions,
+        }
+    }
+}
+
+/// Compatibility score for one candidate experiment.
+///
+/// High population variance means candidate hypotheses disagree; zero means
+/// either that the predictions agree, fewer than two finite predictions remain,
+/// or the score is unrepresentable. Callers that need to distinguish those cases
+/// should use [`assess_epistemic_value`] instead.
 pub fn epistemic_value<H, E>(
     experiment: &E,
     hypotheses: &[H],
     predict: impl Fn(&H, &E) -> Option<f64>,
 ) -> f64 {
-    let predictions: Vec<f64> = hypotheses
-        .iter()
-        .filter_map(|h| predict(h, experiment))
-        .collect();
-    variance(&predictions)
+    match assess_epistemic_value(experiment, hypotheses, predict) {
+        EpistemicAssessment::Score { value, .. } => value,
+        EpistemicAssessment::InsufficientValidPredictions { .. }
+        | EpistemicAssessment::UnrepresentableScore { .. } => 0.0,
+    }
 }
 
-/// Select, from a pool of candidate experiments, the one with maximum
-/// [`epistemic_value`] against `hypotheses` -- i.e. the single most
-/// discriminating experiment to run next. Returns `None` if `candidates` is
-/// empty. Ties broken by first occurrence (stable, deterministic given a
-/// fixed candidate ordering).
+/// Select the highest-scoring candidate with finite, representable disagreement
+/// across at least two hypotheses. Experiments with no valid comparison or zero
+/// disagreement are omitted; returns `None` if no informative candidate remains.
+/// Ties keep the first candidate, preserving deterministic input-order semantics.
 pub fn select_most_informative_experiment<'a, H, E>(
     candidates: &'a [E],
     hypotheses: &[H],
     predict: impl Fn(&H, &E) -> Option<f64> + Copy,
 ) -> Option<(&'a E, f64)> {
-    candidates
-        .iter()
-        .map(|e| (e, epistemic_value(e, hypotheses, predict)))
-        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+    let mut best: Option<(&'a E, f64)> = None;
+
+    for candidate in candidates {
+        let EpistemicAssessment::Score { value, .. } =
+            assess_epistemic_value(candidate, hypotheses, predict)
+        else {
+            continue;
+        };
+
+        if value <= 0.0 {
+            continue;
+        }
+
+        if best.is_none_or(|(_, best_value)| value > best_value) {
+            best = Some((candidate, value));
+        }
+    }
+
+    best
 }
 
 #[cfg(test)]
@@ -206,5 +288,71 @@ mod tests {
             *chosen, 3.0,
             "should prefer the point where x vs x^2 diverge most"
         );
+    }
+
+    #[test]
+    fn selector_skips_non_finite_and_under_supported_candidates() {
+        let hypotheses = [0_i32, 1_i32, 2_i32];
+        let predict = |hypothesis: &i32, experiment: &f64| {
+            if *experiment == 0.0 {
+                if *hypothesis == 0 {
+                    Some(1.0)
+                } else {
+                    Some(f64::NAN)
+                }
+            } else if *experiment == 1.0 {
+                match *hypothesis {
+                    0 => Some(0.0),
+                    1 => Some(10.0),
+                    _ => Some(f64::INFINITY),
+                }
+            } else {
+                None
+            }
+        };
+
+        assert_eq!(
+            assess_epistemic_value(&0.0, &hypotheses, predict),
+            EpistemicAssessment::InsufficientValidPredictions {
+                valid_predictions: 1
+            }
+        );
+
+        let candidates = [0.0, 1.0];
+        let (chosen, score) = select_most_informative_experiment(&candidates, &hypotheses, predict)
+            .expect("the second candidate has two finite, disagreeing predictions");
+        assert_eq!(*chosen, 1.0);
+        assert!((score - 25.0).abs() < 1e-12);
+        assert!(score.is_finite());
+    }
+
+    #[test]
+    fn assessment_distinguishes_unrepresentable_variance() {
+        let extreme = [-1.0e308_f64, 1.0e308_f64];
+        assert_eq!(
+            assess_epistemic_value(&(), &extreme, |value, _| Some(*value)),
+            EpistemicAssessment::UnrepresentableScore {
+                valid_predictions: 2
+            }
+        );
+
+        // The scaled calculation still returns zero for equal large values,
+        // instead of overflowing while summing the mean.
+        let equal_large = [1.0e308_f64, 1.0e308_f64];
+        assert_eq!(
+            assess_epistemic_value(&(), &equal_large, |value, _| Some(*value)),
+            EpistemicAssessment::Score {
+                value: 0.0,
+                valid_predictions: 2
+            }
+        );
+    }
+
+    #[test]
+    fn selector_returns_none_when_no_candidate_has_positive_disagreement() {
+        let hypotheses = [1_i32, 2_i32, 3_i32];
+        let predict = |_: &i32, _: &f64| Some(4.0);
+        let candidates = [0.0, 1.0, 2.0];
+        assert!(select_most_informative_experiment(&candidates, &hypotheses, predict).is_none());
     }
 }

@@ -1,0 +1,46 @@
+name: Active Experiment Score Validity
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "crates/core/symthaea-core/src/hdc/conjecture_engine.rs"
+      - "crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs"
+      - "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs"
+      - ".github/workflows/active-experiment-score-validity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: active-experiment-score-validity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-selector-contract:
+    name: Focused score-validity tests and strict Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format affected crate
+        run: cargo fmt --manifest-path crates/core/symthaea-core/Cargo.toml -- --check
+
+      - name: Focused active-experiment score tests
+        run: cargo test --locked -p symthaea-core --lib hdc::conjecture_engine::experiment_selection -- --nocapture
+
+      - name: Active-discovery integration tests
+        run: cargo test --locked -p symthaea-physics-bridge --lib integrated_discovery -- --nocapture
+
+      - name: Strict Clippy for affected libraries
+        run: |
+          cargo clippy --locked -p symthaea-core --lib -- -D warnings
+          cargo clippy --locked -p symthaea-physics-bridge --lib -- -D warnings
