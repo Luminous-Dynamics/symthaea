@@ -8,6 +8,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs"
       - "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs"
       - "crates/bridges/symthaea-physics-bridge/src/model_adequacy.rs"
+      - "crates/bridges/symthaea-physics-bridge/src/adequacy_calibration.rs"
       - "crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs"
       - "crates/bridges/symthaea-physics-bridge/src/lib.rs"
       - "docs/research/EXPECTED_INFORMATION_GAIN_SELECTOR_V0_1.md"
@@ -36,9 +37,12 @@ jobs:
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/model_adequacy.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/adequacy_calibration.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs
       - name: Test information-gain selector
         run: cargo test -p symthaea-core hdc::conjecture_engine::experiment_selection --lib
+      - name: Test conformal adequacy calibration
+        run: cargo test -p symthaea-physics-bridge adequacy_calibration --lib
       - name: Test model-adequacy decision semantics
         run: cargo test -p symthaea-physics-bridge model_adequacy --lib
       - name: Test exhaustive model-adequacy contract
