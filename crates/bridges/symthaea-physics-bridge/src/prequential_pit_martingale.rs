@@ -436,6 +436,85 @@ mod tests {
         assert_eq!(monitor.state(), PrequentialPitState::Monitoring);
     }
 
+    fn standard_normal_sample(state: &mut u64) -> f64 {
+        let first = next_unit_interval(state).max(1e-12);
+        let second = next_unit_interval(state);
+        (-2.0 * first.ln()).sqrt() * (std::f64::consts::TAU * second).cos()
+    }
+
+    // Abramowitz-Stegun-style approximation for a unit normal CDF. Test fixture only; scientific
+    // deployments should supply a vetted predictive CDF and include its numerical error in the
+    // model-validation protocol.
+    fn approximate_standard_normal_cdf(value: f64) -> f64 {
+        let sign = if value < 0.0 { -1.0 } else { 1.0 };
+        let x = value.abs() / std::f64::consts::SQRT_2;
+        let t = 1.0 / (1.0 + 0.3275911 * x);
+        let polynomial = (((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t
+            - 0.284496736)
+            * t)
+            + 0.254829592)
+            * t;
+        0.5 * (1.0 + sign * (1.0 - polynomial * (-x * x).exp()))
+    }
+
+    #[test]
+    fn adaptive_experiment_pit_detects_context_bias_faster_than_pooled_monitor() {
+        const HORIZON: usize = 200;
+        const MEAN_SHIFT: f64 = 0.8;
+        let mut rng = 0x8CB9_2BA7_4F3D_1A65_u64;
+        let mut intercept =
+            PrequentialPitMartingale::new(0.05, 0).expect("valid pooled monitor");
+        let mut contextual =
+            PrequentialPitMartingale::new(0.05, 1).expect("valid context-aware monitor");
+        let mut accumulated_observations = 0.0;
+        let mut intercept_alarm = None;
+        let mut contextual_alarm = None;
+
+        for observation_index in 1..=HORIZON {
+            // This action is chosen using only prior outcomes, so it is predictable. Under the
+            // misspecified world, the physical mean shifts with the chosen action while the
+            // issued candidate forecast remains N(0,1). Under the true conditional model (shift
+            // zero), the current innovation is independent of this adaptive action.
+            let action = if accumulated_observations >= 0.0 {
+                -1.0
+            } else {
+                1.0
+            };
+            let observed =
+                MEAN_SHIFT * action + standard_normal_sample(&mut rng);
+            let pit = approximate_standard_normal_cdf(observed);
+            accumulated_observations += observed;
+
+            let pooled = intercept.observe(pit, &[]).expect("finite PIT");
+            let conditional = contextual
+                .observe(pit, &[action])
+                .expect("finite PIT and predictable action context");
+
+            if pooled.decision == PrequentialPitDecision::Alarm {
+                intercept_alarm = Some(observation_index);
+            }
+            if conditional.decision == PrequentialPitDecision::Alarm {
+                contextual_alarm = Some(observation_index);
+            }
+            if intercept_alarm.is_some() && contextual_alarm.is_some() {
+                break;
+            }
+        }
+
+        assert!(
+            contextual_alarm.is_some(),
+            "context-aware detector should catch the predeclared misspecification"
+        );
+        assert!(
+            intercept_alarm.is_some(),
+            "pooled detector should eventually catch this strong pooled shift"
+        );
+        assert!(
+            contextual_alarm.unwrap() < intercept_alarm.unwrap(),
+            "expected a shorter detection delay from the predeclared action context: contextual={contextual_alarm:?}, pooled={intercept_alarm:?}"
+        );
+    }
+
     #[test]
     fn context_channel_detects_conditional_bias_hidden_by_pooled_order_and_dispersion() {
         let mut monitor = PrequentialPitMartingale::new(0.05, 1).unwrap();
