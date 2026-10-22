@@ -238,14 +238,16 @@ fn atomic_write(target: &Path, content: &[u8]) -> Result<(), String> {
         filename.to_string_lossy(),
         std::process::id()
     ));
+    // Open outside the cleanup closure: if create_new fails because another
+    // writer owns this temporary path, do not remove that writer's file.
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+        .map_err(|error| {
+            format!("cannot create temporary report {}: {error}", temporary.display())
+        })?;
     let write_result = (|| -> Result<(), String> {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-            .map_err(|error| {
-                format!("cannot create temporary report {}: {error}", temporary.display())
-            })?;
         file.write_all(content)
             .map_err(|error| format!("cannot write temporary report: {error}"))?;
         file.flush()
