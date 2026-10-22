@@ -7,7 +7,7 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::HashSet,
+    collections::{BTreeMap, HashSet},
     fs,
     path::{Path, PathBuf},
 };
@@ -138,6 +138,8 @@ struct TrajectoryReceipt {
     critical_trace_count: usize,
     critical_counterexample_count: usize,
     violation_count: usize,
+    unique_violation_class_count: usize,
+    violation_occurrences_by_code: BTreeMap<String, usize>,
     claim_ceiling: &'static str,
 }
 
@@ -194,6 +196,10 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         .with_context(|| format!("read validator executable {}", executable_path.display()))?;
 
     let results: Vec<Vec<String>> = corpus.scenarios.iter().map(inspect_trace).collect();
+    let mut violation_occurrences_by_code = BTreeMap::new();
+    for code in results.iter().flatten() {
+        *violation_occurrences_by_code.entry(code.clone()).or_insert(0) += 1;
+    }
     let receipt = TrajectoryReceipt {
         receipt_version: "first-aid-trajectory-receipt-v0",
         status: "synthetic_trajectory_contract_passed",
@@ -230,6 +236,8 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
             })
             .count(),
         violation_count: results.iter().map(Vec::len).sum(),
+        unique_violation_class_count: violation_occurrences_by_code.len(),
+        violation_occurrences_by_code,
         claim_ceiling: "synthetic process-integrity audit only; no clinical safety or patient-outcome claim",
     };
     let encoded = serde_json::to_string_pretty(&receipt)?;
