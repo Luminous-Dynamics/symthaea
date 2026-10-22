@@ -232,3 +232,24 @@ Do not compute a single trajectory score by averaging critical invariants with c
 
 Initial data-contract gate: 100% valid fixture structure, strictly increasing event turns within each horizon, no duplicate IDs, all cases kept in `UNREVIEWED_CANDIDATE` until adjudication. This is not yet a model-level behavior target. The 100-turn fixture is a sparse probe plan, not an assertion that a single model can be compared fairly at that horizon without controlling context-window, memory, sampling, and tool differences.
 
+## 14. Industry snapshot and comparison discipline (observed 22 October 2026)
+
+The public [NOPE Evals leaderboard](https://evals.nope.net/) is a useful adjacent reference because it reports both composite results and a safety floor. On the page retrieved for this snapshot:
+
+- **Relational Integrity:** Claude Haiku 4.5 is listed at 89% with an 88% facet floor; Claude Sonnet 5 at 89% with an 85% floor; GPT 6 Astra at 88% with a 79% floor.
+- **Safety & Integrity:** Claude Opus 4.8 and GPT 6 Astra are both listed at 91%; their suite floors differ (84% versus 75%).
+- NOPE's methodology says these are generate-then-judge response-quality scores, not predictive or clinical validation. It reports that changing one judge moved scores by 0.8–3.6 points in its headline analysis and explicitly warns against interpreting small rank gaps as findings.
+
+This snapshot is a planning reference, not an SLD head-to-head result. Capture the leaderboard, model IDs, benchmark/rubric revision, evaluation date, and run transcripts again at the time of every comparison; the page and model endpoints may change.
+
+### What "beat the industry" should mean
+
+1. **Comparable slice first:** run the same eligible public prompts, model snapshots, judge/rubric versions, and decoding controls where allowed. Do not compare SLD's synthetic contract pass rate with NOPE's weighted judge score.
+2. **Mean plus floor:** publish the comparable suite mean and the weakest suite/facet. Do not accept a high aggregate that hides a critical relational-safety deficit.
+3. **Uncertainty-aware superiority:** require repeated runs and a predeclared uncertainty analysis; a one-point leaderboard lead is not a robust finding when reported judge effects can be larger.
+4. **Critical invariants remain separate:** any critical violation blocks SLD promotion even if an external benchmark's aggregate score remains high.
+5. **Mechanism claim:** to claim the new provenance layer helps, show that removing/corrupting the suspect signal is detected, that valid positive controls still work, and that the layer improves held-out decisions over the proxy-free baseline.
+6. **Reproducible external claim:** publish raw case census, per-dimension results, model/provider versions, corpus/rubric digests, failed/skipped counts, and reviewers' disagreement.
+
+The first responsible benchmark milestone is therefore not "score above 89%". It is a same-protocol baseline with reproducible uncertainty and a non-compensable critical-failure report. Only then can an aspirational target be chosen without tuning to noise.
+
