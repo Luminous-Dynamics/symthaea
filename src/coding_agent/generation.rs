@@ -869,11 +869,22 @@ impl CodingAgent {
             bridge.predict_generation(&name, "orchestrator", 0.6, "code will compile and verify")
         });
 
+        let orchestration_started = std::time::Instant::now();
         let response = self
             .orchestrator
             .as_ref()
             .expect("checked is_none above")
             .synthesize(&request);
+        let orchestration_elapsed_ms = orchestration_started.elapsed().as_millis();
+        let tier = Self::orchestrator_backend_tier(&response.backend_name);
+        self.generation_tiers.push(tier);
+        // Record every orchestrator invocation, including candidates rejected by verification.
+        self.actual_backend_attempts.push(BackendAttempt {
+            tier,
+            backend_name: response.backend_name.clone(),
+            success: !response.source.trim().is_empty(),
+            elapsed_ms: orchestration_elapsed_ms,
+        });
 
         if let Some(id) = prediction_id {
             if let Some(ref mut bridge) = self.magi_bridge {
@@ -889,17 +900,10 @@ impl CodingAgent {
             return false;
         }
 
-        let tier = Self::orchestrator_backend_tier(&response.backend_name);
         self.write_code_to_disk(&target, &response.source);
         self.generated_code = Some(Self::sanitize_generated_code(&Self::strip_code_fences(
             &response.source,
         )));
-        self.generation_tiers.push(tier);
-        self.actual_backend_attempts.push(BackendAttempt {
-            tier,
-            backend_name: response.backend_name.clone(),
-            success: response.accepted,
-        });
         self.native_exhausted = false;
         self.observations.push(format!(
             "Orchestrator accepted via {} (confidence {:.2})",
