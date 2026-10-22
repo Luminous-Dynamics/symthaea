@@ -251,8 +251,8 @@ fn validate_experiment(
                 ));
             }
         }
-        baseline_successes += usize::from(sample.baseline.success);
-        candidate_successes += usize::from(sample.candidate.success);
+        baseline_successes += if sample.baseline.success { 1 } else { 0 };
+        candidate_successes += if sample.candidate.success { 1 } else { 0 };
         strata
             .entry(sample.scenario_id.clone())
             .or_default()
@@ -311,7 +311,7 @@ fn summarize_arm(
             &paired.baseline
         };
         total_energy_joules += arm.energy_joules;
-        successful_tasks += usize::from(arm.success);
+        successful_tasks += if arm.success { 1 } else { 0 };
         total_severe_thermal_seconds += arm.severe_thermal_seconds;
         privacy_violation_count += u64::from(arm.privacy_violation_count);
         latencies.push(arm.latency_ms);
@@ -400,7 +400,7 @@ fn bootstrap_energy_savings(
     }
     let mut rng = DeterministicRng::new(seed);
     let mut distribution = Vec::with_capacity(repetitions);
-    let attempt_limit = repetitions.saturating_mul(100).max(repetitions);
+    let attempt_limit = repetitions.saturating_mul(20).max(repetitions);
     let mut attempts = 0usize;
 
     while distribution.len() < repetitions && attempts < attempt_limit {
