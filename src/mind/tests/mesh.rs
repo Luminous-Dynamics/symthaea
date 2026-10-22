@@ -3603,3 +3603,83 @@ fn authenticated_mesh_packet_without_timestamp_fails_closed() {
     assert_eq!(receiver.mesh_stats.wisdom_received, 0);
     assert_eq!(receiver.mesh_stats.packets_replay_rejected, 1);
 }
+
+
+#[cfg(feature = "mesh")]
+fn signed_rate_limit_test_packet(
+    source_id: [u8; 8],
+    sequence: u32,
+    timestamp_s: u32,
+    key: [u8; 32],
+) -> crate::swarm::mesh::WisdomPacket {
+    use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
+    use symthaea_core::hdc::BinaryHV;
+
+    let mut packet = WisdomPacket {
+        source_id,
+        sequence,
+        phi: 0.5,
+        urgency: MeshUrgency::Normal,
+        timestamp_s,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: [0; 32],
+        ttl: 0,
+        wisdom: BinaryHV([0xC3; 2048]),
+    };
+    let mut signer = ContinuousMind::default();
+    signer.set_mesh_auth_key(Some(key));
+    signer.sign_mesh_packet(&mut packet);
+    packet
+}
+
+#[cfg(feature = "mesh")]
+#[test]
+fn spoofed_source_id_cannot_exhaust_authenticated_peer_rate_limit() {
+    let key = [0x91; 32];
+    let source_id = [0xA7; 8];
+    let now_s = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as u32;
+
+    let mut receiver = ContinuousMind::default();
+    receiver.set_mesh_auth_key(Some(key));
+
+    // First, establish a tracked peer through a packet with a valid MAC.
+    receiver.mesh_inbox.push(signed_rate_limit_test_packet(
+        source_id, 1, now_s, key,
+    ));
+    receiver.tick();
+    assert_eq!(receiver.mesh_stats.wisdom_received, 1);
+
+    // More than the 100-packets-per-10-second limit, with the same claimed
+    // source ID but invalid MACs, must not increment the trusted peer's
+    // rate counter.
+    for start in (0u32..101).step_by(50) {
+        for offset in start..(start + 50).min(101) {
+            let mut forged = signed_rate_limit_test_packet(
+                source_id,
+                1_000 + offset,
+                now_s,
+                key,
+            );
+            forged.auth_mac[0] ^= 0xFF;
+            receiver.mesh_inbox.push(forged);
+        }
+        receiver.tick();
+    }
+
+    assert_eq!(receiver.mesh_stats.packets_rate_limited, 0);
+
+    // A fresh, correctly authenticated packet from that peer must still pass.
+    receiver.mesh_inbox.push(signed_rate_limit_test_packet(
+        source_id, 2, now_s, key,
+    ));
+    receiver.tick();
+
+    assert_eq!(
+        receiver.mesh_stats.wisdom_received, 103,
+        "the valid packet must not be dropped because unauthenticated traffic spoofed its source ID"
+    );
+    assert_eq!(receiver.mesh_stats.packets_rate_limited, 0);
+}
