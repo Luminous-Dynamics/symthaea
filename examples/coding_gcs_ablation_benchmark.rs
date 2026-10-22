@@ -743,6 +743,15 @@ mod provenance_tests {
     }
 
     #[test]
+    fn manifest_only_mode_is_explicit_and_cannot_be_combined() {
+        let options = parse_cli(&args(&["--print-manifest"])).unwrap().unwrap();
+        assert!(options.print_manifest);
+        assert!(!options.use_llm && !options.use_cloud);
+        assert!(parse_cli(&args(&["--print-manifest", "--cloud"])).is_err());
+        assert!(parse_cli(&args(&["--print-manifest", "--repeats", "3"])).is_err());
+    }
+
+    #[test]
     fn cli_defaults_are_explicit_and_reproducible() {
         let parsed = parse_cli(&args(&[])).unwrap().unwrap();
         assert!(!parsed.use_llm);
