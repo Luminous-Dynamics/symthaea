@@ -26,7 +26,9 @@ fn bool_field(value: &Value, key: &str) -> Option<bool> {
 }
 
 fn nearly_equal(a: f64, b: f64) -> bool {
-    (a - b).abs() <= 1.0e-8_f64.max(a.abs().max(b.abs()) * 1.0e-8)
+    a.is_finite()
+        && b.is_finite()
+        && (a - b).abs() <= 1.0e-8_f64.max(a.abs().max(b.abs()) * 1.0e-8)
 }
 
 fn push_check(errors: &mut Vec<String>, condition: bool, message: impl Into<String>) {
