@@ -51,8 +51,8 @@ jobs:
           awk -F '\t' '
             $1 == "RUN_HEADER" { if (NF != 34) exit 2; run_header = 1 }
             $1 == "RUN" { if (NF != 34) exit 3; runs += 1 }
-            $1 == "SUMMARY_HEADER" { if (NF != 21) exit 4; summary_header = 1 }
-            $1 == "SUMMARY" { if (NF != 21) exit 5; summaries += 1 }
+            $1 == "SUMMARY_HEADER" { if (NF != 24) exit 4; summary_header = 1 }
+            $1 == "SUMMARY" { if (NF != 24) exit 5; summaries += 1 }
             END {
               if (!run_header || !summary_header || runs != 5328 || summaries != 666) exit 6
               printf "validated run_rows=%d summary_rows=%d\n", runs, summaries
