@@ -13,7 +13,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fmt;
 
-pub const REPORT_SCHEMA: &str = "open-world-physics-evaluator.v0.2";
+pub const REPORT_SCHEMA: &str = "open-world-physics-evaluator.v0.3";
 pub const TRAIN_X_MIN: f64 = 0.75;
 pub const TRAIN_X_MAX: f64 = 3.5;
 pub const HOLDOUT_X_MIN: f64 = 4.0;
@@ -27,7 +27,7 @@ const BIC_DECISIVE_DELTA: f64 = 2.0;
 const CANDIDATES_PER_FAMILY: &[usize] = &[1, 3, 10, 30];
 /// Independent paired seed replications for each diagnostic world.
 const SELECTION_REPLICATION_COUNT: usize = 5;
-const SELECTION_SEED_SCHEDULE: &str = "splitmix64(world_seed ^ fixed_salt ^ replication_index_times_golden_ratio_v1";
+const SELECTION_SEED_SCHEDULE: &str = "splitmix64(world_seed ^ 0x53454c4543540001 ^ (replication_index * 0x9e3779b97f4a7c15))";
 const SELECTION_SEED_SALT: u64 = 0x5345_4c45_4354_0001;
 
 const AMPLITUDES: &[f64] = &[0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
@@ -1302,6 +1302,21 @@ mod tests {
     fn receipt_rejects_a_changed_selection_corpus_even_if_resealed() {
         let mut report = run_reference_benchmark();
         report.body.selection_diagnostic_corpus_sha256 = "00".to_owned();
+        let body = serde_json::to_vec(&report.body).unwrap();
+        report.receipt_sha256 = sha256_hex(&body);
+        assert!(!report.verify_receipt());
+    }
+
+    #[test]
+    fn receipt_rejects_a_changed_replication_schedule_even_if_resealed() {
+        let mut report = run_reference_benchmark();
+        report.body.selection_replication_count += 1;
+        let body = serde_json::to_vec(&report.body).unwrap();
+        report.receipt_sha256 = sha256_hex(&body);
+        assert!(!report.verify_receipt());
+
+        let mut report = run_reference_benchmark();
+        report.body.selection_seed_schedule = "untracked-seed-schedule".to_owned();
         let body = serde_json::to_vec(&report.body).unwrap();
         report.receipt_sha256 = sha256_hex(&body);
         assert!(!report.verify_receipt());
