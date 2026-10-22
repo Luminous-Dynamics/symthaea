@@ -40,6 +40,7 @@ This score is a conservative geometric proxy for worst-pair distinguishability, 
 
 - `src/safe_probe.rs`: validated multi-hypothesis model hull, maximin pairwise effect separation, horizon-certified safe candidate filter, deterministic action selection and unit tests.
 - `src/bin/allostatic-safe-probe-bench.rs`: deterministic contract fixture with informative-safe, informative-unsafe, indistinguishable-model, one-step-dead-end, authority-restricted and invalid-horizon cases.
+- `src/bin/allostatic-guaranteed-learning-bench.rs`: raw-output comparison between full pairwise identification and guaranteed worst-case hypothesis reduction, including the three-model case where one action guarantees eliminating a candidate but cannot identify the true model in one step.
 - The output includes one raw row per declared case and a compact summary. The panel is intentionally a contract suite, not a statistical test set.
 - Any invalid request or failed bounded search yields no recommendation. An emitted probe action must be contained in the reported horizon-viable set.
 
