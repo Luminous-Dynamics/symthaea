@@ -23,7 +23,8 @@
         "base_statement_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "counterfactual_statement_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
         "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target0-counterfactual.lean"
       },
       "mutation": {
         "kind": "no_semantic_change",
@@ -98,7 +99,8 @@
         "base_statement_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
         "counterfactual_statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
         "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target1-counterfactual.lean"
       },
       "mutation": {
         "kind": "precondition_removed",
@@ -173,7 +175,8 @@
         "base_statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
         "counterfactual_statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
         "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target2-counterfactual.lean"
       },
       "mutation": {
         "kind": "inequality_direction_reversed",
@@ -248,7 +251,8 @@
         "base_statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
         "counterfactual_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
         "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target3-counterfactual.lean"
       },
       "mutation": {
         "kind": "object_type_changed",
@@ -323,7 +327,8 @@
         "base_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
         "counterfactual_statement_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
         "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target4-counterfactual.lean"
       },
       "mutation": {
         "kind": "quantifier_scope_changed",
@@ -398,7 +403,8 @@
         "base_statement_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
         "counterfactual_statement_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
         "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target5-counterfactual.lean"
       },
       "mutation": {
         "kind": "premise_removed",
@@ -473,7 +479,8 @@
         "base_statement_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
         "counterfactual_statement_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
         "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target6-counterfactual.lean"
       },
       "mutation": {
         "kind": "predicate_changed",
