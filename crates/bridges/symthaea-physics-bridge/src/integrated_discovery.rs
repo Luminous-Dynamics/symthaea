@@ -607,6 +607,34 @@ fn mean_on_off(
 mod tests {
     use super::*;
 
+    type SelectorPair = (bool, bool, usize, usize, bool);
+
+    /// Paired percentile bootstrap over seed/world outcomes. Every resample carries the raw
+    /// and EIG result together, preserving pairing. This small pilot interval is diagnostic;
+    /// it does not replace world-clustered confirmatory inference on a larger held-out corpus.
+    fn paired_bootstrap_mean_ci(
+        samples: &[SelectorPair],
+        metric: impl Fn(&SelectorPair) -> f64,
+        seed: u64,
+    ) -> (f64, f64, f64) {
+        const BOOTSTRAP_REPLICATES: usize = 2_000;
+        assert!(!samples.is_empty());
+        let observed = samples.iter().map(&metric).sum::<f64>() / samples.len() as f64;
+        let mut rng = seed;
+        let mut means = Vec::with_capacity(BOOTSTRAP_REPLICATES);
+        for _ in 0..BOOTSTRAP_REPLICATES {
+            let sum = (0..samples.len())
+                .map(|_| metric(&samples[rand_index(&mut rng, samples.len())]))
+                .sum::<f64>();
+            means.push(sum / samples.len() as f64);
+        }
+        means.sort_by(f64::total_cmp);
+        let last = means.len() - 1;
+        let low_index = (last * 25) / 1_000;
+        let high_index = (last * 975 + 999) / 1_000;
+        (observed, means[low_index], means[high_index])
+    }
+
     /// Paired-seed pilot comparing raw variance with expected information gain in the
     /// real multi-round equation-discovery loop. This reports evidence; it does not assume EIG
     /// wins. EIG uses an explicit common-noise proxy and rejects incomplete predictions.
@@ -627,6 +655,7 @@ mod tests {
         let mut eig_only_wins = 0usize;
         let mut raw_only_wins = 0usize;
         let mut ties = 0usize;
+        let mut paired_outcomes: Vec<SelectorPair> = Vec::with_capacity(SEEDS as usize);
 
         for seed in 1..=SEEDS {
             let raw = run_trial_with_selector(seed, config, ROUND_BUDGET, ActiveSelector::RawVariance);
@@ -641,6 +670,13 @@ mod tests {
             raw_rounds += raw.rounds_used;
             eig_rounds += eig.rounds_used;
             eig_selection_failures += if eig.selection_failed { 1 } else { 0 };
+            paired_outcomes.push((
+                raw.success,
+                eig.success,
+                raw.rounds_used,
+                eig.rounds_used,
+                eig.selection_failed,
+            ));
             match (raw.success, eig.success) {
                 (true, false) => raw_only_wins += 1,
                 (false, true) => eig_only_wins += 1,
@@ -648,14 +684,31 @@ mod tests {
             }
         }
 
+        let (success_delta, success_ci_low, success_ci_high) = paired_bootstrap_mean_ci(
+            &paired_outcomes,
+            |pair| {
+                (if pair.1 { 1.0 } else { 0.0 }) - (if pair.0 { 1.0 } else { 0.0 })
+            },
+            0x4549_475f_5355_4343,
+        );
+        let (round_delta, round_ci_low, round_ci_high) = paired_bootstrap_mean_ci(
+            &paired_outcomes,
+            |pair| pair.3 as f64 - pair.2 as f64,
+            0x4549_475f_524f_554e,
+        );
         println!(
-            "selector_ablation,seeds={SEEDS},round_budget={ROUND_BUDGET},raw_success_rate={:.3},eig_success_rate={:.3},raw_mean_rounds={:.3},eig_mean_rounds={:.3},eig_selection_failures={eig_selection_failures},raw_only_wins={raw_only_wins},eig_only_wins={eig_only_wins},ties={ties}",
+            "selector_ablation,seeds={SEEDS},round_budget={ROUND_BUDGET},raw_success_rate={:.3},eig_success_rate={:.3},raw_mean_rounds={:.3},eig_mean_rounds={:.3},paired_success_delta_eig_minus_raw={success_delta:.3},success_delta_ci95=[{success_ci_low:.3},{success_ci_high:.3}],paired_round_delta_eig_minus_raw={round_delta:.3},round_delta_ci95=[{round_ci_low:.3},{round_ci_high:.3}],eig_selection_failures={eig_selection_failures},raw_only_wins={raw_only_wins},eig_only_wins={eig_only_wins},ties={ties}",
             raw_successes as f64 / SEEDS as f64,
             eig_successes as f64 / SEEDS as f64,
             raw_rounds as f64 / SEEDS as f64,
             eig_rounds as f64 / SEEDS as f64,
         );
         assert_eq!(raw_only_wins + eig_only_wins + ties, SEEDS as usize);
+        assert_eq!(paired_outcomes.len(), SEEDS as usize);
+        assert!(success_ci_low <= success_delta && success_delta <= success_ci_high);
+        assert!(round_ci_low <= round_delta && round_delta <= round_ci_high);
+        assert!(success_ci_low.is_finite() && success_ci_high.is_finite());
+        assert!(round_ci_low.is_finite() && round_ci_high.is_finite());
         assert!((0.0..=1.0).contains(&(raw_successes as f64 / SEEDS as f64)));
         assert!((0.0..=1.0).contains(&(eig_successes as f64 / SEEDS as f64)));
     }
