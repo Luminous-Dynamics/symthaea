@@ -9,7 +9,10 @@ set -uo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 silicon_dir="$(cd -- "${script_dir}/.." && pwd)"
-repo_root="$(git -C "${silicon_dir}" rev-parse --show-toplevel 2>/dev/null || cd "${silicon_dir}/../../../../.." && pwd)"
+repo_root="$(git -C "${silicon_dir}" rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "${repo_root}" ]]; then
+  repo_root="$(cd "${silicon_dir}/../../.." && pwd)"
+fi
 rtl="${silicon_dir}/rtl/hdc_bind_xor.sv"
 testbench="${silicon_dir}/rtl/tb_hdc_bind_xor.sv"
 stamp="$(date -u +%Y%m%dT%H%M%SZ 2>/dev/null || printf 'timestamp-unavailable')"
@@ -43,7 +46,10 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 2
 fi
 
-missing_json="$(printf '%s\n' "${missing[@]}" | jq -R . | jq -s .)"
+missing_json="[]"
+if (("${#missing[@]}" > 0)); then
+  missing_json="$(printf '%s\n' "${missing[@]}" | jq -R . | jq -s .)"
+fi
 verilator_version="unavailable"
 if command -v verilator >/dev/null 2>&1; then
   verilator --version > "${out_dir}/verilator-version.txt" 2>&1
