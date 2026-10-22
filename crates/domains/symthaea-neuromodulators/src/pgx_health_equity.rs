@@ -82,8 +82,8 @@ pub enum EvidenceLevel {
 }
 
 /// Clinical dosing action derived from genotype.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum DosingAction {
+#[derive(Debug, Clone, PartialEq)]
+enum DosingAction {
     /// Standard labelled dose; no adjustment needed.
     StandardDose,
     /// Reduce dose by the given fraction (e.g., 0.5 = halve).
@@ -125,9 +125,9 @@ pub struct PopulationAlleleFrequency {
     pub source: String,
 }
 
-/// A single CPIC clinical guideline recommendation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CpicGuideline {
+/// Internal-only source record; never exported through the research projection API.
+#[derive(Debug, Clone)]
+struct CpicGuideline {
     /// Drug name (e.g., "codeine").
     pub drug: String,
     /// Gene name (e.g., "CYP2D6").
@@ -142,14 +142,14 @@ pub struct CpicGuideline {
     pub source_population: AncestryGroup,
 }
 
-/// Structured representation of a guideline action for research fixtures.
+/// Internal fixture-only recommendation data. Not a public or patient-facing API.
 ///
 /// This type is not a patient-specific recommendation and must not be used to
 /// prescribe, select, stop, clear, or change a medication. A populated action
 /// does not establish that a patient's genotype, diplotype, context, or
 /// guideline applicability has been validated.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DosingRecommendation {
+#[derive(Debug, Clone)]
+struct DosingRecommendation {
     /// Primary dosing action.
     pub action: DosingAction,
     /// Numeric dose multiplier (e.g., 0.5 for half-dose). `None` if not applicable.
