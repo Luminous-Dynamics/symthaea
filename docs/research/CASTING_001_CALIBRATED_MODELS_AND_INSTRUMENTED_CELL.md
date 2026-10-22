@@ -135,7 +135,7 @@ All numeric values below are proposed research targets, not measured results or 
 
 ### Gate B — calibration and generalization
 
-Report MAE and median absolute relative error for solidification-time estimates, separately for in-domain and held-out geometry/tooling groups. Publish sample counts, calibration range, measurement uncertainty, excluded observations, and all split rules.
+Evaluate against a frozen holdout without refitting. The Rust model now reports MAE, RMSE, mean and median absolute relative error, plus prediction coverage and a per-point outcome. Out-of-domain examples are abstentions, not extrapolated estimates. Every comparison must report both conditional error and coverage so a method cannot appear superior merely by refusing difficult cases. Also publish sample counts, calibration range, measurement uncertainty, excluded observations, and split rules; hold out entire geometries/tooling states where possible.
 
 Proposed first target: median absolute relative error no greater than 15% on a frozen, in-domain held-out coupon set, provided the chosen time measurement has materially smaller uncertainty. If that cannot be met, diagnose model mismatch instead of widening tolerances after observing the data.
 
