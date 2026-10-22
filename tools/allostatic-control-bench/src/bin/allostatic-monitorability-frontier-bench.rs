@@ -31,8 +31,8 @@ const SIGNAL_MODES: [&str; 3] = ["score_only", "residual_only", "sensor_blind"];
 const SHIFT_MAGNITUDES: [f64; 4] = [0.02, 0.05, 0.10, 0.20];
 const HAZARD_LEADS: [usize; 5] = [0, 1, 2, 4, 8];
 
-const RAW_HEADER: &str = "operating_point,signal_mode,shift_magnitude,hazard_lead_steps,episode_seed,shift_step,first_unsafe_action_step,score_threshold,score_alarm_step,residual_threshold,residual_alarm_step,score_pre_hazard_intervention,residual_pre_hazard_intervention,score_late_alarm,residual_late_alarm";
-const SUMMARY_HEADER: &str = "operating_point,signal_mode,shift_magnitude,hazard_lead_steps,episodes,score_pre_shift_alarms,residual_pre_shift_alarms,score_post_shift_alarms,residual_post_shift_alarms,score_no_post_shift_alarm,residual_no_post_shift_alarm,score_pre_hazard_interventions,residual_pre_hazard_interventions,score_late_alarms,residual_late_alarms,mean_score_post_shift_alarm_delay,mean_residual_post_shift_alarm_delay";
+const RAW_HEADER: &str = "operating_point,signal_mode,shift_magnitude,hazard_lead_steps,episode_seed,shift_step,first_unsafe_action_step,score_threshold,score_alarm_step,residual_threshold,residual_alarm_step,score_alarm_before_deadline,residual_alarm_before_deadline,score_late_alarm,residual_late_alarm";
+const SUMMARY_HEADER: &str = "operating_point,signal_mode,shift_magnitude,hazard_lead_steps,episodes,score_pre_shift_alarms,residual_pre_shift_alarms,score_post_shift_alarms,residual_post_shift_alarms,score_no_post_shift_alarm,residual_no_post_shift_alarm,score_alarm_before_deadlines,residual_alarm_before_deadlines,score_late_alarms,residual_late_alarms,mean_score_post_shift_alarm_delay,mean_residual_post_shift_alarm_delay";
 
 #[derive(Clone, Copy, Debug)]
 struct Thresholds {
@@ -55,11 +55,11 @@ struct EpisodeRecord {
 }
 
 impl EpisodeRecord {
-    fn score_pre_hazard_intervention(self) -> bool {
+    fn score_alarm_before_deadline(self) -> bool {
         self.score_alarm_step > 0 && self.score_alarm_step <= self.first_unsafe_action_step
     }
 
-    fn residual_pre_hazard_intervention(self) -> bool {
+    fn residual_alarm_before_deadline(self) -> bool {
         self.residual_alarm_step > 0
             && self.residual_alarm_step.saturating_add(1) <= self.first_unsafe_action_step
     }
@@ -202,8 +202,8 @@ fn write_raw(path: &str, records: &[EpisodeRecord]) -> Result<(), Box<dyn Error>
             record.score_alarm_step,
             record.residual_threshold,
             record.residual_alarm_step,
-            record.score_pre_hazard_intervention(),
-            record.residual_pre_hazard_intervention(),
+            record.score_alarm_before_deadline(),
+            record.residual_alarm_before_deadline(),
             record.score_late_alarm(),
             record.residual_late_alarm(),
         ));
@@ -276,11 +276,11 @@ fn write_summary(path: &str, records: &[EpisodeRecord]) -> Result<(), Box<dyn Er
                         .count();
                     let score_pre_hazard = cell
                         .iter()
-                        .filter(|record| record.score_pre_hazard_intervention())
+                        .filter(|record| record.score_alarm_before_deadline())
                         .count();
                     let residual_pre_hazard = cell
                         .iter()
-                        .filter(|record| record.residual_pre_hazard_intervention())
+                        .filter(|record| record.residual_alarm_before_deadline())
                         .count();
                     let score_late = cell.iter().filter(|record| record.score_late_alarm()).count();
                     let residual_late = cell
