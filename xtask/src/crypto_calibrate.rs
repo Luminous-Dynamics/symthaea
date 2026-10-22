@@ -58,11 +58,16 @@ struct Receipt {
     schema_version: &'static str,
     suite_id: String,
     suite_sha256: String,
+    workspace_manifest_sha256: Option<String>,
+    cargo_lock_sha256: Option<String>,
     source_revision: Option<String>,
     working_tree_clean: bool,
     working_tree_status_sha256: String,
     rustc_version: Option<String>,
+    rustc_verbose_version: Option<String>,
     cargo_version: Option<String>,
+    host_os: &'static str,
+    host_arch: &'static str,
     mode: &'static str,
     started_at_unix_s: u64,
     finished_at_unix_s: u64,
@@ -178,7 +183,10 @@ pub(super) fn run(
         );
     }
     let rustc_version = command_text(root, "rustc", &["--version"]);
+    let rustc_verbose_version = command_text(root, "rustc", &["-vV"]);
     let cargo_version = command_text(root, "cargo", &["--version"]);
+    let workspace_manifest_sha256 = file_sha256(&root.join("Cargo.toml"));
+    let cargo_lock_sha256 = file_sha256(&root.join("Cargo.lock"));
 
     // Preflight every selected task before running any command. A stale source
     // path or disallowed invocation must not leave a partially executed suite.
@@ -267,11 +275,16 @@ pub(super) fn run(
         schema_version: "symthaea.crypto-discovery-receipt/v1",
         suite_id: suite.suite_id,
         suite_sha256,
+        workspace_manifest_sha256,
+        cargo_lock_sha256,
         source_revision,
         working_tree_clean,
         working_tree_status_sha256: sha256_hex(tree_status.as_bytes()),
         rustc_version,
+        rustc_verbose_version,
         cargo_version,
+        host_os: std::env::consts::OS,
+        host_arch: std::env::consts::ARCH,
         mode: if dry_run { "dry_run" } else { "executed" },
         started_at_unix_s: started_at,
         finished_at_unix_s: unix_seconds(),
@@ -598,6 +611,10 @@ fn unix_seconds() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs()
+}
+
+fn file_sha256(path: &Path) -> Option<String> {
+    fs::read(path).ok().map(|bytes| sha256_hex(&bytes))
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
