@@ -364,8 +364,8 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
     let compiled = mode.iter().filter(|r| r.compiled && !r.simulated).count();
     let complete = mode.iter().filter(|r| r.oracle_complete).count();
     let agent_ms: u128 = mode.iter().map(|r| r.agent_elapsed_ms).sum();
-    let mut agent_elapsed_values: Vec<u128> = mode.iter().map(|r| r.agent_elapsed_ms).collect();
-    let mut verification_elapsed_values: Vec<u128> = mode.iter().map(|r| r.verification_elapsed_ms).collect();
+    let agent_elapsed_values: Vec<u128> = mode.iter().map(|r| r.agent_elapsed_ms).collect();
+    let verification_elapsed_values: Vec<u128> = mode.iter().map(|r| r.verification_elapsed_ms).collect();
     let agent_elapsed_ms_p50 = nearest_rank_percentile(&mut agent_elapsed_values.clone(), 0.50).unwrap_or(0);
     let agent_elapsed_ms_p95 = nearest_rank_percentile(&mut agent_elapsed_values.clone(), 0.95).unwrap_or(0);
     let verification_elapsed_ms_p50 = nearest_rank_percentile(&mut verification_elapsed_values.clone(), 0.50).unwrap_or(0);
@@ -908,7 +908,7 @@ mod provenance_tests {
 
     #[test]
     fn latency_percentiles_use_nearest_rank_and_reject_invalid_input() {
-        let mut values = vec![120_u128, 10, 100, 20];
+        let values = vec![120_u128, 10, 100, 20];
         assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.50), Some(20));
         assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.95), Some(120));
         assert_eq!(nearest_rank_percentile(&mut values.clone(), 1.0), Some(120));
