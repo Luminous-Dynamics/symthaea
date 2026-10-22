@@ -45,7 +45,7 @@ Start with the existing quarantined HDC cryptography demonstrations and their ex
 
 These are **known-broken calibration tasks**, not candidate primitives to rehabilitate by renaming. The evaluator should reproduce each stated break against the pre-registered property and confirm that an appropriate standard-backed replacement rejects the same adversarial case.
 
-Reference: 2026-07-13-cryptographic-claim-integrity.md.
+References: 2026-07-13-cryptographic-claim-integrity.md; crypto-discovery-calibration-v1.json (initial machine-readable suite, eight known-broken tasks with existing regression references).
 
 ### WP-1 — Reproducible benchmark harness
 
