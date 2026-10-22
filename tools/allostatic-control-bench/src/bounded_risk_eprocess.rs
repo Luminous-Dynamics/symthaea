@@ -279,6 +279,161 @@ impl<const N: usize> MixtureBoundedRiskEProcess<N> {
     }
 }
 
+/// Predictable adaptive betting for unknown bounded-risk excess.
+///
+/// The next bet is a deterministic function of previous losses only. It uses
+/// a plug-in empirical-mean/variance signal and caps bet * risk_bound below one.
+/// Therefore the conditional-risk e-process argument remains valid under the
+/// stated null, provided the loss sequence is bounded and the bet is predictable.
+/// This is a compact adaptive baseline, not a reproduction of GRAPA/PMEB.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PredictableRiskEProcess {
+    risk_bound: f64,
+    max_bet_fraction: f64,
+    total_delta: f64,
+    simultaneous_monitors: usize,
+    min_history: usize,
+    observations: usize,
+    loss_sum: f64,
+    squared_loss_sum: f64,
+    last_bet: f64,
+    log_e_value: f64,
+    alarmed: bool,
+}
+
+impl PredictableRiskEProcess {
+    pub fn new(
+        risk_bound: f64,
+        max_bet_fraction: f64,
+        total_delta: f64,
+        simultaneous_monitors: usize,
+        min_history: usize,
+    ) -> Option<Self> {
+        if !risk_bound.is_finite()
+            || risk_bound <= 0.0
+            || risk_bound >= 1.0
+            || !max_bet_fraction.is_finite()
+            || max_bet_fraction <= 0.0
+            || max_bet_fraction >= 1.0
+            || !(max_bet_fraction / risk_bound).is_finite()
+            || !total_delta.is_finite()
+            || total_delta <= 0.0
+            || total_delta >= 1.0
+            || simultaneous_monitors == 0
+            || min_history == 0
+            || !(simultaneous_monitors as f64 / total_delta).is_finite()
+        {
+            return None;
+        }
+        Some(Self {
+            risk_bound,
+            max_bet_fraction,
+            total_delta,
+            simultaneous_monitors,
+            min_history,
+            observations: 0,
+            loss_sum: 0.0,
+            squared_loss_sum: 0.0,
+            last_bet: 0.0,
+            log_e_value: 0.0,
+            alarmed: false,
+        })
+    }
+
+    pub const fn risk_bound(self) -> f64 {
+        self.risk_bound
+    }
+
+    pub const fn max_bet_fraction(self) -> f64 {
+        self.max_bet_fraction
+    }
+
+    pub const fn total_delta(self) -> f64 {
+        self.total_delta
+    }
+
+    pub const fn simultaneous_monitors(self) -> usize {
+        self.simultaneous_monitors
+    }
+
+    pub const fn observations(self) -> usize {
+        self.observations
+    }
+
+    pub const fn last_bet(self) -> f64 {
+        self.last_bet
+    }
+
+    pub const fn log_e_value(self) -> f64 {
+        self.log_e_value
+    }
+
+    pub const fn alarmed(self) -> bool {
+        self.alarmed
+    }
+
+    pub fn log_alarm_threshold(self) -> f64 {
+        (self.simultaneous_monitors as f64 / self.total_delta).ln()
+    }
+
+    fn predictable_bet(self) -> f64 {
+        if self.observations < self.min_history {
+            return 0.0;
+        }
+        let n = self.observations as f64;
+        let mean = self.loss_sum / n;
+        let variance = (self.squared_loss_sum / n - mean * mean).max(1.0e-10);
+        let excess = mean - self.risk_bound;
+        if excess <= 0.0 {
+            return 0.0;
+        }
+        let plug_in = excess / (variance + excess * excess);
+        let cap = self.max_bet_fraction / self.risk_bound;
+        if !plug_in.is_finite() {
+            cap
+        } else {
+            plug_in.max(0.0).min(cap)
+        }
+    }
+
+    /// Observe one bounded loss. The bet is calculated before the current loss
+    /// is added to history; same-step information cannot influence its own wager.
+    pub fn observe(&mut self, loss: f64) -> Option<bool> {
+        if !loss.is_finite() || !(0.0..=1.0).contains(&loss) {
+            return None;
+        }
+
+        let bet = self.predictable_bet();
+        let factor = 1.0 + bet * (loss - self.risk_bound);
+        if !factor.is_finite() || factor <= 0.0 {
+            return None;
+        }
+        let next_log = self.log_e_value + factor.ln();
+
+        self.observations = self.observations.saturating_add(1);
+        self.loss_sum += loss;
+        self.squared_loss_sum += loss * loss;
+        self.last_bet = bet;
+        if !next_log.is_finite() {
+            self.log_e_value = f64::MAX;
+            self.alarmed = true;
+            return Some(true);
+        }
+        self.log_e_value = next_log;
+        self.alarmed |= self.log_e_value >= self.log_alarm_threshold();
+        Some(self.alarmed)
+    }
+
+    pub fn reset(&mut self) {
+        self.observations = 0;
+        self.loss_sum = 0.0;
+        self.squared_loss_sum = 0.0;
+        self.last_bet = 0.0;
+        self.log_e_value = 0.0;
+        self.alarmed = false;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296,6 +451,51 @@ mod tests {
             0.5 / 0.15,
             0.75 / 0.15,
         ]);
+    }
+
+    #[test]
+    fn predictable_adaptive_bet_uses_only_prior_losses_and_resets_history() {
+        let mut process =
+            PredictableRiskEProcess::new(0.05, 0.50, 0.05, 5, 2).expect("valid adaptive e-process");
+        assert_eq!(process.last_bet(), 0.0);
+        process.observe(1.0).expect("valid loss");
+        assert_eq!(process.last_bet(), 0.0);
+        process.observe(1.0).expect("valid loss");
+        assert_eq!(process.last_bet(), 0.0);
+        process.observe(0.0).expect("valid loss");
+        assert!(process.last_bet() > 0.0);
+        assert!(process.last_bet() * process.risk_bound() <= process.max_bet_fraction());
+        process.reset();
+        assert_eq!(process.observations(), 0);
+        assert_eq!(process.last_bet(), 0.0);
+        assert_eq!(process.log_e_value(), 0.0);
+    }
+
+    #[test]
+    fn predictable_adaptive_eprocess_rejects_invalid_inputs_without_mutation() {
+        assert!(PredictableRiskEProcess::new(0.05, 0.0, 0.05, 5, 20).is_none());
+        assert!(PredictableRiskEProcess::new(0.05, 1.0, 0.05, 5, 20).is_none());
+        assert!(PredictableRiskEProcess::new(0.05, 0.50, 0.05, 5, 0).is_none());
+        let mut process =
+            PredictableRiskEProcess::new(0.05, 0.50, 0.05, 5, 20).expect("valid adaptive e-process");
+        assert!(process.observe(f64::NAN).is_none());
+        assert_eq!(process.observations(), 0);
+        assert_eq!(process.log_e_value(), 0.0);
+    }
+
+    #[test]
+    fn predictable_adaptive_eprocess_detects_sustained_risk_excess() {
+        let mut process =
+            PredictableRiskEProcess::new(0.05, 0.50, 0.05, 5, 20).expect("valid adaptive e-process");
+        let mut first_alarm = None;
+        for step in 0..80 {
+            if process.observe(1.0) == Some(true) {
+                first_alarm.get_or_insert(step);
+            }
+        }
+        assert!(first_alarm.is_some());
+        assert!(process.log_e_value() >= process.log_alarm_threshold());
+        assert!(process.alarmed());
     }
 
     #[test]
