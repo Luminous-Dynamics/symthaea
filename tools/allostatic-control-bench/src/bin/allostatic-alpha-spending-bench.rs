@@ -13,8 +13,9 @@ use std::io::{Error as IoError, ErrorKind};
 const HORIZON: usize = 8;
 const EPISODES_PER_CONDITION: usize = 300;
 const CONDITIONS_PER_STATE: usize = 4;
-const TOTAL_EPISODES_PER_STATE: u64 =
+const TOTAL_CASES_PER_STATE: u64 =
     (EPISODES_PER_CONDITION * CONDITIONS_PER_STATE) as u64;
+const BUDGET_HORIZON: u64 = EPISODES_PER_CONDITION as u64;
 const CALIBRATED_RESIDUAL_SCALE: f64 = 0.05;
 const RISK_BOUND: f64 = 0.15;
 const GLOBAL_DELTA: f64 = 0.05;
@@ -22,7 +23,7 @@ const PARALLEL_MONITORS: usize = 5;
 const BET_FRACTIONS: [f64; 3] = [0.25, 0.5, 0.75];
 
 const INPUT_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,ground_truth_outside_predictor_envelope,all_episode_scores_below_pointwise_threshold";
-const RAW_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,ground_truth_outside_predictor_envelope,all_episode_scores_below_pointwise_threshold,bounded_risk_loss,episode_budget_index,episode_false_alarm_budget,spending_log_e_value,spending_log_threshold,spending_alarm,spending_first_alarm_step,reset_log_e_value,reset_log_threshold,reset_alarm,reset_first_alarm_step";
+const RAW_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,ground_truth_outside_predictor_envelope,all_episode_scores_below_pointwise_threshold,bounded_risk_loss,episode_budget_index,episode_false_alarm_budget,spending_log_e_value,spending_log_threshold,spending_alarm,spending_first_alarm_step,reset_log_e_value,reset_log_threshold,reset_alarm,reset_first_alarm_step,spending_component_log_e_1,spending_component_log_e_2,spending_component_log_e_3,reset_component_log_e_1,reset_component_log_e_2,reset_component_log_e_3";
 const SUMMARY_HEADER: &str = "operating_point,condition,episodes,spending_alarms,spending_false_alarms,spending_missed_shifts,reset_alarms,reset_false_alarms,reset_missed_shifts,spending_mean_detection_step,reset_mean_detection_step,episodes_all_scores_below_pointwise,spending_caught_below_pointwise,reset_caught_below_pointwise,alpha_budget_spent_sum,max_episode_budget_index,mean_final_spending_log_e,max_final_spending_log_e,mean_final_reset_log_e";
 
 const CONDITIONS: [&str; 4] = [
@@ -271,6 +272,8 @@ fn process_episode(
             spending_alarm,
             reset_monitor.log_e_value(),
             reset_alarm,
+            spending_monitor.component_log_e_values(),
+            reset_monitor.component_log_e_values(),
         ));
     }
 
@@ -285,8 +288,16 @@ fn process_episode(
         .into());
     }
 
-    for (row, bounded_loss, spending_log_e, spending_alarm, reset_log_e, reset_alarm) in
-        &output_rows
+    for (
+        row,
+        bounded_loss,
+        spending_log_e,
+        spending_alarm,
+        reset_log_e,
+        reset_alarm,
+        spending_components,
+        reset_components,
+    ) in &output_rows
     {
         let mut fields = row.fields.clone();
         fields.push(format!("{bounded_loss:.9}"));
@@ -303,6 +314,12 @@ fn process_episode(
         fields.push(format!("{:.9}", (PARALLEL_MONITORS as f64 / GLOBAL_DELTA).ln()));
         fields.push(if *reset_alarm { "true" } else { "false" }.to_string());
         fields.push(reset_first_alarm.to_string());
+        for component_log in spending_components {
+            fields.push(format!("{component_log:.9}"));
+        }
+        for component_log in reset_components {
+            fields.push(format!("{component_log:.9}"));
+        }
         raw_output.push_str(&fields.join(","));
         raw_output.push('\n');
     }
@@ -355,7 +372,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut cells: BTreeMap<(String, String), Cell> = BTreeMap::new();
     let mut episode_indices: BTreeMap<String, u64> = BTreeMap::new();
     let mut expected_state: Option<String> = None;
-    let mut expected_episode = 0_u64;
     let mut current_seed: Option<u64> = None;
 
     for chunk in rows.chunks_exact(HORIZON) {
@@ -374,13 +390,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .into());
             }
             expected_state = Some(first.operating_point.clone());
-            expected_episode = 0;
             current_seed = None;
         }
 
         let ordinal = episode_indices.entry(first.operating_point.clone()).or_default();
         *ordinal += 1;
-        if *ordinal > TOTAL_EPISODES_PER_STATE {
+        if *ordinal > TOTAL_CASES_PER_STATE {
             return Err(IoError::new(
                 ErrorKind::InvalidData,
                 "too many episodes for a state; alpha allocation panel exceeded",
@@ -407,12 +422,21 @@ fn main() -> Result<(), Box<dyn Error>> {
             .into());
         }
         current_seed = Some(first.seed);
-        expected_episode += 1;
-        process_episode(chunk, *ordinal, &mut raw_output, &mut cells)?;
+        let budget_index = first.seed.checked_sub(49_999).ok_or_else(|| {
+            IoError::new(ErrorKind::InvalidData, "episode seed precedes alpha-spending epoch")
+        })?;
+        if budget_index > BUDGET_HORIZON {
+            return Err(IoError::new(
+                ErrorKind::InvalidData,
+                "episode seed exceeds the predeclared alpha-spending horizon",
+            )
+            .into());
+        }
+        process_episode(chunk, budget_index, &mut raw_output, &mut cells)?;
     }
 
     if episode_indices.len() != 5
-        || episode_indices.values().any(|count| *count != TOTAL_EPISODES_PER_STATE)
+        || episode_indices.values().any(|count| *count != TOTAL_CASES_PER_STATE)
         || cells.len() != 20
         || cells.values().any(|cell| cell.episodes != EPISODES_PER_CONDITION)
     {
@@ -423,13 +447,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .into());
     }
 
-    let full_spend = GLOBAL_DELTA * (1.0 - 1.0 / (TOTAL_EPISODES_PER_STATE + 1) as f64);
+    let full_spend = GLOBAL_DELTA * (1.0 - 1.0 / (BUDGET_HORIZON + 1) as f64);
     let mut summary = format!("{SUMMARY_HEADER}\n");
     for ((operating_point, condition), cell) in cells {
         summary_row(&mut summary, &operating_point, &condition, &cell);
     }
-    // The same summable schedule is used in all five monitors. Over the declared
-    // 1..1200 panel, total allocated delta is K * (delta/K)*(1 - 1/1201).
+    // Four conditions are paired counterfactual replays for each episode index,
+    // not four simultaneous runtime streams. The operational index advances once
+    // per episode, and the same budget is used for its paired shift controls.
     if !full_spend.is_finite() || full_spend >= GLOBAL_DELTA {
         return Err(IoError::new(
             ErrorKind::InvalidData,
