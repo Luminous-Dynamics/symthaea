@@ -1135,17 +1135,23 @@ impl LiquidMambaGenerator {
             return Ok(0.0);
         }
 
-        // 1. Prepare context for teacher-forcing
-        if self.config.temporal_projection && self.temporal_proj.is_some() {
+        // 1. Prepare the real projected context once. The same sequence is used
+        // for conditioning and for the differentiable context-gradient objective.
+        let gradient_sequence = if self.config.temporal_projection && self.temporal_proj.is_some() {
             let sequence = self
                 .temporal_proj
                 .as_ref()
-                .unwrap()
+                .expect("temporal projection checked above")
                 .project_to_ssm_sequence(thought_hv);
             self.mamba.inject_context_sequence(&sequence)?;
+            sequence
         } else {
             let ssm_context = self.projection.project_to_ssm(thought_hv);
             self.mamba.inject_initial_context(&ssm_context)?;
+            vec![ssm_context]
+        };
+        if gradient_sequence.is_empty() {
+            anyhow::bail!("cannot distill from an empty projected context sequence");
         }
 
         // 2. Teacher-forced forward + backward
@@ -1169,11 +1175,20 @@ impl LiquidMambaGenerator {
             };
 
             if should_compute_grad {
-                // Compute teacher loss gradient at this position
+                // Replay the actual projected context and the exact teacher-forced
+                // (previous token -> target token) pair. The gradient position rotates
+                // through context chunks when rotation is enabled; otherwise use the last
+                // projected chunk as the trainable context anchor.
+                let gradient_pos = if self.config.rotate_grad {
+                    (self.generation_count + intermediate_states.len().saturating_sub(1))
+                        % gradient_sequence.len()
+                } else {
+                    gradient_sequence.len() - 1
+                };
                 let d_ssm = self.mamba.compute_e2e_token_loss_at(
-                    &[vec![0.0; 768]], // sequence not used in this call
-                    &[target_id],
-                    0,
+                    &gradient_sequence,
+                    &[prev_token, target_id],
+                    gradient_pos,
                 )?;
 
                 // Apply gradient to projection weights
