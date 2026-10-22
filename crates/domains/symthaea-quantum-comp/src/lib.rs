@@ -38,6 +38,7 @@ pub mod entanglement_proxy;
 pub mod errors;
 pub mod mis_graph_identity;
 pub mod mis_informer;
+pub mod mis_shot_budget;
 pub mod experiment;
 pub mod fixtures;
 pub mod interop;
