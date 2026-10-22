@@ -112,20 +112,7 @@ impl ConformalAdequacyCalibrator {
         audit_score: f64,
         independent_audit: bool,
     ) -> Result<ConformalAdequacyResult, CalibrationError> {
-        if !independent_audit {
-            return Err(CalibrationError::AuditNotIndependent);
-        }
-        if !audit_score.is_finite() || audit_score < 0.0 {
-            return Err(CalibrationError::InvalidAuditScore);
-        }
-
-        let no_less_extreme = self
-            .calibration_scores
-            .iter()
-            .filter(|calibration_score| **calibration_score >= audit_score)
-            .count();
-        let p_value =
-            (1 + no_less_extreme) as f64 / (self.calibration_scores.len() + 1) as f64;
+        let p_value = self.audit_p_value(audit_score, independent_audit)?;
         let assessment = if p_value <= self.alpha {
             AdequacyAssessment::Alarm {
                 diagnostic: AdequacyDiagnostic::PredictiveMisfit,
@@ -145,6 +132,32 @@ impl ConformalAdequacyCalibrator {
             alpha: self.alpha,
             assessment,
         })
+    }
+
+    /// Compute the conservative rank p-value without applying this calibrator's one-shot
+    /// significance threshold. This is useful for a separately declared sequential or
+    /// multiplicity-corrected policy that spends its own error budget.
+    ///
+    /// This method does not make repeated p-values independent or anytime-valid. The caller
+    /// must provide an independent audit and preserve the same calibration/scoring protocol.
+    pub fn audit_p_value(
+        &self,
+        audit_score: f64,
+        independent_audit: bool,
+    ) -> Result<f64, CalibrationError> {
+        if !independent_audit {
+            return Err(CalibrationError::AuditNotIndependent);
+        }
+        if !audit_score.is_finite() || audit_score < 0.0 {
+            return Err(CalibrationError::InvalidAuditScore);
+        }
+
+        let no_less_extreme = self
+            .calibration_scores
+            .iter()
+            .filter(|calibration_score| **calibration_score >= audit_score)
+            .count();
+        Ok((1 + no_less_extreme) as f64 / (self.calibration_scores.len() + 1) as f64)
     }
 
     /// Number of independent calibration batches represented.
