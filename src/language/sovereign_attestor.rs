@@ -6,7 +6,10 @@
 //! Cryptographically signs SMT 'Proven' verdicts using post-quantum
 //! Dilithium signatures from mycelix-zkp-core.
 
-use mycelix_zkp_core::dilithium::{verify_signature, DilithiumKeypair};
+use mycelix_zkp_core::dilithium::{
+    verify_detached_signature as verify_mldsa_detached_signature, verify_signature,
+    DilithiumKeypair,
+};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -148,7 +151,7 @@ impl SovereignAttestor {
         let message = signing_message_v2(&attestation);
         attestation.signature = self
             .keys
-            .sign(&message)
+            .sign_detached(&message)
             .map_err(|_| "attestation signing failed".to_string())?;
         Ok(attestation)
     }
@@ -179,8 +182,12 @@ impl SovereignAttestor {
         }
 
         let message = signing_message_v2(attestation);
-        verify_signature(&message, &attestation.signature, &attestation.public_key)
-            .unwrap_or(false)
+        verify_mldsa_detached_signature(
+            &message,
+            &attestation.signature,
+            &attestation.public_key,
+        )
+        .unwrap_or(false)
     }
 }
 
