@@ -15,6 +15,9 @@ source_files=(
   "tools/allostatic-control-bench/src/model_mismatch.rs"
   "tools/allostatic-control-bench/src/robust_viability.rs"
   "tools/allostatic-control-bench/src/paired_statistics.rs"
+  "tools/allostatic-control-bench/src/stratified_metrics.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-stratified-eval-bench.rs"
+  "docs/research/STRATIFIED_RUNTIME_ASSURANCE_AGGREGATION_V1.md"
   "tools/allostatic-control-bench/src/bin/allostatic-paired-eval-bench.rs"
   "docs/research/PAIRED_RUNTIME_ASSURANCE_INFERENCE_V1.md"
   "tools/allostatic-control-bench/src/main.rs"
@@ -47,6 +50,7 @@ paired_out="${out_base}-paired-deltas.csv"
 mismatch_out="${out_base}-mismatch-frontier.csv"
 mismatch_summary_out="${out_base}-mismatch-frontier-summary.csv"
 paired_eval_summary_out="${out_base}-paired-eval-selftest-summary.csv"
+stratified_out="${out_base}-stratified-aggregate.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -213,6 +217,36 @@ if ! awk -F, 'NR == 1 { if (NF != 23) failed = 1; next }
 fi
 
 cp "$tmpdir/paired-eval-a.csv" "$paired_eval_summary_out"
+# Qualify task-balanced aggregation on normalized paired scores. This is a tool self-test only.
+stratified_fixture="$tmpdir/stratified-fixture.csv"
+printf 'task,seed,baseline_score,candidate_score\n' > "$stratified_fixture"
+for seed in $(seq 1 30); do
+  printf 'cartpole,%s,0.4,0.6\n' "$seed" >> "$stratified_fixture"
+  printf 'quadrotor,%s,0.7,0.6\n' "$seed" >> "$stratified_fixture"
+done
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-stratified-eval-bench -- "$stratified_fixture" "$tmpdir/stratified-a.csv" 10000 17
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-stratified-eval-bench -- "$stratified_fixture" "$tmpdir/stratified-b.csv" 10000 17
+if ! cmp -s "$tmpdir/stratified-a.csv" "$tmpdir/stratified-b.csv"; then
+  printf 'FAIL: repeated stratified aggregate is not byte-identical\n' >&2
+  exit 1
+fi
+if ! awk -F, 'NR == 1 { if (NF != 23) failed = 1; next }
+  {
+    if (NF != 23) failed = 1
+    if ($1 == "task") task_rows++
+    else if ($1 == "aggregate") {
+      aggregate_rows++
+      if ($2 != "ALL" || $3 != 60 || $11 < 0.049999 || $11 > 0.050001 ||
+          $14 < 0.049999 || $14 > 0.050001 || $17 < 0.499999 || $17 > 0.500001 ||
+          $20 < 0.499999 || $20 > 0.500001 || $21 != 2 || $22 != 10000 || $23 != 17) failed = 1
+    } else failed = 1
+  }
+  END { if (NR != 4 || task_rows != 2 || aggregate_rows != 1 || failed) exit 1 }
+' "$tmpdir/stratified-a.csv"; then
+  printf 'FAIL: stratified aggregation schema or macro outcome contract is invalid\n' >&2
+  exit 1
+fi
+cp "$tmpdir/stratified-a.csv" "$stratified_out"
 cp "$tmpdir/run-a.csv" "$out_csv"
 cp "$tmpdir/summary-a.csv" "$summary_out"
 cp "$tmpdir/paired-a.csv" "$paired_out"
@@ -239,6 +273,8 @@ cp "$tmpdir/mismatch-summary-a.csv" "$mismatch_summary_out"
   printf 'mismatch_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$mismatch_summary_out") - 1 ))"
   printf 'paired_eval_selftest_sha256=%s\n' "$(sha256sum "$paired_eval_summary_out" | awk '{print $1}')"
   printf 'paired_eval_selftest_rows_excluding_header=%s\n' "$(( $(wc -l < "$paired_eval_summary_out") - 1 ))"
+  printf 'stratified_aggregate_sha256=%s\n' "$(sha256sum "$stratified_out" | awk '{print $1}')"
+  printf 'stratified_aggregate_rows_excluding_header=%s\n' "$(( $(wc -l < "$stratified_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -250,3 +286,4 @@ printf 'Model-mismatch safety frontier: %s\n' "$mismatch_out"
 printf 'Model-mismatch frontier summary: %s\n' "$mismatch_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
 printf 'Paired-inference self-test summary (synthetic only): %s\n' "$paired_eval_summary_out"
+printf 'Stratified aggregation self-test summary (synthetic only): %s\n' "$stratified_out"
