@@ -735,9 +735,23 @@ fn join_pairs(
         let target_family = required_string(target, "family_id", &format!("{ctx}.target"))?;
         let target_commit = required_string(target, "source_commit", &format!("{ctx}.target"))?;
         let artifact_path = required_string(target, "artifact_path", &format!("{ctx}.target"))?;
-        if artifact_path.starts_with('/')
-            || artifact_path.split('/').any(|part| part == ".." || part.is_empty()) {
-            bail!("{ctx}.target.artifact_path must be a safe repository-relative path");
+        let counterfactual_artifact_path = required_string(
+            target,
+            "counterfactual_artifact_path",
+            &format!("{ctx}.target"),
+        )?;
+        for (field, path) in [
+            ("artifact_path", artifact_path),
+            ("counterfactual_artifact_path", counterfactual_artifact_path),
+        ] {
+            if path.starts_with('/')
+                || path.split('/').any(|part| part == ".." || part.is_empty())
+            {
+                bail!("{ctx}.target.{field} must be a safe repository-relative path");
+            }
+        }
+        if artifact_path == counterfactual_artifact_path {
+            bail!("{ctx}: base and counterfactual artifacts must have distinct paths");
         }
         let base_artifact_digest = required_string(
             target,
@@ -811,7 +825,16 @@ fn join_pairs(
             .get(&variant_id)
             .with_context(|| format!("{ctx} missing counterfactual outcome {variant_id}"))?;
         validate_matched_arm(base, variant, &ctx)?;
-        for (row, expected_id, label, status, statement_digest, artifact_digest, side) in [
+        for (
+            row,
+            expected_id,
+            label,
+            status,
+            statement_digest,
+            artifact_digest,
+            side_artifact_path,
+            side,
+        ) in [
             (
                 base,
                 &base_id,
@@ -819,6 +842,7 @@ fn join_pairs(
                 base_status,
                 base_statement_digest,
                 base_artifact_digest,
+                artifact_path,
                 "base",
             ),
             (
@@ -828,6 +852,7 @@ fn join_pairs(
                 variant_status,
                 variant_statement_digest,
                 counterfactual_artifact_digest,
+                counterfactual_artifact_path,
                 "counterfactual",
             ),
         ] {
@@ -851,7 +876,8 @@ fn join_pairs(
             if required_string_at(row, &["target", "theorem_id"], &row_ctx)? != target_id
                 || required_string_at(row, &["target", "family_id"], &row_ctx)? != target_family
                 || required_string_at(row, &["target", "source_commit"], &row_ctx)? != target_commit
-                || required_string_at(row, &["target", "artifact_path"], &row_ctx)? != artifact_path
+                || required_string_at(row, &["target", "artifact_path"], &row_ctx)?
+                    != side_artifact_path
                 || required_string_at(row, &["target", "artifact_sha256"], &row_ctx)?
                     != artifact_digest
                 || required_string_at(row, &["target", "statement_sha256"], &row_ctx)?
