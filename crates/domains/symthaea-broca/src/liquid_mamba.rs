@@ -225,11 +225,15 @@ pub struct LiquidMambaConfig {
     #[serde(default)]
     pub temporal_adapter: bool,
 
-    /// Number of chunks for end-to-end gradient calculation.
+    /// Legacy sparse-gradient stride, retained for serialized config compatibility.
+    /// Full-sequence distillation currently computes gradients for every context
+    /// position in one recurrent unroll and does not consult this field.
     #[serde(default = "default_e2e_grad_chunks")]
     pub e2e_grad_chunks: usize,
 
-    /// Whether to rotate the gradient calculation position (Improvement B).
+    /// Legacy rotating-anchor toggle, retained for serialized config compatibility.
+    /// Full-sequence distillation currently computes gradients for every context
+    /// position in one recurrent unroll and does not consult this field.
     #[serde(default = "default_true")]
     pub rotate_grad: bool,
 
@@ -251,7 +255,9 @@ pub struct LiquidMambaConfig {
     #[serde(default)]
     pub temporal_directional_loss: bool,
 
-    /// Enable rotating gradient position for temporal training (Improvement B).
+    /// Legacy temporal rotating-anchor toggle, retained for serialized config
+    /// compatibility. Full-sequence distillation currently computes gradients for
+    /// every temporal context position and does not consult this field.
     #[serde(default = "default_true")]
     pub temporal_rotate_grad_position: bool,
 
