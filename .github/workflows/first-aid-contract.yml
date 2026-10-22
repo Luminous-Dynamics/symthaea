@@ -193,6 +193,17 @@ jobs:
             .critical_trace_count == 8 and
             .critical_counterexample_count == 6 and
             .violation_count == 9 and
+            .unique_violation_class_count == 8 and
+            .violation_occurrences_by_code == {
+              "invalid_bundle_verification": 1,
+              "offline_core_network_dependency": 1,
+              "render_after_revocation": 1,
+              "render_without_verified_bundle": 2,
+              "sensitive_data_egress_without_consent": 1,
+              "stale_resource_claimed_confirmed": 1,
+              "uncertainty_lost_at_handoff": 1,
+              "unknown_normalized": 1
+            } and
             .corpus_sha256 == "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3" and
             .claim_ceiling == "synthetic process-integrity audit only; no clinical safety or patient-outcome claim" and
             ([.corpus_sha256, .evaluation_protocol_sha256, .mutation_matrix_sha256,
