@@ -161,6 +161,10 @@ pub struct SelectionBottleneckCase {
     pub expected_family: LawFamily,
     pub selected_family: LawFamily,
     pub family_recovered: bool,
+    /// Whether the lowest-held-out-error candidate in this pool has the true family.
+    pub oracle_pool_family_recovered: bool,
+    /// True when the pool oracle could recover the family but the training selector did not.
+    pub selection_missed_oracle_family: bool,
     pub selection_disposition: SelectionDisposition,
     pub delta_bic_to_runner_up: f64,
     pub selected_training_nrmse: f64,
@@ -177,6 +181,10 @@ pub struct SelectionBottleneckSummary {
     pub candidates_per_family: usize,
     pub case_count: usize,
     pub family_recovery_rate: f64,
+    /// Diagnostic upper-bound structural recovery rate using held-out truth (never candidate-facing).
+    pub oracle_pool_family_recovery_rate: f64,
+    /// Share of all rows where the oracle had correct-family recovery but training selection missed it.
+    pub selection_missed_oracle_family_rate: f64,
     pub mean_selected_heldout_nrmse: f64,
     pub mean_oracle_pool_heldout_nrmse: f64,
     pub mean_selection_regret_nrmse: f64,
@@ -802,6 +810,7 @@ fn evaluate_selection_bottleneck(
     let mut family_best: Vec<(f64, Law, f64, f64)> = Vec::new();
     let mut candidate_count = 0usize;
     let mut oracle_pool_heldout_nrmse = f64::INFINITY;
+    let mut oracle_pool_heldout_law = None;
     for family in [
         LawFamily::InversePower,
         LawFamily::ScreenedInversePower,
@@ -820,7 +829,10 @@ fn evaluate_selection_bottleneck(
             let Some(heldout_error) = heldout_nrmse_for_law(world, law) else {
                 continue;
             };
-            oracle_pool_heldout_nrmse = oracle_pool_heldout_nrmse.min(heldout_error);
+            if heldout_error < oracle_pool_heldout_nrmse {
+                oracle_pool_heldout_nrmse = heldout_error;
+                oracle_pool_heldout_law = Some(law);
+            }
             if best_for_family
                 .as_ref()
                 .is_none_or(|(best_score, _, _, _)| score < *best_score)
@@ -833,6 +845,10 @@ fn evaluate_selection_bottleneck(
     family_best.sort_by(|left, right| left.0.total_cmp(&right.0));
     let delta_bic_to_runner_up = (family_best[1].0 - family_best[0].0).max(0.0);
     let (_, selected_law, selected_training_nrmse, selected_heldout_nrmse) = family_best[0];
+    let oracle_pool_law = oracle_pool_heldout_law?;
+    let oracle_pool_family_recovered = oracle_pool_law.family == world.truth.family;
+    let family_recovered = selected_law.family == world.truth.family;
+    let selection_missed_oracle_family = oracle_pool_family_recovered && !family_recovered;
     let selection_regret_nrmse = (selected_heldout_nrmse - oracle_pool_heldout_nrmse).max(0.0);
 
     Some(SelectionBottleneckCase {
@@ -843,7 +859,9 @@ fn evaluate_selection_bottleneck(
         candidate_count,
         expected_family: world.truth.family,
         selected_family: selected_law.family,
-        family_recovered: selected_law.family == world.truth.family,
+        family_recovered,
+        oracle_pool_family_recovered,
+        selection_missed_oracle_family,
         selection_disposition: disposition_from_delta_bic(delta_bic_to_runner_up),
         delta_bic_to_runner_up,
         selected_training_nrmse,
@@ -872,6 +890,16 @@ fn summarize_selection_bottleneck(
         candidates_per_family,
         case_count: selected.len(),
         family_recovery_rate: recovered as f64 / count,
+        oracle_pool_family_recovery_rate: selected
+            .iter()
+            .filter(|row| row.oracle_pool_family_recovered)
+            .count() as f64
+            / count,
+        selection_missed_oracle_family_rate: selected
+            .iter()
+            .filter(|row| row.selection_missed_oracle_family)
+            .count() as f64
+            / count,
         mean_selected_heldout_nrmse: selected
             .iter()
             .map(|row| row.selected_heldout_nrmse)
@@ -1238,6 +1266,10 @@ mod tests {
             assert!(row.oracle_pool_heldout_nrmse.is_finite());
             assert!(row.selection_regret_nrmse.is_finite());
             assert!(row.selection_regret_nrmse >= 0.0);
+            assert_eq!(
+                row.selection_missed_oracle_family,
+                row.oracle_pool_family_recovered && !row.family_recovered
+            );
             assert!(
                 row.oracle_pool_heldout_nrmse <= row.selected_heldout_nrmse + 1.0e-12,
                 "pool oracle must be no worse than the selected candidate"
@@ -1284,6 +1316,8 @@ mod tests {
             assert_eq!(summary.case_count, 9 * SELECTION_REPLICATION_COUNT);
             assert!(summary.family_recovery_rate.is_finite());
             assert!((0.0..=1.0).contains(&summary.family_recovery_rate));
+            assert!((0.0..=1.0).contains(&summary.oracle_pool_family_recovery_rate));
+            assert!((0.0..=1.0).contains(&summary.selection_missed_oracle_family_rate));
             assert!(summary.mean_selected_heldout_nrmse.is_finite());
             assert!(summary.mean_oracle_pool_heldout_nrmse.is_finite());
             assert!(summary.mean_selection_regret_nrmse.is_finite());
