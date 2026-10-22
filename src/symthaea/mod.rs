@@ -23,7 +23,7 @@ mod school;
 
 // ── Re-exports ────────────────────────────────────────────────────────────
 
-pub use relational::{PartnershipState, PhiDyadStatus};
+pub use relational::{PartnershipState, PartnerStateEvidenceStatus, PhiDyadStatus};
 #[cfg(feature = "school_learning")]
 pub use school::{CurriculumObjectiveSummary, CurriculumReport};
 
@@ -2646,8 +2646,9 @@ impl Symthaea {
         // ====================================================================
         // PHASE 7: PARTNERSHIP UPDATE
         // ====================================================================
-        let consciousness = thought.psi as f32;
-        self.update_partnership(content, consciousness);
+        // Record the turn without inferring trust/safety/mutuality from the
+        // system's own consciousness-related scalar.
+        self.relational.record_interaction();
 
         // This buffer contains the user's utterance embedding. Do not label it
         // as an AI state; no assistant-response or independent partner-state stream
@@ -3570,11 +3571,6 @@ impl Symthaea {
             }
         }
         loops
-    }
-
-    /// Update partnership model based on interaction.
-    fn update_partnership(&mut self, _content: &str, consciousness: f32) {
-        self.relational.update_partnership(consciousness);
     }
 
     // ========================================================================
