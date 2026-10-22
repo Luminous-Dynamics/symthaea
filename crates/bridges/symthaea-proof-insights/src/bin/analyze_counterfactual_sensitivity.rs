@@ -737,7 +737,11 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
             40,
             &format!("{source_context}.source_commit"),
         )?;
-        let source_artifact_digest = required_string(source, "source_artifact_sha256", &source_context)?;
+        let source_artifact_digest = required_string(
+            source,
+            "source_artifact_sha256",
+            &source_context,
+        )?;
         let insight_digest = required_string(source, "insight_sha256", &source_context)?;
         validate_digest(
             source_artifact_digest,
@@ -755,9 +759,13 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
             source_artifact_digest.to_owned(),
             insight_digest.to_owned(),
         );
-        if let Some(previous) = source_record_identity.insert(source_record_id.clone(), identity.clone()) {
+        if let Some(previous) =
+            source_record_identity.insert(source_record_id.clone(), identity.clone())
+        {
             if previous != identity {
-                bail!("{source_context}: source record ID maps to conflicting immutable provenance");
+                bail!(
+                    "{source_context}: source record ID maps to conflicting immutable provenance"
+                );
             }
         }
 
@@ -827,9 +835,13 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
             (counterfactual_path, counterfactual_artifact_digest.as_str()),
         ] {
             let key = (target_commit.to_owned(), artifact_path.to_owned());
-            if let Some(previous) = target_artifact_identity.insert(key, artifact_digest.to_owned()) {
+            if let Some(previous) =
+                target_artifact_identity.insert(key, artifact_digest.to_owned())
+            {
                 if previous != artifact_digest {
-                    bail!("{target_context}: one pinned commit/path maps to conflicting artifact digests");
+                    bail!(
+                        "{target_context}: one pinned commit/path maps to conflicting artifact digests"
+                    );
                 }
             }
         }
