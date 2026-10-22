@@ -1,0 +1,420 @@
+{
+  "schema_version": "hdc-public-benchmark-manifest-v1",
+  "benchmark_id": "symthaea-hdc-vsa-public-suite",
+  "status": "metadata_only",
+  "created_date": "2026-10-22",
+  "purpose": "Machine-readable provenance and comparison contract for a Rust-first reproduction of the published seven-task HDC/VSA classification benchmark. This manifest records source and protocol review state; it does not attest that datasets were downloaded, licensed for redistribution, or evaluated.",
+  "reference_protocol": {
+    "paper_title": "Classification using hyperdimensional computing: a review with comparative analysis",
+    "published_date": "2025-03-17",
+    "doi": "10.1007/s10462-025-11181-2",
+    "paper_url": "https://link.springer.com/article/10.1007/s10462-025-11181-2",
+    "reference_code_url": "https://github.com/hyperdimensional-computing/torchhd",
+    "benchmark_dimensions": 10000,
+    "repetitions": 5,
+    "reference_hdc_task_count": 7,
+    "reference_uci_task_count": 121,
+    "reference_defaults": "Keep paper-default configurations in a distinct track. Do not claim exact reproduction until the benchmark code revision, transforms, weights and split handling are pinned for every task.",
+    "reproduction_status": "protocol_identified_code_revision_not_yet_pinned"
+  },
+  "policies": {
+    "data_handling": "Download only from recorded upstream or author-designated sources. This repository does not redistribute raw data or derived benchmark artifacts.",
+    "license_handling": "License claims transcribe upstream metadata where available; they are not legal advice or a determination that redistribution/transformation is permitted.",
+    "artifact_hashing": "A source artifact is not trusted until its bytes, SHA-256, source URL and deterministic transformed-split digest are recorded.",
+    "preprocessing": "Fit scalers, vocabularies, feature selection and learned transforms on training data only, unless the cited reference protocol explicitly specifies otherwise.",
+    "evaluation": "Use published test splits when available; do not tune on test data; report per-task outcomes before aggregate summaries.",
+    "fairness": "Compare reference-default configurations separately from equal-budget tuning. Methods share the exact same splits and query samples.",
+    "claim_ceiling": "Metadata validation is not data ingestion, license clearance, benchmark execution, or a SOTA claim."
+  },
+  "metrics": [
+    "accuracy",
+    "macro_f1",
+    "per_class_recall",
+    "train_wall_ms",
+    "single_query_latency_p50_ms",
+    "single_query_latency_p95_ms",
+    "single_query_latency_p99_ms",
+    "batch_throughput_queries_per_s",
+    "model_payload_bytes",
+    "peak_rss_bytes",
+    "update_wall_ms",
+    "selective_risk",
+    "coverage",
+    "ood_false_accept_rate"
+  ],
+  "comparison_tracks": [
+    {
+      "id": "reference_defaults",
+      "description": "Reproduce documented reference configurations and preprocessing as closely as available source evidence permits.",
+      "tuning_budget": "none_beyond_reference_defaults",
+      "status": "planned"
+    },
+    {
+      "id": "equal_budget_tuning",
+      "description": "Tune only on train/validation data with the same declared search budget; never select using the published test split.",
+      "tuning_budget": "declared_per_task_and_method",
+      "status": "planned"
+    },
+    {
+      "id": "resource_matched",
+      "description": "Compare both equal-dimension and equal-model-byte configurations, counting preprocessing and index/model state.",
+      "tuning_budget": "reuse_selected_parameters_from_other_tracks",
+      "status": "planned"
+    }
+  ],
+  "methods": [
+    {
+      "id": "centroid_prototype",
+      "family": "prototype",
+      "reference": "Centroid / class-prototype baseline",
+      "status": "planned",
+      "notes": "State the numeric representation and deterministic tie policy."
+    },
+    {
+      "id": "map_bipolar_prototype",
+      "family": "vsa",
+      "reference": "MAP / bipolar prototype",
+      "status": "planned",
+      "notes": "Bipolar vector representation; count actual storage bytes."
+    },
+    {
+      "id": "bsc_binary_prototype",
+      "family": "vsa",
+      "reference": "BSC / binary prototype",
+      "status": "planned",
+      "notes": "Count packed bits correctly; do not count one bit as one byte."
+    },
+    {
+      "id": "hrr_real_prototype",
+      "family": "vsa",
+      "reference": "HRR / real-valued baseline",
+      "status": "planned",
+      "notes": "Use declared circular-convolution binding and circular-correlation unbinding."
+    },
+    {
+      "id": "onlinehd",
+      "family": "published_hdc",
+      "reference": "OnlineHD",
+      "status": "planned",
+      "notes": "Requires a faithful implementation or version-pinned reference adapter."
+    },
+    {
+      "id": "adapthd",
+      "family": "published_hdc",
+      "reference": "AdaptHD",
+      "status": "planned",
+      "notes": "Requires a faithful implementation or version-pinned reference adapter."
+    },
+    {
+      "id": "disthd",
+      "family": "published_hdc",
+      "reference": "DistHD",
+      "status": "planned",
+      "notes": "Requires a faithful implementation or version-pinned reference adapter."
+    },
+    {
+      "id": "sparsehd",
+      "family": "published_hdc",
+      "reference": "SparseHD",
+      "status": "planned",
+      "notes": "Report sparse representation, preprocessing and actual model bytes."
+    },
+    {
+      "id": "svm_raw",
+      "family": "conventional_ml",
+      "reference": "SVM on source features",
+      "status": "planned",
+      "notes": "Include a strong external baseline; report kernel/configuration and tuning budget."
+    },
+    {
+      "id": "lda_raw",
+      "family": "conventional_ml",
+      "reference": "LDA on source features",
+      "status": "planned",
+      "notes": "Fit scaling and covariance regularization on training data only."
+    },
+    {
+      "id": "ridge_raw",
+      "family": "conventional_ml",
+      "reference": "Ridge classifier on source features",
+      "status": "planned",
+      "notes": "Declare regularization grid and solver."
+    },
+    {
+      "id": "svm_encoded",
+      "family": "conventional_ml",
+      "reference": "SVM on the same encoded representation",
+      "status": "planned",
+      "notes": "Separates representation benefit from prototype-decoder limitations."
+    },
+    {
+      "id": "lda_encoded",
+      "family": "conventional_ml",
+      "reference": "LDA on the same encoded representation",
+      "status": "planned",
+      "notes": "Separates representation benefit from prototype-decoder limitations."
+    },
+    {
+      "id": "ridge_encoded",
+      "family": "conventional_ml",
+      "reference": "Ridge classifier on the same encoded representation",
+      "status": "planned",
+      "notes": "Separates representation benefit from prototype-decoder limitations."
+    },
+    {
+      "id": "rvfl_raw",
+      "family": "conventional_ml",
+      "reference": "Random Vector Functional Link (RVFL) on source features",
+      "status": "planned",
+      "notes": "Include because published HDC comparisons report strong UCI accuracy; declare random hidden-layer width, seed, activation and tuning budget."
+    },
+    {
+      "id": "rvfl_encoded",
+      "family": "conventional_ml",
+      "reference": "RVFL on the same encoded representation",
+      "status": "planned",
+      "notes": "Separates representation benefit from decoder benefit; account for hidden-layer and matrix state in model bytes."
+    }
+  ],
+  "datasets": [
+    {
+      "id": "cifar10",
+      "benchmark_group": "hdc_application_suite",
+      "display_name": "CIFAR-10",
+      "task": "image_classification",
+      "reference_observations": 60000,
+      "classes": 10,
+      "sources": [
+        {
+          "role": "raw_dataset",
+          "url": "https://www.cs.toronto.edu/~kriz/cifar.html",
+          "citation": "Krizhevsky, A. (2009). Learning Multiple Layers of Features from Tiny Images.",
+          "license_claim": "terms_require_review",
+          "license_evidence_url": "https://www.cs.toronto.edu/~kriz/cifar.html",
+          "license_review_status": "review_required"
+        }
+      ],
+      "reference_preprocessing": {
+        "representation": "pretrained_two_layer_cnn_features",
+        "status": "needs_exact_reference_transform",
+        "notes": "The reference suite uses features extracted by a pretrained two-layer CNN, not raw RGB pixels. Pin extractor source revision, weights digest, output layer, normalization and transformed-feature SHA-256."
+      },
+      "split_policy": {
+        "kind": "published_reference_split",
+        "status": "needs_source_audit",
+        "notes": "Audit the reference code for exact split, ordering and transform. Any raw-pixel experiment is a separate track."
+      },
+      "artifact": {
+        "status": "not_materialized",
+        "sha256": null,
+        "bytes": null
+      }
+    },
+    {
+      "id": "emg_hand_gestures",
+      "benchmark_group": "hdc_application_suite",
+      "display_name": "EMG Data for Gestures / EMGHandGestures",
+      "task": "time_series_classification",
+      "reference_observations": 30000,
+      "classes": null,
+      "sources": [
+        {
+          "role": "raw_dataset",
+          "url": "https://archive.ics.uci.edu/dataset/481/emg%2Bdata",
+          "citation": "Krilova et al. (2018). EMG Data for Gestures. UCI Machine Learning Repository. DOI 10.24432/C5ZP5C.",
+          "license_claim": "CC-BY-4.0",
+          "license_evidence_url": "https://archive.ics.uci.edu/dataset/481/emg%2Bdata",
+          "license_review_status": "upstream_metadata"
+        }
+      ],
+      "reference_preprocessing": {
+        "representation": "reference_temporal_or_feature_pipeline",
+        "status": "needs_exact_reference_transform",
+        "notes": "Eight forearm EMG channels and multiple subjects. Pin segmentation/statistics and handling of rest/unmarked class 0; random row splits risk subject and temporal leakage."
+      },
+      "split_policy": {
+        "kind": "published_reference_split_with_subject_holdout_diagnostic",
+        "status": "needs_source_audit",
+        "notes": "Pin the reference split; report subject-held-out generalization separately."
+      },
+      "artifact": {
+        "status": "not_materialized",
+        "sha256": null,
+        "bytes": null
+      }
+    },
+    {
+      "id": "european_languages",
+      "benchmark_group": "hdc_application_suite",
+      "display_name": "European Languages",
+      "task": "language_classification",
+      "reference_observations": null,
+      "classes": 21,
+      "sources": [
+        {
+          "role": "training_corpus",
+          "url": "https://wortschatz.uni-leipzig.de/en/download/",
+          "citation": "Wortschatz Corpora, Leipzig University.",
+          "license_claim": "component_terms_require_review",
+          "license_evidence_url": "https://wortschatz.uni-leipzig.de/en/download/",
+          "license_review_status": "review_required"
+        },
+        {
+          "role": "test_corpus",
+          "url": "https://www.statmt.org/europarl/",
+          "citation": "Koehn (2005). Europarl: A Parallel Corpus for Statistical Machine Translation.",
+          "license_claim": "upstream_page_reports_no_known_copyright_restrictions_contact_provider",
+          "license_evidence_url": "https://www.statmt.org/europarl/",
+          "license_review_status": "review_required"
+        }
+      ],
+      "reference_preprocessing": {
+        "representation": "character_trigram_counts",
+        "status": "needs_exact_reference_transform",
+        "notes": "Training uses Wortschatz text and testing uses Europarl. Pin corpus versions, language subset, normalization, trigram vocabulary policy and scaling. Fit learned vocabulary on training text only."
+      },
+      "split_policy": {
+        "kind": "cross_corpus_train_test",
+        "status": "reference_structure_known",
+        "notes": "Distinct train/test corpus sources are intentional; do not replace this with a random split."
+      },
+      "artifact": {
+        "status": "not_materialized",
+        "sha256": null,
+        "bytes": null
+      }
+    },
+    {
+      "id": "isolet",
+      "benchmark_group": "hdc_application_suite",
+      "display_name": "ISOLET",
+      "task": "spoken_letter_classification",
+      "reference_observations": 7797,
+      "classes": 26,
+      "sources": [
+        {
+          "role": "raw_dataset",
+          "url": "https://archive.ics.uci.edu/dataset/54/isolet",
+          "citation": "Cole & Fanty (1991). ISOLET. UCI Machine Learning Repository. DOI 10.24432/C51G69.",
+          "license_claim": "CC-BY-4.0",
+          "license_evidence_url": "https://archive.ics.uci.edu/dataset/54/isolet",
+          "license_review_status": "upstream_metadata"
+        }
+      ],
+      "reference_preprocessing": {
+        "representation": "617_real_valued_features",
+        "status": "source_features_described",
+        "notes": "UCI reports 7,797 examples and a speaker-grouped split. Preserve isolet1+2+3+4 for training and isolet5 for testing; do not repartition rows randomly."
+      },
+      "split_policy": {
+        "kind": "official_speaker_group_split",
+        "status": "source_split_described",
+        "notes": "Record source file names and dropped/missing observations."
+      },
+      "artifact": {
+        "status": "not_materialized",
+        "sha256": null,
+        "bytes": null
+      }
+    },
+    {
+      "id": "mnist",
+      "benchmark_group": "hdc_application_suite",
+      "display_name": "MNIST",
+      "task": "handwritten_digit_classification",
+      "reference_observations": 70000,
+      "classes": 10,
+      "sources": [
+        {
+          "role": "raw_dataset",
+          "url": "https://yann.lecun.com/exdb/mnist/",
+          "citation": "LeCun, Cortes & Burges (2010). MNIST handwritten digit database.",
+          "license_claim": "CC-BY-SA-3.0_reported_by_Keras_dataset_docs",
+          "license_evidence_url": "https://keras.io/api/datasets/mnist/",
+          "license_review_status": "review_required"
+        }
+      ],
+      "reference_preprocessing": {
+        "representation": "pretrained_two_layer_cnn_features",
+        "status": "needs_exact_reference_transform",
+        "notes": "Reference suite uses features from a pretrained two-layer CNN, not directly the raw pixels. Pin architecture/source revision, weights digest, output layer, normalization and transformed-feature digest; raw-pixel results are separate."
+      },
+      "split_policy": {
+        "kind": "official_60000_train_10000_test",
+        "status": "source_split_described",
+        "notes": "Keep the canonical 60,000 training / 10,000 test partition."
+      },
+      "artifact": {
+        "status": "not_materialized",
+        "sha256": null,
+        "bytes": null
+      }
+    },
+    {
+      "id": "pamap2",
+      "benchmark_group": "hdc_application_suite",
+      "display_name": "PAMAP2 Physical Activity Monitoring",
+      "task": "wearable_activity_classification",
+      "reference_observations": 3850505,
+      "classes": 18,
+      "sources": [
+        {
+          "role": "raw_dataset",
+          "url": "https://archive.ics.uci.edu/dataset/231/pamap2%2Bphysical%2Bactivity%2Bmonitoring",
+          "citation": "Reiss (2012). PAMAP2 Physical Activity Monitoring. UCI Machine Learning Repository. DOI 10.24432/C5NW2H.",
+          "license_claim": "CC-BY-4.0_in_current_UCI_metadata; original_readme_says_free_for_academic_research",
+          "license_evidence_url": "https://archive.ics.uci.edu/dataset/231/pamap2%2Bphysical%2Bactivity%2Bmonitoring",
+          "license_review_status": "review_required"
+        }
+      ],
+      "reference_preprocessing": {
+        "representation": "wearable_sensor_time_series_or_reference_features",
+        "status": "needs_exact_reference_transform",
+        "notes": "Preserve subject/session structure, missing-value handling and timestamps. Do not randomly split overlapping windows across train/test."
+      },
+      "split_policy": {
+        "kind": "subject_aware_or_reference_split_after_audit",
+        "status": "needs_source_audit",
+        "notes": "Pin reference preprocessing/splits; report subject-held-out performance separately."
+      },
+      "artifact": {
+        "status": "not_materialized",
+        "sha256": null,
+        "bytes": null
+      }
+    },
+    {
+      "id": "ucihar",
+      "benchmark_group": "hdc_application_suite",
+      "display_name": "UCI Human Activity Recognition Using Smartphones",
+      "task": "wearable_activity_classification",
+      "reference_observations": 10299,
+      "classes": 6,
+      "sources": [
+        {
+          "role": "raw_dataset",
+          "url": "https://archive.ics.uci.edu/dataset/240/human%2Bactivity%2Brecognition%2Busing%2Bsmartphones",
+          "citation": "Reyes-Ortiz et al. (2013). Human Activity Recognition Using Smartphones. UCI Machine Learning Repository. DOI 10.24432/C54S4K.",
+          "license_claim": "CC-BY-4.0",
+          "license_evidence_url": "https://archive.ics.uci.edu/dataset/240/human%2Bactivity%2Brecognition%2Busing%2Bsmartphones",
+          "license_review_status": "upstream_metadata"
+        }
+      ],
+      "reference_preprocessing": {
+        "representation": "561_engineered_sensor_features",
+        "status": "source_features_described",
+        "notes": "Preserve packaged train/test windows and subject identifiers. For end-to-end raw IMU work, report windowing/filtering as a separate track."
+      },
+      "split_policy": {
+        "kind": "official_subject_disjoint_split",
+        "status": "source_split_described",
+        "notes": "Preserve the packaged subject-disjoint split; audit the feature-generation procedure before describing results as raw-sensor end-to-end."
+      },
+      "artifact": {
+        "status": "not_materialized",
+        "sha256": null,
+        "bytes": null
+      }
+    }
+  ]
+}

@@ -109,6 +109,11 @@ required-features = ["abstract_thought"]
 name = "cross_domain_query"
 path = "examples/cross_domain_query.rs"
 
+[[example]]
+name = "hdc_public_benchmark_manifest"
+path = "examples/hdc_public_benchmark_manifest.rs"
+test = true
+
 # scaling_study_demo: module not yet wired into physics/mod.rs; exclude from default build
 [[example]]
 name = "scaling_study_demo"

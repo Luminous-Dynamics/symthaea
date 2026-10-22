@@ -1,0 +1,99 @@
+name: HDC Public Benchmark Manifest
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/hdc-public-benchmark-manifest.yml"
+      - "crates/core/symthaea-core/examples/hdc_public_benchmark_manifest.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "docs/research/hdc-public-benchmark-manifest.json"
+      - "docs/research/schemas/hdc-public-benchmark-manifest-v1.schema.json"
+      - "docs/research/HDC_PUBLIC_BENCHMARK_MANIFEST.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/hdc-public-benchmark-manifest.yml"
+      - "crates/core/symthaea-core/examples/hdc_public_benchmark_manifest.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "docs/research/hdc-public-benchmark-manifest.json"
+      - "docs/research/schemas/hdc-public-benchmark-manifest-v1.schema.json"
+      - "docs/research/HDC_PUBLIC_BENCHMARK_MANIFEST.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hdc-public-benchmark-manifest-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  manifest-contract:
+    name: Validate public benchmark manifest contract
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check manifest and schema JSON structure
+        run: |
+          set -euo pipefail
+          jq -e '
+            .schema_version == "hdc-public-benchmark-manifest-v1" and
+            .status == "metadata_only" and
+            (.datasets | length == 7) and
+            ([.datasets[].id] | unique | length == 7) and
+            ([.datasets[].artifact.status] | all(. == "not_materialized")) and
+            ([.datasets[].artifact.sha256] | all(. == null)) and
+            ([.datasets[].artifact.bytes] | all(. == null))
+          ' docs/research/hdc-public-benchmark-manifest.json >/dev/null
+          jq -e '
+            .["$schema"] == "https://json-schema.org/draft/2020-12/schema" and
+            .properties.schema_version.const == "hdc-public-benchmark-manifest-v1" and
+            .properties.datasets.minItems == 7 and
+            .properties.datasets.maxItems == 7
+          ' docs/research/schemas/hdc-public-benchmark-manifest-v1.schema.json >/dev/null
+
+      - name: Resolve locked workspace metadata
+        run: cargo metadata --locked --format-version 1 >/dev/null
+
+      - name: Check validator formatting
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hdc_public_benchmark_manifest.rs
+
+      - name: Test manifest and negative controls
+        run: cargo test --locked --release -p symthaea-core --example hdc_public_benchmark_manifest -- --nocapture
+
+      - name: Run manifest receipt
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-core --example hdc_public_benchmark_manifest 2>&1 | tee research-results/hdc-public-benchmark-manifest.log
+          sha256sum docs/research/hdc-public-benchmark-manifest.json docs/research/schemas/hdc-public-benchmark-manifest-v1.schema.json research-results/hdc-public-benchmark-manifest.log > research-results/SHA256SUMS
+          cat research-results/SHA256SUMS
+
+      - name: Upload manifest validation receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hdc-public-benchmark-manifest-${{ github.event.pull_request.head.sha || github.sha }}
+          path: research-results/
+          if-no-files-found: warn
+          retention-days: 30
