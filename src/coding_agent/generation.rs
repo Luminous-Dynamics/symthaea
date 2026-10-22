@@ -188,6 +188,7 @@ impl CodingAgent {
                     backend_name: "NativeCodeTemplate".to_string(),
                     success: native_candidate.as_ref().is_some_and(|code| !code.trim().is_empty()),
                     elapsed_ms: native_elapsed_ms,
+                    estimated_energy_cost: BackendTier::Native.estimated_energy_cost(),
                 });
                 if let Some(code) = native_candidate {
                     let target = self.resolve_target_file();
