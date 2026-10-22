@@ -753,6 +753,7 @@ mod tests {
         };
         assert!(alice.verify_response(2, &signature, &bob_pubkey));
         let trusted_key = alice.paired_devices()[0].pubkey;
+        let _ = alice.drain_outbound(); // discard the expected Ack
 
         // A different key can produce a cryptographically valid response, but
         // it must not replace the identity already pinned to peer ID 2.
@@ -775,6 +776,7 @@ mod tests {
         assert!(!alice.verify_response(2, &signature, &mallory_pubkey));
         assert_eq!(alice.paired_count(), 1);
         assert_eq!(alice.paired_devices()[0].pubkey, trusted_key);
+        let _ = alice.drain_outbound(); // discard the expected Reject
 
         // Changing identity is possible only after explicit local trust reset.
         assert!(alice.forget_peer(2));
@@ -796,7 +798,10 @@ mod tests {
             other => panic!("Expected Response, got {:?}", other),
         };
         assert!(alice.verify_response(2, &signature, &mallory_pubkey));
-        assert_eq!(alice.paired_devices()[0].pubkey, mallory_pubkey[..32].try_into().unwrap());
+        assert_eq!(
+            alice.paired_devices()[0].pubkey.as_slice(),
+            mallory_pubkey.as_slice()
+        );
     }
 
     #[test]
