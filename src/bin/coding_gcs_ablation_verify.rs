@@ -144,11 +144,11 @@ fn verify_mode_summary(
         .iter()
         .map(|run| u64_field(run, "agent_elapsed_ms").unwrap_or(0))
         .fold(0_u64, u64::saturating_add);
-    let mut agent_times: Vec<u64> = selected_runs
+    let agent_times: Vec<u64> = selected_runs
         .iter()
         .map(|run| u64_field(run, "agent_elapsed_ms").unwrap_or(0))
         .collect();
-    let mut verification_times: Vec<u64> = selected_runs
+    let verification_times: Vec<u64> = selected_runs
         .iter()
         .map(|run| u64_field(run, "verification_elapsed_ms").unwrap_or(0))
         .collect();
@@ -1495,7 +1495,7 @@ mod tests {
 
     #[test]
     fn latency_percentiles_use_nearest_rank_and_reject_invalid_input() {
-        let mut values = vec![120_u64, 10, 100, 20];
+        let values = vec![120_u64, 10, 100, 20];
         assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.50), Some(20));
         assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.95), Some(120));
         assert_eq!(nearest_rank_percentile(&mut values.clone(), 1.0), Some(120));
