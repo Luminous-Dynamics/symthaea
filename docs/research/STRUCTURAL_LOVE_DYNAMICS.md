@@ -247,4 +247,5 @@ A separate synthesis examines possible relations among love-consistent behavior,
 
 The cross-scale extension is MeasurementOnly: it does not authorize runtime changes, claim that Φ measures love, or establish subjective experience.
 
-- [Baseline and comparison protocol](structural-love-dynamics/BASELINE_PROTOCOL.md) defines the benchmark strata, SOTA comparators, non-compensable gates, ablations, corpus growth, reproducibility receipts, and no-go criteria. It explicitly positions SLD as complementary to MentalHealthBench, Emotional Dynamic Trajectories, RESCUE-BENCH, and ESConv/ESC-Eval rather than claiming those areas as new.
+- [Baseline and comparison protocol](structural-love-dynamics/BASELINE_PROTOCOL.md) defines the benchmark strata, SOTA comparators, non-compensable gates, ablations, corpus growth, reproducibility receipts, and no-go criteria.
+- [Measurement-integrity red-team tranche](structural-love-dynamics/MEASUREMENT_INTEGRITY_RED_TEAM.md) specifies provenance, replay, transformation, and endogenous-feedback attacks; a draft corpus adds six candidate cases across three contrastive groups. Cases remain unreviewed, and their presence is not evidence of a model-level pass. It explicitly positions SLD as complementary to MentalHealthBench, Emotional Dynamic Trajectories, RESCUE-BENCH, and ESConv/ESC-Eval rather than claiming those areas as new.
