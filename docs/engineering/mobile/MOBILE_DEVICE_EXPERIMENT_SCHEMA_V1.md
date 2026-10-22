@@ -19,7 +19,7 @@ cargo run -p symthaea-soma --release --bin mobile-benchmark-analyze -- \
   docs/engineering/mobile/fixtures/mobile_benchmark_analyzer_smoke_v1.json
 ```
 
-It should emit a JSON summary with `measurement_origin=synthetic_fixture`, `energy_gate_evaluable=false`, and `qualified_pass=false`, even though the synthetic candidate data has lower nominal energy. This is a fixture expectation, not a claimed run result.
+It should emit a JSON summary with `measurement_origin=synthetic_fixture`, `energy_gate_evaluable=false`, and `declared_gates_pass=false`, even though the synthetic candidate data has lower nominal energy. This is a fixture expectation, not a claimed run result.
 
 ## Record shape
 
@@ -53,4 +53,4 @@ Each sample contains a unique `pair_id`, `scenario_id`, and `baseline` / `candid
 - One privacy violation hard-fails the qualification gate regardless of energy gain.
 - `qualified_pass` is a narrow benchmark gate—not a general claim of industry superiority, battery-life improvement, device security certification, or consciousness.
 
-The analyzer does not calculate a sample hash or claim that a supplied digest is authentic; the acquisition pipeline must hash and preserve the actual canonical artifacts before analysis. Hash-shaped placeholder values in the synthetic fixture are only test identifiers.
+The analyzer does not authenticate calibration records, device attestations, meter traces, or supplied digests; the acquisition pipeline must hash and preserve the actual canonical artifacts before analysis. The JSON report explicitly emits `evidence_receipt_verified=false` and `declared_gates_pass` must not be described as independently verified qualification. Hash-shaped placeholder values in the synthetic fixture are only test identifiers.
