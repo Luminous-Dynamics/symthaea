@@ -156,8 +156,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                         reference_states.iter().map(|state| [state[0], state[1]]),
                         scale,
                     );
+                    // `ode_solvers` output times are accumulated floating-point samples;
+                    // terminal-time validation needs a roundoff envelope, not a single ULP.
+                    let terminal_time_tolerance = 32.0 * f64::EPSILON * T_END.abs().max(1.0);
                     let completed = endpoint_time.is_finite()
-                        && (endpoint_time - T_END).abs() <= f64::EPSILON * T_END.max(1.0);
+                        && (endpoint_time - T_END).abs() <= terminal_time_tolerance;
                     let finite = endpoint_error.is_finite()
                         && energy_drift.is_finite()
                         && reference_states
@@ -169,7 +172,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                         && energy_drift <= energy_drift_limit;
                     all_passed &= pass;
                     format!(
-                        "\"dopri5_endpoint_error_scaled\":{:.17e},\"dopri5_sampled_energy_drift\":{:.17e},\"dopri5_accepted_steps\":{},\"dopri5_rejected_steps\":{},\"dopri5_rhs_evaluations\":{},\"dopri5_output_samples\":{},\"dopri5_complete\":{},\"dopri5_finite\":{},\"dopri5_pass\":{}",
+                        "\"dopri5_terminal_time\":{:.17e},\"dopri5_terminal_time_error\":{:.17e},\"dopri5_terminal_time_tolerance\":{:.17e},\"dopri5_endpoint_error_scaled\":{:.17e},\"dopri5_sampled_energy_drift\":{:.17e},\"dopri5_accepted_steps\":{},\"dopri5_rejected_steps\":{},\"dopri5_rhs_evaluations\":{},\"dopri5_output_samples\":{},\"dopri5_complete\":{},\"dopri5_finite\":{},\"dopri5_pass\":{}",
+                        endpoint_time,
+                        (endpoint_time - T_END).abs(),
+                        terminal_time_tolerance,
                         endpoint_error,
                         energy_drift,
                         stats.accepted_steps,
