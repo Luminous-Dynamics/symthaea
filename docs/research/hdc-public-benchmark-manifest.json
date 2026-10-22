@@ -160,6 +160,20 @@
       "reference": "Ridge classifier on the same encoded representation",
       "status": "planned",
       "notes": "Separates representation benefit from prototype-decoder limitations."
+    },
+    {
+      "id": "rvfl_raw",
+      "family": "conventional_ml",
+      "reference": "Random Vector Functional Link (RVFL) on source features",
+      "status": "planned",
+      "notes": "Include because published HDC comparisons report strong UCI accuracy; declare random hidden-layer width, seed, activation and tuning budget."
+    },
+    {
+      "id": "rvfl_encoded",
+      "family": "conventional_ml",
+      "reference": "RVFL on the same encoded representation",
+      "status": "planned",
+      "notes": "Separates representation benefit from decoder benefit; account for hidden-layer and matrix state in model bytes."
     }
   ],
   "datasets": [
