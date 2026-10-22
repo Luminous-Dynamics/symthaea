@@ -12,7 +12,7 @@ Four complementary forms of evidence now coexist in the research branch:
 3. A finite **abstract lifecycle state model** explores 84 reachable states and 1,344 state/action transitions, while separate truth tables enumerate connectivity, freshness/presentation, sensitivity/consent and unknown normalization.
 4. A **model-to-production differential harness** constructs breadth-first shortest event histories for each reachable abstract state, appends each of the 16 actions, and compares ordered violation outputs on all 1,344 edges. It also compares all 18 orthogonal policy combinations against the production trace checker.
 
-These are complementary, not independent ground truth. The model is compiled only for tests and covers a smaller state space. These tests are implemented in source, but their latest exact-head execution is still pending; a matrix mapping is not a passing receipt.
+These are complementary, not independent ground truth. The model is compiled only for tests and covers a smaller state space. The CI workflow now extracts measured 1,344-edge and 18-policy counts from the actual test output, fails if they differ or are absent, and binds both numbers into the receipt. These tests are implemented in source, but their latest exact-head execution is still pending; a matrix mapping is not a passing receipt.
 
 ## Invariant crosswalk
 
