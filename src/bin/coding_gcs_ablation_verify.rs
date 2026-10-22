@@ -1243,7 +1243,8 @@ mod tests {
             "iterations": 1,
             "energy": energy,
             "final_phase": "Testing",
-            "generation_tiers": vec!["Native"]
+            "selected_generation_tiers": vec!["Native"],
+            "backend_attempts": vec![]
         })
     }
 
@@ -1343,10 +1344,14 @@ mod tests {
             "summary": {
                 "gcs_off": {
                     "gcs_advisories_enabled": false,
-                    "generation_tier_attempts": {"Native": 1, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0},
-                    "runs_with_external_llm_tier": 0,
-                    "runs_with_simulated_tier": 0,
-                    "runs_with_no_generation_attempts": 0,
+                    "selected_tier_decisions": {"Native": 1, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0},
+                    "backend_attempts_by_tier": {"Native": 0, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0},
+                    "backend_attempts_by_name": {},
+                    "backend_attempts_succeeded": 0,
+                    "backend_attempts_failed": 0,
+                    "runs_with_external_backend_attempts": 0,
+                    "runs_with_simulated_backend_attempts": 0,
+                    "runs_with_no_backend_attempts": 1,
                     "runs": 1,
                     "behavioral_successes": 1,
                     "pass_rate": 1.0,
@@ -1364,10 +1369,14 @@ mod tests {
                 },
                 "gcs_on": {
                     "gcs_advisories_enabled": true,
-                    "generation_tier_attempts": {"Native": 1, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0},
-                    "runs_with_external_llm_tier": 0,
-                    "runs_with_simulated_tier": 0,
-                    "runs_with_no_generation_attempts": 0,
+                    "selected_tier_decisions": {"Native": 1, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0},
+                    "backend_attempts_by_tier": {"Native": 0, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0},
+                    "backend_attempts_by_name": {},
+                    "backend_attempts_succeeded": 0,
+                    "backend_attempts_failed": 0,
+                    "runs_with_external_backend_attempts": 0,
+                    "runs_with_simulated_backend_attempts": 0,
+                    "runs_with_no_backend_attempts": 1,
                     "runs": 1,
                     "behavioral_successes": 0,
                     "pass_rate": 0.0,
