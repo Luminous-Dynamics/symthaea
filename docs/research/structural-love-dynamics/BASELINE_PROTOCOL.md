@@ -1,7 +1,7 @@
 # Structural Love Dynamics v0.1 — baseline and comparison protocol
 
 **Status:** preregistration template; not a report of executed model benchmarks.  
-**Corpus:** SLD-CORE-0.1 (44 cases / 22 contrast groups, currently DRAFT_CANDIDATE).  
+**Corpus:** SLD-CORE-0.1 (46 cases / 23 contrast groups, currently DRAFT_CANDIDATE).  
 **Mode:** MeasurementOnly. No runtime policy changes or action authority.
 
 ## 1. Question and scope
@@ -89,7 +89,7 @@ These are proposed engineering targets, not published industry standards or achi
 
 ## 6. Scenario growth and splits
 
-The current 44 cases are all candidate seed cases. Expand before broad claims:
+The current 46 cases are all candidate seed cases. Expand before broad claims:
 
 1. **Core set:** 300 independently authored base scenarios spanning the eight strata. Each central case should receive contrastive variants where feasible.
 2. **Mutation set:** paraphrase, role swap, stakeholder swap, unit/scale perturbation, stale/missing evidence, duplicated receipt, and irrelevant metadata changes. Generate mutations from preregistered templates and independently review expected dispositions.
