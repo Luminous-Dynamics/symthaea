@@ -161,6 +161,7 @@ impl CodingAgent {
             observations: self.observations.clone(),
             errors: self.errors.clone(),
             generation_tiers: self.generation_tiers.clone(),
+            selected_generation_tiers: self.selected_generation_tiers.clone(),
             actual_backend_attempts: self.actual_backend_attempts.clone(),
             total_energy: self.dispatcher.as_ref().map_or(0.0, |d| d.total_energy()),
             remaining_energy: self.energy_budget,
