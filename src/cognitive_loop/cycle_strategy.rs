@@ -11,7 +11,7 @@
 use std::time::Instant;
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
-use symthaea_core::hdc::predictive_encoder::EncodingResult;
+use symthaea_core::hdc::predictive_encoder::{EncodingResult, PredictionDegeneracy};
 
 use super::helpers;
 use super::thresholds::{
@@ -288,14 +288,19 @@ impl CognitiveLoopService {
         // 1. HDC encode with attention from previous prediction
         let _t_core = Instant::now();
         let mut encoding_result = self.encoder.encode(input);
-        let prediction_error = encoding_result.prediction_error;
+        // Degenerate 1.0 values remain on EncodingResult as explicit legacy
+        // sentinels, but they are not observations of surprise. Use zero control
+        // evidence until a genuine prediction comparison is available.
+        let prediction_error = match self.encoder.last_prediction_degeneracy() {
+            PredictionDegeneracy::Genuine => encoding_result.prediction_error,
+            PredictionDegeneracy::NoPrediction | PredictionDegeneracy::ZeroPrediction => 0.0,
+        };
         module_timings.core_hdc_encode = _t_core.elapsed().as_micros() as u64;
 
         // Surface degenerate prediction errors: PE=1.0 from an empty/zero-norm
         // prediction is a broken upstream signal, not real surprise (rate-limited
         // to powers of two so a persistent break doesn't flood the log).
         {
-            use symthaea_core::hdc::predictive_encoder::PredictionDegeneracy;
             if self.encoder.last_prediction_degeneracy() == PredictionDegeneracy::ZeroPrediction {
                 let n = self.encoder.stats().degenerate_zero_prediction_cycles;
                 if n.is_power_of_two() {
@@ -946,6 +951,23 @@ mod tests {
 
     fn make_service() -> CognitiveLoopService {
         CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+    }
+
+    #[test]
+    fn degenerate_encoder_sentinel_is_not_promoted_to_control_signal() {
+        let mut svc = make_service();
+        let mut timings = ModuleTimings::default();
+
+        let result =
+            svc.run_encoding_and_preprocessing("first input without a prior prediction", &mut timings);
+
+        assert_eq!(result.encoding_result.prediction_error, 1.0);
+        assert_eq!(
+            svc.encoder.last_prediction_degeneracy(),
+            PredictionDegeneracy::NoPrediction
+        );
+        assert_eq!(result.prediction_error, 0.0);
+        assert!(!result.surprise_triggered);
     }
 
     #[test]
