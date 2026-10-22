@@ -28,6 +28,10 @@ The sensing function has no sensor or actuator I/O and does not establish that i
 
 Research grounding: Krishna, Hu and Jayaraman, *The Value of Sensory Information to a Robot* (ICLR 2025), empirically studies sensing value by withholding task-relevant observations at different states and finds that sensing criticality depends strongly on task stochasticity and policy. This module is a new cost/risk-gated decision primitive; it does not reproduce that study or prove it improves any policy. The benchmark should compare no-extra-sensing, fixed-rate sensing, uncertainty-triggered sensing, and this cost-sensitive rule with matched trials and held-out conditions. Source: https://proceedings.iclr.cc/paper_files/paper/2025/hash/e1126028d9f1f69c13571ec462084d31-Abstract-Conference.html.
 
+The `sensing_benchmark` module provides matched-trial accounting for five arms: no-extra-sensing, fixed-rate, uncertainty-triggered, value-of-information, and placebo-cost. It requires exactly one record per arm in each scenario/seed/split/evidence cell. It reports completion and scored progress separately, calibrated Brier score when forecasts exist, sensing-only energy and latency with measured/missing counts, observation requests/acquisitions, total-episode resources, safety events, and paired comparisons against fixed-rate sensing. Family-cluster bootstrap intervals are withheld when there are fewer than five independent scenario families or too few bootstrap replicates. Missing sensing-cost observations are never imputed as zero, and any recorded safety violation marks the audit as failed while preserving the trial in the report.
+
+Eight synthetic tests exercise full five-arm matching, missing-arm rejection, safety-violation reporting, missing-energy handling, order invariance, progress/completion consistency, acquisition/request consistency, and missing forecasts. The arm records are generated fixture data, not a RoboDojo result. The output is a measurement contract; no arm is claimed to outperform another until real paired episodes run under a preregistered setup.
+
 ## Trial TSV schema
 
 The CLI requires this exact tab-separated header, in this order:
