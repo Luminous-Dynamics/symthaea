@@ -636,6 +636,118 @@ mod tests {
     }
 
     #[test]
+    fn checkpoint_resume_is_bitwise_equivalent_across_alpha_spent_episode() {
+        let losses = [
+            0.05, 0.10, 0.17, 0.22, 0.07, 0.31, 0.42, 0.12, 0.15, 0.28, 0.06,
+        ];
+        let split = 5;
+        let mut uninterrupted = MixtureBoundedRiskEProcess::new_with_alpha_spending(
+            0.15,
+            [0.25, 0.50, 0.75],
+            0.05,
+            20,
+            37,
+        )
+        .expect("valid alpha-spent stream");
+        for loss in &losses[..split] {
+            assert!(uninterrupted.observe(*loss).is_some());
+        }
+
+        let encoded = uninterrupted.encode_checkpoint();
+        let mut resumed =
+            MixtureBoundedRiskEProcess::from_checkpoint(&encoded).expect("valid checkpoint");
+        assert_eq!(resumed.episode_budget_index(), Some(37));
+        assert_eq!(
+            resumed.component_log_e_values(),
+            uninterrupted.component_log_e_values()
+        );
+        assert_eq!(
+            resumed.log_e_value().to_bits(),
+            uninterrupted.log_e_value().to_bits()
+        );
+        assert_eq!(resumed.alarmed(), uninterrupted.alarmed());
+
+        for loss in &losses[split..] {
+            assert_eq!(resumed.observe(*loss), uninterrupted.observe(*loss));
+            assert_eq!(
+                resumed.component_log_e_values(),
+                uninterrupted.component_log_e_values()
+            );
+            assert_eq!(
+                resumed.log_e_value().to_bits(),
+                uninterrupted.log_e_value().to_bits()
+            );
+            assert_eq!(resumed.alarmed(), uninterrupted.alarmed());
+        }
+    }
+
+    #[test]
+    fn checkpoint_restore_fails_closed_on_corruption_truncation_and_wrong_version() {
+        let mut monitor = MixtureBoundedRiskEProcess::new_with_alpha_spending(
+            0.15,
+            [0.25, 0.50, 0.75],
+            0.05,
+            20,
+            4,
+        )
+        .expect("valid stream");
+        for loss in [0.12, 0.18, 0.21] {
+            assert!(monitor.observe(loss).is_some());
+        }
+        let encoded = monitor.encode_checkpoint();
+        assert!(MixtureBoundedRiskEProcess::from_checkpoint(&encoded).is_some());
+        assert!(MixtureBoundedRiskEProcess::from_checkpoint(
+            &encoded[..encoded.len() - 4]
+        )
+        .is_none());
+
+        let mut corrupted = encoded.clone();
+        let position = corrupted
+            .find("component_log_e_2=")
+            .expect("checkpoint field exists")
+            + "component_log_e_2=".len();
+        let replacement = if corrupted.as_bytes()[position] == b'0' {
+            '1'
+        } else {
+            '0'
+        };
+        corrupted.replace_range(position..position + 1, &replacement.to_string());
+        assert!(MixtureBoundedRiskEProcess::from_checkpoint(&corrupted).is_none());
+
+        let mut wrong_version = encoded;
+        wrong_version.replace_range(0..MIXTURE_CHECKPOINT_MAGIC.len(), "BROKEN_CHECKPOINT_V1");
+        assert!(MixtureBoundedRiskEProcess::from_checkpoint(&wrong_version).is_none());
+    }
+
+    #[test]
+    fn checkpoint_preserves_latched_alarm_and_alpha_budget_boundary() {
+        let mut monitor = MixtureBoundedRiskEProcess::new_with_alpha_spending(
+            0.15,
+            [0.25, 0.50, 0.75],
+            0.05,
+            1,
+            1,
+        )
+        .expect("valid stream");
+        for _ in 0..12 {
+            assert!(monitor.observe(0.85).is_some());
+        }
+        assert!(monitor.alarmed());
+        let encoded = monitor.encode_checkpoint();
+        let restored =
+            MixtureBoundedRiskEProcess::from_checkpoint(&encoded).expect("valid latched state");
+        assert!(restored.alarmed());
+        assert_eq!(
+            restored.log_alarm_threshold().to_bits(),
+            monitor.log_alarm_threshold().to_bits()
+        );
+        assert_eq!(
+            restored.log_e_value().to_bits(),
+            monitor.log_e_value().to_bits()
+        );
+    }
+
+    #[test]
     fn mixture_rejects_invalid_loss_without_mutating_state_and_can_reset() {
         let mut process = MixtureBoundedRiskEProcess::new(
             0.15,
