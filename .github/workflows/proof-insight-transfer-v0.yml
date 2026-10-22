@@ -1306,6 +1306,104 @@ jobs:
 
           print("PITB_COUNTERFACTUAL_SUITE_PASS: 7 synthetic pairs validated; paired reviewers and split/component integrity enforced; 13 negative controls rejected")
           PY
+      - name: Run paired counterfactual outcome analyzer and mutation controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          suite="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/counterfactual-precondition-suite.synthetic.json"
+          outcomes="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/counterfactual-outcomes.synthetic.jsonl"
+          outcome_schema="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/transfer-selectivity-outcome.schema.json"
+          suite_schema="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/counterfactual-precondition-suite.schema.json"
+          report_schema="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/counterfactual-sensitivity-report.schema.json"
+          report="$RUNNER_TEMP/pitb-counterfactual-sensitivity-report.json"
+
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$suite" "$outcomes" "$suite_schema" "$outcome_schema" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          suite_path, outcomes_path, suite_schema_path, outcome_schema_path = map(Path, sys.argv[1:])
+          suite_schema = json.loads(suite_schema_path.read_text())
+          outcome_schema = json.loads(outcome_schema_path.read_text())
+          Draft202012Validator.check_schema(suite_schema)
+          Draft202012Validator.check_schema(outcome_schema)
+          suite = json.loads(suite_path.read_text())
+          Draft202012Validator(suite_schema, format_checker=FormatChecker()).validate(suite)
+          row_validator = Draft202012Validator(outcome_schema, format_checker=FormatChecker())
+          rows = [json.loads(line) for line in outcomes_path.read_text().splitlines() if line.strip()]
+          if len(rows) != 14:
+              raise SystemExit(f"expected 14 synthetic paired outcomes; found {len(rows)}")
+          for index, row in enumerate(rows, start=1):
+              row_validator.validate(row)
+          print("PITB_COUNTERFACTUAL_INPUT_SCHEMA_PASS: 7 pairs and 14 synthetic outcome rows")
+          PY
+
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --locked --bin analyze_transfer_selectivity -- "$outcomes" test "$RUNNER_TEMP/pitb-counterfactual-selectivity-report.json" 1000 17
+          cargo run --locked --bin analyze_counterfactual_sensitivity -- "$suite" "$outcomes" test "$report" 1000 17
+
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$report" "$report_schema" "$outcomes" "$suite" "$(pwd)/target/debug/analyze_counterfactual_sensitivity" <<'PY'
+          import copy
+          import json
+          import subprocess
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          report_path, report_schema_path, outcomes_path, suite_path, binary = map(Path, sys.argv[1:])
+          report = json.loads(report_path.read_text())
+          schema = json.loads(report_schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          validator.validate(report)
+          assert report["dataset_kind"] == "synthetic_fixture"
+          assert report["counts"]["suite_pairs_in_requested_split"] == 7
+          assert report["counts"]["adjudicated_pairs_analyzed"] == 7
+          assert report["counts"]["base_compatible_pairs"] == 7
+          assert report["counts"]["counterfactual_compatible_pairs"] == 1
+          assert report["counts"]["counterfactual_incompatible_pairs"] == 6
+          assert report["counts"]["paired_contract_eligible_pairs"] == 6
+          assert report["metrics"]["base_compatible_accept_recall"]["estimate"] == 1.0
+          assert report["metrics"]["counterfactual_incompatible_sensitivity"]["estimate"] == 1.0
+          assert report["metrics"]["counterfactual_false_accept_rate"]["estimate"] == 0.0
+          assert report["metrics"]["paired_contract_adherence"]["estimate"] == 1.0
+          assert report["metrics"]["semantics_preserving_decision_stability"]["estimate"] == 1.0
+          assert abs(report["metrics"]["compatibility_probability_brier_score"]["estimate"] - 0.01) < 1e-9
+          assert report["proposed_gates"]["overall_confirmatory_decision"].startswith("not_evaluated_")
+
+          source_rows = [json.loads(line) for line in outcomes_path.read_text().splitlines() if line.strip()]
+          suite = json.loads(suite_path.read_text())
+          cases = []
+
+          missing_row = source_rows[:-1]
+          cases.append(("missing pair row", missing_row))
+
+          bad_source = copy.deepcopy(source_rows)
+          bad_source[0]["source"]["insight_sha256"] = "0" * 64
+          cases.append(("source provenance mismatch", bad_source))
+
+          bad_review = copy.deepcopy(source_rows)
+          bad_review[0]["adjudication"]["reviewer_decisions"][0]["label"] = "incompatible"
+          bad_review[0]["adjudication"]["reviewer_decisions"][0]["reason_codes"] = ["other"]
+          cases.append(("reviewer receipt mismatch", bad_review))
+
+          over_budget = copy.deepcopy(source_rows)
+          over_budget[0]["run"]["actual_tokens"] = 1001
+          cases.append(("over-budget row", over_budget))
+
+          for name, rows in cases:
+              bad_path = Path(f"{report_path.parent}/bad-counterfactual-{name.replace(' ', '-')}.jsonl")
+              bad_path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+              result = subprocess.run(
+                  [str(binary), str(suite_path), str(bad_path), "test",
+                   str(bad_path.with_suffix(".report.json")), "1000", "17"],
+                  capture_output=True, text=True
+              )
+              if result.returncode == 0:
+                  raise SystemExit(f"counterfactual analyzer negative control unexpectedly passed: {name}")
+          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, four malformed-link/budget controls")
+          PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
         run: |
