@@ -83,3 +83,21 @@ This scaffold only generates deterministic Boolean SCM ground truths. It does no
 4. Add missing-variable, latent-confounding, intervention-failure and noise-shift variants. Preserve family-held-out tests and disclose each shift separately.
 5. Add paired uncertainty intervals and a benchmark-level falsification/abstention lane; score selective error against coverage rather than hiding errors by abstaining.
 6. Only then compare against established methods on contract-matched data. The objective is improved held-out graph recovery at equal budget, or similar recovery with fewer interventions—not lower entropy alone.
+
+## Layered mixed-graph scoring — follow-up
+
+The scoring utility now also includes \`layered_graph_scores\`, which accepts directed predictions plus legitimate undirected predictions and separately reports:
+- skeleton precision/recall/F1;
+- compelled-direction precision/recall/F1 against caller-supplied CPDAG compelled arrows;
+- exact directed-DAG precision/recall/F1;
+- a documented DAG-SHD convention, including one error for each true adjacency left unresolved;
+- orientation coverage and intervention count relative to a caller-supplied minimum intervention-set size.
+
+This is **ACDB-inspired, not yet an exact ACDB adapter**. The caller must provide the true CPDAG's compelled arrows and benchmark-computed minimum intervention set; this code does not derive them. The unresolved-orientation contribution to \`dag_shd\` is an explicit local convention that still needs a parity check against the official implementation before being reported as an ACDB score. The current intervention output is a raw count ratio, not an assertion about ACDB's exact scalar efficiency calculation.
+
+The suite now rejects a supplied SCM whose actual parent lists contain a directed cycle, and layered scoring rejects duplicate or reciprocal orientations and any adjacency that is declared as both directed and undirected.
+
+Latest exact local validation:
+- Source blob: \`48f7a9e1e6b25ec9be7e8f90f10f1bfa3418b94f\`
+- Test blob: \`5cd2c2d7adc3caa78f6bc87b9903f35b2525c7c3\`
+- Embedded self-test passed; **11/11 tests passed**.
