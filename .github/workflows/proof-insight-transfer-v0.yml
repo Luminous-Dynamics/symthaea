@@ -1139,6 +1139,55 @@ jobs:
           orphan_obligation["events"][3]["obligation_transitions"][0]["obligation_id"] = "orphan"
           mutants.append(orphan_obligation)
 
+          missing_failure_class = copy.deepcopy(fixture)
+          missing_failure_class["events"][1]["kind"] = "failure_diagnosed"
+          mutants.append(missing_failure_class)
+
+          missing_failure_evidence = copy.deepcopy(fixture)
+          missing_failure_evidence["events"][1]["kind"] = "failure_diagnosed"
+          missing_failure_evidence["events"][1]["failure_class"] = "decomposition_error"
+          mutants.append(missing_failure_evidence)
+
+          missing_replan_receipt = copy.deepcopy(fixture)
+          missing_replan_receipt["events"][1]["kind"] = "global_replan"
+          mutants.append(missing_replan_receipt)
+
+          missing_route_economics = copy.deepcopy(fixture)
+          missing_route_economics["events"][1].update({
+              "kind": "action_routed",
+              "decision_receipt_sha256": "a" * 64,
+              "routed_action": "specialist_agent",
+              "estimated_success_probability": 0.7
+          })
+          mutants.append(missing_route_economics)
+
+          missing_retracted_ids = copy.deepcopy(fixture)
+          missing_retracted_ids["events"][1].update({
+              "kind": "subtree_retracted",
+              "decision_receipt_sha256": "b" * 64
+          })
+          mutants.append(missing_retracted_ids)
+
+          routed_positive = copy.deepcopy(fixture)
+          routed_positive["events"][1].update({
+              "kind": "action_routed",
+              "decision_receipt_sha256": "a" * 64,
+              "routed_action": "specialist_agent",
+              "estimated_success_probability": 0.7,
+              "estimated_action_cost_microusd": 250
+          })
+          validator.validate(routed_positive)
+          validate_trace(routed_positive)
+
+          diagnosed_positive = copy.deepcopy(fixture)
+          diagnosed_positive["events"][1].update({
+              "kind": "failure_diagnosed",
+              "failure_class": "decomposition_error",
+              "failure_evidence_sha256": "c" * 64
+          })
+          validator.validate(diagnosed_positive)
+          validate_trace(diagnosed_positive)
+
           for index, mutant in enumerate(mutants, start=1):
               try:
                   validate_trace(mutant)
@@ -1146,7 +1195,7 @@ jobs:
                   continue
               raise SystemExit(f"proof-progress trace negative control {index} unexpectedly passed")
 
-          print("PITB_PROOF_PROGRESS_TRACE_PASS: schema valid; obligation lineage; monotonic budgeted trace; terminal evidence gate; 2 receipt-backed closures; 11 negative controls rejected")
+          print("PITB_PROOF_PROGRESS_TRACE_PASS: schema valid; obligation lineage; monotonic budgeted trace; terminal evidence gate; 2 receipt-backed closures; 16 negative controls rejected")
           PY
       - name: Validate counterfactual precondition suite and paired-review controls
         shell: bash
