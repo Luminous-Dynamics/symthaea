@@ -15,7 +15,8 @@ The Rust module `physics::casting_evidence` introduces:
 - overlap rejection for IDs and originating source-record digests;
 - process-population compatibility checks and homogeneous, matching evidence classes for the calibration and holdout partitions;
 - direct binding to the exact fitted Chvorinov-model digest, training-value digest, and conformal-calibration-value digest;
-- independent manifest reconstruction to detect any changed input after the manifest was created.
+- independent manifest reconstruction to detect any changed input after the manifest was created;
+- an independent aggregate evaluator that replays point predictions and conformal intervals, computes error/coverage metrics, and retains a point-level receipt without calling the model's aggregate holdout-report implementation.
 
 ## Key contract
 
@@ -33,6 +34,10 @@ The manifest cannot be created from unbound observation lists alone. It receives
 10. A verifier reconstructs the manifest from the supplied model, calibrator, and records and refuses if the digest differs.
 
 The split is deliberately ordered: changing the order of training or calibration observations changes the bound data digest. The underlying model/calibrator must be fitted/calibrated in exactly the same order used to declare those partitions.
+
+The benchmark evaluator reports MAE/RMSE and mean/median absolute relative error only over supported predictions, plus prediction coverage over the full holdout. It reports empirical interval coverage among generated intervals, interval provision fraction over the full holdout, interval width, nominal coverage target, model digest, and manifest digest. An out-of-domain point remains in the total denominator but has no fabricated point estimate or interval.
+
+This evaluator independently recomputes aggregation and evidence checks, but it deliberately reuses the model's point-prediction and conformal-interval APIs. It is not an independent numerical implementation of the casting physics; a future verifier should independently reconstruct the formula and interval order statistic from frozen parameters and fixtures.
 
 ## What this does not prove
 
