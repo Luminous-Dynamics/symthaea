@@ -579,11 +579,14 @@ mod tests {
     #[test]
     fn conformal_calibration_applies_to_the_frozen_aggregate_score() {
         let calibration_scores = (1..=19)
-            .map(|value| multi_view_standardized_residual_score(
-                &[value as f64, 0.0, 0.0],
-                &[0.0, 0.0, 0.0],
-                &[1.0, 1.0, 1.0],
-            ).unwrap())
+            .map(|value| {
+                multi_view_standardized_residual_score(
+                    &[value as f64, 0.0, 0.0],
+                    &[0.0, 0.0, 0.0],
+                    &[1.0, 1.0, 1.0],
+                )
+                .unwrap()
+            })
             .collect::<Vec<_>>();
         let calibrator =
             ConformalAdequacyCalibrator::new(&calibration_scores, 0.05).unwrap();
@@ -610,7 +613,9 @@ mod tests {
     fn component_p_fusion_is_monotone_and_checks_contract() {
         let components = component_calibrators();
         let usual = minimum_component_p_fusion_score(&components, &[10.0; 4], true).unwrap();
-        let unusual = minimum_component_p_fusion_score(&components, &[100.0, 10.0, 10.0, 10.0], true).unwrap();
+        let unusual =
+            minimum_component_p_fusion_score(&components, &[100.0, 10.0, 10.0, 10.0], true)
+                .unwrap();
         assert!(unusual > usual);
         assert_eq!(
             minimum_component_p_fusion_score(&components, &[1.0], true),
