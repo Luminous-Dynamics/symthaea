@@ -18,6 +18,9 @@ pub enum ConsentRequirement {
     NotRequired,
     /// A matching affirmative and currently valid record is required.
     Required,
+    /// Policy lookup failed or the action's consent requirement is ambiguous.
+    /// This must block; it must never be silently mapped to NotRequired.
+    Unresolved,
 }
 
 /// Canonical identity of the operation being assessed.
@@ -65,6 +68,7 @@ pub struct ConsentEvidence<'a> {
 /// Why a consent-required action did not satisfy this gate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConsentBlockReason {
+    RequirementUnresolved,
     MissingEvidence,
     UnknownState,
     ImpliedState,
@@ -104,8 +108,12 @@ pub fn evaluate_consent_gate(
     evidence: Option<&ConsentEvidence<'_>>,
     now_unix_s: u64,
 ) -> ConsentGateOutcome {
-    if requirement == ConsentRequirement::NotRequired {
-        return ConsentGateOutcome::NotRequired;
+    match requirement {
+        ConsentRequirement::NotRequired => return ConsentGateOutcome::NotRequired,
+        ConsentRequirement::Required => {},
+        ConsentRequirement::Unresolved => {
+            return ConsentGateOutcome::Blocked(ConsentBlockReason::RequirementUnresolved);
+        }
     }
     let Some(evidence) = evidence else {
         return ConsentGateOutcome::Blocked(ConsentBlockReason::MissingEvidence);
@@ -293,6 +301,19 @@ mod tests {
         assert_eq!(
             evaluate_consent_gate(ConsentRequirement::Required, request(), Some(&e), NOW),
             ConsentGateOutcome::Blocked(ConsentBlockReason::Revoked)
+        );
+    }
+
+    #[test]
+    fn unresolved_requirement_blocks_instead_of_defaulting_open() {
+        assert_eq!(
+            evaluate_consent_gate(
+                ConsentRequirement::Unresolved,
+                request(),
+                None,
+                NOW
+            ),
+            ConsentGateOutcome::Blocked(ConsentBlockReason::RequirementUnresolved)
         );
     }
 
