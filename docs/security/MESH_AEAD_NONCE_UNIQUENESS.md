@@ -37,7 +37,21 @@ Whether this is reachable in a deployment depends on identity allocation and key
 
 The nonce includes a 32-bit sequence. Once the sequence repeats under the same key, sender prefix, payload type and epoch, the nonce repeats. At 50 increments per second, a continuously incremented 32-bit counter wraps in roughly 2.72 years; lower-frequency streams wrap later. Wrapping is not safe under an unchanged AEAD key unless the protocol also changes to a fresh key namespace before reuse.
 
-### N4 — Authentication and encryption identities are separate protocol questions
+### N4 — Fragment-level AEAD repeats nonce after 16-bit thought ID wrap
+
+The independent fragment-encryption path builds its nonce as:
+
+```text
+source_id[0..8] | thought_id[0..2] | fragment_index | 0
+```
+
+`WisdomPacket::thought_id()` returns `sequence as u16`. Therefore, for the same key, source ID and fragment index, sequence values that differ by 65,536 produce the same fragment nonce. At 50 packet-sequence increments per second, the low 16-bit identifier wraps in about 21.8 minutes. Even at lower message rates, wrap remains inevitable if the key and sender persist long enough. The fragment nonce does not contain `DualLayerMesh::encryption_epoch`, so that epoch cannot separate fragment ciphertexts across restarts. Resetting a sender and reusing its fragment sequence namespace can repeat nonces immediately.
+
+The new deterministic test `legacy_fragment_nonce_reuses_after_16_bit_sequence_wrap` constructs packets whose full sequences differ but whose `thought_id()` matches, then confirms that fragment ciphertexts reuse the nonce and expose the XOR of equal-length plaintexts. This is a known-broken behavior witness, not a security-passing assertion. It has been added but not compiled or run in this environment.
+
+**Impact condition:** the same effective key is used for both fragment encryptions. If callers use independently established per-session keys, the collision in nonce bytes alone is not a same-key nonce reuse. The code and configuration must establish that guarantee rather than assume it.
+
+### N5 — Authentication and encryption identities are separate protocol questions
 
 An HMAC-authenticated outer packet and a separately encrypted envelope must not be assumed to share the same identity or replay semantics automatically. Every key/nonce tuple must be evaluated using the *effective encryption key*, not only the outer packet's source ID or MAC. A shared group key also permits any key holder to construct packets that appear to come from another group member; nonce hygiene cannot fix that identity-authentication limitation.
 
@@ -48,7 +62,7 @@ An HMAC-authenticated outer packet and a separately encrypted envelope must not 
 - Do not silently patch the legacy helper's nonce layout in place: the helper's output is on-wire data and an incompatible change requires an explicit protocol version and migration plan.
 - Keep the new construction research-only until the property suite, key-management assumptions and interoperability plan are independently reviewed.
 
-The adjacent source comments have been corrected to remove the false guarantee. This is documentation-level containment, not the complete cryptographic remediation.
+The packet-level and fragment-level source comments have been corrected to remove false restart-safety guarantees. Two deterministic legacy ciphertext-XOR witnesses are now present in `src/swarm/mesh/tests.rs`: `legacy_nonce_source_id_truncation_reveals_plaintext_xor` and `legacy_fragment_nonce_reuses_after_16_bit_sequence_wrap`. Both are deliberately named as vulnerability witnesses; passing them reproduces the old flaw, it does not validate the protocol. They have not been compiled or run here. This is containment plus executable witness authoring, not the complete cryptographic remediation.
 
 ## Protocol-v3 direction
 
@@ -88,7 +102,7 @@ These are proposed acceptance tests; they have not been implemented or run by th
 |---|---|---|
 | NONCE-01 | Same key, sender, type, epoch and sequence after simulated restart | Legacy counterexample reproduces; v3 refuses reuse or uses a provably distinct key namespace |
 | NONCE-02 | Two source IDs share the first six bytes but differ in the last two | `legacy_nonce_source_id_truncation_reveals_plaintext_xor` is the deterministic legacy witness; CI pending. V3 must prevent the collision under every supported key-sharing model |
-| NONCE-03 | Sequence reaches its maximum | Sender rotates key or fails closed before counter reuse |
+| NONCE-03 | Packet-level sequence reaches its maximum | Sender rotates key or fails closed before counter reuse |
 | NONCE-04 | Power loss after nonce reservation but before send, and after send but before durable commit | Restart cannot reuse an already-reserved nonce |
 | NONCE-05 | Snapshot rollback / cloned sender state | Both instances cannot encrypt under the same key/counter namespace |
 | NONCE-06 | Two senders start concurrently with the same group key | Nonce namespaces remain disjoint, or configuration is rejected when it cannot guarantee this |
@@ -98,6 +112,8 @@ These are proposed acceptance tests; they have not been implemented or run by th
 | NONCE-10 | Wrong key and cross-sender identity | Decryption fails; identity claims are checked against the configured key binding |
 | NONCE-11 | All supported payload types at counter zero | No nonce collision under one effective key |
 | NONCE-12 | Sequence serialization and byte-order boundary values | Canonical test vectors agree across independent implementations |
+| NONCE-13 | Fragment sequences differ by 65,536 for the same source/key/index | `legacy_fragment_nonce_reuses_after_16_bit_sequence_wrap` documents the deterministic legacy collision; v3 must use a unique per-key fragment nonce namespace |
+| NONCE-14 | Fragment sender restarts with sequence reset and same key | No fragment nonce is reused; current epoch field must not be assumed to protect fragments |
 
 Tests must include deterministic witnesses, not only random statistical sampling. Property/model-based tests should generate restart, key rotation, counter reservation, rollback, multi-sender and malformed-packet traces. Report a digest of the frozen test corpus and retain minimized failing traces. A deterministic source-truncation witness has now been added in `src/swarm/mesh/tests.rs` as `legacy_nonce_source_id_truncation_reveals_plaintext_xor`; it intentionally demonstrates the legacy flaw and is not a security-passing test. It has not yet been compiled or executed in this environment.
 
