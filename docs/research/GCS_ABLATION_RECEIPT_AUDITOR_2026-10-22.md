@@ -9,7 +9,7 @@ The goal is *proof-carrying measurement*: make an evaluation artifact independen
 ## Checks performed
 
 - Schema and benchmark identifier; valid source-revision and BLAKE3 digest shapes.
-- Requested backend/model metadata must be non-empty and internally consistent. Every run must include a list of recognized observed generation tiers (`Native`, `Hardware`, `LocalLLM`, `CloudLLM`, `Simulated`) captured from the agent result; unknown or missing values are rejected.
+- Requested backend/model metadata must be non-empty and internally consistent. Every run must include a list of recognized observed generation tiers (`Native`, `Hardware`, `LocalLLM`, `CloudLLM`, `Simulated`) captured from the agent result; unknown or missing values are rejected. Observed tiers must be compatible with the requested backend mode (with fallback/native routes allowed), and both treatment-arm routing summaries are recomputed from the individual run records.
 - Ordered task-manifest digest recomputation from task IDs and per-task digests.
 - The receipt includes task description, expected symbol, reference source, explicit expected test count, test fixture and semantic mutants. Schema v2 binds the count into the length-prefixed task digest; schema v3 adds requested model identity plus observed generation tiers to every run. The auditor independently hashes reference/test/mutant source content and checks the declared count against each run's actual observed pass+fail total; the producer's reference/mutant preflight checks actual execution before trials.
 - Unique task IDs and nonzero expected test counts.
@@ -17,7 +17,7 @@ The goal is *proof-carrying measurement*: make an evaluation artifact independen
 - Exactly two modes per task/repeat; no duplicate or missing off/on run; expected run count; consistent test counts.
 - Fail-closed behavioral score recomputed from compile status, simulation status, runtime errors, and complete expected test counts. Oracle completeness is separate: CodeExecutor may put a failed test binary exit in `runtime_error` for an ordinary assertion failure, so exact full test counts with real non-simulated execution make the oracle complete while success remains false.
 - Oracle-completeness classification recomputed separately from correctness. A complete run that fails one behavioral test is an assessed failure, not an incomplete oracle.
-- Alternating paired order checks and recomputation of GCS-on wins, GCS-off wins, ties, net pass delta, per-mode rates, timings, and energy totals. Pairs count as comparable only if both arm oracles completed; unresolved pairs are reported separately and are not silently counted as ties.
+- Alternating paired order checks and recomputation of GCS-on wins, GCS-off wins, ties, net pass delta, per-mode rates, timings, energy totals, generation-tier attempt totals, runs that use external LLM tiers, simulated-tier runs, and runs with no generation attempts. Pairs count as comparable only if both arm oracles completed; unresolved pairs are reported separately and are not silently counted as ties.
 - Prints a deterministic 10,000-resample percentile bootstrap interval over task-identity clusters. Repeated trials are averaged within each task before resampling; the seed derives from the frozen manifest digest. Small task-cluster counts are explicitly labelled descriptive.
 - Optional external pins for the exact source SHA and frozen task-manifest digest.
 
