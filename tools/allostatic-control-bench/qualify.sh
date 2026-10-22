@@ -107,7 +107,7 @@ fi
 # Five operating points × five stress levels × three actions; profiles are paired
 # across all four envelope methods and all operating points.
 if ! awk -F, '
-  NR == 1 { if (NF != 23) failed = 1; next }
+  NR == 1 { if (NF != 22) failed = 1; next }
   {
     if (NF != 22) failed = 1
     if ($1 != "within_envelope" && $1 != "out_of_envelope") failed = 1
