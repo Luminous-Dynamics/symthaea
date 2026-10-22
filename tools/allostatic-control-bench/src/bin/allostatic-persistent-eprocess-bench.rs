@@ -322,6 +322,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                 episode_rows.push(index);
             }
 
+            if episode_indices
+                .iter()
+                .any(|index| rows[*index].all_scores_below_pointwise != all_scores_below_pointwise)
+            {
+                return Err(IoError::new(
+                    ErrorKind::InvalidData,
+                    "source episode-wide pointwise flag disagrees with recomputed residuals",
+                )
+                .into());
+            }
+
             for index in episode_rows {
                 output_rows[index][26] = first_reset_alarm_step.to_string();
             }
