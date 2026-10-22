@@ -138,7 +138,9 @@ jobs:
               and .dopri5_pass == true
               and .custom_common_grid_complete == true
               and .custom_output_samples == 101
+              and .custom_integration_samples >= 2
               and .dopri5_output_samples == 101
+              and .dopri5_integration_samples >= 2
               and .common_grid_matches == true
               and (.max_common_grid_disagreement_scaled | type == "number" and . >= 0)
               and (.max_common_grid_disagreement_scaled <= 2 * .global_endpoint_error_limit)
