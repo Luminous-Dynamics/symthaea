@@ -783,9 +783,11 @@ if ! awk -F, '
         $2 != "abrupt_shift" && $2 != "stealth_shift") failed = 1
     if ($3 != 300) failed = 1
     for (i = 4; i <= 6; i++) if ($i !~ /^[0-9]+$/ || $i > 300) failed = 1
-    if ($4 + $6 != 300 || $5 > $4) failed = 1
-    if ($2 == "nominal" && ($4 > 30 || $5 != $4 || $6 != 0)) failed = 1
-    if ($2 != "nominal" && $5 != 0) failed = 1
+    if ($2 == "nominal") {
+      if ($5 != $4 || $6 != 0 || $4 > 30) failed = 1
+    } else {
+      if ($4 + $6 != 300 || $5 != 0) failed = 1
+    }
     if ($7 != "NA" && $7 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
     if ($8 != "NA" && $8 !~ /^[0-9]+$/) failed = 1
     if ($9 != "NA" && $9 !~ /^[0-9]+$/) failed = 1
