@@ -71,9 +71,32 @@ pub struct ExecutionResult {
 }
 
 impl ExecutionResult {
-    /// Whether the code is fully successful (compiled + all tests passed)
+    /// Whether real compilation succeeded, regardless of whether behavioral tests ran.
+    ///
+    /// Use this for compile-only workflows. It must not be reported as behavioral correctness.
+    pub fn is_compilation_success(&self) -> bool {
+        !self.simulated && self.compiled
+    }
+
+    /// Whether at least one observed behavioral test passed and none failed.
+    ///
+    /// This result alone cannot prove that the declared oracle was complete; callers with
+    /// expected test counts must compare them against the executed count. Zero tests
+    /// (including a skipped/blocked runner) is unverified, not success.
+    pub fn is_test_verified_success(&self) -> bool {
+        self.is_compilation_success()
+            && self.tests_passed > 0
+            && self.tests_failed == 0
+            && self.runtime_error.is_none()
+    }
+
+    /// Whether the code is behaviorally successful, not merely compilable.
+    ///
+    /// This requires real execution and positive test evidence. It does not by itself prove
+    /// that every expected test ran; callers must enforce oracle completeness when known.
+    /// For compile-only tasks, call `is_compilation_success()` explicitly instead.
     pub fn is_success(&self) -> bool {
-        !self.simulated && self.compiled && self.tests_failed == 0
+        self.is_test_verified_success()
     }
 
     /// Parse test failures from the raw test output, populating `test_failures`.
@@ -104,13 +127,15 @@ impl ExecutionResult {
         if !self.compiled {
             let error_factor = (self.compile_errors.len() as f32 / 10.0).min(1.0);
             0.8 + 0.2 * error_factor
+        } else if self.runtime_error.is_some() {
+            // A failed or blocked test runner is unexpected even if it reported no failures.
+            0.7
+        } else if self.tests_passed + self.tests_failed == 0 {
+            // Compiled code without executed tests is unverified, not a perfect outcome.
+            0.3
         } else if self.tests_failed > 0 {
             let total = (self.tests_passed + self.tests_failed) as f32;
-            if total > 0.0 {
-                0.3 + 0.5 * (self.tests_failed as f32 / total)
-            } else {
-                0.3
-            }
+            0.3 + 0.5 * (self.tests_failed as f32 / total)
         } else {
             0.0
         }
@@ -1571,6 +1596,50 @@ mod tests {
             test_failures: Vec::new(),
         };
         assert!(success.is_success());
+    }
+
+    #[test]
+    fn test_compilation_success_does_not_imply_behavioral_success() {
+        let compile_only = ExecutionResult {
+            compiled: true,
+            compile_errors: Vec::new(),
+            tests_passed: 0,
+            tests_failed: 0,
+            test_output: String::new(),
+            runtime_error: None,
+            elapsed: Duration::from_millis(0),
+            simulated: false,
+            binary_path: None,
+            test_failures: Vec::new(),
+        };
+
+        assert!(compile_only.is_compilation_success());
+        assert!(!compile_only.is_test_verified_success());
+        assert!(!compile_only.is_success());
+        assert_eq!(compile_only.to_surprise(), 0.3, "compile-only execution must not look perfectly unsurprising");
+    }
+
+    #[test]
+    fn test_behavioral_success_requires_zero_runtime_error() {
+        let mut failed_runner = ExecutionResult {
+            compiled: true,
+            compile_errors: Vec::new(),
+            tests_passed: 1,
+            tests_failed: 0,
+            test_output: String::new(),
+            runtime_error: Some("test runner exited unexpectedly".to_string()),
+            elapsed: Duration::from_millis(0),
+            simulated: false,
+            binary_path: None,
+            test_failures: Vec::new(),
+        };
+
+        assert!(failed_runner.is_compilation_success());
+        assert!(!failed_runner.is_test_verified_success());
+        assert!(!failed_runner.is_success());
+        assert_eq!(failed_runner.to_surprise(), 0.7, "runtime/test-runner errors need a nonzero surprise signal");
+        failed_runner.runtime_error = None;
+        assert!(failed_runner.is_success());
     }
 
     #[test]
