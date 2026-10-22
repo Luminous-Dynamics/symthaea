@@ -1677,6 +1677,7 @@ mod tests {
         let mut frozen_count = 0usize;
         let mut mutation_count = 0usize;
         let mut workflow_gate_count = 0usize;
+        let mut rejection_count = 0usize;
 
         for case in &matrix.cases {
             let actual = match case.mode.as_str() {
@@ -1707,12 +1708,29 @@ mod tests {
                 outcome: case.expected.outcome.clone(),
                 violation_codes: case.expected.violation_codes.clone(),
             };
+            if actual.outcome == "reject" {
+                rejection_count += 1;
+            }
             assert_eq!(actual, expected, "matrix case {}", case.case_id);
         }
 
         assert_eq!(frozen_count, 12, "frozen trace case count changed");
         assert_eq!(mutation_count, 26, "Rust matrix-runner case count changed");
         assert_eq!(workflow_gate_count, 2, "workflow gate case count changed");
+        assert_eq!(rejection_count, 7, "fail-closed rejection case count changed");
+        assert_eq!(
+            frozen_count + mutation_count + workflow_gate_count,
+            matrix.cases.len(),
+            "every declared matrix case must be accounted for"
+        );
+        println!(
+            "mutation_matrix_cases={} frozen_traces={} rust_runner_cases={} workflow_gate_cases={} rejection_cases={}",
+            matrix.cases.len(),
+            frozen_count,
+            mutation_count,
+            workflow_gate_count,
+            rejection_count
+        );
     }
 
 }
