@@ -327,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_pqc_derivation_succeeds_without_verified_classical_handshake_state() {
+    fn legacy_pqc_candidate_key_derives_without_verified_classical_handshake_state() {
         let mut initiator = PqcHandshakeManager::new(test_config());
         let mut responder = PqcHandshakeManager::new(test_config());
 
@@ -342,17 +342,19 @@ mod tests {
         let ciphertext = initiator.encapsulate_for_peer("peer-B", &nonce).unwrap();
         assert!(!ciphertext.is_empty());
 
-        // Responder decapsulates
-        let responder_key = responder
+        // Responder decapsulates into a pending candidate; neither side marks
+        // the key active because authenticated key confirmation is not implemented.
+        responder
             .decapsulate_and_derive("peer-A", &ciphertext, &nonce)
             .unwrap();
 
-        // Both should derive the same session key
-        let initiator_key = initiator.session_key("peer-B").unwrap();
-        assert_eq!(
-            initiator_key, &responder_key,
-            "Initiator and responder must derive the same session key"
-        );
+        let initiator_key = initiator.pending_session_keys.get("peer-B").unwrap().key();
+        let responder_key = responder.pending_session_keys.get("peer-A").unwrap().key();
+        assert_eq!(initiator_key, responder_key);
+        assert_eq!(initiator.session_count(), 0);
+        assert_eq!(responder.session_count(), 0);
+        assert!(initiator.session_key("peer-B").is_none());
+        assert!(responder.session_key("peer-A").is_none());
     }
 
     #[test]
@@ -371,8 +373,8 @@ mod tests {
         manager.receive_kem_public_key("peer-B", &responder_b.kem_public_key_bytes());
         let _ = manager.encapsulate_for_peer("peer-B", &nonce).unwrap();
 
-        let key_a = manager.session_key("peer-A").unwrap();
-        let key_b = manager.session_key("peer-B").unwrap();
+        let key_a = manager.pending_session_keys.get("peer-A").unwrap().key();
+        let key_b = manager.pending_session_keys.get("peer-B").unwrap().key();
         assert_ne!(
             key_a, key_b,
             "Different peers must have different session keys"
@@ -397,8 +399,8 @@ mod tests {
         initiator2.receive_kem_public_key("peer-R", &rpk);
         let _ = initiator2.encapsulate_for_peer("peer-R", &nonce2).unwrap();
 
-        let key1 = initiator1.session_key("peer-R").unwrap();
-        let key2 = initiator2.session_key("peer-R").unwrap();
+        let key1 = initiator1.pending_session_keys.get("peer-R").unwrap().key();
+        let key2 = initiator2.pending_session_keys.get("peer-R").unwrap().key();
         assert_ne!(
             key1, key2,
             "Different public context inputs change the derived key; they do not add secret entropy"
@@ -419,19 +421,25 @@ mod tests {
         let ciphertext = initiator
             .encapsulate_for_peer("peer-A", &public_challenge)
             .unwrap();
-        let expected = *initiator.session_key("peer-A").unwrap();
+        let expected = *initiator
+            .pending_session_keys
+            .get("peer-A")
+            .unwrap()
+            .key();
 
-        let key_as_peer_a = responder
+        responder
             .decapsulate_and_derive("peer-A", &ciphertext, &public_challenge)
             .unwrap();
-        let key_as_peer_b = responder
+        responder
             .decapsulate_and_derive("peer-B", &ciphertext, &public_challenge)
             .unwrap();
 
+        let key_as_peer_a = *responder.pending_session_keys.get("peer-A").unwrap().key();
+        let key_as_peer_b = *responder.pending_session_keys.get("peer-B").unwrap().key();
         assert_eq!(expected, key_as_peer_a);
         assert_eq!(key_as_peer_a, key_as_peer_b);
-        assert_eq!(responder.session_key("peer-A"), Some(&key_as_peer_a));
-        assert_eq!(responder.session_key("peer-B"), Some(&key_as_peer_b));
+        assert!(responder.session_key("peer-A").is_none());
+        assert!(responder.session_key("peer-B").is_none());
     }
 
     #[test]
@@ -451,11 +459,13 @@ mod tests {
             result.is_ok(),
             "implicit rejection may produce a candidate key for an invalid ciphertext"
         );
-        assert_eq!(responder.session_count(), 1);
+        assert_eq!(responder.session_count(), 0);
+        assert_eq!(responder.pending_session_count(), 1);
         assert!(
-            responder.session_key("peer-X").is_some(),
-            "callers need transcript authentication and explicit key confirmation"
+            responder.session_key("peer-X").is_none(),
+            "candidate key must not be exposed as an established session"
         );
+        assert!(responder.pending_session_keys.contains_key("peer-X"));
     }
 
     #[test]
@@ -466,10 +476,13 @@ mod tests {
 
         manager.receive_kem_public_key("peer-A", &responder.kem_public_key_bytes());
         let _ = manager.encapsulate_for_peer("peer-A", &nonce).unwrap();
-        assert_eq!(manager.session_count(), 1);
+        assert_eq!(manager.session_count(), 0);
+        assert_eq!(manager.pending_session_count(), 1);
+        assert!(manager.session_key("peer-A").is_none());
 
         manager.remove_session("peer-A");
         assert_eq!(manager.session_count(), 0);
+        assert_eq!(manager.pending_session_count(), 0);
         assert!(manager.session_key("peer-A").is_none());
     }
 
@@ -492,12 +505,10 @@ mod tests {
         initiator.receive_kem_public_key("peer-B", &responder.kem_public_key_bytes());
         let _ = initiator.encapsulate_for_peer("peer-B", &nonce).unwrap();
 
-        let key = initiator.session_key("peer-B").unwrap();
-        assert_eq!(
-            key.len(),
-            32,
-            "Session key must be 32 bytes for ChaCha20-Poly1305"
-        );
+        let key = initiator.pending_session_keys.get("peer-B").unwrap().key();
+        assert_eq!(key.len(), 32, "Candidate key is sized for ChaCha20-Poly1305");
+        assert_eq!(initiator.session_count(), 0);
+        assert!(initiator.session_key("peer-B").is_none());
     }
 
     #[test]
