@@ -842,6 +842,30 @@ mod tests {
     }
 
     #[test]
+    fn weighted_information_gain_is_invariant_to_common_weight_scaling() {
+        let hypotheses = [0.0_f64, 1.0, 2.0, 8.0];
+        let base_weights = [1.0, 2.0, 3.0, 4.0];
+        let scaled_weights = [10.0, 20.0, 30.0, 40.0];
+        let base = expected_information_gain_with_prior_nats(
+            &(),
+            &hypotheses,
+            &base_weights,
+            0.9,
+            |hypothesis, _| Some(*hypothesis),
+        )
+        .expect("valid base weights");
+        let scaled = expected_information_gain_with_prior_nats(
+            &(),
+            &hypotheses,
+            &scaled_weights,
+            0.9,
+            |hypothesis, _| Some(*hypothesis),
+        )
+        .expect("valid scaled weights");
+        assert!((base - scaled).abs() < 1.0e-10);
+    }
+
+    #[test]
     fn weighted_prior_is_invariant_to_duplicate_representation_when_mass_is_split() {
         let original_hypotheses = [0_usize, 1, 2, 3];
         let original_priors = [1.0, 1.0, 1.0, 1.0];
