@@ -4,6 +4,10 @@
 //! from the full mycelix-crypto crate. This allows symthaea to compile
 //! without the full mycelix-identity dependency.
 
+/// This workspace-local crate is only a compilation stub, never a cryptographic backend.
+/// Any production ML-KEM integration must replace this crate with a reviewed implementation.
+pub const CRYPTO_BACKEND_IS_STUB: bool = true;
+
 pub mod pqc;
 pub mod traits;
 
