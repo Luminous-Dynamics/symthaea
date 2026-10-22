@@ -175,20 +175,37 @@ const FE_ADJUST: f64 = 0.1;
 /// FEP agent for manufacturing process stability.
 pub struct ManufacturingFepAgent {
     reference_state: ContinuousHV,
+    /// A random vector is only a storage initializer, never a qualified baseline.
+    reference_calibrated: bool,
 }
 
 impl ManufacturingFepAgent {
     pub fn new() -> Self {
         Self {
             reference_state: ContinuousHV::random(HDC_DIMENSION, 0xAF6_BEEF),
+            reference_calibrated: false,
         }
     }
 
+    /// Install a reference derived from a reviewed, appropriate baseline reading.
     pub fn set_reference(&mut self, reference: ContinuousHV) {
         self.reference_state = reference;
+        self.reference_calibrated = true;
     }
 
+    /// Whether free-energy comparisons use an explicit baseline rather than a
+    /// random initialization vector.
+    pub fn is_reference_calibrated(&self) -> bool {
+        self.reference_calibrated
+    }
+
+    /// Compute the free-energy proxy. Until an explicit reference is installed,
+    /// return the conservative sentinel 1.0; callers must inspect calibration
+    /// state and must not interpret this sentinel as a measured process anomaly.
     pub fn compute_free_energy(&self, observed: &ContinuousHV) -> f64 {
+        if !self.reference_calibrated {
+            return 1.0;
+        }
         let sim = observed.similarity(&self.reference_state) as f64;
         if !sim.is_finite() {
             return 1.0;
@@ -232,10 +249,15 @@ pub enum ManufacturingSafetyLevel {
 /// Output from a manufacturing prediction cycle.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ManufacturingOutput {
+    /// Calibrated free-energy proxy; equals the conservative sentinel 1.0 when
+    /// `reference_calibrated` is false and is then not a measured anomaly score.
     pub free_energy: f64,
     pub recommended_action: ManufacturingFepAction,
     pub safety_level: ManufacturingSafetyLevel,
     pub prediction_similarities: Vec<(f32, f32)>,
+    /// True only after an explicit reference has been installed.
+    #[serde(default)]
+    pub reference_calibrated: bool,
 }
 
 impl ManufacturingOutput {
@@ -276,9 +298,17 @@ impl ManufacturingTwin {
         }
     }
 
+    /// Install a reference from a reviewed baseline reading.
+    ///
+    /// Do not select a baseline merely because it is the first reading available;
+    /// use an appropriate commissioning/known-good record.
     pub fn set_reference(&mut self, reading: &ManufacturingReading) {
         let hv = self.encoder.encode(reading);
         self.agent.set_reference(hv);
+    }
+
+    pub fn is_reference_calibrated(&self) -> bool {
+        self.agent.is_reference_calibrated()
     }
 
     pub fn step(&mut self, reading: &ManufacturingReading, dt_seconds: f32) -> ManufacturingOutput {
@@ -296,7 +326,10 @@ impl ManufacturingTwin {
             })
             .collect();
 
+        let reference_calibrated = self.agent.is_reference_calibrated();
         let fe = self.agent.compute_free_energy(&hv);
+        // Without a reviewed reference we fail closed. The accompanying status
+        // makes clear that this is a calibration hold, not an anomaly diagnosis.
         let action = self.agent.select_action(&hv);
         let level = if fe > FE_HALT {
             ManufacturingSafetyLevel::Red
@@ -313,6 +346,7 @@ impl ManufacturingTwin {
             recommended_action: action,
             safety_level: level,
             prediction_similarities: sims,
+            reference_calibrated,
         }
     }
 
@@ -411,11 +445,40 @@ mod tests {
     }
 
     #[test]
+    fn test_fep_starts_uncalibrated_and_does_not_score_random_reference() {
+        let agent = ManufacturingFepAgent::new();
+        let reading = ContinuousHV::random(HDC_DIMENSION, 42);
+
+        assert!(!agent.is_reference_calibrated());
+        assert_eq!(agent.compute_free_energy(&reading), 1.0);
+        assert_eq!(agent.select_action(&reading), ManufacturingFepAction::EmergencyHalt);
+    }
+
+    #[test]
+    fn test_twin_requires_explicit_reference() {
+        let reading = healthy_reading();
+        let mut twin = ManufacturingTwin::new();
+
+        let uncalibrated = twin.step(&reading, 1.0);
+        assert!(!uncalibrated.reference_calibrated);
+        assert_eq!(uncalibrated.free_energy, 1.0);
+        assert_eq!(uncalibrated.recommended_action, ManufacturingFepAction::EmergencyHalt);
+        assert_eq!(uncalibrated.safety_level, ManufacturingSafetyLevel::Red);
+
+        twin.set_reference(&reading);
+        let calibrated = twin.step(&reading, 1.0);
+        assert!(calibrated.reference_calibrated);
+        assert_eq!(calibrated.safety_level, ManufacturingSafetyLevel::Green);
+        assert_eq!(calibrated.recommended_action, ManufacturingFepAction::Maintain);
+    }
+
+    #[test]
     fn test_twin_healthy() {
         let reading = healthy_reading();
         let mut twin = ManufacturingTwin::new();
         twin.set_reference(&reading);
         let output = twin.step(&reading, 1.0);
+        assert!(output.reference_calibrated);
         assert_eq!(output.safety_level, ManufacturingSafetyLevel::Green);
         assert_eq!(output.recommended_action, ManufacturingFepAction::Maintain);
     }
@@ -452,8 +515,10 @@ mod tests {
     fn test_safety_tuple_range() {
         let reading = healthy_reading();
         let mut twin = ManufacturingTwin::new();
-        // Do NOT set reference — random reference will produce nonzero FE
+        // Do NOT set reference: the conservative FE sentinel remains in [0, 1],
+        // but is explicitly marked uncalibrated and is not an anomaly estimate.
         let output = twin.step(&reading, 1.0);
+        assert!(!output.reference_calibrated);
         let (consciousness, error, coherence) = output.to_safety_tuple();
         // All values should be in [0, 1]
         assert!(

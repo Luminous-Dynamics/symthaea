@@ -1084,6 +1084,12 @@ pub struct CycleMetadata {
     /// Design loop free energy from DesignLoopTwin.
     #[serde(default)]
     pub fabrication_design_loop_fe: f64,
+    /// Whether the manufacturing FEP baseline was explicitly calibrated.
+    #[serde(default)]
+    pub fabrication_manufacturing_reference_calibrated: bool,
+    /// Whether the design-loop FEP baseline was explicitly calibrated.
+    #[serde(default)]
+    pub fabrication_design_loop_reference_calibrated: bool,
     /// Manufacturing safety level as string ("Green"/"Yellow"/"Orange"/"Red").
     #[serde(default)]
     pub fabrication_safety_level: String,
@@ -1123,6 +1129,9 @@ pub struct CycleMetadata {
     /// Defect prediction confidence [0, 1].
     #[serde(default)]
     pub fabrication_defect_confidence: f32,
+    /// True only when the defect score is backed by a valid prediction source.
+    #[serde(default)]
+    pub fabrication_defect_prediction_available: bool,
 
     // ── CPG Manager Telemetry ─────────────────────────────────────────────
     /// Kuramoto synchronization index [0, 1]. 0 = incoherent, 1 = perfect sync.

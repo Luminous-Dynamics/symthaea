@@ -650,8 +650,14 @@ pub struct SovereignInfo {
 pub struct FabricationInfo {
     /// ManufacturingTwin free energy.
     pub manufacturing_free_energy: f32,
-    /// DesignLoopTwin free energy.
+    /// DesignLoopTwin free energy (sentinel 1.0 while reference is uncalibrated).
     pub design_loop_free_energy: f32,
+    /// Whether manufacturing FEP free energy uses a configured baseline.
+    #[serde(default)]
+    pub manufacturing_reference_calibrated: bool,
+    /// Whether design-loop FEP free energy uses a configured baseline.
+    #[serde(default)]
+    pub design_loop_reference_calibrated: bool,
     /// Current safety level string.
     pub safety_level: String,
     /// Anomalies detected this cycle.
@@ -686,6 +692,9 @@ pub struct FabricationInfo {
     /// Defect prediction confidence (0.0-1.0).
     #[serde(default)]
     pub defect_confidence: f32,
+    /// Whether the defect prediction fields currently carry a valid prediction.
+    #[serde(default)]
+    pub defect_prediction_available: bool,
 }
 
 /// CfC-HDC neuroevolution snapshot.
@@ -1683,6 +1692,8 @@ fn build_snapshot(
         fabrication: FabricationInfo {
             manufacturing_free_energy: m.fabrication_manufacturing_fe as f32,
             design_loop_free_energy: m.fabrication_design_loop_fe as f32,
+            manufacturing_reference_calibrated: m.fabrication_manufacturing_reference_calibrated,
+            design_loop_reference_calibrated: m.fabrication_design_loop_reference_calibrated,
             safety_level: m.fabrication_safety_level.clone(),
             anomaly_count: m.fabrication_anomaly_count,
             anomaly_ema: m.fabrication_anomaly_ema,
@@ -1697,6 +1708,7 @@ fn build_snapshot(
             mrp_work_order_count: m.fabrication_mrp_work_orders,
             defect_prediction: m.fabrication_defect_prediction,
             defect_confidence: m.fabrication_defect_confidence,
+            defect_prediction_available: m.fabrication_defect_prediction_available,
         },
     }
 }

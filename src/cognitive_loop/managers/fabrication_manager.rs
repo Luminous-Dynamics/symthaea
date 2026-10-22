@@ -107,6 +107,10 @@ pub struct PendingBaseline {
 pub struct FabricationTelemetry {
     pub manufacturing_free_energy: f64,
     pub design_loop_free_energy: f64,
+    /// Whether the manufacturing free-energy baseline has been explicitly configured.
+    pub manufacturing_reference_calibrated: bool,
+    /// Whether the design-loop free-energy baseline has been explicitly configured.
+    pub design_loop_reference_calibrated: bool,
     pub safety_level: String,
     pub anomaly_count: u32,
     pub anomaly_ema: f32,
@@ -122,6 +126,8 @@ pub struct FabricationTelemetry {
     pub mrp_work_order_count: u32,
     pub defect_prediction: f32,
     pub defect_confidence: f32,
+    /// True only when the current defect score has a valid prediction source.
+    pub defect_prediction_available: bool,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -155,9 +161,10 @@ pub struct FabricationManager {
     mrp_feasible: bool,
     mrp_shortages_count: u32,
     mrp_work_order_count: u32,
-    // Defect prediction snapshot.
+    // Defect prediction snapshot; zero values are not a substitute for availability.
     defect_prediction: f32,
     defect_confidence: f32,
+    defect_prediction_available: bool,
     // Optional Cincinnati monitor for simulation mode.
     monitor: Option<CincinnatiMonitor>,
 }
@@ -190,6 +197,7 @@ impl Default for FabricationManager {
             mrp_work_order_count: 0,
             defect_prediction: 0.0,
             defect_confidence: 0.0,
+            defect_prediction_available: false,
             monitor: None,
         }
     }
@@ -202,6 +210,19 @@ impl Default for FabricationManager {
 impl FabricationManager {
     pub const INTERVAL: u32 = thresholds::FABRICATION_MANAGER_INTERVAL;
     const MAX_EVENTS_PER_CYCLE: usize = thresholds::FAB_MAX_EVENTS_PER_CYCLE;
+
+    /// Configure the manufacturing twin from a reviewed known-good reference.
+    ///
+    /// Do not pass an arbitrary first reading: the reference is the baseline
+    /// against which later process deviations are scored.
+    pub fn set_manufacturing_reference(&mut self, reading: &ManufacturingReading) {
+        self.manufacturing_twin.set_reference(reading);
+    }
+
+    /// Configure the design-production twin from a reviewed reference.
+    pub fn set_design_loop_reference(&mut self, reading: &DesignLoopReading) {
+        self.design_loop_twin.set_reference(reading);
+    }
 
     pub fn inject_event(&mut self, event: FabricationEvent) {
         self.pending_events.push(event);
@@ -250,9 +271,20 @@ impl FabricationManager {
     }
 
     /// Update defect prediction snapshot (called from DefectPredictor output).
+    ///
+    /// Non-finite inputs invalidate the snapshot instead of being clamped into
+    /// apparently usable values. Availability is separate from the numeric score:
+    /// `0.0` can be a valid prediction and does not itself mean "unavailable".
     pub fn inject_defect_prediction(&mut self, quality: f32, confidence: f32) {
-        self.defect_prediction = quality.clamp(0.0, 1.0);
-        self.defect_confidence = confidence.clamp(0.0, 1.0);
+        if quality.is_finite() && confidence.is_finite() {
+            self.defect_prediction = quality.clamp(0.0, 1.0);
+            self.defect_confidence = confidence.clamp(0.0, 1.0);
+            self.defect_prediction_available = true;
+        } else {
+            self.defect_prediction = 0.0;
+            self.defect_confidence = 0.0;
+            self.defect_prediction_available = false;
+        }
     }
 
     /// Enable simulation mode with Cincinnati monitoring.
@@ -273,6 +305,8 @@ impl FabricationManager {
         FabricationTelemetry {
             manufacturing_free_energy: self.last_manufacturing_fe,
             design_loop_free_energy: self.last_design_loop_fe,
+            manufacturing_reference_calibrated: self.manufacturing_twin.is_reference_calibrated(),
+            design_loop_reference_calibrated: self.design_loop_twin.is_reference_calibrated(),
             safety_level: format!("{:?}", self.safety_level),
             anomaly_count: self.anomaly_count_this_cycle,
             anomaly_ema: self.anomaly_ema,
@@ -287,6 +321,7 @@ impl FabricationManager {
             mrp_work_order_count: self.mrp_work_order_count,
             defect_prediction: self.defect_prediction,
             defect_confidence: self.defect_confidence,
+            defect_prediction_available: self.defect_prediction_available,
         }
     }
 
@@ -414,7 +449,11 @@ impl FabricationManager {
     fn process_twin_reading(&mut self, reading: &ManufacturingReading) {
         let output = self.manufacturing_twin.step(reading, 0.05);
         self.last_manufacturing_fe = output.free_energy;
-        self.last_recommended_action = format!("{:?}", output.recommended_action);
+        self.last_recommended_action = if output.reference_calibrated {
+            format!("{:?}", output.recommended_action)
+        } else {
+            "CalibrationRequired".to_string()
+        };
         if !output.prediction_similarities.is_empty() {
             let sum: f32 = output.prediction_similarities.iter().map(|(_, s)| *s).sum();
             self.last_prediction_coherence = sum / output.prediction_similarities.len() as f32;
@@ -468,14 +507,33 @@ impl FabricationManager {
         // Phase 4: step the manufacturing twin.
         let twin_out = self.manufacturing_twin.step(&mfg_reading, 0.05);
         self.last_manufacturing_fe = twin_out.free_energy;
-        self.last_recommended_action = format!("{:?}", twin_out.recommended_action);
+        self.last_recommended_action = if twin_out.reference_calibrated {
+            format!("{:?}", twin_out.recommended_action)
+        } else {
+            "CalibrationRequired".to_string()
+        };
 
-        // Simple quality estimate: high free energy = poor prediction = higher defect probability.
+        // Free energy is a sentinel before baseline commissioning, not evidence
+        // of poor quality. Do not turn that sentinel into a defect prediction.
+        if !twin_out.reference_calibrated {
+            self.defect_prediction = 0.0;
+            self.defect_confidence = 0.0;
+            self.defect_prediction_available = false;
+            return;
+        }
+
+        // Simple quality estimate: high calibrated free energy = poor prediction = higher defect probability.
         let quality_estimate =
             (1.0 - (twin_out.free_energy as f32).clamp(0.0, 1.0)).clamp(0.0, 1.0);
         let confidence_estimate = (1.0 - self.anomaly_ema).clamp(0.0, 1.0);
         self.defect_prediction = 1.0 - quality_estimate;
         self.defect_confidence = confidence_estimate;
+        self.defect_prediction_available =
+            self.defect_prediction.is_finite() && self.defect_confidence.is_finite();
+        if !self.defect_prediction_available {
+            self.defect_prediction = 0.0;
+            self.defect_confidence = 0.0;
+        }
     }
 
     fn process_design_loop_reading(&mut self, reading: &DesignLoopReading) {
@@ -834,6 +892,60 @@ mod tests {
     }
 
     #[test]
+    fn uncalibrated_twin_is_not_reported_as_a_defect_prediction() {
+        let mut mgr = FabricationManager::default();
+        let reading = ManufacturingReading {
+            tolerance: 0.95,
+            surface_quality: 0.9,
+            throughput: 0.8,
+            energy_cost: 0.3,
+        };
+
+        let before = mgr.telemetry();
+        assert!(!before.manufacturing_reference_calibrated);
+        assert!(!before.design_loop_reference_calibrated);
+
+        mgr.inject_event(FabricationEvent {
+            kind: FabricationEventKind::TwinReading {
+                reading: reading.clone(),
+            },
+            timestamp_secs: 1,
+        });
+        let _output = mgr.process(&default_snapshot());
+        let uncalibrated = mgr.telemetry();
+        assert_eq!(uncalibrated.recommended_action, "CalibrationRequired");
+        assert_eq!(uncalibrated.defect_prediction, 0.0);
+        assert_eq!(uncalibrated.defect_confidence, 0.0);
+        assert!(!uncalibrated.defect_prediction_available);
+
+        mgr.set_manufacturing_reference(&reading);
+        mgr.set_design_loop_reference(&DesignLoopReading {
+            design_intent: 0.95,
+            manufactured_state: 0.92,
+            tolerance_error: 0.05,
+            quality_confidence: 0.9,
+        });
+        let calibrated = mgr.telemetry();
+        assert!(calibrated.manufacturing_reference_calibrated);
+        assert!(calibrated.design_loop_reference_calibrated);
+    }
+
+    #[test]
+    fn non_finite_external_defect_prediction_is_unavailable() {
+        let mut mgr = FabricationManager::default();
+        mgr.inject_defect_prediction(f32::NAN, 0.8);
+        let t = mgr.telemetry();
+        assert!(!t.defect_prediction_available);
+        assert_eq!(t.defect_prediction, 0.0);
+        assert_eq!(t.defect_confidence, 0.0);
+
+        mgr.inject_defect_prediction(0.0, 0.0);
+        let valid_zero = mgr.telemetry();
+        assert!(valid_zero.defect_prediction_available);
+        assert_eq!(valid_zero.defect_prediction, 0.0);
+    }
+
+    #[test]
     fn test_twin_reading_updates_fe() {
         let mut mgr = FabricationManager::default();
         mgr.inject_event(FabricationEvent {
@@ -866,6 +978,7 @@ mod tests {
             "defect_confidence should be 0.72, got {}",
             t.defect_confidence
         );
+        assert!(t.defect_prediction_available);
     }
 
     #[test]
