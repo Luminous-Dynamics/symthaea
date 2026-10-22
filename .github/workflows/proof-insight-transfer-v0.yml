@@ -150,6 +150,117 @@ jobs:
           set -euo pipefail
           python -m venv "$RUNNER_TEMP/jsonschema-venv"
           "$RUNNER_TEMP/jsonschema-venv/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+      - name: Validate counterfactual mutation qualification schema and controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          root = Path("data/benchmarks/proof-insight-transfer-v0")
+          schema = json.loads((root / "counterfactual-mutation-qualification.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          fixture_path = root / "fixtures/counterfactual-mutation-qualification.synthetic.json"
+          fixture = json.loads(fixture_path.read_text())
+
+          def reject(condition, message):
+              if condition:
+                  raise ValueError(message)
+
+          def validate_suite(value):
+              validator.validate(value)
+              reject(value["schema_version"] != "pitb.counterfactual-mutation-qualification.v0", "unsupported qualification schema version")
+              cases = value["cases"]
+              ids = [item["qualification_id"] for item in cases]
+              reject(len(ids) != len(set(ids)), "duplicate qualification IDs")
+              for item in cases:
+                  pair = item["target_pair"]
+                  reject(pair["base_artifact_path"] == pair["variant_artifact_path"], "base and variant artifact paths must be distinct")
+                  adjudication = item["adjudication"]
+                  reviewers = adjudication["reviewers"]
+                  reviewer_ids = [reviewer["reviewer_id"] for reviewer in reviewers]
+                  reject(len(reviewer_ids) != len(set(reviewer_ids)), f"duplicate reviewer identity in {item['qualification_id']}")
+                  reject(adjudication["status"] == "adjudicated" and len(reviewers) < 2, f"adjudicated case lacks two reviewers: {item['qualification_id']}")
+                  if adjudication["status"] == "adjudicated":
+                      for reviewer in reviewers:
+                          reject(reviewer["statement_relation"] != item["statement_relation"]["relation"], f"reviewer statement relation disagrees in {item['qualification_id']}")
+                          reject(reviewer["contract_relation"] != item["contract_relation"]["status"], f"reviewer contract relation disagrees in {item['qualification_id']}")
+
+                  elaboration = item["elaboration"]
+                  relation = item["statement_relation"]
+                  contract = item["contract_relation"]
+                  if relation["relation"] == "same_elaborated_type":
+                      reject(elaboration["base_status"] != "elaborated" or elaboration["variant_status"] != "elaborated", "same-type relation requires both sides to elaborate")
+                      reject(not elaboration["base_type_sha256"] or elaboration["base_type_sha256"] != elaboration["variant_type_sha256"], "same-type relation requires equal elaborated type digests")
+                      reject(relation["evidence_kind"] != "kernel_checked_defeq_certificate" or not relation["receipt_sha256"], "same-type relation requires a checked definitional-equality receipt")
+                  elif relation["relation"] == "propositionally_equivalent":
+                      reject(elaboration["base_status"] != "elaborated" or elaboration["variant_status"] != "elaborated", "equivalence requires both sides to elaborate")
+                      reject(relation["evidence_kind"] != "kernel_checked_equivalence_proof" or not relation["receipt_sha256"], "propositional equivalence requires a checked equivalence receipt")
+                  elif relation["relation"] == "formally_distinct":
+                      reject(elaboration["base_status"] != "elaborated" or elaboration["variant_status"] != "elaborated", "formal distinction requires both sides to elaborate")
+                      reject(relation["evidence_kind"] not in {"checked_counterexample", "distinctness_proof", "independent_review"} or not relation["receipt_sha256"], "formal distinction lacks evidence")
+                  elif relation["relation"] == "invalid_mutation":
+                      reject(elaboration["variant_status"] not in {"parse_error", "elaboration_error"}, "invalid mutation must have a parser/elaborator diagnostic")
+                      reject(contract["status"] != "unknown", "invalid syntax/elaboration cannot establish strategy-contract violation")
+                      reject(relation["evidence_kind"] != "diagnostic_receipt" or not relation["receipt_sha256"] or not elaboration["diagnostics_sha256"], "invalid mutation lacks diagnostic receipts")
+
+                  if contract["status"] == "contract_violated":
+                      reject(elaboration["base_status"] != "elaborated" or elaboration["variant_status"] != "elaborated", "contract violation requires an elaborated pair")
+                      reject(contract["evidence_kind"] == "none" or not contract["receipt_sha256"], "contract violation lacks proof-state/context evidence")
+                  truth = item["truth_assessment"]
+                  if truth["status"] == "proved":
+                      reject(truth["evidence_kind"] != "kernel_proof" or not truth["receipt_sha256"], "proved truth status lacks a kernel proof receipt")
+                  if truth["status"] == "counterexample_found":
+                      reject(truth["evidence_kind"] != "checked_counterexample" or not truth["receipt_sha256"], "counterexample status lacks a checked counterexample receipt")
+                  attempt = item["strategy_attempt"]
+                  if attempt["status"] == "kernel_checked_success":
+                      reject(not attempt["exact_target_statement_checked"] or not attempt["receipt_sha256"], "verified success lacks exact-target checker evidence")
+
+          validate_suite(fixture)
+          if len(fixture["cases"]) < 4:
+              raise SystemExit("synthetic qualification fixture must cover at least four qualification states")
+          print(f"PITB_MUTATION_QUALIFICATION_SCHEMA_PASS: {len(fixture['cases'])} synthetic cases")
+
+          def expect_reject(mutant, description):
+              try:
+                  validate_suite(mutant)
+              except (ValidationError, ValueError):
+                  return
+              raise SystemExit(f"mutation-qualification negative control unexpectedly passed: {description}")
+
+          mutant = copy.deepcopy(fixture)
+          mutant["cases"][0]["statement_relation"]["receipt_sha256"] = None
+          expect_reject(mutant, "same type without a kernel certificate")
+
+          mutant = copy.deepcopy(fixture)
+          mutant["cases"][3]["elaboration"]["variant_status"] = "elaborated"
+          expect_reject(mutant, "invalid mutant without a parser/elaborator failure")
+
+          mutant = copy.deepcopy(fixture)
+          mutant["cases"][2]["contract_relation"]["receipt_sha256"] = None
+          mutant["cases"][2]["contract_relation"]["evidence_kind"] = "none"
+          expect_reject(mutant, "contract violation without applicability evidence")
+
+          mutant = copy.deepcopy(fixture)
+          mutant["cases"][0]["adjudication"]["reviewers"][1]["reviewer_id"] = mutant["cases"][0]["adjudication"]["reviewers"][0]["reviewer_id"]
+          expect_reject(mutant, "duplicate reviewer identity")
+
+          mutant = copy.deepcopy(fixture)
+          mutant["cases"][0]["strategy_attempt"]["status"] = "kernel_checked_success"
+          mutant["cases"][0]["strategy_attempt"]["exact_target_statement_checked"] = False
+          mutant["cases"][0]["strategy_attempt"]["receipt_sha256"] = "c" * 64
+          expect_reject(mutant, "success not bound to exact checked target")
+
+          mutant = copy.deepcopy(fixture)
+          mutant["cases"][2]["adjudication"]["reviewers"][0]["contract_relation"] = "contract_satisfied"
+          expect_reject(mutant, "reviewer disagreement hidden as adjudicated consensus")
+
+          print("PITB_MUTATION_QUALIFICATION_NEGATIVE_CONTROLS_PASS: 6 malformed qualification controls rejected")
+          PY
       - name: Validate insight schema and synthetic positive/negative controls
         shell: bash
         run: |
