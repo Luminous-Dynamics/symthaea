@@ -787,7 +787,7 @@
     "mutation_suite_test_name": "differential_json_reference_agrees_on_adversarial_mutation_suite",
     "state_model_path": "xtask/src/first_aid_model.rs",
     "state_model_test_name": "exhaustive_reachable_state_graph_preserves_trust_invariants",
-    "state_model_scope": "Finite lifecycle graph: session state, time-varying connectivity, bundle identity/validity/digest, revocation monotonicity, resume/interruption, and uncertainty handoff; separate 18-case orthogonal policy truth tables cover freshness/presentation, sensitivity/consent, and unknown normalization. Truth tables do not model temporal coupling between those policy domains.",
+    "state_model_scope": "Finite 252-state lifecycle/connectivity graph; 31 action types combine lifecycle/connectivity with six resource freshness/presentation events, four sensitive-payload/consent events, and unknown normalization. Event-local policy actions are interleaved in state-action edges and bounded suffix sequences; the underlying freshness, consent and normalization facts do not persist as lifecycle state. Separate exhaustive truth tables continue to cover all 18 local combinations. Same-repository finite abstraction only; no external clinical ground truth.",
     "state_model_spec_path": "docs/research/first-aid/STATE_MODEL_V0.md",
     "matrix_runner_test_name": "executable_mutation_matrix_matches_each_declared_outcome",
     "policy_truth_table_test_name": "exhaustive_orthogonal_policy_truth_tables_cover_non_lifecycle_invariants",
