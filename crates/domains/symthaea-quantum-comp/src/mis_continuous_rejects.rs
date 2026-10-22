@@ -39,7 +39,8 @@ pub enum MisContinuousRejectsError {
     /// At least one candidate must be provided.
     EmptyCandidates,
     /// Candidate probability is non-finite or outside [0, 1].
-    InvalidProbability { /// Zero-based candidate index.
+    InvalidProbability {
+        /// Zero-based candidate index.
         vertex: usize,
     },
     /// The budget must provide one initial observation per candidate.
