@@ -683,7 +683,12 @@ mod tests {
         assert!(validate_suite(&suite).is_err());
     }
 
-    fn task_result(task_id: &str, role: &'static str, package: &str, outcome: &'static str) -> TaskResult {
+    fn task_result(
+        task_id: &str,
+        role: &'static str,
+        package: &str,
+        outcome: &'static str,
+    ) -> TaskResult {
         TaskResult {
             task_id: task_id.to_owned(),
             role,
