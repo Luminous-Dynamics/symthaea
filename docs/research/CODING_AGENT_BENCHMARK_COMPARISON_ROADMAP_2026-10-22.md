@@ -23,7 +23,7 @@ Terminal-Bench itself describes version 4 as a protocol change that calibrates t
 
 A reference implementation passing and an empty patch failing are necessary, not sufficient. The current pilot now requires every curated mutant to compile and fail at least one assertion under a complete, non-simulated test run. CodeExecutor may record a nonzero test-binary exit in `runtime_error` when an ordinary assertion fails; exact full test counts therefore indicate a completed behavioral failure, while missing counts/simulated runs remain unresolved. For a larger task bank, record the mutation catalogue and report killed, surviving, invalid/compile-failing and unresolved mutants separately. A mutant that cannot compile is not evidence that tests discriminate behavior.
 
-The pilot's `#[test]` count is still a text scan. Replace it with structured fixture metadata or an AST-based extractor before broadening to arbitrary Rust repositories. The test harness must also detect a test runner that executed zero tests while returning a successful process exit.
+The fixed eight-task pilot now declares expected test counts explicitly and binds them into each task digest (receipt schema v2), removing the producer/auditor's `#[test]` text scan. The real preflight and each run must account for exactly the declared count, so a zero-test run is incomplete rather than a pass. Before ingesting arbitrary repositories, generalize this into a machine-readable harness contract with independent test-discovery evidence; do not return to counting source-text tokens.
 
 ### 2. Unknown is not failure—and not a tie
 
