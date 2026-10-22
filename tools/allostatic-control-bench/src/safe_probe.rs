@@ -564,6 +564,41 @@ mod tests {
     }
 
     #[test]
+    fn probe_can_guarantee_partial_learning_when_full_identification_is_impossible() {
+        let shared = model(
+            effects((-0.02, -0.01), (0.01, 0.02)),
+            effects((0.02, 0.03), (-0.02, -0.01)),
+            effects((0.08, 0.10), (-0.10, -0.08)),
+        );
+        let distinct_push = model(
+            effects((-0.09, -0.08), (0.09, 0.10)),
+            effects((0.02, 0.03), (-0.02, -0.01)),
+            effects((0.08, 0.10), (-0.10, -0.08)),
+        );
+        let models = [shared, shared, distinct_push];
+        let recommendation = recommend_safe_probe_with_noise(
+            state((0.50, 0.50), (0.50, 0.50)),
+            &models,
+            limits(),
+            true,
+            3,
+            Action::Maintain,
+            0.0,
+            0.005,
+        )
+        .expect("valid partial-learning request");
+
+        assert_eq!(recommendation.selected_action(), Some(Action::Push));
+        assert!(recommendation.selected_action_is_certified());
+        assert!(!recommendation.selected_action_guarantees_pairwise_distinguishability());
+        assert!(recommendation.selected_action_guarantees_hypothesis_reduction());
+        assert_eq!(recommendation.worst_case_remaining_hypotheses()[0], 2);
+        assert_eq!(recommendation.guaranteed_hypothesis_eliminations()[0], 1);
+        assert_eq!(recommendation.worst_case_remaining_hypotheses()[1], 3);
+        assert_eq!(recommendation.guaranteed_hypothesis_eliminations()[1], 0);
+    }
+
+    #[test]
     fn no_model_separation_returns_no_probe_without_claiming_no_safe_action() {
         let identical = model(
             effects((-0.02, -0.01), (0.01, 0.02)),
