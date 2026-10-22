@@ -184,9 +184,9 @@ jobs:
           seeded_count="$(grep -Eo 'model_production_seeded_long_horizon_comparisons=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
           seeded_seed="$(grep -Eo 'seed=0x[0-9a-f]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
           seeded_max_actions="$(grep -Eo 'max_actions=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
-          test "$edge_count" = "5040"
+          test "$edge_count" = "7812"
           test "$policy_count" = "18"
-          test "$two_action_count" = "100800"
+          test "$two_action_count" = "242172"
           test "$seeded_count" = "4096"
           test "$seeded_seed" = "0x4c554d494e4f5553"
           test "$seeded_max_actions" = "64"
@@ -280,9 +280,9 @@ jobs:
             .matrix_workflow_gate_case_count == 2 and
             .state_model_test_outcome == "success" and
             .trajectory_test_outcome == "success" and
-            .model_production_edge_comparison_count == 5040 and
+            .model_production_edge_comparison_count == 7812 and
             .policy_truth_table_comparison_count == 18 and
-            .model_production_two_action_sequence_comparison_count == 100800 and
+            .model_production_two_action_sequence_comparison_count == 242172 and
             .model_production_seeded_long_horizon_comparison_count == 4096 and
             .model_production_seeded_long_horizon_seed == "0x4c554d494e4f5553" and
             .model_production_seeded_long_horizon_max_actions == 64 and
