@@ -42,6 +42,25 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  nixward-config-stale-patch-focused:
+    name: Nixward Config Stale Patch Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check stale patch formatting
+        run: cargo fmt --check -- crates/core/nixward/src/action/config_writer.rs
+
+      - name: Run stale patch regression
+        run: cargo test -p nixward test_apply_patch_rejects_stale_original --lib
+
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
