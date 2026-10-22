@@ -22,6 +22,7 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-multistep-viability-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-ood-fallback-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-safe-probe-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-guaranteed-learning-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-active-learning-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
@@ -58,6 +59,8 @@ ood_out="${out_base}-ood-fallback.csv"
 ood_summary_out="${out_base}-ood-fallback-summary.csv"
 probe_out="${out_base}-safe-probe.csv"
 probe_summary_out="${out_base}-safe-probe-summary.csv"
+guaranteed_learning_out="${out_base}-guaranteed-learning.csv"
+guaranteed_learning_summary_out="${out_base}-guaranteed-learning-summary.csv"
 active_learning_out="${out_base}-active-learning.csv"
 active_learning_summary_out="${out_base}-active-learning-summary.csv"
 receipt="${out_csv}.receipt.txt"
@@ -552,6 +555,45 @@ if ! awk -F, '
   exit 1
 fi
 
+# Distinguish full one-step identification from guaranteed partial learning.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-guaranteed-learning-bench -- \
+  "$tmpdir/guaranteed-learning-a.csv" "$tmpdir/guaranteed-learning-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-guaranteed-learning-bench -- \
+  "$tmpdir/guaranteed-learning-b.csv" "$tmpdir/guaranteed-learning-summary-b.csv"
+if ! cmp -s "$tmpdir/guaranteed-learning-a.csv" "$tmpdir/guaranteed-learning-b.csv" ||
+   ! cmp -s "$tmpdir/guaranteed-learning-summary-a.csv" "$tmpdir/guaranteed-learning-summary-b.csv"; then
+  printf 'FAIL: repeated guaranteed-learning outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 17) failed = 1; next }
+  {
+    if (NF != 17) failed = 1
+    if ($1 != "three_candidate_partial_reduction" || $2 != 3 || $3 != 3 || $4 != 0.005) failed = 1
+    if ($5 != "none" || $6 != 0) failed = 1
+    if ($7 != "push" || $8 != 0) failed = 1
+    if ($9 != "true" || $10 != "false") failed = 1
+    if ($11 != 2 || $12 != 1 || $13 != 3 || $14 != 0 || $15 != 3 || $16 != 0) failed = 1
+    if ($17 != "partial_learning_without_full_identification") failed = 1
+    rows++
+  }
+  END { if (NR != 2 || rows != 1 || failed) exit 1 }
+' "$tmpdir/guaranteed-learning-a.csv"; then
+  printf 'FAIL: guaranteed partial-learning raw metrics or selection contract is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 5) failed = 1; next }
+  { if (NF != 5 || $1 != "three_candidate_partial_reduction" || $2 != "none" ||
+        $3 != "push" || $4 != 1 || $5 != "partial_learning_without_full_identification") failed = 1; rows++ }
+  END { if (NR != 2 || rows != 1 || failed) exit 1 }
+' "$tmpdir/guaranteed-learning-summary-a.csv"; then
+  printf 'FAIL: guaranteed partial-learning summary does not match the contract\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -580,6 +622,8 @@ cp "$tmpdir/ood-a.csv" "$ood_out"
 cp "$tmpdir/ood-summary-a.csv" "$ood_summary_out"
 cp "$tmpdir/probe-a.csv" "$probe_out"
 cp "$tmpdir/probe-summary-a.csv" "$probe_summary_out"
+cp "$tmpdir/guaranteed-learning-a.csv" "$guaranteed_learning_out"
+cp "$tmpdir/guaranteed-learning-summary-a.csv" "$guaranteed_learning_summary_out"
 cp "$tmpdir/active-learning-a.csv" "$active_learning_out"
 cp "$tmpdir/active-learning-summary-a.csv" "$active_learning_summary_out"
 {
@@ -613,6 +657,10 @@ cp "$tmpdir/active-learning-summary-a.csv" "$active_learning_summary_out"
   printf 'safe_probe_rows_excluding_header=%s\n' "$(( $(wc -l < "$probe_out") - 1 ))"
   printf 'safe_probe_summary_sha256=%s\n' "$(sha256sum "$probe_summary_out" | awk '{print $1}')"
   printf 'safe_probe_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$probe_summary_out") - 1 ))"
+  printf 'guaranteed_learning_sha256=%s\n' "$(sha256sum "$guaranteed_learning_out" | awk '{print $1}')"
+  printf 'guaranteed_learning_rows_excluding_header=%s\n' "$(( $(wc -l < "$guaranteed_learning_out") - 1 ))"
+  printf 'guaranteed_learning_summary_sha256=%s\n' "$(sha256sum "$guaranteed_learning_summary_out" | awk '{print $1}')"
+  printf 'guaranteed_learning_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$guaranteed_learning_summary_out") - 1 ))"
   printf 'active_learning_sha256=%s\n' "$(sha256sum "$active_learning_out" | awk '{print $1}')"
   printf 'active_learning_rows_excluding_header=%s\n' "$(( $(wc -l < "$active_learning_out") - 1 ))"
   printf 'active_learning_summary_sha256=%s\n' "$(sha256sum "$active_learning_summary_out" | awk '{print $1}')"
@@ -632,6 +680,8 @@ printf 'OOD fallback frontier: %s\n' "$ood_out"
 printf 'OOD fallback summary: %s\n' "$ood_summary_out"
 printf 'Safety-constrained active-probe frontier: %s\n' "$probe_out"
 printf 'Safety-constrained active-probe summary: %s\n' "$probe_summary_out"
+printf 'Guaranteed partial-learning frontier: %s\n' "$guaranteed_learning_out"
+printf 'Guaranteed partial-learning summary: %s\n' "$guaranteed_learning_summary_out"
 printf 'Active-learning update frontier: %s\n' "$active_learning_out"
 printf 'Active-learning update summary: %s\n' "$active_learning_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
