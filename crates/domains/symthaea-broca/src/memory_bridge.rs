@@ -77,10 +77,13 @@ impl MemoryInterventionPolicy {
                 min_similarity,
                 min_margin,
             } => {
-                if scores.len() < 2 {
+                if scores.is_empty() {
                     return Ok(false);
                 }
                 let (top, second) = validated_top_two(scores)?;
+                if scores.len() < 2 {
+                    return Ok(false);
+                }
                 Ok(top >= min_similarity && top - second >= min_margin)
             }
         }
@@ -301,6 +304,12 @@ mod intervention_policy_tests {
             min_similarity: 0.5,
         }
         .should_intervene(&[f32::INFINITY])
+        .is_err());
+        assert!(MemoryInterventionPolicy::MinTopSimilarityAndMargin {
+            min_similarity: 0.5,
+            min_margin: 0.1,
+        }
+        .should_intervene(&[f32::NAN])
         .is_err());
     }
 }
