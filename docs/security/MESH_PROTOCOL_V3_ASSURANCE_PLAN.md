@@ -3,7 +3,7 @@
 **Status:** research proposal; not a protocol specification or production approval  
 **Date:** 2026-10-22  
 **Related reviews:** PR #8376 (AEAD nonce lifecycle), PR #8412 (key-agreement claim integrity), PR #8365 (crypto calibration runner)  
-**Model:** \`docs/security/models/MESH_NONCE_LIFECYCLE.tla\`
+**Model:** `docs/security/models/MESH_NONCE_LIFECYCLE.tla`
 
 ## Purpose
 
@@ -14,7 +14,7 @@ This plan intentionally does **not** claim that the model has been parsed or mod
 ## Decision proposal
 
 1. **Do not enable a production v3 profile until the protocol state machine and wire format are frozen and independently reviewed.**
-2. **Prefer a maintained, established secure-channel implementation over a custom handshake.** Where transport and dependencies permit, evaluate TLS 1.3 with the standardized \`X25519MLKEM768\` group defined for TLS in RFC 10024 and the hybrid framework in RFC 9954. Verify the actually negotiated group in an integration test; source configuration or a requested feature is not evidence of negotiation.
+2. **Prefer a maintained, established secure-channel implementation over a custom handshake.** Where transport and dependencies permit, evaluate TLS 1.3 with the standardized `X25519MLKEM768` group defined for TLS in RFC 10024 and the hybrid framework in RFC 9954. Verify the actually negotiated group in an integration test; source configuration or a requested feature is not evidence of negotiation.
 3. **Do not copy TLS's key schedule or hybrid group into a bespoke raw-mesh handshake by analogy.** RFC 10024 specifies TLS 1.3 group behavior, not a generic standalone mesh protocol.
 4. **Treat LoRa as a separate transport profile.** Quantify the authenticated handshake, fragment overhead, retries, airtime, energy, maximum frame size and recovery before choosing a suite. If a reviewed interoperable construction does not fit the deployment, defer that security profile rather than claim post-quantum protection from a placeholder backend or a custom combiner.
 5. **A real ML-KEM backend is a hard prerequisite for any PQ session claim.** The all-zero compile stub must remain unable to establish or publish a session. Check the current FIPS 203 publication and errata, run official known-answer tests, and compare against an independently maintained implementation before approval.
@@ -40,7 +40,7 @@ Assumptions must say whether peers share one group secret or have peer-specific 
 
 The production design should make the following states explicit rather than representing every stage as an optional key in a map:
 
-\`\`\`text
+```text
 Disabled
   -> Negotiating
   -> CandidateKeys
@@ -48,21 +48,21 @@ Disabled
   -> LocallyConfirmed
   -> Established
   -> Closing / Closed
-\`\`\`
+```
 
 All error paths lead to a non-established state and erase transient candidates. The exact ordering may differ by the chosen standard implementation, but these invariants may not:
 
-- \`Established\` implies an authenticated peer identity, an allowed protocol version/suite, transcript binding, required key confirmation, and a real cryptographic backend.
+- `Established` implies an authenticated peer identity, an allowed protocol version/suite, transcript binding, required key confirmation, and a real cryptographic backend.
 - A KEM encapsulation/decapsulation result alone does not authenticate the peer or establish a mutually confirmed session.
 - A candidate key is never returned by the application-facing session-key API.
 - A required PQ/hybrid exchange failure cannot silently become a classical-only session.
 - A downgrade is accepted only where an explicit, authenticated policy permits the named lower profile; the chosen profile is bound to the handshake transcript.
 - Session teardown, key rotation, timeout and peer revocation invalidate candidate state and prevent its later promotion.
-- Classical ephemeral private material and KEM transient secrets are erased according to the selected library's documented guarantees; source-level \`drop\` alone is not proof of memory zeroization.
+- Classical ephemeral private material and KEM transient secrets are erased according to the selected library's documented guarantees; source-level `drop` alone is not proof of memory zeroization.
 
 ## Nonce and record contract
 
-For every AEAD invocation, record the abstract pair \`(effective_key_epoch_id, nonce)\`. The invariant applies to the **effective key**, not just the bytes of a nonce or the outer packet identity.
+For every AEAD invocation, record the abstract pair `(effective_key_epoch_id, nonce)`. The invariant applies to the **effective key**, not just the bytes of a nonce or the outer packet identity.
 
 - A key epoch identifies one actual derived traffic-key namespace. Epoch IDs are authenticated metadata, not entropy or secret material.
 - Use the selected protocol/library's defined key schedule and nonce construction. Do not improvise a truncated sender prefix, small random epoch, wrap-prone thought ID or cross-layer nonce format.
@@ -82,23 +82,23 @@ The TLA+ model is deliberately bounded. It isolates three legacy mechanisms:
 2. deterministic restart resetting sequence and epoch to their default while retaining the same effective key;
 3. fragment nonce collision when the thought-ID projection repeats while the same effective key and fragment index are reused.
 
-The fragment model uses a tiny \`FragmentModulus\` so a wrap counterexample can be explored in a small state space. It is an abstraction of the real 16-bit field, not a literal model of production byte encoding. The strict configurations model a fail-closed specification oracle: they prevent recording a duplicate pair. They do **not** establish that the Rust implementation obeys the oracle.
+The fragment model uses a tiny `FragmentModulus` so a wrap counterexample can be explored in a small state space. It is an abstraction of the real 16-bit field, not a literal model of production byte encoding. The strict configurations model a fail-closed specification oracle: they prevent recording a duplicate pair. They do **not** establish that the Rust implementation obeys the oracle.
 
 ### TLC commands
 
-Obtain the official TLA+ tools and use a pinned version of \`tla2tools.jar\` with Java 11 or newer. From the repository root, run the parser first, then each configuration:
+Obtain the official TLA+ tools and use a pinned version of `tla2tools.jar` with Java 11 or newer. From the repository root, run the parser first, then each configuration:
 
-\`\`\`sh
-java -cp /path/to/tla2tools.jar tla2sany.SANY \\
+```sh
+java -cp /path/to/tla2tools.jar tla2sany.SANY \
   docs/security/models/MESH_NONCE_LIFECYCLE.tla
 
 for cfg in docs/security/models/*.cfg; do
-  java -cp /path/to/tla2tools.jar tlc2.TLC \\
+  java -cp /path/to/tla2tools.jar tlc2.TLC \
     -config "$cfg" docs/security/models/MESH_NONCE_LIFECYCLE.tla
 done
-\`\`\`
+```
 
-The three \`*_legacy.cfg\` files are **expected to find a counterexample** for \`NoNonceReuse\`. The three \`*_strict.cfg\` files are expected to finish the bounded exploration without violating \`NoNonceReuse\`. Preserve TLC version, exact model/config digests, command, exit status, state count, invariant result and counterexample trace. Do not call any of those outcomes a universal proof or Rust implementation proof.
+The three `*_legacy.cfg` files are **expected to find a counterexample** for `NoNonceReuse`. The three `*_strict.cfg` files are expected to finish the bounded exploration without violating `NoNonceReuse`. Preserve TLC version, exact model/config digests, command, exit status, state count, invariant result and counterexample trace. Do not call any of those outcomes a universal proof or Rust implementation proof.
 
 ## Mapping model evidence to code
 
@@ -106,11 +106,11 @@ Before model results can qualify implementation behavior, add a trace adapter or
 
 | Model action/property | Concrete conformance target |
 |---|---|
-| \`Send\` | the exact encrypt-and-reserve path, not a detached nonce helper |
-| \`Restart\` | process recreation with the same configured keys and any durable state restored or lost |
-| \`RotateEpoch\` | actual key schedule / key rotation behavior and receiver transition rules |
-| \`usedPairs\` | a test-only, non-secret effective-key identity plus emitted nonce capture |
-| \`NoNonceReuse\` | zero duplicate effective-key/nonce tuples across generated traces |
+| `Send` | the exact encrypt-and-reserve path, not a detached nonce helper |
+| `Restart` | process recreation with the same configured keys and any durable state restored or lost |
+| `RotateEpoch` | actual key schedule / key rotation behavior and receiver transition rules |
+| `usedPairs` | a test-only, non-secret effective-key identity plus emitted nonce capture |
+| `NoNonceReuse` | zero duplicate effective-key/nonce tuples across generated traces |
 | strict refusal | no ciphertext, session advancement or application effect when uniqueness cannot be established |
 
 The test-only key identifier must be collision-resistant for the test's bookkeeping purpose or be a unique internal test label. It must never be used as an operational substitute for the actual key bytes or key schedule.
