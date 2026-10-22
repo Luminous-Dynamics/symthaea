@@ -74,6 +74,32 @@ A synthetic ranking-reversal test uses two plausible priors: `[0.49, 0.49, 0.01,
 
 This is a **finite prior ambiguity set**, not a guarantee over arbitrary priors, an automatically learned posterior, an adversarial distribution over all hypotheses, or a published distributionally robust design algorithm. It also applies only to the supplied candidate pool. If the real model is absent and every declared prior is confidently misspecified in the same way, the envelope can still be confidently wrong. Keep the prior-shift / candidate-pool-omission conditions in the held-out benchmark.
 
+## Published robust-design comparison frontier
+
+The finite prior/model/noise envelope is deliberately a transparent baseline, not a claim to be the current state of the art. The confirmatory benchmark should add separately implemented and version-pinned comparator arms when reproducible reference implementations or complete equations are available:
+
+- **Nominal Bayesian EIG / Bayesian adaptive design:** information-only reference.
+- **Expected generalized information gain (EGIG) and separate model-error penalties:** Callahan and Catanach, AISTATS 2026, analyze how misspecified models can make nominally most-informative experiments amplify bias and propose inferential-error/model-error criteria: https://proceedings.mlr.press/v300/callahan26a.html
+- **R-IDeA:** Tang, Sloman and Kaski, AISTATS 2026, combines representativeness, informativeness and error de-amplification under misspecification: https://proceedings.mlr.press/v300/tang26d.html
+- **Maximin robust Bayesian experimental design:** Abdulsamad et al. (2026) formulate a max-min information-theoretic design using Sibson alpha-mutual information and PAC-Bayes lower bounds: https://arxiv.org/abs/2603.14094
+- **Generalised Bayesian optimal experimental design (GBOED):** Barlas, Sloman and Kaski propose Gibbs EIG based on loss-based updates and study robustness to outliers / incorrect noise assumptions: https://arxiv.org/abs/2511.07671
+- **Random, raw-variance/query-by-committee, weighted EIG, model-robust finite envelope, and prior/model/noise envelope:** maintain these simple, inspectable baselines as ablations.
+
+These methods do not share identical assumptions or objectives, so report their own valid metrics and implementation/evaluation budgets; do not force all outputs into a single unqualified score. Before comparing a method as “reproduced,” record its paper version, implementation commit, estimator choices, tuning budget, and known deviations. This repository's finite-scenario minimum is **not** an implementation of EGIG, R-IDeA, Sibson-MI/PAC-Bayes robust design, or GBOED.
+
+### Benchmark acceptance targets
+
+Freeze complete structural families for test-only evaluation before tuning. Use paired worlds and seeds; cluster uncertainty intervals by world, not by treating every seed as a new independent scientific world. Report at least:
+
+- Discovery/recovery accuracy and held-out predictive loss on a declared target distribution.
+- False-singleton / false-certainty rate under deliberate candidate-pool omissions.
+- Detectable model-coverage failure rate and time/query count to detect the misspecification.
+- Calibration and interval coverage where an output distribution exists; proper scoring rules for probabilistic forecasts.
+- Utility after exact sensing cost, wall time, invalid-selection rate, and an evaluator-only oracle reported strictly as a ceiling.
+- Performance on both matched models and diverse shift / outlier / discrepancy settings; report regressions as well as wins.
+
+A credible SOTA claim requires a preregistered primary metric, matched query and monetary/time budgets, documented tuning, complete test-set disclosure, an independent rerun, and uncertainty that supports the claimed improvement. A small synthetic rank reversal is a unit test for a selector contract, not the evidence required for that claim.
+
 ## Integrated law-discovery pilot
 
 The focused workflow also runs `expected_information_gain_vs_variance_on_paired_seeds` inside the existing `symthaea-physics-bridge` multi-round discovery simulator. It compares the raw-variance selector with expected-information-gain-per-cost (equal unit cost in this first ablation), using the same 40 deterministic seeds, typed-generation setting, four-round budget and candidate-pool generation per seed. The report prints paired selector-only wins, both success rates, mean rounds, EIG selection failures, and 2,000-resample percentile intervals for EIG-minus-variance changes in success rate and rounds. Positive success deltas favor EIG; negative round deltas favor EIG. These seed-resampled pilot intervals do not replace world-clustered confirmatory inference. This is a small pilot diagnostic, not a confirmatory performance claim.
