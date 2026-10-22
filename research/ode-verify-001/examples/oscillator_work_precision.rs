@@ -180,7 +180,7 @@ fn evaluate_case(
     let final_state_error_linf = state_error(final_time, final_state);
 
     Ok(Metrics {
-        integrator: integrator.name(),
+        integrator: integrator.name().to_owned(),
         steps_per_period,
         step_size,
         steps: result.steps,
