@@ -5,7 +5,9 @@
 //! This is sound under the declared rectangular action-effect bounds, but
 //! conservative: it does not search state-contingent continuation policies.
 
-use super::robust_viability::{next_state_envelope, DynamicsBounds, StateEnvelope, ViabilityLimits};
+use super::robust_viability::{
+    next_state_envelope, DynamicsBounds, StateEnvelope, ViabilityLimits,
+};
 use super::Action;
 
 pub const MAX_CERTIFIED_HORIZON: usize = 8;
@@ -93,8 +95,7 @@ fn available_actions(shield_can_recover: bool) -> &'static [Action] {
 }
 
 fn state_is_viable(state: StateEnvelope, limits: ViabilityLimits) -> bool {
-    state.reserve().lower() >= limits.min_reserve()
-        && state.load().upper() <= limits.max_load()
+    state.reserve().lower() >= limits.min_reserve() && state.load().upper() <= limits.max_load()
 }
 
 /// Return the next interval only if every state/effect in the uncertainty set is
@@ -214,9 +215,7 @@ pub fn evaluate_horizon_action_set_with_budget(
         match action {
             Action::Push => set.push = certified,
             Action::Maintain => set.maintain = certified,
-            Action::EmergencyRecover => {
-                set.emergency_recover = shield_can_recover && certified
-            }
+            Action::EmergencyRecover => set.emergency_recover = shield_can_recover && certified,
         }
     }
 
@@ -229,18 +228,17 @@ pub fn evaluate_horizon_action_set_with_budget(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::robust_viability::{evaluate_action_set, ActionEffectBounds, Interval, ViabilityLimits};
+    use crate::robust_viability::{
+        evaluate_action_set, ActionEffectBounds, Interval, ViabilityLimits,
+    };
 
     fn interval(lower: f64, upper: f64) -> Interval {
         Interval::new(lower, upper).expect("valid interval")
     }
 
     fn effects(reserve: (f64, f64), load: (f64, f64)) -> ActionEffectBounds {
-        ActionEffectBounds::new(
-            interval(reserve.0, reserve.1),
-            interval(load.0, load.1),
-        )
-        .expect("valid action effect")
+        ActionEffectBounds::new(interval(reserve.0, reserve.1), interval(load.0, load.1))
+            .expect("valid action effect")
     }
 
     fn limits() -> ViabilityLimits {
@@ -293,9 +291,8 @@ mod tests {
         limits: ViabilityLimits,
     ) -> Option<StateEnvelope> {
         let next = independent_next_tube(state, action, dynamics)?;
-        (next.reserve().lower() >= limits.min_reserve()
-            && next.load().upper() <= limits.max_load())
-        .then_some(next)
+        (next.reserve().lower() >= limits.min_reserve() && next.load().upper() <= limits.max_load())
+            .then_some(next)
     }
 
     fn independently_has_safe_suffix(
@@ -315,13 +312,7 @@ mod tests {
         };
         actions.iter().any(|action| {
             independent_safe_transition(state, *action, dynamics, limits).is_some_and(|next| {
-                independently_has_safe_suffix(
-                    next,
-                    dynamics,
-                    limits,
-                    remaining - 1,
-                    authority,
-                )
+                independently_has_safe_suffix(next, dynamics, limits, remaining - 1, authority)
             })
         })
     }
@@ -394,9 +385,8 @@ mod tests {
         let initial_state = boundary_state();
         let dynamics = deadline_dynamics();
         let one_step = evaluate_action_set(initial_state, dynamics, limits(), true);
-        let horizon_one =
-            evaluate_horizon_action_set(initial_state, dynamics, limits(), true, 1)
-                .expect("valid horizon");
+        let horizon_one = evaluate_horizon_action_set(initial_state, dynamics, limits(), true, 1)
+            .expect("valid horizon");
 
         assert_eq!(horizon_one.horizon(), 1);
         assert_eq!(horizon_one.count(), one_step.count());
@@ -409,12 +399,10 @@ mod tests {
     fn one_step_safe_push_is_rejected_without_a_safe_continuation() {
         let initial_state = boundary_state();
         let dynamics = deadline_dynamics();
-        let one_step =
-            evaluate_horizon_action_set(initial_state, dynamics, limits(), true, 1)
-                .expect("one-step set");
-        let two_step =
-            evaluate_horizon_action_set(initial_state, dynamics, limits(), true, 2)
-                .expect("two-step set");
+        let one_step = evaluate_horizon_action_set(initial_state, dynamics, limits(), true, 1)
+            .expect("one-step set");
+        let two_step = evaluate_horizon_action_set(initial_state, dynamics, limits(), true, 2)
+            .expect("two-step set");
 
         assert!(one_step.push());
         assert!(!two_step.push());
@@ -500,11 +488,9 @@ mod tests {
             effects((0.02, 0.03), (0.03, 0.04)),
             effects((0.02, 0.03), (-0.30, -0.25)),
         );
-        let unsafe_intermediate = next_state_envelope(
-            initial_state,
-            dynamics.effect_for_action(Action::Push),
-        )
-        .expect("well-formed but unsafe intermediate tube");
+        let unsafe_intermediate =
+            next_state_envelope(initial_state, dynamics.effect_for_action(Action::Push))
+                .expect("well-formed but unsafe intermediate tube");
         assert!(!state_is_viable(unsafe_intermediate, limits()));
         let recovered = next_state_envelope(
             unsafe_intermediate,
