@@ -748,6 +748,27 @@ mod tests {
     }
 
     #[test]
+    fn same_seed_is_reproducible_but_changes_observable_evidence_by_seed() {
+        let first = build_fixture(1701, 240);
+        let second = build_fixture(1702, 240);
+        let changed_same_kind = first.iter().any(|left| {
+            second.iter().any(|right| {
+                left.id == right.id
+                    && left.truth.kind == right.truth.kind
+                    && left.features != right.features
+            })
+        });
+        assert!(
+            changed_same_kind,
+            "different seeds changed only ordering, not matched observable profiles"
+        );
+        assert_eq!(
+            fixture_fingerprint(&first),
+            fixture_fingerprint(&build_fixture(1701, 240))
+        );
+    }
+
+    #[test]
     fn policies_receive_features_not_ground_truth() {
         fn accepts_features_only(policy: Policy, features: &ObservedFeatures) -> Action {
             choose_action(policy, features)
