@@ -1,0 +1,480 @@
+{
+  "suite_id": "ORE_ASSAY_REFERENCE_BENCHMARK",
+  "suite_version": "0.1.0",
+  "evidence_class": "synthetic",
+  "claim_ceiling": "Synthetic software contract validation only; not an assay, mineral identification, resource estimate, recovery prediction, feasibility result, or authorization.",
+  "dry_mass_unit": "mg",
+  "assay_unit": "ppm_mass_fraction",
+  "mass_tolerance_ppm": 0,
+  "scenarios": [
+    {
+      "scenario_id": "SYNTHETIC_VALID_ASSAY_AND_CLOSED_FLOW",
+      "expected_disposition": "pass",
+      "expected_reason_codes": [],
+      "sample": {
+        "sample_id": "sample-001",
+        "lot_id": "lot-A",
+        "source_record_id": "source-synthetic-001",
+        "assay_method_id": "method-synthetic-assay-v1",
+        "evidence_class": "synthetic",
+        "dry_mass_mg": 1000000,
+        "quality_control_passed": true,
+        "assays": [
+          {
+            "analyte_id": "Fe",
+            "quantity_kind": "elemental_mass_fraction",
+            "expressed_as": "Fe",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 620000,
+            "detection_limit_ppm": 1000
+          },
+          {
+            "analyte_id": "hematite",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "Fe2O3 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 250000,
+            "detection_limit_ppm": 1000
+          },
+          {
+            "analyte_id": "quartz",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "SiO2 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 300000,
+            "detection_limit_ppm": 1000
+          }
+        ]
+      },
+      "process_flow": {
+        "input_sample_id": "sample-001",
+        "input_lot_id": "lot-A",
+        "feed_dry_mass_mg": 1000000,
+        "streams": [
+          {
+            "stream_id": "concentrate",
+            "kind": "qualified_product",
+            "dry_mass_mg": 200000
+          },
+          {
+            "stream_id": "middlings",
+            "kind": "middlings",
+            "dry_mass_mg": 30000
+          },
+          {
+            "stream_id": "tailings",
+            "kind": "tailings",
+            "dry_mass_mg": 750000
+          },
+          {
+            "stream_id": "process-loss",
+            "kind": "explicit_process_loss",
+            "dry_mass_mg": 20000
+          }
+        ]
+      },
+      "grade_comparison": {
+        "required_analyte_id": "Fe",
+        "required_kind": "elemental_mass_fraction",
+        "required_basis": "dry_mass",
+        "minimum_ppm": 600000,
+        "measured_analyte_id": "Fe",
+        "measured_kind": "elemental_mass_fraction",
+        "measured_basis": "dry_mass",
+        "measured_value_ppm": 650000,
+        "conversion_evidence_id": null,
+        "normalized_value_ppm": null
+      },
+      "expected_assertions": [
+        "Assay identity, basis, quality-control flag, grade semantics, lineage and dry-mass closure are internally consistent."
+      ],
+      "negative_control": "positive known-answer synthetic control"
+    },
+    {
+      "scenario_id": "SYNTHETIC_BELOW_DETECTION_FALSE_ZERO",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "BELOW_DETECTION_VALUE_PRESENT"
+      ],
+      "sample": {
+        "sample_id": "sample-001",
+        "lot_id": "lot-A",
+        "source_record_id": "source-synthetic-001",
+        "assay_method_id": "method-synthetic-assay-v1",
+        "evidence_class": "synthetic",
+        "dry_mass_mg": 1000000,
+        "quality_control_passed": true,
+        "assays": [
+          {
+            "analyte_id": "Zn",
+            "quantity_kind": "elemental_mass_fraction",
+            "expressed_as": "Zn",
+            "basis": "dry_mass",
+            "result_state": "below_detection",
+            "value_ppm": 0,
+            "detection_limit_ppm": 50
+          }
+        ]
+      },
+      "process_flow": null,
+      "grade_comparison": null,
+      "expected_assertions": [
+        "A below-detection result uses no numeric concentration; zero must not stand in for censored evidence."
+      ],
+      "negative_control": "negative: below-detection result encodes zero"
+    },
+    {
+      "scenario_id": "SYNTHETIC_GRADE_BASIS_MISMATCH",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "GRADE_BASIS_MISMATCH"
+      ],
+      "sample": {
+        "sample_id": "sample-001",
+        "lot_id": "lot-A",
+        "source_record_id": "source-synthetic-001",
+        "assay_method_id": "method-synthetic-assay-v1",
+        "evidence_class": "synthetic",
+        "dry_mass_mg": 1000000,
+        "quality_control_passed": true,
+        "assays": [
+          {
+            "analyte_id": "Fe",
+            "quantity_kind": "elemental_mass_fraction",
+            "expressed_as": "Fe",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 620000,
+            "detection_limit_ppm": 1000
+          },
+          {
+            "analyte_id": "hematite",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "Fe2O3 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 250000,
+            "detection_limit_ppm": 1000
+          },
+          {
+            "analyte_id": "quartz",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "SiO2 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 300000,
+            "detection_limit_ppm": 1000
+          }
+        ]
+      },
+      "process_flow": null,
+      "grade_comparison": {
+        "required_analyte_id": "Fe",
+        "required_kind": "elemental_mass_fraction",
+        "required_basis": "dry_mass",
+        "minimum_ppm": 600000,
+        "measured_analyte_id": "Fe",
+        "measured_kind": "oxide_equivalent_mass_fraction",
+        "measured_basis": "dry_mass",
+        "measured_value_ppm": 800000,
+        "conversion_evidence_id": null,
+        "normalized_value_ppm": null
+      },
+      "expected_assertions": [
+        "An oxide-equivalent value cannot satisfy an elemental-grade threshold without an explicit conversion reference and normalized value."
+      ],
+      "negative_control": "negative: elemental specification compared with oxide-equivalent result without conversion evidence"
+    },
+    {
+      "scenario_id": "SYNTHETIC_SAMPLE_LINEAGE_MISMATCH",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "FLOW_SAMPLE_LINEAGE_MISMATCH"
+      ],
+      "sample": {
+        "sample_id": "sample-001",
+        "lot_id": "lot-A",
+        "source_record_id": "source-synthetic-001",
+        "assay_method_id": "method-synthetic-assay-v1",
+        "evidence_class": "synthetic",
+        "dry_mass_mg": 1000000,
+        "quality_control_passed": true,
+        "assays": [
+          {
+            "analyte_id": "Fe",
+            "quantity_kind": "elemental_mass_fraction",
+            "expressed_as": "Fe",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 620000,
+            "detection_limit_ppm": 1000
+          },
+          {
+            "analyte_id": "hematite",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "Fe2O3 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 250000,
+            "detection_limit_ppm": 1000
+          },
+          {
+            "analyte_id": "quartz",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "SiO2 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 300000,
+            "detection_limit_ppm": 1000
+          }
+        ]
+      },
+      "process_flow": {
+        "input_sample_id": "different-sample",
+        "input_lot_id": "lot-other",
+        "feed_dry_mass_mg": 1000000,
+        "streams": [
+          {
+            "stream_id": "concentrate",
+            "kind": "qualified_product",
+            "dry_mass_mg": 200000
+          },
+          {
+            "stream_id": "middlings",
+            "kind": "middlings",
+            "dry_mass_mg": 30000
+          },
+          {
+            "stream_id": "tailings",
+            "kind": "tailings",
+            "dry_mass_mg": 750000
+          },
+          {
+            "stream_id": "process-loss",
+            "kind": "explicit_process_loss",
+            "dry_mass_mg": 20000
+          }
+        ]
+      },
+      "grade_comparison": null,
+      "expected_assertions": [
+        "A process flow cannot silently consume a different sample or lot than the one identified by the assay."
+      ],
+      "negative_control": "negative: feed flow references an unrelated sample and lot"
+    },
+    {
+      "scenario_id": "SYNTHETIC_DRY_MASS_CREATION",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "DRY_MASS_IMBALANCE"
+      ],
+      "sample": {
+        "sample_id": "sample-001",
+        "lot_id": "lot-A",
+        "source_record_id": "source-synthetic-001",
+        "assay_method_id": "method-synthetic-assay-v1",
+        "evidence_class": "synthetic",
+        "dry_mass_mg": 1000000,
+        "quality_control_passed": true,
+        "assays": [
+          {
+            "analyte_id": "Fe",
+            "quantity_kind": "elemental_mass_fraction",
+            "expressed_as": "Fe",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 620000,
+            "detection_limit_ppm": 1000
+          },
+          {
+            "analyte_id": "hematite",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "Fe2O3 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 250000,
+            "detection_limit_ppm": 1000
+          },
+          {
+            "analyte_id": "quartz",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "SiO2 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 300000,
+            "detection_limit_ppm": 1000
+          }
+        ]
+      },
+      "process_flow": {
+        "input_sample_id": "sample-001",
+        "input_lot_id": "lot-A",
+        "feed_dry_mass_mg": 1000000,
+        "streams": [
+          {
+            "stream_id": "concentrate",
+            "kind": "qualified_product",
+            "dry_mass_mg": 200000
+          },
+          {
+            "stream_id": "tailings",
+            "kind": "tailings",
+            "dry_mass_mg": 850000
+          }
+        ]
+      },
+      "grade_comparison": null,
+      "expected_assertions": [
+        "All declared dry-mass streams must reconcile to the dry feed within the stated tolerance."
+      ],
+      "negative_control": "negative: output streams create fifty thousand milligrams of dry mass"
+    },
+    {
+      "scenario_id": "SYNTHETIC_ASSAY_QC_UNRESOLVED",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "ASSAY_QUALITY_CONTROL_UNRESOLVED"
+      ],
+      "sample": {
+        "sample_id": "sample-001",
+        "lot_id": "lot-A",
+        "source_record_id": "source-synthetic-001",
+        "assay_method_id": "method-synthetic-assay-v1",
+        "evidence_class": "synthetic",
+        "dry_mass_mg": 1000000,
+        "quality_control_passed": false,
+        "assays": [
+          {
+            "analyte_id": "Fe",
+            "quantity_kind": "elemental_mass_fraction",
+            "expressed_as": "Fe",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 620000,
+            "detection_limit_ppm": 1000
+          },
+          {
+            "analyte_id": "hematite",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "Fe2O3 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 250000,
+            "detection_limit_ppm": 1000
+          },
+          {
+            "analyte_id": "quartz",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "SiO2 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 300000,
+            "detection_limit_ppm": 1000
+          }
+        ]
+      },
+      "process_flow": null,
+      "grade_comparison": null,
+      "expected_assertions": [
+        "A quality-control failure cannot be hidden by numerically plausible assay values."
+      ],
+      "negative_control": "negative: assay quality-control state is false"
+    },
+    {
+      "scenario_id": "SYNTHETIC_MINERAL_PHASE_TOTAL_TOO_HIGH",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "MINERAL_PHASE_TOTAL_EXCEEDS_ONE_MILLION_PPM"
+      ],
+      "sample": {
+        "sample_id": "sample-001",
+        "lot_id": "lot-A",
+        "source_record_id": "source-synthetic-001",
+        "assay_method_id": "method-synthetic-assay-v1",
+        "evidence_class": "synthetic",
+        "dry_mass_mg": 1000000,
+        "quality_control_passed": true,
+        "assays": [
+          {
+            "analyte_id": "hematite",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "Fe2O3 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 600000,
+            "detection_limit_ppm": 1000
+          },
+          {
+            "analyte_id": "quartz",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "SiO2 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 500000,
+            "detection_limit_ppm": 1000
+          }
+        ]
+      },
+      "process_flow": null,
+      "grade_comparison": null,
+      "expected_assertions": [
+        "Exclusive mineral-phase mass fractions cannot sum to more than the whole dry sample."
+      ],
+      "negative_control": "negative: quantified mineral phase fractions total one million one hundred thousand ppm"
+    },
+    {
+      "scenario_id": "SYNTHETIC_SOURCE_REFERENCE_MISSING",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "SOURCE_REFERENCE_MISSING"
+      ],
+      "sample": {
+        "sample_id": "sample-001",
+        "lot_id": "lot-A",
+        "source_record_id": "",
+        "assay_method_id": "method-synthetic-assay-v1",
+        "evidence_class": "synthetic",
+        "dry_mass_mg": 1000000,
+        "quality_control_passed": true,
+        "assays": [
+          {
+            "analyte_id": "Fe",
+            "quantity_kind": "elemental_mass_fraction",
+            "expressed_as": "Fe",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 620000,
+            "detection_limit_ppm": 1000
+          },
+          {
+            "analyte_id": "hematite",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "Fe2O3 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 250000,
+            "detection_limit_ppm": 1000
+          },
+          {
+            "analyte_id": "quartz",
+            "quantity_kind": "mineral_phase_mass_fraction",
+            "expressed_as": "SiO2 phase",
+            "basis": "dry_mass",
+            "result_state": "quantified",
+            "value_ppm": 300000,
+            "detection_limit_ppm": 1000
+          }
+        ]
+      },
+      "process_flow": null,
+      "grade_comparison": null,
+      "expected_assertions": [
+        "A numerically complete record without source lineage is not accepted as evidence-bearing."
+      ],
+      "negative_control": "negative: source record reference is absent"
+    }
+  ]
+}
