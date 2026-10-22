@@ -111,6 +111,7 @@ Run matched scenarios with fixed seeds/configuration:
 - Add each pairwise combination.
 - Add all signals with provenance and type.
 - Negative control: add the same signals after label swaps, duplicate-source replay, or stale-source injection; the system must not gain confidence from the corruption.
+- Endogenous-feedback control: trace the producer and every consumer of the dyadic signal. A value derived from user-input embeddings plus a synthetic transform cannot count as independently observed partner evidence; do not feed it back into cognition as validated relational evidence. Track the source-level remediation in [issue #8291](https://github.com/Luminous-Dynamics/symthaea/issues/8291).
 - Positive controls: a genuinely new, independently sourced observation may change a decision when relevant; a user boundary withdrawal must override proxy signals.
 
 Record decisions, not just telemetry movements. A proxy is useful only if it improves held-out decisions reliably. A change in Φ or entropy in the direction anticipated by a hypothesis is not itself success.
