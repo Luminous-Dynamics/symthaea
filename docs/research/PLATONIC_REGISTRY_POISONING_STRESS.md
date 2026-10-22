@@ -1,73 +1,83 @@
-# Registry Enrollment Poisoning Stress Benchmark
+# Registry Enrollment Poisoning and Fixed-Budget Replacement Benchmark
 
 **Status:** executable synthetic benchmark authored; exact-head validation pending  
-**Implementation:** \`crates/core/symthaea-core/examples/platonic_registry_poisoning_stress.rs\`  
-**Runner:** \`.github/workflows/levin-pattern-experiments.yml\`
+**Implementation:** `crates/core/symthaea-core/examples/platonic_registry_poisoning_stress.rs`  
+**Runner:** `.github/workflows/levin-pattern-experiments.yml`  
+**Follow-up:** [Issue #8317 — fixed-budget replacement and temporal poisoning](https://github.com/Luminous-Dynamics/symthaea/issues/8317)
 
 ## Research question
 
-How quickly does prototype retrieval degrade when an attacker can enroll a wrong-labelled duplicate or near-duplicate? Do similarity and margin gates reject the attack, or merely convert some poisoning events into abstentions? Does the answer change as query noise increases?
+Can a hostile enrollment change retrieval outcomes by adding attacker-labelled near-duplicates—or, more severely, replacing a genuine prototype while holding memory capacity constant? Do similarity and margin gates reject the attack, accept the attacker identity, or simply move errors into abstentions? Does the result change with query noise?
 
-This fills a gap between the open-set memory-growth stress test and identity-evidence API contract. The open-set test studies unknown observations; this one studies hostile changes *inside the registry*. It is deliberately a controlled insertion attack—not a model-weight poisoning study, authenticated-registry security proof, or estimate of real-world attack prevalence.
+The two attack modes must not be pooled as equivalent:
 
-## Protocol
+- **Insertion:** keeps every genuine entry and appends attacker-labelled copies/near-duplicates, increasing the entry and vector-byte count.
+- **Replacement:** removes each targeted genuine entry and inserts an attacker-labelled copy/near-duplicate. Entry count and estimated vector-payload bytes remain constant. Queries for those underlying genuine classes are scored separately as targeted queries, making class loss visible.
 
-- 1,024-dimensional bipolar prototype vectors; 16 genuine classes.
-- Three deterministic seeds: 17, 29, and 41.
-- Poison entry counts: 0, 1, 2, 4, and 8. The zero-poison case is the clean baseline; other cases add attacker-labelled entries rather than silently replacing legitimate identities.
-- Each malicious entry is a copy of a genuine prototype with 0%, 2%, or 5% coordinate corruption, but carries a separate \`attacker-XX-YY\` label. Attack targets are distinct within each declared budget.
-- Query populations contain 8 observations per genuine class at 0%, 10%, and 20% corruption. The same deterministic query corpus is reused across attack profiles for paired comparisons.
-- A fixed score threshold (0.25) and top-two margin threshold (0.05) provide a visible selective-decision diagnostic. They are not calibrated and have no finite-sample risk guarantee.
+This is an intentionally controlled synthetic registry-state attack. It is not a model-weight poisoning study, a physical memory bit-flip demonstration, an authenticated registry implementation, or a prevalence estimate for real-world attacks.
 
-No threshold is tuned against this result. The test corpus is small and synthetic by design; the values should expose mechanisms and counterexamples, not support broad statistical or deployment claims.
+## Executable protocol
 
-## Output and metrics
+- Vector dimension: 1,024 bipolar coordinates.
+- Registry: 16 genuine classes.
+- Seeds: 17, 29, and 41.
+- Attack budgets: 0, 1, 2, 4, and 8 attacker entries.
+- Prototype corruption for the attacker entry: 0%, 2%, or 5%.
+- Query corruption: 0%, 10%, or 20%.
+- Query corpus: 8 samples per genuine class for each query-noise level. The query vectors are generated once per seed and reused across all insertion and replacement profiles, giving paired comparisons.
+- Attack targets are unique within a declared budget of up to eight classes, selected by a deterministic permutation.
+- Fixed diagnostic acceptance rule: best similarity at least 0.25 and top-two margin at least 0.05. This rule is neither calibrated nor backed by a finite-sample risk guarantee. No threshold is fitted on the reported results.
 
-Each row is stratified by seed, poison-entry count, poison corruption, and query corruption. The runner records:
+The zero-entry baseline runs with zero attacker corruption only. In replacement mode, the genuine entry for every targeted class is removed; attacker labels are added in its place. The bank therefore remains exactly 16 entries in replacement mode, while insertion mode uses 16 plus the attacker count.
 
-- **Top-1 accuracy** over genuine queries, including predictions captured by attacker labels as incorrect.
-- **Coverage** and **selective risk** under the fixed score-plus-margin diagnostic; zero accepted results produce \`NA\` risk, not zero.
-- **Attacker prediction rate** across all genuine queries.
-- **Targeted attack success rate** among queries whose genuine class has a poison entry, plus the conditional attacker success rate among accepted targeted queries.
-- **Entry count** and estimated vector payload bytes, excluding labels, runtime overhead, allocator capacity, and indexes.
-- **p50/p95 exact-scan latency**, scan-loop wall time, and aggregate single-thread query throughput. Per-query p50/p95 measures the `rank` call; scan-loop wall time and aggregate QPS also include per-query timing calls and metric bookkeeping, but exclude query generation and registry construction. These figures must not be compared with ANN-database throughput absent matched hardware, corpus, batching, warm-up, memory accounting, and ground-truth protocol.
-- Registry-build time in a comment record. This is kept separate from query/scan timing.
+## Measurements
 
-Rates stay separated by seed and noise level so aggregate averages cannot hide an attack that is highly effective in a particular regime. The 3-seed, 8-query-per-class smoke setup is not enough for tight confidence intervals; it is meant to establish a reproducible measurement contract and regression controls.
+Rows are separated by seed, attack mode, attack-entry count, attack corruption, and query corruption.
 
-## Crucial negative controls
+- **Overall top-1 accuracy**, coverage, accepted errors and selective risk.
+- **Targeted-class metrics:** top-1 correctness, accepted coverage and false-rejection rate on queries whose genuine class has been attacked.
+- **Retained-class metrics:** top-1 correctness, accepted coverage and false-rejection rate for classes whose genuine entry remains present.
+- **Targeted attack success:** frequency with which the attacker-labelled entry for the true target is the top-ranked label, both over all targeted queries and conditional on targeted queries accepted by the diagnostic rule.
+- **Attacker prediction rate:** fraction of all genuine queries whose top-ranked entry is attacker-labelled.
+- **Resource cost:** entry count and estimated vector payload bytes, registry build time, p50/p95 latency around exact ranking, exact-scan wall time, and aggregate single-thread QPS.
 
-1. **Exact clone:** an attacker entry that is bit-identical to an enrolled prototype is observationally indistinguishable under vector similarity. The current deterministic tie break favours the lexical \`attacker-\` label over \`id-\`, so an exact copy captures clean-prototype queries for its target. The unit test preserves this adversarial counterexample.
-2. **Clean registry:** with zero poison entries, all stored labels remain genuine and every clean prototype query returns its own identity.
-3. **Paired query stream:** all poisoning profiles receive the same generated observations for a given seed/noise condition; an apparent difference cannot be attributed to drawing an easier query set for one profile.
-4. **Memory accounting:** insertion attacks increase memory. Results must not be presented as equal-memory comparisons with the clean baseline; a future replacement-attack arm should hold total entry count fixed and report missing-class effects separately.
+A zero-accepted denominator emits `NA`, not a fabricated zero risk. Payload estimates count only `entry_count × dimension × sizeof(i8)`; labels, allocation overhead, indexes, process RSS, allocator capacity and runtime are excluded. Per-query p50/p95 measures the `rank` call. Scan-loop wall time and QPS also include per-query timing calls and metric bookkeeping, while excluding query generation and registry construction. Do not compare these synthetic timings with ANN-database throughput without matching hardware, corpus, batching, warm-up, ground truth, memory accounting and timing boundaries.
 
-An exact duplicate cannot be made safe by a better similarity threshold: the two entries have the same vector. The architectural control is to separate similarity candidate generation from authority to register an identity, then require independently authenticated enrollment/provenance evidence. The benchmark measures the consequences when that trust boundary is absent; it does not implement authentication.
+The three-seed, eight-query-per-class corpus is smoke-scale. It is intended to reveal deterministic failure modes and validate the measurement contract, not to substantiate stable population rates. Wilson or other binomial intervals would be misleading if they ignore repeated queries sharing a prototype; larger studies must use uncertainty estimates appropriate to the class/prototype sampling design.
 
-## Paradigm shift and next experiments
+## Falsifiable negative controls
 
-Treat enrollment as a security-sensitive state transition rather than an append-only vector write. Candidate ranking can be high-performance and approximate, but identity assignment should depend on a distinct, auditable authorization path. A robust memory should also support quarantine, provenance-aware conflict resolution, registry rollback, and monotonic revocation without silently relabelling an identity.
+1. **Insertion exact clone:** both original and attacker entries score 1.0 against the clean target vector. The lexical tie-break favours the attacker label, but the top-two margin is zero and the fixed diagnostic abstains.
+2. **Replacement exact clone:** the legitimate target entry has been removed, so the attacker copy is the unique best match. It can score 1.0 with a large margin and pass the same acceptance rule. This shows why rejection based on ambiguous duplicate candidates is not enough when registry replacement is possible.
+3. **Clean registry:** with zero attack entries, all prototype labels remain genuine and every clean prototype query retrieves its expected label.
+4. **Constant replacement budget:** replacement with 1/2/4/8 entries must always retain the same bank-entry count and estimated vector payload as the clean baseline.
+5. **Paired query stream:** attack modes and budgets are evaluated against the same query vectors for each seed/noise stratum. A change in outcome is not caused by generating a different test set.
 
-Next comparisons should add (a) a fixed-entry-count replacement attack, (b) repeated low-rate attacks over time, (c) label collisions and replayed enrollment receipts, (d) independently authenticated vs unauthenticated enrollment events, (e) a registry-held-out evaluation, and (f) paired comparisons with a faithful class-wise selective-risk baseline. Any defence must be evaluated against the same attack corpus and include benign near-duplicate controls.
+The essential boundary is architectural: similarity ranks candidates; a distinct authorization/provenance path determines which identities are allowed to enter or replace registry records. Neither high similarity nor a successful statistical certificate authenticates a registry mutation.
 
-## Proposed gates (targets, not achieved results)
+## Paradigm shifts and next work
 
-- Exact-clone counterexample remains detected by a regression test.
-- Every attack profile reports attack success, accepted attack success, ordinary accuracy, coverage, selective risk, and memory cost independently.
-- A proposed mitigation must reduce accepted targeted attack success at matched or explicitly budgeted coverage; a result that only raises abstention is not automatically an improvement.
-- Use at least 5 seeds and 1,000 or more targeted queries per operating point before estimating stable rates; report uncertainty with a sampling unit appropriate to repeated prototypes and classes.
-- Benchmark replacement attacks at equal entry and byte budgets, insertion attacks at reported extra memory, and all methods on identical query streams.
-- Compare against conventional nearest-neighbour/prototype baselines and a verified provenance-aware contract; keep identity assurance claims separate from geometric classification.
+Move from append-only prototype storage toward an **auditable registry state machine** with explicit enrollment authority, provenance, conflict/quarantine states, revocation, monotonic audit events, replay protection, and rollback that cannot silently resurrect revoked identities. Candidate retrieval can remain fast, but identity ownership and enrollment should be controlled separately.
 
-These gates are targets. This benchmark has no deployment-level statistical certificate.
+The immediate follow-up is [Issue #8317](https://github.com/Luminous-Dynamics/symthaea/issues/8317), covering benign multi-template controls, temporal enrollment/revoke/replay sequences and exact-byte-budget replacement. Later attack arms should include repeated low-rate poisoning, multiple labels for the same vector, label collisions, replayed enrollment receipts, prototype bit corruption, and a registry-held-out split. Each defence must be compared on the identical attack/query corpus and at matched coverage or a declared coverage budget.
 
-## Research context
+## Benchmark targets (targets, not achieved results)
 
-- A 2023 study on HDC-based data poisoning in federated learning describes a distinct attack surface involving adversarial samples around hyperdimensional class representations: <https://www.sciencedirect.com/science/article/pii/S0957417423016949>. That setting is not the same as registry-entry insertion here; it motivates testing HDC-specific poisoning rather than assuming the representation itself prevents it.
-- A 2025 review of HDC/VSA classification stresses cross-task comparisons across established HDC datasets and UCI tasks, including conventional classifier baselines: <https://doi.org/10.1007/s10462-025-11181-2>.
-- A 2026 HDC uncertainty-aware human-activity-recognition study combines geometry-derived uncertainty with conformal prediction and evaluates sensor/distribution shifts while reporting on-device resources: <https://doi.org/10.1038/s41598-026-57375-8>. It motivates explicit robustness and resource measurements, but does not certify this synthetic registry experiment.
-- The selective-classification-under-distribution-shift literature shows that calibration and rejection behavior under a changed query distribution cannot simply be assumed from in-distribution results: <https://pmc.ncbi.nlm.nih.gov/articles/PMC12470254/>.
+- **Replacement capacity:** entry count and vector payload equal to the clean baseline for every replacement attack budget.
+- **Security utility:** reduce accepted targeted attack success at matched coverage or a declared coverage budget. Abstaining on every query is not a winning mitigation.
+- **Failure visibility:** report attack success, targeted and retained class coverage, selective risk, false rejection, and resources separately.
+- **Uncertainty quality:** at least five independent seeds and 1,000 or more targeted queries per operating point before making stable rate claims; uncertainty must reflect clustering by identity/prototype.
+- **Equal-workload comparison:** exact same queries, seed, precision, vector dimension, threshold policy and hardware across prototype/HDC variants and conventional nearest-prototype or classifier baselines.
+- **Measured runtime:** include total RSS and index/label costs where feasible, in addition to estimated vector payload and build/query timing.
+- **Provenance contract:** independently test valid enrollment, unauthorized insertion, unauthorized replacement, conflicting labels, replay, revocation, and rollback. Similarity metrics do not count as a provenance control.
+
+## Industry comparison and research context
+
+- **HDC classification benchmarks:** Vergés et al. (2025) propose consistent evaluation across seven established HDC application datasets and 121 UCI classification tasks, making them relevant public-task targets for later comparison. They also emphasize the importance of comparing HDC approaches with other ML classifiers: https://doi.org/10.1007/s10462-025-11181-2
+- **Memory integrity:** *HyperAttack* studies targeted bit flips in HDC associative memory rather than registry entry insertion/replacement; its threat model differs, but it is an essential adversarial comparator for a broader memory-integrity suite: https://doi.org/10.1109/DAC56929.2023.10247811
+- **Accelerator security:** a 2025 HDC side-channel study reports class-hypervector recovery from voltage traces on an FPGA accelerator. This exposes a different physical leakage surface and should motivate a separate threat model, not be mixed into this software-only experiment: https://doi.org/10.1109/ITC-Asia67627.2025.00019
+- **Distribution shift and uncertainty:** a 2026 microcontroller HDC study evaluates uncertainty and conformal prediction across partial and mixed sensor shifts and reports coverage, set size, OOD detection and device resources. These are useful evaluation dimensions for Symthaea's later non-synthetic workload tranche, but its results do not transfer automatically to registry poisoning: https://doi.org/10.1038/s41598-026-57375-8
 
 ## Claim ceiling
 
-The experiment can establish a deterministic, synthetic poisoning stress result for the exact source revision. It cannot establish robust identity, authenticated provenance, statistical guarantees under unknown distributions, real-world attack prevalence, superiority to SOTA, or safe deployment.
+A passing exact-head run would establish only that the executable and tests produce the declared deterministic synthetic measurements. It would not establish secure identity, authenticated provenance, cryptographic guarantees, robustness to unseen attacks or shifts, real-world prevalence, deployment safety, or superiority to SOTA. Those require separately specified evidence.
