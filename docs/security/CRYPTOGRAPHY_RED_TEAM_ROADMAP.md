@@ -21,6 +21,7 @@ Every finding should include: affected commit and code path; attacker preconditi
 - Evaluate a provider matrix instead of selecting a library on brand or throughput alone:
   - **Current legacy baseline:** pqcrypto-dilithium, retained only long enough to measure compatibility and migration cost; RustSec marks the pqcrypto family unmaintained.
   - **Pure-Rust candidate:** RustCrypto ml-dsa 0.1.1 implements final NIST FIPS 204 and exposes ML-DSA-44, -65, and -87. Its maintainers explicitly state that it has not been independently audited. Treat it as a candidate to validate, not as an automatically trusted production replacement: [crate documentation](https://docs.rs/ml-dsa/latest/ml_dsa/).
+  - **Formally verified-components candidate:** Cryspen's libcrux-ml-dsa 0.0.10 supports ML-DSA-44, -65, and -87, with portable and AVX2 implementations. Its documentation says selected field arithmetic, NTT polynomial arithmetic, and serialization components are formally verified in F*; this must not be inflated into a claim that the complete implementation or end-to-end protocol is formally verified or independently audited. Evaluate the exact crate version, proof scope, generated-code correspondence, performance, and remaining unverified components: [crate source and README](https://docs.rs/crate/libcrux-ml-dsa/latest/source/README.md).
   - **Independent differential reference:** OpenSSL 3.5 added ML-DSA support and is an LTS line supported until April 8, 2030. Evaluate it as a separate implementation where the target platforms can pin an appropriate OpenSSL version and provider configuration: [OpenSSL 3.5 release announcement](https://openssl-library.org/post/2025-04-08-openssl-35-final-release/). Do not imply that using OpenSSL alone means a particular build/provider is FIPS-validated.
   - **Adversarial corpus:** use current Project Wycheproof ML-DSA vectors where applicable, alongside applicable NIST ACVP vectors. Pin the exact corpus revision and digest: [Project Wycheproof](https://github.com/C2SP/wycheproof).
 - Record MSRV, no-std/WASM feasibility, license and transitive dependencies, reproducible-build posture, secret-lifecycle behavior, side-channel evidence, maintenance response, and independent audit status for each candidate. Do not use a single provider as both implementation and sole oracle.
@@ -68,6 +69,20 @@ Analyze how primitives are composed and used, not only the primitive APIs:
 - **Error behavior:** consistent fail-closed outcomes; bounded parsing work; no secret values in logs/errors; distinguish invalid user input from internal verifier failures without leaking sensitive detail.
 - **Secrets:** minimize long-lived secret-key copies, remove unnecessary Clone where callers permit it, evaluate zeroization support in the selected provider, and audit persistence, crash dumps, and serialization paths.
 - **Side channels:** rely on provider documentation and independent review; supplement with compiler/assembly inspection and appropriately designed timing tests. Timing tests can detect regressions but cannot prove constant-time behavior.
+
+## Workstream E — standardized build provenance and trust policy (P1)
+
+Do not grow a bespoke signature envelope into a replacement for ecosystem provenance standards. Symthaea's domain-specific attestation can record proof-specific claims, but release/build provenance should compose with the [SLSA v1.2 specification](https://slsa.dev/spec/v1.2/), in-toto statement/predicate formats, and a well-defined signature/identity verification policy.
+
+- **Immediate baseline:** produce provenance for a release/build that binds repository URI, exact source revision, build definition, builder identity, dependency materials, and output digest.
+- **Target Build L2:** use hosted CI to generate and sign provenance and make consumers verify its authenticity. Do not let the ordinary build step freely manufacture the trusted CI provenance.
+- **Longer-term Build L3:** move towards an appropriately hardened builder where build steps cannot access provenance-signing material and separate build runs cannot influence one another. A valid signature generated inside an untrusted build step alone does not establish trustworthy provenance.
+- **Source controls:** progressively adopt SLSA Source Track requirements for retained history, source provenance, enforced controls, and review. Do not claim a source/build level until the concrete controls are in place and independently checked.
+- **Domain claims:** for an SMT or ZK proof attestation, bind a canonical statement digest, proof/verifier algorithm and version, verifier identity/version, result, and associated artifact digests. Keep “signature valid,” “trusted signer,” “proof verified,” “source-to-binary provenance verified,” and “artifact executed in a sandbox” as distinct claims.
+- **Trust roots:** distribute trusted signer identities through policy/configuration or an established transparency/trust channel, never by trusting a key that appears only inside the object being verified.
+- **Evidence bundle:** attach SBOM/dependency inventory and the exact test/vector/fuzz/negative-control results as linked evidence. These records support decisions; they do not turn an unreviewed cryptographic primitive into an audited one.
+
+The [OpenSSF Scorecard](https://www.scorecard.dev/) offers a complementary repository hygiene baseline: review enforcement, branch protection, pinned dependencies/actions, least-privilege CI token permissions, dangerous workflow patterns, fuzzing, vulnerability remediation, and signed releases. Use its checks to expose missing controls, not as a substitute for a protocol-specific threat model or a crypto audit.
 
 ## Workstream E — reproducible evidence and release gates (P1)
 
