@@ -345,30 +345,13 @@ impl RdpSession {
         Some(out)
     }
 
-    /// Open a sealed binary envelope produced by `seal` (or by a peer's `seal` call).
+    /// Open a sealed binary envelope without imposing an application payload type.
     ///
-    /// Performs three checks in order:
+    /// This preserves the general-purpose API for callers that intentionally
+    /// dispatch on the packet's own type. Protocol-specific decoders should
+    /// use `open_with_payload_type` to fail closed on cross-type envelopes.
     ///
-    /// 1. **Length**: envelope must be ≥ 28 bytes (12 nonce + 16 tag).
-    /// 2. **AEAD verify**: ChaCha20-Poly1305 decrypt against the current
-    ///    session key, falling back to the previous key during the
-    ///    rekey grace period.
-    /// 3. **Replay window**: the sequence number embedded in the nonce
-    ///    (positions 8..12, little-endian u32) must be either strictly
-    ///    higher than any previously accepted sequence for the same
-    ///    `(source_id, payload_type)` stream, OR within the 64-message
-    ///    sliding window AND not previously seen.
-    ///
-    /// Returns `None` on any failure. Mutates `self` to advance the replay
-    /// window when a message is accepted.
-    ///
-    /// **Mutability note**: this used to be `&self` before the replay
-    /// window was added in Phase I.A.5 Track 2.2. Callers must update to
-    /// pass `&mut session`.
-    /// Open an authenticated envelope without imposing an application payload type.
-    ///
-    /// Prefer `open_with_payload_type` at protocol boundaries so a valid
-    /// ciphertext for one message class cannot be passed to a different decoder.
+    /// Returns `None` on length, authentication, or replay-window failure.
     #[cfg(feature = "mesh-encryption")]
     pub fn open(&mut self, envelope: &[u8]) -> Option<Vec<u8>> {
         self.open_inner(envelope, None)
