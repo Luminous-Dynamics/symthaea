@@ -334,6 +334,77 @@ fn reference_worlds() -> Vec<ReferenceWorld> {
     ]
 }
 
+/// Additional source-visible worlds whose true parameters lie between the
+/// grid-search values. These holdout-transfer fixtures test whether the
+/// selection curve is robust to parameter values the grid cannot represent
+/// exactly; they do not constitute a blind benchmark.
+fn selection_diagnostic_worlds() -> Vec<ReferenceWorld> {
+    let mut worlds = reference_worlds();
+    worlds.extend([
+        ReferenceWorld {
+            id: "transfer-inverse-power-off-grid-a",
+            truth: Law {
+                family: LawFamily::InversePower,
+                amplitude: 1.35,
+                exponent: 1.8,
+                scale: 1.5,
+            },
+            seed: 0x5048_5953_0000_0004,
+        },
+        ReferenceWorld {
+            id: "transfer-inverse-power-off-grid-b",
+            truth: Law {
+                family: LawFamily::InversePower,
+                amplitude: 2.35,
+                exponent: 2.7,
+                scale: 2.0,
+            },
+            seed: 0x5048_5953_0000_0005,
+        },
+        ReferenceWorld {
+            id: "transfer-screened-power-off-grid-a",
+            truth: Law {
+                family: LawFamily::ScreenedInversePower,
+                amplitude: 2.2,
+                exponent: 1.8,
+                scale: 2.25,
+            },
+            seed: 0x5048_5953_0000_0006,
+        },
+        ReferenceWorld {
+            id: "transfer-screened-power-off-grid-b",
+            truth: Law {
+                family: LawFamily::ScreenedInversePower,
+                amplitude: 1.65,
+                exponent: 2.7,
+                scale: 1.25,
+            },
+            seed: 0x5048_5953_0000_0007,
+        },
+        ReferenceWorld {
+            id: "transfer-saturating-off-grid-a",
+            truth: Law {
+                family: LawFamily::Saturating,
+                amplitude: 1.35,
+                exponent: 1.8,
+                scale: 2.25,
+            },
+            seed: 0x5048_5953_0000_0008,
+        },
+        ReferenceWorld {
+            id: "transfer-saturating-off-grid-b",
+            truth: Law {
+                family: LawFamily::Saturating,
+                amplitude: 2.65,
+                exponent: 2.7,
+                scale: 1.25,
+            },
+            seed: 0x5048_5953_0000_0009,
+        },
+    ]);
+    worlds
+}
+
 /// Return the source-visible reference worlds through their query-only API.
 ///
 /// This is useful for smoke tests and local agent development. It is not a
@@ -787,10 +858,11 @@ pub fn run_reference_benchmark() -> BenchmarkReport {
         .map(|policy| summarize(policy, &rows).expect("each policy has reference cases"))
         .collect();
 
+    let selection_worlds = selection_diagnostic_worlds();
     let mut selection_bottleneck_cases = Vec::new();
     for &candidates_per_family in CANDIDATES_PER_FAMILY {
         for policy in [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom] {
-            for world in &worlds {
+            for world in &selection_worlds {
                 selection_bottleneck_cases.push(
                     evaluate_selection_bottleneck(world, policy, candidates_per_family)
                         .expect("fixed candidate-selection diagnostic must evaluate"),
@@ -1089,7 +1161,7 @@ mod tests {
         let second = run_reference_benchmark();
         assert_eq!(first, second);
         assert!(first.verify_receipt());
-        assert_eq!(first.body.selection_bottleneck_cases.len(), 24);
+        assert_eq!(first.body.selection_bottleneck_cases.len(), 72);
         assert_eq!(first.body.selection_bottleneck_summaries.len(), 8);
 
         for row in &first.body.selection_bottleneck_cases {
@@ -1113,7 +1185,7 @@ mod tests {
 
         // The pool is built from deterministic shuffled prefixes. More candidate
         // proposals may improve the evaluator-only oracle, but may not worsen it.
-        for world in reference_worlds() {
+        for world in selection_diagnostic_worlds() {
             for policy in [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom] {
                 let mut previous_oracle = f64::INFINITY;
                 for &pool_size in CANDIDATES_PER_FAMILY {
@@ -1138,7 +1210,7 @@ mod tests {
         }
 
         for summary in &first.body.selection_bottleneck_summaries {
-            assert_eq!(summary.case_count, 3);
+            assert_eq!(summary.case_count, 9);
             assert!(summary.family_recovery_rate.is_finite());
             assert!((0.0..=1.0).contains(&summary.family_recovery_rate));
             assert!(summary.mean_selected_heldout_nrmse.is_finite());
