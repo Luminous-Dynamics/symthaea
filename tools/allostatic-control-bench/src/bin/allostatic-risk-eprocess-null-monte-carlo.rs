@@ -286,7 +286,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     record.monitor.to_string(),
                     record.events.to_string(),
                     record.event_trace.clone(),
-                    optional_usize((record.first_event_step < HORIZON).then_some(record.first_event_step)),
+                    optional_usize(
+                        (record.first_event_step < HORIZON).then_some(record.first_event_step),
+                    ),
                     record.fixed_first_alarm_step.to_string(),
                     record.mix3_first_alarm_step.to_string(),
                     record.mix7_first_alarm_step.to_string(),
@@ -335,7 +337,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let expected_raw = RISK_RATES.len() * COHORTS * MONITORS;
     let expected_summary = RISK_RATES.len() * 4;
     if all_rate_summaries.len() != expected_summary || raw.lines().count() != expected_raw + 1 {
-        return Err(IoError::new(ErrorKind::InvalidData, "Monte Carlo output coverage mismatch").into());
+        return Err(IoError::new(
+            ErrorKind::InvalidData,
+            "Monte Carlo output coverage mismatch",
+        )
+        .into());
     }
     validate_monte_carlo_gates(&all_rate_summaries)?;
 
