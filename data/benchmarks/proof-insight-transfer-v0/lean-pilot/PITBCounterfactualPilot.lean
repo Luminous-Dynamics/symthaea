@@ -42,6 +42,24 @@ theorem successor_monotonicity_with_premise :
   intro a b h
   exact Nat.succ_le_succ h
 
+/--
+A fixed-target proof-state intervention demonstration.
+
+The theorem statement and goal type stay fixed across the two `trace_state`
+snapshots. The first state contains `h : a ≤ b`; after `clear h`, the exact
+same goal remains but that named local declaration is absent. The remaining
+equality hypothesis supplies an alternate route to close the same target.
+This is a calibration example, not a model decision or a replayed benchmark row.
+-/
+theorem same_goal_after_hypothesis_clear
+    (a b : Nat) (h : a ≤ b) (hEq : a = b) :
+    Nat.succ a ≤ Nat.succ b := by
+  trace_state
+  clear h
+  trace_state
+  subst b
+  exact Nat.le_refl _
+
 /-- Removing the hypothesis changes the contract and produces a false target. -/
 theorem premise_removed_variant_is_false :
     ¬ PremiseRemovedVariant := by
