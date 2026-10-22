@@ -1,0 +1,47 @@
+{
+  "schema": "symthaea-off-target-kernel-inference-receipt-v1",
+  "date": "2026-10-22",
+  "status": "EXACT_LOCAL_ENUMERATION_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/entropy-causal-cut-benchmark-v1",
+  "source": {
+    "path": "validation/off_target_kernel_inference.py",
+    "git_blob": "aadfb064aa8369a1d1e5417bf089703ce9f5d0fb",
+    "sha256": "cd57596385de170e1859d8de513e6daa241251b785d1c777b165e9b389c50032",
+    "bytes": 18527
+  },
+  "tests": {
+    "path": "validation/test_off_target_kernel_inference.py",
+    "git_blob": "525858c74a83cb9476000e6c2ddafda92c5bed63",
+    "sha256": "fc03f079b98b3073ff5162601b304fd10420e5c13f6aa4275f493e95a654c103",
+    "count": 8,
+    "result": "8/8_PASS_LOCAL"
+  },
+  "artifact": {
+    "filename": "off_target_kernel_results_exact.json",
+    "bytes": 37320,
+    "sha256": "f54c7f56d21f4ba53e5fafe600e545cf1846310ccbc738877d8ba5cd2a92dc4d",
+    "source_git_blob_bound": "aadfb064aa8369a1d1e5417bf089703ce9f5d0fb",
+    "repository_summary_path": "validation/off_target_kernel_summary_2026-10-22.json",
+    "repository_summary_git_blob": "661f91685aab72c684eb31d70d71ddb8849726eb"
+  },
+  "report": {
+    "path": "docs/research/OFF_TARGET_KERNEL_INFERENCE_AUDIT_2026-10-22.md",
+    "git_blob": "b5a08ce2c0c63f3ee498a8a9536e7908726a5526"
+  },
+  "protocol": {
+    "candidate_graphs": ["chain", "fork"],
+    "compliance_grid": [0.5, 0.75, 1.0],
+    "off_target_probability_grid": [0.0, 0.25],
+    "heldout_worlds": ["collider XOR", "reversed chain"],
+    "rows": 48,
+    "budget": 2
+  },
+  "validation": {
+    "embedded_self_test": "PASS_LOCAL",
+    "unit_tests": "8/8_PASS_LOCAL",
+    "source_and_test_git_blobs_match_executed_bytes": true,
+    "remote_ci": "no passing GitHub Actions claim; local evidence is independent"
+  },
+  "conclusion": "Joint graph/compliance/off-target inference retains predictive support in this fixture when true q/r are on the hypothesis grid. Off-target information remains low at two probes. This is a small exact pilot, not SOTA or external benchmark evidence."
+}
