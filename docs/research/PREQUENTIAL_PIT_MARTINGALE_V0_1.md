@@ -54,6 +54,7 @@ The number of channels and equal portfolio weights are fixed at construction. Th
 - ONS updates from prior payoffs, with coefficients clipped to [-1,1];
 - per-component log wealth, portfolio log wealth, threshold, observation index, and typed terminal decision;
 - tests for invalid inputs, no state consumption on invalid observations, contextual bias that pooled features can hide, and a fixed-seed null smoke simulation with predictable time-varying contexts.
+- a fixed-seed adaptive Gaussian experiment smoke case that compares pooled and action-contextual detection delay. The fixture uses an approximate normal CDF solely for a deterministic regression test; production use must supply a vetted predictive CDF.
 
 The API cannot verify that a predictive distribution was produced before the outcome, that its parameters were fit without leakage, or that a context feature was computed before seeing (U_t). Record those facts in run receipts. A plug-in CDF that ignores parameter-estimation uncertainty can make PITs non-uniform under the nominal null; it must not be treated as automatically valid. If the forecast is estimated, use a justified prequential/posterior-predictive or honest sample-splitting protocol.
 
