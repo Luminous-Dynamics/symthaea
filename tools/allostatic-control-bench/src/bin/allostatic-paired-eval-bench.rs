@@ -8,7 +8,7 @@
 use allostatic_control_bench::paired_statistics::{PairedEpisode, PairedSummary};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 
@@ -51,8 +51,17 @@ fn run() -> Result<(), String> {
     if bootstrap_replicates < 1_000 {
         return Err("use at least 1000 paired bootstrap replicates".to_owned());
     }
+    if !is_slug(metric_name) || !is_slug(violation_name) {
+        return Err("metric and violation column names must be simple unquoted slugs".to_owned());
+    }
     if !Path::new(input_path).is_file() {
         return Err(format!("input CSV does not exist: {input_path}"));
+    }
+    let canonical_input = fs::canonicalize(input_path)
+        .map_err(|error| format!("cannot resolve input CSV {input_path}: {error}"))?;
+    let canonical_output = canonical_output_path(Path::new(output_path))?;
+    if canonical_input == canonical_output {
+        return Err("input and output resolve to the same file; refusing to overwrite source data".to_owned());
     }
 
     let content = fs::read_to_string(input_path)
@@ -167,30 +176,80 @@ fn run() -> Result<(), String> {
         summaries.push((scenario, shielded, random_seed, summary));
     }
 
-    // Write atomically only after every condition passes validation and analysis.
-    let mut report = fs::File::create(output_path)
-        .map_err(|error| format!("cannot create output CSV {output_path}: {error}"))?;
-    writeln!(
-        report,
-        "scenario,shielded,metric,baseline_policy,candidate_policy,n_pairs,baseline_mean,candidate_mean,candidate_minus_baseline_mean,median_paired_delta,paired_bootstrap_ci95_low,paired_bootstrap_ci95_high,bootstrap_replicates,bootstrap_seed,baseline_violations,candidate_violations,candidate_only_violations,baseline_only_violations,mcnemar_exact_two_sided_p,baseline_violation_rate,candidate_violation_rate,baseline_violation_upper95_exact,candidate_violation_upper95_exact"
-    )
-    .map_err(|error| format!("cannot write report header: {error}"))?;
-    for (scenario, shielded, random_seed, summary) in summaries {
-        write_summary_row(
-            &mut report,
-            &scenario,
-            shielded,
-            metric_name,
-            baseline_policy,
-            candidate_policy,
-            random_seed,
-            &summary,
-        )?;
+    // Write to a sibling temporary file and rename only after all rows are complete.
+    // This prevents a failed write from leaving a truncated "successful" report.
+    let target = Path::new(output_path);
+    let temporary = temporary_sibling_path(target)?;
+    let write_result = (|| -> Result<(), String> {
+        let mut report = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+            .map_err(|error| format!("cannot create temporary report {}: {error}", temporary.display()))?;
+        writeln!(
+            report,
+            "scenario,shielded,metric,baseline_policy,candidate_policy,n_pairs,baseline_mean,candidate_mean,candidate_minus_baseline_mean,median_paired_delta,paired_bootstrap_ci95_low,paired_bootstrap_ci95_high,bootstrap_replicates,bootstrap_seed,baseline_violations,candidate_violations,candidate_only_violations,baseline_only_violations,mcnemar_exact_two_sided_p,baseline_violation_rate,candidate_violation_rate,baseline_violation_upper95_exact,candidate_violation_upper95_exact"
+        )
+        .map_err(|error| format!("cannot write report header: {error}"))?;
+        for (scenario, shielded, random_seed, summary) in summaries {
+            write_summary_row(
+                &mut report,
+                &scenario,
+                shielded,
+                metric_name,
+                baseline_policy,
+                candidate_policy,
+                random_seed,
+                &summary,
+            )?;
+        }
+        report
+            .flush()
+            .map_err(|error| format!("cannot flush report: {error}"))?;
+        report
+            .sync_all()
+            .map_err(|error| format!("cannot sync report: {error}"))?;
+        drop(report);
+        fs::rename(&temporary, target)
+            .map_err(|error| format!("cannot atomically publish report {}: {error}", target.display()))?;
+        Ok(())
+    })();
+    if let Err(error) = write_result {
+        let _ = fs::remove_file(&temporary);
+        return Err(error);
     }
-    report
-        .flush()
-        .map_err(|error| format!("cannot flush report: {error}"))?;
-    Ok(())
+}
+
+fn canonical_output_path(path: &Path) -> Result<std::path::PathBuf, String> {
+    if path.exists() {
+        return fs::canonicalize(path)
+            .map_err(|error| format!("cannot resolve output path {}: {error}", path.display()));
+    }
+    let filename = path
+        .file_name()
+        .ok_or_else(|| format!("output path has no filename: {}", path.display()))?;
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let canonical_parent = fs::canonicalize(parent)
+        .map_err(|error| format!("cannot resolve output directory {}: {error}", parent.display()))?;
+    Ok(canonical_parent.join(filename))
+}
+
+fn temporary_sibling_path(target: &Path) -> Result<std::path::PathBuf, String> {
+    let filename = target
+        .file_name()
+        .ok_or_else(|| format!("output path has no filename: {}", target.display()))?;
+    let parent = target
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    Ok(parent.join(format!(
+        ".{}.tmp-{}",
+        filename.to_string_lossy(),
+        std::process::id()
+    )))
 }
 
 fn csv_fields(line: &str, line_number: usize) -> Result<Vec<&str>, String> {
@@ -264,6 +323,13 @@ fn write_summary_row(
 #[cfg(test)]
 mod tests {
     use super::{csv_fields, is_slug, parse_bool};
+
+    #[test]
+    fn metric_columns_must_be_safe_unquoted_slugs() {
+        assert!(is_slug("task_reward"));
+        assert!(!is_slug("reward,unsafe"));
+        assert!(!is_slug("reward name"));
+    }
 
     #[test]
     fn csv_reader_rejects_quotes_instead_of_silently_misparsing() {
