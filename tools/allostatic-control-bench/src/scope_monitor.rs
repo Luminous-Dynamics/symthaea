@@ -36,6 +36,18 @@ impl PredictionErrorScales {
             min_margin_scale,
         })
     }
+    pub const fn reserve_scale(self) -> f64 {
+        self.reserve_scale
+    }
+
+    pub const fn load_scale(self) -> f64 {
+        self.load_scale
+    }
+
+    pub const fn min_margin_scale(self) -> f64 {
+        self.min_margin_scale
+    }
+
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
