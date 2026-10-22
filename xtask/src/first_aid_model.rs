@@ -454,7 +454,7 @@ mod tests {
                 assert_eq!(
                     network_policy_violation(connectivity, core_network_required),
                     expected,
-                    "network policy mismatch: {connectivity:?}, required={core_network_required}"
+                    "network mismatch: {connectivity:?}, required={core_network_required}"
                 );
             }
         }
