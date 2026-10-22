@@ -499,12 +499,10 @@ mod tests {
         .expect("recovery transition");
         assert!(state_is_viable(recovered, limits()));
 
-        let one_step =
-            evaluate_horizon_action_set(initial_state, dynamics, limits(), true, 1)
-                .expect("one-step set");
-        let two_step =
-            evaluate_horizon_action_set(initial_state, dynamics, limits(), true, 2)
-                .expect("two-step set");
+        let one_step = evaluate_horizon_action_set(initial_state, dynamics, limits(), true, 1)
+            .expect("one-step set");
+        let two_step = evaluate_horizon_action_set(initial_state, dynamics, limits(), true, 2)
+            .expect("two-step set");
         assert!(!one_step.push());
         assert!(!two_step.push());
     }
