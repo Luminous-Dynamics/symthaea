@@ -97,6 +97,18 @@ Therefore, the two hybrid key-share directions alone imply at least **14 fragmen
 
 Benchmark the real trade-off: setup latency and completion probability across loss rates; bytes/fragments per successful session; radio airtime and energy; peak memory; CPU and wall-clock cost on the intended embedded hardware; and session recovery after loss/restart. Compare the secure protocol against itself under link conditions, and against a reviewed implementation on a comparable platform.
 
+## K-9 — Pending KEM state and encoded inputs needed explicit bounds
+
+Before this change, `receive_kem_public_key` copied arbitrary-length public-key bytes into an unbounded `HashMap<String, Vec<u8>>`, and `decapsulate_and_derive` passed arbitrary ciphertext lengths to the KEM API before recording a candidate. A caller-controlled stream of unique peer labels could grow the pending-public-key map without a cap; malformed lengths were not rejected at the API boundary.
+
+**Mitigation in this branch:**
+- Validate ML-KEM-768 public keys at exactly 1,184 bytes and ciphertexts at exactly 1,088 bytes before storing or decapsulating.
+- Bound peer labels at 256 bytes and pending public-key/candidate maps at 256 unique peers each.
+- Return errors for invalid lengths, empty/oversized peer identifiers, and capacity exhaustion without inserting new state.
+- Add tests for public-key lengths 0/1,183/1,185, ciphertext lengths 0/1,087/1,089, and refusal of a 257th pending KEM exchange.
+
+The public-key-length check confirms only the encoding size; it does not authenticate the key or prove it is cryptographically valid. `TaggedPublicKey` construction/encapsulation can still reject malformed contents at the crypto boundary. Identity/transcript binding and rate limits at the transport edge remain mandatory. The new tests have not been compiled or run locally.
+
 ## K-8 — The service was marking a one-sided KEM exchange as complete
 
 The service implementation of `run_pqc_exchange` originally sent the local ML-KEM public key and attempted to read the peer's public key, then called `encapsulate_for_peer`. It explicitly discarded the resulting KEM ciphertext in `_ciphertext`, left peer-side decapsulation as a TODO, and nevertheless returned `Ok(())`. The outer handshake then logged `PQC key exchange complete — hybrid session key derived`. That is not a completed shared-key exchange: the peer has not received the encapsulation ciphertext, decapsulated it, or confirmed possession of the same key.
@@ -169,4 +181,4 @@ A model discovery counts only when the issue is independently reproducible again
 
 ## Validation status
 
-Source review and regression-test authoring only. Tests were not compiled or run in this environment. The regression/limitation tests are `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse`, `legacy_static_x25519_derivation_does_not_bind_peer_source_id`, `x25519_low_order_peer_keys_are_rejected_without_storing_keys`, `legacy_pqc_candidate_key_derives_without_verified_classical_handshake_state`, and `legacy_pqc_session_derivation_does_not_bind_peer_id`; the implicit-rejection test is `test_invalid_ciphertext_uses_implicit_rejection_and_needs_key_confirmation`. Additional tests now ensure KEM outputs remain pending rather than active until confirmation exists. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
+Source review and regression-test authoring only. Tests were not compiled or run in this environment. The regression/limitation tests are `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse`, `legacy_static_x25519_derivation_does_not_bind_peer_source_id`, `x25519_low_order_peer_keys_are_rejected_without_storing_keys`, `legacy_pqc_candidate_key_derives_without_verified_classical_handshake_state`, and `legacy_pqc_session_derivation_does_not_bind_peer_id`; the implicit-rejection test is `test_invalid_ciphertext_uses_implicit_rejection_and_needs_key_confirmation`. Additional tests ensure KEM outputs remain pending until confirmation exists, encoded lengths are checked before KEM operations, and pending state is bounded. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
