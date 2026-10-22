@@ -503,6 +503,8 @@ fn main() {
     };
     let receipt = json!({
         "receipt_schema": "first-aid-evidence-gate-receipt-v0",
+        "tested_revision": env::var("FIRST_AID_TESTED_SHA")
+            .unwrap_or_else(|_| "UNBOUND_LOCAL_RUN".to_owned()),
         "registry_path": path,
         "registry_version": field_str(&root, "registry_version").unwrap_or("unknown"),
         "registry_sha256": sha256_hex(&bytes),
