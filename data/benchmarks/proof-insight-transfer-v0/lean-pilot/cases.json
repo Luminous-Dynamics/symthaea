@@ -44,6 +44,26 @@
       "contract_precondition": "a ≤ b",
       "model_outcomes": "not_run",
       "note": "The base uses the premise to lift order through Nat.succ; the counterfactual universal statement is refuted by the checked instance a=1, b=0."
+    },
+    {
+      "case_id": "fixed-target-hypothesis-clear-replan",
+      "mutation_kind": "proof_state_intervention",
+      "base_statement": "(a b : Nat) (h : a ≤ b) (hEq : a = b) : Nat.succ a ≤ Nat.succ b",
+      "variant_statement": "(a b : Nat) (h : a ≤ b) (hEq : a = b) : Nat.succ a ≤ Nat.succ b",
+      "expected_relation": "same_target_statement_and_goal_type",
+      "evidence_declarations": [
+        "same_goal_after_hypothesis_clear"
+      ],
+      "contract_precondition": "local declaration h : a ≤ b is available in the base state and absent after clear h",
+      "state_intervention": {
+        "kind": "required_hypothesis_cleared",
+        "operation": "clear h",
+        "target_statement_preserved": true,
+        "goal_type_preserved": true,
+        "expected_action_policy": "move_forbidden_or_replan"
+      },
+      "model_outcomes": "not_run",
+      "note": "The Lean theorem traces the goal before and after clearing h and proves the unchanged target by an alternate route using hEq. This is an elaboration calibration, not a model run or serialized state-replay benchmark row."
     }
   ],
   "exclusions": [
