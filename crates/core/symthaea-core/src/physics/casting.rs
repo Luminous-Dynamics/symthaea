@@ -334,7 +334,7 @@ impl ChvorinovConformalCalibrator {
         self.log_residual_quantile
     }
 
-    /// Return the number of independent calibration observations supplied by the caller.
+    /// Return the number of calibration observations supplied by the caller. Independence and exchangeability are not inferred by the API.
     pub fn calibration_sample_count(&self) -> usize {
         self.calibration_sample_count
     }
@@ -552,7 +552,7 @@ impl ChvorinovModel {
 
     fn identity_digest(&self) -> [u8; 32] {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea-chvorinov-model-v1");
+        hasher.update(b"symthaea-chvorinov-model-v2");
         for value in [
             self.mold_constant_s_per_m_pow_n,
             self.exponent,
