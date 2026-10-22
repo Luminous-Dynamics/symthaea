@@ -67,7 +67,7 @@ use std::collections::{HashMap, HashSet};
 
 use symthaea_core::hdc::conjecture_engine::{
     BinOp, CfcSmoother, Expr, UnaryFn, select_experiment_by_information_gain_per_cost,
-    select_most_informative_experiment,
+    select_experiment_by_worst_case_information_gain_per_cost, select_most_informative_experiment,
 };
 
 use crate::dimensional_inference::UnitMap;
@@ -289,6 +289,7 @@ impl PipelineConfig {
 enum ActiveSelector {
     RawVariance,
     ExpectedInformationGain,
+    WorstCaseInformationGain,
     InformationGainWithAudits,
 }
 
@@ -505,6 +506,25 @@ fn run_trial_with_discrepancy(
                         )
                         .map(|(experiment, _)| experiment.clone())
                     }
+                    ActiveSelector::WorstCaseInformationGain => {
+                        let nominal_noise =
+                            selection_noise_std_dev(&remaining, &live, &hypotheses);
+                        // Predeclare a factor-of-two noise envelope around a prediction-only
+                        // proxy. No hidden ground-truth or discrepancy signal enters selection.
+                        let noise_scenarios = [
+                            nominal_noise * 0.5,
+                            nominal_noise,
+                            nominal_noise * 2.0,
+                        ];
+                        select_experiment_by_worst_case_information_gain_per_cost(
+                            &remaining,
+                            &live,
+                            &noise_scenarios,
+                            predict,
+                            |_: &Experiment| 1.0,
+                        )
+                        .map(|(experiment, _)| experiment.clone())
+                    }
                 }
             };
             let Some(selected) = selected else {
@@ -665,6 +685,18 @@ mod tests {
         clean_audit_success: bool,
     }
 
+
+    struct RobustEIGPair {
+        clean_nominal_success: bool,
+        clean_robust_success: bool,
+        misspec_nominal_false_singleton: bool,
+        misspec_robust_false_singleton: bool,
+        misspec_nominal_detected: bool,
+        misspec_robust_detected: bool,
+        misspec_nominal_unresolved: bool,
+        misspec_robust_unresolved: bool,
+    }
+
     /// Paired percentile bootstrap over seed/world outcomes. Every resample carries the raw
     /// and EIG result together, preserving pairing. This small pilot interval is diagnostic;
     /// it does not replace world-clustered confirmatory inference on a larger held-out corpus.
@@ -689,6 +721,141 @@ mod tests {
         let low_index = (last * 25) / 1_000;
         let high_index = (last * 975 + 999) / 1_000;
         (observed, means[low_index], means[high_index])
+    }
+
+
+    /// Small paired-seed pilot for the robust-noise-envelope selector versus nominal EIG.
+    /// It reports clean recovery and three disjoint outcomes under hidden structural
+    /// discrepancy; it intentionally does not assert that the robust policy wins.
+    #[test]
+    fn robust_noise_envelope_vs_nominal_eig_pilot() {
+        const SEEDS: u64 = 20;
+        const ROUND_BUDGET: usize = 4;
+        const SYSTEMATIC_DISCREPANCY: f64 = 0.12;
+        let config = PipelineConfig {
+            typed_candidates: true,
+            active_selection: true,
+            smoothing: false,
+        };
+        let mut clean_nominal_successes = 0usize;
+        let mut clean_robust_successes = 0usize;
+        let mut misspec_nominal_false_singletons = 0usize;
+        let mut misspec_robust_false_singletons = 0usize;
+        let mut misspec_nominal_detected = 0usize;
+        let mut misspec_robust_detected = 0usize;
+        let mut misspec_nominal_unresolved = 0usize;
+        let mut misspec_robust_unresolved = 0usize;
+        let mut paired: Vec<RobustEIGPair> = Vec::with_capacity(SEEDS as usize);
+
+        for seed in 1..=SEEDS {
+            let clean_nominal = run_trial_with_discrepancy(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::ExpectedInformationGain,
+                0.0,
+            );
+            let clean_robust = run_trial_with_discrepancy(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::WorstCaseInformationGain,
+                0.0,
+            );
+            let misspec_nominal = run_trial_with_discrepancy(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::ExpectedInformationGain,
+                SYSTEMATIC_DISCREPANCY,
+            );
+            let misspec_robust = run_trial_with_discrepancy(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::WorstCaseInformationGain,
+                SYSTEMATIC_DISCREPANCY,
+            );
+
+            clean_nominal_successes += usize::from(clean_nominal.success);
+            clean_robust_successes += usize::from(clean_robust.success);
+            misspec_nominal_false_singletons +=
+                usize::from(misspec_nominal.overconfident_under_misspecification);
+            misspec_robust_false_singletons +=
+                usize::from(misspec_robust.overconfident_under_misspecification);
+            misspec_nominal_detected += usize::from(misspec_nominal.model_discrepancy_detected);
+            misspec_robust_detected += usize::from(misspec_robust.model_discrepancy_detected);
+            misspec_nominal_unresolved += usize::from(misspec_nominal.final_live > 1);
+            misspec_robust_unresolved += usize::from(misspec_robust.final_live > 1);
+            paired.push(RobustEIGPair {
+                clean_nominal_success: clean_nominal.success,
+                clean_robust_success: clean_robust.success,
+                misspec_nominal_false_singleton: misspec_nominal
+                    .overconfident_under_misspecification,
+                misspec_robust_false_singleton: misspec_robust
+                    .overconfident_under_misspecification,
+                misspec_nominal_detected: misspec_nominal.model_discrepancy_detected,
+                misspec_robust_detected: misspec_robust.model_discrepancy_detected,
+                misspec_nominal_unresolved: misspec_nominal.final_live > 1,
+                misspec_robust_unresolved: misspec_robust.final_live > 1,
+            });
+        }
+
+        let (clean_delta, clean_ci_low, clean_ci_high) = paired_bootstrap_mean_ci(
+            &paired,
+            |pair| f64::from(pair.clean_robust_success) - f64::from(pair.clean_nominal_success),
+            0x524f_4255_5354_434c,
+        );
+        let (false_delta, false_ci_low, false_ci_high) = paired_bootstrap_mean_ci(
+            &paired,
+            |pair| {
+                f64::from(pair.misspec_robust_false_singleton)
+                    - f64::from(pair.misspec_nominal_false_singleton)
+            },
+            0x524f_4255_5354_4643,
+        );
+        let (detect_delta, detect_ci_low, detect_ci_high) = paired_bootstrap_mean_ci(
+            &paired,
+            |pair| {
+                f64::from(pair.misspec_robust_detected)
+                    - f64::from(pair.misspec_nominal_detected)
+            },
+            0x524f_4255_5354_4445,
+        );
+
+        println!(
+            "robust_eig_pilot,seeds={SEEDS},round_budget={ROUND_BUDGET},noise_factors=[0.5,1,2],discrepancy={SYSTEMATIC_DISCREPANCY},clean_nominal_recovery={:.3},clean_robust_recovery={:.3},clean_delta_robust_minus_nominal={clean_delta:.3},clean_ci95=[{clean_ci_low:.3},{clean_ci_high:.3}],misspec_nominal_false_singleton={:.3},misspec_robust_false_singleton={:.3},false_singleton_delta_robust_minus_nominal={false_delta:.3},false_singleton_ci95=[{false_ci_low:.3},{false_ci_high:.3}],misspec_nominal_detected={:.3},misspec_robust_detected={:.3},detection_delta_robust_minus_nominal={detect_delta:.3},detection_ci95=[{detect_ci_low:.3},{detect_ci_high:.3}],misspec_nominal_unresolved={:.3},misspec_robust_unresolved={:.3}",
+            clean_nominal_successes as f64 / SEEDS as f64,
+            clean_robust_successes as f64 / SEEDS as f64,
+            misspec_nominal_false_singletons as f64 / SEEDS as f64,
+            misspec_robust_false_singletons as f64 / SEEDS as f64,
+            misspec_nominal_detected as f64 / SEEDS as f64,
+            misspec_robust_detected as f64 / SEEDS as f64,
+            misspec_nominal_unresolved as f64 / SEEDS as f64,
+            misspec_robust_unresolved as f64 / SEEDS as f64,
+        );
+
+        assert_eq!(paired.len(), SEEDS as usize);
+        assert_eq!(
+            misspec_nominal_false_singletons
+                + misspec_nominal_detected
+                + misspec_nominal_unresolved,
+            SEEDS as usize
+        );
+        assert_eq!(
+            misspec_robust_false_singletons
+                + misspec_robust_detected
+                + misspec_robust_unresolved,
+            SEEDS as usize
+        );
+        assert!(clean_ci_low <= clean_ci_high);
+        assert!(false_ci_low <= false_ci_high);
+        assert!(detect_ci_low <= detect_ci_high);
+        assert!(clean_ci_low.is_finite() && clean_ci_high.is_finite());
+        assert!(false_ci_low.is_finite() && false_ci_high.is_finite());
+        assert!(detect_ci_low.is_finite() && detect_ci_high.is_finite());
+        assert!(clean_nominal_successes <= SEEDS as usize);
+        assert!(clean_robust_successes <= SEEDS as usize);
     }
 
     /// Paired-seed pilot comparing raw variance with expected information gain in the
