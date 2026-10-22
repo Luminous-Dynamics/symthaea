@@ -450,10 +450,26 @@ fn run_policy(
                 Policy::LcbOnly => false,
             };
             if guard_blocked {
-                let window_has_false_alarm = alarm_history.iter().rev().take(3).any(|entry| {
-                    entry.value && !entry.is_shifted_for_evaluator_only
-                });
-                if window_has_false_alarm {
+                let recent: Vec<&ObservedAlarm> = alarm_history.iter().rev().take(3).collect();
+                let recent_alarm_count = recent.iter().filter(|entry| entry.value).count();
+                let recent_true_positive_count = recent
+                    .iter()
+                    .filter(|entry| entry.value && entry.is_shifted_for_evaluator_only)
+                    .count();
+                // A false alarm is counted as causal only if removing false positives
+                // from this window would leave fewer than two positive alarms.
+                let false_alarm_was_necessary = match policy {
+                    Policy::InstantGuard => current_alarm == Some(true)
+                        && recent.first().is_some_and(|entry| {
+                            entry.value && !entry.is_shifted_for_evaluator_only
+                        }),
+                    Policy::TwoOfThreeGuard => {
+                        recent_alarm_count >= 2
+                            && recent_true_positive_count < 2
+                    }
+                    Policy::LcbOnly => false,
+                };
+                if false_alarm_was_necessary {
                     false_alarm_blocks += 1;
                     if trial.true_dvpc > NEUTRAL_VALUE {
                         false_alarm_beneficial_blocks += 1;
