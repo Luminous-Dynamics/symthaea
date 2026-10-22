@@ -6,7 +6,9 @@
 
 The existing episode-max-calibrated residual CUSUM is useful, but it is not the last word in sequential monitoring. Recent work has identified a subtle statistical issue: if a monitor repeatedly ranks future observations against a fixed calibration set, the ranks are dependent conditional on that fixed set. Treating them as independent conformal p-values does not establish an anytime false-alarm guarantee.
 
-Kuang and Xia (2026) derive the exact predictive null distribution for the next rank conditioned on previous ranks and construct a predictive-rank martingale (PRM). They use feature-based centered payoffs and adaptive online Newton-step betting; an equal-weight portfolio of order and dispersion features covers directional shifts and center-versus-tail shifts. Under the paper's assumptions, the nonnegative martingale and Ville threshold provide finite-sample anytime marginal type-I error control. This implementation follows that PRM construction; it is not an implementation of every recent conformal detector or a claim of superior detection delay.
+Kuang and Xia (2026) derive the exact predictive null distribution for the next rank conditioned on previous ranks and construct a predictive-rank martingale (PRM). They use feature-based centered payoffs and adaptive online Newton-step betting; an equal-weight portfolio of order and dispersion features covers directional shifts and center-versus-tail shifts. Under the paper's assumptions, nonnegative martingale wealth and a Ville threshold provide finite-sample anytime marginal type-I error control.
+
+This branch implements the predictive-rank conditioning, order/dispersion features, bounded predictable bets, and a portfolio. Its ONS-style gain coefficient (4.5) is a local prototype choice and has **not yet been independently reconciled with the paper's exact optimizer parameterization**. The construction should therefore be described as PRM-inspired, not an exact reproduction of Kuang and Xia's algorithm; their specific power/detection-delay results do not automatically transfer to this implementation. This does not remove the need to verify the rank null assumptions or the positive-factor bounds. It is not an implementation of every recent conformal detector or a claim of superior detection delay.
 
 Two additional current baselines matter:
 - Conditional conformal test martingales (CCTM) use a fixed null reference and account for reference estimation error.
@@ -32,7 +34,7 @@ Z_t=h\!\left(\frac{R_t-1}{n}\right)
  h\!\left(\frac{j-1}{n}\right).
 \]
 
-An adaptive coefficient \(\lambda_t\), selected only from previous rank history, updates wealth by (M_t=M_{t-1}(1+\lambda_t Z_t)). The ONS update uses the published projection radius and gradient update so the betting factors remain bounded away from zero. The monitor alarms when its wealth reaches (1/\alpha). The portfolio is the equal-weight mean of the order and dispersion wealth processes, so it also starts at unit wealth and retains the component false-alarm guarantee when the component assumptions hold.
+An adaptive coefficient \(\lambda_t\), selected only from previous rank history, updates wealth by (M_t=M_{t-1}(1+\lambda_t Z_t)). The bounded ONS-style update uses a local fixed step-size coefficient and a conservative projection radius so the betting factors remain bounded away from zero. The exact coefficient and projection must be checked against the source algorithm before claiming faithful reproduction. The monitor alarms when its wealth reaches (1/\alpha). The portfolio is the equal-weight mean of the order and dispersion wealth processes, so it also starts at unit wealth and retains the component false-alarm guarantee when the component assumptions hold.
 
 Features used here:
 
@@ -77,7 +79,7 @@ These synthetic score streams are deterministic software fixtures; their repeate
 
 ## Research limits and next SOTA comparisons
 
-- The current benchmark does not implement the parameter-free conditional conformal martingale of Liu, Prinster and Orabona (2026), the e-process constructions of Bhattacharyya and Ramdas (2026), or CCTM. These are next comparator targets after this PRM implementation and its tests are stable.
+- The current benchmark does not implement the parameter-free conditional conformal martingale of Liu, Prinster and Orabona (2026), the e-process constructions of Bhattacharyya and Ramdas (2026), or CCTM. These are next comparator targets after this prototype's exact betting update has been reconciled with the source PRM method and the tests are stable.
 - For method-level SOTA comparisons, pin the authors' exact public revisions, reference-sample sizes, score functions, alpha allocation, shift distributions, changepoint positions and compute budget. Report false-alarm probability over the whole stream and detection-delay distributions; don't compare only average delay conditional on eventual detection.
 - A distribution detector cannot identify a dynamics shift that leaves all of its observable inputs unchanged. A post-transition residual can provide new evidence only after a transition has happened; it may be too late for the action that produced it. The existing hazard-deadline frontier separately measures this causal timing problem.
 - Even an anytime-valid shift alarm is not an action-safety certificate. The runtime-assurance layer must still route alarms to a separately verified reachability fallback and fail closed when the model, observation or certificate assumptions are invalid.
