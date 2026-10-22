@@ -794,6 +794,8 @@ mod tests {
         let mut misspecified_audit_false_singletons = 0usize;
         let mut misspecified_eig_detections = 0usize;
         let mut misspecified_audit_detections = 0usize;
+        let mut misspecified_eig_unresolved = 0usize;
+        let mut misspecified_audit_unresolved = 0usize;
         let mut audit_query_total = 0usize;
         let mut eig_selection_failures = 0usize;
         let mut audit_selection_failures = 0usize;
@@ -841,6 +843,8 @@ mod tests {
                 if misspec_eig.model_discrepancy_detected { 1 } else { 0 };
             misspecified_audit_detections +=
                 if misspec_audit.model_discrepancy_detected { 1 } else { 0 };
+            misspecified_eig_unresolved += if misspec_eig.final_live > 1 { 1 } else { 0 };
+            misspecified_audit_unresolved += if misspec_audit.final_live > 1 { 1 } else { 0 };
             audit_query_total += misspec_audit.audit_queries;
             eig_selection_failures += if misspec_eig.selection_failed { 1 } else { 0 };
             audit_selection_failures += if misspec_audit.selection_failed { 1 } else { 0 };
@@ -883,17 +887,31 @@ mod tests {
         );
 
         println!(
-            "misspec_audit,seeds={SEEDS},round_budget={ROUND_BUDGET},discrepancy={SYSTEMATIC_DISCREPANCY},clean_eig_recovery={:.3},clean_audit_recovery={:.3},misspec_eig_false_singleton={:.3},misspec_audit_false_singleton={:.3},false_singleton_delta_audit_minus_eig={false_singleton_delta:.3},false_singleton_ci95=[{false_ci_low:.3},{false_ci_high:.3}],misspec_eig_detected={:.3},misspec_audit_detected={:.3},detection_delta_audit_minus_eig={detection_delta:.3},detection_ci95=[{detection_ci_low:.3},{detection_ci_high:.3}],clean_recovery_delta_audit_minus_eig={clean_delta:.3},clean_recovery_ci95=[{clean_ci_low:.3},{clean_ci_high:.3}],eig_selection_failures={eig_selection_failures},audit_selection_failures={audit_selection_failures},eig_mean_rounds={:.2},audit_mean_rounds={:.2},scheduled_audit_queries={audit_query_total}",
+            "misspec_audit,seeds={SEEDS},round_budget={ROUND_BUDGET},discrepancy={SYSTEMATIC_DISCREPANCY},clean_eig_recovery={:.3},clean_audit_recovery={:.3},misspec_eig_false_singleton={:.3},misspec_audit_false_singleton={:.3},false_singleton_delta_audit_minus_eig={false_singleton_delta:.3},false_singleton_ci95=[{false_ci_low:.3},{false_ci_high:.3}],misspec_eig_detected={:.3},misspec_audit_detected={:.3},misspec_eig_unresolved={:.3},misspec_audit_unresolved={:.3},detection_delta_audit_minus_eig={detection_delta:.3},detection_ci95=[{detection_ci_low:.3},{detection_ci_high:.3}],clean_recovery_delta_audit_minus_eig={clean_delta:.3},clean_recovery_ci95=[{clean_ci_low:.3},{clean_ci_high:.3}],eig_selection_failures={eig_selection_failures},audit_selection_failures={audit_selection_failures},eig_mean_rounds={:.2},audit_mean_rounds={:.2},scheduled_audit_queries={audit_query_total}",
             clean_eig_successes as f64 / SEEDS as f64,
             clean_audit_successes as f64 / SEEDS as f64,
             misspecified_eig_false_singletons as f64 / SEEDS as f64,
             misspecified_audit_false_singletons as f64 / SEEDS as f64,
             misspecified_eig_detections as f64 / SEEDS as f64,
             misspecified_audit_detections as f64 / SEEDS as f64,
+            misspecified_eig_unresolved as f64 / SEEDS as f64,
+            misspecified_audit_unresolved as f64 / SEEDS as f64,
             eig_total_rounds as f64 / SEEDS as f64,
             audit_total_rounds as f64 / SEEDS as f64,
         );
         assert_eq!(paired.len(), SEEDS as usize);
+        assert_eq!(
+            misspecified_eig_false_singletons
+                + misspecified_eig_detections
+                + misspecified_eig_unresolved,
+            SEEDS as usize
+        );
+        assert_eq!(
+            misspecified_audit_false_singletons
+                + misspecified_audit_detections
+                + misspecified_audit_unresolved,
+            SEEDS as usize
+        );
         assert!(false_ci_low <= false_ci_high);
         assert!(detection_ci_low <= detection_ci_high);
         assert!(clean_ci_low <= clean_ci_high);
