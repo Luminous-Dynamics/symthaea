@@ -8,11 +8,11 @@
     "trajectory_corpus_sha256": "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3"
   },
   "count_summary": {
-    "case_count": 42,
+    "case_count": 43,
     "frozen_trace_count": 12,
-    "mutation_case_count": 30,
+    "mutation_case_count": 31,
     "planned_not_yet_executable_count": 0,
-    "mapped_case_count": 42
+    "mapped_case_count": 43
   },
   "evidence_status_definitions": {
     "frozen_fixture": "Expected output resides in the frozen corpus and is checked by the trajectory validator.",
@@ -740,12 +740,31 @@
       "operator_id": "unexpected_connectivity_metadata",
       "execution_target": "rust_matrix_runner",
       "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-031",
+      "invariant_id": "CONNECTIVITY-004",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-007",
+      "mutation": "go offline for one dependent action and recover to online before the next dependent action",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "offline_core_network_dependency"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "note": "The offline action is flagged while the later online action is not; covered by connectivity_recovery_is_scoped_to_each_event_time and the executable matrix runner. Exact-head validation pending.",
+      "test_name": "connectivity_recovery_is_scoped_to_each_event_time",
+      "operator_id": "connectivity_recovery_control",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
     }
   ],
   "differential_oracle": {
     "status": "unit_test_added",
     "implementation": "JSON-value-based reference interpreter compared against the production typed-state interpreter",
-    "coverage": "Typed trace checker + JSON-value differential interpreter over all 12 frozen traces and 13 adversarial mutations; independent test-only finite lifecycle/connectivity graph (252 states, 5,040 state/action transitions); 18 orthogonal policy truth-table combinations. Event-level connectivity updates are validated and a mutation rejects connectivity metadata attached to unrelated events.",
+    "coverage": "Typed trace checker + JSON-value differential interpreter over all 12 frozen traces and 13 adversarial mutations; independent test-only finite lifecycle/connectivity graph (252 states, 5,040 state/action transitions); 18 orthogonal policy truth-table combinations. Event-level connectivity degradation, recovery, and metadata scoping are executed by the mutation matrix.",
     "limits": "Same repository and shared invariants/fixtures; implementation-diversity and finite abstraction checks only, not external clinical adjudication, formally verified specification, stateful connectivity/freshness/consent interactions, or clinical validation.",
     "test_name": "differential_json_reference_agrees_on_frozen_traces",
     "mutation_suite_test_name": "differential_json_reference_agrees_on_adversarial_mutation_suite",
