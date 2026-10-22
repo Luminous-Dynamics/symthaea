@@ -268,6 +268,7 @@ pub struct IntelligentDispatcher {
     cloud_llm: Option<Arc<dyn LLMBackend>>,
     /// Per-tier success tracking.
     native_stats: BackendStats,
+    hardware_stats: BackendStats,
     local_stats: BackendStats,
     cloud_stats: BackendStats,
     /// Phase 6: Per-category native success tracking.
@@ -293,6 +294,7 @@ impl IntelligentDispatcher {
             local_llm,
             cloud_llm,
             native_stats: BackendStats::default(),
+            hardware_stats: BackendStats::default(),
             local_stats: BackendStats::default(),
             cloud_stats: BackendStats::default(),
             category_native_stats: std::collections::HashMap::new(),
@@ -651,10 +653,12 @@ impl IntelligentDispatcher {
     pub fn success_rate(&self, tier: BackendTier) -> f64 {
         match tier {
             BackendTier::Native => self.native_stats.success_rate(),
-            BackendTier::Hardware => 1.0, // specialized emitter is deterministic
+            // Until a real emitter reports an outcome, use the neutral prior.
+            BackendTier::Hardware => self.hardware_stats.success_rate(),
             BackendTier::LocalLlm => self.local_stats.success_rate(),
             BackendTier::CloudLlm => self.cloud_stats.success_rate(),
-            BackendTier::Simulated => 1.0,
+            // SimulatedBackend only returns placeholders, never usable code.
+            BackendTier::Simulated => 0.0,
         }
     }
 
@@ -671,7 +675,7 @@ impl IntelligentDispatcher {
     pub fn record_outcome(&mut self, tier: BackendTier, success: bool) {
         match tier {
             BackendTier::Native => self.native_stats.record(success),
-            BackendTier::Hardware => {} // no tracking needed for deterministic emitter
+            BackendTier::Hardware => self.hardware_stats.record(success),
             BackendTier::LocalLlm => self.local_stats.record(success),
             BackendTier::CloudLlm => self.cloud_stats.record(success),
             BackendTier::Simulated => {} // no tracking for simulated
@@ -939,6 +943,19 @@ mod tests {
         assert!(result.backend_attempts.is_empty(), "no hardware backend was invoked");
         assert_eq!(result.energy_cost, 0.0);
         assert_eq!(dispatcher.total_energy(), 0.0);
+    }
+
+    #[test]
+    fn unobserved_hardware_and_simulated_routes_are_not_assumed_perfect() {
+        let mut dispatcher = IntelligentDispatcher::simulated();
+        assert_eq!(dispatcher.success_rate(BackendTier::Hardware), 0.5);
+        assert_eq!(dispatcher.success_rate(BackendTier::Simulated), 0.0);
+
+        dispatcher.record_outcome(BackendTier::Hardware, false);
+        assert_eq!(dispatcher.success_rate(BackendTier::Hardware), 0.0);
+        dispatcher.record_outcome(BackendTier::Hardware, true);
+        assert_eq!(dispatcher.success_rate(BackendTier::Hardware), 0.5);
+        assert_eq!(dispatcher.success_rate(BackendTier::Simulated), 0.0);
     }
 
     #[tokio::test]
