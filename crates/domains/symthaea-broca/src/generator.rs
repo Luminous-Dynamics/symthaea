@@ -119,6 +119,14 @@ pub struct BrocaConfig {
     /// BPE vocab stores spaces as separate tokens. Untrained models don't emit them.
     #[serde(default = "default_auto_spacing")]
     pub enable_auto_spacing: bool,
+    /// Enable experimental lexical-semantic initialization of the token embedding table.
+    ///
+    /// When enabled, known lexemes and conservatively grounded morphological forms
+    /// receive compositional HDC embeddings; all other tokens retain genesis-seeded
+    /// fallback embeddings. This changes initialization only, not model architecture.
+    /// Keep disabled by default until the paired Broca evaluation shows a benefit.
+    #[serde(default)]
+    pub enable_semantic_token_embeddings: bool,
     /// Enable NSM semantic content blending into thought HV (Phase 2).
     /// When true and a semantic_hv is provided, it is blended with the
     /// thought HV before generation via linear interpolation.
@@ -206,6 +214,7 @@ impl Default for BrocaConfig {
             sampling_seed: None,
             enable_auto_spacing: true,
             enable_epistemic_cube_gate: true,
+            enable_semantic_token_embeddings: false,
             // NSM grounding (NsmSemanticGate/NsmCoherenceTracker in gating.rs) is
             // implemented and unit-tested in isolation (see nsm_tests in gating.rs),
             // but has never been exercised through the full generation pipeline with
@@ -365,49 +374,7 @@ type CheckpointLoadResult = anyhow::Result<(
 impl BrocaGenerator {
     /// Create a new generator from genesis seed and config.
     pub fn new(genesis: &GenesisSeed, config: BrocaConfig) -> Self {
-        let tokenizer = BpeTokenizer::default_minimal();
-
-        // Ensure controller vocab_size matches tokenizer
-        let mut ctrl_config = config.controller.clone();
-        ctrl_config.vocab_size = tokenizer.vocab_size();
-
-        let controller = LanguageController::new(genesis, &ctrl_config);
-        let encoder = ThoughtLanguageEncoder::new(genesis);
-        let epistemic_gate = EpistemicGate::new(&tokenizer, &config.gating);
-        let epistemic_cube_gate = crate::gating::EpistemicCubeGate::new(&tokenizer);
-        let emotional_modulator = EmotionalModulator::new(&tokenizer, &config.gating);
-        let mut coherence_feedback = CoherenceFeedback::with_veto_threshold(
-            config.gating.coherence_drift_threshold,
-            config.gating.veto_threshold,
-        );
-        // Phase 2: Enable algebraic coherence correction if configured
-        coherence_feedback.set_algebraic(
-            config.gating.enable_algebraic_correction,
-            config.gating.algebraic_correction_strength,
-        );
-        let sampling_rng = config.sampling_seed.map(StdRng::seed_from_u64);
-
-        let nsm_gate = if config.enable_nsm_gate {
-            Some(crate::gating::NsmSemanticGate::new_with_lexicon(&tokenizer))
-        } else {
-            None
-        };
-
-        let code_gate = crate::gating::CodeGate::new(&tokenizer, &config.gating);
-
-        Self {
-            controller,
-            tokenizer,
-            encoder,
-            epistemic_gate,
-            epistemic_cube_gate,
-            emotional_modulator,
-            coherence_feedback,
-            sampling_rng,
-            nsm_gate,
-            code_gate,
-            config,
-        }
+        Self::with_tokenizer(genesis, config, BpeTokenizer::default_minimal())
     }
 
     /// Create a generator for a specific coding substrate.
@@ -445,7 +412,25 @@ impl BrocaGenerator {
         let mut ctrl_config = config.controller.clone();
         ctrl_config.vocab_size = tokenizer.vocab_size();
 
-        let controller = LanguageController::new(genesis, &ctrl_config);
+        let controller = if config.enable_semantic_token_embeddings {
+            let (controller, coverage) = LanguageController::new_with_semantic_embeddings(
+                genesis,
+                &ctrl_config,
+                &tokenizer,
+                &crate::semantic_embeddings::SemanticEmbeddingConfig::default(),
+            );
+            tracing::info!(
+                target: "symthaea_broca::semantic_embeddings",
+                total_tokens = coverage.total_tokens,
+                direct = coverage.tier1_direct,
+                morphological = coverage.tier2_morphological,
+                fallback = coverage.tier3_genesis,
+                "initialized compositional semantic token embeddings"
+            );
+            controller
+        } else {
+            LanguageController::new(genesis, &ctrl_config)
+        };
         let encoder = ThoughtLanguageEncoder::new(genesis);
         let epistemic_gate = EpistemicGate::new(&tokenizer, &config.gating);
         let epistemic_cube_gate = crate::gating::EpistemicCubeGate::new(&tokenizer);
@@ -2527,6 +2512,35 @@ mod tests {
     /// Verify that different thought intents produce measurably different
     /// generated text. If all 8 intents produce identical output, the
     /// generator is ignoring intent information.
+    #[test]
+    fn semantic_token_initialization_is_opt_in_and_tokenizer_aligned() {
+        assert!(
+            !BrocaConfig::default().enable_semantic_token_embeddings,
+            "the experimental initializer must not change existing defaults"
+        );
+
+        let genesis = test_genesis();
+        let config = BrocaConfig {
+            enable_semantic_token_embeddings: true,
+            ..Default::default()
+        };
+        let generator = BrocaGenerator::new(&genesis, config);
+
+        assert_eq!(
+            generator.controller().token_embeddings().len(),
+            generator.tokenizer().vocab_size(),
+            "semantic initialization must preserve tokenizer row alignment"
+        );
+        assert!(
+            generator
+                .controller()
+                .token_embeddings()
+                .iter()
+                .all(|embedding| embedding.as_slice().len() == symthaea_core::hdc::HDC_DIMENSION),
+            "semantic initialization must preserve HDC dimensionality"
+        );
+    }
+
     #[test]
     fn test_intent_fidelity_generation_diversity() {
         let genesis = test_genesis();

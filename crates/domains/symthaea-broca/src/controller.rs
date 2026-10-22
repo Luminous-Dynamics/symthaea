@@ -23,6 +23,11 @@ use symthaea_core::hdc::{
     ContinuousHV, HDC_DIMENSION, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig,
 };
 
+use crate::semantic_embeddings::{
+    EmbeddingCoverageStats, SemanticEmbeddingConfig, SemanticQuarkBasis,
+};
+use crate::tokenizer::BpeTokenizer;
+
 /// GPU-resident pre-normalized embedding matrix for accelerated logit computation.
 /// Converts 4,096 × 16,384 individual cosine similarities into a single matrix-vector
 /// multiply on GPU (or optimized CPU tensor ops via candle).
@@ -311,9 +316,55 @@ pub struct LanguageController {
 impl LanguageController {
     /// Create a new controller from a genesis seed and config.
     pub fn new(genesis: &GenesisSeed, config: &LanguageControllerConfig) -> Self {
+        let token_embeddings: Vec<ContinuousHV> = (0..config.vocab_size)
+            .map(|i| {
+                ContinuousHV::from_genesis(
+                    genesis,
+                    &format!("broca::token_emb::{i}"),
+                    HDC_DIMENSION,
+                )
+            })
+            .collect();
+        Self::new_with_token_embeddings(genesis, config, token_embeddings)
+    }
+
+    /// Create a controller whose token embeddings combine lexical-semantic
+    /// composition with a genesis-seeded fallback.
+    ///
+    /// This is an opt-in initialization experiment. Checkpoint loading should
+    /// continue restoring checkpoint embeddings verbatim; the default constructor
+    /// remains genesis-seeded for compatibility. Embeddings are built before the
+    /// controller so large vocabularies do not transiently allocate two tables.
+    pub fn new_with_semantic_embeddings(
+        genesis: &GenesisSeed,
+        config: &LanguageControllerConfig,
+        tokenizer: &BpeTokenizer,
+        embedding_config: &SemanticEmbeddingConfig,
+    ) -> (Self, EmbeddingCoverageStats) {
+        let mut effective_config = config.clone();
+        effective_config.vocab_size = tokenizer.vocab_size();
+
+        let basis = SemanticQuarkBasis::new(genesis);
+        let (embeddings, stats) = basis.build_embeddings(tokenizer, genesis, embedding_config);
+        let controller =
+            Self::new_with_token_embeddings(genesis, &effective_config, embeddings);
+        (controller, stats)
+    }
+
+    fn new_with_token_embeddings(
+        genesis: &GenesisSeed,
+        config: &LanguageControllerConfig,
+        token_embeddings: Vec<ContinuousHV>,
+    ) -> Self {
+        assert_eq!(
+            token_embeddings.len(),
+            config.vocab_size,
+            "token embedding row count must equal the configured vocabulary size"
+        );
+
         let neuron_config = UnifiedConfig {
-            tau_base: 0.02,                    // 20ms — matches token generation rate
-            backbone_tau: config.backbone_tau, // Configurable state dependency for coherent sequences
+            tau_base: 0.02,
+            backbone_tau: config.backbone_tau,
             dimension: HDC_DIMENSION,
             learning_rate: config.learning_rate,
             ..UnifiedConfig::default()
@@ -327,17 +378,6 @@ impl LanguageController {
         };
 
         let network = HdcLtcUnifiedNetwork::from_genesis(net_config, genesis);
-
-        // Genesis-seeded token embeddings
-        let token_embeddings: Vec<ContinuousHV> = (0..config.vocab_size)
-            .map(|i| {
-                ContinuousHV::from_genesis(
-                    genesis,
-                    &format!("broca::token_emb::{i}"),
-                    HDC_DIMENSION,
-                )
-            })
-            .collect();
 
         let position_base =
             ContinuousHV::from_genesis(genesis, "broca::position_base", HDC_DIMENSION);
@@ -1228,6 +1268,35 @@ mod tests {
         let ctrl = LanguageController::new(&genesis, &config);
         assert_eq!(ctrl.vocab_size(), 32);
         assert_eq!(ctrl.current_pos(), 0);
+    }
+
+    #[test]
+    fn semantic_embedding_constructor_preserves_tokenizer_alignment_and_coverage() {
+        let genesis = test_genesis();
+        let tokenizer = BpeTokenizer::default_minimal();
+        let config = test_config();
+        let (controller, stats) = LanguageController::new_with_semantic_embeddings(
+            &genesis,
+            &config,
+            &tokenizer,
+            &SemanticEmbeddingConfig::default(),
+        );
+
+        assert_eq!(controller.vocab_size(), tokenizer.vocab_size());
+        assert_eq!(controller.token_embeddings().len(), tokenizer.vocab_size());
+        assert_eq!(stats.total_tokens, tokenizer.vocab_size());
+        assert_eq!(
+            stats.tier1_direct + stats.tier2_morphological + stats.tier3_genesis,
+            stats.total_tokens,
+            "semantic coverage tiers must account for every tokenizer row"
+        );
+        assert!(
+            controller
+                .token_embeddings()
+                .iter()
+                .all(|embedding| embedding.as_slice().len() == HDC_DIMENSION),
+            "all initialized embeddings must retain the controller's HDC dimensionality"
+        );
     }
 
     #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
