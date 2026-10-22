@@ -657,6 +657,82 @@ mod tests {
         );
     }
 
+    fn next_unit_interval(state: &mut u64) -> f64 {
+        // Deterministic test generator only; not suitable for production tie breaking.
+        *state ^= *state >> 12;
+        *state ^= *state << 25;
+        *state ^= *state >> 27;
+        let value = (*state).wrapping_mul(0x2545_F491_4F6C_DD1D);
+        (value >> 11) as f64 / ((1_u64 << 53) as f64)
+    }
+
+    fn sample_predictive_null_rank(
+        state: &mut u64,
+        prior_rank_counts: &[usize],
+        reference_count: usize,
+        audit_index: usize,
+    ) -> usize {
+        let target = next_unit_interval(state)
+            * (reference_count as f64 + audit_index as f64);
+        let mut cumulative_mass = 0.0;
+        for (category, count) in prior_rank_counts.iter().copied().enumerate() {
+            cumulative_mass += 1.0 + count as f64;
+            if target < cumulative_mass {
+                return category;
+            }
+        }
+        // Roundoff can only reach this fallback when target lies infinitesimally above the
+        // final cumulative sum. The final category preserves the rank range.
+        prior_rank_counts.len() - 1
+    }
+
+    #[test]
+    fn predictive_null_rank_stream_smoke_test_respects_anytime_alarm_budget() {
+        const STREAMS: usize = 1_000;
+        const HORIZON: usize = 300;
+        const REFERENCE_COUNT: usize = 20;
+
+        let mut rng = 0xD1B5_4A32_D192_ED03_u64;
+        let calibration_scores = sequential_scores(REFERENCE_COUNT);
+        let calibration_ties = vec![0.5; REFERENCE_COUNT];
+        let mut alarms = 0_usize;
+
+        for _ in 0..STREAMS {
+            let mut monitor =
+                PredictiveRankMartingale::new(&calibration_scores, &calibration_ties, 0.05)
+                    .unwrap();
+            let mut rank_counts = vec![0_usize; REFERENCE_COUNT + 1];
+
+            for audit_index in 1..=HORIZON {
+                // Generate from pi[t,j] = (1 + N[t-1,j]) / (n+t), the exact null
+                // predictive rank law on which the PRM martingale proof depends.
+                let category = sample_predictive_null_rank(
+                    &mut rng,
+                    &rank_counts,
+                    REFERENCE_COUNT,
+                    audit_index,
+                );
+                // Half-integer scores realize every possible rank against the integer-valued
+                // fixed reference and avoid calibration-key collisions in this rank-process test.
+                let result = monitor.observe(category as f64 - 0.5, 0.5).unwrap();
+                if result.decision == PredictiveRankDecision::Alarm {
+                    alarms += 1;
+                    break;
+                }
+                rank_counts[category] += 1;
+            }
+        }
+
+        let empirical_alarm_rate = alarms as f64 / STREAMS as f64;
+        // Fixed-seed smoke bound, deliberately looser than the nominal 0.05 guarantee. This
+        // catches gross errors in rank probabilities, wealth updates, or portfolio thresholding;
+        // it is not a proof or a confidence interval for anytime validity.
+        assert!(
+            empirical_alarm_rate <= 0.10,
+            "null-rank smoke-test alarm rate was {empirical_alarm_rate:.4}"
+        );
+    }
+
     #[test]
     fn invalid_observations_do_not_consume_the_epoch() {
         let mut monitor = monitor_with_scores(&sequential_scores(20), 0.05);
