@@ -1115,11 +1115,19 @@ impl MoralParser {
                     closing_quote = Some('"');
                     result.push(' ');
                 }
+                '`' => {
+                    closing_quote = Some('`');
+                    result.push(' ');
+                }
                 '“' => {
                     closing_quote = Some('”');
                     result.push(' ');
                 }
-                '”' => result.push(' '),
+                '‘' => {
+                    closing_quote = Some('’');
+                    result.push(' ');
+                }
+                '”' | '’' => result.push(' '),
                 _ => result.push(ch),
             }
         }
@@ -1133,8 +1141,9 @@ impl MoralParser {
     /// tie-break) so logs and benchmark outputs are reproducible. This is not an
     /// authorization decision or speaker/provenance verification.
     pub fn assess_consent_evidence(&self, text: &str) -> ConsentTextAssessment {
-        let evidence_text = Self::strip_quoted_consent_text(text);
-        let quoted_text_suppressed = evidence_text != text;
+        let normalized = text.to_lowercase();
+        let evidence_text = Self::strip_quoted_consent_text(&normalized);
+        let quoted_text_suppressed = evidence_text.as_str() != normalized;
 
         if evidence_text.contains('?') {
             return ConsentTextAssessment {
@@ -1960,6 +1969,18 @@ mod tests {
             parser.parse("She gave consent to share the report.").consent,
             ConsentState::Given
         );
+        assert_eq!(
+            parser.assess_consent_evidence("SHE GAVE CONSENT TO SHARE THE REPORT.").state,
+            ConsentState::Given,
+            "public evidence assessment should be case-insensitive"
+        );
+        let curly_quoted =
+            parser.assess_consent_evidence("The note says ‘she gave consent’ but its source is unknown.");
+        assert_eq!(curly_quoted.state, ConsentState::Unknown);
+        assert!(curly_quoted.quoted_text_suppressed);
+        let code_quoted = parser.assess_consent_evidence("The report contains `she gave consent` as an example.");
+        assert_eq!(code_quoted.state, ConsentState::Unknown);
+        assert!(code_quoted.quoted_text_suppressed);
     }
 
     #[test]
