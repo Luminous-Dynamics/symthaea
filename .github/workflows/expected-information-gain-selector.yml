@@ -12,6 +12,7 @@ on:
       - "crates/bridges/symthaea-physics-bridge/src/sequential_adequacy.rs"
       - "crates/bridges/symthaea-physics-bridge/src/predictive_rank_martingale.rs"
       - "crates/bridges/symthaea-physics-bridge/src/prequential_pit_martingale.rs"
+      - "crates/bridges/symthaea-physics-bridge/tests/adaptive_monitoring_benchmark.rs"
       - "crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs"
       - "crates/bridges/symthaea-physics-bridge/src/lib.rs"
       - "docs/research/EXPECTED_INFORMATION_GAIN_SELECTOR_V0_1.md"
@@ -20,6 +21,7 @@ on:
       - "docs/research/SEQUENTIAL_MODEL_ADEQUACY_MONITOR_V0_1.md"
       - "docs/research/PREDICTIVE_RANK_MARTINGALE_V0_1.md"
       - "docs/research/PREQUENTIAL_PIT_MARTINGALE_V0_1.md"
+      - "docs/research/ADAPTIVE_MONITORING_COMPARATIVE_BENCHMARK_V0_1.md"
       - ".github/workflows/expected-information-gain-selector.yml"
   workflow_dispatch:
 
@@ -49,6 +51,7 @@ jobs:
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/sequential_adequacy.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/predictive_rank_martingale.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/prequential_pit_martingale.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/adaptive_monitoring_benchmark.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs
       - name: Test information-gain selector
         run: cargo test -p symthaea-core hdc::conjecture_engine::experiment_selection --lib
@@ -62,6 +65,8 @@ jobs:
         run: cargo test -p symthaea-physics-bridge predictive_rank_martingale --lib
       - name: Test prequential PIT martingale
         run: cargo test -p symthaea-physics-bridge prequential_pit_martingale --lib
+      - name: Run paired adaptive monitoring benchmark
+        run: cargo test -p symthaea-physics-bridge --test adaptive_monitoring_benchmark -- --nocapture
       - name: Test model-adequacy decision semantics
         run: cargo test -p symthaea-physics-bridge model_adequacy --lib
       - name: Test exhaustive model-adequacy contract
