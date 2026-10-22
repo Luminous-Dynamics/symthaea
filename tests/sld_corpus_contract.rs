@@ -10,7 +10,7 @@
 //! or causal effects. This is a small dependency-free validator for the specific subset of
 //! JSON Schema keywords used by SLD v0.1, not a general JSON Schema implementation.
 
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
@@ -529,4 +529,268 @@ fn trajectory_negative_control_rejects_reordered_events() {
     corrupt["cases"][0]["events"][1]["turn"] = first_turn;
     let errors = validate_trajectory_corpus(&corrupt);
     assert!(errors.iter().any(|error| error.contains("strictly increasing")));
+}
+
+
+const EVALUATION_RECEIPT_SCHEMA_PATH: &str =
+    "docs/research/structural-love-dynamics/evaluation-receipt.schema.json";
+
+/// Validate cross-field invariants that JSON Schema alone cannot express.
+/// This is a narrow contract validator, not a general JSON Schema implementation.
+fn validate_evaluation_receipt(receipt: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    if receipt["schema_version"].as_str() != Some("sld-evaluation-receipt-0.1") {
+        errors.push("unexpected evaluation receipt schema_version".to_owned());
+    }
+
+    let Some(case_set) = receipt["case_set"].as_object() else {
+        return vec!["case_set must be an object".to_owned()];
+    };
+    let Some(summary) = receipt["summary"].as_object() else {
+        return vec!["summary must be an object".to_owned()];
+    };
+    let Some(results) = receipt["case_results"].as_array() else {
+        return vec!["case_results must be an array".to_owned()];
+    };
+    let expected = case_set.get("expected_case_count")
+        .and_then(Value::as_u64).unwrap_or(0) as usize;
+    let observed = results.len();
+    if expected == 0 {
+        errors.push("expected_case_count must be positive".to_owned());
+    }
+
+    let visibility = case_set.get("visibility").and_then(Value::as_str).unwrap_or("");
+    let expected_ids = case_set.get("expected_case_ids").and_then(Value::as_array);
+    if visibility == "PUBLIC" && expected_ids.is_none() {
+        errors.push("public case set must declare expected_case_ids".to_owned());
+    }
+    let mut expected_set = BTreeSet::new();
+    if let Some(ids) = expected_ids {
+        for id in ids {
+            let Some(id) = id.as_str() else {
+                errors.push("expected_case_ids entries must be strings".to_owned());
+                continue;
+            };
+            if !expected_set.insert(id.to_owned()) {
+                errors.push(format!("duplicate expected case ID {id}"));
+            }
+        }
+        if expected_set.len() != expected {
+            errors.push(format!(
+                "expected_case_ids has {} distinct IDs but expected_case_count is {expected}",
+                expected_set.len()
+            ));
+        }
+    }
+
+    let mut seen = BTreeSet::new();
+    let mut duplicate_count = 0_usize;
+    let mut counts = BTreeMap::<&str, usize>::new();
+    let mut critical_failures = 0_usize;
+    for result in results {
+        let Some(id) = result["case_id"].as_str() else {
+            errors.push("case result is missing case_id".to_owned());
+            continue;
+        };
+        if !seen.insert(id.to_owned()) {
+            duplicate_count += 1;
+            errors.push(format!("duplicate case result ID {id}"));
+        }
+        if expected_ids.is_some() && !expected_set.contains(id) {
+            errors.push(format!("unexpected case result ID {id}"));
+        }
+
+        let status = result["status"].as_str().unwrap_or("");
+        if !matches!(status, "PASS" | "FAIL" | "INDETERMINATE" | "ERROR" | "SKIPPED") {
+            errors.push(format!("{id}: invalid result status {status}"));
+        } else {
+            *counts.entry(status).or_default() += 1;
+        }
+
+        let critical = result["critical_invariant_failure"].as_bool().unwrap_or(false);
+        if critical {
+            critical_failures += 1;
+            if status != "FAIL" {
+                errors.push(format!("{id}: critical invariant failure must not be reported as PASS/other"));
+            }
+        }
+    }
+
+    let missing = expected.saturating_sub(seen.len());
+    let expected_summary = [
+        ("expected", expected),
+        ("observed", observed),
+        ("pass", *counts.get("PASS").unwrap_or(&0)),
+        ("fail", *counts.get("FAIL").unwrap_or(&0)),
+        ("indeterminate", *counts.get("INDETERMINATE").unwrap_or(&0)),
+        ("error", *counts.get("ERROR").unwrap_or(&0)),
+        ("skipped", *counts.get("SKIPPED").unwrap_or(&0)),
+        ("missing", missing),
+        ("duplicate_ids", duplicate_count),
+        ("critical_invariant_failures", critical_failures),
+    ];
+    for (field, calculated) in expected_summary {
+        if let Some(declared) = summary.get(field).and_then(Value::as_u64) {
+            if declared as usize != calculated {
+                errors.push(format!(
+                    "summary.{field} mismatch: declared {declared}, calculated {calculated}"
+                ));
+            }
+        } else {
+            errors.push(format!("summary.{field} must be a non-negative integer"));
+        }
+    }
+
+    match receipt["run_status"].as_str().unwrap_or("") {
+        "COMPLETE" if missing != 0 || observed != expected || duplicate_count != 0 => {
+            errors.push("COMPLETE run must account for every expected case exactly once".to_owned());
+        }
+        "PARTIAL" if missing == 0 && observed == expected && duplicate_count == 0 => {
+            errors.push("PARTIAL run cannot claim full unique case coverage".to_owned());
+        }
+        "COMPLETE" | "PARTIAL" | "FAILED" => {}
+        status => errors.push(format!("invalid run_status {status}")),
+    }
+
+    if receipt["started_at"].as_str().is_none() {
+        errors.push("started_at is required".to_owned());
+    }
+    if !receipt["limitations"].as_array().is_some_and(|items| {
+        !items.is_empty() && items.iter().all(|item| item.as_str().is_some_and(|s| !s.trim().is_empty()))
+    }) {
+        errors.push("limitations must be a non-empty string array".to_owned());
+    }
+    errors
+}
+
+fn valid_evaluation_receipt() -> Value {
+    let digest = "b".repeat(64);
+    let result = |id: &str| json!({
+        "case_id": id,
+        "status": "PASS",
+        "expected_policy": "HONOR_EXIT",
+        "observed_policy": "HONOR_EXIT",
+        "critical_invariant_failure": false,
+        "response_sha256": digest,
+        "reason_codes": []
+    });
+    json!({
+        "receipt_id": "SLD-RUN-20261022-BASELINE01",
+        "schema_version": "sld-evaluation-receipt-0.1",
+        "run_status": "COMPLETE",
+        "evaluation_mode": "MODEL_BEHAVIOR",
+        "started_at": "2026-10-22T10:00:00Z",
+        "finished_at": "2026-10-22T10:01:00Z",
+        "source": {
+            "commit_sha": "a".repeat(40),
+            "working_tree": "CLEAN",
+            "toolchain": "fixture-only",
+            "lockfile_sha256": "c".repeat(64)
+        },
+        "case_set": {
+            "dataset_id": "SLD-CONTRACT-FIXTURE",
+            "dataset_version": "test-only",
+            "visibility": "PUBLIC",
+            "schema_sha256": "d".repeat(64),
+            "corpus_sha256": "e".repeat(64),
+            "inventory_sha256": "f".repeat(64),
+            "expected_case_count": 2,
+            "expected_case_ids": ["SLD-TEST-001", "SLD-TEST-002"],
+            "split_id": "unit-test",
+            "split_seed": null
+        },
+        "subject": {
+            "provider": "fixture-only",
+            "model_id": "no-model-executed",
+            "model_snapshot": "test-fixture",
+            "weights_sha256": null,
+            "endpoint_class": "NOT_APPLICABLE",
+            "region": null,
+            "license_id": null
+        },
+        "generation": {
+            "system_prompt_sha256": "1".repeat(64),
+            "prompt_bundle_sha256": "2".repeat(64),
+            "decoding_config_sha256": "3".repeat(64),
+            "tool_policy_sha256": "4".repeat(64),
+            "memory_policy": "NONE",
+            "max_turns": 25,
+            "seed": 1,
+            "temperature": 0.0,
+            "top_p": 1.0,
+            "tool_versions_sha256": null
+        },
+        "evaluator": {
+            "rubric_sha256": "5".repeat(64),
+            "judge_panel": [{
+                "judge_id": "fixture-rubric-check",
+                "snapshot": "test-only",
+                "implementation_sha256": "6".repeat(64)
+            }],
+            "human_review_status": "NOT_PERFORMED",
+            "human_rater_count": 0,
+            "agreement_statistic": null,
+            "agreement_value": null,
+            "independent_adjudication_status": "NOT_PERFORMED"
+        },
+        "environment": {
+            "os_arch": "test-only",
+            "runtime": "test fixture",
+            "dependency_lock_sha256": "c".repeat(64),
+            "hardware_class": "NOT_APPLICABLE",
+            "determinism_notes": "No model was run; synthetic receipt fixture only."
+        },
+        "case_results": [
+            result("SLD-TEST-001"),
+            result("SLD-TEST-002")
+        ],
+        "summary": {
+            "expected": 2, "observed": 2, "pass": 2, "fail": 0,
+            "indeterminate": 0, "error": 0, "skipped": 0, "missing": 0,
+            "duplicate_ids": 0, "critical_invariant_failures": 0
+        },
+        "limitations": ["Synthetic unit-test fixture; not model-evaluation evidence."],
+        "transcript_bundle_sha256": null,
+        "receipt_notes": ["Do not interpret this fixture as a real evaluation run."]
+    })
+}
+
+#[test]
+fn evaluation_receipt_contract_reconciles_a_complete_census() {
+    let schema = read_json(EVALUATION_RECEIPT_SCHEMA_PATH);
+    assert_eq!(
+        schema["properties"]["schema_version"]["const"].as_str(),
+        Some("sld-evaluation-receipt-0.1")
+    );
+    let receipt = valid_evaluation_receipt();
+    let errors = validate_evaluation_receipt(&receipt);
+    assert!(errors.is_empty(), "receipt invalid: {errors:#?}");
+}
+
+#[test]
+fn evaluation_receipt_fails_closed_on_missing_skipped_and_duplicate_cases() {
+    let receipt = valid_evaluation_receipt();
+    let mut missing = receipt.clone();
+    missing["case_results"].as_array_mut().expect("case results").pop();
+    missing["summary"]["observed"] = Value::from(1);
+    missing["summary"]["pass"] = Value::from(1);
+    missing["summary"]["missing"] = Value::from(1);
+    let errors = validate_evaluation_receipt(&missing);
+    assert!(errors.iter().any(|error| error.contains("COMPLETE run must account")));
+
+    let mut duplicate = receipt.clone();
+    duplicate["case_results"][1]["case_id"] = Value::String("SLD-TEST-001".to_owned());
+    duplicate["summary"]["duplicate_ids"] = Value::from(0);
+    duplicate["summary"]["missing"] = Value::from(1);
+    let errors = validate_evaluation_receipt(&duplicate);
+    assert!(errors.iter().any(|error| error.contains("duplicate case result ID")));
+
+    let mut skipped = receipt;
+    skipped["case_results"][0]["status"] = Value::String("SKIPPED".to_owned());
+    skipped["summary"]["pass"] = Value::from(1);
+    skipped["summary"]["skipped"] = Value::from(1);
+    let errors = validate_evaluation_receipt(&skipped);
+    assert!(errors.is_empty(), "a fully accounted skipped case is not a pass, but can be a complete census: {errors:#?}");
+    assert_eq!(skipped["summary"]["pass"], 1);
+    assert_eq!(skipped["summary"]["skipped"], 1);
 }
