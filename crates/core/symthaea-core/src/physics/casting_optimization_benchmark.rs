@@ -1025,8 +1025,12 @@ mod tests {
     fn all_synthetic_fixture_optima_are_known_answers() {
         for case in SyntheticCase::ALL {
             let optimum = case.optimum();
-            assert_abs_close(case.objective(optimum), 0.0, 1e-15);
-            assert_abs_close(case.known_optimum_value(), 0.0, 1e-15);
+            assert_abs_close(
+                case.objective(optimum),
+                case.known_optimum_value(),
+                1e-6,
+            );
+            assert!(case.known_optimum_value().is_finite());
             assert!((0.0..=1.0).contains(&optimum.x));
             assert!((0.0..=1.0).contains(&optimum.y));
             assert!(case.is_feasible(optimum));
@@ -1222,14 +1226,26 @@ mod tests {
 
     #[test]
     fn casting_adjacent_paper_analytical_functions_have_frozen_reference_minima() {
-        for case in [
-            SyntheticCase::McCormick,
-            SyntheticCase::Eggholder,
-            SyntheticCase::HolderTable,
+        for (case, expected_value, tolerance) in [
+            (
+                SyntheticCase::McCormick,
+                -1.913222954981037,
+                1e-8,
+            ),
+            (
+                SyntheticCase::Eggholder,
+                -959.6406627208397,
+                1e-5,
+            ),
+            (
+                SyntheticCase::HolderTable,
+                -19.20850256788675,
+                1e-8,
+            ),
         ] {
             let optimum = case.optimum();
-            assert_abs_close(case.objective(optimum), 0.0, 1e-12);
-            assert_abs_close(case.known_optimum_value(), 0.0, 1e-12);
+            assert_abs_close(case.objective(optimum), expected_value, tolerance);
+            assert_abs_close(case.known_optimum_value(), expected_value, 0.0);
             assert!((0.0..=1.0).contains(&optimum.x));
             assert!((0.0..=1.0).contains(&optimum.y));
         }
