@@ -475,6 +475,216 @@ if ! awk -F, '
   exit 1
 fi
 
+# Persistent task-outcome risk stream. Unlike the residual monitors, this
+# carries evidence across 300 episodes and consumes only observed false-safe
+# outcomes. Its risk-null is conditional expected event loss <= 5%, not OOD.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-task-risk-stream-bench -- \
+  "$tmpdir/scope-a.csv" "$tmpdir/task-risk-a.csv" "$tmpdir/task-risk-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-task-risk-stream-bench -- \
+  "$tmpdir/scope-a.csv" "$tmpdir/task-risk-b.csv" "$tmpdir/task-risk-summary-b.csv"
+if ! cmp -s "$tmpdir/task-risk-a.csv" "$tmpdir/task-risk-b.csv" ||
+   ! cmp -s "$tmpdir/task-risk-summary-a.csv" "$tmpdir/task-risk-summary-b.csv"; then
+  printf 'FAIL: repeated task-risk event stream outputs are not byte-identical\n' >&2
+  exit 1
+fi
+if ! cmp -s "$tmpdir/scope-a.csv" <(cut -d, -f1-19 "$tmpdir/task-risk-a.csv"); then
+  printf 'FAIL: task-risk output does not preserve the exact task-scope episode rows\n' >&2
+  exit 1
+fi
+
+if ! awk -F, -v raw="$tmpdir/task-risk-a.csv" -v summary="$tmpdir/task-risk-summary-a.csv" '
+  FILENAME == raw {
+    if (FNR == 1) {
+      if (NF != 34) failed = 1
+      next
+    }
+    if (NF != 34) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "moderate_shift" &&
+        $2 != "strong_shift" && $2 != "stealth_shift") failed = 1
+    if ($3 !~ /^[0-9]+$/ || $3 < 0 || $3 >= 300) failed = 1
+    if ($15 !~ /^[0-8]$/) failed = 1
+    if ($19 != "true" && $19 != "false") failed = 1
+    if ($20 != "true" && $20 != "false") failed = 1
+    if (($15 < 8) != ($20 == "true")) failed = 1
+    if ($19 != $20) failed = 1
+    if (($11 == "false") != ($2 == "nominal")) failed = 1
+    if ($21 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    for (i = 22; i <= 24; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($25 != "true" && $25 != "false") failed = 1
+    if ($26 != "NA" && ($26 !~ /^[0-9]+$/ || $26 >= 300)) failed = 1
+    if ($27 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($28 != "true" && $28 != "false") failed = 1
+    if ($29 != "NA" && ($29 !~ /^[0-9]+$/ || $29 >= 300)) failed = 1
+    if ($30 !~ /^[0-9]*[.]?[0-9]+$/ || $31 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if (($30 - log(100) > 0.000001) || (log(100) - $30 > 0.000001)) failed = 1
+    if (($31 - 0.05 > 0.000001) || (0.05 - $31 > 0.000001)) failed = 1
+    if (($32 - 0.25 > 0.000001) || (0.25 - $32 > 0.000001) ||
+        ($33 - 0.50 > 0.000001) || (0.50 - $33 > 0.000001) ||
+        ($34 - 0.75 > 0.000001) || (0.75 - $34 > 0.000001)) failed = 1
+
+    key = $1 SUBSEP $2
+    if ($3 == 0) {
+      streams[key] = 1
+      next_episode[key] = 0
+      event_count[key] = 0
+      first_event[key] = 300
+      first_mix[key] = 300
+      first_fixed[key] = 300
+      events_at_mix[key] = 0
+      events_at_fixed[key] = 0
+      previous_1[key] = 0
+      previous_2[key] = 0
+      previous_3[key] = 0
+      previous_fixed[key] = 0
+      latched_mix[key] = "false"
+      latched_fixed[key] = "false"
+      report_first_mix[key] = $26
+      report_first_fixed[key] = $29
+    } else if (!streams[key] || $3 != next_episode[key]) failed = 1
+    if ($26 != report_first_mix[key] || $29 != report_first_fixed[key]) failed = 1
+
+    loss = ($20 == "true") ? 1 : 0
+    if (loss == 1) {
+      event_count[key]++
+      if (first_event[key] == 300) first_event[key] = $3
+    }
+    factor_1 = 1 + ($32 / $31) * (loss - $31)
+    factor_2 = 1 + ($33 / $31) * (loss - $31)
+    factor_3 = 1 + ($34 / $31) * (loss - $31)
+    if (factor_1 <= 0 || factor_2 <= 0 || factor_3 <= 0) failed = 1
+    expected_1 = previous_1[key] + log(factor_1)
+    expected_2 = previous_2[key] + log(factor_2)
+    expected_3 = previous_3[key] + log(factor_3)
+    if (($22 - expected_1 > 0.000002) || (expected_1 - $22 > 0.000002) ||
+        ($23 - expected_2 > 0.000002) || (expected_2 - $23 > 0.000002) ||
+        ($24 - expected_3 > 0.000002) || (expected_3 - $24 > 0.000002)) failed = 1
+    previous_1[key] = $22
+    previous_2[key] = $23
+    previous_3[key] = $24
+    max_component = $22
+    if ($23 > max_component) max_component = $23
+    if ($24 > max_component) max_component = $24
+    expected_mix = max_component + log((exp($22 - max_component) +
+      exp($23 - max_component) + exp($24 - max_component)) / 3)
+    if (($21 - expected_mix > 0.000002) || (expected_mix - $21 > 0.000002)) failed = 1
+    expected_mix_alarm = (latched_mix[key] == "true" || $21 >= $30) ? "true" : "false"
+    if ($25 != expected_mix_alarm) failed = 1
+    if ($25 == "true" && first_mix[key] == 300) {
+      first_mix[key] = $3
+      events_at_mix[key] = event_count[key]
+    }
+    latched_mix[key] = expected_mix_alarm
+
+    factor_fixed = 1 + (0.50 / $31) * (loss - $31)
+    if (factor_fixed <= 0) failed = 1
+    expected_fixed = previous_fixed[key] + log(factor_fixed)
+    if (($27 - expected_fixed > 0.000002) || (expected_fixed - $27 > 0.000002)) failed = 1
+    previous_fixed[key] = $27
+    expected_fixed_alarm = (latched_fixed[key] == "true" || $27 >= $30) ? "true" : "false"
+    if ($28 != expected_fixed_alarm) failed = 1
+    if ($28 == "true" && first_fixed[key] == 300) {
+      first_fixed[key] = $3
+      events_at_fixed[key] = event_count[key]
+    }
+    latched_fixed[key] = expected_fixed_alarm
+
+    if ($2 == "nominal" && loss != 0) failed = 1
+    pair_key = $1 SUBSEP $3
+    if ($2 == "strong_shift") {
+      strong_event[pair_key] = $20
+      strong_first_event[pair_key] = $15
+      for (i = 20; i <= 34; i++) strong_output[pair_key SUBSEP i] = $i
+    }
+    if ($2 == "stealth_shift") {
+      if (strong_event[pair_key] != $20 || strong_first_event[pair_key] != $15) failed = 1
+      for (i = 20; i <= 34; i++)
+        if (strong_output[pair_key SUBSEP i] != $i) failed = 1
+    }
+
+    row_key = key SUBSEP $3
+    if (seen[row_key]++) failed = 1
+    next_episode[key] = $3 + 1
+    if ($3 == 299) {
+      if (first_mix[key] == 300 && report_first_mix[key] != "NA") failed = 1
+      if (first_mix[key] < 300 && report_first_mix[key] != first_mix[key]) failed = 1
+      if (first_fixed[key] == 300 && report_first_fixed[key] != "NA") failed = 1
+      if (first_fixed[key] < 300 && report_first_fixed[key] != first_fixed[key]) failed = 1
+      raw_events[key] = event_count[key]
+      raw_first_event[key] = first_event[key]
+      raw_first_mix[key] = first_mix[key]
+      raw_first_fixed[key] = first_fixed[key]
+      raw_events_at_mix[key] = (first_mix[key] < 300 ? events_at_mix[key] : "NA")
+      raw_events_at_fixed[key] = (first_fixed[key] < 300 ? events_at_fixed[key] : "NA")
+      raw_final_mix[key] = $21
+      raw_final_fixed[key] = $27
+      raw_mix_alarm[key] = (first_mix[key] < 300 ? "true" : "false")
+      raw_fixed_alarm[key] = (first_fixed[key] < 300 ? "true" : "false")
+    }
+    raw_rows++
+    next
+  }
+
+  FILENAME == summary {
+    if (FNR == 1) {
+      if (NF != 20) failed = 1
+      next
+    }
+    if (NF != 20) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "moderate_shift" &&
+        $2 != "strong_shift" && $2 != "stealth_shift") failed = 1
+    key = $1 SUBSEP $2
+    if (summary_seen[key]++) failed = 1
+    if ($3 != 300 || $4 !~ /^[0-9]+$/ || $4 > 300) failed = 1
+    if ($5 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        ($5 - ($4 / 300) > 0.000001) || (($4 / 300) - $5 > 0.000001)) failed = 1
+    if ($6 != "true" && $6 != "false") failed = 1
+    if ($8 != "true" && $8 != "false") failed = 1
+    if ($7 != "NA" && ($7 !~ /^[0-9]+$/ || $7 >= 300)) failed = 1
+    if ($9 != "NA" && ($9 !~ /^[0-9]+$/ || $9 >= 300)) failed = 1
+    if ($10 != "NA" && ($10 !~ /^[0-9]+$/ || $10 >= 300)) failed = 1
+    if ($11 != "NA" && ($11 !~ /^[0-9]+$/ || $11 >= 300)) failed = 1
+    if ($12 != "NA" && ($12 !~ /^[0-9]+$/ || $12 >= 300)) failed = 1
+    if ($13 != "NA" && ($13 !~ /^[0-9]+$/ || $13 > $4)) failed = 1
+    if ($14 != "NA" && ($14 !~ /^[0-9]+$/ || $14 > $4)) failed = 1
+    if ($15 !~ /^-?[0-9]*[.]?[0-9]+$/ || $16 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if (($17 - log(100) > 0.000001) || (log(100) - $17 > 0.000001)) failed = 1
+    if (($18 - 0.05 > 0.000001) || (0.05 - $18 > 0.000001)) failed = 1
+    if (($19 - 0.05 > 0.000001) || (0.05 - $19 > 0.000001)) failed = 1
+    if ($20 != 5) failed = 1
+    if ($6 != raw_mix_alarm[key] || $8 != raw_fixed_alarm[key]) failed = 1
+    if (($7 == "NA" ? 300 : $7) != raw_first_mix[key]) failed = 1
+    if (($9 == "NA" ? 300 : $9) != raw_first_fixed[key]) failed = 1
+    if (($10 == "NA" ? 300 : $10) != raw_first_event[key]) failed = 1
+    if (($11 == "NA" ? 300 : $11) !=
+        ((raw_first_mix[key] < 300 && raw_first_event[key] < 300)
+          ? raw_first_mix[key] - raw_first_event[key] : 300)) failed = 1
+    if (($12 == "NA" ? 300 : $12) !=
+        ((raw_first_fixed[key] < 300 && raw_first_event[key] < 300)
+          ? raw_first_fixed[key] - raw_first_event[key] : 300)) failed = 1
+    if ($13 != raw_events_at_mix[key] || $14 != raw_events_at_fixed[key]) failed = 1
+    if (($15 - raw_final_mix[key] > 0.000002) || (raw_final_mix[key] - $15 > 0.000002) ||
+        ($16 - raw_final_fixed[key] > 0.000002) || (raw_final_fixed[key] - $16 > 0.000002)) failed = 1
+    if ($2 == "nominal" && ($4 != 0 || $6 != "false" || $8 != "false")) failed = 1
+    rows_summary++
+    next
+  }
+
+  END {
+    if (raw_rows != 6000 || rows_summary != 20 || failed) exit 1
+    for (key in streams) {
+      if (next_episode[key] != 300) exit 1
+    }
+    for (key in summary_seen) if (!streams[key]) exit 1
+  }
+' "$tmpdir/task-risk-a.csv" "$tmpdir/task-risk-summary-a.csv"; then
+  printf 'FAIL: persistent task-risk stream schema, event accounting, mixture recurrence or stealth pairing is invalid\n' >&2
+  exit 1
+fi
+
 # Calibrated sequential CUSUM over residuals. Pointwise and cumulative
 # thresholds are independently calibrated from nominal episode maxima.
 cargo run --locked --release --manifest-path "$manifest" --bin allostatic-sequential-scope-bench -- \
