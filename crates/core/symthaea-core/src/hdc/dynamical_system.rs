@@ -3289,4 +3289,119 @@ mod tests {
         // They can be somewhat similar or not, but the test is that the pipeline works
         assert!(sim.is_finite(), "Similarity should be finite");
     }
+
+    #[test]
+    fn rk45_failure_receipt_enforces_internal_attempt_budget() {
+        let oscillator = HarmonicOscillator::simple(1.0);
+        let integrator = Rk45Integrator {
+            tol: 1.0e-8,
+            dt_min: 1.0e-12,
+            dt_max: 0.1,
+        };
+        let tolerances = Rk45Tolerances::new(1.0e-12, vec![1.0e-15; 2]);
+        let mut controller = Rk45Controller::new(0.1).unwrap();
+
+        let outcome = controller.try_step_with_receipt(
+            &integrator,
+            &oscillator,
+            &[1.0, 0.0],
+            0.0,
+            0.1,
+            &tolerances,
+            1,
+        );
+        let Rk45StepOutcome::Failed(receipt) = outcome else {
+            panic!("one internal attempt should not meet the strict tolerance");
+        };
+
+        assert_eq!(
+            receipt.error,
+            SimulationError::Rk45AttemptBudgetExceeded {
+                maximum_attempts: 1
+            }
+        );
+        assert_eq!(receipt.attempted_steps, 1);
+        assert_eq!(receipt.rejected_steps, 1);
+        assert_eq!(receipt.derivative_evaluations, 6);
+        assert_eq!(receipt.last_accepted_state, vec![1.0, 0.0]);
+        assert_eq!(receipt.last_accepted_time, 0.0);
+        assert_eq!(receipt.last_attempted_dt, Some(0.1));
+        assert!(receipt.min_attempted_dt.is_some_and(|dt| dt > 0.0 && dt <= 0.1));
+        assert_eq!(controller.next_step_size(), Some(0.1));
+    }
+
+    #[test]
+    fn rk45_failure_receipt_counts_rhs_calls_for_a_failed_stage() {
+        let malformed = MalformedDerivativeSystem { output: vec![0.0] };
+        let integrator = Rk45Integrator {
+            tol: 1.0e-8,
+            dt_min: 1.0e-12,
+            dt_max: 0.1,
+        };
+        let tolerances = Rk45Tolerances::new(1.0e-6, vec![1.0e-8; 2]);
+        let mut controller = Rk45Controller::new(0.1).unwrap();
+
+        let outcome = controller.try_step_with_receipt(
+            &integrator,
+            &malformed,
+            &[1.0, 0.0],
+            4.0,
+            0.1,
+            &tolerances,
+            4,
+        );
+        let Rk45StepOutcome::Failed(receipt) = outcome else {
+            panic!("dimension-mismatched derivative must fail");
+        };
+
+        assert_eq!(
+            receipt.error,
+            SimulationError::DerivativeDimensionMismatch {
+                stage: 1,
+                expected: 2,
+                actual: 1
+            }
+        );
+        assert_eq!(receipt.attempted_steps, 1);
+        assert_eq!(receipt.rejected_steps, 0);
+        assert_eq!(receipt.derivative_evaluations, 1);
+        assert_eq!(receipt.last_accepted_state, vec![1.0, 0.0]);
+        assert_eq!(receipt.last_accepted_time, 4.0);
+        assert_eq!(receipt.last_attempted_dt, Some(0.1));
+        assert_eq!(receipt.min_attempted_dt, Some(0.1));
+    }
+
+    #[test]
+    fn rk45_failure_receipt_allows_a_zero_attempt_budget_without_rhs_calls() {
+        let oscillator = HarmonicOscillator::simple(1.0);
+        let integrator = Rk45Integrator::new(1.0e-8);
+        let tolerances = Rk45Tolerances::new(1.0e-6, vec![1.0e-8; 2]);
+        let mut controller = Rk45Controller::new(0.1).unwrap();
+
+        let outcome = controller.try_step_with_receipt(
+            &integrator,
+            &oscillator,
+            &[1.0, 0.0],
+            0.0,
+            0.1,
+            &tolerances,
+            0,
+        );
+        let Rk45StepOutcome::Failed(receipt) = outcome else {
+            panic!("zero internal-attempt budget must fail closed");
+        };
+
+        assert_eq!(
+            receipt.error,
+            SimulationError::Rk45AttemptBudgetExceeded {
+                maximum_attempts: 0
+            }
+        );
+        assert_eq!(receipt.attempted_steps, 0);
+        assert_eq!(receipt.rejected_steps, 0);
+        assert_eq!(receipt.derivative_evaluations, 0);
+        assert_eq!(receipt.last_attempted_dt, None);
+        assert_eq!(receipt.min_attempted_dt, None);
+    }
+
 }
