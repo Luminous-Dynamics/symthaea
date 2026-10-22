@@ -781,8 +781,10 @@ mod tests {
                 if misspec_nominal.overconfident_under_misspecification { 1 } else { 0 };
             misspec_robust_false_singletons +=
                 if misspec_robust.overconfident_under_misspecification { 1 } else { 0 };
-            misspec_nominal_detected += if misspec_nominal.model_discrepancy_detected { 1 } else { 0 };
-            misspec_robust_detected += if misspec_robust.model_discrepancy_detected { 1 } else { 0 };
+            misspec_nominal_detected +=
+                if misspec_nominal.model_discrepancy_detected { 1 } else { 0 };
+            misspec_robust_detected +=
+                if misspec_robust.model_discrepancy_detected { 1 } else { 0 };
             misspec_nominal_unresolved += if misspec_nominal.final_live > 1 { 1 } else { 0 };
             misspec_robust_unresolved += if misspec_robust.final_live > 1 { 1 } else { 0 };
             paired.push(RobustEIGPair {
