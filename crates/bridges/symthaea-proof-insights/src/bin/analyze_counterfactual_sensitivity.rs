@@ -2129,6 +2129,44 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn resource_frontier_reports_ratios_and_signed_deltas() {
+        let expensive_base = PairObservation {
+            component_id: "cost-component".into(),
+            mutation_kind: "precondition_removed".into(),
+            base_compatible: true,
+            base_accept: true,
+            base_decision: "accept".into(),
+            variant_compatible: false,
+            variant_accept: false,
+            variant_decision: "reject".into(),
+            noop: false,
+            base_probability: Some(0.9),
+            variant_probability: Some(0.1),
+            base_model_calls: 3,
+            variant_model_calls: 2,
+            base_tokens: 1000,
+            variant_tokens: 500,
+            base_wall_ms: 500,
+            variant_wall_ms: 200,
+            base_cost_microusd: 1000,
+            variant_cost_microusd: 400,
+        };
+        let counts = aggregate(&[expensive_base]);
+        let metrics = counts.metrics();
+        assert_eq!(metrics["mean_counterfactual_to_base_cost_ratio"].2, Some(0.4));
+        assert_eq!(metrics["mean_counterfactual_to_base_token_ratio"].2, Some(0.5));
+        assert_eq!(metrics["mean_counterfactual_to_base_wall_time_ratio"].2, Some(0.4));
+        assert_eq!(metrics["mean_counterfactual_model_call_delta"].2, Some(-1.0));
+        assert_eq!(metrics["mean_counterfactual_token_delta"].2, Some(-500.0));
+        assert_eq!(metrics["mean_counterfactual_wall_time_delta_ms"].2, Some(-300.0));
+        assert_eq!(metrics["mean_counterfactual_cost_delta_microusd"].2, Some(-600.0));
+        assert_eq!(counts.base_cost_microusd_sum, 1000);
+        assert_eq!(counts.variant_cost_microusd_sum, 400);
+    }
+
+
     #[test]
     fn goal_noise_or_reject_everything_cannot_pass_paired_adherence() {
         let reject_all = PairObservation {
