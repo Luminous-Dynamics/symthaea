@@ -72,10 +72,18 @@ fn main() -> BenchResult<()> {
     println!("# prototype_budgets=16,64,256; total stored entries held equal across bank modes");
     println!("# seeds=17,29,41; queries_per_stratum={QUERIES_PER_STRATUM}");
     println!("# known_noise=0,0.10,0.20,0.30; near_unknown_noise=0.05,0.10,0.20");
-    println!("# correlated_shadows=half the budget are independent bases, half are distinct labels 2% bit-flips from bases");
-    println!("# decision_rule=similarity>={MIN_SIMILARITY},margin>={MIN_TOP_TWO_MARGIN}; fixed diagnostic only, not calibrated");
-    println!("# vector_payload_bytes=prototype_count*dimension*sizeof(i8); excludes labels, allocations, runtime and indexes");
-    println!("record_type,seed,dimension,prototype_budget,bank_mode,stratum,query_n,known_n,accepted_n,top1_correct,top1_accuracy,coverage,accepted_errors,selective_risk,unknown_false_accept_rate,mean_best_similarity,mean_top_two_margin,p50_latency_us,p95_latency_us,vector_payload_bytes");
+    println!(
+        "# correlated_shadows=half the budget are independent bases, half are distinct labels 2% bit-flips from bases"
+    );
+    println!(
+        "# decision_rule=similarity>={MIN_SIMILARITY},margin>={MIN_TOP_TWO_MARGIN}; fixed diagnostic only, not calibrated"
+    );
+    println!(
+        "# vector_payload_bytes=prototype_count*dimension*sizeof(i8); excludes labels, allocations, runtime and indexes"
+    );
+    println!(
+        "record_type,seed,dimension,prototype_budget,bank_mode,stratum,query_n,known_n,accepted_n,top1_correct,top1_accuracy,coverage,accepted_errors,selective_risk,unknown_false_accept_rate,mean_best_similarity,mean_top_two_margin,p50_latency_us,p95_latency_us,vector_payload_bytes"
+    );
 
     for seed in SEEDS {
         for prototype_budget in PROTOTYPE_BUDGETS {
@@ -86,8 +94,7 @@ fn main() -> BenchResult<()> {
 
                 for query in &queries {
                     let started_query = Instant::now();
-                    let (best_label, best_similarity, top_two_margin) =
-                        rank(&bank, &query.vector)?;
+                    let (best_label, best_similarity, top_two_margin) = rank(&bank, &query.vector)?;
                     let latency_us = started_query.elapsed().as_nanos() as f64 / 1_000.0;
                     let accepted = accepts(best_similarity, top_two_margin);
                     let target_known = query.target_label.is_some();
@@ -108,8 +115,7 @@ fn main() -> BenchResult<()> {
                         });
                 }
 
-                let vector_payload_bytes =
-                    bank.len() * DIMENSION * std::mem::size_of::<i8>();
+                let vector_payload_bytes = bank.len() * DIMENSION * std::mem::size_of::<i8>();
                 for (stratum, observations) in grouped {
                     report_group(
                         seed,
@@ -160,10 +166,8 @@ fn build_bank(
         });
 
         if mode == BankMode::CorrelatedShadows {
-            let shadow = prototype.with_noise(
-                SHADOW_NOISE,
-                derive_seed(seed, 0x5348_4144, index as u64),
-            )?;
+            let shadow =
+                prototype.with_noise(SHADOW_NOISE, derive_seed(seed, 0x5348_4144, index as u64))?;
             bank.push(StoredPattern {
                 label: format!("shadow-{index:04}"),
                 vector: shadow,
@@ -184,8 +188,7 @@ fn build_queries(
 
     for (noise_index, noise_fraction) in KNOWN_NOISE_LEVELS.iter().copied().enumerate() {
         for query_index in 0..QUERIES_PER_STRATUM {
-            let base_index =
-                (query_index * 7 + noise_index + seed as usize) % bases.len();
+            let base_index = (query_index * 7 + noise_index + seed as usize) % bases.len();
             let (target_label, prototype) = &bases[base_index];
             let vector = prototype.with_noise(
                 noise_fraction,
@@ -194,7 +197,10 @@ fn build_queries(
             queries.push(Query {
                 vector,
                 target_label: Some(target_label.clone()),
-                stratum: format!("known_noise_{:02}", (noise_fraction * 100.0).round() as usize),
+                stratum: format!(
+                    "known_noise_{:02}",
+                    (noise_fraction * 100.0).round() as usize
+                ),
             });
         }
     }
@@ -237,8 +243,7 @@ fn build_queries(
 
     for (noise_index, noise_fraction) in NEAR_UNKNOWN_NOISE_LEVELS.iter().copied().enumerate() {
         for query_index in 0..QUERIES_PER_STRATUM {
-            let base_index =
-                (query_index * 5 + noise_index + seed as usize) % bases.len();
+            let base_index = (query_index * 5 + noise_index + seed as usize) % bases.len();
             let vector = bases[base_index].1.with_noise(
                 noise_fraction,
                 derive_seed(seed, 0x554e_4b4e + noise_index as u64, query_index as u64),
@@ -330,10 +335,16 @@ fn report_group(
     } else {
         "NA".to_owned()
     };
-    let mean_best_similarity =
-        observations.iter().map(|row| row.best_similarity).sum::<f64>() / total as f64;
-    let mean_margin =
-        observations.iter().map(|row| row.top_two_margin).sum::<f64>() / total as f64;
+    let mean_best_similarity = observations
+        .iter()
+        .map(|row| row.best_similarity)
+        .sum::<f64>()
+        / total as f64;
+    let mean_margin = observations
+        .iter()
+        .map(|row| row.top_two_margin)
+        .sum::<f64>()
+        / total as f64;
     let mut latencies = observations
         .iter()
         .map(|row| row.latency_us)
