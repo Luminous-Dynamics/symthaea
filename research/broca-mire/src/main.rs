@@ -418,7 +418,7 @@ fn run_model(actions: &[Action], model: &mut MemoryModel) -> Vec<QueryResult> {
                     query_id: *query_id,
                     step: *step,
                     episode: key.episode,
-                    family,
+                    family: *family,
                     expected: *expected,
                     actual: model.query(*key),
                 });
