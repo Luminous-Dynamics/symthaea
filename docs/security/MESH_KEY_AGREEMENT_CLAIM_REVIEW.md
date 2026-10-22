@@ -130,12 +130,13 @@ The partial service path also treated PQC failure as non-fatal and continued usi
 
 **Fail-closed changes in this branch:**
 - `run_pqc_exchange` now returns a specific error instead of performing a one-sided exchange whose key cannot be confirmed.
-- If PQC establishment fails while the feature is enabled, `run_handshake_for_peer` removes the just-verified classical trust entry and returns the error rather than silently falling back. The `TrustChanged::Verified` event is emitted only after enabled handshake requirements pass.
-- `PqcHandshakeManager` stores KEM-derived values in `pending_session_keys`; `session_key()` and `session_count()` now report established sessions only. There is currently no activation/key-confirmation API, so a candidate remains pending and is not exposed as an active session.
+- The outbound path rejects `require_handshake = false` when `pqc-handshake` is compiled; it cannot take the early `LocalTrust` return. If the KEM manager is missing after classical verification, or the PQC phase errors, the service rolls back the trust entry, closes the channel and returns an error. The `TrustChanged` event is emitted only after enabled requirements pass.
+- The inbound path also rejects when the PQC phase is incomplete. `accept_connections` closes the connection and continues instead of registering a failed inbound peer as `LocalTrust`.
+- `PqcHandshakeManager` stores KEM-derived values in `pending_session_keys`; `session_key()` and `session_count()` report established sessions only. There is currently no activation/key-confirmation API, so a candidate remains pending and is not exposed as an active session.
 - `decapsulate_and_derive` returns `()`, not raw key bytes. A future protocol must implement canonical authenticated transcript binding and key confirmation before a session can be activated.
 - The candidate timestamp is named `created_at`, not `established_at`, to avoid misrepresenting its lifecycle.
 
-These are intentional API behavior changes: with `pqc-handshake` enabled, the service will now fail closed until the complete bidirectional exchange, transcript binding and key confirmation are implemented. That is safer than claiming a protection it does not provide; deployments requiring uninterrupted service must make an explicit policy decision before enabling the incomplete feature.
+These are intentional API behavior changes: with `pqc-handshake` and `swarm` enabled, the service will fail closed until the complete bidirectional exchange, transcript binding and key confirmation are implemented. This is safer than claiming protection that the implementation does not establish; deployments requiring uninterrupted service need a deliberate policy decision before enabling this incomplete feature.
 
 ## K-9 — Pending KEM state and encoded inputs needed explicit bounds
 
