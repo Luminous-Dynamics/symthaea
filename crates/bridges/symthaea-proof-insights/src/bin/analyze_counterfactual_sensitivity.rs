@@ -118,11 +118,13 @@ impl Counts {
             self.cost_ratio_count += 1;
         }
         if observation.base_tokens > 0 {
-            self.token_ratio_sum += observation.variant_tokens as f64 / observation.base_tokens as f64;
+            self.token_ratio_sum +=
+                observation.variant_tokens as f64 / observation.base_tokens as f64;
             self.token_ratio_count += 1;
         }
         if observation.base_wall_ms > 0 {
-            self.wall_ratio_sum += observation.variant_wall_ms as f64 / observation.base_wall_ms as f64;
+            self.wall_ratio_sum +=
+                observation.variant_wall_ms as f64 / observation.base_wall_ms as f64;
             self.wall_ratio_count += 1;
         }
         if observation.base_compatible {
