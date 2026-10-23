@@ -578,7 +578,7 @@ jobs:
           report="$RUNNER_TEMP/pitb-proof-state-intervention-report.json"
 
           cd "$(dirname "$PITB_MANIFEST")"
-          cargo test --locked --bin analyze_proof_state_intervention
+          PITB_REPO_ROOT="$GITHUB_WORKSPACE" cargo test --locked --bin analyze_proof_state_intervention
           cargo run --locked --bin analyze_proof_state_intervention -- "$suite" "$outcomes" test "$report" 1000 17
 
           "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$report" "$report_schema" <<'PY'
