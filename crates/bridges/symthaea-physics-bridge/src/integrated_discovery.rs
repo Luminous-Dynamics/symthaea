@@ -313,6 +313,9 @@ const MAX_TYPED_RECOVERY_RESTARTS: usize = 2;
 const RECOVERY_CANDIDATES_PER_EXPANSION: usize = 4;
 const RECOVERY_GENERATION_ATTEMPT_CAP: usize = 256;
 const RECOVERY_COMPLEXITY_PENALTY: f64 = 1.0e-4;
+/// Truth-absent recovery is not successful until the final candidate survives at least this
+/// many new policy-visible measurements after the most recent recovery restart.
+const MIN_POST_RECOVERY_VALIDATION_MEASUREMENTS: usize = 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RecoveryProposalFamily {
@@ -721,6 +724,7 @@ struct TrialOutcome {
     typed_recovery_restarts: usize,
     structured_recovery_candidates: usize,
     accepted_recovery_candidates: usize,
+    post_recovery_validation_measurements: usize,
     terminal_pit_alarm: bool,
 }
 
@@ -880,6 +884,7 @@ fn run_trial_with_mode(
             typed_recovery_restarts: 0,
             structured_recovery_candidates: 0,
             accepted_recovery_candidates: 0,
+            post_recovery_validation_measurements: 0,
             terminal_pit_alarm: false,
         };
     }
@@ -988,6 +993,8 @@ fn run_trial_with_mode(
     let mut typed_recovery_restarts = 0usize;
     let mut structured_recovery_candidates = 0usize;
     let mut accepted_recovery_candidates = 0usize;
+    let mut awaiting_post_recovery_validation = false;
+    let mut post_recovery_validation_measurements = 0usize;
     let mut recovery_triggered_on_empty_pool = false;
     let mut rejected_after_alarm = Vec::<usize>::new();
     let mut terminal_pit_alarm = false;
@@ -1221,6 +1228,9 @@ fn run_trial_with_mode(
             }
         }
 
+        if awaiting_post_recovery_validation {
+            post_recovery_validation_measurements += 1;
+        }
         live.retain(|idx| match eval_at(&hypotheses[*idx], &chosen) {
             Some(pred) => (pred - observed).abs() <= ELIMINATION_TOLERANCE * (1.0 + observed.abs()),
             None => false,
@@ -1262,6 +1272,8 @@ fn run_trial_with_mode(
             structured_recovery_candidates += recovery.structured_count;
             accepted_recovery_candidates += recovery.accepted_count;
             typed_recovery_restarts += 1;
+            awaiting_post_recovery_validation = true;
+            post_recovery_validation_measurements = 0;
             terminal_pit_alarm = false;
             if pit_mode {
                 pit_monitor = Some(
@@ -1312,6 +1324,8 @@ fn run_trial_with_mode(
             structured_recovery_candidates += recovery.structured_count;
             accepted_recovery_candidates += recovery.accepted_count;
             typed_recovery_restarts += 1;
+            awaiting_post_recovery_validation = true;
+            post_recovery_validation_measurements = 0;
         }
     }
 
@@ -1337,6 +1351,9 @@ fn run_trial_with_mode(
             && ground_truth_equivalent
             && ground_truth_extrapolation_equivalent
             && (!truth_absent || !initial_pool_contains_reference)
+            && (!truth_absent
+                || post_recovery_validation_measurements
+                    >= MIN_POST_RECOVERY_VALIDATION_MEASUREMENTS)
             && !terminal_pit_alarm
             && !monitoring_protocol_invalid,
         final_live: live.len(),
@@ -1357,6 +1374,7 @@ fn run_trial_with_mode(
         typed_recovery_restarts,
         structured_recovery_candidates,
         accepted_recovery_candidates,
+        post_recovery_validation_measurements,
         terminal_pit_alarm,
     }
 }
@@ -1856,6 +1874,8 @@ mod tests {
         let mut same_domain_recovered = 0usize;
         let mut ood_recovered = 0usize;
         let mut full_recovery_successes = 0usize;
+        let mut runs_with_post_recovery_validation = 0usize;
+        let mut total_post_recovery_validation_measurements = 0usize;
         let mut baseline_measurements = 0usize;
         let mut recovery_measurements = 0usize;
         let mut unresolved_after_recovery = 0usize;
@@ -1923,6 +1943,21 @@ mod tests {
                 0
             };
             full_recovery_successes += if recovered.success { 1 } else { 0 };
+            runs_with_post_recovery_validation +=
+                if recovered.post_recovery_validation_measurements
+                    >= MIN_POST_RECOVERY_VALIDATION_MEASUREMENTS
+                {
+                    1
+                } else {
+                    0
+                };
+            total_post_recovery_validation_measurements +=
+                recovered.post_recovery_validation_measurements;
+            assert!(
+                !recovered.success
+                    || recovered.post_recovery_validation_measurements
+                        >= MIN_POST_RECOVERY_VALIDATION_MEASUREMENTS
+            );
         }
 
         println!(concat!(
@@ -1934,6 +1969,8 @@ mod tests {
             "selection_failures_after_recovery={selection_failures_after_recovery},",
             "baseline_measurements={baseline_measurements},",
             "recovery_measurements={recovery_measurements},",
+            "runs_with_post_recovery_validation={runs_with_post_recovery_validation},",
+            "total_post_recovery_validation_measurements={total_post_recovery_validation_measurements},",
             "empty_pool_recovery_attempts={empty_pool_recovery_attempts},",
             "failed_recovery_attempts={failed_recovery_attempts},",
             "accepted_recovery_candidates={accepted_recovery_candidates},",
