@@ -13,7 +13,7 @@ use std::time::Instant;
 
 use symthaea_quantum_comp::mis_verifier::{MisGraph, EXACT_ORACLE_MAX_VERTICES};
 use symthaea_quantum_comp::rng::XorShift64;
-use symthaea_quantum_comp::{MisDimacsLimits, parse_dimacs_mis_with_limits};
+use symthaea_quantum_comp::{MisDimacsLimits, parse_dimacs_mis_with_limits, parse_qoblib_solution};
 
 fn fnv1a64(bytes: &[u8]) -> u64 {
     let mut hash = 0xcbf2_9ce4_8422_2325_u64;
@@ -736,8 +736,111 @@ fn run(path: &str, seed_base: u64, target_objective: Option<usize>) -> Result<()
     Ok(())
 }
 
+
+fn verify_solution_text(
+    graph_source: &str,
+    solution_source: &str,
+    reported_objective: Option<usize>,
+) -> Result<
+    (
+        symthaea_quantum_comp::ParsedMisDimacs,
+        Vec<usize>,
+        symthaea_quantum_comp::mis_verifier::MisVerificationReport,
+    ),
+    String,
+> {
+    let limits = MisDimacsLimits::default();
+    let parsed = parse_dimacs_mis_with_limits(graph_source, limits)
+        .map_err(|error| format!("DIMACS parse error: {error}"))?;
+    let selected = parse_qoblib_solution(solution_source, parsed.graph.vertex_count())
+        .map_err(|error| format!("QOBLIB solution parse error: {error}"))?;
+    let report = parsed.graph.verify_solution(&selected, reported_objective);
+    Ok((parsed, selected, report))
+}
+
+fn run_verify_solution(
+    graph_path: &str,
+    solution_path: &str,
+    reported_objective: Option<usize>,
+) -> Result<bool, String> {
+    let graph_source = fs::read_to_string(graph_path)
+        .map_err(|error| format!("failed to read graph {graph_path:?}: {error}"))?;
+    let solution_source = fs::read_to_string(solution_path)
+        .map_err(|error| format!("failed to read solution {solution_path:?}: {error}"))?;
+    let (parsed, selected, report) = verify_solution_text(
+        &graph_source,
+        &solution_source,
+        reported_objective,
+    )?;
+    let violations = report.violations.iter()
+        .map(|violation| format!("\"{}\"", json_escape(&format!("{violation:?}"))))
+        .collect::<Vec<_>>()
+        .join(",");
+    println!(
+        concat!(
+            "{\n",
+            "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.qoblib-solution-verification.v1\",\n",
+            "  \"benchmark_track\": \"published-solution-feasibility-audit\",\n",
+            "  \"graph_path\": \"{}\",\n",
+            "  \"graph_bytes\": {},\n",
+            "  \"graph_fnv1a64\": \"{:016x}\",\n",
+            "  \"solution_path\": \"{}\",\n",
+            "  \"solution_bytes\": {},\n",
+            "  \"solution_fnv1a64\": \"{:016x}\",\n",
+            "  \"vertices\": {},\n",
+            "  \"edges\": {},\n",
+            "  \"selected_count\": {},\n",
+            "  \"computed_objective\": {},\n",
+            "  \"reported_objective\": {},\n",
+            "  \"feasible\": {},\n",
+            "  \"violations\": [{}],\n",
+            "  \"limitations\": [\"FNV-1a is a non-cryptographic integrity checksum\", \"feasibility does not prove optimality\", \"this command verifies a solution file but does not reproduce the submitted algorithm or its performance measurements\"]\n",
+            "}"
+        ),
+        json_escape(graph_path),
+        graph_source.len(),
+        fnv1a64(graph_source.as_bytes()),
+        json_escape(solution_path),
+        solution_source.len(),
+        fnv1a64(solution_source.as_bytes()),
+        parsed.declared_vertex_count,
+        parsed.declared_edge_count,
+        selected.len(),
+        report.computed_objective,
+        reported_objective.map(|value| value.to_string()).unwrap_or_else(|| "null".to_owned()),
+        report.feasible,
+        violations
+    );
+    Ok(report.feasible)
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
+    if args.get(1).map(String::as_str) == Some("--verify-solution") {
+        if args.len() != 4 && args.len() != 5 {
+            eprintln!("Usage: qoblib-mis-smoke --verify-solution <graph-path> <solution-path> [reported-objective]");
+            return ExitCode::from(2);
+        }
+        let reported_objective = if args.len() == 5 {
+            match args[4].parse::<usize>() {
+                Ok(value) => Some(value),
+                Err(_) => {
+                    eprintln!("reported-objective must be a nonnegative integer");
+                    return ExitCode::from(2);
+                }
+            }
+        } else {
+            None
+        };
+        return match run_verify_solution(&args[2], &args[3], reported_objective) {
+            Ok(true) => ExitCode::SUCCESS,
+            Ok(false) => ExitCode::FAILURE,
+            Err(error) => {
+                eprintln!("{error}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     let mut path: Option<String> = None;
     let mut seed_base = MULTISTART_GREEDY_SEED_BASE;
     let mut target_objective: Option<usize> = None;
@@ -748,7 +851,7 @@ fn main() -> ExitCode {
     while index < args.len() {
         match args[index].as_str() {
             "--help" | "-h" => {
-                eprintln!("Usage: qoblib-mis-smoke [--seed-base <u64>] [--target-objective <usize>] <path-to-DIMACS-edge-graph>");
+                eprintln!("Usage: qoblib-mis-smoke [--seed-base <u64>] [--target-objective <usize>] <path-to-DIMACS-edge-graph>\n       qoblib-mis-smoke --verify-solution <graph-path> <solution-path> [reported-objective]");
                 eprintln!("Runs one deterministic greedy control, 16 seeded randomized greedy trials, bounded local improvement, and the tiny exact reference when within its vertex limit.");
                 return ExitCode::SUCCESS;
             }
@@ -824,6 +927,39 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn published_solution_mode_checks_feasibility_and_reported_objective() {
+        let graph = "p edge 4 2\n e 1 2\n e 3 4\n";
+        let good = "# Objective value = 2\n1\n3\n";
+        let (parsed, selected, report) = verify_solution_text(graph, good, Some(2)).unwrap();
+        assert_eq!(parsed.declared_vertex_count, 4);
+        assert_eq!(selected, vec![0, 2]);
+        assert!(report.feasible);
+        assert_eq!(report.computed_objective, 2);
+
+        let mismatch = verify_solution_text(graph, good, Some(3)).unwrap();
+        assert!(!mismatch.2.feasible);
+        assert!(mismatch.2.violations.iter().any(|v| matches!(
+            v,
+            symthaea_quantum_comp::mis_verifier::MisViolation::ObjectiveMismatch {
+                reported: 3,
+                computed: 2
+            }
+        )));
+    }
+
+    #[test]
+    fn published_solution_mode_rejects_adjacent_selected_vertices() {
+        let graph = "p edge 2 1\ne 1 2\n";
+        let bad = "1\n2\n";
+        let (_, _, report) = verify_solution_text(graph, bad, Some(2)).unwrap();
+        assert!(!report.feasible);
+        assert!(report.violations.iter().any(|v| matches!(
+            v,
+            symthaea_quantum_comp::mis_verifier::MisViolation::AdjacentSelectedVertices { .. }
+        )));
+    }
 
     #[test]
     fn residual_degree_greedy_is_deterministic_and_feasible_on_a_path() {
