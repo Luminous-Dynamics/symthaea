@@ -69,7 +69,7 @@ struct CatalogRouteRow {
 #[derive(Debug, Serialize)]
 struct InstrumentRow {
     instrument_id: &'static str,
-    rust_variant: &'static str,
+    rust_variant: String,
     declared_renderer_family: &'static str,
     gm_program_0_based: u8,
     sample_capability_status: &'static str,
@@ -91,6 +91,7 @@ struct FrontierCell {
 #[derive(Debug, Serialize)]
 struct StyleSeedSmoke {
     style_id: String,
+    catalog_ids: Vec<u16>,
     rust_variant: String,
     seed: u64,
     first_score_sha256: String,
@@ -254,7 +255,8 @@ fn run() -> Result<(), String> {
             };
 
             style_seed_smoke.push(StyleSeedSmoke {
-                style_id,
+                style_id: style_id.clone(),
+                catalog_ids: style_catalog_ids.get(&style_id).cloned().unwrap_or_default(), 
                 rust_variant: format!("{style:?}"),
                 seed,
                 first_score_sha256: first_hash,
@@ -380,7 +382,7 @@ fn catalog_route_row(entry: &CanonicalStyle, executable_style_names: &HashSet<St
 fn instrument_row(instrument: Instrument) -> InstrumentRow {
     InstrumentRow {
         instrument_id: instrument.canonical_id(),
-        rust_variant: format!("{instrument:?}").leak(),
+        rust_variant: format!("{instrument:?}"),
         declared_renderer_family: renderer_family(instrument),
         gm_program_0_based: instrument.gm_program(),
         sample_capability_status: "not_measured_by_frontier_m0",
@@ -490,7 +492,13 @@ mod tests {
 
     #[test]
     fn source_revision_requires_full_hex_sha() {
-        for invalid in ["", "main", "deadbeef", "z".repeat(40).as_str()] {
+        let invalid_values = vec![
+            String::new(),
+            "main".to_owned(),
+            "deadbeef".to_owned(),
+            "z".repeat(40),
+        ];
+        for invalid in &invalid_values {
             assert!(
                 !((40..=64).contains(&invalid.len())
                     && invalid.bytes().all(|b| b.is_ascii_hexdigit()))
@@ -506,7 +514,8 @@ mod tests {
         let instruments = Instrument::ALL.len();
         let cells = CATALOG.len() * instruments;
         assert_eq!(cells, CATALOG.len() * Instrument::ALL.len());
-        assert!(CATALOG.len() >= INITIAL_CATALOG_COHORT || CATALOG.len() < INITIAL_CATALOG_COHORT);
+        assert!(cells >= instruments);
+        assert_eq!(cells % instruments, 0);
     }
 
     #[test]
