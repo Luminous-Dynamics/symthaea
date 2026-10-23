@@ -23,7 +23,6 @@ struct Measurement {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Decision {
-    id: &'static str,
     /// Losses ordered by [chair, table, stool].
     losses: [u32; 3],
 }
@@ -31,11 +30,9 @@ struct Decision {
 fn decisions() -> [Decision; 2] {
     [
         Decision {
-            id: "restore-chair",
             losses: [0, 100, 100],
         },
         Decision {
-            id: "safe-hold",
             losses: [4, 4, 4],
         },
     ]
