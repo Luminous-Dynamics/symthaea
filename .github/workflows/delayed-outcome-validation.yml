@@ -1,0 +1,42 @@
+name: Delayed Outcome Validation
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/bridges/symthaea-physics-bridge/Cargo.toml"
+      - "crates/bridges/symthaea-physics-bridge/src/lib.rs"
+      - "crates/bridges/symthaea-physics-bridge/src/delayed_outcome_validation.rs"
+      - "crates/bridges/symthaea-physics-bridge/tests/delayed_outcome_benchmark.rs"
+      - "docs/research/DELAYED_OUTCOME_VALIDATION_V0_1.md"
+      - "docs/research/DELAYED_OUTCOME_BENCHMARK_V0_1.md"
+      - "docs/research/CONTROL_ADJUSTED_OUTCOME_V0_1.md"
+      - ".github/workflows/delayed-outcome-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: delayed-outcome-validation-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  focused:
+    name: Delayed outcome contracts and paired benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Format exact source and test
+        run: |
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/delayed_outcome_validation.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/delayed_outcome_benchmark.rs
+      - name: Test delayed-label and control-adjustment contracts
+        run: cargo test --locked -p symthaea-physics-bridge delayed_outcome_validation --lib
+      - name: Run paired delayed-outcome benchmark
+        run: cargo test --locked -p symthaea-physics-bridge --test delayed_outcome_benchmark -- --nocapture
