@@ -7,11 +7,13 @@
 //! All public APIs are preserved via re-exports.
 
 pub mod carryover;
+pub mod prediction_evidence;
 mod output;
 mod scheduling;
 pub(crate) mod telemetry;
 
 pub use output::*;
+pub use prediction_evidence::{PredictionErrorEvidence, PredictionEvidenceStatus};
 pub use scheduling::*;
 pub use telemetry::*;
 
