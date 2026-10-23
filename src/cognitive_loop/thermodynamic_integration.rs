@@ -28,7 +28,10 @@ pub struct ThermodynamicInput {
     // From consciousness phase
     pub unified_psi: f64,
     pub coherence: f32,
+    /// Last PE value is retained for continuity when no comparison is available.
     pub prediction_error: f32,
+    /// Whether prediction_error is a fresh, comparable observation this cycle.
+    pub prediction_error_valid: bool,
     pub attention_sensitivity: f32,
 
     // From substrate/metabolism
@@ -67,6 +70,7 @@ impl Default for ThermodynamicInput {
             unified_psi: 0.0,
             coherence: 0.0,
             prediction_error: 0.0,
+            prediction_error_valid: false,
             attention_sensitivity: 0.0,
             energy_per_cycle: 0.0,
             total_energy_spent: 0.0,
@@ -180,11 +184,11 @@ impl ThermodynamicIntegration {
                 .update_hfe(input.hfe_total, input.hfe_complexity, input.hfe_accuracy);
         }
 
-        self.state.update_energy(
+        self.state.update_energy_with_evidence(
             input.energy_per_cycle,
             input.total_energy_spent,
             input.metabolic_stress,
-            input.prediction_error,
+            input.prediction_error_valid.then_some(input.prediction_error),
         );
 
         // ═══════════════════════════════════════════════════════════════════
@@ -216,11 +220,11 @@ impl ThermodynamicIntegration {
         // ═══════════════════════════════════════════════════════════════════
 
         let info_processed = input.coherence as f64 * input.unified_psi;
-        self.bridge.compute(
+        self.bridge.compute_with_evidence(
             input.attention_sensitivity as f64,
             info_processed,
             input.coherence as f64,
-            input.prediction_error as f64,
+            input.prediction_error_valid.then_some(input.prediction_error as f64),
             self.state.effective_temperature,
             self.state.entropy_production_rate,
             self.state.order_parameter,
@@ -392,6 +396,7 @@ mod tests {
             unified_psi: 0.6,
             coherence: 0.7,
             prediction_error: 0.3,
+            prediction_error_valid: true,
             attention_sensitivity: 0.5,
             // Energy budget in effective consciousness units (same scale as
             // k_eff=0.01 Landauer costs, not physical joules).
