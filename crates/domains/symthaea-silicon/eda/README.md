@@ -1,6 +1,6 @@
-# HDL qualification dev shell and correctness sweep
+# HDL qualification dev shell and canonical-oracle correctness sweep
 
-The root flake exposes `nix develop .#hdl` for the Symthaea silicon word-primitive sweep. It uses the repository's existing `flake.lock`; it does not add an unpinned Nixpkgs input.
+The root flake exposes `nix develop .#hdl` for the Symthaea silicon word-primitive sweep. It reuses the repository's locked Rust toolchain and `flake.lock`, and includes Verilator plus the small JSON/hash utilities used by the receipt path.
 
 From the repository root:
 
@@ -16,15 +16,14 @@ The runner defines twelve cases:
 - linear-accumulation Hamming count at the same widths;
 - balanced-tree Hamming count at the same widths.
 
-Each case must pass lint, build and simulation, exit successfully and emit the exact expected testbench PASS marker. The JSON receipt records per-case status, source hashes for modules/testbenches/runner/manifest/schema/case matrix/validator, repository HEAD, root `flake.nix` and `flake.lock` hashes, simulator version, and hashed logs. Missing tools yield `unqualified_tool_missing`; failed cases yield a non-pass status.
+Before RTL simulation, it runs `hdc_rtl_oracle.rs` using `cargo run --locked --offline`. The generator consumes the canonical `symthaea_core::hdc::BinaryHV` APIs, writes per-width `$readmemh` files for XOR expected results and per-word Hamming counts, and checks that the sum of word counts equals the canonical full-vector Hamming distance. The generator binds the current Git HEAD, `binary_hv.rs` SHA-256, root `Cargo.lock` SHA-256, and each emitted memory-file hash. An identity mismatch or fixture hash mismatch blocks simulation.
 
-`hdl_expected_case_matrix_v1.json` freezes the exact twelve case IDs. `hdl_run_receipt_v1.schema.json` describes receipt shape and status invariants. `validate_hdl_receipt.sh` separately checks that the receipt covers each expected case exactly once, all stage codes/pass markers succeed, and the recorded source/configuration hashes still match the current checkout. Use the exact recorded Git commit to revalidate a historical receipt; a newer source tree should not silently validate an old run.
+Each RTL case must pass lint, build and simulation, exit successfully, emit its local PASS marker, and emit the software-oracle PASS marker. The versioned JSON receipt records per-case status, source hashes for modules/testbenches/generator/Cargo manifest/canonical HDC source/lock file/runner/manifest/schema/case matrix/validator/flake inputs, the generated oracle-receipt hash, Verilator version and hashed logs.
 
-## Checks completed while tools are unavailable
+`hdl_expected_case_matrix_v1.json` freezes the exact twelve case IDs. `hdl_run_receipt_v1.schema.json` requires all twelve case results to pass, including oracle markers. `validate_hdl_receipt.sh` checks that each expected case appears exactly once, verifies source/configuration hashes and Git HEAD, and recomputes the hashes of all software-oracle memory files.
 
-- A local copy of the runner passed `bash -n`.
-- The runner's missing-Verilator negative control exited 2 and produced a valid `unqualified_tool_missing` receipt.
-- A local copy of the receipt validator accepted a synthetic 12-case complete receipt and rejected a synthetic receipt missing one case.
-- A mathematical reference check compared linear and balanced popcount results over 144 generated/patterned cases across the four widths with no arithmetic mismatches.
+## Validation status for this draft
 
-These checks do **not** simulate or compile the RTL. The RTL sweep, root flake evaluation, formal proof, synthesis/PPA and physical FPGA measurements remain unexecuted because Verilator/Nix are unavailable on the authoring host. This is not a full ASIC signoff environment or evidence of a product/SOTA advantage.
+The environment used to author this change did not have Cargo, Rust, Nix or Verilator. Consequently the new Rust oracle generator has **not** been compiled and the twelve RTL cases have **not** been simulated. Earlier shell/receipt-only checks on the harness don't validate this new source-to-test integration. The immediate next gate is to evaluate `nix develop .#hdl`, compile the fixture generator, generate the mem files, and run all twelve cases. Any compile, file-format, or simulation failure must be fixed before claiming functional equivalence.
+
+This is still a word-level correctness experiment, not synthesis/PPA, formal proof, FPGA observation, physical energy, ASIC qualification or evidence of product/SOTA superiority.
