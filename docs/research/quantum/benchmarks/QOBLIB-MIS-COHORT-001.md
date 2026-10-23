@@ -1,0 +1,97 @@
+# QOBLIB-MIS-COHORT-001: pinned maximum-independent-set cohort
+
+Status: **source inventory pinned; no solver run or performance result claimed**
+
+## Immutable source
+
+This cohort is pinned to QOBLIB commit d61f234b9fc816deb3d4e1dea4c031595b35acd7, whose website index reports a build time of 2026-10-19T09:44:36Z. The MIS directory tree at that commit has Git tree ID f2b6f6d6f7b705851b4f04253de1972b5930f568. The companion JSON lists the 50 .gph files, immutable raw URLs, Git blob SHA-1 object IDs, and byte sizes. It excludes the directory README from the graph count and does not vendor graph bytes.
+
+The official website reports 1,264 instances across ten problem classes and identifies 50 instances for MIS, with declared sizes from 17 to 4,000 variables. Those aggregate site counts describe the snapshot; they are not head-to-head solver evidence.
+
+## Format and feasibility
+
+The pinned QOBLIB instance README specifies DIMACS edge format: lines beginning with c are comments; p edge n m declares node and edge counts; e u v specifies an undirected edge; nodes are one-based. The official checker verifies that a proposed set is feasible (no selected adjacent pair) and explicitly does not verify optimality. Feasibility evidence and the objective's optimal/best-known provenance must therefore remain separate.
+
+**Important complement warning:** QOBLIB states that several original maximum-clique graphs have already been inverted into independent-set instances. Do not complement these graphs a second time. The JSON keeps the immutable source and the warning together; read the source README at the pinned commit when implementing the parser or QUBO encoding.
+
+## Experimental design to run against this cohort
+
+### Primary question
+
+Does changing the reducer's information source improve independently verified final MIS quality or reduce all-in cost to a preregistered target, on the same graph instances, under the same stopping and candidate-generation rules?
+
+### Required arms
+
+1. Reducer-only baseline, without an informer.
+2. Seeded random informer as a negative control.
+3. Predeclared inexpensive graph-structural informer.
+4. Strong classical local-search/population informer, charging all search and aggregation costs.
+5. Classical solver or solver portfolio used as both solution baseline and cost baseline.
+6. Exact-oracle signal on tiny fixtures only as a positive plumbing control.
+7. Quantum-informed policy as a separate evidence track; distinguish replayed published outputs, circuit export, ideal simulation, approximate simulation and real hardware.
+
+The experiment must isolate the information source as the intended treatment. Candidate pool, reducer version/configuration, tie-breaking, verifier, graph, repetition schedule, target rule, and stopping budget must otherwise be paired. A quantum policy compared only with random or with a weak single-run heuristic is not a meaningful SOTA comparison.
+
+### Outcomes and cost boundary
+
+Retain raw per-instance objective value, feasibility verdict, verifier output, target attainment, objective gap where an authoritative optimum/best-known value is available, and full resource vector. Record candidate observations, physical device shots and circuit batches separately. Include preprocessing, classical compute, compilation, calibration, queue and wall time without double-counting elapsed time. Report cost to target and probability of hitting that target, not just best sampled bitstring or informer accuracy.
+
+A target must be defined before confirmatory evaluation for each graph from an authoritative optimum/best-known record or an explicit policy goal. The local checker does not establish optimality. Update result provenance if a result improves the current best-known bound.
+
+### Pin comparison records separately from the graph cohort
+
+The JSON manifest now pins three public comparison records to a separate QOBLIB snapshot, commit 1e0e7c523cd9707dd541cc9e5a3086125d4da3c7 (2026-10-19T09:52:56Z), including each submission README's Git blob ID. This keeps the graph-source snapshot and the evolving submission/best-known record snapshot independently auditable.
+
+At this pinned submission snapshot, the classical ParallelILS README reports farm objective 10 (best-known), 10/10 successful trials, 0.0004 s average wall-clock time on an Apple M5 Max with 18 CPU cores. For es60fst02 it reports objective 88, 10/10, and 0.0006 s. The HSQC hybrid record reports objective 88, 5/5, and 2.5608 s total (2.4765 s QPU, 0.0843 s CPU). The QAOA record reports objective 88, 5/20, and 23,365.8542 s total (78 s QPU, 23,287.8542 s CPU).
+
+These are source-pinned published records, not reproduced by Symthaea and not fair head-to-head timings. They use different hardware, algorithms, resource allocations and success conventions. Use them as comparison context and as motivation for a controlled experiment, not as a causal claim that one paradigm is faster.
+
+### Report both QOBLIB-native and all-in cost
+
+QOBLIB's current contributor guide specifies that submitted runtime fields should exclude compilation and queue time, while reporting total runtime, time-to-solution and CPU/GPU/QPU/other-hardware runtime. For apples-to-apples comparisons with a QOBLIB row, reproduce those conventions and report the hardware and averaging method. Do not add local stage timers to a published QOBLIB total unless their definitions match.
+
+For Symthaea's decision-value question, also retain an explicitly separate all-in operational account that can include compile/transpile, calibration, queueing, data transfer, preprocessing, classical inference, retries, and end-to-end latency. Preserve each component separately and do not sum overlapping component durations with end-to-end wall time. This internal all-in account is a different metric from the QOBLIB-native submission field, not a retroactive correction to the public leaderboard.
+
+Reference records are pinned separately to QOBLIB result snapshot commit 1e0e7c523cd9707dd541cc9e5a3086125d4da3c7 (2026-10-19T09:52:56Z), and are preserved in the companion JSON with file-level Git blob IDs. The [ParallelILS result table](https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/submissions/20260806_ParallelILS_Hegade/README.md) reports best-known objective 10 for farm over 10/10 trials with 0.0004 s total runtime on an Apple M5 Max with 18 CPU cores; on es60fst02 it reports objective 88, 10/10 successful trials and 0.0006 s. The [HSQC hybrid record](https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/submissions/20260804_HSQC_Hegade/es60fst02/README.md) reports objective 88, 5/5 successful trials and 2.5608 s total including 2.4765 s QPU time. The [QAOA hardware record](https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/submissions/20260907_QAOA_Vivek/es60fst02/README.md) reports objective 88, 5 successful runs out of 20 and 23,365.8542 s total, with 78 s QPU and 23,287.8542 s CPU. These published records use different hardware and experimental protocols, so they are **not controlled head-to-head timings**; the point is to preserve the real cost boundary and strong classical reference, not claim a speedup by matching objective alone.
+
+### Current frontier: keep random-regular graphs as a separate track
+
+A paper accepted by Physical Review Research on 19 October 2026, *Scalable quantum-enhanced greedy algorithm for the maximum independent set problems on random regular graphs* (DOI: https://doi.org/10.1103/ds1n-wsdm), reports a hybrid that combines QAOA local expectation values with sequential minimum-degree greedy reduction. Its abstract describes implementation on a 20-qubit superconducting device and instances with thousands of vertices; it reports comparisons against classical greedy and more sophisticated approximation methods for random-regular graphs. This is a **separate graph-distribution track**, not evidence that the method wins on QOBLIB's named real-world/general MIS cohort.
+
+The qReduMIS paper (Physical Review Research 8, 033296, published 10 September 2026; DOI: https://doi.org/10.1103/nh3b-1wv5) is another important design point: use a quantum coprocessor to provide information that changes classical kernelization/reduction, rather than demanding that a QPU solve the whole original MIS instance. Its outlook explicitly calls for larger comparisons against classical ReduMIS.
+
+Therefore add a second, separately versioned random-regular cohort rather than relabeling QOBLIB graphs:
+- Generate d-regular graphs with a documented generator, exact degree and connectivity policy, sizes spanning below and beyond hardware embedding limits, and immutable seed list.
+- Evaluate the same frozen graph instances using the published quantum-informed greedy configuration where available, minimum-degree greedy, strong classical local search / ILS, and a matched ReduMIS-style reduction baseline if reproduction material permits.
+- Freeze QAOA depth, angle source, number of quantum samples, marginal-estimation method, stopping criteria, embedding/transpilation rules and tie-breaking before confirmatory runs.
+- Report graph size/density, independent-set cardinality and gap where known, feasibility rate, distribution across graph/degree/seed, shot budget, total solver calls, preprocessing, classical compute, QPU/queue/wall time, and time-to-target.
+- Keep physical hardware, ideal circuits, tensor-network simulation and classical replay in distinct evidence tracks.
+
+This is an opportunity to exceed SOTA **methodologically first**: reproduce the exact published workload, match strong baselines and budgets, account for the full hybrid pipeline, then test new Symthaea information policies on held-out seeds and unseen sizes. A single favorable graph family cannot establish universal quantum advantage.
+
+### Stratification and claims
+
+- Report results by source family and graph size/density; set strata before seeing confirmatory outcomes.
+- Separate model development/tuning from confirmatory comparisons. Since benchmark instances may already have appeared in prior research, claims of out-of-distribution generalization require additional held-out graph families.
+- Run the checker independently on every returned set. Preserve infeasible runs, timeouts, abstentions and failures.
+- Pair statistical units at graph-instance level. Repeated seeds within one graph are nested repeats, not independent new graph instances.
+- Submit useful positive or negative results to QOBLIB only under its source-specific contribution rules and licenses.
+- Never infer quantum advantage from website totals, solver-reported claims, a simulation, a lower local score, or a circuit that was exported but not executed.
+
+## Frozen provisional family partition
+
+The companion JSON now assigns every pinned instance to a deterministic, family-held-out development partition: 27 train, 9 validation and 14 test instances, across 18 named source groups. For the test split, all BROCK graphs, the C-series graphs, and all FRB graphs stay together by group. C-series membership is not itself a claim that every instance was complemented; apply the upstream inversion warning only to its enumerated instances. The validation split holds out all Hamming, Insecta and Sloane-named instances. All other source groups are assigned to train. Per-instance assignments and the family-to-split map are recorded in the JSON manifest.
+
+This is a *provisional source-name family grouping*, not proof that each group is an independent graph-generation distribution. It is also not a blinded test set: QOBLIB graphs and best-known values are public and prior research may already have influenced development. Use the partition to prevent obvious within-family leakage during selector tuning; claims of out-of-distribution generalization still need newly generated or independently held-out graph families. A changed split must use a new partition ID rather than silently rewriting this one.
+
+## Next executable gates
+
+1. Add a strict DIMACS parser test suite for comments, duplicate edges, self-loops, malformed headers, count mismatch, out-of-range vertices, and the large C4000 file.
+2. Independently validate graph and solution parsing against QOBLIB fixtures and the pinned checker behavior.
+3. Establish a deterministic baseline report on tiny exact instances and then on a frozen small subset; record content IDs and resource counters.
+4. Run the complete 50-instance cohort only after the parser/verifier and cost accounting are validated.
+5. Compare the same arms on separate random unit-disk cohorts for a qReduMIS-style reduction study; don't pool that evidence with QOBLIB as if the graph distributions were identical.
+
+## Validation boundary
+
+This contribution only inventories the immutable source cohort. It does not parse graph bytes, run a solver, reproduce QOBLIB submissions, evaluate a QPU, or provide evidence of a quantum advantage. The pinned Git object IDs are Git SHA-1 object identifiers, not SHA-256 checksums of raw files.

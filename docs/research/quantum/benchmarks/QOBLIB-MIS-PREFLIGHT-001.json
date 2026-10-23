@@ -1,0 +1,1246 @@
+{
+  "schema": "org.luminousdynamics.symthaea.qcomp.qoblib-mis-preflight.v1",
+  "status": "exploratory-preflight-not-preregistered-not-rust-execution",
+  "qoblib_source": {
+    "repository": "ZIB-AOPT/QOBLIB",
+    "commit": "d61f234b9fc816deb3d4e1dea4c031595b35acd7",
+    "graph_directory": "07-independentset/instances",
+    "baseline_submission_path": "07-independentset/submissions/20260806_ParallelILS_Hegade/README.md"
+  },
+  "method": {
+    "implementation": "transient JavaScript reference analysis used to inspect benchmark data; not production code",
+    "input_check": "parses DIMACS edge headers/records; checks endpoints, self-loops, duplicated undirected edges and declared edge count",
+    "policy_families": [
+      "greedy minimum residual degree (tie: lowest vertex ID)",
+      "greedy maximum residual degree (tie: lowest vertex ID)",
+      "16 seeded randomized minimum-residual-degree tie-break policies"
+    ],
+    "local_improvement": "repeat 1-for-2 exchange: remove one selected vertex and add two mutually nonadjacent unselected vertices compatible with all other selected vertices until no such move exists",
+    "total_policies_per_instance": 18,
+    "random_seeds": [
+      37,
+      7956,
+      15875,
+      23794,
+      31713,
+      39632,
+      47551,
+      55470,
+      63389,
+      71308,
+      79227,
+      87146,
+      95065,
+      102984,
+      110903,
+      118822
+    ],
+    "metrics": "objective cardinality, feasibility, number of 1-for-2 exchanges; no locally timed values recorded"
+  },
+  "summary": {
+    "instances": 8,
+    "all_candidate_solutions_feasible": true,
+    "matching_published_objective": [
+      "farm",
+      "chesapeake",
+      "karate",
+      "ibm32",
+      "brock200-1",
+      "c-fat200-1",
+      "es60fst03"
+    ],
+    "below_published_objective": [
+      {
+        "instance_id": "C125-9",
+        "gap": 1
+      }
+    ],
+    "above_published_objective": []
+  },
+  "results": [
+    {
+      "instance_id": "farm",
+      "source_git_blob_sha1": "ae103bba88413c1a8eafdeddd07ba5fe69fddc8d",
+      "vertices": 17,
+      "edges": 39,
+      "public_classical_baseline": {
+        "submission": "ParallelILS / Hegade, pinned QOBLIB snapshot",
+        "objective": 10,
+        "best_known": 10,
+        "successful_trials": 10,
+        "total_trials": 10,
+        "reported_runtime_seconds": 0.0004
+      },
+      "exact_optimum_independent_subset_search": 10,
+      "policy_count": 18,
+      "best_policy_objective": 10,
+      "worst_policy_objective": 5,
+      "all_policy_outputs_feasible": true,
+      "policies": [
+        {
+          "id": "greedy_min_residual_degree",
+          "seed": null,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "greedy_max_residual_degree",
+          "seed": null,
+          "objective": 5,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 7956,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 15875,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 23794,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 31713,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 39632,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 47551,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 55470,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 63389,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 71308,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 79227,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 87146,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 95065,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 102984,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 110903,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 118822,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 126741,
+          "objective": 10,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        }
+      ]
+    },
+    {
+      "instance_id": "chesapeake",
+      "source_git_blob_sha1": "3e3754fe393d4e239359c872c0b4aa9cbcfc1716",
+      "vertices": 39,
+      "edges": 170,
+      "public_classical_baseline": {
+        "submission": "ParallelILS / Hegade, pinned QOBLIB snapshot",
+        "objective": 17,
+        "best_known": 17,
+        "successful_trials": 10,
+        "total_trials": 10,
+        "reported_runtime_seconds": 0.0003
+      },
+      "exact_optimum_independent_subset_search": null,
+      "policy_count": 18,
+      "best_policy_objective": 17,
+      "worst_policy_objective": 16,
+      "all_policy_outputs_feasible": true,
+      "policies": [
+        {
+          "id": "greedy_min_residual_degree",
+          "seed": null,
+          "objective": 16,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "greedy_max_residual_degree",
+          "seed": null,
+          "objective": 16,
+          "feasible": true,
+          "one_for_two_exchanges": 12
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 7956,
+          "objective": 17,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 15875,
+          "objective": 16,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 23794,
+          "objective": 16,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 31713,
+          "objective": 17,
+          "feasible": true,
+          "one_for_two_exchanges": 1
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 39632,
+          "objective": 17,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 47551,
+          "objective": 16,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 55470,
+          "objective": 17,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 63389,
+          "objective": 16,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 71308,
+          "objective": 16,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 79227,
+          "objective": 17,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 87146,
+          "objective": 16,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 95065,
+          "objective": 16,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 102984,
+          "objective": 16,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 110903,
+          "objective": 17,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 118822,
+          "objective": 17,
+          "feasible": true,
+          "one_for_two_exchanges": 1
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 126741,
+          "objective": 17,
+          "feasible": true,
+          "one_for_two_exchanges": 1
+        }
+      ]
+    },
+    {
+      "instance_id": "karate",
+      "source_git_blob_sha1": "693d44ec559772f8a6227751a385934cb71b4d94",
+      "vertices": 34,
+      "edges": 78,
+      "public_classical_baseline": {
+        "submission": "ParallelILS / Hegade, pinned QOBLIB snapshot",
+        "objective": 20,
+        "best_known": 20,
+        "successful_trials": 10,
+        "total_trials": 10,
+        "reported_runtime_seconds": 0.0003
+      },
+      "exact_optimum_independent_subset_search": null,
+      "policy_count": 18,
+      "best_policy_objective": 20,
+      "worst_policy_objective": 20,
+      "all_policy_outputs_feasible": true,
+      "policies": [
+        {
+          "id": "greedy_min_residual_degree",
+          "seed": null,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "greedy_max_residual_degree",
+          "seed": null,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 16
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 7956,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 15875,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 23794,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 31713,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 39632,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 47551,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 55470,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 63389,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 71308,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 79227,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 87146,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 95065,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 102984,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 110903,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 118822,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 126741,
+          "objective": 20,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        }
+      ]
+    },
+    {
+      "instance_id": "C125-9",
+      "source_git_blob_sha1": "8a4d512bc71a16a458b6aae3f2820cf6bd04127d",
+      "vertices": 125,
+      "edges": 787,
+      "public_classical_baseline": {
+        "submission": "ParallelILS / Hegade, pinned QOBLIB snapshot",
+        "objective": 34,
+        "best_known": 34,
+        "successful_trials": 10,
+        "total_trials": 10,
+        "reported_runtime_seconds": 0.0004
+      },
+      "exact_optimum_independent_subset_search": null,
+      "policy_count": 18,
+      "best_policy_objective": 33,
+      "worst_policy_objective": 31,
+      "all_policy_outputs_feasible": true,
+      "policies": [
+        {
+          "id": "greedy_min_residual_degree",
+          "seed": null,
+          "objective": 31,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "greedy_max_residual_degree",
+          "seed": null,
+          "objective": 32,
+          "feasible": true,
+          "one_for_two_exchanges": 13
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 7956,
+          "objective": 33,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 15875,
+          "objective": 32,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 23794,
+          "objective": 33,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 31713,
+          "objective": 33,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 39632,
+          "objective": 33,
+          "feasible": true,
+          "one_for_two_exchanges": 1
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 47551,
+          "objective": 33,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 55470,
+          "objective": 33,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 63389,
+          "objective": 33,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 71308,
+          "objective": 32,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 79227,
+          "objective": 33,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 87146,
+          "objective": 33,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 95065,
+          "objective": 32,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 102984,
+          "objective": 32,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 110903,
+          "objective": 33,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 118822,
+          "objective": 33,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 126741,
+          "objective": 32,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        }
+      ]
+    },
+    {
+      "instance_id": "ibm32",
+      "source_git_blob_sha1": "224c63c2d5ceb258d7bc58c2095c8bac891f0cdd",
+      "vertices": 32,
+      "edges": 90,
+      "public_classical_baseline": {
+        "submission": "ParallelILS / Hegade, pinned QOBLIB snapshot",
+        "objective": 13,
+        "best_known": 13,
+        "successful_trials": 10,
+        "total_trials": 10,
+        "reported_runtime_seconds": 0.0003
+      },
+      "exact_optimum_independent_subset_search": null,
+      "policy_count": 18,
+      "best_policy_objective": 13,
+      "worst_policy_objective": 13,
+      "all_policy_outputs_feasible": true,
+      "policies": [
+        {
+          "id": "greedy_min_residual_degree",
+          "seed": null,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "greedy_max_residual_degree",
+          "seed": null,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 4
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 7956,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 1
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 15875,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 1
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 23794,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 31713,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 39632,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 47551,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 55470,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 63389,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 71308,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 79227,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 87146,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 95065,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 102984,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 110903,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 118822,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 1
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 126741,
+          "objective": 13,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        }
+      ]
+    },
+    {
+      "instance_id": "brock200-1",
+      "source_git_blob_sha1": "86fb49f62a753e86136d1d219bb3cfb0953025cc",
+      "vertices": 200,
+      "edges": 14834,
+      "public_classical_baseline": {
+        "submission": "ParallelILS / Hegade, pinned QOBLIB snapshot",
+        "objective": 6,
+        "best_known": 6,
+        "successful_trials": 10,
+        "total_trials": 10,
+        "reported_runtime_seconds": 0.0011
+      },
+      "exact_optimum_independent_subset_search": null,
+      "policy_count": 18,
+      "best_policy_objective": 6,
+      "worst_policy_objective": 5,
+      "all_policy_outputs_feasible": true,
+      "policies": [
+        {
+          "id": "greedy_min_residual_degree",
+          "seed": null,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "greedy_max_residual_degree",
+          "seed": null,
+          "objective": 5,
+          "feasible": true,
+          "one_for_two_exchanges": 2
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 7956,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 15875,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 23794,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 31713,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 39632,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 47551,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 55470,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 63389,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 71308,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 79227,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 87146,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 95065,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 102984,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 110903,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 118822,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 126741,
+          "objective": 6,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        }
+      ]
+    },
+    {
+      "instance_id": "c-fat200-1",
+      "source_git_blob_sha1": "fdc601ac55b67d5eb6f7d21c16b53d5a3d4e8490",
+      "vertices": 200,
+      "edges": 1534,
+      "public_classical_baseline": {
+        "submission": "ParallelILS / Hegade, pinned QOBLIB snapshot",
+        "objective": 18,
+        "best_known": 18,
+        "successful_trials": 10,
+        "total_trials": 10,
+        "reported_runtime_seconds": 0.0004
+      },
+      "exact_optimum_independent_subset_search": null,
+      "policy_count": 18,
+      "best_policy_objective": 18,
+      "worst_policy_objective": 18,
+      "all_policy_outputs_feasible": true,
+      "policies": [
+        {
+          "id": "greedy_min_residual_degree",
+          "seed": null,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "greedy_max_residual_degree",
+          "seed": null,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 5
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 7956,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 15875,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 23794,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 31713,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 39632,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 47551,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 55470,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 63389,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 71308,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 79227,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 87146,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 95065,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 102984,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 110903,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 118822,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 126741,
+          "objective": 18,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        }
+      ]
+    },
+    {
+      "instance_id": "es60fst03",
+      "source_git_blob_sha1": "cf1d6e4777f00e98851b0807fe5ae352c6771c5b",
+      "vertices": 113,
+      "edges": 142,
+      "public_classical_baseline": {
+        "submission": "ParallelILS / Hegade, pinned QOBLIB snapshot",
+        "objective": 55,
+        "best_known": 55,
+        "successful_trials": 10,
+        "total_trials": 10,
+        "reported_runtime_seconds": 0.0004
+      },
+      "exact_optimum_independent_subset_search": null,
+      "policy_count": 18,
+      "best_policy_objective": 55,
+      "worst_policy_objective": 50,
+      "all_policy_outputs_feasible": true,
+      "policies": [
+        {
+          "id": "greedy_min_residual_degree",
+          "seed": null,
+          "objective": 55,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "greedy_max_residual_degree",
+          "seed": null,
+          "objective": 50,
+          "feasible": true,
+          "one_for_two_exchanges": 8
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 7956,
+          "objective": 55,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 15875,
+          "objective": 54,
+          "feasible": true,
+          "one_for_two_exchanges": 1
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 23794,
+          "objective": 55,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 31713,
+          "objective": 55,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 39632,
+          "objective": 55,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 47551,
+          "objective": 54,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 55470,
+          "objective": 55,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 63389,
+          "objective": 54,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 71308,
+          "objective": 54,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 79227,
+          "objective": 55,
+          "feasible": true,
+          "one_for_two_exchanges": 1
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 87146,
+          "objective": 55,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 95065,
+          "objective": 54,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 102984,
+          "objective": 55,
+          "feasible": true,
+          "one_for_two_exchanges": 1
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 110903,
+          "objective": 54,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 118822,
+          "objective": 55,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        },
+        {
+          "id": "random_min_degree_tie",
+          "seed": 126741,
+          "objective": 55,
+          "feasible": true,
+          "one_for_two_exchanges": 0
+        }
+      ]
+    }
+  ],
+  "caveats": [
+    "This is a selected eight-instance exploratory quality preflight, not a random or preregistered sample of the 50-instance cohort.",
+    "The 18 policies are basic greedy/1-for-2 heuristics, not a competitive MIS portfolio and not equivalents of ParallelILS, qReduMIS or the accepted QAOA-on-random-regular-graphs method.",
+    "Public ParallelILS results were read from the same pinned QOBLIB commit; we did not reproduce that solver or its timings.",
+    "Only farm (17 vertices) received a full independent subset enumeration; the other public objectives are published best-known values, not independently proven optima in this preflight.",
+    "No local runtime comparisons are included. Published runtimes are platform-specific metadata and cannot be compared to this transient implementation.",
+    "No quantum hardware, quantum simulator, Rust parser, or Rust binary was run."
+  ]
+}
