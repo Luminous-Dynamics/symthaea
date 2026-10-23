@@ -623,6 +623,34 @@ mod tests {
     }
 
     #[test]
+    fn permitted_augmentation_and_diminution_are_exactly_validated() {
+        let f = family();
+
+        assert_eq!(
+            f.validate_return(&f.canonical.augment(), ReturnTransformation::Augmented),
+            ReturnValidationVerdict::Accepted
+        );
+        assert_eq!(
+            f.validate_return(&f.canonical.diminish(), ReturnTransformation::Diminished),
+            ReturnValidationVerdict::Accepted
+        );
+    }
+
+    #[test]
+    fn exact_transform_still_must_obey_family_invariants() {
+        let f = family_with_policy(
+            vec![MotifInvariant::FirstDegree(1)],
+            vec![ReturnTransformation::Transposed],
+        );
+        let transposed = f.canonical.transpose(2);
+
+        assert_eq!(
+            f.validate_return(&transposed, ReturnTransformation::Transposed),
+            ReturnValidationVerdict::InvariantViolation
+        );
+    }
+
+    #[test]
     fn prohibited_transformation_is_not_authorized_by_shape_similarity() {
         let f = family_with_policy(
             vec![MotifInvariant::RhythmicIdentity],
