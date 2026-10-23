@@ -77,6 +77,14 @@ The typed-value contract has additional unit fixtures: a value is available only
 
 Report raw counts as well as rates. Do not collapse all dimensions into one score.
 
+### Three-tier scoreboard (proposed gates, not measured results)
+
+1. **Evidence integrity:** zero invalid-evidence leakage, false replay admission, false PE-only surprise, stale-sample reuse, or duplicate PE admission. Run deterministic counterfactuals plus at least 10,000 generated/interleaved invalid cases. Any nonzero result blocks a correctness claim.
+2. **Predictive utility:** compare normalized prediction loss and calibration against persistence and zero-prediction baselines. Stretch target: beat persistence on aggregate held-out streams with a paired 95% confidence interval excluding zero, improve at least four of six heterogeneous task families, and report every task rather than hiding regressions in an average. Track valid-sample coverage and missingness separately so a system cannot “improve” by refusing hard cases.
+3. **Continual-learning utility:** on a public sequential-task suite such as CL-Bench, report absolute reward, gain over the same system's stateless baseline, per-task gains, forgetting/transfer, latency and cost. Stretch target: positive aggregate gain with a paired confidence interval above zero against the matched stateless baseline, then a better reward/cost frontier than the strongest comparable baseline. Use at least five repeated runs per task (ten for the internal PEV suite); publish variance and traces. Only claim a leaderboard win after running the full matching benchmark protocol.
+
+Keep evidence integrity as a hard gate rather than a weighted metric: strong task accuracy cannot compensate for invalid evidence changing safety or learning state. Resource overhead is an explicit engineering objective, but no p95 overhead limit should be claimed until measured on a pinned machine and workload.
+
 - **Invalid-evidence leakage rate:** PE-dependent state transitions caused by invalid observations / invalid observations. Gate: **0 in deterministic tests** and **0 over at least 10,000 generated invalid/interleaved cases**.
 - **False replay admission:** invalid transitions admitted to episodic replay. Gate: **0**.
 - **False-surprise rate:** invalid PE causing a PE-only surprise, vigilance, exploration, or PROBE decision. Gate: **0**.
@@ -90,7 +98,7 @@ For stream-learning experiments also report per-step task performance, forward/b
 
 ### Typed-contract regression checks
 
-The new typed layer includes unit tests for invalid numeric payloads (`0`, `1`, NaN, and positive/negative infinity), non-finite values incorrectly flagged valid, cycle mismatch, constructor invariants, valid serialization round-trip, and malformed serialized records. Keep these separate from the 12 core PEV scenarios so a passing type-contract test cannot be mistaken for coverage of all downstream consumers.
+The new typed layer includes unit tests for invalid numeric payloads (`0`, `1`, NaN, and positive/negative infinity), non-finite values incorrectly flagged valid, cycle mismatch, stale-status classification, constructor invariants, valid serialization round-trip, malformed serialized records, and a deterministic 10,000-payload boundary sweep. Keep these separate from the 12 core PEV scenarios so a passing type-contract test cannot be mistaken for coverage of all downstream consumers. These are authored checks, not a pass claim until run at the exact head.
 
 ## 5. Experimental protocol
 
@@ -109,7 +117,7 @@ The new typed layer includes unit tests for invalid numeric payloads (`0`, `1`, 
 - **Replay-only and fixed-window baselines:** help separate the value of evidence provenance from memory policy or more elaborate adaptation.
 - **Resource-normalized comparison:** report quality at a fixed wall-clock/compute budget and time/cost to a fixed quality target.
 
-Continual Learning Bench evaluates sequential related tasks and reports both task reward and *gain over the same system's stateless baseline*, alongside cost. That is the right style of evidence for claims that Symthaea improves from experience: [CL-Bench methodology](https://continual-learning-bench.com/docs/) and [2026 benchmark paper](https://arxiv.org/abs/2606.05661).
+Continual Learning Bench evaluates sequential related tasks and reports both task reward and *gain over the same system's stateless baseline*, alongside cost. That is the right style of evidence for claims that Symthaea improves from experience: [CL-Bench methodology](https://continual-learning-bench.com/docs/) and [2026 benchmark paper](https://arxiv.org/abs/2606.05661). The [public leaderboard](https://continual-learning-bench.com/leaderboard.html) is also a useful external reference, but it must not be treated as a direct comparison until Symthaea runs the same task sequences with the same reset, memory, and cost accounting. Current published results show that simple in-context-learning baselines can be highly competitive; greater architectural complexity is not itself evidence of improvement.
 
 A 2026 ICLR study, *Forget Forgetting*, also reports that in a regime with abundant replay memory but limited GPU time, the central tension may shift from memory efficiency to plasticity; simple replay can beat more complicated approaches at lower GPU cost. That cautions against assuming that more subsystems or more sophisticated memory automatically outperform a simple baseline: [ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/17fc58b1ba92abbb72c5f457e140d851-Abstract-Conference.html).
 
