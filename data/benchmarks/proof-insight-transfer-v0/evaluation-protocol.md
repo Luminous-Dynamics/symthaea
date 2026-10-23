@@ -358,3 +358,8 @@ Each run must persist: protocol version and digest; source commit and family spl
 ### 2026-10-24 amendment — enforce fixed-target pair identity at analyzer boundary
 
 The outcome analyzer now validates the suite contract before joining outcomes: both base and variant replay states must match the target descriptor's source commit, theorem-statement digest, elaborated-goal digest, environment digest, and Lean toolchain. The two states must also agree on goal count. Only local proof context/snapshot evidence may vary for this fixed-theorem intervention track. This is a fail-closed integrity gate; it does not prove that the captured state digests or replay receipts truthfully describe the underlying Lean process. A regression test mutates each invariant independently and expects rejection.
+
+
+### 2026-10-24 amendment — validate intervention evidence, not just intervention labels
+
+The Rust analyzer now checks that the declared operation matches the intervention kind and that the before/after declaration receipts and precondition contract agree. A cleared required hypothesis must be present before, absent after, type-matched to the insight's required type, and paired with an available→absent precondition status and a move-forbidden/replan policy. Alpha-renaming must preserve declaration type/position while changing the name. Irrelevant removal and independent-declaration reordering have separate structural contracts. This validates receipt consistency; it does not replace Lean replay or independent adjudication of whether a precondition is logically necessary.
