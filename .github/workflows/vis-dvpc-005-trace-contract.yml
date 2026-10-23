@@ -1,0 +1,61 @@
+name: VIS-DVPC-005 paired trace contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-trace-validator.rs"
+      - "docs/research/VIS_DVPC_005_PAIRED_TRACE_CONTRACT_V1.md"
+      - "fixtures/vision-dvpc-observations.tsv"
+      - "fixtures/vision-dvpc-evaluations.tsv"
+      - ".github/workflows/vis-dvpc-005-trace-contract.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-trace-validator.rs"
+      - "docs/research/VIS_DVPC_005_PAIRED_TRACE_CONTRACT_V1.md"
+      - "fixtures/vision-dvpc-observations.tsv"
+      - "fixtures/vision-dvpc-evaluations.tsv"
+      - ".github/workflows/vis-dvpc-005-trace-contract.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust with rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check tools/vision-dvpc-trace-validator.rs
+
+      - name: Compile and run focused tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-trace-validator.rs -o /tmp/vis-dvpc-005-tests
+          /tmp/vis-dvpc-005-tests
+
+      - name: Build standalone validator
+        run: rustc --edition=2024 -O tools/vision-dvpc-trace-validator.rs -o /tmp/vis-dvpc-005
+
+      - name: Admit fixture and require deterministic replay
+        run: |
+          /tmp/vis-dvpc-005 fixtures/vision-dvpc-observations.tsv fixtures/vision-dvpc-evaluations.tsv > /tmp/vis-dvpc-005-a.tsv
+          /tmp/vis-dvpc-005 fixtures/vision-dvpc-observations.tsv fixtures/vision-dvpc-evaluations.tsv > /tmp/vis-dvpc-005-b.tsv
+          cmp /tmp/vis-dvpc-005-a.tsv /tmp/vis-dvpc-005-b.tsv
+          sha256sum tools/vision-dvpc-trace-validator.rs fixtures/vision-dvpc-observations.tsv fixtures/vision-dvpc-evaluations.tsv /tmp/vis-dvpc-005-a.tsv
+
+      - name: Validate admission receipt
+        run: |
+          grep -Fx $'ADMISSION\tstatus\tPASS_SCHEMA_ONLY' /tmp/vis-dvpc-005-a.tsv
+          grep -Fx $'ADMISSION\tobservation_rows\t2' /tmp/vis-dvpc-005-a.tsv
+          grep -Fx $'ADMISSION\tevaluation_rows\t2' /tmp/vis-dvpc-005-a.tsv
+          grep -Fx $'ADMISSION\tgroups\t2' /tmp/vis-dvpc-005-a.tsv
+          grep -Fx $'ADMISSION\ttrain_rows\t1' /tmp/vis-dvpc-005-a.tsv
+          grep -Fx $'ADMISSION\ttest_rows\t1' /tmp/vis-dvpc-005-a.tsv
+          grep -Fx $'ADMISSION\tperformance_claim\tNONE' /tmp/vis-dvpc-005-a.tsv
