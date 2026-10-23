@@ -12,6 +12,12 @@ use std::collections::HashSet;
 use crate::mis_verifier::{MisGraph, MisGraphError};
 use crate::rng::XorShift64;
 
+/// Maximum vertex count accepted by the seeded regular-MIS generator.
+pub const MAX_MIS_RANDOM_REGULAR_VERTICES: usize = 100_000;
+/// Maximum number of stubs accepted before allocating the generator buffers.
+/// The current paper-shaped cohort only needs 15,000 stubs at N=5,000, degree 3.
+pub const MAX_MIS_RANDOM_REGULAR_STUBS: usize = 1_000_000;
+
 /// Seeded random-regular graph request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MisRandomRegularConfig {
@@ -50,6 +56,10 @@ pub enum MisRandomRegularError {
     ZeroVertices,
     /// A simple graph requires degree less than its vertex count.
     DegreeNotLessThanVertices { vertex_count: usize, degree: usize },
+    /// Vertex count exceeds the explicit per-call allocation ceiling.
+    VertexCountLimitExceeded { actual: usize, maximum: usize },
+    /// Stub storage exceeds the explicit per-call allocation ceiling.
+    StubCountLimitExceeded { actual: usize, maximum: usize },
     /// A regular graph requires an even vertex-count times degree.
     OddStubCount { vertex_count: usize, degree: usize },
     /// Vertex count times degree overflowed usize arithmetic.
@@ -66,6 +76,8 @@ impl fmt::Display for MisRandomRegularError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ZeroVertices => write!(f, "vertex_count must be positive"),
+            Self::VertexCountLimitExceeded { actual, maximum } => write!(f, "vertex_count {actual} exceeds allocation ceiling {maximum}"),
+            Self::StubCountLimitExceeded { actual, maximum } => write!(f, "stub count {actual} exceeds allocation ceiling {maximum}"),
             Self::DegreeNotLessThanVertices { vertex_count, degree } =>
                 write!(f, "degree {degree} must be less than vertex_count {vertex_count}"),
             Self::OddStubCount { vertex_count, degree } =>
@@ -93,6 +105,12 @@ pub fn generate_mis_random_regular(
     config: MisRandomRegularConfig,
 ) -> Result<(MisGraph, MisRandomRegularReport), MisRandomRegularError> {
     if config.vertex_count == 0 { return Err(MisRandomRegularError::ZeroVertices); }
+    if config.vertex_count > MAX_MIS_RANDOM_REGULAR_VERTICES {
+        return Err(MisRandomRegularError::VertexCountLimitExceeded {
+            actual: config.vertex_count,
+            maximum: MAX_MIS_RANDOM_REGULAR_VERTICES,
+        });
+    }
     if config.max_attempts == 0 { return Err(MisRandomRegularError::ZeroRetryBudget); }
     if config.degree >= config.vertex_count {
         return Err(MisRandomRegularError::DegreeNotLessThanVertices {
@@ -104,6 +122,12 @@ pub fn generate_mis_random_regular(
             vertex_count: config.vertex_count, degree: config.degree,
         },
     )?;
+    if stub_count > MAX_MIS_RANDOM_REGULAR_STUBS {
+        return Err(MisRandomRegularError::StubCountLimitExceeded {
+            actual: stub_count,
+            maximum: MAX_MIS_RANDOM_REGULAR_STUBS,
+        });
+    }
     if stub_count % 2 != 0 {
         return Err(MisRandomRegularError::OddStubCount {
             vertex_count: config.vertex_count, degree: config.degree,
@@ -211,6 +235,64 @@ mod tests {
         assert_eq!(generate_mis_random_regular(MisRandomRegularConfig {
             max_attempts: 0, ..MisRandomRegularConfig::new(20, 3, 2)
         }), Err(MisRandomRegularError::ZeroRetryBudget));
+    }
+
+    #[test]
+    fn rejects_vertex_and_stub_limits_before_allocating() {
+        assert_eq!(
+            generate_mis_random_regular(MisRandomRegularConfig::new(
+                MAX_MIS_RANDOM_REGULAR_VERTICES + 1, 0, 7
+            )),
+            Err(MisRandomRegularError::VertexCountLimitExceeded {
+                actual: MAX_MIS_RANDOM_REGULAR_VERTICES + 1,
+                maximum: MAX_MIS_RANDOM_REGULAR_VERTICES,
+            })
+        );
+        assert_eq!(
+            generate_mis_random_regular(MisRandomRegularConfig::new(400_000, 3, 17)),
+            Err(MisRandomRegularError::StubCountLimitExceeded {
+                actual: 1_200_000,
+                maximum: MAX_MIS_RANDOM_REGULAR_STUBS,
+            })
+        );
+    }
+
+    #[test]
+    fn small_degree_three_graph_sample_has_expected_triangle_class_frequency() {
+        // There are exactly 70 labelled simple 3-regular graphs on six vertices:
+        // 10 labelled K3,3 graphs (no triangles) and 60 labelled triangular prisms
+        // (with triangles). Uniform pairing conditioned on simplicity predicts P(K3,3)=1/7.
+        fn has_triangle(graph: &MisGraph) -> bool {
+            let mut adjacent = vec![vec![false; graph.vertex_count()]; graph.vertex_count()];
+            for &(u, v) in graph.edges() {
+                adjacent[u][v] = true;
+                adjacent[v][u] = true;
+            }
+            for u in 0..graph.vertex_count() {
+                for v in (u + 1)..graph.vertex_count() {
+                    if !adjacent[u][v] { continue; }
+                    for w in (v + 1)..graph.vertex_count() {
+                        if adjacent[u][w] && adjacent[v][w] { return true; }
+                    }
+                }
+            }
+            false
+        }
+
+        const SAMPLES: usize = 5_000;
+        let mut k33_count = 0usize;
+        for seed in 1..=(SAMPLES as u64) {
+            let (graph, _) = generate_mis_random_regular(
+                MisRandomRegularConfig::new(6, 3, seed)
+            ).expect("small simple cubic graph should be generated");
+            if !has_triangle(&graph) { k33_count += 1; }
+        }
+        let observed = k33_count as f64 / SAMPLES as f64;
+        let expected = 1.0 / 7.0;
+        assert!(
+            (observed - expected).abs() < 0.04,
+            "K3,3 sample fraction {observed:.4} too far from reference {expected:.4}"
+        );
     }
 
     #[test]
