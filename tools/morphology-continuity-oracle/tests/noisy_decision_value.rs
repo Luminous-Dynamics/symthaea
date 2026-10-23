@@ -394,7 +394,11 @@ fn robust_evsi_lower_bound(
 
     let mut lower_bound = f64::INFINITY;
     for reliability in minimum_reliability..=maximum_reliability {
-        lower_bound = lower_bound.min(evsi(symmetric_binary_sensor(reliability), weights, decisions));
+        lower_bound = lower_bound.min(evsi(
+            symmetric_binary_sensor(reliability),
+            weights,
+            decisions,
+        ));
     }
     Some(lower_bound)
 }
