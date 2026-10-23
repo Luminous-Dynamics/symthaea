@@ -35,7 +35,7 @@ fn make_evidence(
     state: ConsentState,
     trust_mask: u8,
     revoked: bool,
-    scope_case: usize,
+    evidence_scope_case: usize,
     time_case: usize,
 ) -> ConsentEvidence<'static> {
     let mut evidence = ConsentEvidence {
@@ -52,13 +52,13 @@ fn make_evidence(
         revoked,
     };
 
-    match scope_case {
+    match evidence_scope_case {
         0 => {}
         1 => evidence.subject_id = "subject:bob",
         2 => evidence.action_id = "action:publish-record",
         3 => evidence.purpose_id = "purpose:advertising",
         4 => evidence.record_id = "",
-        _ => unreachable!("scope case is bounded by the matrix"),
+        _ => unreachable!("evidence scope case is bounded by the matrix"),
     }
 
     match time_case {
@@ -82,17 +82,18 @@ fn make_evidence(
     evidence
 }
 
-fn make_request(scope_case: usize) -> ConsentRequest<'static> {
+fn make_request(request_scope_case: usize) -> ConsentRequest<'static> {
     let mut request = ConsentRequest {
         subject_id: "subject:alice",
         action_id: "action:export-record",
         purpose_id: "purpose:care-coordination",
     };
-    match scope_case {
-        0 | 4 => {}
+    match request_scope_case {
+        0 => {}
         1 => request.subject_id = "subject:bob",
         2 => request.action_id = "action:publish-record",
         3 => request.purpose_id = "purpose:advertising",
+        4 => request.action_id = "",
         _ => unreachable!("request scope case is bounded by the matrix"),
     }
     request
@@ -104,7 +105,8 @@ fn expected_consent_outcome(
     trust_mask: u8,
     revoked: bool,
     evidence_present: bool,
-    scope_case: usize,
+    request_scope_case: usize,
+    evidence_scope_case: usize,
     time_case: usize,
 ) -> ConsentGateOutcome {
     match requirement {
@@ -126,7 +128,8 @@ fn expected_consent_outcome(
             if state == ConsentState::Given
                 && trust_mask == 0b111
                 && !revoked
-                && scope_case == 0
+                && request_scope_case == 0
+                && evidence_scope_case == 0
                 && time_case == 0
             {
                 ConsentGateOutcome::Satisfied
@@ -160,17 +163,18 @@ fn main() {
             for trust_mask in 0_u8..8 {
                 for revoked in [false, true] {
                     for evidence_present in [false, true] {
-                        for scope_case in 0_usize..5 {
-                            for time_case in 0_usize..4 {
-                                metrics.cases += 1;
-                                let request = make_request(scope_case);
-                                let evidence = make_evidence(
-                                    state,
-                                    trust_mask,
-                                    revoked,
-                                    scope_case,
-                                    time_case,
-                                );
+                        for request_scope_case in 0_usize..5 {
+                            for evidence_scope_case in 0_usize..5 {
+                                for time_case in 0_usize..4 {
+                                    metrics.cases += 1;
+                                    let request = make_request(request_scope_case);
+                                    let evidence = make_evidence(
+                                        state,
+                                        trust_mask,
+                                        revoked,
+                                        evidence_scope_case,
+                                        time_case,
+                                    );
                                 let evidence_ref = evidence_present.then_some(&evidence);
                                 let expected = expected_consent_outcome(
                                     requirement,
@@ -178,7 +182,8 @@ fn main() {
                                     trust_mask,
                                     revoked,
                                     evidence_present,
-                                    scope_case,
+                                    request_scope_case,
+                                    evidence_scope_case,
                                     time_case,
                                 );
 
@@ -239,11 +244,13 @@ fn main() {
                                     && state == ConsentState::Given
                                     && trust_mask == 0b111
                                     && !revoked
-                                    && scope_case == 0
+                                    && request_scope_case == 0
+                                    && evidence_scope_case == 0
                                     && time_case == 0
                                     && observed != ConsentGateOutcome::Satisfied
                                 {
                                     metrics.false_blocks += 1;
+                                }
                                 }
                             }
                         }
