@@ -25,6 +25,29 @@ For each task, it recomputes from `pre_patch_status` and `post_patch_status`:
 
 If validation evidence is missing or malformed for any candidate, the program writes a non-lockable audit report and exits nonzero without writing a task manifest. If evidence is complete, it emits a manifest of strictly eligible tasks and retains every rejected task with reasons in a separate audit report. It hashes the prompt/gold/test patch content and both baseline and gold logs into the manifest instead of copying prompt, patch or test contents.
 
+## Pinned runtime evidence overlay (required before validation)
+
+The current upstream validator discards command exit codes, ignores the boolean returns from `apply_patch`, writes only an aggregate of the three gold logs, and does not preserve each run's resolved Docker image ID. PR #850x includes a patch against exactly SWE-bench-Live commit `62d02936a0726fbf4597b05bd07b09fb99eddae6`:
+
+`docs/research/patches/swe-bench-live-validation-evidence.patch`
+
+Apply and syntax-check it in a fresh clone before running gold validation:
+
+```bash
+git clone https://github.com/microsoft/SWE-bench-Live.git /tmp/SWE-bench-Live
+git -C /tmp/SWE-bench-Live checkout --detach 62d02936a0726fbf4597b05bd07b09fb99eddae6
+git -C /tmp/SWE-bench-Live apply --check /path/to/symthaea/docs/research/patches/swe-bench-live-validation-evidence.patch
+git -C /tmp/SWE-bench-Live apply /path/to/symthaea/docs/research/patches/swe-bench-live-validation-evidence.patch
+python3 -m py_compile /tmp/SWE-bench-Live/evaluation/validation.py
+git -C /tmp/SWE-bench-Live submodule update --init launch
+```
+
+Run the upstream three-repeat gold validation only after the overlay is applied. It records `validation_evidence.json`, a separate `gold_run_0.log`, `gold_run_1.log`, and `gold_run_2.log` per task. Evidence includes actual shell exit codes, whether the test and gold patches applied, parsed status per run, raw-log SHA-256, Docker container ID, configured image reference and the immutable Docker image ID (`sha256:...`). Missing runtime metadata is not replaced with a requested image label.
+
+The Rust auditor requires that evidence for every candidate. It verifies all three per-run logs against their SHA-256 values; checks baseline and per-run parsed maps; reconstructs the gold aggregate; rejects timeout/incomplete commands and mismatched test patch states; verifies that the four container IDs are distinct and their actual Docker image IDs agree; and binds the resolved image ID, all container IDs and the runtime evidence hash into the eligible manifest. The evaluator-only controller manifest carries both the requested image reference and the observed immutable image ID.
+
+This instrumentation still is not cryptographic host attestation: a compromised runner can fabricate these files. It does close the observable gap between “a tag was requested” and “the Docker API reported this container/image ID and these commands returned these exit codes.” Preserve the raw files and independently rerun the validator for publication.
+
 ## Invocation
 
 First export the full Rust split from the pinned dataset snapshot to JSONL without filtering rows. Keep the dataset task fields intact. Run the upstream three-run validation on that complete input; do not use its filtered output as the candidate denominator. Then run:
@@ -58,7 +81,7 @@ The auditor now emits two separate artifacts only when the full candidate set ha
 - `agent-prompts.jsonl`: one JSON object per eligible task, containing only `problem_statement`. It contains no instance ID, repository, base commit, gold patch, test patch, hint, expected test labels, or commit URL. Line order is pinned by sorted task identity through the separate controller map.
 - `controller-manifest.evaluator-only.json`: maps zero-based line number to instance ID and requested Docker image, and binds the ordered eligible-ID digest plus safe prompt projection digest. This artifact is explicitly evaluator-only and must never enter the agent's prompt, filesystem, retrieval context or tool outputs.
 
-The unit tests serialize the projection structs and assert exact allowed fields plus absence of representative prohibited fields. This prevents accidental field copying at the data-contract level; it does not enforce operating-system access controls. The runner still must mount or expose only the prompt and sandbox to the agent and keep the controller/evaluator files in a separate trust domain.
+The unit tests serialize the projection structs and assert exact allowed fields plus absence of representative prohibited fields. The runtime-evidence tests also reject tampered per-run logs and image-ID drift across baseline/gold containers. This prevents accidental field copying at the data-contract level; it does not enforce operating-system access controls. The runner still must mount or expose only the prompt and sandbox to the agent and keep the controller/evaluator files in a separate trust domain.
 
 ## Digest contract
 
