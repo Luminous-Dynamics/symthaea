@@ -146,6 +146,9 @@ const CRISIS_EMA_ALPHA: f64 = 0.1;
 pub struct CrisisDetectorInput {
     /// Current prediction error (from FEP module).
     pub prediction_error: f64,
+    /// Whether the current PE is a comparable, finite observation.
+    /// False preserves the PE EMA/streak without allowing the sentinel to trigger a crisis.
+    pub prediction_error_valid: bool,
     /// Current safety level (0=Green, 1=Yellow, 2=Orange, 3=Red).
     pub safety_level_ordinal: u8,
     /// Current consciousness level (Phi).
@@ -228,18 +231,25 @@ impl CivicCrisisDetector {
 
         self.cycles_since_last_event += 1;
 
-        // Update EMAs
-        self.pe_ema =
-            self.pe_ema * (1.0 - CRISIS_EMA_ALPHA) + input.prediction_error * CRISIS_EMA_ALPHA;
+        // Update PE state only from valid finite observations. Invalid data must
+        // neither manufacture a crisis nor erase evidence already accumulated.
+        let prediction_error_valid =
+            input.prediction_error_valid && input.prediction_error.is_finite();
+        if prediction_error_valid {
+            self.pe_ema =
+                self.pe_ema * (1.0 - CRISIS_EMA_ALPHA)
+                    + input.prediction_error * CRISIS_EMA_ALPHA;
+
+            if self.pe_ema > CRISIS_PE_THRESHOLD {
+                self.pe_sustained += 1;
+            } else {
+                self.pe_sustained = 0;
+            }
+        }
+
+        // Independent arousal continues to update regardless of PE validity.
         self.arousal_ema =
             self.arousal_ema * (1.0 - CRISIS_EMA_ALPHA) + input.arousal * CRISIS_EMA_ALPHA;
-
-        // Track PE sustained
-        if self.pe_ema > CRISIS_PE_THRESHOLD {
-            self.pe_sustained += 1;
-        } else {
-            self.pe_sustained = 0;
-        }
 
         // Track arousal sustained
         if self.arousal_ema > CRISIS_AROUSAL_THRESHOLD {
@@ -269,7 +279,7 @@ impl CivicCrisisDetector {
         let mut signals = Vec::new();
 
         // Signal 1: Sustained prediction error (world model failing)
-        if self.pe_sustained >= CRISIS_PE_SUSTAINED_CYCLES {
+        if prediction_error_valid && self.pe_sustained >= CRISIS_PE_SUSTAINED_CYCLES {
             signals.push(CrisisSignal {
                 name: "prediction_error".to_string(),
                 value: self.pe_ema,
@@ -435,6 +445,7 @@ mod tests {
     fn default_input() -> CrisisDetectorInput {
         CrisisDetectorInput {
             prediction_error: 0.1,
+            prediction_error_valid: true,
             safety_level_ordinal: 0, // Green
             consciousness_level: 0.6,
             collective_phi: 0.0,
@@ -451,6 +462,64 @@ mod tests {
         for cycle in 0..200 {
             assert!(detector.tick(&input, cycle).is_none());
         }
+    }
+
+    #[test]
+    fn invalid_pe_sentinel_cannot_trigger_civic_crisis() {
+        let mut detector = CivicCrisisDetector::new();
+        let mut input = default_input();
+        input.prediction_error = 10.0;
+        input.prediction_error_valid = false;
+
+        for cycle in 0..200 {
+            assert!(
+                detector.tick(&input, cycle).is_none(),
+                "invalid PE alone must not trigger a civic crisis"
+            );
+        }
+        assert_eq!(detector.pe_ema, 0.0);
+        assert_eq!(detector.pe_sustained, 0);
+    }
+
+    #[test]
+    fn invalid_pe_does_not_erase_or_advance_existing_pe_streak() {
+        let mut detector = CivicCrisisDetector::new();
+        let mut input = default_input();
+        input.prediction_error = 0.9;
+
+        for cycle in 0..15 {
+            let _ = detector.tick(&input, cycle);
+        }
+        let ema_before = detector.pe_ema;
+        let streak_before = detector.pe_sustained;
+        assert!(streak_before > 0);
+
+        input.prediction_error = 10.0;
+        input.prediction_error_valid = false;
+        for cycle in 15..20 {
+            let _ = detector.tick(&input, cycle);
+        }
+        assert_eq!(detector.pe_ema, ema_before);
+        assert_eq!(detector.pe_sustained, streak_before);
+    }
+
+    #[test]
+    fn invalid_pe_does_not_mask_independent_red_safety_signal() {
+        let mut detector = CivicCrisisDetector::new();
+        let mut input = default_input();
+        input.prediction_error = 10.0;
+        input.prediction_error_valid = false;
+        input.safety_level_ordinal = 3;
+
+        let event = detector.tick(&input, 0).expect("red safety remains actionable");
+        assert!(
+            event.trigger_signals.iter().any(|signal| signal.name == "safety_level"),
+            "independent safety evidence must still trigger"
+        );
+        assert!(
+            !event.trigger_signals.iter().any(|signal| signal.name == "prediction_error"),
+            "invalid PE must not appear as a crisis signal"
+        );
     }
 
     #[test]
