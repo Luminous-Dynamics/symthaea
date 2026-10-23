@@ -1,0 +1,61 @@
+{
+  "schema": "symthaea-adaptive-probe-policy-receipt-v1",
+  "date": "2026-10-23",
+  "status": "EXACT_LOCAL_ADAPTIVE_POLICY_PILOT_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/causal-target-subset-kernel-v1",
+  "source": {
+    "path": "validation/adaptive_probe_policy_benchmark.py",
+    "git_blob": "b8a40e8bdba0687a4792c9b57ed222889c50a92d",
+    "sha256": "0efb2d5b6f96be95a680391363aaa8be1b25d0223326bc6198948b5cc43372f2",
+    "bytes": 16672
+  },
+  "base_kernel_source": {
+    "path": "validation/action_subset_kernel_benchmark.py",
+    "git_blob": "ce19dccec3a81f4c6a18563de88152019b966f5d",
+    "sha256": "9d000f97b9cd7f16e4e86e9089c1ff230c2fc4ee4624dc7a5836a7c1ebbf6526",
+    "bytes": 25398
+  },
+  "tests": {
+    "path": "validation/test_adaptive_probe_policy_benchmark.py",
+    "git_blob": "63592e5a64ecbea391bd24e9ab0d004b67ac6222",
+    "sha256": "55eb970c63affba4f15cc7390b60efc7123277f2",
+    "bytes": 2298,
+    "count": 7,
+    "result": "7/7_PASS_LOCAL"
+  },
+  "artifact": {
+    "filename": "adaptive_probe_policy_results_exact_2026-10-23.json",
+    "bytes": 184055,
+    "sha256": "9d3221eda838d534a24215a55e738fadc9552115d3ceb299365b5414e40eafd5",
+    "source_git_blob_bound": "b8a40e8bdba0687a4792c9b57ed222889c50a92d",
+    "local_only": true
+  },
+  "report": {
+    "path": "docs/research/ADAPTIVE_PROBE_POLICY_BENCHMARK_2026-10-23.md",
+    "git_blob": "f4d79291d9d137eb5a4cf309a6574159e39ec5af",
+    "local_draft_differs_from_committed_report": true
+  },
+  "summary": {
+    "path": "validation/adaptive_probe_policy_summary_2026-10-23.json",
+    "git_blob": "e7e13d094b4882b6027fa52fa28c8f7267e574b5"
+  },
+  "protocol": {
+    "graphs": 4,
+    "truth_regimes": 2,
+    "policies": 7,
+    "replicates_per_graph_regime": 5,
+    "probes_per_trial": 8,
+    "observation_mode": "exact_target_subset",
+    "trials_per_policy_per_truth_regime": 20,
+    "result_rows": 280
+  },
+  "validation": {
+    "exact_posterior_enumeration": "PASS_LOCAL",
+    "unit_tests": "7/7_PASS_LOCAL",
+    "source_and_test_git_blobs_match_executed_bytes": true,
+    "full_artifact_digest": "bound; local output file not committed",
+    "remote_ci": "not asserted in this receipt; see current exact-head workflow state"
+  },
+  "scientific_boundary": "Greedy graph information gain concentrated probes on one action and showed poor target-kernel estimation in the pilot. Joint/kernel objectives and coverage constraints trade off graph recovery versus kernel estimation. Sample size is only 20 trials per policy/regime, so findings are exploratory, not statistically qualified or SOTA."
+}
