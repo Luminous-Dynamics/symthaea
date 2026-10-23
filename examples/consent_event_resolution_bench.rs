@@ -317,6 +317,196 @@ fn counterfactual_pairs_pass(scope: &ConsentScope) -> (usize, usize) {
     (pairs.iter().filter(|(passed, _)| *passed).count(), pairs.len())
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FieldCase {
+    Exact,
+    Mismatch,
+    Missing,
+    Empty,
+}
+
+const FIELD_CASES: [FieldCase; 4] = [
+    FieldCase::Exact,
+    FieldCase::Mismatch,
+    FieldCase::Missing,
+    FieldCase::Empty,
+];
+const TRANSITIONS: [ConsentTransition; 4] = [
+    ConsentTransition::Granted,
+    ConsentTransition::Refused,
+    ConsentTransition::Withdrawn,
+    ConsentTransition::Revoked,
+];
+const MODALITIES: [ConsentModality; 6] = [
+    ConsentModality::Asserted,
+    ConsentModality::Asked,
+    ConsentModality::Quoted,
+    ConsentModality::Reported,
+    ConsentModality::Conditional,
+    ConsentModality::Hypothetical,
+];
+const ORDERS: [Option<u64>; 3] = [None, Some(0), Some(1)];
+
+fn mutate_field(
+    field: &mut Option<String>,
+    case: FieldCase,
+    expected: &str,
+    mismatch: &str,
+) {
+    *field = match case {
+        FieldCase::Exact => Some(expected.to_owned()),
+        FieldCase::Mismatch => Some(mismatch.to_owned()),
+        FieldCase::Missing => None,
+        FieldCase::Empty => Some(String::new()),
+    };
+}
+
+fn matrix_event(
+    scope: &ConsentScope,
+    subject: FieldCase,
+    action: FieldCase,
+    purpose: FieldCase,
+    transition: ConsentTransition,
+    modality: ConsentModality,
+    order: Option<u64>,
+) -> ConsentEvidenceEvent {
+    let mut candidate = event(scope, transition, modality, order);
+    mutate_field(
+        &mut candidate.scope.subject_id,
+        subject,
+        &scope.subject_id,
+        "person:other",
+    );
+    mutate_field(
+        &mut candidate.scope.action_id,
+        action,
+        &scope.action_id,
+        "action:other",
+    );
+    mutate_field(
+        &mut candidate.scope.purpose_id,
+        purpose,
+        &scope.purpose_id,
+        "purpose:other",
+    );
+    candidate
+}
+
+/// Independent, high-level oracle for a single synthetic event. This is not
+/// the implementation itself: it classifies mutation cases before inspecting
+/// the event and never invokes resolver helpers.
+fn expected_single(
+    event: &ConsentEvidenceEvent,
+    fields: [FieldCase; 3],
+) -> ResolutionKey {
+    if fields.contains(&FieldCase::Mismatch) {
+        return ResolutionKey::NoRelevantEvidence;
+    }
+    if fields
+        .iter()
+        .any(|case| matches!(case, FieldCase::Missing | FieldCase::Empty))
+    {
+        return ResolutionKey::Unknown(ConsentResolutionUncertainty::AmbiguousEventScope);
+    }
+    if event.modality != ConsentModality::Asserted {
+        return ResolutionKey::Unknown(ConsentResolutionUncertainty::NonAssertedEvidence);
+    }
+    match event.order {
+        None => ResolutionKey::Unknown(ConsentResolutionUncertainty::MissingTemporalOrder),
+        Some(order) => ResolutionKey::Candidate(event.transition, order),
+    }
+}
+
+fn expected_exact_pair(events: &[ConsentEvidenceEvent; 2]) -> ResolutionKey {
+    if events.iter().any(|event| event.modality != ConsentModality::Asserted) {
+        return ResolutionKey::Unknown(ConsentResolutionUncertainty::NonAssertedEvidence);
+    }
+    let [Some(left), Some(right)] = [events[0].order, events[1].order] else {
+        return ResolutionKey::Unknown(ConsentResolutionUncertainty::MissingTemporalOrder);
+    };
+    if left == right {
+        return ResolutionKey::Unknown(ConsentResolutionUncertainty::DuplicateTemporalOrder);
+    }
+    let latest = if left > right { &events[0] } else { &events[1] };
+    ResolutionKey::Candidate(latest.transition, latest.order.unwrap_or_default())
+}
+
+fn exhaustive_single_event_matrix(scope: &ConsentScope) -> (usize, usize) {
+    let mut passes = 0usize;
+    let mut total = 0usize;
+    for subject in FIELD_CASES {
+        for action in FIELD_CASES {
+            for purpose in FIELD_CASES {
+                let fields = [subject, action, purpose];
+                for transition in TRANSITIONS {
+                    for modality in MODALITIES {
+                        for order in ORDERS {
+                            let candidate = matrix_event(
+                                scope, subject, action, purpose, transition, modality, order,
+                            );
+                            let expected = expected_single(&candidate, fields);
+                            let actual = resolve(std::slice::from_ref(&candidate), scope);
+                            total += 1;
+                            if actual == expected {
+                                passes += 1;
+                            } else if total <= 20 {
+                                println!(
+                                    "single_matrix_mismatch,case={total},fields={fields:?},transition={transition:?},modality={modality:?},order={order:?},expected={expected:?},actual={actual:?}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    println!(
+        "single_event_matrix,passes={passes},total={total},scope_mutation_combinations=64"
+    );
+    (passes, total)
+}
+
+fn exhaustive_exact_pair_matrix(scope: &ConsentScope) -> (usize, usize, usize) {
+    let mut candidates = Vec::new();
+    for transition in TRANSITIONS {
+        for modality in MODALITIES {
+            for order in ORDERS {
+                candidates.push(event(scope, transition, modality, order));
+            }
+        }
+    }
+
+    let mut expected_passes = 0usize;
+    let mut permutation_passes = 0usize;
+    let mut total = 0usize;
+    for left in &candidates {
+        for right in &candidates {
+            let pair = [left.clone(), right.clone()];
+            let expected = expected_exact_pair(&pair);
+            let actual = resolve(&pair, scope);
+            total += 1;
+            if actual == expected {
+                expected_passes += 1;
+            } else if total <= 20 {
+                println!(
+                    "pair_matrix_mismatch,case={total},expected={expected:?},actual={actual:?}"
+                );
+            }
+
+            let reversed = [right.clone(), left.clone()];
+            if resolve(&reversed, scope) == actual {
+                permutation_passes += 1;
+            } else if total <= 20 {
+                println!("pair_matrix_permutation_mismatch,case={total}");
+            }
+        }
+    }
+    println!(
+        "exact_scope_pair_matrix,oracle_passes={expected_passes}/{total},permutation_passes={permutation_passes}/{total}"
+    );
+    (expected_passes, permutation_passes, total)
+}
+
 fn main() {
     let started = Instant::now();
     let scope = request();
@@ -360,9 +550,12 @@ fn main() {
     }
 
     let (counterfactual_passes, counterfactual_total) = counterfactual_pairs_pass(&scope);
+    let (single_passes, single_total) = exhaustive_single_event_matrix(&scope);
+    let (pair_passes, pair_permutation_passes, pair_total) =
+        exhaustive_exact_pair_matrix(&scope);
     let fixture_total = fixtures.len();
     println!(
-        "summary,fixtures={fixture_passes}/{fixture_total},permutation_invariant_fixtures={permutation_cases}/{fixture_total},permutation_trials={permutation_trials},permutation_failures={permutation_failures},counterfactual_pairs={counterfactual_passes}/{counterfactual_total},elapsed_us={}",
+        "summary,fixtures={fixture_passes}/{fixture_total},permutation_invariant_fixtures={permutation_cases}/{fixture_total},permutation_trials={permutation_trials},permutation_failures={permutation_failures},counterfactual_pairs={counterfactual_passes}/{counterfactual_total},single_event_matrix={single_passes}/{single_total},exact_pair_matrix={pair_passes}/{pair_total},exact_pair_permutations={pair_permutation_passes}/{pair_total},elapsed_us={}",
         started.elapsed().as_micros()
     );
 
@@ -370,6 +563,9 @@ fn main() {
         || permutation_failures != 0
         || permutation_cases != fixture_total
         || counterfactual_passes != counterfactual_total
+        || single_passes != single_total
+        || pair_passes != pair_total
+        || pair_permutation_passes != pair_total
     {
         std::process::exit(1);
     }
