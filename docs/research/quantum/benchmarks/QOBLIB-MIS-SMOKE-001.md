@@ -25,7 +25,7 @@ The receipt records:
 - the tiny exact reference result and feasibility verdict when the graph has at most 24 vertices, or an explicit skipped-over-limit status otherwise;
 - parser, greedy, portfolio, local-improvement, exact-oracle and end-to-end elapsed nanoseconds;
 - QOBLIB-compatible incumbent time series in seconds: `qoblib_objective_time_series.deterministic_greedy` contains one run, `multi_start_greedy_per_trial` contains one trace per seeded restart, and `local_improvement_stage` contains its own stage-relative trace when run;
-- explicit seed-base and restart-count provenance for the randomized portfolio, with `--seed-base <u64>` available to replay or run a distinct deterministic campaign;
+- explicit seed-base and restart-count provenance for the randomized portfolio, with `--seed-base <u64>` available to replay or run a distinct deterministic campaign. The 64-bit `seed_base` and `best_seed` are JSON decimal strings, not JSON numbers, so consumers preserve the full integer exactly;
 - a stable non-cryptographic checksum over normalized input, policy/configuration, seeds and outcomes, excluding variable runtime fields;
 - package version, target OS/architecture, compile-time Rust version when provided, explicit determinism/replay wording, and null time/memory limits when none were configured;
 - failure receipts for source-read errors, DIMACS parse errors, local verification failures and exact-oracle failures;
