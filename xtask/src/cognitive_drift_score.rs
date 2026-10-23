@@ -289,7 +289,11 @@ pub fn score_trace(mut trace: DriftTrace) -> anyhow::Result<DriftScore> {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
-    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+    let mut hex = String::with_capacity(digest.len() * 2);
+    for byte in digest.iter() {
+        hex.push_str(&format!("{byte:02x}"));
+    }
+    hex
 }
 
 #[cfg(test)]
