@@ -1830,7 +1830,9 @@ mod tests {
         };
         let mut initial_reference_hits = 0usize;
         let mut unresolved_without_recovery = 0usize;
+        let mut false_singletons_without_recovery = 0usize;
         let mut empty_pool_recovery_attempts = 0usize;
+        let mut failed_recovery_attempts = 0usize;
         let mut accepted_recovery_candidates = 0usize;
         let mut false_singletons_after_recovery = 0usize;
         let mut same_domain_recovered = 0usize;
@@ -1857,16 +1859,20 @@ mod tests {
             } else {
                 0
             };
-            unresolved_without_recovery += if baseline.final_live != 1 || !baseline.success {
-                1
-            } else {
-                0
-            };
+            unresolved_without_recovery += if baseline.final_live != 1 { 1 } else { 0 };
+            false_singletons_without_recovery +=
+                if baseline.final_live == 1 && !baseline.success { 1 } else { 0 };
             empty_pool_recovery_attempts += if recovered.recovery_triggered_on_empty_pool {
                 1
             } else {
                 0
             };
+            failed_recovery_attempts +=
+                if recovered.recovery_triggered_on_empty_pool && recovered.terminal_pit_alarm {
+                    1
+                } else {
+                    0
+                };
             accepted_recovery_candidates += recovered.accepted_recovery_candidates;
             false_singletons_after_recovery +=
                 if recovered.final_live == 1 && !recovered.ground_truth_equivalent {
@@ -1891,7 +1897,9 @@ mod tests {
             "truth_absent_recovery,seeds={SEEDS},budget={ROUND_BUDGET},",
             "initial_reference_hits={initial_reference_hits},",
             "unresolved_without_recovery={unresolved_without_recovery},",
+            "false_singletons_without_recovery={false_singletons_without_recovery},",
             "empty_pool_recovery_attempts={empty_pool_recovery_attempts},",
+            "failed_recovery_attempts={failed_recovery_attempts},",
             "accepted_recovery_candidates={accepted_recovery_candidates},",
             "false_singletons_after_recovery={false_singletons_after_recovery},",
             "same_domain_recovered={same_domain_recovered},",
