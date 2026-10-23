@@ -42,6 +42,17 @@ Prefer standard reviewed components. Do not design a new AEAD, home-grown KDF, o
 
 References: [RFC 5869 — HKDF](https://www.rfc-editor.org/rfc/rfc5869.html), [RFC 9180 — HPKE](https://www.rfc-editor.org/rfc/rfc9180.html), [RFC 8439 — ChaCha20 and Poly1305](https://www.rfc-editor.org/rfc/rfc8439.html), [RFC 5116 — AEAD interface requirements](https://www.rfc-editor.org/rfc/rfc5116.html).
 
+### 3.1.1 Global nonce namespace across APIs
+
+Nonce uniqueness is an invariant across **all invocations using the same effective key**, not separately within each function or transport. The existing packet and fragment helpers use different layouts, but those layouts are not automatically disjoint. A deterministic runtime witness in [PR #8558](https://github.com/Luminous-Dynamics/symthaea/pull/8558) constructs identical 12-byte nonces from the packet and fragment APIs with one shared key and valid packet type. This demonstrates a conditional code-path collision, not that every deployment shares those keys.
+
+V3 must therefore enforce one of the following and test the actual effective keys emitted/selected by the runtime:
+
+- derive distinct, reviewed purpose-specific keys for packet AEAD, fragment AEAD, and other encrypted channels using explicit KDF domain separation; or
+- specify and prove globally disjoint nonce allocation across every use of a shared key.
+
+A different function name, packet type, route, or nonce field layout is not proof of separation. The test oracle must observe all ciphertext-producing entry points and compare the full effective-key/nonce pair. The shared key must not be assumed separate by convention alone.
+
 ### 3.2 Nonce and sequence
 
 - Freeze an exact, byte-level nonce layout for the new protocol version and test it against golden vectors. Never alter the existing v2 layout in place.
