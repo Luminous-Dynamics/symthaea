@@ -495,6 +495,25 @@ mod tests {
             (projected_score.normalized_mean_shift - exact_score.normalized_mean_shift).abs()
                 < 1e-8
         );
+
+        let sparse_scale_shift = reference
+            .iter()
+            .map(|row| {
+                let mut shifted = row.clone();
+                shifted[0] *= 3.0;
+                shifted
+            })
+            .collect::<Vec<_>>();
+        let exact_scale_score = exact.score(&sparse_scale_shift).unwrap();
+        let projected_scale_score = projected.score(&sparse_scale_shift).unwrap();
+        assert!(exact_scale_score.normalized_scale_shift > 8.0);
+        assert!(projected_scale_score.normalized_scale_shift > 8.0);
+        assert!(
+            (projected_scale_score.normalized_scale_shift
+                - exact_scale_score.normalized_scale_shift)
+                .abs()
+                < 1e-8
+        );
     }
 
     #[test]
