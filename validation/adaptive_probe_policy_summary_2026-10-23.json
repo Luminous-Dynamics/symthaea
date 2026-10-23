@@ -33,7 +33,7 @@
   },
   "report": {
     "path": "docs/research/ADAPTIVE_PROBE_POLICY_BENCHMARK_2026-10-23.md",
-    "git_blob": null
+    "git_blob": "f4d79291d9d137eb5a4cf309a6574159e39ec5af"
   },
   "parameters": {
     "graph_families": 4,
