@@ -225,7 +225,6 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
     let per_dataset: Vec<DatasetSummary> = by_dataset
         .iter()
         .map(|(dataset_id, records)| {
-            let n = records.len() as f64;
             DatasetSummary {
                 dataset_id: dataset_id.clone(),
                 paired_records: records.len(),
