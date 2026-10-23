@@ -231,7 +231,7 @@ pub fn evaluate_episode(
 mod tests {
     use super::*;
 
-    fn shape(templates: &[Template], id: &str) -> &Shape {
+    fn shape<'a>(templates: &'a [Template], id: &str) -> &'a Shape {
         &template(templates, id).expect("canonical template").cells
     }
 
