@@ -2,8 +2,8 @@
 
 **Status:** proposed preregistered evaluation contract; not executed benchmark evidence  
 **Scope:** PR #8376, #8412, #8365, #8471 and #8491  
-**Machine-readable suite:** \`mesh-security-scenarios-v1.json\`  
-**Receipt schema:** \`mesh-security-evidence-v1.schema.json\`
+**Machine-readable suite:** `mesh-security-scenarios-v1.json`  
+**Receipt schema:** `mesh-security-evidence-v1.schema.json`
 
 ## Research proposition
 
@@ -41,9 +41,11 @@ Headline scores from these efforts are not directly comparable: their tasks, mod
 | Differential test | Implementations agreed or disagreed on named vectors and versions. | Correctness merely because two implementations agree. |
 | Independent review | Reviewer assessed the specified artifact and scope. | Other scopes or changed heads are covered automatically. |
 
-A result has a single explicit \`claim_ceiling\`; it may not be promoted to a stronger class by a summary, benchmark score, CI badge, or AI-generated report.
+A result has a single explicit `claim_ceiling`; it may not be promoted to a stronger class by a summary, benchmark score, CI badge, or AI-generated report.
 
 ## Preregistered scenarios
+
+The current versioned registry defines **17 security properties and 14 scenarios**. All scenarios remain proposed and unexecuted until each has an exact implementation/model oracle and a machine-readable receipt.
 
 The current registry separates nonce uniqueness, sender namespace, restart/rollback, counter wrap, snapshot cloning, key-rotation boundaries, fragmentation/MTU, identity/transcript binding, mutual confirmation, real backend availability, downgrade, replay, resource limits and interoperability. Each scenario declares both a legacy expectation and a required replacement observation.
 
@@ -51,7 +53,7 @@ The known-failure cases are calibration, never novel discoveries. An attack task
 
 ## Recommended held-out experiment
 
-Freeze corpus version \`v1\` and hash it before any prompt, rule, or model tuning. Partition the tasks by protocol family so near-duplicate mutations do not leak from development into holdout. Keep the hidden labels and scoring oracle isolated from the proposing agent. Have two reviewers adjudicate ambiguous outcomes; record agreement and arbitration.
+Freeze corpus version `v1` and hash it before any prompt, rule, or model tuning. Partition the tasks by protocol family so near-duplicate mutations do not leak from development into holdout. Keep the hidden labels and scoring oracle isolated from the proposing agent. Have two reviewers adjudicate ambiguous outcomes; record agreement and arbitration.
 
 Compare with equal caps on wall-clock time, model tokens/API cost, CPU/memory, tool invocations, and human attention:
 
@@ -87,7 +89,7 @@ The hard security gate is lexicographic: first satisfy every mandatory property 
 
 - Keep known breaks, held-out seeded faults, novel research findings, and performance data on separate scoreboards.
 - Every reported result links to a machine-readable evidence receipt conforming to the v1 JSON Schema.
-- An unavailable runner or missing artifact is \`unknown\` / infrastructure error, never \`pass\`.
+- An unavailable runner or missing artifact is `unknown` / infrastructure error, never `pass`.
 - A counterexample expected from a mutant is a benchmark-control success only if the named invariant violation is observed. A parser error does not count.
 - Exact-source results expire when source, model, configuration, tool, dependency lock, or the property statement changes.
 - Do not call a bounded result "formally secure"; say which property held, under which bounds and assumptions.
@@ -97,7 +99,7 @@ The hard security gate is lexicographic: first satisfy every mandatory property 
 
 1. Validate both JSON files against a JSON Schema Draft 2020-12 implementation in CI.
 2. Emit the evidence receipt from each model/runner invocation and hash raw logs, configs and counterexample traces.
-3. Map all registry entries to actual test functions or mark them explicitly \`not_implemented\`; no unimplemented scenario may count in the denominator as passed.
+3. Map all registry entries to actual test functions or mark them explicitly `not_implemented`; no unimplemented scenario may count in the denominator as passed.
 4. Run the nonce and handshake model suites separately, then add trace-conformance tests at the real Rust boundary.
 5. Publish the frozen benchmark bundle and baseline protocol after external review of the scoring oracle.
 
