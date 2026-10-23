@@ -86,6 +86,10 @@ jobs:
         run: cargo test -p symthaea-physics-bridge structured_recovery_families_preserve_energy_dimensions --lib
       - name: Test residual-guided correction scoring
         run: cargo test -p symthaea-physics-bridge empirical_recovery_score_rewards_a_structured_correction_on_observed_residuals --lib
+      - name: Test fitted correction coefficient recovery
+        run: cargo test -p symthaea-physics-bridge fitted_correction_coefficient_recovers_known_scalar_on_synthetic_residuals --lib
+      - name: Test evaluator-only held-out law equivalence
+        run: cargo test -p symthaea-physics-bridge evaluator_equivalence_requires_independent_heldout_points --lib
       - name: Run robust noise-envelope pilot
         run: cargo test -p symthaea-physics-bridge scenario_robust_eig_vs_nominal_eig_pilot --lib -- --nocapture
       - name: Strict Clippy for the core library
