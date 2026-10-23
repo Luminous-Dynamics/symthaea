@@ -92,6 +92,10 @@ struct PairedTask {
     costs: CostRow,
 }
 
+fn take_arg(values: &mut BTreeMap<String, String>, key: &str) -> Result<String, String> {
+    values.remove(key).ok_or_else(|| format!("required argument {key} missing"))
+}
+
 fn usage() -> &'static str {
     "Usage:\n  cargo run --locked --bin rust-repair-trial-compare --features rust-repair-manifest -- \\\n    --preregistration <locked-preregistration.json> \\\n    --expected-preregistration-sha256 <64-hex-pinned-externally> \\\n    --control-report <control-score-report.json> \\\n    --treatment-report <treatment-score-report.json> \\\n    --cost-ledger <per-task-cost-and-receipt-ledger.json> \\\n    --report-out <comparison-report.json>"
 }
@@ -117,20 +121,14 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         index += 2;
     }
 
-    let mut take = |key: &str| {
-        values
-            .remove(key)
-            .ok_or_else(|| format!("required argument {key} missing"))
-    };
     let cli = Cli {
-        preregistration: PathBuf::from(take("--preregistration")?),
-        expected_preregistration_sha256: take("--expected-preregistration-sha256")?,
-        control_report: PathBuf::from(take("--control-report")?),
-        treatment_report: PathBuf::from(take("--treatment-report")?),
-        cost_ledger: PathBuf::from(take("--cost-ledger")?),
-        report_out: PathBuf::from(take("--report-out")?),
+        preregistration: PathBuf::from(take_arg(&mut values, "--preregistration")?),
+        expected_preregistration_sha256: take_arg(&mut values, "--expected-preregistration-sha256")?,
+        control_report: PathBuf::from(take_arg(&mut values, "--control-report")?),
+        treatment_report: PathBuf::from(take_arg(&mut values, "--treatment-report")?),
+        cost_ledger: PathBuf::from(take_arg(&mut values, "--cost-ledger")?),
+        report_out: PathBuf::from(take_arg(&mut values, "--report-out")?),
     };
-    drop(take);
     if !values.is_empty() {
         return Err(format!("unknown arguments: {:?}", values.keys().collect::<Vec<_>>()));
     }
