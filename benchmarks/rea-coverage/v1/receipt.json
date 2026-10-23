@@ -1,0 +1,135 @@
+{
+  "schema_version": "symthaea.rea-coverage-receipt.v1",
+  "benchmark_id": "ENG-REA-003",
+  "run_status": "pass",
+  "claim_ceiling": "Synthetic normalized-report contract only; no REA provider or physical-device qualification.",
+  "execution": {
+    "date": "2026-10-18",
+    "command": "benchmarks/rea-coverage/v1/verify.sh",
+    "case_count": 16,
+    "accepted_consistent_reports": 5,
+    "rejected_inconsistent_reports": 8,
+    "invalid_input_cases": 1,
+    "malformed_report_cases": 2,
+    "result": "All 16 observed dispositions matched the independent expected_dispositions oracle."
+  },
+  "environment": {
+    "os_kernel": "Linux x86_64, kernel 6.18.55",
+    "jq": "jq-1.7",
+    "sha256sum": "GNU coreutils 9.7",
+    "requires_node_or_rust": false,
+    "requires_binwalk_or_unblob": false
+  },
+  "files": {
+    "cases.json": {
+      "sha256": "39861e671ff0a204b75c69b35c8f44518558b66588e3815016382ade6d6bfbdd",
+      "git_blob_sha1": "999bcc970952da82da0957f50447519d22ee066b"
+    },
+    "oracle.json": {
+      "sha256": "0489e9c36d81041a34a61abdc1ed31b37aeb94a9e1076452d6019ef7fe46ab0c",
+      "git_blob_sha1": "67d6cd533ebc4a878c8c32e687952a6fdb38f9d6"
+    },
+    "verify.sh": {
+      "sha256": "4d108d207f5be73e39c5f1e7484c50670b0e3d2502ebc5ad7909c21762712261",
+      "git_blob_sha1": "cce1b5f76b23aec37d2c2f58b83d7ea9ffd4ba5b"
+    },
+    "README.md": {
+      "git_blob_sha1": "688d9409f136dbe47a76d8a14350f8217a602efe"
+    },
+    "property-sweep.sh": {
+      "sha256": "4ddd3d3a737242735447aea83d272f8b88ef9aae2d110ea2c9a4ebe1ed8748c7",
+      "git_blob_sha1": "6a56e5411449c998779b39db901fb727e3e05422"
+    },
+    "representation-sweep.sh": {
+      "sha256": "9119a8eea7969413efc1b132807d57259834ccd9a916cda56ed6c720d96daac7",
+      "git_blob_sha1": "4b0dfc1d96ff503d91ba204ad16068cb6898079d",
+      "bytes": 2868
+    },
+    "verify-receipt.sh": {
+      "git_blob_sha1": "fadec74dd33303856327d1285a04855cf20c3b47"
+    },
+    "mutation-controls.sh": {
+      "git_blob_sha1": "acfbf3c858e5d72c5e5bb8b755651e715e2a6e52"
+    }
+  },
+  "upstream_observation": {
+    "repository": "morluto/rea",
+    "file": "src/firmware/FirmwareReports.ts",
+    "observed_blob_sha1": "f06129aa2894e1a03a5ad573c90e432cbddd1712",
+    "candidate_fix": "https://github.com/morluto/rea/pull/4953",
+    "candidate_fix_state_at_research_time": "open draft; not assumed merged"
+  },
+  "not_run": [
+    "REA CLI or MCP",
+    "Binwalk",
+    "Unblob",
+    "Ghidra or other native-analysis provider",
+    "recovered/vendor firmware execution",
+    "emulation",
+    "physical hardware or hardware-write paths",
+    "GitHub Actions"
+  ],
+  "property_sweep_execution": {
+    "run_status": "pass",
+    "date": "2026-10-18",
+    "command": "benchmarks/rea-coverage/v1/property-sweep.sh",
+    "tested_script_git_blob_sha1": "6a56e5411449c998779b39db901fb727e3e05422",
+    "domain": "all covered/uncovered byte masks for selected-input lengths 1 through 8",
+    "case_count": 510,
+    "independent_reference": "Bytewise bitmap-to-gap-run construction, compared against the interval-union complement implementation",
+    "root_range_check": "510 deterministic selected-to-root source offsets",
+    "result": "All 510 masks accepted against the independent bytewise gap oracle; root-file offset mappings matched.",
+    "claim_ceiling": "Synthetic normalized-report property test only; not REA/Unblob provider qualification."
+  },
+  "representation_sweep_execution": {
+    "run_status": "pass",
+    "date": "2026-10-18",
+    "command": "benchmarks/rea-coverage/v1/representation-sweep.sh",
+    "tested_script_git_blob_sha1": "4b0dfc1d96ff503d91ba204ad16068cb6898079d",
+    "domain": "All subsets of valid integer byte intervals within selected lengths 1 through 5",
+    "interval_subsets": 33866,
+    "tested_representations": 169330,
+    "representations": [
+      "original interval order",
+      "reversed interval order",
+      "duplicate every interval",
+      "ascending interval length then offset",
+      "descending interval length then descending offset"
+    ],
+    "independent_reference": "Bytewise coverage enumeration and gap-run construction, independent of the interval-union complement algorithm",
+    "result": "All 169,330 representations matched the bytewise oracle with zero mismatches.",
+    "claim_ceiling": "Synthetic contract property test only; REA/Unblob provider, recovered firmware and hardware not exercised.",
+    "tested_script_sha256": "9119a8eea7969413efc1b132807d57259834ccd9a916cda56ed6c720d96daac7"
+  },
+  "automation": {
+    "workflow_path": ".github/workflows/rea-coverage-contract.yml",
+    "workflow_git_blob_sha1": "587053534ee1ab4dac43b31cc662e97aa5558a30",
+    "runner": "ubuntu-24.04",
+    "action": "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+    "enabled_lanes": [
+      "fixed known-answer corpus",
+      "510 byte-mask sweep",
+      "169330 interval-representation sweep",
+      "receipt identity verification",
+      "three fail-closed mutation controls"
+    ],
+    "status": "pass",
+    "mutation_script_git_blob_sha1": "acfbf3c858e5d72c5e5bb8b755651e715e2a6e52",
+    "last_observed_successful_run": {
+      "run_id": 39168254360,
+      "run_number": 4,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/39168254360",
+      "tested_commit": "9e7e03b22a4cd9dee98b93de22a3f4fe403b9218",
+      "conclusion": "success",
+      "all_steps_passed": [
+        "required tool check",
+        "fixed 16-case known-answer corpus",
+        "510 byte-mask property sweep",
+        "169330 interval-representation sweep",
+        "receipt integrity verification",
+        "three fail-closed mutation controls"
+      ],
+      "note": "The record is scoped to tested_commit. The next receipt-only commit triggers a fresh run; the PR conversation has the latest run URL."
+    }
+  }
+}
