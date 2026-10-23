@@ -109,7 +109,7 @@ cargo run --manifest-path tools/mesh-security-contract-audit/Cargo.toml -- \
   --out /tmp/mesh-security-contract-audit.json
 ```
 
-The emitted receipt includes the exact Git revision and SHA-256 digests for the suite, all three schemas, validator source/manifest and resolved Cargo lockfile. It labels the result `schema_and_registry_integrity_only`; it is not a security qualification. The checker explicitly disables external reference resolution and includes negative tests for remote schema references, invalid schema keywords, duplicate IDs, and undeclared property references.
+The emitted receipt includes the exact Git revision and SHA-256 digests for the suite, all three schemas, validator source/manifest and resolved Cargo lockfile. Receipt-persistence failure returns a nonzero exit instead of making a printed-but-unwritten receipt look successful. It labels the result `schema_and_registry_integrity_only`; it is not a security qualification. The checker explicitly disables external reference resolution and includes negative tests for remote schema references, invalid schema keywords, duplicate IDs, and undeclared property references.
 
 ## Next executable phase
 
