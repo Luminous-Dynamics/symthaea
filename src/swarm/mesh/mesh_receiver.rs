@@ -212,6 +212,12 @@ impl MeshReceiver {
         }
     }
 
+    /// Record that a requested fragment-AEAD receive profile could not obtain
+    /// authenticated source identity from the configured transport.
+    pub(crate) fn record_fragment_identity_unavailable(&mut self) {
+        self.stats.packets_decrypt_failed += 1;
+    }
+
     /// Set the timeout for incomplete assemblies.
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
