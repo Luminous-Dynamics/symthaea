@@ -90,6 +90,7 @@ pub struct ComparisonResult {
     pub comparison_track: String,
     pub dataset_count: usize,
     pub paired_record_count: usize,
+    pub bootstrap_method: String,
     pub bootstrap_replicates: usize,
     pub bootstrap_seed: u64,
     pub candidate_dataset_macro_mean: f64,
@@ -137,7 +138,9 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
     });
 
     let mut keys = BTreeSet::new();
-    let mut by_dataset: BTreeMap<String, Vec<(f64, f64, f64)>> = BTreeMap::new();
+    let mut by_dataset: BTreeMap<String, Vec<(u64, String, f64, f64, f64)>> = BTreeMap::new();
+    let mut by_dataset_seed: BTreeMap<String, BTreeMap<u64, Vec<(String, f64)>>> = BTreeMap::new();
+    let mut scenario_sets: BTreeMap<String, BTreeMap<u64, BTreeSet<String>>> = BTreeMap::new();
     let mut all_oriented_deltas = Vec::with_capacity(input.pairs.len());
     let mut wins = 0.0f64;
     let orientation = if input.metric.higher_is_better { 1.0 } else { -1.0 };
@@ -166,7 +169,19 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
         by_dataset
             .entry(pair.dataset_id.clone())
             .or_default()
-            .push((pair.candidate_value, pair.baseline_value, delta));
+            .push((pair.seed, pair.scenario_id.clone(), pair.candidate_value, pair.baseline_value, delta));
+        by_dataset_seed
+            .entry(pair.dataset_id.clone())
+            .or_default()
+            .entry(pair.seed)
+            .or_default()
+            .push((pair.scenario_id.clone(), delta));
+        scenario_sets
+            .entry(pair.dataset_id.clone())
+            .or_default()
+            .entry(pair.seed)
+            .or_default()
+            .insert(pair.scenario_id.clone());
     }
 
     ensure!(
@@ -176,6 +191,19 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
     let unique_seeds: BTreeSet<u64> = input.pairs.iter().map(|pair| pair.seed).collect();
     ensure!(unique_seeds.len() >= 2, "at least two distinct seeds are required");
 
+    // Require a balanced scenario panel for every dataset and seed. Resampling must
+    // not change the scenario mix while claiming a paired comparison.
+    for (dataset_id, seeds) in &scenario_sets {
+        let mut iterator = seeds.values();
+        let reference = iterator.next().context("dataset has no seed/scenario records")?;
+        for scenarios in iterator {
+            ensure!(
+                scenarios == reference,
+                "unbalanced scenario panel for dataset {dataset_id}; every seed must include the same scenarios"
+            );
+        }
+    }
+
     let dataset_ids: Vec<String> = by_dataset.keys().cloned().collect();
     let per_dataset: Vec<DatasetSummary> = by_dataset
         .iter()
@@ -184,9 +212,9 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
             DatasetSummary {
                 dataset_id: dataset_id.clone(),
                 paired_records: records.len(),
-                candidate_mean: records.iter().map(|x| x.0).sum::<f64>() / n,
-                baseline_mean: records.iter().map(|x| x.1).sum::<f64>() / n,
-                oriented_mean_delta: records.iter().map(|x| x.2).sum::<f64>() / n,
+                candidate_mean: records.iter().map(|x| x.2).sum::<f64>() / n,
+                baseline_mean: records.iter().map(|x| x.3).sum::<f64>() / n,
+                oriented_mean_delta: records.iter().map(|x| x.4).sum::<f64>() / n,
             }
         })
         .collect();
@@ -209,18 +237,24 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
     let mut rng = SplitMix64::new(input.bootstrap.seed);
     let mut bootstrap_effects = Vec::with_capacity(input.bootstrap.replicates);
 
-    // Hierarchical paired bootstrap: sample dataset clusters, then paired rows within
-    // each selected dataset. Each dataset has equal weight in the final estimate.
+    // Hierarchical paired bootstrap: sample datasets, then seeds within each sampled
+    // dataset. Keep each seed's entire scenario block intact, preserving scenario pairing.
+    // Each sampled dataset receives equal final weight.
     for _ in 0..input.bootstrap.replicates {
         let mut sample_effect_sum = 0.0;
         for _ in 0..dataset_count {
             let sampled_dataset = &dataset_ids[rng.index(dataset_count)];
-            let records = &by_dataset[sampled_dataset];
-            let mut dataset_delta_sum = 0.0;
-            for _ in 0..records.len() {
-                dataset_delta_sum += records[rng.index(records.len())].2;
+            let seeds = &by_dataset_seed[sampled_dataset];
+            let seed_ids: Vec<u64> = seeds.keys().copied().collect();
+            let mut dataset_seed_mean_sum = 0.0;
+            for _ in 0..seed_ids.len() {
+                let sampled_seed = seed_ids[rng.index(seed_ids.len())];
+                let scenario_deltas = &seeds[&sampled_seed];
+                let seed_mean = scenario_deltas.iter().map(|(_, delta)| *delta).sum::<f64>()
+                    / scenario_deltas.len() as f64;
+                dataset_seed_mean_sum += seed_mean;
             }
-            sample_effect_sum += dataset_delta_sum / records.len() as f64;
+            sample_effect_sum += dataset_seed_mean_sum / seed_ids.len() as f64;
         }
         bootstrap_effects.push(sample_effect_sum / dataset_count as f64);
     }
@@ -252,6 +286,7 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
         comparison_track: input.candidate.comparison_track,
         dataset_count,
         paired_record_count: input.pairs.len(),
+        bootstrap_method: "hierarchical-paired-bootstrap/dataset-then-seed-scenario-block/v1".to_owned(),
         bootstrap_replicates: input.bootstrap.replicates,
         bootstrap_seed: input.bootstrap.seed,
         candidate_dataset_macro_mean,
@@ -443,6 +478,15 @@ mod tests {
     fn rejects_non_finite_metrics() {
         let mut input = fixture(true);
         input.pairs[0].candidate_value = f64::NAN;
+        assert!(compare(input).is_err());
+    }
+
+    #[test]
+    fn rejects_unbalanced_scenario_panel_within_dataset() {
+        let mut input = fixture(true);
+        input.pairs.retain(|pair| {
+            !(pair.dataset_id == "dataset-a" && pair.seed == 11 && pair.scenario_id == "gradual")
+        });
         assert!(compare(input).is_err());
     }
 }
