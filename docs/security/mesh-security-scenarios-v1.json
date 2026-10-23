@@ -149,6 +149,18 @@
       "claim": "Independent implementations agree on canonical encoding, protocol transcript, key schedule, and frozen known-answer vectors.",
       "layer": "interoperability",
       "mandatory": true
+    },
+    {
+      "id": "CLONE-SAFETY",
+      "claim": "Restored or cloned sender state cannot create multiple active senders that reuse an effective key and nonce namespace.",
+      "layer": "lifecycle",
+      "mandatory": true
+    },
+    {
+      "id": "KEY-ROTATION-BOUNDARY",
+      "claim": "Key rotation creates a genuinely new effective traffic-key namespace and cannot rely on unauthenticated epoch metadata alone.",
+      "layer": "key-management",
+      "mandatory": true
     }
   ],
   "scenarios": [
@@ -306,6 +318,32 @@
       "strict_config": null,
       "implementation_target": "cross-implementation differential harness",
       "positive_control": "Known-good vector corpus passes on each supported implementation.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-NONCE-004",
+      "property": "CLONE-SAFETY",
+      "class": "adversarial",
+      "stimulus": "Snapshot a sender after nonce reservation, clone the snapshot into two active instances with the same effective key and identity, then send from both instances.",
+      "expected_legacy": "If both clones can use the same reserved counter/key namespace, their emitted nonce pairs collide. Persisted counters alone do not prevent cloning a snapshot taken after reservation.",
+      "required_replacement": "Prevent concurrent clones through a reviewed uniqueness/anti-rollback authority, obtain independently authorized fresh session keys/epochs before use, or fail closed. State explicitly which assumption provides uniqueness.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "clone-and-rollback integration trace with emitted nonce capture and effective-key test labels",
+      "positive_control": "Independent authorized sessions or instances use distinct effective key namespaces and both carry valid traffic.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-ROTATE-001",
+      "property": "KEY-ROTATION-BOUNDARY",
+      "class": "adversarial",
+      "stimulus": "Change only the claimed epoch field while retaining the same effective traffic key, then repeat a nonce counter value.",
+      "expected_legacy": "Metadata changes alone do not guarantee a distinct key/nonce pair; fragment paths that omit the epoch are unaffected by it.",
+      "required_replacement": "Receiver authenticates the transition and the sender proves a new effective key namespace or stops before nonce reuse.",
+      "model_config": "docs/security/models/packet_restart_legacy.cfg",
+      "strict_config": "docs/security/models/packet_restart_strict.cfg",
+      "implementation_target": "key-rotation boundary test captures actual key-domain labels and nonce outputs",
+      "positive_control": "Authorized traffic under newly derived key material decrypts; stale epoch traffic follows explicit receive policy.",
       "status": "proposed"
     }
   ]
