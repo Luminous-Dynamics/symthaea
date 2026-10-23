@@ -6,8 +6,12 @@
 //! Demonstrates:
 //! - Encode 5 preset materials into 16,384D
 //! - Similarity matrix (metals cluster together)
-//! - Aging prediction at 5 horizons (1 day to 50 years)
+//! - Research-only material representation drift at 5 horizons (1 day to 50 years)
 //! - Constraint search (metals with yield > 200 MPa)
+//!
+//! The CfC/HDC horizon output in this example is a representation-space drift
+//! heuristic only. It is not residual strength, fatigue life, damage, or a
+//! physical safety/qualification result.
 
 fn main() {
     println!("=== Genesis Mission Challenge 9: Materials Design ===\n");
@@ -35,19 +39,23 @@ fn main() {
         println!();
     }
 
-    // 2. Aging prediction
-    println!("\n--- Aging Predictions (Steel A36) ---");
+    // 2. Research-only temporal representation drift
+    println!("\n--- Representation-Drift Heuristic (Steel A36) ---");
     let aging_model = MaterialAgingModel::new();
     let steel = MaterialProperty::steel_a36();
     for pred in aging_model.predict_all_horizons(&steel) {
         println!(
-            "  {}: similarity={:.3}, remaining_strength={:.3}",
-            pred.horizon_label, pred.state_similarity, pred.remaining_strength
+            "  {}: state_similarity={:.3} [research heuristic only]",
+            pred.horizon_label, pred.state_similarity
         );
     }
+    println!(
+        "  claim_class={} (no residual-strength/lifetime claim)",
+        symthaea_materials::MATERIAL_AGING_CLAIM_CLASS
+    );
 
-    // 3. O(1) cost proof
-    println!("\n--- O(1) Aging Prediction Cost ---");
+    // 3. O(1) cost proof for the representation evolution only.
+    println!("\n--- O(1) Representation Prediction Cost ---");
     for &horizon in symthaea_materials::AGING_HORIZONS {
         let start = std::time::Instant::now();
         for _ in 0..1000 {
@@ -82,5 +90,5 @@ fn main() {
         );
     }
 
-    println!("\nPASS: Materials Design operational");
+    println!("\nPASS: Materials Design research demo operational");
 }
