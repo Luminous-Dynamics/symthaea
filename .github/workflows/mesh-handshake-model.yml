@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      TOOL_JAR: ${{ runner.temp }}/tla2tools.jar
+      TOOL_JAR: /tmp/tla2tools.jar
       EVIDENCE_DIR: target/mesh-formal-models
     steps:
       - name: Checkout exact source
