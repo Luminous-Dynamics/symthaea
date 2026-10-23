@@ -26,7 +26,10 @@ pub struct ResourceVector {
 
 impl ResourceVector {
     pub const fn new(latency_us: u64, energy_uj: u64) -> Self {
-        Self { latency_us, energy_uj }
+        Self {
+            latency_us,
+            energy_uj,
+        }
     }
 
     fn is_positive(self) -> bool {
@@ -44,7 +47,10 @@ pub struct ObservedResourceCost {
 
 impl ObservedResourceCost {
     pub const fn known(latency_us: u64, energy_uj: u64) -> Self {
-        Self { latency_us: Some(latency_us), energy_uj: Some(energy_uj) }
+        Self {
+            latency_us: Some(latency_us),
+            energy_uj: Some(energy_uj),
+        }
     }
 }
 
@@ -252,10 +258,14 @@ impl VectorBudgetLedgerV1 {
             return None;
         }
         Some(ResourceVector {
-            latency_us: self.capacity.latency_us
+            latency_us: self
+                .capacity
+                .latency_us
                 .checked_sub(self.charged.latency_us)?
                 .checked_sub(self.reserved.latency_us)?,
-            energy_uj: self.capacity.energy_uj
+            energy_uj: self
+                .capacity
+                .energy_uj
                 .checked_sub(self.charged.energy_uj)?
                 .checked_sub(self.reserved.energy_uj)?,
         })
@@ -297,7 +307,8 @@ impl VectorBudgetLedgerV1 {
 
         self.reserved = new_reserved;
         self.next_reservation_id = next_reservation_id;
-        self.reservations.insert(reservation_id, Reservation { trial_id, expected });
+        self.reservations
+            .insert(reservation_id, Reservation { trial_id, expected });
         Some((reservation_id, available_before))
     }
 
@@ -338,8 +349,12 @@ impl VectorBudgetLedgerV1 {
         if latency_overflow || energy_overflow {
             self.run_exceeded = true;
         }
-        if actual.latency_us.is_some_and(|cost| cost > reservation.expected.latency_us)
-            || actual.energy_uj.is_some_and(|cost| cost > reservation.expected.energy_uj)
+        if actual
+            .latency_us
+            .is_some_and(|cost| cost > reservation.expected.latency_us)
+            || actual
+                .energy_uj
+                .is_some_and(|cost| cost > reservation.expected.energy_uj)
         {
             self.reservation_overrun = true;
         }
@@ -514,7 +529,10 @@ fn validate_estimate(
     expected_input_digest: &EvidenceDigest,
 ) -> Result<f64, EstimateFailure> {
     if estimate.estimator_id.trim().is_empty()
-        || estimate.estimator_artifact_digest.iter().all(|byte| *byte == 0)
+        || estimate
+            .estimator_artifact_digest
+            .iter()
+            .all(|byte| *byte == 0)
         || estimate.loss_profile_id != expected_loss_profile
         || estimate.source_input_digest != *expected_input_digest
         || !estimate.net_benefit_lower_bound.is_finite()
@@ -543,7 +561,9 @@ fn digest_hex(digest: &EvidenceDigest) -> String {
 }
 
 fn option_u64(value: Option<u64>) -> String {
-    value.map(|number| number.to_string()).unwrap_or_else(|| "NA".to_owned())
+    value
+        .map(|number| number.to_string())
+        .unwrap_or_else(|| "NA".to_owned())
 }
 
 #[cfg(test)]
@@ -598,7 +618,10 @@ mod tests {
         assert_eq!(commit.choice, AllocationChoice::KeepCheap);
         assert_eq!(commit.reason, AllocationReason::BudgetUnavailable);
         assert_eq!(policy.budget().reserved(), ResourceVector::default());
-        assert_eq!(policy.budget().available(), Some(ResourceVector::new(10, 100)));
+        assert_eq!(
+            policy.budget().available(),
+            Some(ResourceVector::new(10, 100))
+        );
     }
 
     #[test]
@@ -610,7 +633,10 @@ mod tests {
         assert_eq!(commit.choice, AllocationChoice::KeepCheap);
         assert_eq!(commit.reason, AllocationReason::BudgetUnavailable);
         assert_eq!(policy.budget().reserved(), ResourceVector::default());
-        assert_eq!(policy.budget().available(), Some(ResourceVector::new(100, 10)));
+        assert_eq!(
+            policy.budget().available(),
+            Some(ResourceVector::new(100, 10))
+        );
     }
 
     #[test]
@@ -626,10 +652,16 @@ mod tests {
         assert_eq!(second.choice, AllocationChoice::KeepCheap);
         assert_eq!(second.reason, AllocationReason::BudgetUnavailable);
         assert_eq!(policy.budget().reserved(), ResourceVector::new(60, 60));
-        assert_eq!(policy.budget().available(), Some(ResourceVector::new(40, 40)));
+        assert_eq!(
+            policy.budget().available(),
+            Some(ResourceVector::new(40, 40))
+        );
 
         let status = policy
-            .settle(first.reservation_id.unwrap(), ObservedResourceCost::known(40, 30))
+            .settle(
+                first.reservation_id.unwrap(),
+                ObservedResourceCost::known(40, 30),
+            )
             .unwrap();
         assert_eq!(status, BudgetStatus::WithinBudget);
         assert_eq!(policy.budget().charged(), ResourceVector::new(40, 30));
@@ -646,7 +678,10 @@ mod tests {
         let status = policy
             .settle(
                 first.reservation_id.unwrap(),
-                ObservedResourceCost { latency_us: Some(25), energy_uj: None },
+                ObservedResourceCost {
+                    latency_us: Some(25),
+                    energy_uj: None,
+                },
             )
             .unwrap();
         assert_eq!(status, BudgetStatus::CostAccountingUnknown);
@@ -668,7 +703,10 @@ mod tests {
             .decide(candidate(1, Some(ResourceVector::new(20, 10)), 0.2, true))
             .unwrap();
         let status = policy
-            .settle(first.reservation_id.unwrap(), ObservedResourceCost::known(10, 11))
+            .settle(
+                first.reservation_id.unwrap(),
+                ObservedResourceCost::known(10, 11),
+            )
             .unwrap();
         assert_eq!(status, BudgetStatus::ReservationOverrun);
         assert_eq!(policy.budget().charged(), ResourceVector::new(10, 11));
@@ -682,7 +720,10 @@ mod tests {
             .decide(candidate(1, Some(ResourceVector::new(10, 20)), 0.2, true))
             .unwrap();
         let status = policy
-            .settle(first.reservation_id.unwrap(), ObservedResourceCost::known(11, 10))
+            .settle(
+                first.reservation_id.unwrap(),
+                ObservedResourceCost::known(11, 10),
+            )
             .unwrap();
         assert_eq!(status, BudgetStatus::ReservationOverrun);
         assert_eq!(policy.budget().charged(), ResourceVector::new(11, 10));
@@ -698,7 +739,10 @@ mod tests {
         let status = policy
             .settle(
                 first.reservation_id.unwrap(),
-                ObservedResourceCost { latency_us: None, energy_uj: Some(25) },
+                ObservedResourceCost {
+                    latency_us: None,
+                    energy_uj: Some(25),
+                },
             )
             .unwrap();
         assert_eq!(status, BudgetStatus::CostAccountingUnknown);
@@ -714,7 +758,10 @@ mod tests {
             .decide(candidate(1, Some(ResourceVector::new(10, 10)), 0.2, true))
             .unwrap();
         let status = policy
-            .settle(first.reservation_id.unwrap(), ObservedResourceCost::known(101, 10))
+            .settle(
+                first.reservation_id.unwrap(),
+                ObservedResourceCost::known(101, 10),
+            )
             .unwrap();
         assert_eq!(status, BudgetStatus::RunBudgetExceeded);
         assert_eq!(policy.budget().charged(), ResourceVector::new(101, 10));
@@ -733,7 +780,9 @@ mod tests {
             .decide(candidate(1, Some(ResourceVector::new(10, 10)), 0.2, true))
             .unwrap();
         let id = first.reservation_id.unwrap();
-        policy.settle(id, ObservedResourceCost::known(5, 5)).unwrap();
+        policy
+            .settle(id, ObservedResourceCost::known(5, 5))
+            .unwrap();
         assert_eq!(
             policy.settle(id, ObservedResourceCost::known(5, 5)),
             Err(AllocationError::UnknownReservation(id))
@@ -752,9 +801,7 @@ mod tests {
             Ok(BudgetStatus::WithinBudget)
         );
 
-        let (second_id, available) = ledger
-            .reserve(2, ResourceVector::new(1, 1))
-            .unwrap();
+        let (second_id, available) = ledger.reserve(2, ResourceVector::new(1, 1)).unwrap();
         assert_eq!(available, ResourceVector::new(1, 1));
         let status = ledger
             .settle(second_id, ObservedResourceCost::known(2, 1))
@@ -814,8 +861,16 @@ mod tests {
         assert_eq!(
             &fields[..10],
             [
-                "COMMIT", "7", "escalate", "positive_conservative_value", "0.200000000",
-                "10", "20", "1", "100", "100",
+                "COMMIT",
+                "7",
+                "escalate",
+                "positive_conservative_value",
+                "0.200000000",
+                "10",
+                "20",
+                "1",
+                "100",
+                "100",
             ]
         );
         assert_eq!(fields[10], "08".repeat(32).as_str());
