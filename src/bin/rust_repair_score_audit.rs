@@ -164,7 +164,7 @@ fn usage() -> &'static str {
     --evaluation-dir <scored-agent-output-dir> \\
     --report-out <score-audit-report.json>
 
-Prediction map must be {\"instance_id\":{\"model_patch\":\"...\"}}.
+Predictions may be an ID-keyed JSON object, JSONL records ({\"instance_id\":...,\"model_patch\":...}), or a JSON array of records.
 The scored evaluation directory must contain <instance_id>/evaluation_evidence.json,
 status.json, and post_patch_log.txt. Missing or unresolved runs stay in the
 assigned denominator and prevent a lockable pass@1 result."
