@@ -1143,7 +1143,11 @@ mod tests {
         fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {
             self.fire_count += 1;
             SubsystemOutput {
-                confidence_delta: snapshot.prediction_error as f64 * 0.01,
+                confidence_delta: if snapshot.prediction_error_valid != 0 {
+                    snapshot.prediction_error as f64 * 0.01
+                } else {
+                    0.0
+                },
                 ..SubsystemOutput::NEUTRAL
             }
         }
@@ -1159,6 +1163,7 @@ mod tests {
 
         let snapshot = CycleSnapshot {
             prediction_error: 0.5,
+            prediction_error_valid: 1,
             ..CycleSnapshot::default()
         };
 
