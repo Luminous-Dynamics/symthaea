@@ -51,7 +51,6 @@ struct TaskManifestRecord {
     runtime_evidence_sha256: String,
     container_image_id: String,
     network_mode: String,
-    repo_head_sha: String,
     workspace_clean: bool,
     container_ids: Vec<String>,
     fail_to_pass_count: usize,
@@ -93,7 +92,6 @@ struct ControllerTaskRecord {
     docker_image_reference: String,
     container_image_id: String,
     network_mode: String,
-    repo_head_sha: String,
     workspace_clean: bool,
 }
 
