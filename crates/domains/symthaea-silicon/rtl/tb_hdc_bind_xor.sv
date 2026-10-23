@@ -28,6 +28,11 @@ module tb_hdc_bind_xor #(
     logic [DATA_W-1:0] second_a;
     logic [DATA_W-1:0] second_b;
     logic [DATA_W-1:0] held_result;
+    localparam int unsigned MAX_ORACLE_WORDS = 4096;
+    logic [3*DATA_W-1:0] oracle_words [0:MAX_ORACLE_WORDS-1];
+    logic [3*DATA_W-1:0] oracle_row;
+    integer oracle_word_count;
+    string oracle_path;
 
     hdc_bind_xor #(.DATA_W(DATA_W)) dut (
         .clk,
@@ -45,13 +50,16 @@ module tb_hdc_bind_xor #(
         forever #5 clk = ~clk;
     end
 
-    task automatic check_xor(
+    task automatic check_xor_expected(
         input logic [DATA_W-1:0] a,
         input logic [DATA_W-1:0] b,
+        input logic [DATA_W-1:0] expected_oracle,
         input string label
     );
-        logic [DATA_W-1:0] expected;
-        expected = a ^ b;
+        logic [DATA_W-1:0] expected_local;
+        expected_local = a ^ b;
+        if (expected_oracle !== expected_local)
+            $fatal(1, "%s: software oracle disagrees with word XOR", label);
 
         @(negedge clk);
         if (in_ready !== 1'b1) $fatal(1, "%s: expected in_ready before request", label);
@@ -62,12 +70,21 @@ module tb_hdc_bind_xor #(
         @(posedge clk);
         @(negedge clk);
         if (out_valid !== 1'b1) $fatal(1, "%s: missing out_valid", label);
-        if (result !== expected) $fatal(1, "%s: XOR mismatch", label);
+        if (result !== expected_oracle)
+            $fatal(1, "%s: XOR mismatch got=%h expected=%h", label, result, expected_oracle);
 
         in_valid = 1'b0;
         @(posedge clk);  // out_ready=1: consume the result
         @(negedge clk);
         if (out_valid !== 1'b0) $fatal(1, "%s: output did not retire", label);
+    endtask
+
+    task automatic check_xor(
+        input logic [DATA_W-1:0] a,
+        input logic [DATA_W-1:0] b,
+        input string label
+    );
+        check_xor_expected(a, b, a ^ b, label);
     endtask
 
     initial begin
@@ -103,6 +120,28 @@ module tb_hdc_bind_xor #(
                 random_b[lane +: 32] = rng_b;
             end
             check_xor(random_a, random_b, "deterministic-lcg");
+        end
+
+        // Optional canonical-BinaryHV software-oracle words. Each line of
+        // the .mem file is {operand_a, operand_b, expected_xor}; byte order is
+        // frozen by hdc_rtl_oracle.rs. This is an independent software-derived
+        // expected result, not a value generated from the DUT.
+        if ($value$plusargs("ORACLE_XOR=%s", oracle_path)) begin
+            if (!$value$plusargs("ORACLE_WORDS=%d", oracle_word_count))
+                $fatal(1, "ORACLE_XOR requires +ORACLE_WORDS=<count>");
+            if (oracle_word_count < 1 || oracle_word_count > MAX_ORACLE_WORDS)
+                $fatal(1, "ORACLE_WORDS out of range: %0d", oracle_word_count);
+            $readmemh(oracle_path, oracle_words, 0, oracle_word_count - 1);
+            for (int oracle_index = 0; oracle_index < oracle_word_count; oracle_index++) begin
+                oracle_row = oracle_words[oracle_index];
+                check_xor_expected(
+                    oracle_row[3*DATA_W-1 -: DATA_W],
+                    oracle_row[2*DATA_W-1 -: DATA_W],
+                    oracle_row[DATA_W-1:0],
+                    "canonical-BinaryHV-oracle"
+                );
+            end
+            $display("PASS: hdc_bind_xor software oracle words=%0d", oracle_word_count);
         end
 
         // Backpressure must hold the first result and refuse a second input.
