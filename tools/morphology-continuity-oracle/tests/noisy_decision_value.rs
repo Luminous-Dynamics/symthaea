@@ -308,3 +308,73 @@ fn joint_hypothesis_permutations_preserve_risk_and_action_choice() {
         );
     }
 }
+
+
+fn symmetric_binary_sensor(reliability: u16) -> Measurement {
+    assert!(u64::from(reliability) <= PROBABILITY_SCALE);
+    let error_rate = (PROBABILITY_SCALE - u64::from(reliability)) as u16;
+    Measurement {
+        id: "symmetric-reliability-sweep",
+        outcomes: ["chair-like", "not-chair", "unused"],
+        likelihood_per_mille: [
+            [reliability, error_rate, 0],
+            [error_rate, reliability, 0],
+            [error_rate, reliability, 0],
+        ],
+        cost_milliunits: 1_000,
+        provenance_validated: true,
+    }
+}
+
+#[test]
+fn decision_value_has_a_measurable_reliability_threshold() {
+    let candidates = [
+        (900, 0.0),
+        (920, 0.0),
+        (930, 0.0),
+        (940, 0.0),
+        (941, 0.0),
+        (942, 0.0336),
+        (950, 0.36),
+        (975, 1.38),
+        (990, 1.992),
+        (995, 2.196),
+        (1_000, 2.4),
+    ];
+    let decisions = decisions();
+    let mut previous_value = -EPSILON;
+
+    for (reliability, expected_value) in candidates {
+        let sensor = symmetric_binary_sensor(reliability);
+        assert!(valid_likelihoods(sensor));
+        let value = evsi(sensor, PRIOR_WEIGHTS, &decisions);
+        assert!(
+            (value - expected_value).abs() <= EPSILON,
+            "unexpected EVSI at reliability {reliability}: expected {expected_value}, got {value}"
+        );
+        assert!(
+            value + EPSILON >= previous_value,
+            "EVSI decreased as symmetric sensor reliability rose to {reliability}"
+        );
+        previous_value = value;
+    }
+}
+
+#[test]
+fn prior_shift_can_eliminate_the_value_of_an_otherwise_useful_sensor() {
+    let decisions = decisions();
+    let sensor = symmetric_binary_sensor(950);
+
+    assert!((evsi(sensor, PRIOR_WEIGHTS, &decisions) - 0.36).abs() <= EPSILON);
+    assert!((evsi(sensor, [4, 4, 2], &decisions) - 0.0).abs() <= EPSILON);
+    assert!((evsi(sensor, [8, 1, 1], &decisions) - 2.08).abs() <= EPSILON);
+
+    assert_eq!(
+        choose_by_evsi_per_cost(&[sensor], [4, 4, 2], &decisions),
+        None
+    );
+    assert_eq!(
+        choose_by_evsi_per_cost(&[sensor], [8, 1, 1], &decisions).map(|item| item.id),
+        Some("symmetric-reliability-sweep")
+    );
+}
