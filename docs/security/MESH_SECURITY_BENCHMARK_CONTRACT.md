@@ -45,7 +45,7 @@ A result has a single explicit \`claim_ceiling\`; it may not be promoted to a st
 
 ## Preregistered scenarios
 
-The current registry separates nonce uniqueness, sender namespace, restart/rollback, counter wrap, fragmentation/MTU, identity/transcript binding, mutual confirmation, real backend availability, downgrade, replay, resource limits and interoperability. Each scenario declares both a legacy expectation and a required replacement observation.
+The current registry separates nonce uniqueness, sender namespace, restart/rollback, counter wrap, snapshot cloning, key-rotation boundaries, fragmentation/MTU, identity/transcript binding, mutual confirmation, real backend availability, downgrade, replay, resource limits and interoperability. Each scenario declares both a legacy expectation and a required replacement observation.
 
 The known-failure cases are calibration, never novel discoveries. An attack task counts as correctly solved only when its specified witness is reproduced and its positive controls remain green. A repair only scores when it rejects the same attack and preserves valid controls on the exact repair revision.
 
