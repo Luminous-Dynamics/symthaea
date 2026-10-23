@@ -160,6 +160,26 @@ fn eval_at(e: &Expr, point: &Experiment) -> Option<f64> {
     r.is_finite().then_some(r)
 }
 
+/// Evaluator-only equivalence check on a separate pre-generated design. This function must only
+/// be called after the policy finishes; its reference expression and points never inform search.
+fn evaluator_matches_reference(
+    candidate: &Expr,
+    reference: &Expr,
+    holdout: &[Experiment],
+) -> bool {
+    if holdout.len() < 8 {
+        return false;
+    }
+    holdout.iter().all(|point| {
+        match (eval_at(candidate, point), eval_at(reference, point)) {
+            (Some(predicted), Some(expected)) => {
+                (predicted - expected).abs() <= 1.0e-6 * (1.0 + expected.abs())
+            }
+            _ => false,
+        }
+    })
+}
+
 fn vars_used(e: &Expr, out: &mut HashSet<String>) {
     match e {
         Expr::Var(n) => {
@@ -618,6 +638,7 @@ struct TrialOutcome {
     overconfident_under_misspecification: bool,
     prequential_pit_alarm: bool,
     monitoring_protocol_invalid: bool,
+    ground_truth_equivalent: bool,
     typed_recovery_restarts: usize,
     structured_recovery_candidates: usize,
     terminal_pit_alarm: bool,
@@ -735,6 +756,7 @@ fn run_trial_with_discrepancy(
             overconfident_under_misspecification: false,
             prequential_pit_alarm: false,
             monitoring_protocol_invalid: true,
+            ground_truth_equivalent: false,
             typed_recovery_restarts: 0,
             structured_recovery_candidates: 0,
             terminal_pit_alarm: false,
@@ -787,6 +809,17 @@ fn run_trial_with_discrepancy(
             candidate_pool.push(e);
         }
     }
+    // Independent evaluator-only points: never passed to the experiment selector or recovery
+    // generator. Ground-truth equivalence is scored only after the adaptive policy terminates.
+    let mut evaluator_rng = seed ^ 0xE7A1_0A7A_2026_0001;
+    let mut holdout: Vec<Experiment> = Vec::with_capacity(64);
+    while holdout.len() < 64 {
+        let point = random_experiment(&mut evaluator_rng);
+        if eval_at(&ground_truth, &point).is_some() {
+            holdout.push(point);
+        }
+    }
+
     let mut fixed_order = candidate_pool.clone();
     let mut order_rng = seed ^ 0x9999_8888_7777_6666;
     shuffle(&mut order_rng, &mut fixed_order);
@@ -1084,11 +1117,17 @@ fn run_trial_with_discrepancy(
         }
     }
 
+    let ground_truth_equivalent = live.len() == 1
+        && evaluator_matches_reference(
+            &hypotheses[live[0]],
+            &ground_truth,
+            &holdout,
+        );
+
     TrialOutcome {
         rounds_used: round,
         success: systematic_discrepancy == 0.0
-            && live.len() == 1
-            && live[0] == 0
+            && ground_truth_equivalent
             && !terminal_pit_alarm
             && !monitoring_protocol_invalid,
         final_live: live.len(),
@@ -1101,6 +1140,7 @@ fn run_trial_with_discrepancy(
             && !prequential_pit_alarm,
         prequential_pit_alarm,
         monitoring_protocol_invalid,
+        ground_truth_equivalent,
         typed_recovery_restarts,
         structured_recovery_candidates,
         terminal_pit_alarm,
@@ -1544,6 +1584,41 @@ mod tests {
         assert!(round_ci_low.is_finite() && round_ci_high.is_finite());
         assert!((0.0..=1.0).contains(&(raw_successes as f64 / SEEDS as f64)));
         assert!((0.0..=1.0).contains(&(eig_successes as f64 / SEEDS as f64)));
+    }
+
+    #[test]
+    fn evaluator_equivalence_requires_independent_heldout_points() {
+        let reference = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".to_string())),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let equivalent = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Const(0.5)),
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Const(2.0)),
+                Box::new(reference.clone()),
+            )),
+        );
+        let non_equivalent = Expr::BinOp(
+            BinOp::Add,
+            Box::new(reference.clone()),
+            Box::new(Expr::Const(0.5)),
+        );
+        let mut rng = 0xE7A1_0A7A_2026_0001_u64;
+        let holdout: Vec<Experiment> = (0..64)
+            .map(|_| random_experiment(&mut rng))
+            .collect();
+
+        assert!(evaluator_matches_reference(&equivalent, &reference, &holdout));
+        assert!(!evaluator_matches_reference(&non_equivalent, &reference, &holdout));
+        assert!(!evaluator_matches_reference(&equivalent, &reference, &holdout[..4]));
     }
 
     #[test]
