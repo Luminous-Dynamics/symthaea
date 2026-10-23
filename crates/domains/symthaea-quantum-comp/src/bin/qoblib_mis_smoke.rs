@@ -187,6 +187,8 @@ struct MultiStartGreedyResult {
     best_seed: u64,
     objectives: Vec<usize>,
     distinct_solutions: usize,
+    /// One QOBLIB-compatible incumbent time series per independently seeded run.
+    objective_time_series: Vec<Vec<(u128, usize)>>,
 }
 
 fn multi_start_greedy(graph: &MisGraph, repeats: usize) -> MultiStartGreedyResult {
@@ -194,12 +196,15 @@ fn multi_start_greedy(graph: &MisGraph, repeats: usize) -> MultiStartGreedyResul
     let mut best_vertices = Vec::new();
     let mut best_seed = MULTISTART_GREEDY_SEED_BASE;
     let mut objectives = Vec::with_capacity(repeats);
+    let mut objective_time_series = Vec::with_capacity(repeats);
     let mut unique_solutions = BTreeSet::new();
 
     for run_index in 0..repeats {
         let seed = MULTISTART_GREEDY_SEED_BASE.wrapping_add(run_index as u64);
-        let vertices = greedy_min_residual_degree_with_seed(graph, Some(seed));
+        let run = greedy_min_residual_degree_with_seed_trace(graph, Some(seed));
+        let vertices = run.vertices;
         objectives.push(vertices.len());
+        objective_time_series.push(run.objective_time_series);
         unique_solutions.insert(vertices.clone());
         if vertices.len() > best_vertices.len()
             || (vertices.len() == best_vertices.len() && vertices < best_vertices)
@@ -214,6 +219,7 @@ fn multi_start_greedy(graph: &MisGraph, repeats: usize) -> MultiStartGreedyResul
         best_seed,
         objectives,
         distinct_solutions: unique_solutions.len(),
+        objective_time_series,
     }
 }
 
@@ -228,6 +234,8 @@ struct LocalImprovementResult {
     exchanges: usize,
     pair_checks: usize,
     locally_optimal: bool,
+    /// QOBLIB-compatible incumbent observations relative to this stage's start.
+    objective_time_series: Vec<(u128, usize)>,
 }
 
 /// Repeatedly replace one selected vertex by two mutually nonadjacent compatible
@@ -239,6 +247,7 @@ fn improve_one_for_two(
     initial: &[usize],
     pair_check_budget: usize,
 ) -> LocalImprovementResult {
+    let search_start = Instant::now();
     let vertex_count = graph.vertex_count();
     let mut adjacency = vec![Vec::new(); vertex_count];
     for &(u, v) in graph.edges() {
@@ -257,6 +266,8 @@ fn improve_one_for_two(
     }
     let mut exchanges = 0usize;
     let mut pair_checks = 0usize;
+    let initial_objective = selected.iter().filter(|&&keep| keep).count();
+    let mut objective_time_series = vec![(0_u128, initial_objective)];
 
     loop {
         let mut selected_neighbor_count = vec![0usize; vertex_count];
@@ -293,9 +304,13 @@ fn improve_one_for_two(
                         let vertices = selected.iter().enumerate()
                             .filter_map(|(vertex, &keep)| keep.then_some(vertex))
                             .collect();
+                        let elapsed = search_start.elapsed().as_nanos();
+                        let last_time = objective_time_series.last().map(|point| point.0).unwrap_or(0);
+                        objective_time_series.push((elapsed.max(last_time), vertices.len()));
                         return LocalImprovementResult {
                             vertices, exchanges, pair_checks,
                             locally_optimal: false,
+                            objective_time_series,
                         };
                     }
                     pair_checks += 1;
@@ -311,14 +326,20 @@ fn improve_one_for_two(
             let vertices = selected.iter().enumerate()
                 .filter_map(|(vertex, &keep)| keep.then_some(vertex))
                 .collect();
+            let elapsed = search_start.elapsed().as_nanos();
+            let last_time = objective_time_series.last().map(|point| point.0).unwrap_or(0);
+            objective_time_series.push((elapsed.max(last_time), vertices.len()));
             return LocalImprovementResult {
                 vertices, exchanges, pair_checks, locally_optimal: true,
+                objective_time_series,
             };
         };
         selected[removed] = false;
         selected[left] = true;
         selected[right] = true;
         exchanges += 1;
+        let objective = selected.iter().filter(|&&keep| keep).count();
+        objective_time_series.push((search_start.elapsed().as_nanos(), objective));
     }
 }
 
