@@ -94,6 +94,8 @@ jobs:
         run: cargo test -p symthaea-physics-bridge extrapolation_design_is_outside_every_training_variable_interval --lib
       - name: Test extrapolation law equivalence
         run: cargo test -p symthaea-physics-bridge extrapolation_equivalence_distinguishes_an_equivalent_law_from_a_shift --lib
+      - name: Benchmark truth-absent recovery without oracle candidates
+        run: cargo test -p symthaea-physics-bridge truth_absent_recovery_is_reported_separately_from_oracle_present_discrimination --lib -- --nocapture
       - name: Run robust noise-envelope pilot
         run: cargo test -p symthaea-physics-bridge scenario_robust_eig_vs_nominal_eig_pilot --lib -- --nocapture
       - name: Strict Clippy for the core library
