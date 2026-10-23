@@ -1086,8 +1086,10 @@ mod tests {
         assert_eq!(router_fields[17], "15000");
         assert_eq!(router_fields[21], "false");
         assert_eq!(router_fields[24], "true");
-        assert_eq!(router_fields[10], "1");
-        assert_eq!(router_fields[11], "0");
+        assert_eq!(router_fields[23], "0");
+        assert_eq!(router_fields[24], "true");
+        assert_eq!(router_fields[10], "0");
+        assert_eq!(router_fields[11], "1");
     }
 
     #[test]
