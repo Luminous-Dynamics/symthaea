@@ -2548,3 +2548,7 @@ name = "action_semantics_probe"
 # Fixed, human-readable consent-state confusion matrix (diagnostic only).
 [[example]]
 name = "consent_semantics_bench"
+
+# Exhaustive synthetic consent-policy and point-of-use closure invariant matrix.
+[[example]]
+name = "consent_gate_matrix_bench"
