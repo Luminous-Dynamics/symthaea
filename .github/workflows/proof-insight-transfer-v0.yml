@@ -590,17 +590,22 @@ jobs:
           PITB_REPO_ROOT="$GITHUB_WORKSPACE" cargo test --locked --bin analyze_proof_state_intervention
           cargo run --locked --bin analyze_proof_state_intervention -- "$suite" "$outcomes" test "$report" 1000 17
 
-          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$report" "$report_schema" <<'PY'
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$report" "$report_schema" "$GITHUB_WORKSPACE/crates/bridges/symthaea-proof-insights/src/bin/analyze_proof_state_intervention.rs" <<'PY'
+          import hashlib
           import json
           import sys
           from pathlib import Path
           from jsonschema import Draft202012Validator, FormatChecker
 
-          report_path, schema_path = map(Path, sys.argv[1:])
+          report_path, schema_path, analyzer_path = map(Path, sys.argv[1:])
           report = json.loads(report_path.read_text())
           schema = json.loads(schema_path.read_text())
           Draft202012Validator.check_schema(schema)
           Draft202012Validator(schema, format_checker=FormatChecker()).validate(report)
+          expected_source_digest = hashlib.sha256(analyzer_path.read_bytes()).hexdigest()
+          assert report["analyzer_source_sha256"] == expected_source_digest, (
+              "report analyzer digest does not match checked-in Rust source"
+          )
 
           assert report["dataset_kind"] == "synthetic_fixture"
           assert report["split"] == "test"
