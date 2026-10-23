@@ -28,14 +28,17 @@
 //!
 //! ## Validity is enforced, not assumed
 //!
-//! [`ForecastDistribution`], [`ForecastBranch`], [`Probability`] and [`Interval`] have private
-//! storage and validated constructors — see the [`validated`] module docs for the empirical
-//! reason (invalid probabilities used to score *better* than valid ones, making the neutral
-//! comparison layer non-neutral over its own accepted input space).
+//! [`ForecastDistribution`], [`ForecastPayload`], [`ForecastBranch`], [`Probability`] and
+//! [`Interval`] have private storage and validated constructors. `ForecastDistribution` retains
+//! the existing tick-indexed simulation contract; `ForecastPayload` contains only the validated
+//! probability/outcome surface so external or calendar-time scenario families do not need fake
+//! ticks merely to participate in scoring and evidence recording.
 
 use serde::{Deserialize, Serialize};
 
+pub mod payload;
 pub mod validated;
+pub use payload::ForecastPayload;
 pub use validated::{
     ForecastBranch, ForecastDistribution, ForecastError, Interval, MASS_TOLERANCE, Probability,
 };
@@ -63,7 +66,7 @@ pub enum OutcomeRegion {
 }
 
 impl OutcomeRegion {
-    /// Build an `Interval` region from raw bounds, validating them.
+    /// Build an `Interval` region from raw bounds, validating them on the way in.
     pub fn interval(low: f64, high: f64) -> Result<Self, ForecastError> {
         Ok(Self::Interval(Interval::new(low, high)?))
     }
@@ -80,8 +83,9 @@ impl OutcomeRegion {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AssumptionId(pub String);
 
-/// How many ticks ahead a forecast reaches. A plain newtype, not a duration type — Symtropy-side
-/// scenarios (see `symthaea-futures-symtropy`) are tick-indexed, not wall-clock-indexed.
+/// How many ticks ahead a legacy simulation forecast reaches. The neutral v2 ledger does not
+/// require this type; calendar/external scenario families bind time semantics separately from
+/// [`ForecastPayload`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Horizon(pub u64);
 
@@ -107,10 +111,12 @@ pub enum ForecastOutput {
     Abstain(AbstentionReason),
 }
 
-/// Implemented by every predictor competing in the lab — the naive persistence baseline, the
-/// FEP-driven ensemble, the oracle upper bound, and (Phase 3B, gated) any quantum lane. Generic
-/// over `Observation` so this crate never needs to know what a scenario family's observation
-/// type looks like; `symthaea-futures-symtropy` owns that (see its `ObservationPolicy`).
+/// Implemented by every predictor competing in the legacy tick-indexed lab — the naive
+/// persistence baseline, the FEP-driven ensemble, the oracle upper bound, and (Phase 3B, gated)
+/// any quantum lane. Generic over `Observation` so this crate never needs to know what a
+/// scenario family's observation type looks like; `symthaea-futures-symtropy` owns that (see its
+/// `ObservationPolicy`). Calendar/external adapters can emit [`ForecastPayload`] without being
+/// forced through this tick-specific trait.
 pub trait TrajectoryGenerator {
     type Observation;
 
