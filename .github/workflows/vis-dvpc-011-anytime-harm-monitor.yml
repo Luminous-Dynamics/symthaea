@@ -1,0 +1,45 @@
+name: VIS-DVPC-011 anytime-valid harm monitor
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-anytime-harm-monitor.rs"
+      - "docs/research/VIS_DVPC_011_ANYTIME_HARM_MONITOR_V1.md"
+      - ".github/workflows/vis-dvpc-011-anytime-harm-monitor.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-anytime-harm-monitor.rs"
+      - "docs/research/VIS_DVPC_011_ANYTIME_HARM_MONITOR_V1.md"
+      - ".github/workflows/vis-dvpc-011-anytime-harm-monitor.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust with rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check tools/vision-dvpc-anytime-harm-monitor.rs
+
+      - name: Compile and run anytime-valid contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2024 --test tools/vision-dvpc-anytime-harm-monitor.rs -o /tmp/vis-dvpc-011-tests
+          /tmp/vis-dvpc-011-tests --test-threads=1 2>&1 | tee /tmp/vis-dvpc-011-test.log
+          grep -E 'test result: ok\. 12 passed; 0 failed;' /tmp/vis-dvpc-011-test.log
+
+      - name: Record exact-head evidence
+        run: |
+          git rev-parse HEAD
+          sha256sum tools/vision-dvpc-anytime-harm-monitor.rs docs/research/VIS_DVPC_011_ANYTIME_HARM_MONITOR_V1.md
