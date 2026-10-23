@@ -1,0 +1,95 @@
+name: Mesh Runtime Nonce Pair Oracle
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "src/swarm/mesh/mod.rs"
+      - "src/swarm/mesh/tests.rs"
+      - "src/swarm/mesh/dual_layer.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/mesh-runtime-nonce-oracle.yml"
+  push:
+    branches: ["**"]
+    paths:
+      - "src/swarm/mesh/mod.rs"
+      - "src/swarm/mesh/tests.rs"
+      - "src/swarm/mesh/dual_layer.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/mesh-runtime-nonce-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mesh-runtime-nonce-oracle-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-mesh-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+      EVIDENCE_DIR: target/mesh-runtime-nonce-oracle
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install repository Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Record toolchain and exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          {
+            printf 'git_head=%s\n' "$(git rev-parse HEAD)"
+            printf 'rustc='; rustc --version
+            printf 'cargo='; cargo --version
+            printf 'command=cargo test --lib --features mesh-encryption -- swarm::mesh --nocapture --test-threads=1\n'
+            sha256sum src/swarm/mesh/mod.rs src/swarm/mesh/tests.rs               src/swarm/mesh/dual_layer.rs Cargo.toml Cargo.lock rust-toolchain.toml
+          } > "$EVIDENCE_DIR/input-manifest.txt"
+
+      - name: Check formatting for the focused test module
+        shell: bash
+        run: rustfmt --edition 2024 --check src/swarm/mesh/tests.rs
+
+      - name: Run focused encrypted mesh test suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          cargo test --lib --features mesh-encryption -- swarm::mesh --nocapture --test-threads=1             2>&1 | tee "$EVIDENCE_DIR/cargo-test.log"
+
+      - name: Record final evidence digest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          printf 'git_head=%s\n' "$(git rev-parse HEAD)"             > "$EVIDENCE_DIR/final-manifest.txt"
+          if [ -f "$EVIDENCE_DIR/cargo-test.log" ]; then
+            sha256sum "$EVIDENCE_DIR/cargo-test.log" >> "$EVIDENCE_DIR/final-manifest.txt"
+          fi
+          if [ -f "$EVIDENCE_DIR/input-manifest.txt" ]; then
+            sha256sum "$EVIDENCE_DIR/input-manifest.txt" >> "$EVIDENCE_DIR/final-manifest.txt"
+          fi
+
+      - name: Upload exact-head test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mesh-runtime-nonce-oracle-${{ github.sha }}
+          path: target/mesh-runtime-nonce-oracle/
+          if-no-files-found: error
+          retention-days: 30
