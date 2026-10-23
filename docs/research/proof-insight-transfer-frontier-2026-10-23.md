@@ -102,6 +102,12 @@ Suggested initial success criteria to preregister and challenge:
 
 These thresholds may be revised before data collection if power, reviewer agreement, or task eligibility makes them unsuitable. After the test is opened, changes must be labelled exploratory and require a new held-out evaluation for confirmation.
 
+## Implementation progress: paired proof-state outcome contract
+
+PITB now adds `proof-state-intervention-outcome.schema.json` and `fixtures/proof-state-intervention-outcomes.synthetic.json`. Each state-side row is bound to the suite's exact base or variant outcome ID, case/pair/component/split, source insight digest, expected action policy, target statement, goal/environment, local-context and snapshot hashes. The row format reserves separate fields for observed action, whether the original move was applied, exact-target checker result, proof digest, run receipt, and measured resource use.
+
+The schema has a mandatory `not_run` representation and a conditional `executed` representation. An executed record requires model/configuration identity, an observed decision, the checker result, a run receipt, and resource counters; a checked success requires a proof digest. The checked-in synthetic fixture has eight state rows for four base/variant pairs and all remain `not_run`. A new workflow step cross-checks every row against the paired suite and adds nine malformed-row controls. A local JavaScript simulation of those cross-field joins rejected all nine controls; the independent Draft 2020-12 validator and actual CI step still need to run, so this is not a CI pass or a measured system outcome.
+
 ## What “beat SOTA” should mean here
 
 First reproduce a relevant baseline on the same eligible tasks, checker/toolchain, context budget, attempt budget, and model availability. Then show incremental value from the insight representation against the strongest eligible retrieval baseline, with paired uncertainty intervals, safety slices, and cost reporting. A result on PITB's task is **a PITB result** until independently replicated; it does not imply that Symthaea beats Goedel-Prover-V2 on MiniF2F, LeanSearch v2 on premise retrieval, or a SorryDB leaderboard entry.
