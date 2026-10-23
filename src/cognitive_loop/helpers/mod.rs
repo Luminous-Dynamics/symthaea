@@ -653,19 +653,31 @@ impl CognitiveLoopService {
     }
 
     pub(super) fn update_stats(&mut self, error: f32, cycle_time: Duration) {
-        // EMA for error
-        let alpha = ERROR_EMA_ALPHA;
-        self.stats.avg_prediction_error =
-            self.stats.avg_prediction_error * (1.0 - alpha) + error * alpha;
-        self.stats.avg_prediction_error_sq =
-            self.stats.avg_prediction_error_sq * (1.0 - alpha) + (error * error) * alpha;
+        self.update_stats_with_evidence(Some(error), cycle_time);
+    }
 
-        // Error trend — capacity bound: 100 elements, evict before push
-        if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
-            self.error_history.pop_front();
+    /// Update cycle-wide telemetry while admitting prediction-error statistics
+    /// only when a genuine finite comparison exists.
+    pub(super) fn update_stats_with_evidence(
+        &mut self,
+        error_evidence: Option<f32>,
+        cycle_time: Duration,
+    ) {
+        if let Some(error) = error_evidence.filter(|value| value.is_finite()) {
+            // EMA for prediction error
+            let alpha = ERROR_EMA_ALPHA;
+            self.stats.avg_prediction_error =
+                self.stats.avg_prediction_error * (1.0 - alpha) + error * alpha;
+            self.stats.avg_prediction_error_sq =
+                self.stats.avg_prediction_error_sq * (1.0 - alpha) + (error * error) * alpha;
+
+            // Error trend — capacity bound: 100 elements, evict before push
+            if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
+                self.error_history.pop_front();
+            }
+            self.error_history.push_back(error);
+            self.stats.error_trend = self.compute_error_trend();
         }
-        self.error_history.push_back(error);
-        self.stats.error_trend = self.compute_error_trend();
 
         // Attention stats from encoder
         let encoder_stats = self.encoder.stats();
