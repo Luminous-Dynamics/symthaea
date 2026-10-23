@@ -152,7 +152,8 @@
               "checker_result",
               "proof_sha256",
               "run_receipt_sha256",
-              "resource_usage"
+              "resource_usage",
+              "budget_caps"
             ],
             "properties": {
               "status": {
@@ -312,6 +313,46 @@
                     "type": "null"
                   }
                 ]
+              },
+              "budget_caps": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "model_calls",
+                      "input_tokens",
+                      "output_tokens",
+                      "wall_time_ms",
+                      "cost_microusd"
+                    ],
+                    "properties": {
+                      "model_calls": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "input_tokens": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "output_tokens": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "wall_time_ms": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "cost_microusd": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "allOf": [
@@ -353,6 +394,9 @@
                       "type": "null"
                     },
                     "checked_target_statement_sha256": {
+                      "type": "null"
+                    },
+                    "budget_caps": {
                       "type": "null"
                     }
                   }
@@ -516,6 +560,25 @@
                   "properties": {
                     "applicability_judgment": {
                       "const": "eligible"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "executed"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "budget_caps": {
+                      "type": "object"
                     }
                   }
                 }
