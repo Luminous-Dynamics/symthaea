@@ -188,6 +188,7 @@ impl ActiveInferenceBridge {
 
         PrincipledSignals {
             prediction_error,
+            prediction_error_valid: true,
             uncertainty,
             coherence,
             confidence,
