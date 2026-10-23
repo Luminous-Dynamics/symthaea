@@ -57,5 +57,6 @@
     "result_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
     "log_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
   },
-  "notes": "SYNTHETIC STRUCTURE FIXTURE ONLY. These values are placeholders and are not measured benchmark output."
+  "notes": "SYNTHETIC STRUCTURE FIXTURE ONLY. These values are placeholders and are not measured benchmark output.",
+  "evaluation_mode": "single_fidelity"
 }
