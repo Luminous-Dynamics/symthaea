@@ -171,6 +171,21 @@ impl PredictionErrorEvidence {
         self.status
     }
 
+    /// Report staleness relative to a consumer's requested observation cycle.
+    #[inline]
+    pub fn status_for_observation(
+        &self,
+        observation_cycle: u64,
+    ) -> PredictionEvidenceStatus {
+        if self.status == PredictionEvidenceStatus::Valid
+            && self.observation_cycle != observation_cycle
+        {
+            PredictionEvidenceStatus::StaleOrOutOfOrder
+        } else {
+            self.status
+        }
+    }
+
     /// Originating cycle for the prediction, when known.
     #[inline]
     pub fn prediction_cycle(&self) -> Option<u64> {
@@ -188,9 +203,7 @@ impl PredictionErrorEvidence {
     /// though it were a fresh outcome.
     #[inline]
     pub fn value_for_observation(&self, observation_cycle: u64) -> Option<f32> {
-        if self.status != PredictionEvidenceStatus::Valid
-            || self.observation_cycle != observation_cycle
-        {
+        if self.status_for_observation(observation_cycle) != PredictionEvidenceStatus::Valid {
             return None;
         }
         self.value.filter(|value| value.is_finite())
@@ -239,6 +252,48 @@ mod tests {
     fn invalid_constructor_rejects_valid_status() {
         assert!(PredictionErrorEvidence::invalid(PredictionEvidenceStatus::Valid, None, 1).is_err());
         assert!(PredictionErrorEvidence::valid(f32::NAN, None, 1).is_err());
+    }
+
+    #[test]
+    fn stale_evidence_is_classified_and_cannot_be_consumed() {
+        let evidence = PredictionErrorEvidence::valid(0.5, Some(10), 11).unwrap();
+        assert_eq!(
+            evidence.status_for_observation(12),
+            PredictionEvidenceStatus::StaleOrOutOfOrder
+        );
+        assert_eq!(evidence.value_for_observation(12), None);
+    }
+
+    #[test]
+    fn deterministic_10k_payload_sweep_fails_closed() {
+        // Fixed xorshift sequence: reproducible coverage without an extra
+        // property-testing dependency. This tests the typed boundary, not all
+        // downstream cognitive-loop consumers.
+        let mut bits = 0xC0FF_EE01u32;
+        for index in 0..10_000u64 {
+            bits ^= bits << 13;
+            bits ^= bits >> 17;
+            bits ^= bits << 5;
+
+            let payload = f32::from_bits(bits);
+            let valid_flag = index % 3 != 0;
+            let evidence = PredictionErrorEvidence::from_compatibility_fields(
+                payload,
+                valid_flag,
+                Some(index.saturating_sub(1)),
+                index,
+            );
+
+            let expected = if !valid_flag {
+                None
+            } else if payload.is_finite() {
+                Some(payload)
+            } else {
+                None
+            };
+            assert_eq!(evidence.value_for_observation(index), expected);
+            assert_eq!(evidence.value_for_observation(index.saturating_add(1)), None);
+        }
     }
 
     #[test]
