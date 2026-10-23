@@ -27,6 +27,7 @@ on:
       - "docs/research/REFERENCE_FREE_DETECTOR_PANEL_V0_1.md"
       - "docs/research/STRATIFIED_PROBE_DETECTOR_PANEL_V0_1.md"
       - "docs/research/DELAYED_OUTCOME_VALIDATION_V0_1.md"
+      - "docs/research/CONTROL_ADJUSTED_OUTCOME_V0_1.md"
       - ".github/workflows/expected-information-gain-selector.yml"
   workflow_dispatch:
 
