@@ -183,7 +183,10 @@ pub struct ReceiptAttestationVerificationReport {
     pub policy_fingerprint: String,
     pub environment_identity: VerifierEnvironmentIdentity,
     pub environment_fingerprint: String,
-    /// Fingerprint of the resolver's durable view, when resolution was performed.
+    /// Fingerprint of the exact verification method security state consulted during resolution.
+    ///
+    /// The frozen v2 report field is retained for wire compatibility; its value is now
+    /// causally local to the resolved method rather than the resolver's entire map.
     pub resolution_snapshot_fingerprint: Option<String>,
     pub resolved_verification_method: Option<String>,
     pub structural_validation: VerificationStage,
@@ -414,6 +417,34 @@ impl ResolvedVerificationMethod {
             .iter()
             .any(|purpose| purpose == proof_purpose)
     }
+
+    /// Fingerprint only the security-relevant state of the method actually consulted.
+    ///
+    /// This intentionally excludes unrelated resolver entries so historical verification
+    /// evidence changes only when the causal resolution subject changes. Purpose ordering
+    /// and duplicate entries are normalized as a set.
+    pub fn snapshot_fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:verification-method-resolution:v2\n");
+        hasher.update(&(self.verification_method.len() as u64).to_be_bytes());
+        hasher.update(self.verification_method.as_bytes());
+        hasher.update(&self.verifying_key.to_bytes());
+        hasher.update(&[match self.status {
+            VerificationMethodStatus::Active => 0,
+            VerificationMethodStatus::Revoked => 1,
+            VerificationMethodStatus::Expired => 2,
+            VerificationMethodStatus::Unknown => 3,
+        }]);
+        let mut purposes = self.allowed_proof_purposes.clone();
+        purposes.sort();
+        purposes.dedup();
+        hasher.update(&(purposes.len() as u64).to_be_bytes());
+        for purpose in &purposes {
+            hasher.update(&(purpose.len() as u64).to_be_bytes());
+            hasher.update(purpose.as_bytes());
+        }
+        hasher.finalize().to_hex().to_string()
+    }
 }
 
 /// Application-supplied verification-method resolver.
@@ -470,6 +501,9 @@ impl VerificationMethodResolver for InMemoryVerificationMethodResolver {
     }
 
     fn snapshot_fingerprint(&self) -> Option<String> {
+        // Retain the resolver-wide fingerprint as an explicit legacy/diagnostic view.
+        // Verification reports use ResolvedVerificationMethod::snapshot_fingerprint()
+        // after resolution so unrelated entries cannot perturb causal evidence.
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea:verification-method-resolver-snapshot:v1\n");
         for (method_id, method) in &self.methods {
@@ -615,10 +649,12 @@ impl Ed25519ReceiptVerifier {
         resolver: &R,
     ) -> ReceiptAttestationVerificationReport {
         let mut report = self.verify_with_resolver_report_inner(envelope, receipt, resolver);
-        report.resolution_snapshot_fingerprint = self
-            .resolution_snapshot_fingerprint
-            .clone()
-            .or_else(|| resolver.snapshot_fingerprint());
+        if report.resolution_snapshot_fingerprint.is_none() {
+            report.resolution_snapshot_fingerprint = self
+                .resolution_snapshot_fingerprint
+                .clone()
+                .or_else(|| resolver.snapshot_fingerprint());
+        }
         report
     }
 
@@ -712,8 +748,14 @@ impl Ed25519ReceiptVerifier {
                 );
             }
         };
+        let resolution_snapshot_fingerprint = resolved.snapshot_fingerprint();
+        let with_resolution_fingerprint = |mut report: ReceiptAttestationVerificationReport| {
+            report.resolution_snapshot_fingerprint = Some(resolution_snapshot_fingerprint.clone());
+            report
+        };
+
         if resolved.verification_method != method {
-            return ReceiptAttestationVerificationReport::failed(
+            return with_resolution_fingerprint(ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
@@ -721,12 +763,17 @@ impl Ed25519ReceiptVerifier {
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
-            );
+            ));
         }
+
+            report.resolution_snapshot_fingerprint = Some(resolution_snapshot_fingerprint.clone());
+            report
+        };
+
         match resolved.status {
             VerificationMethodStatus::Active => {}
             VerificationMethodStatus::Revoked => {
-                return ReceiptAttestationVerificationReport::failed(
+                return with_resolution_fingerprint(ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::VerificationMethodRevoked,
                     VerificationStage::Failed,
                     receipt.fingerprint(),
@@ -734,10 +781,10 @@ impl Ed25519ReceiptVerifier {
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
-                );
+                ));
             }
             VerificationMethodStatus::Expired => {
-                return ReceiptAttestationVerificationReport::failed(
+                return with_resolution_fingerprint(ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::VerificationMethodExpired,
                     VerificationStage::Failed,
                     receipt.fingerprint(),
@@ -745,10 +792,10 @@ impl Ed25519ReceiptVerifier {
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
-                );
+                ));
             }
             VerificationMethodStatus::Unknown => {
-                return ReceiptAttestationVerificationReport::failed(
+                return with_resolution_fingerprint(ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
                     VerificationStage::Failed,
                     receipt.fingerprint(),
@@ -756,11 +803,11 @@ impl Ed25519ReceiptVerifier {
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
-                );
+                ));
             }
         }
         if !resolved.is_authorized_for(&envelope.proof_purpose) {
-            return ReceiptAttestationVerificationReport::failed(
+            return with_resolution_fingerprint(ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
@@ -768,9 +815,12 @@ impl Ed25519ReceiptVerifier {
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
-            );
+            ));
         }
-        self.verify_with_resolved_key_report(envelope, receipt, method, &resolved.verifying_key)
+        let mut report =
+            self.verify_with_resolved_key_report(envelope, receipt, method, &resolved.verifying_key);
+        report.resolution_snapshot_fingerprint = Some(resolution_snapshot_fingerprint);
+        report
     }
 
     fn verify_with_resolved_key(
@@ -1341,6 +1391,97 @@ mod tests {
             report.resolution_snapshot_fingerprint,
             changed_report.resolution_snapshot_fingerprint
         );
+    }
+
+    #[test]
+    fn resolver_snapshot_is_local_to_consulted_method() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let target = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let unrelated = ResolvedVerificationMethod {
+            verification_method: "did:example:unrelated#key-9".into(),
+            verifying_key: SigningKey::from_bytes(&[9u8; 32]).verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["authentication".into()],
+        };
+        let target_only = InMemoryVerificationMethodResolver::new([target.clone()]);
+        let target_plus_unrelated =
+            InMemoryVerificationMethodResolver::new([target, unrelated]);
+        let verifier = Ed25519ReceiptVerifier::new(
+            "ignored-by-resolver",
+            signing_key.verifying_key(),
+            150,
+        );
+        let first = verifier.verify_with_resolver_report(&envelope, &receipt, &target_only);
+        let second =
+            verifier.verify_with_resolver_report(&envelope, &receipt, &target_plus_unrelated);
+        assert_eq!(
+            first.resolution_snapshot_fingerprint,
+            second.resolution_snapshot_fingerprint
+        );
+        assert_eq!(first.fingerprint(), second.fingerprint());
+    }
+
+    #[test]
+    fn resolver_snapshot_changes_for_consulted_method_security_state() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let active = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let changed_key = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: SigningKey::from_bytes(&[8u8; 32]).verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let verifier = Ed25519ReceiptVerifier::new(
+            "ignored-by-resolver",
+            signing_key.verifying_key(),
+            150,
+        );
+        let active_report = verifier.verify_with_resolver_report(
+            &envelope,
+            &receipt,
+            &InMemoryVerificationMethodResolver::new([active]),
+        );
+        let changed_report = verifier.verify_with_resolver_report(
+            &envelope,
+            &receipt,
+            &InMemoryVerificationMethodResolver::new([changed_key]),
+        );
+        assert_ne!(
+            active_report.resolution_snapshot_fingerprint,
+            changed_report.resolution_snapshot_fingerprint
+        );
+    }
+
+    #[test]
+    fn resolver_snapshot_normalizes_purpose_order_and_duplicates() {
+        let (_, signing_key, _) = envelope_and_key();
+        let first = ResolvedVerificationMethod {
+            verification_method: "did:example:key".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec![
+                "z-purpose".into(),
+                "a-purpose".into(),
+                "z-purpose".into(),
+            ],
+        };
+        let second = ResolvedVerificationMethod {
+            verification_method: "did:example:key".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["a-purpose".into(), "z-purpose".into()],
+        };
+        assert_eq!(first.snapshot_fingerprint(), second.snapshot_fingerprint());
     }
 
     #[test]
