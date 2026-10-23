@@ -41,8 +41,10 @@ Required metadata keys:
 The exact observation header is:
 
 ```text
-OBS_HEADER  trace_id  dataset_id  dataset_revision  split  group_id  step_index  sample_sha256  cheap_output_sha256  pre_features_sha256  utility_spec_sha256  declared_extra_latency_us  declared_extra_energy_uj  estimated_dvpc  reported_uncertainty  shift_signal_sha256
+OBS_HEADER\ttrace_id\tdataset_id\tdataset_revision\tsplit\tgroup_id\tstep_index\tsample_sha256\tcheap_output_sha256\tpre_features_sha256\tutility_spec_sha256\tdeclared_extra_latency_us\tdeclared_extra_energy_uj\testimated_dvpc\treported_uncertainty\tshift_signal_sha256
 ```
+
+Here, each visible `\\t` denotes one literal TAB byte in the actual TSV header.
 
 Fields are TAB-separated, not space-separated. SHA-256 fields must be 64 hexadecimal characters; optional shift signal uses `-` only when no observable signal exists. Trace/group IDs are tokens rather than filesystem paths. Split is one of `train`, `validation`, `test`, or `private_test`. Declared incremental latency and energy are strictly positive integer estimates, in microseconds and microjoules respectively. DVPC estimate is finite and may be negative; uncertainty is finite and non-negative.
 
@@ -53,8 +55,10 @@ The observation schema intentionally does not permit ground-truth shift labels, 
 The exact evaluation header is:
 
 ```text
-EVAL_HEADER  trace_id  sample_sha256  cheap_utility_01  full_utility_01  cheap_safety_violations  full_safety_violations  actual_extra_latency_us  actual_extra_energy_uj  shift_label  shift_mechanism
+EVAL_HEADER\ttrace_id\tsample_sha256\tcheap_utility_01\tfull_utility_01\tcheap_safety_violations\tfull_safety_violations\tactual_extra_latency_us\tactual_extra_energy_uj\tshift_label\tshift_mechanism
 ```
+
+Here, each visible `\\t` denotes one literal TAB byte in the actual TSV header.
 
 - Utility is finite in `[0,1]`, normalized by the frozen utility specification, with higher being better.
 - Safety violation counts are non-negative integer counts, not scores.
