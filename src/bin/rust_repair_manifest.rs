@@ -855,6 +855,149 @@ mod tests {
         assert_eq!(canonical_id_digest(&ids_a), canonical_id_digest(&ids_b));
     }
 
+
+
+    fn write_candidate_artifacts(
+        root: &Path,
+        instance_id: &str,
+        baseline: &[(&str, &str)],
+        gold: &[(&str, &str)],
+        listed_f2p: &[&str],
+        listed_p2p: &[&str],
+        gold_log: &str,
+    ) -> Value {
+        let task_dir = root.join(instance_id);
+        fs::create_dir_all(&task_dir).unwrap();
+        let status = serde_json::json!({
+            "instance_id": instance_id,
+            "pre_patch_status": baseline.iter().map(|(id, state)| ((*id).to_string(), (*state).to_string())).collect::<BTreeMap<_, _>>(),
+            "post_patch_status": gold.iter().map(|(id, state)| ((*id).to_string(), (*state).to_string())).collect::<BTreeMap<_, _>>(),
+            "FAIL_TO_PASS": listed_f2p,
+            "PASS_TO_PASS": listed_p2p
+        });
+        fs::write(task_dir.join("status.json"), serde_json::to_vec(&status).unwrap()).unwrap();
+        fs::write(task_dir.join("pre_patch_log.txt"), "baseline: complete test log\n").unwrap();
+        fs::write(task_dir.join("post_patch_log.txt"), gold_log).unwrap();
+
+        serde_json::json!({
+            "instance_id": instance_id,
+            "repo": "owner/repo",
+            "base_commit": "a".repeat(40),
+            "docker_image": "test-image@sha256:deadbeef",
+            "problem_statement": "Fix the documented bug.",
+            "patch": "diff --git a/src/lib.rs b/src/lib.rs\n+fn fixed() {}",
+            "test_patch": "diff --git a/tests/lib.rs b/tests/lib.rs\n+assert!(fixed());"
+        })
+    }
+
+    #[test]
+    fn valid_task_artifacts_produce_hashed_manifest_record() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-issue-1";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail"), ("regression-guard", "pass")],
+            &[("bug-fixed", "pass"), ("regression-guard", "pass")],
+            &["bug-fixed"],
+            &["regression-guard"],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"candidate row"),
+        );
+        assert!(result.audit.eligible, "{:?}", result.audit.reasons);
+        let record = result.manifest_record.expect("eligible task has manifest");
+        assert_eq!(record.fail_to_pass_count, 1);
+        assert_eq!(record.pass_to_pass_count, 1);
+        assert_eq!(
+            record.baseline_validation_log_sha256,
+            sha256_bytes(b"baseline: complete test log\n")
+        );
+        assert_eq!(
+            record.gold_validation_log_sha256,
+            sha256_bytes(b"eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n")
+        );
+    }
+
+    #[test]
+    fn gold_patch_regression_is_rejected_even_if_upstream_drops_the_guard() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-regression";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail"), ("must-remain-green", "pass")],
+            &[("bug-fixed", "pass"), ("must-remain-green", "fail")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"regression row"),
+        );
+        assert!(!result.audit.eligible);
+        assert!(result.manifest_record.is_none());
+        assert!(result.audit.reasons.iter().any(|reason| reason.contains("PASS_TO_PASS")));
+        assert!(result.audit.reasons.iter().any(|reason| reason.contains("baseline-passing test")));
+    }
+
+    #[test]
+    fn incomplete_gold_run_log_is_unresolved_and_cannot_be_locked() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-incomplete";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail")],
+            &[("bug-fixed", "pass")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n",
+        );
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"incomplete row"),
+        );
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result.manifest_record.is_none());
+        assert!(result.audit.reasons.iter().any(|reason| reason.contains("eval No.2")));
+    }
+
+    #[test]
+    fn missing_baseline_test_cannot_be_misclassified_as_fixed() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-missing-baseline";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("stable", "pass")],
+            &[("stable", "pass"), ("appeared-after", "pass")],
+            &["appeared-after"],
+            &["stable"],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"missing baseline row"),
+        );
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result.manifest_record.is_none());
+        assert!(result.audit.reasons.iter().any(|reason| reason.contains("test-ID sets differ")));
+    }
+
     #[test]
     fn sha256_matches_standard_known_vector() {
         assert_eq!(
