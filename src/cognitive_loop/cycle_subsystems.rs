@@ -231,7 +231,8 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (consciousness_gradient_magnitude, consciousness_limiting_component) =
             if let Some(ref dc) = self.primitive_tier.differentiable_consciousness {
-                if self.stats.total_cycles % (47 * interval_mult) == 0
+                if prediction_error_valid
+                    && self.stats.total_cycles % (47 * interval_mult) == 0
                     && self.stats.total_cycles > 0
                 {
                     use crate::consciousness::consciousness_equation_v2::{
@@ -244,11 +245,7 @@ impl CognitiveLoopService {
                     core_values.insert(CoreComponent::Workspace, coherence as f64 * 0.8);
                     core_values.insert(CoreComponent::Attention, phi_attention_weight as f64);
                     core_values.insert(CoreComponent::Recursion, 0.5);
-                    // Omit Efficacy when PE is unavailable; the sentinel is not a
-                    // valid observation of model accuracy.
-                    if prediction_error_valid {
-                        core_values.insert(CoreComponent::Efficacy, 1.0 - prediction_error as f64);
-                    }
+                    core_values.insert(CoreComponent::Efficacy, 1.0 - prediction_error as f64);
                     core_values.insert(
                         CoreComponent::Knowledge,
                         self.carryover.quality.last_epistemic_quality,
