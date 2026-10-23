@@ -221,8 +221,9 @@ mod tests {
     fn rows_with_correlation(len: usize, rho: f64) -> Vec<Vec<f64>> {
         (0..len)
             .map(|index| {
-                let x = (index as f64 * 0.37).sin() + (index as f64 * 0.11).cos();
-                let independent = (index as f64 * 0.23).sin() - (index as f64 * 0.19).cos();
+                // Balanced orthogonal +/-1 columns yield exactly zero reference correlation.
+                let x = if index % 2 == 0 { 1.0 } else { -1.0 };
+                let independent = if (index / 2) % 2 == 0 { 1.0 } else { -1.0 };
                 let y = rho * x + (1.0 - rho * rho).sqrt() * independent;
                 vec![x, y]
             })
