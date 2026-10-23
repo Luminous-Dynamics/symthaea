@@ -1496,6 +1496,7 @@ mod tests {
             "baseline": {
                 "role": "baseline",
                 "test_patch_applied": true,
+                "workspace_clean_exit_code": 0,
                 "repo_head_exit_code": 0,
                 "repo_head_sha": "a".repeat(40),
                 "rebuild_exit_code": 0,
@@ -1641,6 +1642,37 @@ mod tests {
         assert!(result.audit.unresolved);
         assert!(result.manifest_record.is_none());
         assert!(result.audit.reasons.iter().any(|reason| reason.contains("test-ID sets differ")));
+    }
+
+    #[test]
+    fn dirty_pre_patch_worktree_is_rejected() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-dirty-worktree";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail")],
+            &[("bug-fixed", "pass")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let bytes = fs::read(&evidence_path).unwrap();
+        let mut evidence: Value = serde_json::from_slice(&bytes).unwrap();
+        evidence["baseline"]["workspace_clean_exit_code"] = Value::from(1);
+        fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"dirty worktree row"),
+        );
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result.audit.reasons.iter().any(|reason| {
+            reason.contains("worktree is dirty or cleanliness inspection failed")
+        }));
     }
 
     #[test]
@@ -1882,6 +1914,7 @@ mod tests {
             docker_image_reference: "image@sha256:deadbeef".to_string(),
             container_image_id: format!("sha256:{}", "b".repeat(64)),
             network_mode: "none".to_string(),
+            workspace_clean: true,
         };
         let projected = serde_json::to_value(controller).unwrap();
         assert_eq!(
@@ -1892,7 +1925,8 @@ mod tests {
                 "repo_head_sha": "a".repeat(40),
                 "docker_image_reference": "image@sha256:deadbeef",
                 "container_image_id": format!("sha256:{}", "b".repeat(64)),
-                "network_mode": "none"
+                "network_mode": "none",
+                "workspace_clean": true
             })
         );
         let serialized = projected.to_string();
