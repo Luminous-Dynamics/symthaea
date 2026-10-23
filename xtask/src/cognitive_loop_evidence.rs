@@ -339,6 +339,78 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
     nonempty_string_field(drift_protocol, "source_paper", "drift_protocol")?;
     nonempty_string_field(drift_protocol, "claims", "drift_protocol")?;
 
+    let utility_contract = drift_protocol
+        .get("adaptation_counterfactual_protocol")
+        .context("drift_protocol.adaptation_counterfactual_protocol is required")?;
+    ensure!(
+        nonempty_string_field(utility_contract, "protocol_id", "adaptation_counterfactual_protocol")?
+            == "same-stream-three-arm-counterfactual-v1",
+        "unexpected adaptation counterfactual protocol id"
+    );
+    let arms = nonempty_string_array(utility_contract, "arms", "adaptation_counterfactual_protocol")?;
+    ensure!(
+        arms.len() == 3
+            && ["no-adapt", "detector-triggered", "oracle-timed"]
+                .iter().all(|expected| arms.iter().any(|arm| arm == expected)),
+        "adaptation counterfactual protocol must declare no-adapt, detector-triggered, and oracle-timed arms"
+    );
+    let replay_identity = nonempty_string_array(
+        utility_contract,
+        "replay_identity_requirements",
+        "adaptation_counterfactual_protocol",
+    )?;
+    for phrase in [
+        "same pinned exogenous stream digest",
+        "same contiguous cycle panel",
+        "repository head SHA",
+        "not a deployable detector",
+    ] {
+        ensure!(
+            replay_identity.iter().any(|requirement| requirement.contains(phrase)),
+            "adaptation counterfactual replay contract must state: {phrase}"
+        );
+    }
+    let utility_metrics = nonempty_string_array(
+        utility_contract,
+        "required_metrics",
+        "adaptation_counterfactual_protocol",
+    )?;
+    for expected in [
+        "no_adapt.mean_task_loss",
+        "detector_triggered.mean_task_loss",
+        "oracle_timed.mean_task_loss",
+        "detector_task_loss_improvement_vs_no_adapt",
+        "detector_task_loss_regret_vs_oracle_timed",
+        "detector_adaptation_cost_delta_vs_no_adapt",
+        "canonical_input_sha256",
+        "result_sha256",
+    ] {
+        ensure!(
+            utility_metrics.iter().any(|metric| metric == expected),
+            "adaptation counterfactual protocol is missing metric {expected}"
+        );
+    }
+    let unit_policy = nonempty_string_field(
+        utility_contract,
+        "unit_policy",
+        "adaptation_counterfactual_protocol",
+    )?;
+    ensure!(
+        unit_policy.contains("separate axes")
+            && unit_policy.contains("preregistered"),
+        "adaptation utility contract must keep loss and cost separate unless weights are preregistered"
+    );
+    let utility_claim_policy = nonempty_string_field(
+        utility_contract,
+        "claim_policy",
+        "adaptation_counterfactual_protocol",
+    )?;
+    ensure!(
+        utility_claim_policy.contains("do not prove hidden-state identity")
+            && utility_claim_policy.contains("not a deployable detector"),
+        "adaptation utility claim policy must limit counterfactual/oracle claims"
+    );
+
     let comparison_contract = drift_protocol
         .get("paired_comparison_contract")
         .context("drift_protocol.paired_comparison_contract is required")?;
@@ -560,6 +632,30 @@ mod tests {
                 "trace_contract": "Each trace pins detector_version and comparison_track; label_delay_cycles is recorded; alarms mark evidence_valid. Invalid-evidence alarms cannot match, count as false alarms, and fail the hard gate.",
                 "source_paper": "https://doi.org/10.1145/3770855.3819070",
                 "claims": "Comparator definitions are not measured results.",
+                "adaptation_counterfactual_protocol": {
+                    "protocol_id": "same-stream-three-arm-counterfactual-v1",
+                    "arms": ["no-adapt", "detector-triggered", "oracle-timed"],
+                    "replay_identity_requirements": [
+                        "All arms consume the same pinned exogenous stream digest.",
+                        "All arms emit the same contiguous cycle panel beginning at zero.",
+                        "Pin arm version, repository head SHA, and configuration digest separately.",
+                        "Oracle-timed policy uses ground-truth change timing only as a reference arm; it is not a deployable detector."
+                    ],
+                    "required_metrics": [
+                        "no_adapt.mean_task_loss",
+                        "detector_triggered.mean_task_loss",
+                        "oracle_timed.mean_task_loss",
+                        "detector_task_loss_improvement_vs_no_adapt",
+                        "detector_task_loss_regret_vs_oracle_timed",
+                        "detector_adaptation_cost_delta_vs_no_adapt",
+                        "detector_dominated_by_no_adapt",
+                        "adaptation_cost_units_per_task_loss_unit_reduced",
+                        "canonical_input_sha256",
+                        "result_sha256"
+                    ],
+                    "unit_policy": "Report task loss and adaptation resource cost as separate axes. Do not collapse them into a composite utility unless the cost conversion was preregistered.",
+                    "claim_policy": "A shared stream digest and paired arm records do not prove hidden-state identity or implementation correctness. Oracle-timed is not a deployable detector; report all arm-level values."
+                },
                 "kdd26_reference_protocol": {
                     "paper_doi": "10.1145/3770855.3819070",
                     "detector_family_count": 14,
@@ -673,6 +769,24 @@ mod tests {
         manifest["external_drift_detectors"][0]["comparison_track"] = json!("observed-outcome");
         let error = validate_value(&manifest).unwrap_err().to_string();
         assert!(error.contains("labels_required conflicts with comparison_track"));
+    }
+
+    #[test]
+    fn rejects_counterfactual_utility_protocol_that_hides_loss_cost_tradeoff() {
+        let mut manifest = valid_manifest();
+        manifest["drift_protocol"]["adaptation_counterfactual_protocol"]["unit_policy"] =
+            json!("Only report one composite utility score.");
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("keep loss and cost separate"));
+    }
+
+    #[test]
+    fn rejects_counterfactual_protocol_that_omits_oracle_limitation() {
+        let mut manifest = valid_manifest();
+        manifest["drift_protocol"]["adaptation_counterfactual_protocol"]["replay_identity_requirements"][3] =
+            json!("Oracle timing is the production baseline.");
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("not a deployable detector"));
     }
 
     #[test]
