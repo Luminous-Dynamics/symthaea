@@ -22,6 +22,16 @@ Do not use the rolling upstream `v1.8.0` download URL for evidence runs: the rel
 - mesh_clone_nonce_strict.cfg enables exclusive fencing and fails closed on a repeated tuple. Acquiring a new generation also models a fresh effective traffic key and a reset counter. TLC should complete the strict bounded state space without violating TypeOK or NoNonceReuse.
 - The CI workflow pins the TLA+ tools checksum, records exact source/config/tool hashes, checks that the legacy run violates the named invariant, and retains raw logs as an artifact.
 
+## Recorded bounded model-check evidence
+
+The dedicated TLC workflow completed successfully at model/config head `07cec7c2d604f4faac65bf62433c8237fd4772e2`: [run 40023452333](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40023452333).
+
+- Fenced reference: 1,692 states generated, 885 distinct states; TLC reported no invariant violation.
+- Legacy clone mutant: 21 states generated, 14 distinct states before the intended `NoNonceReuse` invariant violation.
+- Tool identity: immutable TLA+ build `tla2tools-2026.08.11.125311`, SHA-256 `ab323b79802aedc3203b3f9af37c6aca3ed43f4e0225b36f2aa77b26de46c05f`.
+
+This is bounded evidence about this abstraction only. It does not establish the runtime send path implements exclusive fencing, that generation changes yield new key bytes, or that a device/authority is rollback-resistant. Any later source/config/model edit requires evidence at its new exact head before that head is considered checked.
+
 ## Required implementation architecture
 
 This reference model is valid only if the real system enforces every abstraction it relies on:
