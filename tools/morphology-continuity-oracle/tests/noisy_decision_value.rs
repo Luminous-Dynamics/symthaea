@@ -30,7 +30,9 @@ struct Decision {
 
 fn decisions() -> [Decision; 2] {
     [
-        Decision { losses: [0, 100, 100] },
+        Decision {
+            losses: [0, 100, 100],
+        },
         Decision { losses: [4, 4, 4] },
     ]
 }
@@ -91,7 +93,9 @@ fn valid_likelihoods(measurement: Measurement) -> bool {
         }
     }
     measurement.likelihood_per_mille.iter().all(|row| {
-        row.iter().map(|probability| u32::from(*probability)).sum::<u32>()
+        row.iter()
+            .map(|probability| u32::from(*probability))
+            .sum::<u32>()
             == PROBABILITY_SCALE as u32
     })
 }
@@ -146,16 +150,13 @@ fn expected_loss_after_measurement(
                     .zip(decision.losses.iter())
                     .zip(measurement.likelihood_per_mille.iter())
                     .map(|((weight, loss), row)| {
-                        *weight as f64
-                            * f64::from(*loss)
-                            * f64::from(row[outcome_index])
+                        *weight as f64 * f64::from(*loss) * f64::from(row[outcome_index])
                     })
                     .sum::<f64>()
             })
             .fold(f64::INFINITY, f64::min);
 
-        expected_loss += best_joint_loss
-            / (total_weight * PROBABILITY_SCALE as f64);
+        expected_loss += best_joint_loss / (total_weight * PROBABILITY_SCALE as f64);
     }
 
     expected_loss
@@ -212,10 +213,14 @@ fn noisy_likelihoods_change_downstream_risk_and_choose_best_value_per_cost() {
     let weak = candidates[3];
 
     assert!((baseline - 4.0).abs() <= EPSILON);
-    assert!((expected_loss_after_measurement(inventory, PRIOR_WEIGHTS, &decisions) - 3.64).abs()
-        <= EPSILON);
-    assert!((expected_loss_after_measurement(design, PRIOR_WEIGHTS, &decisions) - 3.76).abs()
-        <= EPSILON);
+    assert!(
+        (expected_loss_after_measurement(inventory, PRIOR_WEIGHTS, &decisions) - 3.64).abs()
+            <= EPSILON
+    );
+    assert!(
+        (expected_loss_after_measurement(design, PRIOR_WEIGHTS, &decisions) - 3.76).abs()
+            <= EPSILON
+    );
     assert!((evsi(inventory, PRIOR_WEIGHTS, &decisions) - 0.36).abs() <= EPSILON);
     assert!((evsi(design, PRIOR_WEIGHTS, &decisions) - 0.24).abs() <= EPSILON);
     assert!((evsi(weak, PRIOR_WEIGHTS, &decisions) - 0.0).abs() <= EPSILON);
@@ -309,7 +314,6 @@ fn joint_hypothesis_permutations_preserve_risk_and_action_choice() {
     }
 }
 
-
 fn symmetric_binary_sensor(reliability: u16) -> Measurement {
     assert!(u64::from(reliability) <= PROBABILITY_SCALE);
     let error_rate = (PROBABILITY_SCALE - u64::from(reliability)) as u16;
@@ -379,7 +383,6 @@ fn prior_shift_can_eliminate_the_value_of_an_otherwise_useful_sensor() {
     );
 }
 
-
 fn robust_evsi_lower_bound(
     minimum_reliability: u16,
     maximum_reliability: u16,
@@ -424,10 +427,22 @@ fn robust_selector_abstains_when_reliability_bounds_cross_the_decision_threshold
     assert!((shifted_narrow - 0.12).abs() <= EPSILON);
     assert!((high_chair - 2.64).abs() <= EPSILON);
 
-    assert!(nominal_wide <= EPSILON, "wide interval must cause abstention");
-    assert!(shifted_wide <= EPSILON, "prior-shifted interval must cause abstention");
-    assert!(nominal_narrow > EPSILON, "qualified narrow interval has positive worst-case value");
-    assert!(shifted_narrow > EPSILON, "narrower shifted interval has positive worst-case value");
+    assert!(
+        nominal_wide <= EPSILON,
+        "wide interval must cause abstention"
+    );
+    assert!(
+        shifted_wide <= EPSILON,
+        "prior-shifted interval must cause abstention"
+    );
+    assert!(
+        nominal_narrow > EPSILON,
+        "qualified narrow interval has positive worst-case value"
+    );
+    assert!(
+        shifted_narrow > EPSILON,
+        "narrower shifted interval has positive worst-case value"
+    );
 }
 
 #[test]
