@@ -37,6 +37,8 @@ Proposal envelopes may carry:
 
 The interface does **not** accept patient records, clinical diagnoses, patient-specific images, free-form motor commands, medication instructions or a field that can elevate clinical/physical authority. If a future design requires those, it is a new intended-use and governance review rather than a schema extension silently accepted by v0.
 
+A synthetic example is provided at examples/careframe-tool-design-proposal-v0.example.json with its scenario fixture at examples/careframe-example-scenario-set-v0.json. Digests for the sample model/configuration/task are hashes of explicitly named placeholder strings, not hashes of real model artifacts. They demonstrate shape only and must never be used as provenance receipts.
+
 ## Contract alignment with Symtropy
 
 Current supported pairs:
