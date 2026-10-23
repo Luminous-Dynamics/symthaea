@@ -133,6 +133,7 @@ struct PolicyMetrics {
     utility_delta_vs_all_cheap: Option<f64>,
     cvar95_delta_vs_all_cheap: Option<f64>,
     safety_delta_vs_all_cheap: Option<i64>,
+    utility_gap_to_oracle: Option<f64>,
 }
 
 fn fail(message: impl Into<String>) -> String {
@@ -488,6 +489,172 @@ fn add_cost(total: &mut u64, increment: u64) -> bool {
             true
         }
     }
+}
+
+
+#[derive(Debug, Clone)]
+struct OracleItem {
+    trace_id: String,
+    group_id: String,
+    utility_gain: f64,
+    latency_us: u64,
+    energy_uj: u64,
+}
+
+#[derive(Debug, Clone)]
+struct OracleState {
+    latency_us: u64,
+    energy_uj: u64,
+    weighted_gain: f64,
+    escalations: usize,
+}
+
+#[derive(Debug, Clone)]
+struct OracleMetrics {
+    group_balanced_utility: f64,
+    escalations: usize,
+    latency_us: u64,
+    energy_uj: u64,
+}
+
+const ORACLE_FRONTIER_CAP: usize = 50_000;
+
+fn fenwick_max_prefix(tree: &[f64], mut index: usize) -> f64 {
+    let mut best = f64::NEG_INFINITY;
+    while index > 0 {
+        best = best.max(tree[index]);
+        index &= index - 1;
+    }
+    best
+}
+
+fn fenwick_update_max(tree: &mut [f64], mut index: usize, value: f64) {
+    while index < tree.len() {
+        tree[index] = tree[index].max(value);
+        let low_bit = index & (!index + 1);
+        if low_bit == 0 {
+            break;
+        }
+        index += low_bit;
+    }
+}
+
+/// Retain non-dominated resource/gain states. States are sorted by latency,
+/// then energy, then descending gain. A Fenwick max tree lets each state test
+/// whether an earlier state uses no more of either resource and gets at least
+/// as much group-balanced utility gain.
+fn pareto_prune(mut states: Vec<OracleState>) -> Vec<OracleState> {
+    states.sort_by(|left, right| {
+        left.latency_us
+            .cmp(&right.latency_us)
+            .then(left.energy_uj.cmp(&right.energy_uj))
+            .then_with(|| right.weighted_gain.total_cmp(&left.weighted_gain))
+    });
+    let mut energy_coordinates: Vec<u64> = states.iter().map(|state| state.energy_uj).collect();
+    energy_coordinates.sort_unstable();
+    energy_coordinates.dedup();
+    let mut tree = vec![f64::NEG_INFINITY; energy_coordinates.len() + 1];
+    let mut frontier = Vec::new();
+
+    for state in states {
+        let coordinate = energy_coordinates
+            .binary_search(&state.energy_uj)
+            .expect("state energy must be in the compressed coordinates")
+            + 1;
+        let best_prior_gain = fenwick_max_prefix(&tree, coordinate);
+        if best_prior_gain >= state.weighted_gain {
+            continue;
+        }
+        fenwick_update_max(&mut tree, coordinate, state.weighted_gain);
+        frontier.push(state);
+    }
+    frontier
+}
+
+/// Exact 0/1 two-resource hindsight oracle for frozen paired traces, subject
+/// to a bounded Pareto frontier. None means the cap was exceeded; no approximate
+/// result is mislabeled as exact.
+fn compute_hindsight_oracle(
+    observations: &BTreeMap<String, Observation>,
+    outcomes: &BTreeMap<String, Outcome>,
+    latency_budget_us: u64,
+    energy_budget_uj: u64,
+) -> Option<OracleMetrics> {
+    let mut group_counts: BTreeMap<String, usize> = BTreeMap::new();
+    for observation in observations.values() {
+        *group_counts.entry(observation.group_id.clone()).or_default() += 1;
+    }
+    if group_counts.is_empty() {
+        return None;
+    }
+    let group_count = group_counts.len() as f64;
+    let mut cheap_by_group: BTreeMap<String, Vec<f64>> = BTreeMap::new();
+    let mut items = Vec::new();
+
+    for (trace_id, observation) in observations {
+        let outcome = outcomes.get(trace_id)?;
+        cheap_by_group
+            .entry(observation.group_id.clone())
+            .or_default()
+            .push(outcome.cheap_utility);
+        let delta = outcome.full_utility - outcome.cheap_utility;
+        if delta > 0.0 {
+            let group_size = *group_counts.get(&observation.group_id)? as f64;
+            items.push(OracleItem {
+                trace_id: trace_id.clone(),
+                group_id: observation.group_id.clone(),
+                utility_gain: delta / (group_count * group_size),
+                latency_us: outcome.actual_latency_us,
+                energy_uj: outcome.actual_energy_uj,
+            });
+        }
+    }
+    let base_group_means: Vec<f64> = cheap_by_group.values().map(|values| mean(values)).collect();
+    let cheap_group_balanced_utility = mean(&base_group_means);
+
+    let mut frontier = vec![OracleState {
+        latency_us: 0,
+        energy_uj: 0,
+        weighted_gain: 0.0,
+        escalations: 0,
+    }];
+    for item in items {
+        let mut candidates = frontier.clone();
+        for state in &frontier {
+            let Some(latency) = state.latency_us.checked_add(item.latency_us) else {
+                continue;
+            };
+            let Some(energy) = state.energy_uj.checked_add(item.energy_uj) else {
+                continue;
+            };
+            if latency > latency_budget_us || energy > energy_budget_uj {
+                continue;
+            }
+            candidates.push(OracleState {
+                latency_us: latency,
+                energy_uj: energy,
+                weighted_gain: state.weighted_gain + item.utility_gain,
+                escalations: state.escalations + 1,
+            });
+        }
+        frontier = pareto_prune(candidates);
+        if frontier.len() > ORACLE_FRONTIER_CAP {
+            return None;
+        }
+    }
+
+    let best = frontier.iter().max_by(|left, right| {
+        left.weighted_gain
+            .total_cmp(&right.weighted_gain)
+            .then_with(|| right.latency_us.cmp(&left.latency_us))
+            .then_with(|| right.energy_uj.cmp(&left.energy_uj))
+    })?;
+    Some(OracleMetrics {
+        group_balanced_utility: cheap_group_balanced_utility + best.weighted_gain,
+        escalations: best.escalations,
+        latency_us: best.latency_us,
+        energy_uj: best.energy_uj,
+    })
 }
 
 fn score(
