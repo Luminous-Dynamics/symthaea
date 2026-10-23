@@ -54,6 +54,7 @@ pub mod lyapunov;
 pub mod model_adequacy;
 pub mod sequential_adequacy;
 pub mod predictive_rank_martingale;
+pub mod prequential_pit_martingale;
 pub mod noise_robustness;
 pub mod pde_wave_stage_a;
 pub mod pde_wave_stage_b;

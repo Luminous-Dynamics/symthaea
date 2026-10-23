@@ -11,6 +11,7 @@ on:
       - "crates/bridges/symthaea-physics-bridge/src/adequacy_calibration.rs"
       - "crates/bridges/symthaea-physics-bridge/src/sequential_adequacy.rs"
       - "crates/bridges/symthaea-physics-bridge/src/predictive_rank_martingale.rs"
+      - "crates/bridges/symthaea-physics-bridge/src/prequential_pit_martingale.rs"
       - "crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs"
       - "crates/bridges/symthaea-physics-bridge/src/lib.rs"
       - "docs/research/EXPECTED_INFORMATION_GAIN_SELECTOR_V0_1.md"
@@ -18,6 +19,7 @@ on:
       - "docs/research/CALIBRATED_MODEL_ADEQUACY_AUDITS_V0_1.md"
       - "docs/research/SEQUENTIAL_MODEL_ADEQUACY_MONITOR_V0_1.md"
       - "docs/research/PREDICTIVE_RANK_MARTINGALE_V0_1.md"
+      - "docs/research/PREQUENTIAL_PIT_MARTINGALE_V0_1.md"
       - ".github/workflows/expected-information-gain-selector.yml"
   workflow_dispatch:
 
@@ -46,6 +48,7 @@ jobs:
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/adequacy_calibration.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/sequential_adequacy.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/predictive_rank_martingale.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/prequential_pit_martingale.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs
       - name: Test information-gain selector
         run: cargo test -p symthaea-core hdc::conjecture_engine::experiment_selection --lib
@@ -57,6 +60,8 @@ jobs:
         run: cargo test -p symthaea-physics-bridge sequential_adequacy --lib
       - name: Test predictive-rank martingale detector
         run: cargo test -p symthaea-physics-bridge predictive_rank_martingale --lib
+      - name: Test prequential PIT martingale
+        run: cargo test -p symthaea-physics-bridge prequential_pit_martingale --lib
       - name: Test model-adequacy decision semantics
         run: cargo test -p symthaea-physics-bridge model_adequacy --lib
       - name: Test exhaustive model-adequacy contract
