@@ -1,0 +1,51 @@
+{
+  "schema": "symthaea-prior-shift-oracle-receipt-v1",
+  "date": "2026-10-23",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/causal-target-subset-kernel-v1",
+  "status": "EXACT_LOCAL_PRIOR_SHIFT_ORACLE_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "source": {
+    "path": "validation/prior_shift_oracle_benchmark.py",
+    "git_blob": "5222bd65b53cb872cdef04d34247f395b825c1ee",
+    "sha256": "72db9a14c879731c23698df77a54cfa24170a8d804f6f96770ca5e486f359504",
+    "bytes": 9805
+  },
+  "test_source": {
+    "path": "validation/test_prior_shift_oracle_benchmark.py",
+    "git_blob": "be7a515cb3cc8a3e7496e24141e2f45d48508eeb",
+    "sha256": "3883a82c3f8ae26051016126760977e229d41532196580aa71c9123a428d86fc",
+    "bytes": 2283,
+    "tests": 6,
+    "result": "6/6_PASS_LOCAL"
+  },
+  "base_source": {
+    "path": "validation/objective_matched_oracle_benchmark.py",
+    "git_blob": "f101346c2f37cfad4e029ae280e9a002548f309c"
+  },
+  "artifact": {
+    "filename": "prior_shift_oracle_results_exact_2026-10-23.json",
+    "bytes": 234478,
+    "sha256": "a03028bc12ab4fce908f4824add119e07e246826367658884cf1eca27da30f2a",
+    "source_git_blob_bound": "5222bd65b53cb872cdef04d34247f395b825c1ee",
+    "rows": 594,
+    "local_only": true
+  },
+  "report": {
+    "path": "docs/research/PRIOR_SHIFT_ORACLE_BENCHMARK_2026-10-23.md",
+    "git_blob": "9c73893fe73a3bd397b26e9bc65b5f93b4acc1dc"
+  },
+  "summary": {
+    "path": "validation/prior_shift_oracle_summary_2026-10-23.json",
+    "git_blob": "ca66164e471117385d8df035b7aff78fa844f7b5"
+  },
+  "validation": {
+    "exact_bellman_oracle_by_objective": "PASS_LOCAL",
+    "all_tested_priors_normalize": true,
+    "all_matched_oracles_zero_regret": true,
+    "no_policy_negative_regret": true,
+    "combined_five_suite_tests": "36/36_PASS_LOCAL",
+    "source_and_test_git_blobs_match_executed_bytes": true,
+    "remote_ci": "not claimed; inspect exact head separately"
+  },
+  "scientific_boundary": "Prior-sensitivity stress on a fixed 16-hypothesis chain/fork game; exact target-subset telemetry is assumed. This does not qualify transfer across graph/mechanism families and is not a SOTA claim."
+}
