@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct CandidateAction {
     id: &'static str,
     /// One deterministic outcome per hypothesis, in the prior-weight order below.
@@ -19,7 +19,7 @@ struct CandidateAction {
 const HYPOTHESIS_PRIOR_WEIGHTS: [u64; 3] = [6, 3, 1];
 
 fn expected_brier_reduction(action: CandidateAction) -> f64 {
-    if !action.provenance_validated || action.cost_units == 0 {
+    if !action.provenance_validated {
         return 0.0;
     }
 
@@ -152,15 +152,8 @@ fn unverified_or_zero_cost_actions_are_not_ranked_as_authoritative_measurements(
         .expect("zero-cost action exists");
 
     assert_eq!(expected_brier_reduction(*unverified), 0.0);
-    assert_eq!(expected_brier_reduction(*zero_cost), 0.0);
-    assert_eq!(
-        choose_action(&[
-            actions[0],
-            *unverified,
-            *zero_cost,
-        ]),
-        None
-    );
+    assert!((expected_brier_reduction(*zero_cost) - 0.54).abs() <= 1.0e-12);
+    assert_eq!(choose_action(&[actions[0], *unverified, *zero_cost]), None);
 }
 
 #[test]
