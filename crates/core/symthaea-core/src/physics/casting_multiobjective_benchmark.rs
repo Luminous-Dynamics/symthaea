@@ -89,6 +89,35 @@ impl fmt::Display for ParetoMetricError {
                 f.write_str("spacing requires at least two approximation points")
             }
             Self::NonFiniteMetricResult => f.write_str("front metric overflowed or produced a non-finite result"),
+            Self::InvalidDecisionDimension => {
+                f.write_str("ZDT decision vector must contain at least two variables")
+            }
+            Self::NonFiniteDecisionVariable => f.write_str("ZDT decision variables must be finite"),
+            Self::DecisionOutOfDomain => {
+                f.write_str("ZDT decision variable is outside the problem's declared bounds")
+            }
+            Self::InvalidReferenceFrontResolution => {
+                f.write_str("each reference-front segment requires at least two samples")
+            }
+            Self::InsufficientFrontForGap => {
+                f.write_str("gap targeting requires at least two distinct front points")
+            }
+            Self::EmptyPredictedCandidateSet => {
+                f.write_str("epsilon proposal needs at least one candidate prediction")
+            }
+            Self::DuplicateCandidateId => f.write_str("candidate prediction IDs must be unique"),
+            Self::InvalidObjectiveScale => {
+                f.write_str("objective normalization scales must be finite and positive")
+            }
+            Self::InvalidConfidenceMultiplier => {
+                f.write_str("confidence multiplier must be finite and non-negative")
+            }
+            Self::InvalidPredictionUncertainty => {
+                f.write_str("predicted means and standard deviations must be finite and standard deviations non-negative")
+            }
+            Self::NoEpsilonFeasibleCandidate => {
+                f.write_str("no predicted candidate satisfies the upper-confidence epsilon constraint")
+            }
         }
     }
 }
