@@ -1125,10 +1125,10 @@ mod tests {
             .unwrap_or_else(|error| panic!("read {}: {error}", suite_path.display()));
         let outcomes_bytes = std::fs::read(&outcomes_path)
             .unwrap_or_else(|error| panic!("read {}: {error}", outcomes_path.display()));
-        let suite: Value =
-            serde_json::from_slice(&suite_bytes).expect("checked-in proof-state suite fixture must parse");
-        let outcomes: Value =
-            serde_json::from_slice(&outcomes_bytes).expect("checked-in proof-state outcomes fixture must parse");
+        let suite: Value = serde_json::from_slice(&suite_bytes)
+            .expect("checked-in proof-state suite fixture must parse");
+        let outcomes: Value = serde_json::from_slice(&outcomes_bytes)
+            .expect("checked-in proof-state outcomes fixture must parse");
         (suite, outcomes)
     }
 
@@ -1217,7 +1217,11 @@ mod tests {
             17,
         )
         .expect_err("synthetic fixture must never claim an executed model result");
-        assert!(error.to_string().contains("synthetic fixture cannot contain an executed model outcome"));
+        assert!(
+            error
+                .to_string()
+                .contains("synthetic fixture cannot contain an executed model outcome")
+        );
     }
 
     #[test]
