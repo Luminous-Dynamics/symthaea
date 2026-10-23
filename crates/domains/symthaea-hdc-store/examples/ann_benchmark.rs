@@ -185,8 +185,21 @@ fn verify_source_binding(expected_sha: &str) -> Result<(), Box<dyn Error>> {
         .into());
     }
 
+    let root = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()?;
+    if !root.status.success() {
+        return Err(io::Error::other("git rev-parse --show-toplevel failed").into());
+    }
+    let root = String::from_utf8(root.stdout)?.trim().to_owned();
     let status = Command::new("git")
-        .args(["status", "--porcelain", "--untracked-files=no"])
+        .args([
+            "-C",
+            root.as_str(),
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+        ])
         .output()?;
     if !status.status.success() {
         return Err(io::Error::other("git status failed").into());
@@ -733,14 +746,23 @@ mod tests {
         for id in 0..config.size {
             store.append(id as u64, &corpus_vector(&config, id)).unwrap();
         }
-        let left = build_queries(&config, &store);
-        let right = build_queries(&config, &store);
-        assert_eq!(left.len(), right.len());
-        for (left, right) in left.iter().zip(right.iter()) {
+        let left_queries = build_queries(&config, &store);
+        let right_queries = build_queries(&config, &store);
+        assert_eq!(left_queries.len(), right_queries.len());
+        for (left, right) in left_queries.iter().zip(right_queries.iter()) {
             assert_eq!(left.kind, right.kind);
             assert_eq!(left.vector, right.vector);
         }
-        assert_eq!(left.iter().filter(|query| query.kind == "novel").count(), 4);
-        assert_eq!(left.iter().filter(|query| query.kind == "near_neighbor").count(), 16);
+        assert_eq!(
+            left_queries.iter().filter(|query| query.kind == "novel").count(),
+            4
+        );
+        assert_eq!(
+            left_queries
+                .iter()
+                .filter(|query| query.kind == "near_neighbor")
+                .count(),
+            16
+        );
     }
 }
