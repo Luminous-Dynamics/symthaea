@@ -13,6 +13,7 @@ categories = ["science", "simulation"]
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
 anyhow = { workspace = true }
+blake3 = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
