@@ -310,7 +310,7 @@ jobs:
     assert pr is not None
     # A workflow whose only runner root explicitly excludes PR does not need a
     # ready_for_review event because no PR runner can ever be allocated.
-    assert validate_generic(Path("manual.yml"), manual, pr) == (1, 0)
+    assert validate_generic(Path("manual.yml"), manual, pr) == (0, 0)
 
 
 def main() -> int:
