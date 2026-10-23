@@ -279,6 +279,8 @@ impl CognitiveLoopService {
         let _t_core = Instant::now();
         let mut encoding_result = self.encoder.encode(input);
         let prediction_error = encoding_result.prediction_error;
+        let prediction_error_valid = self.encoder.last_prediction_degeneracy()
+            == symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::Genuine;
         module_timings.core_hdc_encode = _t_core.elapsed().as_micros() as u64;
 
         // Surface degenerate prediction errors: PE=1.0 from an empty/zero-norm
@@ -486,7 +488,7 @@ impl CognitiveLoopService {
             // amplify dimensions that differ most from last prediction.
             // Feldman & Friston (2010): precision-weighted prediction errors
             // gate information flow at the dimension level.
-            if prediction_error > SURPRISE_PE_THRESHOLD {
+            if prediction_error_valid && prediction_error > SURPRISE_PE_THRESHOLD {
                 if let Some(ref last_pred) = self.last_prediction {
                     if last_pred.len() == raw.len() {
                         let pred_slice = last_pred.as_slice();
@@ -1052,6 +1054,30 @@ mod tests {
         svc.behavior.social_mgr.social.social_trust = 0.5;
         let result = svc.run_strategy_selection(false);
         assert!(!result.social_strategy_bias);
+    }
+
+    #[test]
+    fn invalid_prediction_sentinels_do_not_enter_cycle_evidence_histories() {
+        let mut svc = make_service();
+
+        // Cold start has no prior prediction. Its public PE stays compatible,
+        // but it must not enter stateful histories or replay as an observation.
+        let first = svc.cycle("invalid PE bootstrap regression");
+        assert_eq!(first.prediction_error, 1.0);
+        assert!(svc.carryover.history.error_history.is_empty());
+        assert!(svc.error_history.is_empty());
+        assert_eq!(svc.stats.avg_prediction_error, 0.0);
+        assert!(svc.buffer.is_empty());
+
+        // Force an explicitly present zero-norm prediction on the next cycle.
+        svc.encoder
+            .set_prediction(vec![0.0; svc.config.cfc_config.input_dim]);
+        let second = svc.cycle("invalid PE zero norm regression");
+        assert_eq!(second.prediction_error, 1.0);
+        assert!(svc.carryover.history.error_history.is_empty());
+        assert!(svc.error_history.is_empty());
+        assert_eq!(svc.stats.avg_prediction_error, 0.0);
+        assert!(svc.buffer.is_empty());
     }
 
     #[test]
