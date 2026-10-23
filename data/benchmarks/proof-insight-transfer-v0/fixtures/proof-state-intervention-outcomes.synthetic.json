@@ -12,7 +12,7 @@
       "state_role": "base",
       "source_insight_record_id": "synthetic-insight-0",
       "source_insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
-      "expected_action_policy": "preserve_eligibility",
+      "expected_action_policy": "move_forbidden_or_replan",
       "proof_state": {
         "target_statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
@@ -30,10 +30,8 @@
         "checker_result": "not_run",
         "proof_sha256": null,
         "run_receipt_sha256": null,
-        "resource_usage": null,
-        "applicability_judgment": null
-      },
-      "expected_applicability": "eligible"
+        "resource_usage": null
+      }
     },
     {
       "outcome_id": "state-outcome-0-variant",
@@ -62,10 +60,8 @@
         "checker_result": "not_run",
         "proof_sha256": null,
         "run_receipt_sha256": null,
-        "resource_usage": null,
-        "applicability_judgment": null
-      },
-      "expected_applicability": "not_applicable"
+        "resource_usage": null
+      }
     },
     {
       "outcome_id": "state-outcome-1-base",
@@ -94,10 +90,8 @@
         "checker_result": "not_run",
         "proof_sha256": null,
         "run_receipt_sha256": null,
-        "resource_usage": null,
-        "applicability_judgment": null
-      },
-      "expected_applicability": "eligible"
+        "resource_usage": null
+      }
     },
     {
       "outcome_id": "state-outcome-1-variant",
@@ -126,10 +120,8 @@
         "checker_result": "not_run",
         "proof_sha256": null,
         "run_receipt_sha256": null,
-        "resource_usage": null,
-        "applicability_judgment": null
-      },
-      "expected_applicability": "eligible"
+        "resource_usage": null
+      }
     },
     {
       "outcome_id": "state-outcome-2-base",
@@ -158,10 +150,8 @@
         "checker_result": "not_run",
         "proof_sha256": null,
         "run_receipt_sha256": null,
-        "resource_usage": null,
-        "applicability_judgment": null
-      },
-      "expected_applicability": "eligible"
+        "resource_usage": null
+      }
     },
     {
       "outcome_id": "state-outcome-2-variant",
@@ -190,10 +180,8 @@
         "checker_result": "not_run",
         "proof_sha256": null,
         "run_receipt_sha256": null,
-        "resource_usage": null,
-        "applicability_judgment": null
-      },
-      "expected_applicability": "eligible"
+        "resource_usage": null
+      }
     },
     {
       "outcome_id": "state-outcome-3-base",
@@ -222,10 +210,8 @@
         "checker_result": "not_run",
         "proof_sha256": null,
         "run_receipt_sha256": null,
-        "resource_usage": null,
-        "applicability_judgment": null
-      },
-      "expected_applicability": "eligible"
+        "resource_usage": null
+      }
     },
     {
       "outcome_id": "state-outcome-3-variant",
@@ -254,10 +240,8 @@
         "checker_result": "not_run",
         "proof_sha256": null,
         "run_receipt_sha256": null,
-        "resource_usage": null,
-        "applicability_judgment": null
-      },
-      "expected_applicability": "eligible"
+        "resource_usage": null
+      }
     }
   ]
 }
