@@ -1,0 +1,110 @@
+{
+  "branch": "research/causal-target-subset-kernel-v1",
+  "date": "2026-10-24",
+  "full_grid_horizons_1_2": {
+    "bytes": 1505536,
+    "horizons": [
+      1,
+      2
+    ],
+    "local_only": true,
+    "matched": 6,
+    "misspecified": 30,
+    "objectives": [
+      "graph",
+      "kernel",
+      "joint"
+    ],
+    "pairings": 36,
+    "policies": 12,
+    "rows": 2592,
+    "sha256": "aa926e0cac8d5d45efcfaf94354d073e63c36e500f0c03e7274f4268608e2789"
+  },
+  "horizon_2_misspecification": {
+    "graph": {
+      "max_excess_bits": 0.42625640250026886,
+      "mean_excess_cross_entropy_bits_excluding_robust_oracle": 0.09657133941946938,
+      "worst_case": "chain true / fork assumed / random"
+    },
+    "joint": {
+      "max_excess_bits": 0.3904986815224962,
+      "mean_excess_cross_entropy_bits_excluding_robust_oracle": 0.07299847314907605,
+      "worst_case": "chain true / fork assumed / random"
+    },
+    "joint_policy_regret_bits": {
+      "greedy_joint": {
+        "max": 0.15437433331291928,
+        "mean": 0.029293534087483617
+      },
+      "random_uniform": {
+        "max": 0.3904986815224962,
+        "mean": 0.19493092542832613
+      }
+    },
+    "kernel": {
+      "max_excess_bits": 0.3891397416794762,
+      "mean_excess_cross_entropy_bits_excluding_robust_oracle": 0.05665402098938008,
+      "worst_case": "low-spill true / graph-kernel-correlated assumed / greedy graph"
+    },
+    "misspecified_rows": 1080,
+    "negative_log_score_reduction_rows": 6,
+    "worst_brier_risk_reduction": -0.0325875767305307,
+    "worst_log_score_reduction_bits": -0.07321279393897973
+  },
+  "horizon_3_boundary_joint_mismatch": {
+    "greedy_joint": {
+      "max_excess_bits": 0.05557,
+      "mean_excess_bits": 0.0496
+    },
+    "note": "rounded metrics; only two mismatched prior pairings",
+    "random_uniform": {
+      "max_excess_bits": 0.23023,
+      "mean_excess_bits": 0.21556
+    }
+  },
+  "horizon_3_boundary_slice": {
+    "bytes": 247420,
+    "horizons": [
+      1,
+      2,
+      3
+    ],
+    "local_only": true,
+    "matched": 2,
+    "misspecified": 2,
+    "pairings": 4,
+    "rows": 432,
+    "sha256": "c8968415d6ce633f5e8984f98333fdeb07b6850e700bb3addb3c0897e9db6f63"
+  },
+  "repository": "Luminous-Dynamics/symthaea",
+  "schema": "symthaea-prior-misspecification-summary-v1",
+  "scientific_boundary": [
+    "16 hypotheses; chain/fork only; three binary action-kernel spill parameters.",
+    "Prior mismatch changes weights over fixed positive support; no held-out graph/mechanism shift.",
+    "Exact realized target-subset telemetry is assumed; no telemetry noise/cost or action disturbance.",
+    "The true-posterior-aware oracle is a diagnostic ceiling, not a deployable policy.",
+    "No external baseline was run; SOTA is not claimed."
+  ],
+  "source": {
+    "bytes": 14894,
+    "git_blob": "541c31521e1b9e49dfb84c0fa265e877ca9ea632",
+    "path": "validation/prior_misspecification_benchmark.py",
+    "sha256": "c83c16e51aba4c184a2da8d90c9dfad0f5bfae40efa6f4b27cfcb283717ea84f"
+  },
+  "status": "EXACT_LOCAL_PILOT_NOT_EXTERNAL_QUALIFICATION",
+  "test_source": {
+    "bytes": 2790,
+    "git_blob": "c28fc1573a3bb982cc881a75018d931c49f492dd",
+    "path": "validation/test_prior_misspecification_benchmark.py",
+    "result": "7/7_PASS_LOCAL",
+    "sha256": "33c3fdb75d36bb6b5f22d3a7c3bdf443392517fc9d3ff799c6bb4d7978bc5106",
+    "tests": 7
+  },
+  "validation": {
+    "combined_tests": "43/43_PASS_LOCAL",
+    "exact_oracle_regret_nonnegative": true,
+    "remote_ci": "not yet inspected on final updated head",
+    "robust_oracle_zero_excess_within_tolerance": true,
+    "source_and_test_blob_match_executed_files": true
+  }
+}
