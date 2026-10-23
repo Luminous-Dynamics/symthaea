@@ -9,6 +9,7 @@ on:
       - "xtask/src/cognitive_loop_evidence.rs"
       - "xtask/src/cognitive_drift_score.rs"
       - "xtask/src/cognitive_drift_compare.rs"
+      - "xtask/src/cognitive_drift_baselines.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
@@ -22,6 +23,7 @@ on:
       - "xtask/src/cognitive_loop_evidence.rs"
       - "xtask/src/cognitive_drift_score.rs"
       - "xtask/src/cognitive_drift_compare.rs"
+      - "xtask/src/cognitive_drift_baselines.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
@@ -56,6 +58,9 @@ jobs:
 
       - name: Test counterfactual adaptation utility failure modes
         run: cargo test --locked -p xtask cognitive_adaptation_utility
+
+      - name: Test scalar drift baseline failure modes
+        run: cargo test --locked -p xtask cognitive_drift_baselines
 
       - name: Run the drift scorer CLI against the synthetic fixture
         run: |
@@ -102,3 +107,21 @@ jobs:
             (.canonical_input_sha256 | length) == 64 and
             (.result_sha256 | length) == 64
           ' "$RUNNER_TEMP/adaptation-utility.json"
+
+      - name: Run the fixed-threshold drift baseline against the synthetic fixture
+        run: |
+          cargo run --locked -p xtask -- run-cognitive-drift-baseline --input benchmarks/cognitive-loop-evidence/synthetic-fixed-threshold-run.json --out "$RUNNER_TEMP/scalar-drift-baseline.json"
+          jq -e '
+            .metric_version == "scalar-drift-baselines-v1" and
+            .detector_id == "fixed-threshold" and
+            .comparison_track == "valid-pe-only" and
+            .valid_evaluation_observation_count == 7 and
+            .evaluation_cycle_count == 8 and
+            .score.true_positive_events == 2 and
+            .score.false_positive_alarms == 0 and
+            .score.missed_events == 0 and
+            .score.hard_gate_pass == true and
+            (.canonical_input_sha256 | length) == 64 and
+            (.configuration_digest | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/scalar-drift-baseline.json"
