@@ -276,6 +276,29 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
     nonempty_string_field(drift_protocol, "source_paper", "drift_protocol")?;
     nonempty_string_field(drift_protocol, "claims", "drift_protocol")?;
 
+    let comparison_contract = drift_protocol
+        .get("paired_comparison_contract")
+        .context("drift_protocol.paired_comparison_contract is required")?;
+    ensure!(
+        nonempty_string_field(comparison_contract, "protocol_id", "paired_comparison_contract")?
+            == "paired-dataset-bootstrap-v1",
+        "unexpected paired comparison protocol id"
+    );
+    ensure!(
+        comparison_contract.get("minimum_independent_datasets").and_then(Value::as_u64) == Some(3),
+        "paired comparison must require at least three independent datasets"
+    );
+    ensure!(
+        comparison_contract.get("bootstrap_replicates_min").and_then(Value::as_u64) == Some(1000)
+            && comparison_contract.get("bootstrap_replicates_max").and_then(Value::as_u64) == Some(100000),
+        "paired bootstrap replicate bounds must be [1000, 100000]"
+    );
+    for field in ["matching_key", "required_outputs"] {
+        nonempty_string_array(comparison_contract, field, "paired_comparison_contract")?;
+    }
+    nonempty_string_field(comparison_contract, "resampling", "paired_comparison_contract")?;
+    nonempty_string_field(comparison_contract, "claim_policy", "paired_comparison_contract")?;
+
     Ok(ManifestSummary {
         baseline_count: baselines.len(),
         suite_count: groups.len(),
@@ -434,7 +457,18 @@ mod tests {
                 "tuning_policy": "Tune on all but one dataset and hold that dataset out.",
                 "trace_contract": "Each trace pins detector_version and comparison_track; label_delay_cycles is recorded; alarms mark evidence_valid. Invalid-evidence alarms cannot match, count as false alarms, and fail the hard gate.",
                 "source_paper": "https://doi.org/10.1145/3770855.3819070",
-                "claims": "Comparator definitions are not measured results."
+                "claims": "Comparator definitions are not measured results.",
+                "paired_comparison_contract": {
+                    "protocol_id": "paired-dataset-bootstrap-v1",
+                    "minimum_independent_datasets": 3,
+                    "minimum_unique_seeds": 2,
+                    "bootstrap_replicates_min": 1000,
+                    "bootstrap_replicates_max": 100000,
+                    "resampling": "sample dataset clusters with replacement, then paired records within dataset; give each dataset equal final weight",
+                    "matching_key": ["dataset_id", "seed", "scenario_id"],
+                    "required_outputs": ["candidate_dataset_macro_mean", "baseline_dataset_macro_mean", "dataset_macro_paired_effect", "median_oriented_paired_delta", "paired_win_fraction", "percentile_95_ci_oriented_effect", "bootstrap_fraction_effect_above_zero", "per_dataset", "canonical_input_sha256", "result_sha256"],
+                    "claim_policy": "A positive interval is not a universal SOTA claim."
+                }
             },
             "scenario_groups": [
                 {
@@ -518,6 +552,14 @@ mod tests {
         manifest["external_drift_detectors"][0]["comparison_track"] = json!("observed-outcome");
         let error = validate_value(&manifest).unwrap_err().to_string();
         assert!(error.contains("labels_required conflicts with comparison_track"));
+    }
+
+    #[test]
+    fn rejects_paired_comparison_contract_with_too_few_datasets() {
+        let mut manifest = valid_manifest();
+        manifest["drift_protocol"]["paired_comparison_contract"]["minimum_independent_datasets"] = json!(1);
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("at least three independent datasets"));
     }
 
     #[test]
