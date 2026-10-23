@@ -762,6 +762,32 @@ mod tests {
     }
 
     #[test]
+    fn zero_point_benefit_with_uncertainty_does_not_escalate() {
+        let mut policy = router();
+        let decision = policy.decide(input(1, 0.0, 0.02)).unwrap();
+        assert!(decision.calibrated_lower_bound.unwrap() < 0.05);
+        assert_eq!(decision.allocation.choice, AllocationChoice::KeepCheap);
+        assert_eq!(policy.budget().reserved(), ResourceVector::default());
+    }
+
+    #[test]
+    fn changed_domain_assessor_id_or_artifact_blocks_escalation() {
+        let mut policy = router();
+        let mut candidate = input(1, 1000.0, 0.001);
+        candidate.domain_assessor_id = "new-domain-scorer".to_owned();
+        let decision = policy.decide(candidate).unwrap();
+        assert_eq!(decision.gate_reason, GateReasonV1::DomainAssessorMismatch);
+        assert_eq!(decision.allocation.choice, AllocationChoice::KeepCheap);
+
+        let mut candidate = input(2, 1000.0, 0.001);
+        candidate.domain_assessor_artifact_digest = [0xEE; 32];
+        let decision = policy.decide(candidate).unwrap();
+        assert_eq!(decision.gate_reason, GateReasonV1::DomainAssessorArtifactMismatch);
+        assert_eq!(decision.allocation.choice, AllocationChoice::KeepCheap);
+        assert_eq!(policy.budget().reserved(), ResourceVector::default());
+    }
+
+    #[test]
     fn receipts_are_deterministic_and_expose_calibration_state() {
         let mut policy = router();
         let decision = policy.decide(input(1, 0.30, 0.02)).unwrap();
