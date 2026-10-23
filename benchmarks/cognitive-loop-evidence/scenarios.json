@@ -810,7 +810,7 @@
       "minimum_unique_seeds": 2,
       "bootstrap_replicates_min": 1000,
       "bootstrap_replicates_max": 100000,
-      "resampling": "paired hierarchical bootstrap: sample dataset clusters with replacement, then paired records within each selected dataset; give every sampled dataset equal final weight",
+      "resampling": "paired hierarchical bootstrap: sample dataset clusters with replacement, then seeds within each selected dataset with each seed's complete paired scenario block intact; require the identical scenario panel across all datasets; give every sampled dataset equal final weight",
       "matching_key": [
         "dataset_id",
         "seed",
