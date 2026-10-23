@@ -1,0 +1,47 @@
+name: VIS-DVPC-008 calibrated decision-value router
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-decision-value-calibrated-router.rs"
+      - "tools/vision-decision-value-vector-budget.rs"
+      - "docs/research/VIS_DVPC_008_CALIBRATED_ROUTER_V1.md"
+      - ".github/workflows/vis-dvpc-008-calibrated-router.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-decision-value-calibrated-router.rs"
+      - "tools/vision-decision-value-vector-budget.rs"
+      - "docs/research/VIS_DVPC_008_CALIBRATED_ROUTER_V1.md"
+      - ".github/workflows/vis-dvpc-008-calibrated-router.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust with rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check tools/vision-decision-value-calibrated-router.rs
+
+      - name: Compile and run calibration and vector-budget tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2024 --test tools/vision-decision-value-calibrated-router.rs -o /tmp/vis-dvpc-008-tests
+          /tmp/vis-dvpc-008-tests --test-threads=1 2>&1 | tee /tmp/vis-dvpc-008-test.log
+          grep -E 'test result: ok\. 33 passed; 0 failed;' /tmp/vis-dvpc-008-test.log
+
+      - name: Record exact-head evidence
+        run: |
+          git rev-parse HEAD
+          sha256sum tools/vision-decision-value-calibrated-router.rs tools/vision-decision-value-vector-budget.rs docs/research/VIS_DVPC_008_CALIBRATED_ROUTER_V1.md
