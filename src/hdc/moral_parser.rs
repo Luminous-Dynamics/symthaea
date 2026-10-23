@@ -117,6 +117,8 @@ pub enum ConsentEvidenceBasis {
     ExplicitAssumptionCue,
     /// The unquoted input was interrogative; no proposition is asserted.
     Interrogative,
+    /// A relevant consent cue was qualified by uncertainty or a negation that does not establish consent.
+    UncertaintySuppressed,
     /// A structured CONSENT field supplied the state; truth/provenance remain unverified.
     StructuredField,
     /// Incompatible grant/non-grant cues appeared without reliable temporal resolution.
@@ -175,6 +177,7 @@ impl ConsentTextAssessment {
             ConsentEvidenceBasis::ExplicitAbsenceCue => "Wording states consent was not obtained",
             ConsentEvidenceBasis::ExplicitAssumptionCue => "Consent is described as assumed, not affirmatively granted",
             ConsentEvidenceBasis::Interrogative => "Question does not assert a consent state",
+            ConsentEvidenceBasis::UncertaintySuppressed => "Consent wording is uncertain or negated in a way that does not establish an affirmative state",
             ConsentEvidenceBasis::StructuredField => "Structured consent field extracted; truth, identity and provenance unverified",
             ConsentEvidenceBasis::ConflictingSignals => "Grant and non-grant cues conflict; chronology and speaker attribution are unresolved",
         }
@@ -1165,6 +1168,60 @@ impl MoralParser {
             };
         }
 
+        // These are conservative phrase-level scope guards, not a general
+        // natural-language negation parser. They prevent common uncertainty
+        // and "absence of refusal" constructions from being promoted to
+        // affirmative or denied consent merely because they contain a cue.
+        // Explicit denial/absence phrases such as "did not consent" and
+        // "did not give consent" remain handled by their dedicated categories.
+        const UNCERTAINTY_CUES: &[&str] = &[
+            "there is no evidence that",
+            "no verified evidence that",
+            "no evidence that",
+            "not verified whether",
+            "not verified that",
+            "not confirmed whether",
+            "not confirmed that",
+            "not sure whether",
+            "not sure if",
+            "unclear whether",
+            "unclear if",
+            "unknown whether",
+            "no one can confirm that",
+            "no one knows whether",
+            "cannot confirm that",
+            "can't confirm that",
+            "did not refuse consent",
+            "didn't refuse consent",
+            "does not mean she gave consent",
+            "doesn't mean she gave consent",
+            "did not withdraw consent",
+            "didn't withdraw consent",
+            "may have given consent",
+            "might have given consent",
+            "could have given consent",
+            "may have consented",
+            "might have consented",
+            "possibly gave consent",
+            "allegedly gave consent",
+            "the claim that she gave consent is unverified",
+            "unverified",
+        ];
+        if let Some(cue) = UNCERTAINTY_CUES
+            .iter()
+            .filter(|cue| evidence_text.contains(**cue))
+            .max_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)))
+        {
+            return ConsentTextAssessment {
+                state: ConsentState::Unknown,
+                basis: ConsentEvidenceBasis::UncertaintySuppressed,
+                matched_phrase: Some((*cue).to_string()),
+                conflicting_phrases: Vec::new(),
+                question_suppressed: false,
+                quoted_text_suppressed,
+            };
+        }
+
         fn longest_matching_cue(cues: &HashSet<String>, text: &str) -> Option<String> {
             cues.iter()
                 .map(String::as_str)
@@ -2037,6 +2094,47 @@ mod tests {
         let code_quoted = parser.assess_consent_evidence("The report contains `she gave consent` as an example.");
         assert_eq!(code_quoted.state, ConsentState::Unknown);
         assert!(code_quoted.quoted_text_suppressed);
+    }
+
+    #[test]
+    fn consent_uncertainty_and_negation_do_not_create_false_assertions() {
+        let parser = MoralParser::new();
+        use super::ConsentEvidenceBasis;
+
+        for text in [
+            "They did not refuse consent.",
+            "There is no evidence that she gave consent.",
+            "There is no verified evidence that she gave consent.",
+            "It is unclear whether she gave consent.",
+            "She may have given consent.",
+            "No one can confirm that she gave consent.",
+            "She did not withdraw consent.",
+            "The claim that she gave consent is unverified.",
+            "She might have consented.",
+        ] {
+            let assessment = parser.assess_consent_evidence(text);
+            assert_eq!(
+                assessment.state,
+                ConsentState::Unknown,
+                "uncertainty or negated non-refusal must not establish consent: {text}"
+            );
+            assert_eq!(
+                assessment.basis,
+                ConsentEvidenceBasis::UncertaintySuppressed,
+                "the evidence trace must explain why a matching cue was suppressed: {text}"
+            );
+            assert!(!assessment.has_affirmative_cue());
+        }
+
+        // Explicit negative statements retain their dedicated semantics.
+        assert_eq!(
+            parser.assess_consent_evidence("She did not consent.").state,
+            ConsentState::Denied
+        );
+        assert_eq!(
+            parser.assess_consent_evidence("I did not give consent.").state,
+            ConsentState::Absent
+        );
     }
 
     #[test]
