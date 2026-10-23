@@ -19,7 +19,18 @@
       "vertex_source_constant": "MAX_MIS_RANDOM_REGULAR_VERTICES"
     },
     "canonical_implementation_pr": "[Luminous-Dynamics/symthaea#8324](https://github.com/Luminous-Dynamics/symthaea/pull/8324)",
-    "generator_version": "symthaea-qcomp-random-regular-v1"
+    "generator_version": "symthaea-qcomp-random-regular-v1",
+    "canonical_source": {
+      "repository": "Luminous-Dynamics/symthaea",
+      "pull_request": 8324,
+      "branch": "research/qcomp-portfolio-001a-mis-verifier-current",
+      "inspected_commit": "38ea70144397a7b2a864dac42c9ec473b50a369e",
+      "generator_path": "crates/domains/symthaea-quantum-comp/src/mis_random_regular.rs",
+      "generator_blob_sha1": "e2ad816606b774ce0b5e97170d6a8f7255f666a8",
+      "cli_path": "crates/domains/symthaea-quantum-comp/src/bin/qcomp_rrg_generate.rs",
+      "cli_blob_sha1": "da95584daa14f7b6513e5b1aecc7a3ae9048759c",
+      "note": "Commit identity is a source pin for this manifest revision. The Rust implementation is not compiled or executed in this authoring environment."
+    }
   },
   "motivation": {
     "primary_reference": "Wybo et al., Scalable quantum-enhanced greedy algorithm for maximum independent set problems, accepted by Physical Review Research on 2026-10-19",
@@ -12329,6 +12340,12 @@
     ],
     "limit_constant": "MAX_MIS_RANDOM_REGULAR_STUBS",
     "rust_regression_test_source": "crates/domains/symthaea-quantum-comp/src/mis_random_regular.rs in PR #8324",
-    "seed_stream_note": "Canonical PR #8324 implementation was aligned to the preflight seed stream: same XorShift64* generator, rejection-sampled Fisher-Yates bounded draws, and in-place re-shuffle of the stub vector between rejected attempts. Byte parity must still be verified by compiling/running Rust."
+    "seed_stream_note": "Canonical PR #8324 implementation was aligned to the preflight seed stream: same XorShift64* generator, rejection-sampled Fisher-Yates bounded draws, and in-place re-shuffle of the stub vector between rejected attempts. Byte parity must still be verified by compiling/running Rust.",
+    "canonical_rust_generator": {
+      "commit": "38ea70144397a7b2a864dac42c9ec473b50a369e",
+      "module_blob_sha1": "e2ad816606b774ce0b5e97170d6a8f7255f666a8",
+      "seed_stream_semantics": "XorShift64* plus rejection-sampled Fisher-Yates; the canonical generator shuffles the stub vector in place between rejected attempts, matching the JS preflight's specified deterministic stream semantics.",
+      "execution_status": "not compiled or executed; JavaScript preflight does not substitute for Rust tests or byte-parity verification"
+    }
   }
 }
