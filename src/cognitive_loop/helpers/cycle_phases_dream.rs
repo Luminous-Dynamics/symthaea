@@ -57,8 +57,11 @@ impl CognitiveLoopService {
                     },
                 ) // 1.0 to 1.5x boost
                 .unwrap_or(1.0);
-            let mut phi_weighted_surprise =
-                prediction_error * (1.0 + unified_psi as f32).clamp(1.0, 2.0) * narrative_salience;
+            let mut phi_weighted_surprise = if prediction_error_valid {
+                prediction_error * (1.0 + unified_psi as f32).clamp(1.0, 2.0) * narrative_salience
+            } else {
+                0.0
+            };
 
             // Knowledge-aware dream consolidation: contradictions and deep causal
             // chains boost consolidation priority for offline integration.
