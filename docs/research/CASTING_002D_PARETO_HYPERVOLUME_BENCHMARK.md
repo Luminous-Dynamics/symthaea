@@ -234,3 +234,24 @@ Focused command:
     cargo test -p symthaea-core casting_multiobjective_benchmark
 
 These tests have not been compiled or run in the current authoring environment. Exact-head execution is still mandatory.
+
+## CASTING-002J — Post-selection and regional coverage audit
+
+A frozen conformal multiplier is now diagnosable on a separate held-out dataset with optimizer-selection and region labels. The audit reports overall, selected-only, unselected-only and per-region empirical coverage, the selected-minus-unselected gap, and the worst observed region.
+
+The known-answer fixture intentionally shows why an aggregate number is inadequate: with multiplier 2 and target coverage 80%, overall coverage is 12/14 (about 85.7%) while optimizer-selected coverage is only 2/4 (50%); unselected coverage is 100%. The audit therefore detects a significant selected-subset reliability warning even though the aggregate exceeds the nominal target. It also reports the region with the lowest observed coverage. These are synthetic held-out observations, not an empirical manufacturing finding.
+
+The implementation does not refit the multiplier, treats each region's minimum count as a frozen precondition, rejects empty selected/unselected strata, and deterministically orders regional summaries. Small groups fail closed rather than producing unstable coverage reports.
+
+Research motivation:
+- *Conformal prediction with local weights: randomization enables robust guarantees*, JRSS B (2025): https://academic.oup.com/jrsssb/article/87/2/549/7889096
+- Jonkers et al., *Conformal Predictive Systems Under Covariate Shift*, COPA 2024: https://proceedings.mlr.press/v230/jonkers24a.html
+- Oliveira et al., *Split Conformal Prediction and Non-Exchangeable Data*, JMLR 2024: https://jmlr.org/papers/v25/23-1553.html
+
+Four new tests cover the masked aggregate-undercoverage example, input-order invariance, insufficient group/missing selection strata, and invalid parameters/scores. Total: 45 authored test cases in this test-only module.
+
+Focused command:
+
+    cargo test -p symthaea-core casting_multiobjective_benchmark
+
+This is an offline diagnostic, not distribution-free conditional coverage, a calibrated drift alarm, safety certification or physical casting validation. Rust tests have not been executed in this environment.
