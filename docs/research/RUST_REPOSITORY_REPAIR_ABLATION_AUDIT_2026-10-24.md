@@ -69,11 +69,12 @@ cargo run --locked \
   --preregistration build/rust-repair/ablation-preregistration.json \
   --expected-preregistration-sha256 <PRE-REGISTERED-64-HEX> \
   --trial-results build/rust-repair/ablation-trials.jsonl \
+  --expected-trial-results-sha256 <INDEPENDENTLY-RETAINED-64-HEX> \
   --score-reports-dir build/rust-repair/score-reports \
   --report-out build/rust-repair/ablation-audit.json
 ```
 
-The full preregistration SHA, raw JSONL SHA, per-line JSONL hashes, report-file hashes, arm settings, outcome counts and bootstrap settings are included in the generated report. The executable prints the output report's SHA-256 so the report can be placed in an immutable artifact store or signed by a separate trusted system.
+The full preregistration SHA, raw JSONL SHA, externally expected JSONL SHA, per-line JSONL hashes, report-file hashes, arm settings, outcome counts and bootstrap settings are included in the generated report. The executable rejects a trial-results file that does not match `--expected-trial-results-sha256`. Obtain that digest from a separately retained collection receipt or immutable artifact manifest; do not calculate it ad hoc from the same mutable file and claim that this adds independent authenticity. The executable prints the output report's SHA-256 so the report can be placed in an immutable artifact store or signed by a separate trusted system.
 
 ## Estimands and safeguards
 
