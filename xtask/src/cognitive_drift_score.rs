@@ -5,6 +5,7 @@
 
 use anyhow::{ensure, Context};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{collections::BTreeSet, fs, path::Path};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -35,6 +36,8 @@ pub struct DriftEvent {
 #[serde(deny_unknown_fields)]
 pub struct Detection {
     pub cycle_index: u64,
+    /// Whether the detector had valid evidence from its declared access track at this cycle.
+    pub evidence_valid: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -52,6 +55,9 @@ pub struct EventMatch {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct DriftScore {
     pub metric_version: String,
+    pub canonical_trace_sha256: String,
+    /// SHA-256 of the serialized score with this field set to null.
+    pub result_sha256: Option<String>,
     pub stream_id: String,
     pub detector_id: String,
     pub repository_head_sha: String,
@@ -64,6 +70,8 @@ pub struct DriftScore {
     pub true_positive_events: usize,
     pub false_positive_alarms: usize,
     pub missed_events: usize,
+    pub invalid_evidence_alarms: usize,
+    pub hard_gate_pass: bool,
     pub precision: f64,
     pub recall: f64,
     pub event_f1: f64,
@@ -135,7 +143,16 @@ pub fn score_trace(mut trace: DriftTrace) -> anyhow::Result<DriftScore> {
         );
     }
 
-    trace.drift_events.sort_by_key(|event| (event.start_cycle, event.end_cycle, event.id.clone()));
+    let canonical_trace = serde_json::to_vec(&trace)?;
+    let canonical_trace_sha256 = sha256_hex(&canonical_trace);
+
+    // Earliest-deadline interval matching maximizes event/alarm matches for interval-compatible
+    // events; alarms still prefer the earliest valid timestamp within each window.
+    trace.drift_events.sort_by_key(|event| (
+        event.end_cycle.saturating_add(trace.max_detection_delay_cycles),
+        event.start_cycle,
+        event.id.clone(),
+    ));
     trace.detections.sort_by_key(|detection| detection.cycle_index);
 
     let mut used_detection = vec![false; trace.detections.len()];
@@ -147,6 +164,7 @@ pub fn score_trace(mut trace: DriftTrace) -> anyhow::Result<DriftScore> {
         let deadline = event.end_cycle.saturating_add(trace.max_detection_delay_cycles);
         let found = trace.detections.iter().enumerate().find(|(index, detection)| {
             !used_detection[*index]
+                && detection.evidence_valid
                 && detection.cycle_index >= event.start_cycle
                 && detection.cycle_index <= deadline
         });
@@ -182,7 +200,9 @@ pub fn score_trace(mut trace: DriftTrace) -> anyhow::Result<DriftScore> {
         }
     }
 
+    event_matches.sort_by_key(|m| (m.start_cycle, m.end_cycle, m.event_id.clone()));
     let true_positive_events = event_matches.iter().filter(|m| m.detected_cycle.is_some()).count();
+    let invalid_evidence_alarms = trace.detections.iter().filter(|d| !d.evidence_valid).count();
     let false_alarm_cycles = trace
         .detections
         .iter()
@@ -219,8 +239,10 @@ pub fn score_trace(mut trace: DriftTrace) -> anyhow::Result<DriftScore> {
         total_normalized_delay / trace.drift_events.len() as f64
     };
 
-    Ok(DriftScore {
+    let mut score = DriftScore {
         metric_version: "cognitive-drift-event/v1".to_owned(),
+        canonical_trace_sha256,
+        result_sha256: None,
         stream_id: trace.stream_id,
         detector_id: trace.detector_id,
         repository_head_sha: trace.repository_head_sha,
@@ -233,6 +255,8 @@ pub fn score_trace(mut trace: DriftTrace) -> anyhow::Result<DriftScore> {
         true_positive_events,
         false_positive_alarms,
         missed_events,
+        invalid_evidence_alarms,
+        hard_gate_pass: invalid_evidence_alarms == 0,
         precision,
         recall,
         event_f1,
@@ -241,7 +265,15 @@ pub fn score_trace(mut trace: DriftTrace) -> anyhow::Result<DriftScore> {
         mean_normalized_detection_delay_penalized,
         event_matches,
         false_alarm_cycles,
-    })
+    };
+    let score_payload = serde_json::to_vec(&score)?;
+    score.result_sha256 = Some(sha256_hex(&score_payload));
+    Ok(score)
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 #[cfg(test)]
@@ -268,7 +300,7 @@ mod tests {
     fn matches_one_alarm_to_one_drift_episode() {
         let result = score_trace(trace(
             vec![DriftEvent { id: "d1".to_owned(), start_cycle: 100, end_cycle: 120 }],
-            vec![Detection { cycle_index: 110 }],
+            vec![Detection { cycle_index: 110, evidence_valid: true }],
         )).expect("trace scores");
         assert_eq!(result.true_positive_events, 1);
         assert_eq!(result.false_positive_alarms, 0);
@@ -282,9 +314,9 @@ mod tests {
         let result = score_trace(trace(
             vec![DriftEvent { id: "d1".to_owned(), start_cycle: 100, end_cycle: 100 }],
             vec![
-                Detection { cycle_index: 20 },
-                Detection { cycle_index: 105 },
-                Detection { cycle_index: 106 },
+                Detection { cycle_index: 20, evidence_valid: true },
+                Detection { cycle_index: 105, evidence_valid: true },
+                Detection { cycle_index: 106, evidence_valid: true },
             ],
         )).expect("trace scores");
         assert_eq!(result.true_positive_events, 1);
@@ -298,7 +330,7 @@ mod tests {
     fn missed_shift_receives_full_delay_penalty() {
         let result = score_trace(trace(
             vec![DriftEvent { id: "d1".to_owned(), start_cycle: 100, end_cycle: 130 }],
-            vec![Detection { cycle_index: 20 }],
+            vec![Detection { cycle_index: 20, evidence_valid: true }],
         )).expect("trace scores");
         assert_eq!(result.missed_events, 1);
         assert_eq!(result.missed_drift_rate, 1.0);
@@ -313,6 +345,19 @@ mod tests {
         );
         bad.configuration_digest = "short".to_owned();
         assert!(score_trace(bad).is_err());
+    }
+
+    #[test]
+    fn alarm_without_valid_evidence_cannot_match_and_fails_hard_gate() {
+        let result = score_trace(trace(
+            vec![DriftEvent { id: "d1".to_owned(), start_cycle: 100, end_cycle: 100 }],
+            vec![Detection { cycle_index: 105, evidence_valid: false }],
+        )).expect("trace scores");
+        assert_eq!(result.true_positive_events, 0);
+        assert_eq!(result.false_positive_alarms, 1);
+        assert_eq!(result.missed_events, 1);
+        assert_eq!(result.invalid_evidence_alarms, 1);
+        assert!(!result.hard_gate_pass);
     }
 
     #[test]
