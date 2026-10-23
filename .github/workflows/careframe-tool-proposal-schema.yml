@@ -5,7 +5,9 @@ on:
     branches: [main]
     paths:
       - "schemas/careframe-tool-design-proposal-v0.schema.json"
+      - "schemas/careframe-morphology-v0.schema.json"
       - "examples/careframe-tool-design-proposal-v0.example.json"
+      - "examples/careframe-wheeled-upper-body-morphology-v0.example.json"
       - "examples/careframe-example-scenario-set-v0.json"
       - "docs/research/medical-robotics/CARE_FRAME_TOOL_DESIGNER_CONTRACT_V0.md"
       - ".github/workflows/careframe-tool-proposal-schema.yml"
@@ -51,6 +53,55 @@ jobs:
                  .authority.patient_contact_authorized == false and
                  .authority.clinical_use_authorized == false' \
             examples/careframe-tool-design-proposal-v0.example.json
+
+      - name: Validate articulated morphology proposal
+        run: |
+          set -euo pipefail
+          model=examples/careframe-wheeled-upper-body-morphology-v0.example.json
+          check-jsonschema --schemafile schemas/careframe-morphology-v0.schema.json "$model"
+          jq -e '
+            .schema_version == "careframe-morphology-v0" and
+            .links | length == 16
+          ' "$model"
+          jq -e '
+            .joints | length == 15 and
+            all(.[]; .command_enabled == false)
+          ' "$model"
+          jq -e '
+            .authority.simulation_only == true and
+            .authority.physical_actuation_authorized == false and
+            .authority.patient_contact_authorized == false and
+            .authority.clinical_use_authorized == false and
+            .controller.commands_enabled == false
+          ' "$model"
+          jq -e 'all(.links[]; .collision.source == "synthetic_placeholder")' "$model"
+          jq -e 'all(.joints[]; .source == "synthetic_placeholder")' "$model"
+
+      - name: Reject morphology authority and schema escalations
+        shell: bash
+        run: |
+          set -euo pipefail
+          model=examples/careframe-wheeled-upper-body-morphology-v0.example.json
+          reject() {
+            local candidate="$1"
+            local description="$2"
+            if check-jsonschema --schemafile schemas/careframe-morphology-v0.schema.json "$candidate"; then
+              echo "ERROR: morphology schema accepted $description" >&2
+              exit 1
+            fi
+          }
+          jq '.authority.physical_actuation_authorized = true' "$model" > /tmp/careframe-morph-actuation.json
+          reject /tmp/careframe-morph-actuation.json "physical actuation authority"
+          jq '.authority.patient_contact_authorized = true' "$model" > /tmp/careframe-morph-contact.json
+          reject /tmp/careframe-morph-contact.json "patient contact authority"
+          jq '.joints[0].command_enabled = true' "$model" > /tmp/careframe-morph-joint-command.json
+          reject /tmp/careframe-morph-joint-command.json "joint command enablement"
+          jq '.controller.commands_enabled = true' "$model" > /tmp/careframe-morph-controller-command.json
+          reject /tmp/careframe-morph-controller-command.json "controller command enablement"
+          jq '.links[0].silent_collision = true' "$model" > /tmp/careframe-morph-unknown-field.json
+          reject /tmp/careframe-morph-unknown-field.json "unknown link field"
+          jq '.joints[2].axis_xyz = [0,1,0]' "$model" > /tmp/careframe-morph-fixed-axis.json
+          reject /tmp/careframe-morph-fixed-axis.json "nonzero axis on fixed joint"
 
       - name: Check proposal cross-references and matched task definition
         run: |
