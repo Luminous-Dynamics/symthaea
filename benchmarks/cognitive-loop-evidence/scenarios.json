@@ -998,7 +998,8 @@
         "All arms consume the same pinned exogenous stream digest.",
         "All arms emit the same contiguous cycle panel beginning at zero.",
         "Pin arm version, repository head SHA, and configuration digest separately.",
-        "Oracle-timed policy uses ground-truth change timing only as a reference arm; it is not a deployable detector."
+        "Oracle-timed policy uses ground-truth change timing only as a reference arm; it is not a deployable detector.",
+        "Each arm carries its own observed exogenous-stream digest and must match the shared stream digest."
       ],
       "required_metrics": [
         "no_adapt.mean_task_loss",
@@ -1010,10 +1011,13 @@
         "detector_dominated_by_no_adapt",
         "adaptation_cost_units_per_task_loss_unit_reduced",
         "canonical_input_sha256",
-        "result_sha256"
+        "result_sha256",
+        "no_adapt.exogenous_stream_sha256",
+        "detector_triggered.exogenous_stream_sha256",
+        "oracle_timed.exogenous_stream_sha256"
       ],
       "unit_policy": "Report task loss and adaptation resource cost as separate axes. Do not collapse them into a composite utility unless the cost conversion was preregistered.",
-      "claim_policy": "A shared stream digest and paired arm records do not prove hidden-state identity or implementation correctness. Oracle-timed is not a deployable detector; report all arm-level values."
+      "claim_policy": "A shared stream digest and per-arm digest agreement reduce accidental mismatches but do not prove hidden-state identity or implementation correctness. Oracle-timed is not a deployable detector; report all arm-level values."
     }
   }
 }
