@@ -369,6 +369,9 @@ pub fn compare_mis_amortized_costs(
             None
         } else if candidate_fixed <= baseline_fixed {
             Some(1)
+        } else if candidate_marginal == baseline_marginal {
+            // Higher fixed cost with no marginal savings is never amortized away.
+            None
         } else {
             let setup_premium = u128::from(candidate_fixed - baseline_fixed);
             let marginal_saving = u128::from(baseline_marginal - candidate_marginal);
@@ -587,4 +590,20 @@ mod tests {
         assert_eq!(profile("none", vec![]).validate(), Err(MisAmortizedCostError::EmptyCostProfile { arm_id: "none".to_owned() }));
         assert_eq!(profile("  ", vec![entry(MisAmortizedMetric::PhysicalShots, 0, 0)]).validate(), Err(MisAmortizedCostError::EmptyArmId));
     }
+
+    #[test]
+    fn higher_fixed_cost_without_marginal_savings_never_breaks_even() {
+        let candidate = profile(
+            "candidate",
+            vec![entry(MisAmortizedMetric::CompilationMillis, 101, 5)],
+        );
+        let baseline = profile(
+            "baseline",
+            vec![entry(MisAmortizedMetric::CompilationMillis, 100, 5)],
+        );
+        let result = compare_mis_amortized_costs(&candidate, &baseline, 10).unwrap();
+        assert!(!result.metrics[0].candidate_no_more_expensive_at_requested_size);
+        assert_eq!(result.metrics[0].candidate_break_even_cohort_size, None);
+    }
+
 }
