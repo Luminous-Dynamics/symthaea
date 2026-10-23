@@ -46,9 +46,7 @@ jobs:
 
       - name: Run the drift scorer CLI against the synthetic fixture
         run: |
-          cargo run --locked -p xtask -- score-cognitive-loop-drift \\
-            --input benchmarks/cognitive-loop-evidence/synthetic-smoke-trace.json \\
-            --out "$RUNNER_TEMP/drift-score.json"
+          cargo run --locked -p xtask -- score-cognitive-loop-drift --input benchmarks/cognitive-loop-evidence/synthetic-smoke-trace.json --out "$RUNNER_TEMP/drift-score.json"
           jq -e '
             .stream_id == "synthetic-smoke-fixture-not-measured" and
             .ground_truth_events == 2 and
