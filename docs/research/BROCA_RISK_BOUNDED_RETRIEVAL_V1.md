@@ -169,3 +169,12 @@ The differentiator is not simply “HDC is faster.” It is an auditable, storag
 ## Submission opportunity (separate from algorithmic claims)
 
 The Agent Memory Leaderboard Cycle 2 guide currently lists a material deadline of October 31, 2026 at 23:59 UTC+8 (17:59 Johannesburg), with evaluation ending November 4. Participants must deploy stable Add/Search APIs and submit a version/materials package; a repository-only benchmark is not a qualifying endpoint. Treat this as a time-bounded deployment decision, not as evidence that a leaderboard win is guaranteed. Track endpoint feasibility, scope isolation, reproducible version binding, and smoke-test readiness independently from the retrieval research.
+
+
+## Cross-domain selective-risk contract and consolidation
+
+A runner-independent comparison against the CRISPR selective-risk kernel in [PR #7502](https://github.com/Luminous-Dynamics/symthaea/pull/7502) found a concrete interface mismatch: the memory curve exposes a zero-coverage origin, whereas CRISPR T10 currently emits only its observed confidence tiers. Both group exact ties and report unknown-label effects, but their event semantics differ (retrieval unsafe outcome versus classification error). These are not interchangeable safety labels.
+
+The new [cross-domain fixture](../../research/broca-risk-bounded/fixtures/SELECTIVE_RISK_CROSS_DOMAIN_V1.json) pins threshold inclusivity, tie atomicity, coverage denominators, unknown-label bounds and null rates at zero accepted cases. Its JSON syntax and four expected operating points were independently reconstructed and matched in the authoring environment. Neither Rust implementation was run; this is not source parity or a performance result.
+
+The follow-on [issue #8562 — unify selective-risk semantics](https://github.com/Luminous-Dynamics/symthaea/issues/8562) requires each domain adapter to normalize its **own preregistered error event** to a common metric contract, pass the shared fixture, and preserve domain-specific calibration, context partitioning, sampling units, data rights and authority. Extract a shared kernel only after exact-head Rust tests show parity; do not force both domains into one unsafe-event definition.
