@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "benchmarks/cognitive-loop-evidence/**"
+      - "Cargo.toml"
+      - "scripts/check-workspace-targets.sh"
       - "xtask/src/cognitive_loop_evidence.rs"
       - "xtask/src/cognitive_drift_score.rs"
       - "xtask/src/cognitive_drift_compare.rs"
@@ -14,6 +16,8 @@ on:
     branches: [main]
     paths:
       - "benchmarks/cognitive-loop-evidence/**"
+      - "Cargo.toml"
+      - "scripts/check-workspace-targets.sh"
       - "xtask/src/cognitive_loop_evidence.rs"
       - "xtask/src/cognitive_drift_score.rs"
       - "xtask/src/cognitive_drift_compare.rs"
