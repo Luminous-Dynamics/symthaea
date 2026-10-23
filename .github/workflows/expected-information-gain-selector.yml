@@ -54,13 +54,6 @@ jobs:
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/prequential_pit_martingale.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/adaptive_monitoring_benchmark.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs
-      - name: Diagnose workspace lockfile drift
-        run: |
-          cargo update --workspace
-          echo "=== Cargo.lock diff stat ==="
-          git diff --stat -- Cargo.lock
-          echo "=== Cargo.lock reconciliation diff ==="
-          git diff -- Cargo.lock
       - name: Test information-gain selector
         run: cargo test -p symthaea-core hdc::conjecture_engine::experiment_selection --lib
       - name: Run paired law-discovery selector pilot
