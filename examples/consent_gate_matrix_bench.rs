@@ -22,7 +22,7 @@ const NOW: u64 = 1_800_000_000;
 #[derive(Default)]
 struct Metrics {
     cases: usize,
-    expected_execute: usize,
+    expected_closure_invocations: usize,
     expected_block: usize,
     false_permits: usize,
     false_blocks: usize,
@@ -200,13 +200,13 @@ fn main() {
                                             metrics.false_permits += 1;
                                         }
                                     } else {
-                                        metrics.expected_execute += 1;
+                                        metrics.expected_closure_invocations += 1;
                                         if observed != expected {
                                             metrics.outcome_mismatches += 1;
                                         }
                                     }
 
-                                    let should_execute =
+                                    let should_invoke_closure =
                                         !matches!(expected, ConsentGateOutcome::Blocked(_));
                                     let mut invocations = 0_u32;
                                     let wrapped = execute_after_consent_check(
@@ -219,14 +219,14 @@ fn main() {
                                         },
                                     );
 
-                                    if should_execute && invocations != 1 {
+                                    if should_invoke_closure && invocations != 1 {
                                         metrics.closure_not_invoked_on_allow += 1;
                                     }
-                                    if !should_execute && invocations != 0 {
+                                    if !should_invoke_closure && invocations != 0 {
                                         metrics.closure_invocations_on_block += 1;
                                     }
 
-                                    if should_execute {
+                                    if should_invoke_closure {
                                         if let Ok(((), outcome)) = wrapped {
                                             if outcome != expected {
                                                 metrics.outcome_mismatches += 1;
@@ -235,7 +235,7 @@ fn main() {
                                             metrics.outcome_mismatches += 1;
                                         }
                                     } else if wrapped.is_ok() {
-                                        metrics.false_permits += 1;
+                                        metrics.outcome_mismatches += 1;
                                     }
 
                                     // Also catch unexpected blocks for a valid Required
@@ -263,8 +263,8 @@ fn main() {
 
     println!("Consent point-of-use gate matrix");
     println!("cases={}", metrics.cases);
-    println!("expected_block={}", metrics.expected_block);
-    println!("expected_execute={}", metrics.expected_execute);
+    println!("expected_blocked_cases={}", metrics.expected_block);
+    println!("expected_closure_invocations={}", metrics.expected_closure_invocations);
     println!("false_permits={}", metrics.false_permits);
     println!("false_blocks={}", metrics.false_blocks);
     println!(
@@ -276,7 +276,7 @@ fn main() {
         metrics.closure_not_invoked_on_allow
     );
     println!("outcome_mismatches={}", metrics.outcome_mismatches);
-    println!("scope: synthetic fixed-clock consent precondition only; not end-to-end authorization");
+    println!("scope: synthetic consent precondition only; NotRequired does not bypass other gates; not end-to-end authorization");
 
     if metrics.false_permits > 0
         || metrics.false_blocks > 0
