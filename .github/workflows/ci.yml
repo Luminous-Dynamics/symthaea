@@ -440,6 +440,10 @@ jobs:
       - name: Run tests
         run: cargo test -p symthaea --lib -- --test-threads=1
 
+      # Keep the coding benchmark's evidence-accounting regression tests live in CI.
+      - name: Test coding-agent benchmark evidence accounting
+        run: cargo test -p symthaea --example coding_agent_benchmark --features code_generation -- --test-threads=1
+
   test-spark-engine:
     name: Test spark-engine (workspace-excluded crate)
     runs-on: ubuntu-latest
