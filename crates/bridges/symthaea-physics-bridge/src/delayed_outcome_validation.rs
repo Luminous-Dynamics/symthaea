@@ -261,10 +261,9 @@ impl DelayedOutcomeMonitor {
             .checked_add(window_size)
             .ok_or(DelayedOutcomeError::StreamIndexOverflow)?;
 
-        let expected = usize::try_from(window_size)
-            .map_err(|_| DelayedOutcomeError::InvalidWindowSize)?;
-        let baseline =
-            self.summarize_window(baseline_start_for_summary, alarm_index, expected);
+        let expected =
+            usize::try_from(window_size).map_err(|_| DelayedOutcomeError::InvalidWindowSize)?;
+        let baseline = self.summarize_window(baseline_start_for_summary, alarm_index, expected);
         let post_alarm = self.summarize_window(alarm_index, post_end, expected);
         let latest_index = self.last_index.unwrap_or(alarm_index);
 
@@ -378,8 +377,7 @@ impl DelayedOutcomeMonitor {
             let mean = sum / labeled_observations as f64;
             mean.is_finite().then_some(mean)
         };
-        let label_coverage_fraction =
-            labeled_observations as f64 / expected_observations as f64;
+        let label_coverage_fraction = labeled_observations as f64 / expected_observations as f64;
 
         OutcomeWindowSummary {
             start_inclusive,
@@ -637,9 +635,6 @@ mod tests {
             monitor.raise_alarm(10),
             Err(DelayedOutcomeError::DuplicateAlarm)
         );
-        assert_eq!(
-            monitor.assess(9),
-            Err(DelayedOutcomeError::UnknownAlarm)
-        );
+        assert_eq!(monitor.assess(9), Err(DelayedOutcomeError::UnknownAlarm));
     }
 }
