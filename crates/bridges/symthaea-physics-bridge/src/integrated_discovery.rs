@@ -668,6 +668,7 @@ struct TrialOutcome {
     recovery_triggered_on_empty_pool: bool,
     typed_recovery_restarts: usize,
     structured_recovery_candidates: usize,
+    accepted_recovery_candidates: usize,
     terminal_pit_alarm: bool,
 }
 
@@ -830,6 +831,7 @@ fn run_trial_with_mode(
             recovery_triggered_on_empty_pool: false,
             typed_recovery_restarts: 0,
             structured_recovery_candidates: 0,
+            accepted_recovery_candidates: 0,
             terminal_pit_alarm: false,
         };
     }
@@ -989,6 +991,7 @@ fn run_trial_with_mode(
     let mut monitoring_protocol_invalid = false;
     let mut typed_recovery_restarts = 0usize;
     let mut structured_recovery_candidates = 0usize;
+    let mut accepted_recovery_candidates = 0usize;
     let mut recovery_triggered_on_empty_pool = false;
     let mut rejected_after_alarm = Vec::<usize>::new();
     let mut terminal_pit_alarm = false;
@@ -1262,6 +1265,7 @@ fn run_trial_with_mode(
                 break;
             }
             structured_recovery_candidates += recovery.structured_count;
+            accepted_recovery_candidates += recovery.accepted_count;
             typed_recovery_restarts += 1;
             terminal_pit_alarm = false;
             if pit_mode {
@@ -1311,6 +1315,7 @@ fn run_trial_with_mode(
                 break;
             }
             structured_recovery_candidates += recovery.structured_count;
+            accepted_recovery_candidates += recovery.accepted_count;
             typed_recovery_restarts += 1;
         }
     }
@@ -1359,6 +1364,7 @@ fn run_trial_with_mode(
         recovery_triggered_on_empty_pool,
         typed_recovery_restarts,
         structured_recovery_candidates,
+        accepted_recovery_candidates,
         terminal_pit_alarm,
     }
 }
@@ -1846,7 +1852,7 @@ mod tests {
                 if baseline.final_live != 1 || !baseline.success { 1 } else { 0 };
             empty_pool_recovery_attempts +=
                 if recovered.recovery_triggered_on_empty_pool { 1 } else { 0 };
-            accepted_recovery_candidates += recovered.structured_recovery_candidates;
+            accepted_recovery_candidates += recovered.accepted_recovery_candidates;
             same_domain_recovered += if recovered.ground_truth_equivalent { 1 } else { 0 };
             ood_recovered += if recovered.ground_truth_extrapolation_equivalent {
                 1
