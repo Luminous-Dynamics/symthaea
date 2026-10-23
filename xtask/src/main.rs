@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod cognitive_loop_evidence;
 mod cognitive_drift_score;
+mod cognitive_drift_compare;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -75,6 +76,13 @@ enum Commands {
     },
     /// Score alarm timestamps against ground-truth drift episodes.
     ScoreCognitiveLoopDrift {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Compare paired detector results with a dataset-clustered bootstrap interval.
+    CompareCognitiveLoopDrift {
         #[arg(long)]
         input: PathBuf,
         #[arg(long)]
@@ -184,6 +192,16 @@ fn main() -> anyhow::Result<()> {
             if let Some(path) = out {
                 std::fs::write(&path, rendered.as_bytes())?;
                 println!("Wrote drift score to {}", path.display());
+            } else {
+                println!("{rendered}");
+            }
+        }
+        Commands::CompareCognitiveLoopDrift { input, out } => {
+            let result = cognitive_drift_compare::evaluate_file(&input)?;
+            let rendered = serde_json::to_string_pretty(&result)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote paired comparison to {}", path.display());
             } else {
                 println!("{rendered}");
             }
