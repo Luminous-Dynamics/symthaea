@@ -20,7 +20,8 @@
     "budget",
     "accounting",
     "termination_reason",
-    "artifacts"
+    "artifacts",
+    "evaluation_mode"
   ],
   "properties": {
     "schema_version": {
@@ -198,6 +199,30 @@
             "null"
           ],
           "minimum": 0
+        },
+        "fidelity_evaluations": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_-]*$"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Per-fidelity oracle call counts; required for evaluation_mode=multi_fidelity and must sum to objective_evaluations."
+        },
+        "fidelity_cost_units_by_level": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_-]*$"
+          },
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "Cumulative cost units corresponding to exactly the same fidelity keys as fidelity_evaluations."
         }
       }
     },
@@ -333,6 +358,12 @@
     "notes": {
       "type": "string",
       "maxLength": 4000
+    },
+    "evaluation_mode": {
+      "enum": [
+        "single_fidelity",
+        "multi_fidelity"
+      ]
     }
   },
   "$defs": {
@@ -395,6 +426,28 @@
             "type": [
               "object",
               "null"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evaluation_mode": {
+            "const": "multi_fidelity"
+          }
+        },
+        "required": [
+          "evaluation_mode"
+        ]
+      },
+      "then": {
+        "properties": {
+          "accounting": {
+            "required": [
+              "fidelity_evaluations",
+              "fidelity_cost_units_by_level"
             ]
           }
         }
