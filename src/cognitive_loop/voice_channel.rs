@@ -48,8 +48,10 @@ pub struct VoiceRequest {
     /// Effective CfC time-constant factor for pacing (1.0 = baseline).
     /// Derived from the cycle's adaptive tau factors (FEP surprise × Φ).
     pub tau: f32,
-    /// Prediction error at time of generation.
+    /// Compatibility numeric PE payload; check the validity flag before interpreting.
     pub prediction_error: f32,
+    /// Whether PE is a current, finite comparison.
+    pub prediction_error_valid: bool,
     /// Detected primitives for prosody.
     pub detected_primitives: Vec<String>,
     /// Speech-rate multiplier from adaptive behavior (1.0 = baseline).
@@ -164,11 +166,11 @@ impl VoiceSynthesisChannel {
             // routing (synthesize_from_cycle_result on an uninitialized
             // VoiceOutput) fell through to simulate_tts — a placeholder sine
             // wave — so the loop's "voice" was never speech.
-            let (audio, metrics) = orchestrator.thought_to_speech_paced(
+            let (audio, metrics) = orchestrator.thought_to_speech_paced_with_evidence(
                 &latest.text,
                 &latest.cfc_output,
                 latest.tau,
-                latest.prediction_error,
+                latest.prediction_error_valid.then_some(latest.prediction_error),
                 latest.detected_primitives.clone(),
                 latest.speech_rate_multiplier,
                 latest.pause_multiplier,
@@ -217,6 +219,7 @@ mod tests {
             cfc_output: vec![0.0; 16],
             tau: 1.0,
             prediction_error: 0.1,
+            prediction_error_valid: true,
             detected_primitives: vec![],
             speech_rate_multiplier: 1.0,
             pause_multiplier: 1.0,
@@ -241,6 +244,7 @@ mod tests {
             cfc_output: vec![0.2; 16],
             tau: 1.0,
             prediction_error: 0.1,
+            prediction_error_valid: true,
             detected_primitives: vec![],
             speech_rate_multiplier: 1.0,
             pause_multiplier: 1.0,
