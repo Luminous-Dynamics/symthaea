@@ -67,6 +67,24 @@ Keep the existing `AnnValidationThresholds` expectations aligned with this repor
 
 These are engineering gates to test and recalibrate, not published SOTA thresholds. Report every raw query, not only aggregate averages. A failure is useful evidence; do not loosen thresholds or omit failed query classes after seeing the result.
 
+## Industry comparison: keep two evaluation layers separate
+
+### Binary nearest-neighbor systems
+
+The correct first external comparison is a metric-matched binary-vector benchmark, not a comparison against a dense-vector system using a different representation. Candidate baselines:
+
+- **Exact anchor:** this HdcStore full scan.
+- **FAISS binary indexes:** `IndexBinaryFlat` for optimized exhaustive ground truth and `IndexBinaryHNSW` or `IndexBinaryIVF` for approximate search. FAISS documents these indexes specifically for Hamming distance over byte-packed binary vectors: https://github.com/facebookresearch/faiss/wiki/Binary-Indexes
+- **pgvector binary HNSW:** `bit` vectors with `bit_hamming_ops`, which supports a database-backed baseline with an operational/storage layer: https://github.com/pgvector/pgvector
+
+The published FAISS binary-hashing methodology emphasizes recall alongside wall-clock latency, distance computations and random memory accesses: https://github.com/facebookresearch/faiss/wiki/Binary-hashing-index-benchmark. Match the exact vector bytes, queries, Hamming metric and top-K; capture build time, search p50/p95, recall, memory overhead, insert/delete/update cost and recovery/rebuild cost. Report adapter/database overhead separately from raw index time. Do not compare the current 16,384-bit vectors with FAISS's 256-bit example workloads and call the results matched.
+
+### Agent-memory quality
+
+A store-level Recall@K improvement is not sufficient evidence that an agent remembers or acts better. MemoryAgentBench describes four separate capabilities—accurate retrieval, test-time learning, long-range understanding and selective forgetting: https://arxiv.org/abs/2507.05257. Run that task-level lane, plus the Agent Memory Leaderboard's current public track when deployment is available: https://agentmemories.ai/docs. For the latter, the current Cycle 2 guide specifies a materials deadline of October 31, 2026 at 23:59 UTC+8 (17:59 in Johannesburg) and requires participant-hosted Add/Search APIs; repository-only submissions are not enough. Deployment feasibility is tracked separately in [PR #8476](https://github.com/Luminous-Dynamics/symthaea/pull/8476).
+
+Do not pool the binary ANN result, MemoryAgentBench scores and the external leaderboard score into one number. They measure different layers and have different task and deployment contracts.
+
 ## Machine and run receipt
 
 Archive the complete CSV (including its metadata and per-query exact/approximate IDs) alongside:
