@@ -408,5 +408,9 @@ mod tests {
         let n100 = one_sided_clopper_pearson_upper(0, 100, 0.95).unwrap();
         let n1000 = one_sided_clopper_pearson_upper(0, 1_000, 0.95).unwrap();
         assert!(n1000 < n100);
+        assert_eq!(
+            minimum_zero_failure_trials(1e-300, 0.95).unwrap_err(),
+            RiskGateError::SampleSizeOverflow
+        );
     }
 }
