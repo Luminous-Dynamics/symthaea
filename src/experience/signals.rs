@@ -303,7 +303,11 @@ impl SignalComputer {
             None => current.clone(),
             Some(prev) => PrincipledSignals {
                 prediction_error: if current.prediction_error_valid {
-                    self.ema(prev.prediction_error, current.prediction_error)
+                    if prev.prediction_error_valid {
+                        self.ema(prev.prediction_error, current.prediction_error)
+                    } else {
+                        current.prediction_error
+                    }
                 } else {
                     prev.prediction_error
                 },
@@ -402,10 +406,12 @@ mod tests {
 
         let s1 = PrincipledSignals {
             prediction_error: 0.2,
+            prediction_error_valid: true,
             ..Default::default()
         };
         let s2 = PrincipledSignals {
             prediction_error: 0.8,
+            prediction_error_valid: true,
             ..Default::default()
         };
 
@@ -415,6 +421,49 @@ mod tests {
         let smoothed2 = computer.smooth(s2);
         // EMA: 0.5 * 0.8 + 0.5 * 0.2 = 0.5
         assert!((smoothed2.prediction_error - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn invalid_prediction_error_is_excluded_from_decisions_and_smoothing() {
+        let invalid = PrincipledSignals {
+            prediction_error: 1.0,
+            prediction_error_valid: false,
+            confidence: 0.8,
+            coherence: 0.8,
+            uncertainty: 0.2,
+            salience: 0.2,
+            ..Default::default()
+        };
+        // Without valid PE the decision methods use the other explicit signals,
+        // not the retained numeric sentinel.
+        assert!(invalid.action_readiness() > 0.7);
+        assert!(invalid.learning_potential() < 0.3);
+        assert_eq!(invalid.summary().split_whitespace().next(), Some("PE:n/a"));
+
+        let mut computer = SignalComputer::new(0.5);
+        let first = computer.smooth(PrincipledSignals {
+            prediction_error: 0.1,
+            prediction_error_valid: true,
+            ..Default::default()
+        });
+        assert!(first.prediction_error_valid);
+        let missing = computer.smooth(PrincipledSignals {
+            prediction_error: 1.0,
+            prediction_error_valid: false,
+            ..Default::default()
+        });
+        assert!(!missing.prediction_error_valid);
+        assert_eq!(missing.prediction_error, 0.1);
+
+        // The first valid comparison after missingness starts from the current
+        // measured value rather than blending the invalid held signal.
+        let recovered = computer.smooth(PrincipledSignals {
+            prediction_error: 0.4,
+            prediction_error_valid: true,
+            ..Default::default()
+        });
+        assert!(recovered.prediction_error_valid);
+        assert_eq!(recovered.prediction_error, 0.4);
     }
 
     #[test]
