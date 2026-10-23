@@ -40,9 +40,9 @@ jobs:
 
       - name: Verify frozen active-evidence request digest
         run: echo "bdbc62fb67b3461d91f51789a17eb940dddc750c50306190e599e9eec6dd6b18  tools/morphology-continuity-oracle/active_evidence_request_v0_1.txt" | sha256sum --check -
- 
-     - name: Verify frozen metamorphic evidence request digest
-       run: echo "4aadbcbcaccb4bf1bc96cf1e650b8c967b3ef798520cd4934885f4063c58a182  tools/morphology-continuity-oracle/active_evidence_request_v0_2.txt" | sha256sum --check -
+
+      - name: Verify frozen metamorphic evidence request digest
+        run: echo "4aadbcbcaccb4bf1bc96cf1e650b8c967b3ef798520cd4934885f4063c58a182  tools/morphology-continuity-oracle/active_evidence_request_v0_2.txt" | sha256sum --check -
 
       - name: Formatting
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
