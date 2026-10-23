@@ -1,0 +1,195 @@
+{
+  "schema_version": "eng-semi-ref-001a-adversarial-v1",
+  "parent_issue": 5868,
+  "frozen_source_base": "2dfddf6027d8eaf62221f8a71be2bb6d1d7bd9a9",
+  "claim_ceiling": "Evidence constitution only; no device, simulator, measurement, fabrication, tapeout, or production capability established.",
+  "dispositions": [
+    "AdmissibleUnderProfile",
+    "EvidenceInsufficient",
+    "ProfileMismatch",
+    "PreserveDiscrepancy",
+    "HeldOutLeakage",
+    "UnsupportedPhysicalClaim",
+    "AuthorityNotGranted",
+    "NewGenerationRequired"
+  ],
+  "cases": [
+    {
+      "id": "REF001A-ADV-001",
+      "name": "datasheet-typical-is-not-article-truth",
+      "inputs": {
+        "datasheet_typical_curve_present": true,
+        "physical_article_measurement_present": false,
+        "claim": "exact tested article follows datasheet typical curve"
+      },
+      "expected_disposition": "UnsupportedPhysicalClaim",
+      "invariant": "manufacturer typical evidence != exact article observation"
+    },
+    {
+      "id": "REF001A-ADV-002",
+      "name": "analytical-fit-does-not-validate-mechanism",
+      "inputs": {
+        "analytical_fit_good": true,
+        "tcad_prediction_disagrees_materially": true,
+        "physical_measurement_present": false
+      },
+      "expected_disposition": "PreserveDiscrepancy",
+      "invariant": "analytical agreement != TCAD/model-family validity"
+    },
+    {
+      "id": "REF001A-ADV-003",
+      "name": "mesh-sensitivity-remains-visible",
+      "inputs": {
+        "tcad_run_a_converged": true,
+        "tcad_run_b_converged": true,
+        "mesh_changed": true,
+        "prediction_shift_material": true
+      },
+      "expected_disposition": "PreserveDiscrepancy",
+      "invariant": "solver convergence != discretization adequacy"
+    },
+    {
+      "id": "REF001A-ADV-004",
+      "name": "fit-data-cannot-be-held-out",
+      "inputs": {
+        "physical_curve_used_for_fit": true,
+        "same_curve_reported_as_validation": true
+      },
+      "expected_disposition": "HeldOutLeakage",
+      "invariant": "fit evidence != held-out validation evidence"
+    },
+    {
+      "id": "REF001A-ADV-005",
+      "name": "compact-fit-cannot-retrovalidate-tcad",
+      "inputs": {
+        "compact_model_matches_physical_data": true,
+        "tcad_assumption_known_wrong_or_unresolved": true
+      },
+      "expected_disposition": "PreserveDiscrepancy",
+      "invariant": "compact-model fit != physical mechanism established"
+    },
+    {
+      "id": "REF001A-ADV-006",
+      "name": "article-may-differ-from-datasheet",
+      "inputs": {
+        "calibration_current": true,
+        "physical_measurement_differs_from_datasheet_typical": true
+      },
+      "expected_disposition": "AdmissibleUnderProfile",
+      "invariant": "physical article evidence remains article-specific and does not rewrite manufacturer history"
+    },
+    {
+      "id": "REF001A-ADV-007",
+      "name": "stale-calibration-blocks-strong-physical-claim",
+      "inputs": {
+        "physical_measurement_present": true,
+        "instrument_calibration_current": false,
+        "claim_requires_current_calibration": true
+      },
+      "expected_disposition": "EvidenceInsufficient",
+      "invariant": "measurement bytes != qualified physical observation under a profile requiring current calibration"
+    },
+    {
+      "id": "REF001A-ADV-008",
+      "name": "temperature-mismatch-is-profile-mismatch",
+      "inputs": {
+        "analytical_temperature_kelvin": 300,
+        "measurement_temperature_kelvin": 330,
+        "temperature_is_material_to_claim": true,
+        "no_temperature_transfer_model": true
+      },
+      "expected_disposition": "ProfileMismatch",
+      "invariant": "same device identity != same environmental applicability"
+    },
+    {
+      "id": "REF001A-ADV-009",
+      "name": "unmeasured-reverse-region-remains-unavailable",
+      "inputs": {
+        "reverse_region_measured": false,
+        "reverse_region_simulated": true,
+        "claim": "physical reverse-region behavior observed"
+      },
+      "expected_disposition": "UnsupportedPhysicalClaim",
+      "invariant": "simulation != physical observation"
+    },
+    {
+      "id": "REF001A-ADV-010",
+      "name": "source-document-change-creates-new-generation",
+      "inputs": {
+        "same_friendly_part_name": true,
+        "datasheet_content_digest_changed": true,
+        "old_generation_reused_without_review": true
+      },
+      "expected_disposition": "NewGenerationRequired",
+      "invariant": "friendly source label != immutable source evidence identity"
+    },
+    {
+      "id": "REF001A-ADV-011",
+      "name": "article-substitution-not-silent",
+      "inputs": {
+        "catalog_component_same_family": true,
+        "tested_article_variant_changed": true,
+        "old_measurement_profile_reused_as_same_subject": true
+      },
+      "expected_disposition": "NewGenerationRequired",
+      "invariant": "catalog family != exact tested article"
+    },
+    {
+      "id": "REF001A-ADV-012",
+      "name": "spice-convergence-is-not-physical-validation",
+      "inputs": {
+        "ngspice_converged": true,
+        "physical_measurement_present": false,
+        "claim": "reference device physically validated"
+      },
+      "expected_disposition": "UnsupportedPhysicalClaim",
+      "invariant": "circuit convergence != device measurement"
+    },
+    {
+      "id": "REF001A-ADV-013",
+      "name": "one-cots-benchmark-does-not-establish-fab-capability",
+      "inputs": {
+        "reference_device_campaign_successful": true,
+        "custom_fabrication_evidence_present": false,
+        "claim": "semiconductor manufacturing capability established"
+      },
+      "expected_disposition": "UnsupportedPhysicalClaim",
+      "invariant": "reference characterization != fabrication capability"
+    },
+    {
+      "id": "REF001A-ADV-014",
+      "name": "benchmark-cannot-authorize-hardware",
+      "inputs": {
+        "simulation_and_measurement_plan_complete": true,
+        "independent_physical_authority_present": false,
+        "requested_effect": "energize instrumentation"
+      },
+      "expected_disposition": "AuthorityNotGranted",
+      "invariant": "engineering evidence plan != physical execution authority"
+    },
+    {
+      "id": "REF001A-ADV-015",
+      "name": "missing-geometry-remains-assumption",
+      "inputs": {
+        "exact_internal_device_geometry_known": false,
+        "tcad_geometry_assumed": true,
+        "tcad_matches_datasheet": true,
+        "claim": "fabricated internal geometry established"
+      },
+      "expected_disposition": "UnsupportedPhysicalClaim",
+      "invariant": "successful model fit != as-fabricated internal geometry evidence"
+    },
+    {
+      "id": "REF001A-ADV-016",
+      "name": "optical-profile-cannot-leak-into-electrical-primary-profile",
+      "inputs": {
+        "device_family": "photodiode",
+        "electrical_dark_profile_only": true,
+        "optical_responsivity_measurement_present": false,
+        "claim": "optical responsivity physically characterized"
+      },
+      "expected_disposition": "EvidenceInsufficient",
+      "invariant": "device class supports optical use != optical measurement exists"
+    }
+  ]
+}
