@@ -530,6 +530,12 @@ mod tests {
             result.error_reduction_pct
         );
         assert_eq!(result.prediction_errors.len(), result.prediction_error_validity.len());
+        assert!(
+            result.initial_valid_samples > 0 && result.final_valid_samples > 0,
+            "PE reduction needs valid samples in both windows (initial={}, final={})",
+            result.initial_valid_samples,
+            result.final_valid_samples
+        );
         // The system should show some learning over 200 cycles of repeating input.
         // Tolerance is 25% because CfC temporal dynamics involve rayon-parallel
         // post-processing whose scheduling order can vary under load, causing
