@@ -48,6 +48,14 @@ The HSQC hybrid record reports objective 88, 5/5, and 2.5608 s total (2.4765 s Q
 
 These are source-pinned published records, not reproduced by Symthaea and not fair head-to-head timings. They use different hardware, algorithms, resource allocations and success conventions. Use them as comparison context and as motivation for a controlled experiment, not as a causal claim that one paradigm is faster.
 
+### Independently rechecked public solution artifacts
+
+The machine-readable [QOBLIB-MIS-REFERENCE-AUDIT-001.json](QOBLIB-MIS-REFERENCE-AUDIT-001.json) pins the graph and three published solution files for es60fst02 to QOBLIB commit 1e0e7c523cd9707dd541cc9e5a3086125d4da3c7, recording the file-level Git object IDs.
+
+A separate JavaScript source parser and edge checker inspected all three submitted 88-vertex solution sets against the exact 186-vertex, 280-edge graph. ParallelILS, the HSQC hybrid submission, and the QAOA submission each had 88 unique in-range vertices and zero selected-edge conflicts. This establishes **feasibility of the submitted lists only**; it does not prove that 88 is globally optimal, validate the reported repeated-run success rates, reproduce any algorithm, or measure runtime. The QOBLIB record explicitly leaves the quantum submissions' optimality bounds as N/A.
+
+This audit was executed during authoring but the one-off JavaScript checker is not a committed standalone tool. The new `--verify-solution` mode in the Symthaea smoke runner (PR #8324) makes the same class of feasibility check repeatable from the repository when Rust becomes executable: it emits an audit receipt and exits nonzero on an invalid candidate or mismatched reported objective. That Rust path remains authored but uncompiled in this environment.
+
 ### Report both QOBLIB-native and all-in cost
 
 QOBLIB's current contributor guide specifies that submitted runtime fields should exclude compilation and queue time, while reporting total runtime, time-to-solution and CPU/GPU/QPU/other-hardware runtime. For apples-to-apples comparisons with a QOBLIB row, reproduce those conventions and report the hardware and averaging method. Do not add local stage timers to a published QOBLIB total unless their definitions match.
