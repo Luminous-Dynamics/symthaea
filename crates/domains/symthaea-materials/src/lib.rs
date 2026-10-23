@@ -12,6 +12,7 @@
 #![warn(missing_docs)]
 
 pub mod aging;
+pub mod capacitor_device;
 pub mod compound_stability;
 pub mod database;
 pub mod encoder;
@@ -21,6 +22,13 @@ pub mod properties;
 pub mod strategic;
 
 pub use aging::{AGING_HORIZON_LABELS, AGING_HORIZONS, AgingPrediction, MaterialAgingModel};
+pub use capacitor_device::{
+    CapacitorDeviceConstraintViolation, CapacitorDeviceEvidenceKind, CapacitorDeviceMetrics,
+    CapacitorDeviceModelError, CapacitorDeviceScreeningDisposition,
+    CapacitorDeviceScreeningLimitation, CapacitorDeviceScreeningReport,
+    CapacitorDeviceScreeningRequirements, SeriesRlcCapacitorModel,
+    calculate_capacitor_device_metrics, screen_capacitor_device,
+};
 pub use database::{MaterialDatabase, MaterialSearchResult};
 pub use encoder::MaterialHdcEncoder;
 pub use mining::{
