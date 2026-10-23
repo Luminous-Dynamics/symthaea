@@ -25,7 +25,6 @@ const MIN_BOOTSTRAP_REPLICATES: usize = 1_000;
 
 #[derive(Debug, Clone)]
 struct StateRow {
-    outcome_id: String,
     case_id: String,
     pair_id: String,
     component_id: String,
@@ -33,7 +32,6 @@ struct StateRow {
     state_role: String,
     intervention_kind: String,
     expected_applicability: String,
-    expected_action_policy: String,
     execution_status: String,
     model_id: Option<String>,
     model_version: Option<String>,
@@ -95,7 +93,11 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 5 || args.len() > 7 || args.get(1).is_some_and(|x| x == "--help" || x == "-h") {
         eprintln!(
-            "usage: {} <proof-state-suite.json> <outcomes.json> <train|validation|test|external_challenge> <report.json> [bootstrap_replicates] [seed]",
+            concat!(
+                "usage: {} <proof-state-suite.json> <outcomes.json> ",
+                "<train|validation|test|external_challenge> <report.json> ",
+                "[bootstrap_replicates] [seed]"
+            ),
             args.first().map(String::as_str).unwrap_or("analyze_proof_state_intervention")
         );
         if args.get(1).is_some_and(|x| x == "--help" || x == "-h") {
@@ -124,8 +126,10 @@ fn main() -> Result<()> {
         .transpose()?
         .unwrap_or(DEFAULT_SEED);
 
-    let suite: Value = serde_json::from_slice(&suite_bytes).context("parse proof-state suite JSON")?;
-    let outcomes: Value = serde_json::from_slice(&outcome_bytes).context("parse proof-state outcome JSON")?;
+    let suite: Value =
+        serde_json::from_slice(&suite_bytes).context("parse proof-state suite JSON")?;
+    let outcomes: Value =
+        serde_json::from_slice(&outcome_bytes).context("parse proof-state outcome JSON")?;
     let report = analyze(
         &suite,
         &outcomes,
@@ -262,14 +266,19 @@ fn analyze(
             bail!("{context}: source insight record ID mismatch");
         }
         let insight_sha = string(value, "source_insight_sha256", &context)?;
-        let expected_insight_sha = string(field(case, "source_insight", &case_id)?, "insight_sha256", &case_id)?;
+        let expected_insight_sha = string(
+            field(case, "source_insight", &case_id)?,
+            "insight_sha256",
+            &case_id,
+        )?;
         validate_sha256(insight_sha, &format!("{context}.source_insight_sha256"))?;
         if insight_sha != expected_insight_sha {
             bail!("{context}: source insight digest mismatch");
         }
 
         let intervention_kind = string(field(case, "intervention", &case_id)?, "kind", &case_id)?;
-        let (expected_applicability, expected_action_policy) = expected_state_labels(intervention_kind, &role)?;
+        let (expected_applicability, expected_action_policy) =
+            expected_state_labels(intervention_kind, &role)?;
         if string(value, "expected_applicability", &context)? != expected_applicability {
             bail!("{context}: expected_applicability contradicts the intervention/state role");
         }
@@ -313,7 +322,6 @@ fn analyze(
         let execution = field(value, "execution", &context)?;
         let parsed = parse_execution(execution, &context, dataset_kind)?;
         rows.push(StateRow {
-            outcome_id,
             case_id,
             pair_id,
             component_id,
@@ -321,7 +329,6 @@ fn analyze(
             state_role: role,
             intervention_kind: intervention_kind.to_owned(),
             expected_applicability: expected_applicability.to_owned(),
-            expected_action_policy: expected_action_policy.to_owned(),
             execution_status: parsed.status,
             model_id: parsed.model_id,
             model_version: parsed.model_version,
@@ -372,7 +379,12 @@ fn analyze(
     );
     counts.insert(
         "uncertain_judgments".into(),
-        json!(selected.iter().filter(|row| row.applicability_judgment.as_deref() == Some("uncertain")).count()),
+        json!(
+            selected
+                .iter()
+                .filter(|row| row.applicability_judgment.as_deref() == Some("uncertain"))
+                .count()
+        ),
     );
     counts.insert(
         "checked_success_rows".into(),
@@ -434,14 +446,23 @@ fn analyze(
             "replicates": bootstrap_replicates,
             "seed": seed,
             "interval": "percentile_95",
-            "note": "Intervals are component-clustered descriptive intervals; the analyzer never certifies the independent truth of the supplied labels."
+            "note": concat!(
+                "Intervals are component-clustered descriptive intervals; the analyzer never certifies ",
+                "the independent truth of the supplied labels."
+            ),
         },
         "counts": Value::Object(counts),
         "metrics": Value::Object(metrics),
         "resource_usage": Value::Object(resource_usage),
         "limitations": [
-            "The analyzer validates suite-to-outcome joins but does not establish the mathematical correctness of reviewer labels.",
-            "A structurally valid run receipt digest does not prove the receipt content was independently audited.",
+            concat!(
+                "The analyzer validates suite-to-outcome joins but does not establish the mathematical ",
+                "correctness of reviewer labels."
+            ),
+            concat!(
+                "A structurally valid run receipt digest does not prove the receipt content was ",
+                "independently audited."
+            ),
             "Synthetic fixtures are never scored; their model outcomes must remain not_run.",
             "The overall confirmatory decision is never set to pass by this binary."
         ],
@@ -475,14 +496,26 @@ struct Usage {
     cost_microusd: u64,
 }
 
-fn parse_execution(execution: &Value, context: &str, dataset_kind: &str) -> Result<ParsedExecution> {
+fn parse_execution(
+    execution: &Value,
+    context: &str,
+    dataset_kind: &str,
+) -> Result<ParsedExecution> {
     let status = string(execution, "status", context)?.to_owned();
     let checker_result = string(execution, "checker_result", context)?.to_owned();
     if !matches!(status.as_str(), "not_run" | "executed") {
         bail!("{context}: unsupported execution status {status:?}");
     }
     if status == "not_run" {
-        for key in ["model", "decision", "applicability_judgment", "original_move_applied", "proof_sha256", "run_receipt_sha256", "resource_usage"] {
+        for key in [
+            "model",
+            "decision",
+            "applicability_judgment",
+            "original_move_applied",
+            "proof_sha256",
+            "run_receipt_sha256",
+            "resource_usage",
+        ] {
             if !field(execution, key, context)?.is_null() {
                 bail!("{context}: not_run execution must set {key} to null");
             }
@@ -523,7 +556,10 @@ fn parse_execution(execution: &Value, context: &str, dataset_kind: &str) -> Resu
         bail!("{context}: unknown applicability judgment");
     }
     let decision = string(execution, "decision", context)?.to_owned();
-    if !matches!(decision.as_str(), "apply_original_move" | "adapt_move" | "replan" | "abstain" | "reject_insight") {
+    if !matches!(
+        decision.as_str(),
+        "apply_original_move" | "adapt_move" | "replan" | "abstain" | "reject_insight"
+    ) {
         bail!("{context}: unknown action decision {decision:?}");
     }
     let original_move_applied = field(execution, "original_move_applied", context)?
@@ -547,10 +583,17 @@ fn parse_execution(execution: &Value, context: &str, dataset_kind: &str) -> Resu
 
     let proof_sha = field(execution, "proof_sha256", context)?;
     if checker_result == "checked_success" {
-        let digest = proof_sha.as_str().with_context(|| format!("{context}: checked success requires proof_sha256"))?;
+        let digest = proof_sha
+            .as_str()
+            .with_context(|| format!("{context}: checked success requires proof_sha256"))?;
         validate_sha256(digest, &format!("{context}.proof_sha256"))?;
     } else if !proof_sha.is_null() {
-        validate_sha256(proof_sha.as_str().context("proof_sha256 must be a string or null")?, &format!("{context}.proof_sha256"))?;
+        validate_sha256(
+            proof_sha
+                .as_str()
+                .context("proof_sha256 must be a string or null")?,
+            &format!("{context}.proof_sha256"),
+        )?;
     }
     let receipt = string(execution, "run_receipt_sha256", context)?;
     validate_sha256(receipt, &format!("{context}.run_receipt_sha256"))?;
@@ -578,13 +621,18 @@ fn parse_execution(execution: &Value, context: &str, dataset_kind: &str) -> Resu
     })
 }
 
-fn expected_state_labels(intervention_kind: &str, role: &str) -> Result<(&'static str, &'static str)> {
+fn expected_state_labels(
+    intervention_kind: &str,
+    role: &str,
+) -> Result<(&'static str, &'static str)> {
     if role == "base" {
         return Ok(("eligible", "preserve_eligibility"));
     }
     match intervention_kind {
         "required_hypothesis_cleared" => Ok(("not_applicable", "move_forbidden_or_replan")),
-        "hypothesis_alpha_renamed" | "irrelevant_declaration_removed" | "independent_declarations_reordered" => {
+        "hypothesis_alpha_renamed"
+        | "irrelevant_declaration_removed"
+        | "independent_declarations_reordered" => {
             Ok(("eligible", "preserve_eligibility"))
         }
         _ => bail!("unsupported intervention kind {intervention_kind:?}"),
@@ -598,16 +646,33 @@ fn validate_pair_configurations(rows: &[StateRow]) -> Result<()> {
     }
     for (pair_id, pair_rows) in by_pair {
         if pair_rows.len() != 2 {
-            bail!("pair {pair_id:?} must have exactly one base and one variant outcome; found {}", pair_rows.len());
+            bail!(
+                "pair {pair_id:?} must have exactly one base and one variant outcome; found {}",
+                pair_rows.len()
+            );
         }
-        let base = pair_rows.iter().find(|row| row.state_role == "base").context("paired outcomes are missing base row")?;
-        let variant = pair_rows.iter().find(|row| row.state_role == "variant").context("paired outcomes are missing variant row")?;
-        if base.case_id != variant.case_id || base.component_id != variant.component_id || base.split != variant.split {
+        let base = pair_rows
+            .iter()
+            .find(|row| row.state_role == "base")
+            .context("paired outcomes are missing base row")?;
+        let variant = pair_rows
+            .iter()
+            .find(|row| row.state_role == "variant")
+            .context("paired outcomes are missing variant row")?;
+        if base.case_id != variant.case_id
+            || base.component_id != variant.component_id
+            || base.split != variant.split
+        {
             bail!("pair {pair_id:?} has inconsistent case/component/split metadata");
         }
         if base.execution_status == "executed" && variant.execution_status == "executed" {
-            if base.model_id != variant.model_id || base.model_version != variant.model_version || base.config_sha256 != variant.config_sha256 {
-                bail!("pair {pair_id:?} uses mismatched model/configuration across base and variant states");
+            if base.model_id != variant.model_id
+                || base.model_version != variant.model_version
+                || base.config_sha256 != variant.config_sha256
+            {
+                bail!(
+                    "pair {pair_id:?} uses mismatched model/configuration across base and variant states"
+                );
             }
         }
     }
@@ -627,31 +692,60 @@ fn compute_metrics(
         component_id: row.component_id.clone(),
         success: row.execution_status == "executed" && row.checker_result == "checked_success",
     }).collect();
-    metrics.insert("exact_target_solve_rate_on_assigned_rows".into(), metric_json(estimate(assigned_solve, bootstrap_replicates, seed)));
+    metrics.insert(
+        "exact_target_solve_rate_on_assigned_rows".into(),
+        metric_json(estimate(assigned_solve, bootstrap_replicates, seed)),
+    );
 
     let coverage = selected.iter().map(|row| Point {
         component_id: row.component_id.clone(),
-        success: row.execution_status == "executed" && row.applicability_judgment.as_deref().is_some_and(|x| x != "uncertain"),
+        success: row.execution_status == "executed"
+            && row
+                .applicability_judgment
+                .as_deref()
+                .is_some_and(|value| value != "uncertain"),
     }).collect();
-    metrics.insert("decisive_applicability_judgment_coverage".into(), metric_json(estimate(coverage, bootstrap_replicates, seed.wrapping_add(1))));
+    metrics.insert(
+        "decisive_applicability_judgment_coverage".into(),
+        metric_json(estimate(coverage, bootstrap_replicates, seed.wrapping_add(1))),
+    );
 
     let overall_accuracy = selected.iter().map(|row| Point {
         component_id: row.component_id.clone(),
-        success: row.execution_status == "executed" && row.applicability_judgment.as_deref() == Some(row.expected_applicability.as_str()),
+        success: row.execution_status == "executed"
+            && row.applicability_judgment.as_deref()
+                == Some(row.expected_applicability.as_str()),
     }).collect();
-    metrics.insert("applicability_correct_rate_on_assigned_rows".into(), metric_json(estimate(overall_accuracy, bootstrap_replicates, seed.wrapping_add(2))));
+    metrics.insert(
+        "applicability_correct_rate_on_assigned_rows".into(),
+        metric_json(estimate(overall_accuracy, bootstrap_replicates, seed.wrapping_add(2))),
+    );
 
-    let eligible_recall = selected.iter().filter(|row| row.expected_applicability == "eligible").map(|row| Point {
+    let eligible_recall = selected
+        .iter()
+        .filter(|row| row.expected_applicability == "eligible")
+        .map(|row| Point {
         component_id: row.component_id.clone(),
-        success: row.execution_status == "executed" && row.applicability_judgment.as_deref() == Some("eligible"),
+        success: row.execution_status == "executed"
+            && row.applicability_judgment.as_deref() == Some("eligible"),
     }).collect();
-    metrics.insert("eligible_insight_recall_on_assigned_rows".into(), metric_json(estimate(eligible_recall, bootstrap_replicates, seed.wrapping_add(3))));
+    metrics.insert(
+        "eligible_insight_recall_on_assigned_rows".into(),
+        metric_json(estimate(eligible_recall, bootstrap_replicates, seed.wrapping_add(3))),
+    );
 
-    let inapplicable_sensitivity = selected.iter().filter(|row| row.expected_applicability == "not_applicable").map(|row| Point {
+    let inapplicable_sensitivity = selected
+        .iter()
+        .filter(|row| row.expected_applicability == "not_applicable")
+        .map(|row| Point {
         component_id: row.component_id.clone(),
-        success: row.execution_status == "executed" && row.applicability_judgment.as_deref() == Some("not_applicable"),
+        success: row.execution_status == "executed"
+            && row.applicability_judgment.as_deref() == Some("not_applicable"),
     }).collect();
-    metrics.insert("inapplicability_sensitivity_on_assigned_rows".into(), metric_json(estimate(inapplicable_sensitivity, bootstrap_replicates, seed.wrapping_add(4))));
+    metrics.insert(
+        "inapplicability_sensitivity_on_assigned_rows".into(),
+        metric_json(estimate(inapplicable_sensitivity, bootstrap_replicates, seed.wrapping_add(4))),
+    );
 
     let false_eligibility = selected.iter().filter(|row| {
         row.expected_applicability == "not_applicable"
@@ -661,13 +755,22 @@ fn compute_metrics(
         component_id: row.component_id.clone(),
         success: row.applicability_judgment.as_deref() == Some("eligible"),
     }).collect();
-    metrics.insert("false_eligibility_rate_among_decisive_invalid_state_judgments".into(), metric_json(estimate(false_eligibility, bootstrap_replicates, seed.wrapping_add(5))));
+    metrics.insert(
+        "false_eligibility_rate_among_decisive_invalid_state_judgments".into(),
+        metric_json(estimate(false_eligibility, bootstrap_replicates, seed.wrapping_add(5))),
+    );
 
-    let unsafe_reuse = selected.iter().filter(|row| row.expected_applicability == "not_applicable" && row.execution_status == "executed").map(|row| Point {
+    let unsafe_reuse = selected
+        .iter()
+        .filter(|row| row.expected_applicability == "not_applicable" && row.execution_status == "executed")
+        .map(|row| Point {
         component_id: row.component_id.clone(),
         success: row.original_move_applied == Some(true),
     }).collect();
-    metrics.insert("unsafe_original_move_application_rate".into(), metric_json(estimate(unsafe_reuse, bootstrap_replicates, seed.wrapping_add(6))));
+    metrics.insert(
+        "unsafe_original_move_application_rate".into(),
+        metric_json(estimate(unsafe_reuse, bootstrap_replicates, seed.wrapping_add(6))),
+    );
 
     let pairs = selected_pairs(&selected);
     let equivalence_pairs: Vec<_> = pairs.iter().filter(|(_, base, variant)| {
@@ -682,7 +785,10 @@ fn compute_metrics(
             && base.applicability_judgment.as_deref().is_some_and(|x| x != "uncertain")
             && base.applicability_judgment.as_deref() == variant.applicability_judgment.as_deref(),
     }).collect();
-    metrics.insert("semantics_preserving_applicability_stability_on_assigned_pairs".into(), metric_json(estimate(pair_stability, bootstrap_replicates, seed.wrapping_add(7))));
+    metrics.insert(
+        "semantics_preserving_applicability_stability_on_assigned_pairs".into(),
+        metric_json(estimate(pair_stability, bootstrap_replicates, seed.wrapping_add(7))),
+    );
 
     let withdrawal_pairs: Vec<_> = pairs.iter().filter(|(_, base, variant)| {
         base.intervention_kind == "required_hypothesis_cleared"
@@ -697,15 +803,33 @@ fn compute_metrics(
             && variant.applicability_judgment.as_deref() == Some("not_applicable")
             && variant.original_move_applied == Some(false),
     }).collect();
-    metrics.insert("required_precondition_withdrawal_pair_accuracy".into(), metric_json(estimate(withdrawal_accuracy, bootstrap_replicates, seed.wrapping_add(8))));
+    metrics.insert(
+        "required_precondition_withdrawal_pair_accuracy".into(),
+        metric_json(estimate(withdrawal_accuracy, bootstrap_replicates, seed.wrapping_add(8))),
+    );
 
-    let decisive = selected.iter().filter(|row| row.execution_status == "executed" && row.applicability_judgment.as_deref().is_some_and(|x| x != "uncertain")).map(|row| Point {
+    let decisive = selected
+        .iter()
+        .filter(|row| {
+            row.execution_status == "executed"
+                && row
+                    .applicability_judgment
+                    .as_deref()
+                    .is_some_and(|value| value != "uncertain")
+        })
+        .map(|row| Point {
         component_id: row.component_id.clone(),
         success: row.applicability_judgment.as_deref() == Some(row.expected_applicability.as_str()),
     }).collect();
-    metrics.insert("applicability_accuracy_among_decisive_executed_rows".into(), metric_json(estimate(decisive, bootstrap_replicates, seed.wrapping_add(9))));
+    metrics.insert(
+        "applicability_accuracy_among_decisive_executed_rows".into(),
+        metric_json(estimate(decisive, bootstrap_replicates, seed.wrapping_add(9))),
+    );
 
-    let matched_config = selected.iter().filter(|row| row.execution_status == "executed").collect::<Vec<_>>();
+    let matched_config = selected
+        .iter()
+        .filter(|row| row.execution_status == "executed")
+        .collect::<Vec<_>>();
     let executed_configurations: BTreeSet<_> = matched_config
         .iter()
         .filter_map(|row| {
@@ -717,7 +841,9 @@ fn compute_metrics(
         })
         .collect();
     if executed_configurations.len() > 1 {
-        bail!("requested split contains multiple model/configuration identities; analyze one frozen comparison arm at a time");
+        bail!(
+            "requested split contains multiple model/configuration identities; analyze one frozen comparison arm at a time"
+        );
     }
     Ok(metrics)
 }
@@ -834,7 +960,11 @@ fn unsigned(value: &Value, key: &str, context: &str) -> Result<u64> {
 }
 
 fn validate_sha256(value: &str, context: &str) -> Result<()> {
-    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()) {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
         bail!("{context} must be lowercase 64-character SHA-256 hex");
     }
     Ok(())
@@ -851,15 +981,31 @@ mod tests {
 
     #[test]
     fn applicability_labels_differ_before_and_after_required_premise_removal() {
-        assert_eq!(expected_state_labels("required_hypothesis_cleared", "base").unwrap(), ("eligible", "preserve_eligibility"));
-        assert_eq!(expected_state_labels("required_hypothesis_cleared", "variant").unwrap(), ("not_applicable", "move_forbidden_or_replan"));
+        assert_eq!(
+            expected_state_labels("required_hypothesis_cleared", "base").unwrap(),
+            ("eligible", "preserve_eligibility")
+        );
+        assert_eq!(
+            expected_state_labels("required_hypothesis_cleared", "variant").unwrap(),
+            ("not_applicable", "move_forbidden_or_replan")
+        );
     }
 
     #[test]
     fn semantics_preserving_context_changes_keep_insight_eligible() {
-        for kind in ["hypothesis_alpha_renamed", "irrelevant_declaration_removed", "independent_declarations_reordered"] {
-            assert_eq!(expected_state_labels(kind, "base").unwrap(), ("eligible", "preserve_eligibility"));
-            assert_eq!(expected_state_labels(kind, "variant").unwrap(), ("eligible", "preserve_eligibility"));
+        for kind in [
+            "hypothesis_alpha_renamed",
+            "irrelevant_declaration_removed",
+            "independent_declarations_reordered",
+        ] {
+            assert_eq!(
+                expected_state_labels(kind, "base").unwrap(),
+                ("eligible", "preserve_eligibility")
+            );
+            assert_eq!(
+                expected_state_labels(kind, "variant").unwrap(),
+                ("eligible", "preserve_eligibility")
+            );
         }
     }
 
