@@ -108,7 +108,7 @@
           "const": false
         },
         "inertia_source": {
-          "const": "derived_from_synthetic_bounding_primitives"
+          "const": "not_provided_kinematic_only"
         }
       }
     },
