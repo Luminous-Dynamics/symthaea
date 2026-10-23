@@ -118,10 +118,7 @@ pub enum TerminationStatus {
 
 impl TerminationStatus {
     fn is_invalid(self) -> bool {
-        matches!(
-            self,
-            Self::NumericalFailure | Self::InvalidConfiguration
-        )
+        matches!(self, Self::NumericalFailure | Self::InvalidConfiguration)
     }
 
     fn can_continue(self) -> bool {
@@ -227,9 +224,7 @@ pub fn next_discovery_action(snapshot: DiscoverySnapshot) -> DiscoveryAction {
         };
     }
 
-    if snapshot.validation == ValidationStatus::Passed
-        && snapshot.adequacy.is_trustworthy_clear()
-    {
+    if snapshot.validation == ValidationStatus::Passed && snapshot.adequacy.is_trustworthy_clear() {
         return DiscoveryAction::AcceptValidatedCandidate;
     }
 

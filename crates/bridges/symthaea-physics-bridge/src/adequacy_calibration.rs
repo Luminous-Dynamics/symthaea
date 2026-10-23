@@ -33,9 +33,7 @@ pub enum CalibrationError {
         minimum_required: usize,
     },
     /// A calibration score is negative or non-finite.
-    InvalidCalibrationScore {
-        index: usize,
-    },
+    InvalidCalibrationScore { index: usize },
     /// The audit batch score is negative or non-finite.
     InvalidAuditScore,
     /// The audit observations were not independent of model fitting/tuning data.
@@ -355,11 +353,7 @@ pub fn standardized_residual_diagnostics(
         .map(|score| score / max_abs)
         .collect::<Vec<_>>();
     let mean_normalized = normalized.iter().sum::<f64>() / n as f64;
-    let mean_scaled_squares = normalized
-        .iter()
-        .map(|score| score * score)
-        .sum::<f64>()
-        / n as f64;
+    let mean_scaled_squares = normalized.iter().map(|score| score * score).sum::<f64>() / n as f64;
     let rms = max_abs * mean_scaled_squares.sqrt();
 
     // Fixed scale factors make the raw components more comparable; they are not null p-values.
@@ -382,10 +376,7 @@ pub fn standardized_residual_diagnostics(
             .iter()
             .map(|score| score * score)
             .sum::<f64>();
-        let right_sum_squares = centered[1..]
-            .iter()
-            .map(|score| score * score)
-            .sum::<f64>();
+        let right_sum_squares = centered[1..].iter().map(|score| score * score).sum::<f64>();
         let denominator = left_sum_squares.sqrt() * right_sum_squares.sqrt();
         if denominator == 0.0 {
             0.0
@@ -522,7 +513,10 @@ mod tests {
         assert_eq!(standardized_rms_residual(&[1.0], &[], &[1.0]), None);
         assert_eq!(standardized_rms_residual(&[1.0], &[0.0], &[0.0]), None);
         assert_eq!(standardized_rms_residual(&[f64::NAN], &[0.0], &[1.0]), None);
-        assert_eq!(standardized_rms_residual(&[f64::MAX], &[-f64::MAX], &[1.0]), None);
+        assert_eq!(
+            standardized_rms_residual(&[f64::MAX], &[-f64::MAX], &[1.0]),
+            None
+        );
     }
 
     #[test]
@@ -573,11 +567,7 @@ mod tests {
     #[test]
     fn multi_view_score_preserves_zero_and_fails_closed() {
         assert_eq!(
-            multi_view_standardized_residual_score(
-                &[1.0, -2.0],
-                &[1.0, -2.0],
-                &[0.1, 100.0]
-            ),
+            multi_view_standardized_residual_score(&[1.0, -2.0], &[1.0, -2.0], &[0.1, 100.0]),
             Some(0.0)
         );
         assert_eq!(multi_view_standardized_residual_score(&[], &[], &[]), None);
@@ -607,14 +597,16 @@ mod tests {
                 .unwrap()
             })
             .collect::<Vec<_>>();
-        let calibrator =
-            ConformalAdequacyCalibrator::new(&calibration_scores, 0.05).unwrap();
+        let calibrator = ConformalAdequacyCalibrator::new(&calibration_scores, 0.05).unwrap();
         let audit_score =
             multi_view_standardized_residual_score(&[100.0, 0.0, 0.0], &[0.0; 3], &[1.0; 3])
                 .unwrap();
         let result = calibrator.assess_audit_score(audit_score, true).unwrap();
         assert!((result.p_value - 0.05).abs() < 1e-12);
-        assert!(matches!(result.assessment, AdequacyAssessment::Alarm { .. }));
+        assert!(matches!(
+            result.assessment,
+            AdequacyAssessment::Alarm { .. }
+        ));
     }
 
     fn component_calibrators() -> Vec<ConformalAdequacyCalibrator> {
@@ -653,8 +645,7 @@ mod tests {
         let one_unusual =
             sum_log_component_p_fusion_score(&components, &[100.0, 10.0, 10.0, 10.0], true)
                 .unwrap();
-        let all_unusual =
-            sum_log_component_p_fusion_score(&components, &[100.0; 4], true).unwrap();
+        let all_unusual = sum_log_component_p_fusion_score(&components, &[100.0; 4], true).unwrap();
         assert!(one_unusual > usual);
         assert!(all_unusual > one_unusual);
         assert_eq!(
@@ -668,22 +659,22 @@ mod tests {
         let components = component_calibrators();
         let aggregate_reference = (1..=19)
             .map(|value| {
-                sum_log_component_p_fusion_score(
-                    &components,
-                    &[value as f64, 0.0, 0.0, 0.0],
-                    true,
-                )
-                .unwrap()
+                sum_log_component_p_fusion_score(&components, &[value as f64, 0.0, 0.0, 0.0], true)
+                    .unwrap()
             })
             .collect::<Vec<_>>();
         let final_calibrator =
             ConformalAdequacyCalibrator::new(&aggregate_reference, 0.05).unwrap();
         let audit_aggregate =
-            sum_log_component_p_fusion_score(&components, &[100.0, 0.0, 0.0, 0.0], true)
-                .unwrap();
-        let result = final_calibrator.assess_audit_score(audit_aggregate, true).unwrap();
+            sum_log_component_p_fusion_score(&components, &[100.0, 0.0, 0.0, 0.0], true).unwrap();
+        let result = final_calibrator
+            .assess_audit_score(audit_aggregate, true)
+            .unwrap();
         assert!((result.p_value - 0.05).abs() < 1e-12);
-        assert!(matches!(result.assessment, AdequacyAssessment::Alarm { .. }));
+        assert!(matches!(
+            result.assessment,
+            AdequacyAssessment::Alarm { .. }
+        ));
     }
 
     #[test]
@@ -699,9 +690,14 @@ mod tests {
         let audit_aggregate =
             minimum_component_p_fusion_score(&components, &[100.0, 10.0, 10.0, 10.0], true)
                 .unwrap();
-        let result = final_calibrator.assess_audit_score(audit_aggregate, true).unwrap();
+        let result = final_calibrator
+            .assess_audit_score(audit_aggregate, true)
+            .unwrap();
         assert!((result.p_value - 0.05).abs() < 1e-12);
-        assert!(matches!(result.assessment, AdequacyAssessment::Alarm { .. }));
+        assert!(matches!(
+            result.assessment,
+            AdequacyAssessment::Alarm { .. }
+        ));
     }
 
     #[test]
