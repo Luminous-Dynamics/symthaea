@@ -200,7 +200,8 @@ fn audit(root: &Path) -> Result<Value, String> {
             errors.push(error);
             let mut failed_receipt = receipt;
             failed_receipt["status"] = Value::String("FAIL".to_owned());
-            failed_receipt["checks"]["audit_receipt_instance_validation"] = Value::String("FAIL".to_owned());
+            failed_receipt["checks"]["audit_receipt_instance_validation"] =
+                Value::String("FAIL".to_owned());
             failed_receipt["errors"] = json!(errors);
             Ok(failed_receipt)
         }
@@ -321,8 +322,12 @@ fn semantic_checks(suite: &Value) -> Value {
     }
 
     json!({
-        "unique_property_ids": errors.iter().all(|message| !message.starts_with("duplicate property ID")),
-        "unique_scenario_ids": errors.iter().all(|message| !message.starts_with("duplicate scenario ID")),
+        "unique_property_ids": errors
+            .iter()
+            .all(|message| !message.starts_with("duplicate property ID")),
+        "unique_scenario_ids": errors
+            .iter()
+            .all(|message| !message.starts_with("duplicate scenario ID")),
         "scenario_property_references_resolve": references_resolve,
         "errors": errors
     })
@@ -431,8 +436,16 @@ mod tests {
         suite["scenarios"].as_array_mut().unwrap().push(scenario);
 
         let errors = semantic_checks(&suite)["errors"].as_array().unwrap().clone();
-        assert!(errors.iter().any(|error| error.as_str().unwrap().contains("duplicate property ID")));
-        assert!(errors.iter().any(|error| error.as_str().unwrap().contains("duplicate scenario ID")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.as_str().unwrap().contains("duplicate property ID"))
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.as_str().unwrap().contains("duplicate scenario ID"))
+        );
     }
 
     #[test]
@@ -454,8 +467,12 @@ mod tests {
             "$schema": DRAFT_2020_12,
             "$ref": "https://schemas.example.invalid/mesh.json"
         });
-        let error = validate_instance(&external_schema, &json!({"attack": true}), "offline negative control")
-            .expect_err("unregistered external schema must not be fetched");
+        let error = validate_instance(
+            &external_schema,
+            &json!({"attack": true}),
+            "offline negative control",
+        )
+        .expect_err("unregistered external schema must not be fetched");
         assert!(error.contains("offline validator"), "{error}");
     }
 
