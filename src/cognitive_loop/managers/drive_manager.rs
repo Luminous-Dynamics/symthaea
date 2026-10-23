@@ -342,6 +342,7 @@ mod tests {
     fn snapshot_with(pe: f64, coherence: f64, arousal: f32, valence: f32) -> CycleSnapshot {
         CycleSnapshot {
             prediction_error: pe as f32,
+            prediction_error_valid: 1,
             coherence: coherence as f32,
             arousal,
             valence,
@@ -575,6 +576,21 @@ mod tests {
         let mut dm = DriveManager::default();
         let result = dm.restore(&[0u8; 10]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_pe_does_not_change_drive_evidence_state() {
+        let mut manager = DriveManager::default();
+        let initial_threshold = manager.exploration_threshold;
+        let mut snapshot = snapshot_with(1.0, 0.5, 0.5, 0.0);
+        snapshot.prediction_error_valid = 0;
+
+        let _ = manager.process(&snapshot);
+
+        assert!(manager.error_history.is_empty());
+        assert_eq!(manager.low_error_streak, 0);
+        assert_eq!(manager.flow_streak, 0);
+        assert_eq!(manager.exploration_threshold, initial_threshold);
     }
 
     #[test]
