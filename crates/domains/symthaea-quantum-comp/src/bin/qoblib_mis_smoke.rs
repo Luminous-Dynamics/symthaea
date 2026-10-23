@@ -48,6 +48,11 @@ fn json_vertices(vertices: &[usize]) -> String {
     format!("[{body}]")
 }
 
+fn json_numbers(values: &[usize]) -> String {
+    let body = values.iter().map(usize::to_string).collect::<Vec<_>>().join(",");
+    format!("[{body}]")
+}
+
 const MULTISTART_GREEDY_RUNS: usize = 16;
 const MULTISTART_GREEDY_SEED_BASE: u64 = 0x5143_4f4d_505f_3031;
 
@@ -396,6 +401,23 @@ fn run(path: &str) -> Result<(), RunFailure> {
         });
     }
 
+    let portfolio_start = Instant::now();
+    let portfolio = multi_start_greedy(&parsed.graph, MULTISTART_GREEDY_RUNS);
+    let portfolio_ns = portfolio_start.elapsed().as_nanos();
+    let portfolio_report = parsed.graph.verify_solution(
+        &portfolio.best_vertices,
+        Some(portfolio.best_vertices.len()),
+    );
+    if !portfolio_report.feasible {
+        return Err(RunFailure {
+            kind: "portfolio_verification",
+            message: "internal error: multi-start greedy portfolio failed independent verification".to_owned(),
+            source_bytes: Some(source.len()),
+            source_fnv1a64: Some(source_hash),
+            elapsed_ns: end_to_end_start.elapsed().as_nanos(),
+        });
+    }
+
     let local_start = Instant::now();
     let local: Option<LocalImprovementResult> = if parsed.graph.vertex_count() <= LOCAL_SEARCH_MAX_VERTICES {
         Some(improve_one_for_two(&parsed.graph, &greedy, LOCAL_SEARCH_MAX_PAIR_CHECKS))
@@ -456,12 +478,20 @@ fn run(path: &str) -> Result<(), RunFailure> {
             result.vertices.iter().map(|vertex| (vertex + 1).to_string()).collect::<Vec<_>>().join(",")
         )
     }).unwrap_or_else(|| "skipped-vertex-limit".to_owned());
+    let portfolio_normalized = format!(
+        "seed={}|objectives={}|distinct={}|vertices={}",
+        portfolio.best_seed,
+        portfolio.objectives.iter().map(usize::to_string).collect::<Vec<_>>().join(","),
+        portfolio.distinct_solutions,
+        portfolio.best_vertices.iter().map(|vertex| (vertex + 1).to_string()).collect::<Vec<_>>().join(",")
+    );
     let normalized = format!(
-        "v2|{}|{}|{}|greedy-min-residual-degree|{}|local={}|exact={}",
+        "v3|{}|{}|{}|greedy-min-residual-degree|{}|portfolio={}|local={}|exact={}",
         format!("{source_hash:016x}"),
         parsed.declared_vertex_count,
         parsed.declared_edge_count,
         greedy.iter().map(|vertex| (vertex + 1).to_string()).collect::<Vec<_>>().join(","),
+        portfolio_normalized,
         local_normalized,
         exact.as_ref().map(|vertices| vertices.iter()
             .map(|vertex| (vertex + 1).to_string()).collect::<Vec<_>>().join(","))
@@ -482,6 +512,7 @@ fn run(path: &str) -> Result<(), RunFailure> {
             "  \"vertices\": {},\n",
             "  \"edges\": {},\n",
             "  \"greedy\": {{\"policy\": \"minimum-residual-degree-then-lowest-index\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"elapsed_ns\": {}}},\n",
+            "  \"multi_start_greedy\": {{\"policy\": \"minimum-residual-degree-seeded-ties\", \"runs\": {}, \"best_seed\": {}, \"best_objective\": {}, \"feasible\": {}, \"distinct_solutions\": {}, \"objectives_by_run\": {}, \"vertices_one_based\": {}, \"elapsed_ns\": {}}},\n",
             "  \"local_improvement\": {{\"neighborhood\": \"one-selected-for-two-unselected\", \"status\": \"{}\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"exchanges\": {}, \"pair_checks\": {}, \"elapsed_ns\": {}}},\n",
             "  \"exact_oracle\": {{\"status\": \"{}\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"elapsed_ns\": {}}},\n",
             "  \"timing_ns\": {{\"parse\": {}, \"end_to_end\": {}}},\n",
@@ -501,6 +532,14 @@ fn run(path: &str) -> Result<(), RunFailure> {
         greedy_report.feasible,
         json_vertices(&greedy),
         greedy_ns,
+        MULTISTART_GREEDY_RUNS,
+        portfolio.best_seed,
+        portfolio_report.computed_objective,
+        portfolio_report.feasible,
+        portfolio.distinct_solutions,
+        json_numbers(&portfolio.objectives),
+        json_vertices(&portfolio.best_vertices),
+        portfolio_ns,
         local.as_ref().map(|result| if result.locally_optimal { "locally-optimal-1-for-2" } else { "pair-check-budget-exhausted" }).unwrap_or("skipped-vertex-limit"),
         local_report.as_ref().map(|report| report.computed_objective.to_string()).unwrap_or_else(|| "null".to_owned()),
         local_report.as_ref().map(|report| report.feasible.to_string()).unwrap_or_else(|| "null".to_owned()),
@@ -565,6 +604,20 @@ mod tests {
         let selected = greedy_min_residual_degree(&graph);
         assert_eq!(selected, vec![1, 2, 3]);
         assert!(graph.verify_solution(&selected, Some(3)).feasible);
+    }
+
+    #[test]
+    fn multi_start_greedy_portfolio_is_seeded_replayable_and_feasible() {
+        let graph = MisGraph::new(7, [
+            (0, 3), (0, 4), (1, 3), (1, 5), (2, 4), (2, 6), (3, 5), (4, 6),
+        ]).unwrap();
+        let first = multi_start_greedy(&graph, MULTISTART_GREEDY_RUNS);
+        let second = multi_start_greedy(&graph, MULTISTART_GREEDY_RUNS);
+        assert_eq!(first, second);
+        assert_eq!(first.objectives.len(), MULTISTART_GREEDY_RUNS);
+        assert!(first.best_vertices.len() >= greedy_min_residual_degree(&graph).len());
+        assert!(graph.verify_solution(&first.best_vertices, Some(first.best_vertices.len())).feasible);
+        assert!(first.distinct_solutions >= 1);
     }
 
     #[test]
