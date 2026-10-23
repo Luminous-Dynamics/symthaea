@@ -468,6 +468,13 @@ fn validate_container_identity(
         .get("container_identity")
         .and_then(Value::as_object)
         .ok_or_else(|| "container_identity missing or not an object".to_string())?;
+    if identity
+        .get("git_metadata_sanitization_exit_code")
+        .and_then(Value::as_i64)
+        != Some(0)
+    {
+        return Err("Git metadata sanitization was not confirmed".to_string());
+    }
     let network_mode = identity
         .get("network_mode")
         .and_then(Value::as_str)
@@ -1481,6 +1488,7 @@ mod tests {
                     "configured_image": image_reference,
                     "container_image_id": image_id,
                     "network_mode": "none",
+                    "git_metadata_sanitization_exit_code": 0,
                     "repo_digests": []
                 },
                 "log_sha256": sha256_bytes(run_log.as_bytes()),
@@ -1505,6 +1513,7 @@ mod tests {
                     "configured_image": image_reference,
                     "container_image_id": image_id,
                     "network_mode": "none",
+                    "git_metadata_sanitization_exit_code": 0,
                     "repo_digests": []
                 },
                 "log_sha256": sha256_bytes(baseline_log.as_bytes()),
