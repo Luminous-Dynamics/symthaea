@@ -57,13 +57,13 @@ The supplied calibration-manifest digest is retained in the receipt but this sta
 
 ## Adversarial tests
 
-The thirteen authored Rust tests cover:
+The fourteen authored Rust tests cover:
 1. exact zero-harm bound and the 71-vs-72 example for a 5% target with adjusted (delta=0.025);
 2. a known one-harm/ten-escalation Clopper–Pearson reference value;
 3. rejection of tiny clean samples that do not certify the population target;
 4. zero selected escalations as insufficient evidence;
 5. sufficient clean escalations meeting the adjusted target;
-6. stronger correction for a larger predeclared policy family;
+6. stronger correction for a larger predeclared policy family, including 89-vs-90 clean escalations per group across four groups;
 7. a rare group failing its bound even when the pooled bound passes;
 8. a represented group with no escalations returning insufficient evidence;
 9. a demonstrated failing group's risk bound taking precedence over another group's insufficient evidence;
