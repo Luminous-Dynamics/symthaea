@@ -558,7 +558,7 @@
   "controller": {
     "kinematics_only": true,
     "commands_enabled": false,
-    "inertia_source": "derived_from_synthetic_bounding_primitives"
+    "inertia_source": "not_provided_kinematic_only"
   },
   "authority": {
     "simulation_only": true,
