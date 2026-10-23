@@ -31,15 +31,15 @@
   },
   "report": {
     "path": "docs/research/ACTION_SUBSET_KERNEL_BENCHMARK_2026-10-23.md",
-    "git_blob": "03467699bff75abc056ac007a47e256af1f858fb",
-    "bytes": 7692
+    "git_blob": "a51b1f7672edfe0f3e7dbab2791b94344118e7ad",
+    "bytes": 7700
   },
   "validation": {
     "exact_scm_enumeration": "PASS_LOCAL",
     "embedded_self_test": "PASS_LOCAL",
     "unit_tests": "8/8_PASS_LOCAL",
     "source_and_test_git_blobs_match_executed_bytes": true,
-    "remote_ci": "not claimed; inspect latest exact-head checks"
+    "remote_ci": "no checks returned for exact latest head; no remote pass claimed"
   },
   "scientific_boundary": "Prior art already includes arbitrary action-dependent subset distributions. This is an exact small-SCM telemetry ablation pilot; it is neither an external leaderboard result nor a state-of-the-art claim."
 }
