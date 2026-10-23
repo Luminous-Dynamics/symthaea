@@ -348,7 +348,10 @@ impl CognitiveLoopService {
             == symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::Genuine;
         let _t_surprise = Instant::now();
         let (surprise_triggered, exploration_action) =
-            self.run_surprise_exploration(&encoding_res.compressed_state);
+            self.run_surprise_exploration(
+                &encoding_res.compressed_state,
+                prediction_error_valid,
+            );
         module_timings.surprise_exploration = _t_surprise.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
