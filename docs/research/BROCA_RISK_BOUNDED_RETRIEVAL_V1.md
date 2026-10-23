@@ -13,6 +13,7 @@ Related work:
 - [Exact binomial confidence limits (NIST)](https://itl.nist.gov/div898/software/dataplot/refman2/auxillar/exacbici.htm)
 - [Selective Conformal Risk Control](https://arxiv.org/abs/2512.12844)
 - [SCoRE: Conformal Selective Prediction with General Risk Control](https://arxiv.org/abs/2603.24704)
+- [Fixed-Sequence Confidence-Interval Calibration for Finite-Sample Selective Risk Control (2026)](https://www.mdpi.com/2571-905X/9/5/109)
 
 ## Thesis: retrieval should spend compute where the risk is
 
@@ -117,7 +118,7 @@ These are proposed go/no-go criteria to preregister before the locked evaluation
 - Mean strict exact-ID Recall@K at least 0.98 for the target production-like query distribution; also report the existing store-level 0.95 threshold as a comparable baseline rather than silently replacing it.
 - Worst-query Recall@K at least 0.80, with per-query output retained.
 - Mean tie-aware Recall@K at least 0.99, shown only as a supplement to strict recall.
-- For the primary target stratum, the one-sided 95% upper confidence bound on the unsafe-accepted-result rate should be at most 1%. Report numerator, denominator, and the exact interval method. This gate needs enough accepted test examples; zero observed failures in a small set is not sufficient evidence. The standalone reference in [research/broca-risk-bounded](../../research/broca-risk-bounded/README.md) computes a one-sided Clopper-Pearson bound and requires a configured minimum accepted sample count; under its binomial assumptions, 299 independent accepted cases with zero unsafe outcomes are needed to put the 95% upper bound at or below 1%.
+- For the primary target stratum, the one-sided 95% upper confidence bound on the unsafe-accepted-result rate should be at most 1%. Report numerator, denominator, and the exact interval method. This gate needs enough accepted test examples; zero observed failures in a small set is not sufficient evidence. The standalone reference in [research/broca-risk-bounded](../../research/broca-risk-bounded/README.md) computes a one-sided Clopper-Pearson bound and requires a configured minimum accepted sample count; under its binomial assumptions, 299 independent accepted cases with zero unsafe outcomes are needed to put the 95% upper bound at or below 1%. It also provides a descriptive risk–coverage curve (ties enter together; missing outcomes remain visible) and a fixed-sequence threshold certification routine that stops at the first risk-budget failure. The candidate threshold sequence must be preregistered independently of evaluation labels. This design is aligned with recent finite-sample selective-risk calibration work, including the 2026 fixed-sequence confidence-interval calibration framework; it is not a claim of a novel risk-control theorem.
 - Report every error class separately: low-recall results, high-confidence false accepts, exact fallback, no candidates, stale index, OOD/unanswerable query, and scope/privacy failure.
 - Scope isolation, deletion/forgetting and index-integrity tests have a zero-tolerance gate: any cross-scope retrieval, resurrected deleted memory, or unvalidated index use fails the candidate policy regardless of average recall.
 
@@ -151,7 +152,7 @@ Keep train/calibration/tuning/test data disjoint by conversation, session or mem
 ## Decision rule and launch sequence
 
 1. **Baseline:** run PR #8494 and preserve the complete raw run receipt. If the local environment cannot compile/run, record that limitation rather than substituting source inspection for measurements.
-2. **Instrumentation:** reuse `AnnValidationReport` / `AnnValidationSuite` for strict recall, candidate fraction and fallback metrics. Add only the extra observability required for latency, tie handling, per-class analysis and routing-risk evaluation. The standalone risk-gate crate can calculate the held-out unsafe-rate bound once its exact-head Rust tests pass; it does not train or calibrate the routing model.
+2. **Instrumentation:** reuse `AnnValidationReport` / `AnnValidationSuite` for strict recall, candidate fraction and fallback metrics. Add only the extra observability required for latency, tie handling, per-class analysis and routing-risk evaluation. The standalone risk-gate crate can produce development risk–coverage curves and fixed-sequence certification reports once its exact-head Rust tests pass; it does not train or calibrate the routing model.
 3. **Offline policy replay:** train/tune on disjoint partitions; evaluate frozen rules on a locked test set. Include always-exact and always-approximate endpoints so the cascade's trade-off is visible.
 4. **Adversarial and lifecycle checks:** prove that deletion, scope boundaries, index validation and exact fallback are preserved through normal operation and recovery.
 5. **Shadow mode:** compute the proposed route and its audit receipt but return exact results; compare predicted risk with realized misses without affecting product behavior.
