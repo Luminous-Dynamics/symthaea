@@ -1,0 +1,121 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark_id": "SPACE-TELEM-BENCH-001",
+  "protocol_path": "docs/research/SPACE_TELEM_BENCH_001_PROTOCOL_2026-10-18.md",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7947",
+  "status": "candidate_registry_protocol_not_executed",
+  "freeze_date": "2026-10-18",
+  "policy": {
+    "no_dataset_payloads_committed": true,
+    "unknown_rights_block_ingestion": true,
+    "official_splits_preserved": true,
+    "test_exposure_is_explicit": true,
+    "queued_ci_is_not_pass": true,
+    "cross_source_aggregate_score_allowed": false
+  },
+  "sources": [
+    {
+      "source_id": "ESA-ADB",
+      "title": "ESA Anomaly Dataset",
+      "source_kind": "real_spacecraft_telemetry_with_curated_anomaly_annotations",
+      "source_url": "https://github.com/esa/anomaly-dataset",
+      "data_record_url": "https://zenodo.org/records/12528696",
+      "paper_url": "https://arxiv.org/abs/2406.17826",
+      "challenge_url": "https://www.kaggle.com/competitions/esa-adb-challenge",
+      "declared_scope": "Three ESA missions, per official repository description",
+      "split_policy": "Candidate: reproduce exact official split when confirmed in the frozen archive; add grouped mission/time/episode holdouts only if metadata supports them",
+      "rights": {
+        "repository_license": "CC BY 3.0 IGO stated by official repository LICENSE",
+        "exact_data_artifact_terms": "UnknownNeedsReview",
+        "use_admission": "blocked_until_exact_archive_and_terms_are_frozen",
+        "redistribution": "do_not_mirror_data_payload"
+      },
+      "evaluation_status": "not_downloaded_not_executed",
+      "known_gaps": [
+        "Exact archive version and checksum not frozen",
+        "Label granularity and event interval semantics need inspection",
+        "Mission identifiers and feasible grouped splits need inspection",
+        "Exact data-record terms and attribution requirements must be checked"
+      ],
+      "claim_ceiling": "Reproducible evaluation on the exact admitted data version and split only"
+    },
+    {
+      "source_id": "OPSSAT-AD",
+      "title": "OPS-SAT benchmark for anomaly detection in satellite telemetry",
+      "source_kind": "real_spacecraft_telemetry_segment_classification",
+      "source_url": "https://github.com/kplabs-pl/OPS-SAT-AD",
+      "data_record_url": "https://zenodo.org/records/15108715",
+      "paper_url": "https://www.nature.com/articles/s41597-025-05035-3",
+      "correction_url": "https://www.nature.com/articles/s41597-025-05751-w",
+      "correction_published": "2025-08-18",
+      "reported_dataset_profile": {
+        "segments_total": 2123,
+        "channels_total": 9,
+        "engineered_features_per_segment": 18,
+        "training_segments": 1494,
+        "test_segments": 529,
+        "nominal_segments_total": 1689,
+        "anomalous_segments_total": 434,
+        "source_reported_metrics": [
+          "accuracy",
+          "precision",
+          "recall",
+          "F1",
+          "MCC",
+          "ROC_AUC",
+          "PR_AUC"
+        ]
+      },
+      "split_policy": "Reproduce supplied official split exactly; preserve raw-fragment and engineered-feature tasks as separate subjects",
+      "rights": {
+        "exact_data_artifact_terms": "UnknownNeedsReview",
+        "paper_license_must_not_be_assumed_to_cover_data_archive": true,
+        "use_admission": "blocked_until_exact_archive_and_terms_are_frozen",
+        "redistribution": "do_not_mirror_data_payload"
+      },
+      "evaluation_status": "not_downloaded_not_executed",
+      "known_gaps": [
+        "Exact data record metadata, version and checksum not frozen",
+        "Published article was corrected; verify the corrected record before baseline reproduction",
+        "Segment-level labels do not automatically justify time-based false-alarm rates"
+      ],
+      "claim_ceiling": "Segment classification performance on the exact admitted OPSSAT-AD version and split only"
+    },
+    {
+      "source_id": "SMAP-MSL-LEGACY",
+      "title": "NASA SMAP/MSL telemetry used by existing legacy example",
+      "source_kind": "historical_reference_dataset_family",
+      "source_url": "https://github.com/khundman/telemanom",
+      "implementation_reference": "crates/domains/symthaea-physics/examples/spacecraft_sepsis_eval.rs",
+      "split_policy": "Preserve existing historical experiment and document its original split/preprocessing; do not make it the sole primary benchmark",
+      "rights": {
+        "exact_data_artifact_terms": "UnknownNeedsReview",
+        "use_admission": "legacy_experiment_only_until_source_terms_are_rechecked",
+        "redistribution": "do_not_add_data_payloads"
+      },
+      "evaluation_status": "existing_example_requires_audit",
+      "known_gaps": [
+        "Published literature identifies limitations as a sole time-series benchmark",
+        "Existing example's preprocessing and threshold scope need separate audit",
+        "Historical metric values are not directly comparable to the new sources without split and metric alignment"
+      ],
+      "claim_ceiling": "Historical reference result for the exact original experiment only"
+    }
+  ],
+  "required_run_fields": [
+    "source_id_and_release",
+    "archive_digest",
+    "source_rights_and_attribution",
+    "split_manifest_digest",
+    "label_granularity",
+    "preprocessing_fit_scope",
+    "model_and_configuration_digest",
+    "seed",
+    "evaluator_version",
+    "hardware_runtime_profile",
+    "metrics_and_confidence_intervals",
+    "test_exposure_status",
+    "limitations_and_claim_ceiling",
+    "report_digest"
+  ]
+}
