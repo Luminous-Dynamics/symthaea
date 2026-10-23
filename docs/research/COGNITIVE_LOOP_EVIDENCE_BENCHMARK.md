@@ -234,12 +234,12 @@ Incremental drift, recurring drift, and correlated sensor shifts are planned fut
 
 ## Paired comparison with uncertainty
 
-Detector-level scores are not enough to justify a performance claim. The Rust \`xtask compare-cognitive-loop-drift\` command consumes paired metric records, one candidate and one reference value per identical \`(dataset_id, seed, scenario_id)\` key:
+Detector-level scores are not enough to justify a performance claim. The Rust `xtask compare-cognitive-loop-drift` command consumes paired metric records, one candidate and one reference value per identical `(dataset_id, seed, scenario_id)` key:
 
-\`\`\`bash
+```bash
 cargo run --locked -p xtask -- compare-cognitive-loop-drift --input path/to/paired-comparison.json --out reports/paired-comparison.json
 cargo test --locked -p xtask cognitive_drift_compare
-\`\`\`
+```
 
 Each arm pins a version, repository head SHA, configuration digest and evidence-access track. The candidate and baseline must use the same track. Duplicate pairs, non-finite values, fewer than three dataset clusters, fewer than two seeds, and unbalanced scenario panels fail closed.
 
