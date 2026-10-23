@@ -31,7 +31,8 @@
         "proof_sha256": null,
         "run_receipt_sha256": null,
         "resource_usage": null,
-        "applicability_judgment": null
+        "applicability_judgment": null,
+        "checked_target_statement_sha256": null
       },
       "expected_applicability": "eligible"
     },
@@ -63,7 +64,8 @@
         "proof_sha256": null,
         "run_receipt_sha256": null,
         "resource_usage": null,
-        "applicability_judgment": null
+        "applicability_judgment": null,
+        "checked_target_statement_sha256": null
       },
       "expected_applicability": "not_applicable"
     },
@@ -95,7 +97,8 @@
         "proof_sha256": null,
         "run_receipt_sha256": null,
         "resource_usage": null,
-        "applicability_judgment": null
+        "applicability_judgment": null,
+        "checked_target_statement_sha256": null
       },
       "expected_applicability": "eligible"
     },
@@ -127,7 +130,8 @@
         "proof_sha256": null,
         "run_receipt_sha256": null,
         "resource_usage": null,
-        "applicability_judgment": null
+        "applicability_judgment": null,
+        "checked_target_statement_sha256": null
       },
       "expected_applicability": "eligible"
     },
@@ -159,7 +163,8 @@
         "proof_sha256": null,
         "run_receipt_sha256": null,
         "resource_usage": null,
-        "applicability_judgment": null
+        "applicability_judgment": null,
+        "checked_target_statement_sha256": null
       },
       "expected_applicability": "eligible"
     },
@@ -191,7 +196,8 @@
         "proof_sha256": null,
         "run_receipt_sha256": null,
         "resource_usage": null,
-        "applicability_judgment": null
+        "applicability_judgment": null,
+        "checked_target_statement_sha256": null
       },
       "expected_applicability": "eligible"
     },
@@ -223,7 +229,8 @@
         "proof_sha256": null,
         "run_receipt_sha256": null,
         "resource_usage": null,
-        "applicability_judgment": null
+        "applicability_judgment": null,
+        "checked_target_statement_sha256": null
       },
       "expected_applicability": "eligible"
     },
@@ -255,7 +262,8 @@
         "proof_sha256": null,
         "run_receipt_sha256": null,
         "resource_usage": null,
-        "applicability_judgment": null
+        "applicability_judgment": null,
+        "checked_target_statement_sha256": null
       },
       "expected_applicability": "eligible"
     }
