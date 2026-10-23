@@ -374,6 +374,7 @@ impl CognitiveLoopService {
         module_timings: &mut super::ModuleTimings,
     ) -> DynamicsPhaseResult {
         let prediction_error = perception.urgency.prediction_error;
+        let prediction_error_valid = perception.urgency.prediction_error_valid;
         let urgency = perception.urgency.urgency;
         let phi_attention_weight = perception.encoding.phi_attention_weight;
         let surprise_triggered = perception.exploration.surprise_triggered;
@@ -391,6 +392,7 @@ impl CognitiveLoopService {
             self.prediction_confidence,
             self.fep.lr_boost,
             prediction_error,
+            prediction_error_valid,
             self.language_comm
                 .voice_coherence
                 .bridge
@@ -2136,16 +2138,20 @@ impl CognitiveLoopService {
             );
         }
 
-        // 10d. Update prediction confidence
-        self.update_prediction_confidence(pattern, prediction_error, pattern_confidence);
+        // 10d. Update prediction confidence only from a genuine comparison.
+        if prediction_error_valid {
+            self.update_prediction_confidence(pattern, prediction_error, pattern_confidence);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.5 Active Inference Bridge
         // ═══════════════════════════════════════════════════════════════════════
-        let prediction_success = prediction_error < self.config.learning_threshold;
-        self.fep
-            .active_inference_bridge
-            .observe_resolution(self.prediction_confidence, prediction_success);
+        if prediction_error_valid {
+            let prediction_success = prediction_error < self.config.learning_threshold;
+            self.fep
+                .active_inference_bridge
+                .observe_resolution(self.prediction_confidence, prediction_success);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.6 FEP Active Inference
@@ -2156,10 +2162,20 @@ impl CognitiveLoopService {
         // This is a structural ordering dependency, not a bug — FEP sees last cycle's LR.
         let effective_lr = self.stats.adaptive_learning_rate;
         let (fep_action_idx, fep_action_probs, is_surprised, fep_pragmatic_value_raw) =
-            self.step_fep_active_inference(prediction_error, coherence);
+            if prediction_error_valid {
+                self.step_fep_active_inference(prediction_error, coherence)
+            } else {
+                // No current PE evidence: do not perceive, select, or enact an FEP
+                // action from the compatibility sentinel. Retain the previous index
+                // only for diagnostics; empty probabilities mark no current decision.
+                (self.fep.last_action_idx as usize, Vec::new(), false, 0.0)
+            };
 
-        // Store action index for JEPA and other downstream consumers
-        self.fep.last_action_idx = fep_action_idx as u8;
+        // Store only a newly evaluated action; invalid PE must not masquerade as a
+        // fresh FEP policy decision.
+        if prediction_error_valid {
+            self.fep.last_action_idx = fep_action_idx as u8;
+        }
 
         // ── Cross-manifold prediction error → attention reallocation ──
         // Rao & Ballard (1999): large prediction errors between visual and cognitive
