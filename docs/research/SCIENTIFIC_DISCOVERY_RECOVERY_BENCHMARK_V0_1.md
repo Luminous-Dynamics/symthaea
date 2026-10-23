@@ -18,6 +18,7 @@ The target loop is: generate physically admissible hypotheses; choose an experim
 | [EGG-SR (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/1704fe7aaff33a54802b83a016050ab8-Abstract-Conference.html) | Equality-graph symbolic equivalence to reduce duplicate search and aggregate equivalent expressions | Comparator for equivalence-aware canonicalization and search-efficiency gains |
 | [Exhaustive Symbolic Regression with MDL](https://doi.org/10.1098/rsta.2024.0584) | Bounded search over a declared operator basis, parameter fitting, and minimum-description-length model selection | Strong small-grammar reference; tests whether stochastic search is necessary |
 | [SRBench](https://github.com/cavalab/srbench) and [SRBench++](https://doi.org/10.1109/TEVC.2024.3423681) | Broad regression comparison plus task-specific tests: exact form, feature selection, deceptive shortcuts, extrapolation, noise, interpretability | Standard retrospective regression track and robustness suite |
+| [ERBench](https://equation-discovery.ti2.fmi.uni-jena.de/index.html) and [ERBench paper](https://arxiv.org/abs/2606.09276) | Equation-recovery suite with public training problems and a hidden evaluation set; emphasizes the distinction between in-domain fit and OOD generalization | External equation-recovery track and leaderboard target; pin benchmark version and report its official metrics separately from custom active-discovery results |
 | [SciLaws-Bench](https://yiyihum.github.io/SciLaws-Bench/) | Separates prediction, scientific validity and structural recovery, including active-query tasks | Science-specific endpoint taxonomy and active-discovery track |
 | [RESTART (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/72416ded78a439907ff72165ac9c56e0-Abstract-Conference.html) and [official code](https://github.com/Liyunlun/RESTART) | Boosting identifies unexplained signal; an LLM proposes targeted equation refinements; successful structures are stored for reuse | Direct comparator for post-alarm structured correction; align access to LLMs, library memory, data, and compute |
 | [Influence-Guided Symbolic Regression (IGSR, 2026)](https://arxiv.org/abs/2605.29184) | LLM-generated basis terms, per-term influence feedback and Monte Carlo tree search | Hybrid-search comparator; count all model/tool costs and pin source/version |
@@ -39,7 +40,9 @@ Test dimensional inference, finite outputs, deterministic seeds, candidate dedup
 
 Start with at least 60 held-out structural worlds across six or more task families and at least 20 paired seeds per world. Include exact in-class laws across expression depths; dimensionally valid near-misses; coefficient-identifiability traps; irrelevant and correlated features; deceptive shortcuts; interpolation versus extrapolation; and observationally equivalent laws that cannot be uniquely identified.
 
-Report exact recovery only when a unique structure is identifiable. Otherwise score recovery of a declared equivalence class. Also report held-out prediction, complexity or description length, unit consistency, and uncertainty separately.
+Keep at least three evaluator-only regimes distinct: (1) IID/in-domain, (2) interpolation with held-out combinations or feature correlations, and (3) true range extrapolation where each relevant feature is outside its discovery interval. For range extrapolation, include lower-tail, upper-tail, mixed-tail and scale-shift cases; generate evaluation points from an independent seed; never pass them into candidate generation, parameter fitting, EIG, stopping, or monitor calibration. Log how many reference-valid OOD points were available; do not replace invalid OOD points with in-domain data. Where the reference law itself is undefined or numerically unstable, record the case as not evaluable under the declared domain rather than silently scoring it as successful.
+
+Report exact recovery only when a unique structure is identifiable. Otherwise score recovery of a declared equivalence class. Also report held-out prediction, complexity or description length, unit consistency, OOD prediction, and uncertainty separately. For external equation-recovery comparisons, include the versioned ERBench protocol where feasible and report official leaderboard metrics separately from our active-discovery simulator.
 
 ### Tier C — misspecification and active design
 
@@ -117,6 +120,8 @@ Every run should record benchmark/version and world family; exact commit and sou
 - Li et al., GenSR, ICLR 2026: https://proceedings.iclr.cc/paper_files/paper/2026/hash/8fd1a81c882cd45f64958da6284f4a3f-Abstract-Conference.html
 - Jiang et al., EGG-SR, ICLR 2026: https://proceedings.iclr.cc/paper_files/paper/2026/hash/1704fe7aaff33a54802b83a016050ab8-Abstract-Conference.html
 - SRBench: https://github.com/cavalab/srbench
+- ERBench, Equation Recovery Benchmark and Testsuite (2026): https://arxiv.org/abs/2606.09276
+- ERBench leaderboard and benchmark documentation: https://equation-discovery.ti2.fmi.uni-jena.de/index.html
 - SRBench++, IEEE TEVC: https://doi.org/10.1109/TEVC.2024.3423681
 - 2026 symbolic-regression survey, published 20 August 2026: https://doi.org/10.1007/s11831-026-10681-w
 - Exhaustive Symbolic Regression and MDL, Philosophical Transactions of the Royal Society A, online 9 April 2026: https://doi.org/10.1098/rsta.2024.0584
