@@ -48,6 +48,80 @@
 
 pub mod seed_plan;
 pub mod task_validator;
+/// Expected relation between a perturbation and an authoritative artifact.
+///
+/// This is deliberately a bounded comparison contract, not a causal-inference
+/// engine: the fixture author supplies the dependency declaration and the
+/// harness classifies the observed before/after artifact relation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PerturbationExpectation {
+    /// The declared perturbation is outside the artifact's dependency scope.
+    InvariantPreserved,
+    /// The declared perturbation is inside the artifact's dependency scope.
+    ExpectedDependencyChanged,
+}
+
+/// Classification of one deterministic perturbation comparison.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PerturbationResult {
+    InvariantPreserved,
+    ExpectedDependencyChanged,
+    UnexpectedCollateralChange,
+    UnexpectedInvariance,
+    InfrastructureIndeterminate,
+}
+
+/// Minimal fixture metadata for a bounded perturbation experiment.
+///
+/// subject_id, dependency_scope, perturbation_id, and lineage_digest are
+/// caller-owned semantic identities. The evidence plane does not infer
+/// causality from them; it records the declared contract and compares the
+/// authoritative artifact identity supplied by the caller.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PerturbationFixture {
+    pub subject_id: String,
+    pub dependency_scope: String,
+    pub perturbation_id: String,
+    pub lineage_digest: String,
+    pub expected: PerturbationExpectation,
+}
+
+impl PerturbationFixture {
+    pub fn new(
+        subject_id: impl Into<String>,
+        dependency_scope: impl Into<String>,
+        perturbation_id: impl Into<String>,
+        lineage_digest: impl Into<String>,
+        expected: PerturbationExpectation,
+    ) -> Self {
+        Self {
+            subject_id: subject_id.into(),
+            dependency_scope: dependency_scope.into(),
+            perturbation_id: perturbation_id.into(),
+            lineage_digest: lineage_digest.into(),
+            expected,
+        }
+    }
+
+    /// Classify a before/after authoritative artifact identity comparison.
+    ///
+    /// Equal artifacts are valid only for an invariant expectation; changed
+    /// artifacts are valid only for a dependency-change expectation. Empty
+    /// artifact identities are treated as infrastructure-indeterminate rather
+    /// than as accidental equality.
+    pub fn classify(&self, before_artifact: &str, after_artifact: &str) -> PerturbationResult {
+        if before_artifact.is_empty() || after_artifact.is_empty() {
+            return PerturbationResult::InfrastructureIndeterminate;
+        }
+        let changed = before_artifact != after_artifact;
+        match (self.expected, changed) {
+            (PerturbationExpectation::InvariantPreserved, false) => PerturbationResult::InvariantPreserved,
+            (PerturbationExpectation::InvariantPreserved, true) => PerturbationResult::UnexpectedCollateralChange,
+            (PerturbationExpectation::ExpectedDependencyChanged, true) => PerturbationResult::ExpectedDependencyChanged,
+            (PerturbationExpectation::ExpectedDependencyChanged, false) => PerturbationResult::UnexpectedInvariance,
+        }
+    }
+}
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashMap};
@@ -345,6 +419,41 @@ mod tests {
 
     /// Reproduces `TemporalStateMode::HdcLtc`'s requirement: the active
     /// mechanism's predict counter must be positive. A passing case.
+    #[test]
+    fn perturbation_fixture_classifies_invariant_locality() {
+        let fixture = PerturbationFixture::new(
+            "attestation:method-a",
+            "resolver:method-a",
+            "add-unrelated-method",
+            "lineage:test-1",
+            PerturbationExpectation::InvariantPreserved,
+        );
+        assert_eq!(fixture.classify("artifact-a", "artifact-a"), PerturbationResult::InvariantPreserved);
+        assert_eq!(fixture.classify("artifact-a", "artifact-b"), PerturbationResult::UnexpectedCollateralChange);
+    }
+
+    #[test]
+    fn perturbation_fixture_classifies_expected_dependency_change() {
+        let fixture = PerturbationFixture::new(
+            "attestation:method-a",
+            "resolver:method-a:key",
+            "rotate-consulted-key",
+            "lineage:test-2",
+            PerturbationExpectation::ExpectedDependencyChanged,
+        );
+        assert_eq!(fixture.classify("artifact-a", "artifact-b"), PerturbationResult::ExpectedDependencyChanged);
+        assert_eq!(fixture.classify("artifact-a", "artifact-a"), PerturbationResult::UnexpectedInvariance);
+    }
+
+    #[test]
+    fn perturbation_fixture_rejects_missing_artifact_identity() {
+        let fixture = PerturbationFixture::new(
+            "subject", "dependency", "perturbation", "lineage",
+            PerturbationExpectation::InvariantPreserved,
+        );
+        assert_eq!(fixture.classify("", "artifact"), PerturbationResult::InfrastructureIndeterminate);
+        assert_eq!(fixture.classify("artifact", ""), PerturbationResult::InfrastructureIndeterminate);
+    }
     #[test]
     fn hdc_ltc_style_positive_case_passes() {
         let mut declared = HashMap::new();
