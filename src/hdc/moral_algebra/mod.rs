@@ -41,10 +41,12 @@
 //! Semantic roles      Bound HVs            Judgment
 //! ```
 
+mod consent_evidence;
 mod judgment;
 mod operators;
 mod primitives;
 
+pub use consent_evidence::*;
 pub use judgment::*;
 pub use operators::*;
 pub use primitives::*;
