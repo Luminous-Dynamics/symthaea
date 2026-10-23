@@ -37,7 +37,7 @@ jobs:
           set -euo pipefail
           rustc --edition=2024 --test tools/vision-dvpc-harm-risk-certificate.rs -o /tmp/vis-dvpc-010-tests
           /tmp/vis-dvpc-010-tests --test-threads=1 2>&1 | tee /tmp/vis-dvpc-010-test.log
-          grep -E 'test result: ok\. 12 passed; 0 failed;' /tmp/vis-dvpc-010-test.log
+          grep -E 'test result: ok\. 13 passed; 0 failed;' /tmp/vis-dvpc-010-test.log
 
       - name: Record exact-head evidence
         run: |
