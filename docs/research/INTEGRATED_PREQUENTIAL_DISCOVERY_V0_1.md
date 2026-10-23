@@ -18,13 +18,19 @@ New selector path: `InformationGainWithPrequentialPitAudits`.
 
 The simulator rejects the PIT-audit policy if CfC smoothing is enabled or adaptive selection is disabled. Smoothing changes the measurement distribution; treating its state estimate as one Gaussian draw would break the declared predictive-CDF contract. An unsupported configuration fails closed instead of silently reusing the PIT guarantee.
 
-## 2. Bounded typed recovery after a PIT alarm
+## 2. Structured refinement after a PIT alarm
 
-The follow-up branch `research/post-alarm-typed-recovery-v0-1` adds an exploratory recovery transition. After an alarm it archives the provisional model, excludes all previously alarmed models from the live pool, reopens other archived hypotheses, adds up to four fresh ENERGY-dimensional candidates from the existing typed grammar, and starts a new monitor epoch. The run allows at most two recovery restarts; if no novel, finite candidate can be proposed or the restart cap is reached, the outcome remains unresolved rather than silently accepting an alarmed model.
+The follow-up branch `research/residual-guided-typed-refinement-v0-1` extends bounded reseeding with three explicit, unit-checked correction templates around the rejected provisional model:
 
-Candidate generation uses only the public ENERGY task signature, existing hypothesis expressions, and the pre-generated design pool. It does not receive observed outcomes, the hidden discrepancy amplitude, or a ground-truth handle. Novelty is checked from model predictions over that predeclared pool; the selected measurement points already used remain unavailable after recovery. A fresh PIT monitor starts only for subsequent observations, so the alarm-triggering outcome is not replayed into the new epoch.
+- **Additive correction:** `base + delta`, where `delta` has ENERGY dimensions.
+- **Multiplicative correction:** `base * (1 + factor)`, where `factor` is dimensionless.
+- **Interaction correction:** `base + x * delta_x`, where the generated `delta_x` has dimensions ENERGY divided by the dimensions of `x`.
 
-This is deliberately **bounded typed reseeding, not yet full scientific model repair**. It resamples the existing expression grammar; it does not add an operator family, optimize free coefficients, infer a discrepancy mechanism, or guarantee recovery of the true law. The new test asserts boundedness, continued exclusion of previously alarmed candidates across multiple restarts, reopening of alternatives, and dimensional validity. The end-to-end pilot reports typed-recovery restart counts and terminal unresolved alarms without asserting that recovery beats its baseline.
+Proposals are scored on previously observed measurements using normalized squared residuals and a small, fixed expression-complexity penalty. Structured proposals are retained only if they improve that empirical score against the rejected candidate. If none survive, the routine can fall back to generic typed candidates. This is candidate ranking, not validation or a statistical guarantee: proposals can overfit the accumulated observations, so post-alarm claims must still use fresh unused measurements and the new monitoring epoch.
+
+All previously alarmed candidates remain excluded. The search has a fixed generation-attempt cap, accepts at most four new candidates per restart, allows at most two restarts, and returns terminal unresolved status if it cannot construct a usable candidate set. The proposal routine has no access to the evaluator's discrepancy amplitude or ground-truth expression. New tests check dimensional validity for all three correction families and verify that a structured correction can improve empirical fit on a controlled residual fixture.
+
+This remains short-term **structured correction search**, not a complete mechanism-discovery system. It does not fit arbitrary coefficients, introduce new operator libraries, use boosting, or provide a long-term reusable structure library. Those are separate research steps; the current code does not claim parity with RESTART or other 2026 discovery systems.
 
 The PIT monitor is only valid if the conditional predictive CDF is issued before the observation, its parameters/uncertainty protocol are frozen without leakage, and the context channels are based only on the selected action and permitted history. The current synthetic fixture has a known Gaussian noise model; this does not establish validity for real physics measurements, unknown noise, fitted-scale uncertainty, censored data, or adaptive repeated measurements.
 
