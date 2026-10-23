@@ -277,26 +277,25 @@ struct RecoveryProposalSummary {
     structured_count: usize,
 }
 
-/// Build one dimensionally consistent correction around the rejected provisional model.
-/// Additive corrections have target ENERGY dimensions; multiplicative corrections are
-/// dimensionless factors around 1; interactions multiply a declared variable by a typed term
-/// whose units make the product ENERGY. The caller still screens finite values and novelty.
-fn structured_correction_proposal(
+/// Build a unit-correct correction basis around a rejected candidate. The scalar coefficient is fitted
+/// separately from observed outcomes; the result remains a proposal until a fresh audit validates it.
+///
+/// Additive: basis has ENERGY dimensions.
+/// Multiplicative: basis = base * dimensionless factor, so base + c*basis == base*(1 + c*factor).
+/// Interaction: basis = x * delta_x, where delta_x has dimensions ENERGY / dimensions(x).
+fn structured_correction_basis(
     rng: &mut u64,
     base: &Expr,
     family: RecoveryProposalFamily,
 ) -> Option<Expr> {
     let units = demo_units();
-    let candidate = match family {
-        RecoveryProposalFamily::AdditiveCorrection => {
-            let correction = random_expr_with_dimension(
-                rng,
-                DimensionalSignature::ENERGY,
-                &units,
-                GEN_MAX_DEPTH,
-            );
-            Expr::BinOp(BinOp::Add, Box::new(base.clone()), Box::new(correction))
-        }
+    let basis = match family {
+        RecoveryProposalFamily::AdditiveCorrection => random_expr_with_dimension(
+            rng,
+            DimensionalSignature::ENERGY,
+            &units,
+            GEN_MAX_DEPTH,
+        ),
         RecoveryProposalFamily::MultiplicativeCorrection => {
             let factor = random_expr_with_dimension(
                 rng,
@@ -304,13 +303,7 @@ fn structured_correction_proposal(
                 &units,
                 GEN_MAX_DEPTH,
             );
-            let one_plus_factor =
-                Expr::BinOp(BinOp::Add, Box::new(Expr::Const(1.0)), Box::new(factor));
-            Expr::BinOp(
-                BinOp::Mul,
-                Box::new(base.clone()),
-                Box::new(one_plus_factor),
-            )
+            Expr::BinOp(BinOp::Mul, Box::new(base.clone()), Box::new(factor))
         }
         RecoveryProposalFamily::InteractionCorrection => {
             if VAR_NAMES.is_empty() {
@@ -325,17 +318,69 @@ fn structured_correction_proposal(
                 &units,
                 GEN_MAX_DEPTH,
             );
-            let interaction = Expr::BinOp(
+            Expr::BinOp(
                 BinOp::Mul,
                 Box::new(Expr::Var(name.to_string())),
                 Box::new(correction),
-            );
-            Expr::BinOp(BinOp::Add, Box::new(base.clone()), Box::new(interaction))
+            )
         }
         RecoveryProposalFamily::GenericTyped => return None,
     };
     matches!(
-        infer_dimensions(&candidate, &units),
+        infer_dimensions(&basis, &units),
+        InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
+    )
+    .then_some(basis)
+}
+
+/// Fit the scalar in candidate = base + coefficient * basis by weighted least squares.
+/// The weights normalize each outcome by 1 + abs(y), matching the recovery score. The
+/// deterministic coefficient bound is fixed in advance so ill-scaled observations cannot
+/// produce arbitrarily large corrections. No hidden truth or discrepancy label is read.
+fn fit_linear_correction_coefficient(
+    base: &Expr,
+    basis: &Expr,
+    observations: &[(Experiment, f64)],
+) -> Option<f64> {
+    if observations.is_empty() {
+        return None;
+    }
+    let mut numerator = 0.0;
+    let mut denominator = 0.0;
+    for (point, observed) in observations {
+        if !observed.is_finite() {
+            return None;
+        }
+        let base_prediction = eval_at(base, point)?;
+        let basis_prediction = eval_at(basis, point)?;
+        let scale = 1.0 + observed.abs();
+        let residual = (observed - base_prediction) / scale;
+        let normalized_basis = basis_prediction / scale;
+        numerator += normalized_basis * residual;
+        denominator += normalized_basis * normalized_basis;
+    }
+    if !numerator.is_finite() || !denominator.is_finite() || denominator <= 1.0e-12 {
+        return None;
+    }
+    let coefficient = (numerator / denominator).clamp(-10.0, 10.0);
+    coefficient.is_finite().then_some(coefficient)
+}
+
+fn compose_linear_correction(base: &Expr, basis: &Expr, coefficient: f64) -> Option<Expr> {
+    if !coefficient.is_finite() {
+        return None;
+    }
+    let candidate = Expr::BinOp(
+        BinOp::Add,
+        Box::new(base.clone()),
+        Box::new(Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Const(coefficient)),
+            Box::new(basis.clone()),
+        )),
+    );
+    matches!(
+        infer_dimensions(&candidate, &demo_units()),
         InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
     )
     .then_some(candidate)
@@ -419,7 +464,15 @@ fn reseed_typed_candidates_after_alarm(
                 GEN_MAX_DEPTH,
             )
         } else {
-            let Some(candidate) = structured_correction_proposal(rng, &base, family) else {
+            let Some(basis) = structured_correction_basis(rng, &base, family) else {
+                continue;
+            };
+            let Some(coefficient) =
+                fit_linear_correction_coefficient(&base, &basis, observations)
+            else {
+                continue;
+            };
+            let Some(candidate) = compose_linear_correction(&base, &basis, coefficient) else {
                 continue;
             };
             candidate
@@ -1515,12 +1568,14 @@ mod tests {
         for family in families {
             let mut candidate = None;
             for _ in 0..128 {
-                if let Some(proposal) =
-                    structured_correction_proposal(&mut rng, &base, family)
-                {
-                    candidate = Some(proposal);
-                    break;
-                }
+                let Some(basis) = structured_correction_basis(&mut rng, &base, family) else {
+                    continue;
+                };
+                let Some(proposal) = compose_linear_correction(&base, &basis, 0.5) else {
+                    continue;
+                };
+                candidate = Some(proposal);
+                break;
             }
             let candidate = candidate.expect(
                 "typed correction family failed to propose a valid expression",
@@ -1530,6 +1585,63 @@ mod tests {
                 InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
             ));
         }
+    }
+
+    #[test]
+    fn fitted_correction_coefficient_recovers_known_scalar_on_synthetic_residuals() {
+        let base = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".to_string())),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let basis = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("m".to_string())),
+                Box::new(Expr::BinOp(
+                    BinOp::Pow,
+                    Box::new(Expr::Var("r".to_string())),
+                    Box::new(Expr::Const(2.0)),
+                )),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("t".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        const TRUE_COEFFICIENT: f64 = 0.37;
+        let mut rng = 0xF17C_0EFF_1C1E_2026_u64;
+        let observations: Vec<(Experiment, f64)> = (0..64)
+            .map(|_| {
+                let point = random_experiment(&mut rng);
+                let value = eval_at(&base, &point).unwrap()
+                    + TRUE_COEFFICIENT * eval_at(&basis, &point).unwrap();
+                (point, value)
+            })
+            .collect();
+
+        let fitted = fit_linear_correction_coefficient(&base, &basis, &observations)
+            .expect("identifiable coefficient should fit");
+        assert!(
+            (fitted - TRUE_COEFFICIENT).abs() < 1.0e-10,
+            "expected {TRUE_COEFFICIENT}, recovered {fitted}"
+        );
+        let corrected = compose_linear_correction(&base, &basis, fitted)
+            .expect("fitted correction must preserve units");
+        assert!(matches!(
+            infer_dimensions(&corrected, &demo_units()),
+            InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
+        ));
+        assert!(
+            recovery_fit_score(&corrected, &observations).unwrap()
+                < recovery_fit_score(&base, &observations).unwrap()
+        );
     }
 
     #[test]
