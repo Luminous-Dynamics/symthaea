@@ -339,7 +339,7 @@
           ]
         },
         {
-          "id": "swebench-verified-pinned-adapter",
+          "id": "swebench-verified-audited-pinned-adapter",
           "inject": "Run the pinned SWE-bench Verified subset with documented model/scaffold/tool configuration and the benchmark's specified test protocol.",
           "metrics": [
             "resolved-rate",
@@ -348,9 +348,10 @@
             "false-resolution-rate"
           ],
           "assertions": [
-            "record exact dataset snapshot",
-            "publish tool and inference config",
-            "manual audit of disagreement/failure samples"
+            "pin dataset snapshot, tool/scaffold and test protocol",
+            "benchmark-review index currently labels SWE-bench Verified flawed; treat published score as diagnostic, not uncontested ground truth",
+            "audit sampled task/test disagreements and publish both published-set and audited-subset results",
+            "report cost and task-level failure analysis"
           ]
         },
         {
@@ -364,8 +365,9 @@
           ],
           "assertions": [
             "pin task set and environment image",
-            "audit grader reliability",
-            "compare only matched scaffolds"
+            "OSWorld 2.1 was marked flawed in a September 2026 audit: 36 of 50 reviewed tasks had scoring issues",
+            "use an audited/pinned task subset and report grader disagreement",
+            "compare only matched scaffolds and budgets"
           ]
         }
       ]
