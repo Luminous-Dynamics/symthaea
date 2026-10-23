@@ -20,6 +20,22 @@ This plan intentionally does **not** claim that the model has been parsed or mod
 5. **A real ML-KEM backend is a hard prerequisite for any PQ session claim.** The all-zero compile stub must remain unable to establish or publish a session. Check the current FIPS 203 publication and errata, run official known-answer tests, and compare against an independently maintained implementation before approval.
 6. **No established session before mutual confirmation.** Candidate key material stays inaccessible to application traffic until the peer identity, protocol version, selected suite, ephemeral classical exchange, KEM exchange (where used), full transcript and key confirmation have been validated in both directions.
 
+
+## A standards-first transport decision tree
+
+Do not choose one protocol stack for every physical link. Key establishment and record protection should be separated from the radio framing profile, and the selected profile must be observed at runtime rather than inferred from build flags.
+
+| Deployment profile | First candidate to evaluate | Explicit limitation |
+|---|---|---|
+| IP transport with mature TLS 1.3 support | A maintained TLS 1.3 provider that can negotiate RFC 10024's `X25519MLKEM768` group, where the provider and policy support it | Provider configuration is not proof of negotiated group; capture and assert the actual negotiated group in integration tests. |
+| Constrained CoAP / low-power network | EDHOC (RFC 9528) to establish an authenticated ephemeral-DH context, then OSCORE (RFC 8613; integration details in RFC 9668) for end-to-end object protection | The standardized EDHOC profile is not automatically post-quantum. Do not label it a hybrid/PQ profile unless a specified, reviewed extension and real implementation are selected. |
+| Raw mesh / LoRa with the project's 222-byte frame contract | First test whether the existing link can carry a standard authenticated session profile through a gateway or compact transport binding | Large KEM shares/ciphertexts can require many fragments; measure bytes, retransmissions, airtime, energy, and loss recovery before choosing. |
+| LoRa profile that cannot support the required security properties within resource/MTU limits | Fail closed / do not enable that profile until a reviewed option exists | Do not invent a bespoke hybrid combiner or falsely claim post-quantum confidentiality to satisfy a product label. |
+
+EDHOC is specifically designed for constrained scenarios and identifies LoRaWAN as a relevant low-power-network use case; it uses established COSE/CBOR constructions and ephemeral authenticated Diffie–Hellman. OSCORE provides end-to-end protection for constrained REST interactions and includes replay-related context semantics. These are relevant design baselines, not drop-in replacements for Symthaea's current raw mesh framing. See [RFC 9528](https://www.rfc-editor.org/rfc/rfc9528.html), [RFC 8613](https://www.rfc-editor.org/rfc/rfc8613.html), and [RFC 9668](https://www.rfc-editor.org/rfc/rfc9668.html).
+
+This split surfaces the actual engineering trade: a compact classical authenticated handshake may be viable on a low-power link while a post-quantum hybrid exchange may incur substantial fragmentation and retransmission cost. The right response is to report the trade-off and require an explicit policy decision—not to silently downgrade the cryptographic property or claim that protocol crypto-agility implies an available PQ suite.
+
 ## Threat model and assumptions
 
 The protected properties are claim-specific and not interchangeable:
