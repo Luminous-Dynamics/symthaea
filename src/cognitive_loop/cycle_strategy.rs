@@ -53,20 +53,12 @@ pub(crate) struct EncodingPhaseResult {
     pub(crate) compressed_state: Vec<f32>,
     pub(crate) soul_alignment: f32,
     pub(crate) phi_attention_weight: f32,
-    pub(crate) surprise_triggered: bool,
-    pub(crate) exploration_action: Option<String>,
     pub(crate) memo_threshold: f32,
     pub(crate) input_similarity: f32,
     pub(crate) input_memoized: bool,
     pub(crate) effective_threshold: f32,
-    pub(crate) urgency: super::CycleUrgency,
-    pub(crate) error_pattern: &'static str,
-    pub(crate) predicted_urgency: &'static str,
-    pub(crate) prediction_coherence_urgency_bias: f32,
     pub(crate) prediction_error: f32,
     pub(crate) temporal_binding_strength: f32,
-    pub(crate) error_slope: f32,
-    pub(crate) oscillation_ratio: f32,
 }
 
 impl CognitiveLoopService {
@@ -275,11 +267,9 @@ impl CognitiveLoopService {
     /// - BinaryHV cache (real_hv_to_hv16)
     /// - Soul alignment evaluation (Eight Harmonies)
     /// - Phi-guided attention gating
-    /// - Surprise-driven exploration
     /// - Codebook diversity → memoization threshold adaptation
     /// - Input similarity memoization (Tulving & Schacter 1990)
     /// - Unified Ethics Engine evaluation
-    /// - Adaptive learning threshold + urgency computation
     pub(super) fn run_encoding_and_preprocessing(
         &mut self,
         input: &str,
@@ -481,9 +471,9 @@ impl CognitiveLoopService {
         };
 
         // ═══════════════════════════════════════════════════════════════════════
-        // 1.1 Surprise-Driven Exploration
+        // 1.1–1.2 Perception-owned exploration and urgency updates run in
+        // cycle_phase_perception.rs exactly once after encoding is finalized.
         // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
         let compressed_state: Vec<f32> = {
             let raw: Vec<f32> = self
                 .encoder
@@ -571,10 +561,6 @@ impl CognitiveLoopService {
         } else {
             compressed_state
         };
-
-        let (surprise_triggered, exploration_action) =
-            self.run_surprise_exploration(&compressed_state);
-        module_timings.surprise_exploration = _t.elapsed().as_micros() as u64;
 
         // ── Phase 21: Codebook diversity → memoization threshold adaptation ─
         let base_memo_threshold = super::thresholds::INPUT_MEMO_THRESHOLD;
@@ -890,31 +876,16 @@ impl CognitiveLoopService {
             self.stats.value_gate_applied_count += 1;
         }
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // 1.2 Adaptive Learning Threshold + Urgency
-        // ═══════════════════════════════════════════════════════════════════════
-        // Science: Friston (2010) — precision (inverse uncertainty) modulates PE weighting.
-        let confidence_scale = (1.0
-            + (self.prediction_confidence - CONFIDENCE_SCALE_MIDPOINT as f64)
-                * CONFIDENCE_SCALE_SENSITIVITY as f64) as f32;
-        let exploration_scale = (1.0
-            - (self.behavior.curiosity_drive.exploration_urge - EXPLORATION_SCALE_MIDPOINT as f64)
-                * EXPLORATION_SCALE_SENSITIVITY as f64) as f32;
+        // Urgency and surprise are stateful perception outputs; the perception
+        // orchestrator owns their single update per cycle.
         let effective_threshold = self.config.learning_threshold
             * self.carryover.learning.adaptive_threshold_scale as f32
-            * confidence_scale
-            * exploration_scale;
-        let urgency_result = self.compute_urgency_and_error_pattern(
-            prediction_error,
-            surprise_triggered,
-            effective_threshold,
-        );
-        let urgency = urgency_result.urgency;
-        let error_pattern = urgency_result.error_pattern;
-        let predicted_urgency = urgency_result.predicted_urgency;
-        let prediction_coherence_urgency_bias = urgency_result.prediction_coherence_urgency_bias;
-        let error_slope = urgency_result.error_slope;
-        let oscillation_ratio = urgency_result.oscillation_ratio;
+            * (1.0
+                + (self.prediction_confidence - CONFIDENCE_SCALE_MIDPOINT as f64)
+                    * CONFIDENCE_SCALE_SENSITIVITY as f64) as f32
+            * (1.0
+                - (self.behavior.curiosity_drive.exploration_urge - EXPLORATION_SCALE_MIDPOINT as f64)
+                    * EXPLORATION_SCALE_SENSITIVITY as f64) as f32;
 
         EncodingPhaseResult {
             encoding_result,
@@ -922,20 +893,12 @@ impl CognitiveLoopService {
             compressed_state,
             soul_alignment,
             phi_attention_weight,
-            surprise_triggered,
-            exploration_action,
             memo_threshold,
             input_similarity,
             input_memoized,
             effective_threshold,
-            urgency,
-            error_pattern,
-            predicted_urgency,
-            prediction_coherence_urgency_bias,
             prediction_error,
             temporal_binding_strength,
-            error_slope,
-            oscillation_ratio,
         }
     }
 }
@@ -1090,4 +1053,19 @@ mod tests {
         let result = svc.run_strategy_selection(false);
         assert!(!result.social_strategy_bias);
     }
+
+    #[test]
+    fn urgency_error_history_advances_once_per_cognitive_cycle() {
+        let mut svc = make_service();
+        assert!(svc.carryover.history.error_history.is_empty());
+
+        let _ = svc.cycle("single perception update regression");
+
+        assert_eq!(
+            svc.carryover.history.error_history.len(),
+            1,
+            "encoding must not update urgency history before the perception phase owns it"
+        );
+    }
+
 }
