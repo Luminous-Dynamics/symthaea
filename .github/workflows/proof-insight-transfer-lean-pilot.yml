@@ -180,7 +180,7 @@ jobs:
 
           state_cases = [
               binding for binding in case_bindings
-              if binding.get("state_intervention", {}).get("operation") == "clear h"
+              if (binding.get("state_intervention") or {}).get("operation") == "clear h"
           ]
           if len(state_cases) != 1:
               raise SystemExit("expected exactly one manifest case for the clear-h state intervention")
