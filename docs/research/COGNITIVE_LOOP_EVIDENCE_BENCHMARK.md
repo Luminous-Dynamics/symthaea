@@ -230,3 +230,21 @@ Trace schema v1 requires a detector ID and version, comparison/access track, out
 The scorer is intended to report event precision/recall/F1, false alarms per 1,000 valid observations, missed-drift rate, and a penalized normalized delay. The delay penalty is delay divided by transition width plus the post-window delay budget, clipped to `[0,1]`; missed events receive 1.0. This is our explicitly defined metric—not a claim to reproduce the paper's exact metric. Publish metric version and per-event matches beside aggregate results.
 
 Incremental drift, recurring drift, and correlated sensor shifts are planned future extensions, not part of the current eight-cell core matrix.
+
+
+## Paired comparison with uncertainty
+
+Detector-level scores are not enough to justify a performance claim. The Rust \`xtask compare-cognitive-loop-drift\` command consumes paired metric records, one candidate and one reference value per identical \`(dataset_id, seed, scenario_id)\` key:
+
+\`\`\`bash
+cargo run --locked -p xtask -- compare-cognitive-loop-drift --input path/to/paired-comparison.json --out reports/paired-comparison.json
+cargo test --locked -p xtask cognitive_drift_compare
+\`\`\`
+
+Each arm pins a version, repository head SHA, configuration digest and evidence-access track. The candidate and baseline must use the same track. Duplicate pairs, non-finite values, fewer than three dataset clusters, fewer than two seeds, and unbalanced scenario panels fail closed.
+
+The effect is direction-normalized so positive always favors the candidate. It reports candidate and baseline dataset-macro means, a paired effect, median per-record delta, paired win fraction, per-dataset effects, and a deterministic 95% percentile interval. The interval uses a hierarchical paired bootstrap: sample datasets with replacement, then sample seeds within each selected dataset while retaining the complete scenario block for each sampled seed. It requires the same scenario panel across all datasets and gives each dataset equal final weight, avoiding the mistake of treating repeated seeds as independent datasets.
+
+The bootstrap fraction above zero is descriptive, not a p-value. A confidence interval above zero supports an effect only for the pinned metric, dataset set, access track, and configurations. It does not establish universal state-of-the-art superiority. Compare costs, false alarms, recovery and domain-specific slices independently, publish per-dataset results and uncertainty, and pre-register the primary metric before looking at test results.
+
+A clearly labelled synthetic comparison fixture exercises the CLI in CI; its perfect candidate/reference separation is **not a measured result** and must never be added to benchmark leaderboards.
