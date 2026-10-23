@@ -132,7 +132,7 @@ The decision-space evaluators implement the standard \(g(x)\) penalty and valida
 
 ### New regression tests
 
-The module now has 23 authored test cases. Six new ZDT tests cover hand-calculated objective values, a ZDT4 non-optimal tail penalty, deterministic and correctly sized fronts, attainable Pareto-set points, nondominance plus zero self-comparison epsilon/IGD+, and fail-closed decision-domain/resolution validation. The previous 17 archive/metric tests remain.
+The module now has 24 authored test cases. Seven new ZDT tests cover hand-calculated objective values, a ZDT4 non-optimal tail penalty, deterministic and correctly sized fronts, attainable Pareto-set points, nondominance plus zero self-comparison epsilon/IGD+, fail-closed decision-domain/resolution validation, and end-to-end known hypervolume values for sampled ZDT1/ZDT2 fronts (3.353553390593274 and 3.125 with reference point (2, 2)). The previous 17 archive/metric tests remain.
 
 ### Benchmark references and industry comparator boundary
 
