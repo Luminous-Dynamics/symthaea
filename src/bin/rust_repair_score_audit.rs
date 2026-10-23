@@ -328,23 +328,72 @@ fn candidate_rows(
     Ok((rows, digest))
 }
 
+fn insert_prediction_record(
+    out: &mut BTreeMap<String, Option<String>>,
+    record: &Value,
+) -> Result<(), String> {
+    let instance_id = required_string(record, "instance_id")?.to_string();
+    let patch = record
+        .get("model_patch")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    if out.insert(instance_id.clone(), patch).is_some() {
+        return Err(format!("duplicate prediction instance_id {instance_id:?}"));
+    }
+    Ok(())
+}
+
 fn predictions_map(path: &Path) -> Result<(BTreeMap<String, Option<String>>, String), String> {
-    let bytes = fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let bytes = fs::read(path)
+        .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
     let digest = sha256_bytes(&bytes);
-    let value: Value = serde_json::from_slice(&bytes)
-        .map_err(|error| format!("prediction file is invalid JSON: {error}"))?;
-    let object = value
-        .as_object()
-        .ok_or_else(|| "prediction file must be a JSON object keyed by instance_id".to_string())?;
     let mut out = BTreeMap::new();
-    for (instance_id, prediction) in object {
-        // Missing or malformed patch text is a task-level unresolved outcome,
-        // not a reason to shrink the benchmark denominator or abort the report.
-        let patch = prediction
-            .get("model_patch")
-            .and_then(Value::as_str)
-            .map(str::to_string);
-        out.insert(instance_id.clone(), patch);
+
+    if let Ok(value) = serde_json::from_slice::<Value>(&bytes) {
+        match value {
+            Value::Object(object) if object.contains_key("instance_id") => {
+                insert_prediction_record(&mut out, &Value::Object(object))?;
+            }
+            Value::Object(object) => {
+                for (instance_id, prediction) in object {
+                    // Missing/malformed patch text remains a task-level unresolved
+                    // attempt, preserving the locked benchmark denominator.
+                    let patch = prediction
+                        .get("model_patch")
+                        .and_then(Value::as_str)
+                        .map(str::to_string);
+                    out.insert(instance_id, patch);
+                }
+            }
+            Value::Array(records) => {
+                for record in records {
+                    insert_prediction_record(&mut out, &record)?;
+                }
+            }
+            _ => {
+                return Err(
+                    "prediction JSON must be an ID-keyed map, an array of records, or JSONL"
+                        .to_string(),
+                );
+            }
+        }
+    } else {
+        let text = std::str::from_utf8(&bytes)
+            .map_err(|error| format!("prediction JSONL is not UTF-8: {error}"))?;
+        for (index, line) in text.lines().enumerate() {
+            if line.trim().is_empty() {
+                return Err(format!("prediction JSONL line {} is empty", index + 1));
+            }
+            let record: Value = serde_json::from_str(line).map_err(|error| {
+                format!("prediction JSONL line {} is invalid JSON: {error}", index + 1)
+            })?;
+            insert_prediction_record(&mut out, &record)
+                .map_err(|error| format!("prediction JSONL line {}: {error}", index + 1))?;
+        }
+    }
+
+    if out.is_empty() {
+        return Err("prediction input contains zero task records".to_string());
     }
     Ok((out, digest))
 }
@@ -1288,6 +1337,36 @@ mod tests {
         let (row, row_digest) = rows.get("task-a").unwrap();
         assert_eq!(row["problem_statement"], "Fix it");
         assert_eq!(*row_digest, sha256_bytes(line.as_bytes()));
+    }
+
+    #[test]
+    fn standard_swebench_jsonl_predictions_are_accepted() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("predictions.jsonl");
+        let contents = concat!(
+            "{\"instance_id\":\"task-a\",\"model_patch\":\"diff --git a/a b/a\\n+x\\n\"}\n",
+            "{\"instance_id\":\"task-b\",\"model_patch\":\"diff --git a/b b/b\\n+y\\n\"}\n"
+        );
+        fs::write(&path, contents).unwrap();
+        let (predictions, digest) = predictions_map(&path).unwrap();
+        assert_eq!(predictions.len(), 2);
+        assert!(predictions.get("task-a").unwrap().as_ref().unwrap().contains("+x"));
+        assert!(predictions.get("task-b").unwrap().as_ref().unwrap().contains("+y"));
+        assert_eq!(digest, sha256_bytes(contents.as_bytes()));
+    }
+
+    #[test]
+    fn duplicate_jsonl_prediction_ids_are_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("duplicate.jsonl");
+        let contents = concat!(
+            "{\"instance_id\":\"task-a\",\"model_patch\":\"one\"}\n",
+            "{\"instance_id\":\"task-a\",\"model_patch\":\"two\"}\n"
+        );
+        fs::write(&path, contents).unwrap();
+        assert!(predictions_map(&path)
+            .unwrap_err()
+            .contains("duplicate prediction instance_id"));
     }
 
     #[test]
