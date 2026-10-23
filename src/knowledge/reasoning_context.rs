@@ -46,7 +46,7 @@ pub struct ReasoningContext {
 /// A fact from the knowledge graph with provenance
 #[derive(Debug, Clone)]
 pub struct GroundedFact {
-    /// Human-readable fact text
+    /// Human-readable fact text from the stored knowledge record.
     pub text: String,
     /// Confidence score (decayed over time)
     pub confidence: f32,
@@ -148,15 +148,21 @@ impl ReasoningContext {
         let search_results = manager.last_search_results();
         let alerts: &[(); 0] = &[]; // Alerts are drained separately
 
-        // 1. Convert search results to grounded facts
+        // 1. Resolve search hits back to their authoritative graph records.
+        // Search results intentionally carry only ranking metadata; reconstructing
+        // placeholders here used to discard source text, domain and causal status
+        // exactly at the reasoning boundary. A stale/missing hit is skipped rather
+        // than manufacturing an ungrounded `fact:<id>` assertion.
         let relevant_facts: Vec<GroundedFact> = search_results
             .iter()
-            .map(|r| GroundedFact {
-                text: format!("fact:{}", r.fact_id),
-                confidence: r.confidence,
-                similarity: r.similarity,
-                domain: None,
-                is_causal: false,
+            .filter_map(|r| {
+                manager.graph().get_fact(r.fact_id).map(|fact| GroundedFact {
+                    text: fact.encoding.source_text.clone(),
+                    confidence: r.confidence,
+                    similarity: r.similarity,
+                    domain: fact.domain.clone(),
+                    is_causal: fact.has_causal_relations,
+                })
             })
             .collect();
 
@@ -383,6 +389,25 @@ mod tests {
         // depending on HDC similarity thresholds)
         assert!(ctx.epistemic_state.uncertainty >= 0.0);
         assert!(ctx.epistemic_state.uncertainty <= 1.0);
+    }
+
+    #[test]
+    fn test_reasoning_context_preserves_stored_fact_semantics() {
+        let mut mgr = KnowledgeManager::default();
+        mgr.bootstrap_entities();
+        mgr.process("Sanctions caused oil shortage.", 1);
+
+        let ctx = ReasoningContext::from_manager(&mgr, "sanctions");
+        assert!(!ctx.relevant_facts.is_empty());
+        assert!(ctx
+            .relevant_facts
+            .iter()
+            .all(|fact| !fact.text.starts_with("fact:")));
+        assert!(ctx
+            .relevant_facts
+            .iter()
+            .any(|fact| fact.text.contains("Sanctions caused oil shortage")));
+        assert!(ctx.relevant_facts.iter().any(|fact| fact.is_causal));
     }
 
     #[test]
