@@ -368,11 +368,7 @@ fn run_trial(seed: u64, config: PipelineConfig, max_rounds: usize) -> TrialOutco
 /// Estimate a common observation-noise scale from live predictions alone.
 /// The simulator uses truth-scaled noise; the median proxy avoids leakage from the
 /// hidden law and makes the EIG selector's homoscedastic approximation explicit.
-fn selection_noise_std_dev(
-    remaining: &[Experiment],
-    live: &[usize],
-    hypotheses: &[Expr],
-) -> f64 {
+fn selection_noise_std_dev(remaining: &[Experiment], live: &[usize], hypotheses: &[Expr]) -> f64 {
     let mut magnitudes = Vec::new();
     for experiment in remaining {
         for index in live {
@@ -509,8 +505,7 @@ fn run_trial_with_discrepancy(
                         .map(|(experiment, _)| experiment.clone())
                     }
                     ActiveSelector::WorstCaseInformationGain => {
-                        let nominal_noise =
-                            selection_noise_std_dev(&remaining, &live, &hypotheses);
+                        let nominal_noise = selection_noise_std_dev(&remaining, &live, &hypotheses);
                         // These are bundled stress scenarios, not a full Cartesian sweep:
                         // three measurement scales paired with the nominal model and two
                         // alternative smooth discrepancy shapes. All parameters are fixed
@@ -590,8 +585,8 @@ fn run_trial_with_discrepancy(
             .map(|(index, value)| (value * (3.0 + index as f64)).sin())
             .sum::<f64>()
             / coordinates.len().max(1) as f64;
-        let true_val = base_true_val
-            + systematic_discrepancy * (1.0 + base_true_val.abs()) * discrepancy_wave;
+        let true_val =
+            base_true_val + systematic_discrepancy * (1.0 + base_true_val.abs()) * discrepancy_wave;
         // `smoothing`'s real question: is it worth taking K_REPEATS repeated noisy readings at
         // this SAME chosen point and blending them (CfC, dt-aware, irregular gaps between
         // readings), vs. a single one-shot reading? Deliberately NOT smoothing across
@@ -711,9 +706,7 @@ fn mean_on_off(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adequacy_calibration::{
-        ConformalAdequacyCalibrator, standardized_rms_residual,
-    };
+    use crate::adequacy_calibration::{ConformalAdequacyCalibrator, standardized_rms_residual};
     use crate::model_adequacy::{
         DiscoveryAction, DiscoverySnapshot, TerminationStatus, ValidationStatus,
         next_discovery_action,
@@ -779,10 +772,9 @@ mod tests {
                 .map(|(index, value)| (value * (3.0 + index as f64)).sin())
                 .sum::<f64>()
                 / coordinates.len().max(1) as f64;
-            let simulated_observation = prediction
-                + discrepancy_amplitude * (1.0 + prediction.abs()) * discrepancy_wave;
-            let actual_noise_scale =
-                NOISE_SIGMA_FRACTION * (1.0 + simulated_observation.abs());
+            let simulated_observation =
+                prediction + discrepancy_amplitude * (1.0 + prediction.abs()) * discrepancy_wave;
+            let actual_noise_scale = NOISE_SIGMA_FRACTION * (1.0 + simulated_observation.abs());
             let measurement =
                 simulated_observation + rand_gaussian(&mut noise_rng, actual_noise_scale);
             let predictive_scale = NOISE_SIGMA_FRACTION * (1.0 + prediction.abs());
@@ -888,19 +880,39 @@ mod tests {
             clean_nominal_successes += if clean_nominal.success { 1 } else { 0 };
             clean_robust_successes += if clean_robust.success { 1 } else { 0 };
             misspec_nominal_false_singletons +=
-                if misspec_nominal.overconfident_under_misspecification { 1 } else { 0 };
+                if misspec_nominal.overconfident_under_misspecification {
+                    1
+                } else {
+                    0
+                };
             misspec_robust_false_singletons +=
-                if misspec_robust.overconfident_under_misspecification { 1 } else { 0 };
-            misspec_nominal_detected +=
-                if misspec_nominal.model_discrepancy_detected { 1 } else { 0 };
-            misspec_robust_detected +=
-                if misspec_robust.model_discrepancy_detected { 1 } else { 0 };
+                if misspec_robust.overconfident_under_misspecification {
+                    1
+                } else {
+                    0
+                };
+            misspec_nominal_detected += if misspec_nominal.model_discrepancy_detected {
+                1
+            } else {
+                0
+            };
+            misspec_robust_detected += if misspec_robust.model_discrepancy_detected {
+                1
+            } else {
+                0
+            };
             misspec_nominal_unresolved += if misspec_nominal.final_live > 1 { 1 } else { 0 };
             misspec_robust_unresolved += if misspec_robust.final_live > 1 { 1 } else { 0 };
-            misspec_nominal_selection_failures +=
-                if misspec_nominal.selection_failed { 1 } else { 0 };
-            misspec_robust_selection_failures +=
-                if misspec_robust.selection_failed { 1 } else { 0 };
+            misspec_nominal_selection_failures += if misspec_nominal.selection_failed {
+                1
+            } else {
+                0
+            };
+            misspec_robust_selection_failures += if misspec_robust.selection_failed {
+                1
+            } else {
+                0
+            };
             misspec_nominal_round_total += misspec_nominal.rounds_used;
             misspec_robust_round_total += misspec_robust.rounds_used;
             paired.push(RobustEIGPair {
@@ -908,8 +920,7 @@ mod tests {
                 clean_robust_success: clean_robust.success,
                 misspec_nominal_false_singleton: misspec_nominal
                     .overconfident_under_misspecification,
-                misspec_robust_false_singleton: misspec_robust
-                    .overconfident_under_misspecification,
+                misspec_robust_false_singleton: misspec_robust.overconfident_under_misspecification,
                 misspec_nominal_detected: misspec_nominal.model_discrepancy_detected,
                 misspec_robust_detected: misspec_robust.model_discrepancy_detected,
                 misspec_nominal_unresolved: misspec_nominal.final_live > 1,
@@ -923,23 +934,39 @@ mod tests {
 
         let (clean_delta, clean_ci_low, clean_ci_high) = paired_bootstrap_mean_ci(
             &paired,
-            |pair| (if pair.clean_robust_success { 1.0 } else { 0.0 })
-                - (if pair.clean_nominal_success { 1.0 } else { 0.0 }),
+            |pair| {
+                (if pair.clean_robust_success { 1.0 } else { 0.0 })
+                    - (if pair.clean_nominal_success { 1.0 } else { 0.0 })
+            },
             0x524f_4255_5354_434c,
         );
         let (false_delta, false_ci_low, false_ci_high) = paired_bootstrap_mean_ci(
             &paired,
             |pair| {
-                (if pair.misspec_robust_false_singleton { 1.0 } else { 0.0 })
-                    - (if pair.misspec_nominal_false_singleton { 1.0 } else { 0.0 })
+                (if pair.misspec_robust_false_singleton {
+                    1.0
+                } else {
+                    0.0
+                }) - (if pair.misspec_nominal_false_singleton {
+                    1.0
+                } else {
+                    0.0
+                })
             },
             0x524f_4255_5354_4643,
         );
         let (detect_delta, detect_ci_low, detect_ci_high) = paired_bootstrap_mean_ci(
             &paired,
             |pair| {
-                (if pair.misspec_robust_detected { 1.0 } else { 0.0 })
-                    - (if pair.misspec_nominal_detected { 1.0 } else { 0.0 })
+                (if pair.misspec_robust_detected {
+                    1.0
+                } else {
+                    0.0
+                }) - (if pair.misspec_nominal_detected {
+                    1.0
+                } else {
+                    0.0
+                })
             },
             0x524f_4255_5354_4445,
         );
@@ -947,8 +974,15 @@ mod tests {
         let (failure_delta, failure_ci_low, failure_ci_high) = paired_bootstrap_mean_ci(
             &paired,
             |pair| {
-                (if pair.misspec_robust_selection_failed { 1.0 } else { 0.0 })
-                    - (if pair.misspec_nominal_selection_failed { 1.0 } else { 0.0 })
+                (if pair.misspec_robust_selection_failed {
+                    1.0
+                } else {
+                    0.0
+                }) - (if pair.misspec_nominal_selection_failed {
+                    1.0
+                } else {
+                    0.0
+                })
             },
             0x524f_4255_5354_5346,
         );
@@ -980,9 +1014,7 @@ mod tests {
             SEEDS as usize
         );
         assert_eq!(
-            misspec_robust_false_singletons
-                + misspec_robust_detected
-                + misspec_robust_unresolved,
+            misspec_robust_false_singletons + misspec_robust_detected + misspec_robust_unresolved,
             SEEDS as usize
         );
         assert!(clean_ci_low <= clean_ci_high);
@@ -1024,12 +1056,8 @@ mod tests {
         let mut paired_outcomes: Vec<SelectorPair> = Vec::with_capacity(SEEDS as usize);
 
         for seed in 1..=SEEDS {
-            let raw = run_trial_with_selector(
-                seed,
-                config,
-                ROUND_BUDGET,
-                ActiveSelector::RawVariance,
-            );
+            let raw =
+                run_trial_with_selector(seed, config, ROUND_BUDGET, ActiveSelector::RawVariance);
             let eig = run_trial_with_selector(
                 seed,
                 config,
@@ -1058,7 +1086,8 @@ mod tests {
         let (success_delta, success_ci_low, success_ci_high) = paired_bootstrap_mean_ci(
             &paired_outcomes,
             |pair| {
-                (if pair.eig_false_singleton { 1.0 } else { 0.0 }) - (if pair.eig_detected { 1.0 } else { 0.0 })
+                (if pair.eig_false_singleton { 1.0 } else { 0.0 })
+                    - (if pair.eig_detected { 1.0 } else { 0.0 })
             },
             0x4549_475f_5355_4343,
         );
@@ -1147,14 +1176,28 @@ mod tests {
 
             clean_eig_successes += if clean_eig.success { 1 } else { 0 };
             clean_audit_successes += if clean_audit.success { 1 } else { 0 };
-            misspecified_eig_false_singletons +=
-                if misspec_eig.overconfident_under_misspecification { 1 } else { 0 };
+            misspecified_eig_false_singletons += if misspec_eig.overconfident_under_misspecification
+            {
+                1
+            } else {
+                0
+            };
             misspecified_audit_false_singletons +=
-                if misspec_audit.overconfident_under_misspecification { 1 } else { 0 };
-            misspecified_eig_detections +=
-                if misspec_eig.model_discrepancy_detected { 1 } else { 0 };
-            misspecified_audit_detections +=
-                if misspec_audit.model_discrepancy_detected { 1 } else { 0 };
+                if misspec_audit.overconfident_under_misspecification {
+                    1
+                } else {
+                    0
+                };
+            misspecified_eig_detections += if misspec_eig.model_discrepancy_detected {
+                1
+            } else {
+                0
+            };
+            misspecified_audit_detections += if misspec_audit.model_discrepancy_detected {
+                1
+            } else {
+                0
+            };
             misspecified_eig_unresolved += if misspec_eig.final_live > 1 { 1 } else { 0 };
             misspecified_audit_unresolved += if misspec_audit.final_live > 1 { 1 } else { 0 };
             audit_query_total += misspec_audit.audit_queries;
@@ -1275,10 +1318,7 @@ mod tests {
 
             let perturbed = calibrator
                 .assess_audit_score(
-                    conformal_audit_batch_score(
-                        30_000 + index as u64,
-                        DISCREPANCY_AMPLITUDE,
-                    ),
+                    conformal_audit_batch_score(30_000 + index as u64, DISCREPANCY_AMPLITUDE),
                     true,
                 )
                 .expect("perturbed audit batch is independent of calibration");
