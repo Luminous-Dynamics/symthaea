@@ -27,6 +27,8 @@ const DEFAULT_TOP_K: usize = 10;
 const DEFAULT_NOISE_BITS: usize = 128;
 const DEFAULT_CLUSTERS: usize = 64;
 const DEFAULT_CLUSTER_NOISE_BITS: usize = 1_024;
+const DEFAULT_LSH_CONFIGS: &str = "32x8,16x16,64x4";
+const BOOTSTRAP_RESAMPLES: usize = 2_000;
 const DEFAULT_SEED: u64 = 42;
 
 #[derive(Debug)]
@@ -42,8 +44,19 @@ struct Config {
     seed: u64,
     candidate_multiplier: usize,
     fallback_on_empty: bool,
-    lsh_bands: u32,
-    lsh_rows: u32,
+    lsh_configs: Vec<LshConfig>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LshConfig {
+    bands: u32,
+    rows: u32,
+}
+
+impl LshConfig {
+    fn label(self) -> String {
+        format!("{}x{}", self.bands, self.rows)
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -56,6 +69,8 @@ struct Sample {
     query_index: usize,
     round: usize,
     kind: &'static str,
+    lsh_bands: u32,
+    lsh_rows: u32,
     exact_ns: u128,
     approximate_ns: u128,
     recall_at_k: f64,
@@ -71,6 +86,8 @@ struct Sample {
 
 struct Quality {
     kind: &'static str,
+    lsh_bands: u32,
+    lsh_rows: u32,
     recall_at_k: f64,
     tie_aware_recall_at_k: f64,
     examined: usize,
@@ -85,35 +102,47 @@ fn main() -> Result<(), Box<dyn Error>> {
     })?;
     verify_source_binding(&config.source_sha)?;
     let dir = tempdir()?;
-    let path = dir.path().join("ann-benchmark.hdc");
-
-    let mut store_config = StoreConfig::default();
-    store_config.initial_capacity = u64::try_from(config.size)?;
-    store_config.lsh_bands = config.lsh_bands;
-    store_config.lsh_rows = config.lsh_rows;
-    let mut store = HdcStore::create(&path, store_config)?;
-
+    let mut corpus_config = StoreConfig::default();
+    corpus_config.initial_capacity = u64::try_from(config.size)?;
+    let corpus_path = dir.path().join("ann-corpus.hdc");
+    let mut corpus_store = HdcStore::create(&corpus_path, corpus_config)?;
     for id in 0..config.size {
-        store.append(id as u64, &corpus_vector(&config, id))?;
+        corpus_store.append(id as u64, &corpus_vector(&config, id))?;
     }
+    let queries = build_queries(&config, &corpus_store);
+    drop(corpus_store);
 
-    let queries = build_queries(&config, &store);
     let options = ApproximateSearchOptions {
         candidate_multiplier: config.candidate_multiplier,
         fallback_on_empty: config.fallback_on_empty,
     };
+    let mut samples = Vec::with_capacity(
+        config.queries.saturating_mul(config.rounds).saturating_mul(config.lsh_configs.len()),
+    );
+    let mut first_round_quality = Vec::with_capacity(config.queries.saturating_mul(config.lsh_configs.len()));
 
-    // Warm both paths before collecting samples. The measured intervals contain
-    // only the retrieval calls, not query generation, ID comparison or CSV output.
-    for query in &queries {
-        let _ = store.scan_similar(&query.vector, config.top_k);
-        let _ = store.scan_similar_approx(&query.vector, config.top_k, options);
-    }
+    for lsh_config in config.lsh_configs.iter().copied() {
+        // Every arm rebuilds the same deterministic corpus with only LSH band/row
+        // parameters changed; queries remain identical across arms.
+        let store_path = dir.path().join(format!("ann-{}.hdc", lsh_config.label()));
+        let mut store_config = StoreConfig::default();
+        store_config.initial_capacity = u64::try_from(config.size)?;
+        store_config.lsh_bands = lsh_config.bands;
+        store_config.lsh_rows = lsh_config.rows;
+        let mut store = HdcStore::create(&store_path, store_config)?;
+        for id in 0..config.size {
+            store.append(id as u64, &corpus_vector(&config, id))?;
+        }
 
-    let mut samples = Vec::with_capacity(config.queries.saturating_mul(config.rounds));
-    let mut first_round_quality = Vec::with_capacity(config.queries);
-    for round in 0..config.rounds {
-        for (query_index, query) in queries.iter().enumerate() {
+        // Warm both paths before collecting samples. Timed intervals exclude corpus
+        // construction, query generation, ID comparison and CSV output.
+        for query in &queries {
+            let _ = store.scan_similar(&query.vector, config.top_k);
+            let _ = store.scan_similar_approx(&query.vector, config.top_k, options);
+        }
+
+        for round in 0..config.rounds {
+            for (query_index, query) in queries.iter().enumerate() {
             // Alternate call order to reduce systematic cache/order bias.
             let (exact, exact_ns, approximate, approximate_ns) =
                 if (round + query_index) % 2 == 0 {
@@ -139,6 +168,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             if round == 0 {
                 first_round_quality.push(Quality {
                     kind: query.kind,
+                    lsh_bands: lsh_config.bands,
+                    lsh_rows: lsh_config.rows,
                     recall_at_k,
                     tie_aware_recall_at_k,
                     examined: approximate.examined,
@@ -152,6 +183,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 query_index,
                 round,
                 kind: query.kind,
+                lsh_bands: lsh_config.bands,
+                lsh_rows: lsh_config.rows,
                 exact_ns,
                 approximate_ns,
                 recall_at_k,
@@ -164,6 +197,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 exact_ids,
                 approximate_ids,
             });
+            }
         }
     }
 
@@ -228,8 +262,7 @@ fn parse_args() -> Result<Config, String> {
         "seed",
         "candidate-multiplier",
         "fallback-on-empty",
-        "lsh-bands",
-        "lsh-rows",
+        "lsh-configs",
     ];
     let mut values = std::collections::HashMap::<String, String>::new();
     for arg in env::args().skip(1) {
@@ -265,9 +298,9 @@ fn parse_args() -> Result<Config, String> {
     let noise_bits = parse_value(&values, "noise-bits", DEFAULT_NOISE_BITS)?;
     let seed = parse_value(&values, "seed", DEFAULT_SEED)?;
     let candidate_multiplier = parse_value(&values, "candidate-multiplier", 4usize)?;
-    let default_store_config = StoreConfig::default();
-    let lsh_bands = parse_value(&values, "lsh-bands", default_store_config.lsh_bands)?;
-    let lsh_rows = parse_value(&values, "lsh-rows", default_store_config.lsh_rows)?;
+    let lsh_configs = parse_lsh_configs(
+        values.get("lsh-configs").map(String::as_str).unwrap_or(DEFAULT_LSH_CONFIGS),
+    )?;
     let fallback_on_empty = match values.get("fallback-on-empty").map(String::as_str) {
         None | Some("true") => true,
         Some("false") => false,
@@ -306,8 +339,7 @@ fn parse_args() -> Result<Config, String> {
         seed,
         candidate_multiplier,
         fallback_on_empty,
-        lsh_bands,
-        lsh_rows,
+        lsh_configs,
     })
 }
 
@@ -712,8 +744,7 @@ mod tests {
             seed: 42,
             candidate_multiplier: 4,
             fallback_on_empty: true,
-            lsh_bands: 32,
-            lsh_rows: 8,
+            lsh_configs: vec![LshConfig { bands: 32, rows: 8 }],
         };
         let anchor = corpus_vector(&config, 0);
         let same_cluster = corpus_vector(&config, 8);
