@@ -460,8 +460,15 @@ fn parse_cost_ledger(
 
 fn quantile(values: &mut [f64], probability: f64) -> f64 {
     values.sort_by(f64::total_cmp);
-    let position = ((values.len() - 1) as f64 * probability).round() as usize;
-    values[position]
+    let position = (values.len() - 1) as f64 * probability;
+    let lower = position.floor() as usize;
+    let upper = position.ceil() as usize;
+    if lower == upper {
+        values[lower]
+    } else {
+        let weight = position - lower as f64;
+        values[lower] * (1.0 - weight) + values[upper] * weight
+    }
 }
 
 #[derive(Debug)]
@@ -856,11 +863,12 @@ mod tests {
     }
 
     #[test]
-    fn quantile_is_nearest_rank_with_rounding() {
-        let mut values = vec![10.0, 0.0, 5.0, 15.0, 20.0];
+    fn quantile_uses_linear_interpolation_between_order_statistics() {
+        let mut values = vec![30.0, 0.0, 20.0, 10.0];
         assert_eq!(quantile(&mut values, 0.0), 0.0);
-        assert_eq!(quantile(&mut values, 1.0), 20.0);
-        assert_eq!(quantile(&mut values, 0.5), 10.0);
+        assert_eq!(quantile(&mut values, 1.0), 30.0);
+        assert_eq!(quantile(&mut values, 0.25), 7.5);
+        assert_eq!(quantile(&mut values, 0.5), 15.0);
     }
 
     #[test]
