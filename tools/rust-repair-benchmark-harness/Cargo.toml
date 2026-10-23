@@ -24,3 +24,7 @@ path = "../../src/bin/rust_repair_manifest.rs"
 [[bin]]
 name = "rust-repair-score-audit"
 path = "../../src/bin/rust_repair_score_audit.rs"
+
+[[bin]]
+name = "rust-repair-trial-compare"
+path = "../../src/bin/rust_repair_trial_compare.rs"
