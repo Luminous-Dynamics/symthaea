@@ -306,23 +306,17 @@ pub fn certify_harm_rate_v1(
         || groups
             .iter()
             .any(|bound| bound.status == RiskCertificateStatusV1::NotCertifiedRiskBound);
-    let status = if any_insufficient {
-        RiskCertificateStatusV1::InsufficientEvidence
-    } else if any_risk_failure {
+    // A known risk-bound failure takes precedence over an unrelated group that
+    // lacks evidence; never mask a demonstrated failure as merely insufficient.
+    let status = if any_risk_failure {
         RiskCertificateStatusV1::NotCertifiedRiskBound
+    } else if any_insufficient {
+        RiskCertificateStatusV1::InsufficientEvidence
     } else {
         RiskCertificateStatusV1::Certified
     };
 
-    let mut sorted_ids: Vec<&str> = observations
-        .iter()
-        .map(|row| row.trace_id.as_str())
-        .collect();
-    sorted_ids.sort_unstable();
-    // Sorting IDs is also an explicit deterministic evidence-order check in tests.
-    let _canonical_trace_order = sorted_ids;
-
-    Ok(RiskCertificateV1 {
+Ok(RiskCertificateV1 {
         policy_id: config.policy_id.clone(),
         policy_digest: config.policy_digest,
         loss_profile_id: config.loss_profile_id.clone(),
@@ -437,12 +431,20 @@ pub fn clopper_pearson_upper(
 
     for _ in 0..96 {
         let midpoint = lower + (upper - lower) * 0.5;
+        // Stop when floating-point precision can no longer bisect the interval.
+        if midpoint <= lower || midpoint >= upper {
+            break;
+        }
         let log_cdf = log_binomial_cdf(
             harmful,
             escalations,
             midpoint,
             &log_factorials,
         );
+        if log_cdf == f64::NEG_INFINITY {
+            upper = midpoint;
+            continue;
+        }
         if !log_cdf.is_finite() {
             return Err(RiskCertificateErrorV1::NumericalFailure);
         }
