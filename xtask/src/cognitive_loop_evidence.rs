@@ -268,7 +268,10 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
     for phrase in ["matching-window deadline", "earliest unused valid-evidence alarm", "false alarm", "missed", "invalid/missing PE"] {
         ensure!(matching_rule.contains(phrase), "drift_protocol.matching_rule must state: {phrase}");
     }
-    nonempty_string_field(drift_protocol, "trace_contract", "drift_protocol")?;
+    let trace_contract = nonempty_string_field(drift_protocol, "trace_contract", "drift_protocol")?;
+    for phrase in ["detector_version", "comparison_track", "label_delay_cycles", "evidence_valid", "hard gate"] {
+        ensure!(trace_contract.contains(phrase), "drift_protocol.trace_contract must state: {phrase}");
+    }
     nonempty_string_field(drift_protocol, "tuning_policy", "drift_protocol")?;
     nonempty_string_field(drift_protocol, "source_paper", "drift_protocol")?;
     nonempty_string_field(drift_protocol, "claims", "drift_protocol")?;
