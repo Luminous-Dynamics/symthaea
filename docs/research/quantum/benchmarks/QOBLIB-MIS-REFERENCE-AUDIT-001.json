@@ -1,0 +1,180 @@
+{
+  "schema": "org.luminousdynamics.symthaea.qcomp.qoblib-mis-reference-audit.v1",
+  "status": "pinned-public-records-and-independent-feasibility-preflight",
+  "audit_date": "2026-10-24",
+  "research_boundary": "The feasibility checks below were executed independently against source files fetched from one pinned QOBLIB commit. They do not reproduce any submitted solver, confirm the reported runtimes, or prove optimality where QOBLIB says best-known.",
+  "source_snapshot": {
+    "repository": "ZIB-AOPT/QOBLIB",
+    "commit": "1e0e7c523cd9707dd541cc9e5a3086125d4da3c7",
+    "commit_date_utc": "2026-10-19T09:52:56Z",
+    "commit_url": "https://github.com/ZIB-AOPT/QOBLIB/commit/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7",
+    "contribution_guide_url": "https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/CONTRIBUTING.md",
+    "runtime_reporting_policy": {
+      "timing_statistic": "average across all repetitions",
+      "excluded_from_qoblib_runtime_fields": [
+        "queue time",
+        "compilation time"
+      ],
+      "reported_components": [
+        "total runtime",
+        "time to solution",
+        "CPU runtime",
+        "GPU runtime",
+        "QPU runtime",
+        "other hardware runtime"
+      ],
+      "nuance": "Keep a separate Symthaea all-in operational ledger that may include queue and compilation. Do not substitute it for QOBLIB-native fields."
+    }
+  },
+  "graph": {
+    "instance_id": "es60fst02",
+    "source_path": "07-independentset/instances/es60fst02.gph",
+    "immutable_url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/instances/es60fst02.gph",
+    "git_blob_sha1": "60b6ffb5b015323eb0f7c9503d1247c39804e27f",
+    "size_bytes": 2558,
+    "vertex_count": 186,
+    "declared_edge_count": 280,
+    "independently_observed_edge_count": 280,
+    "graph_parse_check": "header and observed edge count agree",
+    "cohort_partition": "train",
+    "note": "This is a public development fixture, not held-out confirmatory evidence."
+  },
+  "published_solutions": [
+    {
+      "submission_id": "20260806_ParallelILS_Hegade",
+      "method_family": "classical cooperative parallel iterated local search",
+      "instance_id": "es60fst02",
+      "source_readme": {
+        "path": "07-independentset/submissions/20260806_ParallelILS_Hegade/es60fst02/README.md",
+        "git_blob_sha1": "65c73f8e013bc4bd1b9b42b089deff1a777b3a99",
+        "size_bytes": 1349,
+        "url": "https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/submissions/20260806_ParallelILS_Hegade/es60fst02/README.md"
+      },
+      "source_solution": {
+        "path": "07-independentset/submissions/20260806_ParallelILS_Hegade/es60fst02/es60fst02_solution.sol",
+        "git_blob_sha1": "046dbed088c0ff0d29e3c80038171982a5f42510",
+        "size_bytes": 370,
+        "url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/submissions/20260806_ParallelILS_Hegade/es60fst02/es60fst02_solution.sol"
+      },
+      "reported": {
+        "best_objective": 88,
+        "best_known_objective": 88,
+        "optimality_proven": false,
+        "runs": 10,
+        "successful_runs": 10,
+        "runtime_seconds": 0.0006,
+        "runtime_interpretation": "Published table reports 0.0006 s average wall-clock runtime across ten independent trials.",
+        "hardware": "Apple M5 Max (arm64, 48 GB RAM), 18 CPU cores",
+        "implementation": "C++ compiled with clang -O3 -march=native"
+      },
+      "independent_feasibility_audit": {
+        "selected_count": 88,
+        "unique_selected_count": 88,
+        "duplicate_count": 0,
+        "out_of_range_count": 0,
+        "selected_edge_conflict_count": 0,
+        "feasible": true,
+        "method": "Independent JavaScript parser/set checker over the graph and solution files at the pinned commit."
+      }
+    },
+    {
+      "submission_id": "20260804_HSQC_Hegade",
+      "method_family": "hybrid quantum hardware with exact classical kernelization",
+      "instance_id": "es60fst02",
+      "source_readme": {
+        "path": "07-independentset/submissions/20260804_HSQC_Hegade/es60fst02/README.md",
+        "git_blob_sha1": "31cfc42f73f6760402f5d7bdfdd8cb54256f6677",
+        "size_bytes": 1355,
+        "url": "https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/submissions/20260804_HSQC_Hegade/es60fst02/README.md"
+      },
+      "source_solution": {
+        "path": "07-independentset/submissions/20260804_HSQC_Hegade/es60fst02/es60fst02_solution.sol",
+        "git_blob_sha1": "15e1c74f3fff174ab27bd8e1d6dc6fadecf9dd54",
+        "size_bytes": 362,
+        "url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/submissions/20260804_HSQC_Hegade/es60fst02/es60fst02_solution.sol"
+      },
+      "reported": {
+        "best_objective": 88,
+        "optimality_bound": null,
+        "optimality_proven": false,
+        "runs": 5,
+        "feasible_runs": 5,
+        "successful_runs": 5,
+        "success_threshold": 0,
+        "total_runtime_seconds": 2.5608,
+        "cpu_runtime_seconds": 0.0843,
+        "qpu_runtime_seconds": 2.4765,
+        "gpu_runtime_seconds": 0,
+        "hardware": "IBM Heron R3 (ibm_aachen) QPU and Apple M5 Max CPU, single core for classical pre/post-processing"
+      },
+      "independent_feasibility_audit": {
+        "selected_count": 88,
+        "unique_selected_count": 88,
+        "duplicate_count": 0,
+        "out_of_range_count": 0,
+        "selected_edge_conflict_count": 0,
+        "feasible": true,
+        "method": "Independent JavaScript parser/set checker over the graph and solution files at the pinned commit."
+      }
+    },
+    {
+      "submission_id": "20260907_QAOA_Vivek",
+      "method_family": "classical reduction interleaved with hardware-aware QAOA marginal estimates",
+      "instance_id": "es60fst02",
+      "source_readme": {
+        "path": "07-independentset/submissions/20260907_QAOA_Vivek/es60fst02/README.md",
+        "git_blob_sha1": "3b5257cf1219644412ccbd866370ae50aaa1b403",
+        "size_bytes": 1646,
+        "url": "https://github.com/ZIB-AOPT/QOBLIB/blob/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/submissions/20260907_QAOA_Vivek/es60fst02/README.md"
+      },
+      "source_solution": {
+        "path": "07-independentset/submissions/20260907_QAOA_Vivek/es60fst02/es60fst02_solution.sol",
+        "git_blob_sha1": "0548d0d623836c06921727670f607547d6c02738",
+        "size_bytes": 378,
+        "url": "https://raw.githubusercontent.com/ZIB-AOPT/QOBLIB/1e0e7c523cd9707dd541cc9e5a3086125d4da3c7/07-independentset/submissions/20260907_QAOA_Vivek/es60fst02/es60fst02_solution.sol"
+      },
+      "reported": {
+        "best_objective": 88,
+        "optimality_bound": null,
+        "optimality_proven": false,
+        "runs": 20,
+        "feasible_runs": 20,
+        "successful_runs": 5,
+        "success_threshold": 0,
+        "total_runtime_seconds": 23365.8542,
+        "cpu_runtime_seconds": 23287.8542,
+        "qpu_runtime_seconds": 78,
+        "gpu_runtime_seconds": null,
+        "hardware": "IBM Heron R3 (ibm_aachen) QPU; CPU VM with 32 cores and 128 GB RAM"
+      },
+      "independent_feasibility_audit": {
+        "selected_count": 88,
+        "unique_selected_count": 88,
+        "duplicate_count": 0,
+        "out_of_range_count": 0,
+        "selected_edge_conflict_count": 0,
+        "feasible": true,
+        "method": "Independent JavaScript parser/set checker over the graph and solution files at the pinned commit."
+      }
+    }
+  ],
+  "exact_correctness_anchor": {
+    "instance_id": "farm",
+    "source_snapshot_commit": "d61f234b9fc816deb3d4e1dea4c031595b35acd7",
+    "source_path": "07-independentset/instances/farm.gph",
+    "git_blob_sha1": "ae103bba88413c1a8eafdeddd07ba5fe69fddc8d",
+    "vertices": 17,
+    "edges": 39,
+    "independently_exhaustive_mis_cardinality": 10,
+    "published_parallel_ils_best_known": 10,
+    "method": "Independent JavaScript source parser plus exhaustive subset enumeration, not Rust execution."
+  },
+  "claims_and_limits": [
+    "All three es60fst02 solution sets were independently checked as feasible and each has cardinality 88.",
+    "Equal best objective does not establish global optimality; QOBLIB records N/A for the quantum submissions' optimality bounds.",
+    "Published runtime numbers are reported under QOBLIB's native conventions, but differing algorithms and hardware mean these submissions are not a randomized same-platform head-to-head trial.",
+    "For Symthaea research, rerun all methods on matched graph instances and disclose hardware/resource boundaries; track QOBLIB-native runtime separately from all-in latency/cost that includes queueing or compilation.",
+    "The JavaScript feasibility checker was executed during this authoring session but is not committed as a standalone script. The Rust parser/verifier/CLI extension in PR #8324 is intended to make this check independently repeatable in the repository.",
+    "No QPU was run by this audit; no new best-known solution or quantum advantage is claimed."
+  ]
+}
