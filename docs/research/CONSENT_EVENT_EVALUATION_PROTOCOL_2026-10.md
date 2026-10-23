@@ -18,6 +18,8 @@ OpenAI's May 2026 shared playbook for third-party evaluations similarly emphasiz
 
 This matters particularly for moral competence. A 2026 *Nature* roadmap argues for multidimensional, context-sensitive evaluation and meaningful attention to pluralism: https://www.nature.com/articles/s41586-025-10021-1. Accordingly, this protocol treats a parser label, candidate state, authorization decision and downstream side effect as distinct measures.
 
+For the event layer specifically, EventRelBench (Findings of EMNLP 2025) evaluates 35,000 event-relation questions across coreference, temporal, causal and supersub relations at sentence and document level: https://aclanthology.org/2025.findings-emnlp.482/. It motivates evaluating subject/coreference and temporal relations as first-class extraction tasks instead of assuming the event resolver receives correct events. Symthaea's synthetic matrices are narrower: they test resolver contracts, not language-level event extraction, and should not be compared numerically with EventRelBench.
+
 ## 3. Layers and primary metrics
 
 ### Layer A — event resolver invariants
