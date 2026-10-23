@@ -353,3 +353,8 @@ Each run must persist: protocol version and digest; source commit and family spl
 
 
 - **2026-10-23, before outcomes were generated or inspected:** implemented `analyze_success_cost_frontier.rs` with a strict outcome schema and report schema, matched-join and budget checks, exact checked-target digest binding, paired same-budget component-bootstrap differences, and an observed nondominated success/cost frontier. Added an 18-cell synthetic no-run ledger and CI schema/report/source-digest checks plus a synthetic-execution forgery negative control. The implementation always leaves the confirmatory decision unassessed and cannot substitute for the primary utility/power gate. The new tests are authored but not yet confirmed by a current exact-head Rust run; no model scores or cost reductions are claimed. All future frozen run configs must hash the updated protocol bytes.
+
+
+### 2026-10-24 amendment — enforce fixed-target pair identity at analyzer boundary
+
+The outcome analyzer now validates the suite contract before joining outcomes: both base and variant replay states must match the target descriptor's source commit, theorem-statement digest, elaborated-goal digest, environment digest, and Lean toolchain. The two states must also agree on goal count. Only local proof context/snapshot evidence may vary for this fixed-theorem intervention track. This is a fail-closed integrity gate; it does not prove that the captured state digests or replay receipts truthfully describe the underlying Lean process. A regression test mutates each invariant independently and expects rejection.
