@@ -263,15 +263,22 @@ pub fn resolve_latest_consent_candidate(
         );
     }
 
-    let (event_index, event) = exact
+    let Some((event_index, event)) = exact
         .into_iter()
-        .max_by_key(|(_, event)| event.order.expect("order was checked above"))
-        .expect("non-empty exact evidence was checked above");
+        .max_by_key(|(_, event)| event.order.unwrap_or_default())
+    else {
+        return ConsentEvidenceResolution::NoRelevantEvidence;
+    };
+    let Some(order) = event.order else {
+        return ConsentEvidenceResolution::Unknown(
+            ConsentResolutionUncertainty::MissingTemporalOrder,
+        );
+    };
 
     ConsentEvidenceResolution::LatestCandidate {
         transition: event.transition,
         event_index,
-        order: event.order.expect("order was checked above"),
+        order,
     }
 }
 
@@ -353,6 +360,21 @@ mod tests {
 
         assert_eq!(
             resolve_latest_consent_candidate(&[other_action, other_purpose], &scope),
+            ConsentEvidenceResolution::NoRelevantEvidence
+        );
+    }
+
+    #[test]
+    fn known_scope_mismatch_excludes_event_even_when_another_field_is_missing() {
+        let scope = request();
+        let mut unrelated = event(&scope, ConsentTransition::Granted, Some(1));
+        unrelated.scope.subject_id = Some("person:bob".to_owned());
+        unrelated.scope.action_id = None;
+
+        // A known mismatch proves irrelevance; a missing field must not make an
+        // event about Bob ambiguous for Alice's request.
+        assert_eq!(
+            resolve_latest_consent_candidate(&[unrelated], &scope),
             ConsentEvidenceResolution::NoRelevantEvidence
         );
     }
