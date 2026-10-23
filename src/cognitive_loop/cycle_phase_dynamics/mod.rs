@@ -2083,26 +2083,28 @@ impl CognitiveLoopService {
         // these when the vocal tract pipeline is wired into the cycle (Phase 28+).
         // Until then, this provides a non-trivial self-referential signal that
         // keeps AdaptiveBehavior.confidence responsive to cognitive coherence.
-        let voice_heartbeat = crate::voice::VoiceOutputMetrics {
-            articulation_score: coherence.clamp(0.0, 1.0),
-            formant_accuracy: (1.0 - prediction_error).clamp(0.0, 1.0),
-            speech_rate: super::thresholds::VOICE_HEARTBEAT_BASE_RATE
-                * self.behavior.adaptive_behavior.speech_rate_multiplier,
-            pitch_stability: pattern_confidence,
-            coarticulation_smoothness: coherence.clamp(0.0, 1.0)
-                * super::thresholds::VOICE_HEARTBEAT_COARTICULATION_WEIGHT,
-            listener_prediction: if prediction_error < self.config.learning_threshold {
-                super::thresholds::VOICE_HEARTBEAT_LISTENER_SUCCESS
-            } else {
-                super::thresholds::VOICE_HEARTBEAT_LISTENER_FAIL
-            },
-            duration_accuracy: 0.7,
-            energy_consistency: 0.8,
-        };
-        self.language_comm
-            .voice_coherence
-            .voice
-            .update(voice_heartbeat);
+        if prediction_error_valid {
+            let voice_heartbeat = crate::voice::VoiceOutputMetrics {
+                articulation_score: coherence.clamp(0.0, 1.0),
+                formant_accuracy: (1.0 - prediction_error).clamp(0.0, 1.0),
+                speech_rate: super::thresholds::VOICE_HEARTBEAT_BASE_RATE
+                    * self.behavior.adaptive_behavior.speech_rate_multiplier,
+                pitch_stability: pattern_confidence,
+                coarticulation_smoothness: coherence.clamp(0.0, 1.0)
+                    * super::thresholds::VOICE_HEARTBEAT_COARTICULATION_WEIGHT,
+                listener_prediction: if prediction_error < self.config.learning_threshold {
+                    super::thresholds::VOICE_HEARTBEAT_LISTENER_SUCCESS
+                } else {
+                    super::thresholds::VOICE_HEARTBEAT_LISTENER_FAIL
+                },
+                duration_accuracy: 0.7,
+                energy_consistency: 0.8,
+            };
+            self.language_comm
+                .voice_coherence
+                .voice
+                .update(voice_heartbeat);
+        }
 
         let voice_confidence = self
             .language_comm
@@ -2238,7 +2240,7 @@ impl CognitiveLoopService {
         }
 
         // ── Track 5b: MCTS plan post-hoc evaluation ─────────────────────────
-        let mcts_plan_effectiveness: f32 =
+        let mcts_plan_effectiveness: f32 = if prediction_error_valid {
             if let Some((_prev_action, _prev_confidence, prev_error)) =
                 self.carryover.history.mcts_plan_applied.take()
             {
@@ -2270,13 +2272,21 @@ impl CognitiveLoopService {
                 effectiveness
             } else {
                 0.0
-            };
+            }
+        } else {
+            // Preserve pending post-hoc evaluation until a genuine outcome arrives.
+            0.0
+        };
 
         // ── Apply previous cycle's MCTS plan ──────────────
         if let Some((plan_action, plan_confidence)) = self.carryover.history.mcts_plan.take() {
-            if plan_confidence > MCTS_PLAN_CONFIDENCE_THRESHOLD && plan_action != fep_action_idx {
-                self.carryover.history.mcts_plan_applied =
-                    Some((plan_action, plan_confidence, prediction_error));
+            if plan_confidence > MCTS_PLAN_CONFIDENCE_THRESHOLD
+                && (!prediction_error_valid || plan_action != fep_action_idx)
+            {
+                if prediction_error_valid {
+                    self.carryover.history.mcts_plan_applied =
+                        Some((plan_action, plan_confidence, prediction_error));
+                }
                 let plan_weight = plan_confidence * MCTS_PLAN_WEIGHT_SCALE;
                 match plan_action {
                     0 => {
@@ -2300,12 +2310,17 @@ impl CognitiveLoopService {
         }
 
         // ── FEP Free Energy Decomposition ──────────────
-        let fep_vals = self
-            .fep
-            .agent
-            .last_fe_components
-            .as_ref()
-            .map(|fe| (fe.accuracy, fe.complexity, fe.surprise, fe.prediction_error));
+        let fep_vals = if prediction_error_valid {
+            self.fep
+                .agent
+                .last_fe_components
+                .as_ref()
+                .map(|fe| (fe.accuracy, fe.complexity, fe.surprise, fe.prediction_error))
+        } else {
+            // last_fe_components is stateful and may belong to a previous PE.
+            // Do not replay its confidence/surprise/trend effects as fresh evidence.
+            None
+        };
         let (fep_accuracy, fep_complexity, fep_surprise, fep_td_error) =
             if let Some((acc, comp, surp, pe)) = fep_vals {
                 if acc > FEP_ACCURACY_CONFIDENCE_THRESHOLD {
@@ -2353,7 +2368,7 @@ impl CognitiveLoopService {
             self.adjust_exploration("fep_pragmatic_low", p_explore);
         }
 
-        if fep_td_error.abs() > FEP_TD_ERROR_DISCOVERY_THRESHOLD {
+        if prediction_error_valid && fep_td_error.abs() > FEP_TD_ERROR_DISCOVERY_THRESHOLD {
             if let Some(ref mut enhancer) = self.memory.causal_enhancer {
                 if enhancer.should_discover() {
                     let graph = enhancer.run_discovery();
@@ -2361,7 +2376,7 @@ impl CognitiveLoopService {
                 }
             }
             self.carryover.quality.consecutive_low_td_error = 0;
-        } else if fep_td_error.abs() < 0.01 {
+        } else if prediction_error_valid && fep_td_error.abs() < 0.01 {
             self.carryover.quality.consecutive_low_td_error = self
                 .carryover
                 .quality
@@ -2370,7 +2385,10 @@ impl CognitiveLoopService {
         }
         // Session 13 Item 3: Sustained low TD error → model converged → dampen exploration.
         // Science: Sutton & Barto (2018) — convergent TD signals indicate policy stability.
-        if self.carryover.quality.consecutive_low_td_error > 10 && self.stats.total_cycles > 30 {
+        if prediction_error_valid
+            && self.carryover.quality.consecutive_low_td_error > 10
+            && self.stats.total_cycles > 30
+        {
             self.scale_exploration(
                 "fep_td_converged",
                 super::thresholds::FEP_TD_CONVERGE_EXPLORE_SCALE,
@@ -2465,7 +2483,9 @@ impl CognitiveLoopService {
             }
         }
 
-        if self.behavior.social_mgr.social.external_reward.abs() > f32::EPSILON {
+        if prediction_error_valid
+            && self.behavior.social_mgr.social.external_reward.abs() > f32::EPSILON
+        {
             let outcome_obs = Observation::from_consciousness_state(
                 self.behavior.social_mgr.social.external_reward as f64,
                 coherence as f64,
@@ -2774,7 +2794,10 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // NEUROMODULATOR BATH + PSI SYNTHESIS (extracted to cycle_neuromod_phase.rs)
         // ═══════════════════════════════════════════════════════════════════════
-        let neuromod_result = self.run_neuromodulator_and_psi_phase(prediction_error, coherence);
+        let neuromod_result = self.run_neuromodulator_and_psi_phase_with_evidence(
+            prediction_error_valid.then_some(prediction_error),
+            coherence,
+        );
         let ne_reorienting_boost = neuromod_result.ne_reorienting_boost;
         let ne_arousal_feedback = neuromod_result.ne_arousal_feedback;
         let sht_crash_dip = neuromod_result.sht_crash_dip;
@@ -2886,10 +2909,11 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.6b Enhanced FEP Bridge
         // ═══════════════════════════════════════════════════════════════════════
-        let run_enhanced = surprise_triggered
-            || is_surprised
-            || prediction_error > self.config.learning_threshold
-            || urgency.should_run(self.stats.total_cycles, 1, 4, 8);
+        let run_enhanced = prediction_error_valid
+            && (surprise_triggered
+                || is_surprised
+                || prediction_error > self.config.learning_threshold
+                || urgency.should_run(self.stats.total_cycles, 1, 4, 8));
         let enhanced_result = if run_enhanced {
             let r = self.fep.enhanced_bridge.cycle(
                 prediction_error as f64,
@@ -3204,7 +3228,11 @@ impl CognitiveLoopService {
         }
 
         // 10e–g. Update flow state, curiosity drive, self-reflection
-        self.update_drives_and_reflection(pattern, prediction_error, coherence);
+        self.update_drives_and_reflection_with_evidence(
+            prediction_error_valid.then_some(prediction_error),
+            pattern,
+            coherence,
+        );
 
         // Unified Psi + Experience Bus + Guiding Question computed by
         // run_neuromodulator_and_psi_phase() above — values already in neuromod_result.
@@ -3216,7 +3244,8 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.0 PsiAttestation record (every 10 cycles to reduce overhead)
         // ═══════════════════════════════════════════════════════════════════════
-        if self.config.enable_psi_attestation
+        if prediction_error_valid
+            && self.config.enable_psi_attestation
             && self.config.agent_did.is_some()
             && (self.stats.total_cycles % 10 == 0)
         {
@@ -3293,7 +3322,13 @@ impl CognitiveLoopService {
                     phi: unified_psi,
                     gwt: coherence as f64,
                     ast: self.prediction_confidence,
-                    pp: (1.0 - prediction_error as f64).clamp(0.0, 1.0),
+                    // No PE is not perfect prediction. Use a conservative zero
+                    // contribution to this PE-derived metric when no comparison exists.
+                    pp: if prediction_error_valid {
+                        (1.0 - prediction_error as f64).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    },
                     rpt: pattern_confidence as f64,
                     embodiment: self.fep.learning_signal as f64,
                     unified: unified_psi,
@@ -4001,7 +4036,8 @@ impl CognitiveLoopService {
         let pe_variance = self.stats.avg_prediction_error_sq
             - self.stats.avg_prediction_error * self.stats.avg_prediction_error;
         let pe_variance = pe_variance.max(0.0);
-        if pe_variance > PE_VARIANCE_THRESHOLD
+        if prediction_error_valid
+            && pe_variance > PE_VARIANCE_THRESHOLD
             && self.stats.total_cycles > DYNAMICS_POST_BOOT_CYCLES
         {
             let variance_dampen = 1.0
