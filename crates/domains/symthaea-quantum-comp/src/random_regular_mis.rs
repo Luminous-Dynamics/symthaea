@@ -41,7 +41,7 @@ impl RandomRegularMisGraph {
         self.seed
     }
 
-    /// Number of configuration pairings rejected before the returned graph.
+    /// Number of pairing attempts performed, including the successful attempt.
     pub fn attempts_used(&self) -> usize {
         self.attempts_used
     }
