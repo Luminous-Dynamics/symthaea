@@ -161,21 +161,26 @@ impl CognitiveSubsystem for DriveManager {
 
         // ── 1. Record prediction error ────────────────────────────────────
         let pe = snapshot.prediction_error;
-        self.push_error(pe);
+        let prediction_error_valid = snapshot.prediction_error_valid != 0;
+        if prediction_error_valid {
+            self.push_error(pe);
+        }
         let _mean_pe = self.mean_error();
 
         // ── 2. Boredom dynamics ───────────────────────────────────────────
-        // Sustained low prediction error → boredom → exploration urge
-        if pe < Self::LOW_ERROR_THRESHOLD {
-            self.low_error_streak = self.low_error_streak.saturating_add(1);
-            if self.low_error_streak > Self::BOREDOM_ONSET_CYCLES {
-                // Boredom ramps up linearly, capped
-                self.boredom =
-                    (self.boredom + thresholds::DRIVE_BOREDOM_INCREMENT).min(Self::MAX_BOREDOM);
+        // Boredom responds only to genuine prediction comparisons; missing evidence
+        // must neither count as a surprising failure nor as an easy low-error cycle.
+        if prediction_error_valid {
+            if pe < Self::LOW_ERROR_THRESHOLD {
+                self.low_error_streak = self.low_error_streak.saturating_add(1);
+                if self.low_error_streak > Self::BOREDOM_ONSET_CYCLES {
+                    self.boredom =
+                        (self.boredom + thresholds::DRIVE_BOREDOM_INCREMENT).min(Self::MAX_BOREDOM);
+                }
+            } else {
+                self.low_error_streak = 0;
+                self.boredom *= Self::BOREDOM_DECAY;
             }
-        } else {
-            self.low_error_streak = 0;
-            self.boredom *= Self::BOREDOM_DECAY;
         }
 
         // Boredom drives exploration
@@ -193,19 +198,21 @@ impl CognitiveSubsystem for DriveManager {
             && snapshot.arousal > thresholds::DRIVE_FLOW_AROUSAL_MIN
             && snapshot.arousal < thresholds::DRIVE_FLOW_AROUSAL_MAX;
 
-        if meets_flow {
-            self.flow_streak = self.flow_streak.saturating_add(1);
-            if self.flow_streak >= Self::FLOW_ONSET_CYCLES {
-                self.in_flow = true;
-                self.flow_intensity = (self.flow_intensity + Self::FLOW_RAMP).min(1.0);
-            }
-        } else {
-            self.flow_streak = 0;
-            if self.in_flow {
-                self.flow_intensity -= Self::FLOW_DECAY;
-                if self.flow_intensity <= 0.0 {
-                    self.in_flow = false;
-                    self.flow_intensity = 0.0;
+        if prediction_error_valid {
+            if meets_flow {
+                self.flow_streak = self.flow_streak.saturating_add(1);
+                if self.flow_streak >= Self::FLOW_ONSET_CYCLES {
+                    self.in_flow = true;
+                    self.flow_intensity = (self.flow_intensity + Self::FLOW_RAMP).min(1.0);
+                }
+            } else {
+                self.flow_streak = 0;
+                if self.in_flow {
+                    self.flow_intensity -= Self::FLOW_DECAY;
+                    if self.flow_intensity <= 0.0 {
+                        self.in_flow = false;
+                        self.flow_intensity = 0.0;
+                    }
                 }
             }
         }
@@ -227,27 +234,32 @@ impl CognitiveSubsystem for DriveManager {
 
         // ── 4. Curiosity / exploration dynamics ───────────────────────────
         // Moderate surprise → exploration. Too much surprise → retreat.
-        let surprise_signal = (pe - self.exploration_threshold).clamp(-0.5, 0.5);
-
-        if surprise_signal > 0.0 {
-            // Prediction error exceeds threshold → explore
-            let exploration_boost =
-                surprise_signal as f64 * thresholds::DRIVE_SURPRISE_EXPLORATION_SCALE;
-            output.exploration_delta += exploration_boost;
-            // Surprise should mildly increase arousal
-            output.arousal_delta += surprise_signal * thresholds::DRIVE_SURPRISE_AROUSAL_SCALE;
-            // Adapt threshold upward (habituation)
-            self.exploration_threshold += Self::THRESHOLD_ADAPT_RATE * surprise_signal;
+        let surprise_signal = if prediction_error_valid {
+            (pe - self.exploration_threshold).clamp(-0.5, 0.5)
         } else {
-            // Error below threshold → adapt threshold downward (sensitization)
-            self.exploration_threshold += Self::THRESHOLD_ADAPT_RATE * surprise_signal * 0.5;
+            0.0
+        };
+
+        if prediction_error_valid {
+            if surprise_signal > 0.0 {
+                let exploration_boost =
+                    surprise_signal as f64 * thresholds::DRIVE_SURPRISE_EXPLORATION_SCALE;
+                output.exploration_delta += exploration_boost;
+                output.arousal_delta += surprise_signal * thresholds::DRIVE_SURPRISE_AROUSAL_SCALE;
+                self.exploration_threshold += Self::THRESHOLD_ADAPT_RATE * surprise_signal;
+            } else {
+                self.exploration_threshold += Self::THRESHOLD_ADAPT_RATE * surprise_signal * 0.5;
+            }
+            self.exploration_threshold = self.exploration_threshold.clamp(0.05, 0.8);
         }
-        // Clamp threshold to sensible range
-        self.exploration_threshold = self.exploration_threshold.clamp(0.05, 0.8);
 
         // ── 5. Emotional homeostasis contribution ─────────────────────────
         // Pull valence toward neutral when no strong drive signal
-        if !self.in_flow && self.boredom < 0.2 && surprise_signal.abs() < 0.1 {
+        if prediction_error_valid
+            && !self.in_flow
+            && self.boredom < 0.2
+            && surprise_signal.abs() < 0.1
+        {
             // Gentle pull toward neutral valence
             let valence_pull = -snapshot.valence * 0.02;
             output.valence_delta += valence_pull;
