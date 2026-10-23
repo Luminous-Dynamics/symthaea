@@ -38,7 +38,7 @@ have exact hypervolume
 
 `(4 - 2)(10 - 8) + (7 - 4)(10 - 4) + (10 - 7)(10 - 2) = 46`.
 
-The 11 test-only authored cases in this module cover:
+The 11 archive-specific test-only cases cover:
 
 - empty-front hypervolume is zero;
 - exact three-point hypervolume;
@@ -104,7 +104,7 @@ Hypervolume is retained as the primary area-based indicator, but it must not be 
 
 All three indicators require comparable objective directions and **the same frozen objective normalization** across methods. Epsilon and IGD+ require the same independent reference-front points. Do not derive normalization, reference points, or the reference front separately for each optimizer after observing results. When analytic ground truth is unavailable, do not fabricate a reference front to enable IGD+; report hypervolume and other reference-free diagnostics while labeling the limitation.
 
-The new tests include hand-calculated epsilon/IGD+/spacing examples, dominance behavior, input-order invariance, empty and too-small fronts, non-finite inputs, and arithmetic-overflow rejection. They are authored only; no Rust test execution is claimed here.
+The module now has 17 authored test cases: 11 archive-specific cases plus 6 coverage-metric cases. The new metric tests include hand-calculated epsilon/IGD+/spacing examples, dominance behavior, input-order invariance, empty and too-small fronts, non-finite inputs, and arithmetic-overflow rejection. They are authored only; no Rust test execution is claimed here.
 
 Research rationale:
 - Yang, Katt & Kaski, *Multi-Objective Bayesian Optimization via Adaptive ε-Constraints Decomposition*, ICML 2026 (STAGE-BO): https://proceedings.mlr.press/v306/yang26af.html
