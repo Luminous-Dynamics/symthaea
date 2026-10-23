@@ -113,7 +113,7 @@ pub use matrix::{
     ExperimentMatrixCell, ExperimentMatrixConfig, ExperimentMatrixReport, ExperimentMatrixRunner,
 };
 pub use migration::{MigrationGuide, MigrationRisk, MigrationStep, alpha9_to_alpha10_migration};
-pub use mis_dimacs::{MisDimacsError, ParsedMisDimacs, parse_dimacs_mis, parse_qoblib_solution};
+pub use mis_dimacs::{MisDimacsError, MisDimacsLimits, ParsedMisDimacs, parse_dimacs_mis, parse_dimacs_mis_with_limits, parse_qoblib_solution};
 pub use mis_random_regular::{MisRandomRegularConfig, MisRandomRegularError, MisRandomRegularReport, generate_mis_random_regular};
 pub use noise_sweep::{NoiseSweepConfig, NoiseSweepPoint, NoiseSweepReport, NoiseSweepRunner};
 pub use phase_hdc::PhaseHypervector;
