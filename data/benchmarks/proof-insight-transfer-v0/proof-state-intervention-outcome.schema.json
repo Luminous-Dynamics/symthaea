@@ -395,6 +395,44 @@
                     }
                   }
                 }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "decision": {
+                      "const": "apply_original_move"
+                    }
+                  },
+                  "required": [
+                    "decision"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "original_move_applied": {
+                      "const": true
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "original_move_applied": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "original_move_applied"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "decision": {
+                      "const": "apply_original_move"
+                    }
+                  }
+                }
               }
             ]
           }
