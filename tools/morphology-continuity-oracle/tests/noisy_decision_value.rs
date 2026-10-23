@@ -458,7 +458,6 @@ fn invalid_reliability_bounds_are_rejected_not_clamped() {
     );
 }
 
-
 const COST_PENALTY_PER_MILLIUNIT: f64 = 0.0001;
 
 /// Evaluate decisions made using the assumed observation model against outcomes
@@ -549,7 +548,8 @@ fn model_misspecification_can_make_a_nominally_best_sensor_worse_than_baseline()
     .expect("valid assumed and true likelihoods");
     assert!((selected_actual_risk - 5.68).abs() <= EPSILON);
 
-    let selected_total = total_loss_with_acquisition_cost(selected_actual_risk, inventory.cost_milliunits);
+    let selected_total =
+        total_loss_with_acquisition_cost(selected_actual_risk, inventory.cost_milliunits);
     let baseline_total = baseline_expected_loss(PRIOR_WEIGHTS, &decisions);
     let true_inventory = Measurement {
         likelihood_per_mille: true_inventory_likelihood,
@@ -629,7 +629,8 @@ fn decision_regret_shrinks_as_true_reliability_approaches_the_assumed_model() {
 
         assert!(
             (regret - expected_regret).abs() <= EPSILON,
-            "unexpected decision regret at true reliability {reliability}: expected {expected_regret}, got {regret}"
+            "unexpected decision regret at true reliability {reliability}: \
+             expected {expected_regret}, got {regret}"
         );
         assert!(
             regret <= previous_regret + EPSILON,
