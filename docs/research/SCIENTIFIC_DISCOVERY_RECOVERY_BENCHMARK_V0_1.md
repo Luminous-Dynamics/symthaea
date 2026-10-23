@@ -1,0 +1,117 @@
+# Scientific-Law Discovery Under Adaptive Design and Misspecification
+
+**Benchmark protocol v0.1 — proposal only; no comparative results are claimed.**
+
+## Objective
+
+Evaluate whether a scientific-discovery system returns a validated law or an honestly unresolved result—not merely a low residual, a small candidate set, or a confident singleton.
+
+The target loop is: generate physically admissible hypotheses; choose an experiment; record a predictive distribution before the outcome; test candidate fit and predictive adequacy separately; expand the hypothesis family after falsification; then validate any replacement on fresh observations. A monitor alarm is evidence against a forecast under its assumptions, not proof of any replacement. No alarm is not proof of adequacy.
+
+## External comparison registry
+
+| System or benchmark | Strength to compare against | Role in our evaluation |
+|---|---|---|
+| [PySR / SymbolicRegression.jl](https://github.com/MilesCranmer/PySR) | Practical configurable evolutionary symbolic regression, custom operators and complexity penalties | Primary regression baseline on matched data, grammar and compute budgets |
+| [AI Feynman](https://doi.org/10.1126/sciadv.aay2631) and [AI Feynman 2.0](https://proceedings.neurips.cc/paper/2020/hash/33a854e247155d590883b93bca53848a-Paper.html) | Physics-informed symmetry, separability, modularity and recursive decomposition | Physics-informed baseline where assumptions and operators align |
+| [Exhaustive Symbolic Regression with MDL](https://doi.org/10.1098/rsta.2024.0584) | Bounded search over a declared operator basis, parameter fitting, and minimum-description-length model selection | Strong small-grammar reference; tests whether stochastic search is necessary |
+| [SRBench](https://github.com/cavalab/srbench) and [SRBench++](https://doi.org/10.1109/TEVC.2024.3423681) | Broad regression comparison plus task-specific tests: exact form, feature selection, deceptive shortcuts, extrapolation, noise, interpretability | Standard retrospective regression track and robustness suite |
+| [SciLaws-Bench](https://yiyihum.github.io/SciLaws-Bench/) | Separates prediction, scientific validity and structural recovery, including active-query tasks | Science-specific endpoint taxonomy and active-discovery track |
+| [LLM-AutoSciLab / ActiveSciBench](https://scientific-discovery.github.io/llm-autoscilab-project/) | Closed loop of hypothesis generation, experiment selection and mechanism refinement | Agentic discovery baseline where models, tools and budgets can be aligned |
+| [LLM-SRBench](https://proceedings.mlr.press/v267/shojaee25a.html) | Symbolic-reasoning and transformed-equation tasks intended to reduce simple memorization | Held-out robustness track with pinned prompts, model versions and query budget |
+| Sparse regression / SINDy-style methods | Efficient recovery when the feature dictionary is known or well motivated | Simple strong baseline on dynamical systems; not a universal symbolic-regression comparator |
+
+Published scores are properties of the exact benchmark version, split, operators, priors, tools and budget in each paper. They are not directly comparable with results from Symthaea's small synthetic simulator.
+
+## Tiered benchmark
+
+### Tier A — correctness and negative controls
+
+Test dimensional inference, finite outputs, deterministic seeds, candidate deduplication, measurement-cost accounting, and complete provenance. Include deliberate protocol violations: hidden-truth access, current-outcome leakage into a forecast, reused validation measurements, invalid predictive CDFs, dimensionally invalid recovery proposals, and acceptance after terminal uncertainty. These must result in typed rejection or `unresolved`, never a silent fallback.
+
+### Tier B — controlled structural recovery
+
+Start with at least 60 held-out structural worlds across six or more task families and at least 20 paired seeds per world. Include exact in-class laws across expression depths; dimensionally valid near-misses; coefficient-identifiability traps; irrelevant and correlated features; deceptive shortcuts; interpolation versus extrapolation; and observationally equivalent laws that cannot be uniquely identified.
+
+Report exact recovery only when a unique structure is identifiable. Otherwise score recovery of a declared equivalence class. Also report held-out prediction, complexity or description length, unit consistency, and uncertainty separately.
+
+### Tier C — misspecification and active design
+
+Include predeclared cases for omitted additive terms, multiplicative corrections, missing interactions or latent variables, context-conditional shifts that cancel in aggregate, regime shifts, heteroscedastic or heavy-tailed noise, wrong predictive uncertainty, and extrapolation/domain shift.
+
+Keep scientific-law misspecification separate from measurement-distribution misspecification. A PIT alarm establishes evidence of forecast miscalibration only under its monitoring assumptions; it does not identify a missing physical mechanism.
+
+For each world, keep its law, noise process, variable units, admissible actions, domain split, candidate prior, severity scale and budgets in evaluator-only artifacts. Do not expose hidden truth or discrepancy labels to the selector, proposal generator, threshold policy or stopping rule.
+
+### Tier D — recovery after falsification
+
+Compare: stop and return unresolved; restart the original candidate pool; bounded typed reseeding; structured additive-residual proposals; multiplicative-correction proposals; scenario-robust EIG; and bounded exhaustive/MDL reference search where feasible.
+
+Recovery may use existing observations to propose hypotheses, but a replacement must be evaluated on fresh outcomes. Previously used measurement points remain consumed. Record rejected model IDs, proposed family, dimensional checks, reason for alarm, validation evidence, and final status. An alarm followed by a guessed law is not a successful recovery.
+
+### Tier E — real-world scientific use
+
+After controlled tiers pass, use reproducible public datasets and expert-reviewed cases. When ground truth is unknown, report predictive performance, stability, calibration, physical constraints and expert assessment—not exact-law accuracy. Preserve data licenses, provenance, and limits on causal interpretation.
+
+## Baselines and assumption checks
+
+At minimum compare random/round-robin selection, nominal EIG, scenario-robust EIG with a frozen scenario set, scheduled random audits, and independent-batch conformal or rank-based audits where calibration assumptions hold. Include finite-horizon sequential monitoring, predictive-rank martingales only under their stated exchangeability conditions, and prequential PIT only when a valid conditional predictive CDF is issued before every outcome. An oracle design or candidate pool may appear only as a labelled upper bound.
+
+Adaptive EIG residuals are not automatically exchangeable. A fitted plug-in CDF is not automatically the true conditional predictive distribution. Invalid assumptions must produce an explicit `invalid_protocol` outcome rather than a misleading alarm-rate result.
+
+Ablate typed generation, experiment selection, adequacy monitoring and recovery independently. Use the same worlds, candidate pools, seeds and noise streams across methods wherever feasible.
+
+## Required endpoints
+
+**Discovery:** exact recovery where identifiable; equivalence-class recovery; held-out and extrapolation error; relevant-feature recovery; dimensional/physical validity; complexity or description length.
+
+**Decision quality:** false confident singleton rate; clean-null false-alarm probability; detection sensitivity by misspecification family and severity; median and 90th-percentile detection delay; calibration; valid recovery after alarm; unresolved rate; fraction of alarms yielding a validated replacement.
+
+**Efficiency:** measurements and measurement cost; total experiments to valid recovery or explicit unresolved outcome; CPU/GPU time, wall time, peak memory, model evaluations, search expansions, and variation across seeds.
+
+**Trust:** hidden-label leakage results; invalid protocol count; rejected-proposal counts; source/config/data digests; exact commit and toolchain; benchmark version, hardware, seeds and per-run machine-readable receipts.
+
+Report per-family and per-severity breakdowns. No single aggregate score should hide failure on extrapolation, context-conditional shifts, or protocol negative controls.
+
+## Statistical protocol and target gates
+
+Pre-register hypotheses, alternatives, query/compute budgets, thresholds, baseline versions, held-out split and analysis before opening the held-out outcomes.
+
+- Use at least 10,000 independently generated clean-null streams for a serious sequential false-alarm audit; publish binomial confidence intervals and assumptions. Smoke tests are regression checks, not confirmation.
+- For structural worlds, use paired uncertainty intervals and resample worlds first, then seeds within worlds. Keep comparisons paired by world and seed.
+- Publish sensitivity curves over preregistered discrepancy sizes, and null controls using the same adaptive design machinery.
+- Publish raw per-world and per-run records, not only pooled summaries. Correct for repeated comparisons or label secondary analyses exploratory.
+
+Initial acceptance thresholds are **targets, not current results**:
+
+1. Clean-world structural recovery declines by no more than 5 percentage points versus the strongest matched baseline.
+2. False confident singleton rate falls by at least 20% relatively on the preregistered misspecification mix, with a nonzero baseline and a paired uncertainty interval supporting the effect.
+3. Sensitivity reaches at least 80% on practically important alternatives designated before held-out evaluation, with clean-null alarms controlled at the chosen level.
+4. Median measurement cost to validated recovery or explicit unresolved status improves by at least 20% versus the strongest simple matched-budget baseline, with world-clustered uncertainty supporting the effect.
+5. Negative controls show no hidden-truth leakage or invalid monitor inputs; terminal failures are reported unresolved, not accepted.
+
+If a gate fails, retain and publish the negative result. Do not tune thresholds or task composition after inspection of the held-out set.
+
+## Proposed Symthaea differentiator
+
+The plausible contribution is not simply faster equation generation. It is a combined system: constructive unit-aware generation; experiment selection robust to declared uncertainty scenarios; pre-outcome predictive records; monitoring with explicit statistical assumptions; bounded structural recovery after falsification; fresh validation; and a typed `validated`, `rejected`, or `unresolved` outcome with cost and provenance receipts.
+
+To substantiate the claim, first compete on a shared symbolic-regression suite with strong baselines. Then run a separate held-out active-discovery/recovery benchmark under matched information and compute budgets. Until both pass, describe the combined loop as a research hypothesis—not state of the art.
+
+## Reproducible run manifest
+
+Every run should record benchmark/version and world family; exact commit and source-tree digest; build profile, Rust toolchain and dependency lockfile; algorithm, full configuration, grammar, priors and dimensions; RNG seed and stream IDs; generator and split digests; measurement count/cost, hardware, memory and timings; per-step action and forecast timestamped before observation; observed outcome; monitor state transition and proposal IDs; final status; all structural/predictive metrics; protocol failures; and unresolved reason.
+
+`queued`, `skipped`, `cancelled`, and `in_progress` CI states are not passes. Neither CI status nor a manually replayed simulation substitutes for an exact-head benchmark receipt.
+
+## References
+
+- Udrescu and Tegmark, AI Feynman, Science Advances (2020): https://doi.org/10.1126/sciadv.aay2631
+- AI Feynman 2.0, NeurIPS (2020): https://proceedings.neurips.cc/paper/2020/hash/33a854e247155d590883b93bca53848a-Paper.html
+- SRBench: https://github.com/cavalab/srbench
+- SRBench++, IEEE TEVC: https://doi.org/10.1109/TEVC.2024.3423681
+- 2026 symbolic-regression survey, published 20 August 2026: https://doi.org/10.1007/s11831-026-10681-w
+- Exhaustive Symbolic Regression and MDL, Philosophical Transactions of the Royal Society A, online 9 April 2026: https://doi.org/10.1098/rsta.2024.0584
+- SciLaws-Bench: https://yiyihum.github.io/SciLaws-Bench/
+- LLM-AutoSciLab / ActiveSciBench: https://scientific-discovery.github.io/llm-autoscilab-project/
+- LLM-SRBench, ICML (2025): https://proceedings.mlr.press/v267/shojaee25a.html
