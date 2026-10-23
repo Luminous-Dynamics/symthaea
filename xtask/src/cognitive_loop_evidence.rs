@@ -265,9 +265,10 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
         ensure!(access_ids.contains(required_track), "drift protocol is missing evidence access track {required_track}");
     }
     let matching_rule = nonempty_string_field(drift_protocol, "matching_rule", "drift_protocol")?;
-    for phrase in ["earliest unused alarm", "false alarm", "missed", "invalid/missing PE"] {
+    for phrase in ["matching-window deadline", "earliest unused valid-evidence alarm", "false alarm", "missed", "invalid/missing PE"] {
         ensure!(matching_rule.contains(phrase), "drift_protocol.matching_rule must state: {phrase}");
     }
+    nonempty_string_field(drift_protocol, "trace_contract", "drift_protocol")?;
     nonempty_string_field(drift_protocol, "tuning_policy", "drift_protocol")?;
     nonempty_string_field(drift_protocol, "source_paper", "drift_protocol")?;
     nonempty_string_field(drift_protocol, "claims", "drift_protocol")?;
@@ -428,6 +429,7 @@ mod tests {
                 ],
                 "matching_rule": "Process events by earliest matching-window deadline. Match the earliest unused valid-evidence alarm in the event window. Unmatched alarm is a false alarm; unmatched event is missed; invalid/missing PE cannot be observations.",
                 "tuning_policy": "Tune on all but one dataset and hold that dataset out.",
+                "trace_contract": "Each trace pins detector_version and comparison_track; label_delay_cycles is recorded; alarms mark evidence_valid. Invalid-evidence alarms cannot match, count as false alarms, and fail the hard gate.",
                 "source_paper": "https://doi.org/10.1145/3770855.3819070",
                 "claims": "Comparator definitions are not measured results."
             },
