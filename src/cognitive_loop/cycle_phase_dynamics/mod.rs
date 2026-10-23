@@ -2280,14 +2280,15 @@ impl CognitiveLoopService {
 
         // ── Apply previous cycle's MCTS plan ──────────────
         if let Some((plan_action, plan_confidence)) = self.carryover.history.mcts_plan.take() {
-            if prediction_error_valid
-                && plan_confidence > MCTS_PLAN_CONFIDENCE_THRESHOLD
-                && plan_action != fep_action_idx
+            if plan_confidence > MCTS_PLAN_CONFIDENCE_THRESHOLD
+                && (!prediction_error_valid || plan_action != fep_action_idx)
             {
-                // A tracked MCTS intervention requires a fresh FEP comparison;
-                // otherwise both its effect and policy agreement are unidentifiable.
-                self.carryover.history.mcts_plan_applied =
-                    Some((plan_action, plan_confidence, prediction_error));
+                // MCTS may still act on its own plan confidence when PE is missing;
+                // only its PE-based post-hoc effect record requires valid evidence.
+                if prediction_error_valid {
+                    self.carryover.history.mcts_plan_applied =
+                        Some((plan_action, plan_confidence, prediction_error));
+                }
                 let plan_weight = plan_confidence * MCTS_PLAN_WEIGHT_SCALE;
                 match plan_action {
                     0 => {
