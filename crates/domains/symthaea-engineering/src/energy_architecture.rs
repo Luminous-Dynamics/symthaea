@@ -1125,6 +1125,14 @@ pub fn reference_service_hub_candidates() -> Vec<EnergySystemCandidate> {
             carrier: EnergyCarrier::Electricity,
         },
         EnergyConnection {
+            connection_id: "grid-to-battery-charge".to_owned(),
+            from_component: "grid".to_owned(),
+            from_port: "import".to_owned(),
+            to_component: "battery".to_owned(),
+            to_port: "charge".to_owned(),
+            carrier: EnergyCarrier::Electricity,
+        },
+        EnergyConnection {
             connection_id: "grid-to-essential-load".to_owned(),
             from_component: "grid".to_owned(),
             from_port: "import".to_owned(),
