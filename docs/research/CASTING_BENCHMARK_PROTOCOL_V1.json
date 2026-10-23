@@ -191,5 +191,61 @@
     "No skipped, queued, incomplete, or missing run is reported as successful.",
     "Per-task paired effects and uncertainty intervals are provided.",
     "Synthetic, public benchmark, simulator, and physical findings are labelled separately."
-  ]
+  ],
+  "multifidelity_extension": {
+    "status": "designed_not_execution_ready",
+    "motivation": "Casting search naturally spans cheap approximations, reduced-order or intermediate-resolution models, high-fidelity multiphysics solvers, and physical foundry observations. A call-count-only comparison can reward methods that spend more on costly evaluations unless the fidelity mix and fidelity-specific costs are recorded.",
+    "levels": [
+      {
+        "id": "low",
+        "role": "cheap_screening_or_coarse_discretization",
+        "physical_observation": false,
+        "exact_implementation_must_be_locked": true
+      },
+      {
+        "id": "medium",
+        "role": "reduced_order_or_intermediate_discretization",
+        "physical_observation": false,
+        "exact_implementation_must_be_locked": true
+      },
+      {
+        "id": "high",
+        "role": "reference_high_fidelity_simulator",
+        "physical_observation": false,
+        "exact_implementation_must_be_locked": true
+      },
+      {
+        "id": "physical",
+        "role": "foundry_observation",
+        "physical_observation": true,
+        "exact_protocol_and_provenance_must_be_locked": true
+      }
+    ],
+    "rules": [
+      "Each fidelity-level oracle call counts as one objective evaluation; failed, invalid and infeasible calls still count.",
+      "Per-run fidelity call counts must sum exactly to the objective-evaluation count and fidelity cost keys must exactly match fidelity-count keys.",
+      "Report both raw objective calls and fidelity-specific cost units; do not compare methods on call count alone when costs differ.",
+      "Never treat low/medium outputs as high-fidelity labels without a declared discrepancy model trained on paired samples.",
+      "Predeclare high-fidelity budget floors and promotion thresholds before seeing test results.",
+      "Audit false-promotion rate, high-fidelity constraint confirmation, rank/Pareto misclassification, and quality achieved per fixed high-fidelity cost.",
+      "Simulator fidelity is not physical validation; physical observations require separate data provenance and process-shift evaluation.",
+      "Abstain or promote additional candidates when fidelity discrepancy leaves the calibrated range; do not silently extrapolate the correction."
+    ],
+    "required_receipt_fields_for_multifidelity_runs": [
+      "accounting.fidelity_evaluations",
+      "accounting.fidelity_cost_units_by_level"
+    ],
+    "future_metrics": [
+      "cost_adjusted_normalized_hypervolume_auc",
+      "false_promotion_rate",
+      "high_fidelity_constraint_confirmation_rate",
+      "high_fidelity_pareto_classification_error",
+      "quality_at_fixed_high_fidelity_budget"
+    ],
+    "references": [
+      "https://link.springer.com/article/10.1007/s11831-025-10392-8",
+      "https://doi.org/10.1145/3801959",
+      "https://link.springer.com/article/10.1007/s43939-026-00685-5"
+    ]
+  }
 }
