@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-kubernetes-workload-state-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Read-only Kubernetes workload and condition state augmentation for Symthaea"
+
+[dependencies]
+symthaea-integration-core = { path = "../../core/symthaea-integration-core" }
+symthaea-kubernetes-bridge = { path = "../symthaea-kubernetes-bridge" }
+symthaea-kubernetes-state-bridge = { path = "../symthaea-kubernetes-state-bridge" }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+symthaea-kubernetes-endpointslice-bridge = { path = "../symthaea-kubernetes-endpointslice-bridge" }

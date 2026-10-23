@@ -1,0 +1,196 @@
+name: Integration Fabric Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-integration-core/**'
+      - 'crates/core/symthaea-evidence-plane/**'
+      - 'crates/core/symthaea-logparse/**'
+      - 'crates/bridges/symthaea-prometheus-bridge/**'
+      - 'crates/bridges/symthaea-otlp-bridge/**'
+      - 'crates/bridges/symthaea-kubernetes-bridge/**'
+      - 'crates/bridges/symthaea-kubernetes-state-bridge/**'
+      - 'crates/bridges/symthaea-kubernetes-endpointslice-bridge/**'
+      - 'crates/bridges/symthaea-kubernetes-workload-state-bridge/**'
+      - 'crates/bridges/symthaea-kubernetes-state-origin-bridge/**'
+      - 'crates/bridges/symthaea-kubernetes-service-capacity/**'
+      - '.github/workflows/integration-fabric.yml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: integration-fabric-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  qualify-read-only-fabric:
+    name: Read-only integration fabric
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-integration-fabric-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-integration-fabric-
+
+      - name: Resolve workspace metadata
+        run: cargo metadata --format-version 1 --no-deps >/dev/null
+
+      - name: Check formatting for integration packages
+        id: formatting
+        continue-on-error: true
+        run: |
+          cargo fmt \
+            -p symthaea-integration-core \
+            -p symthaea-logparse \
+            -p symthaea-prometheus-bridge \
+            -p symthaea-otlp-bridge \
+            -p symthaea-kubernetes-bridge \
+            -p symthaea-kubernetes-state-bridge \
+            -p symthaea-kubernetes-endpointslice-bridge \
+            -p symthaea-kubernetes-workload-state-bridge \
+            -p symthaea-kubernetes-state-origin-bridge \
+            -p symthaea-kubernetes-service-capacity \
+            -- --check
+
+      # If committed source is not rustfmt-clean, produce the exact repair using
+      # the same pinned toolchain rather than reconstructing console diffs by hand.
+      # Tests below then exercise rustfmt-equivalent source, while the job still
+      # fails at the end until the exact formatting output is committed.
+      #
+      # This workflow intentionally keeps contents read-only. It does not grant a
+      # pull-request job write authority merely to auto-commit formatting output;
+      # the uploaded artifact must be reviewed/applied through a trusted path.
+      - name: Produce exact formatting repair artifact
+        if: steps.formatting.outcome == 'failure'
+        run: |
+          cargo fmt \
+            -p symthaea-integration-core \
+            -p symthaea-logparse \
+            -p symthaea-prometheus-bridge \
+            -p symthaea-otlp-bridge \
+            -p symthaea-kubernetes-bridge \
+            -p symthaea-kubernetes-state-bridge \
+            -p symthaea-kubernetes-endpointslice-bridge \
+            -p symthaea-kubernetes-workload-state-bridge \
+            -p symthaea-kubernetes-state-origin-bridge \
+            -p symthaea-kubernetes-service-capacity
+          git diff -- \
+            crates/core/symthaea-integration-core \
+            crates/core/symthaea-logparse \
+            crates/bridges/symthaea-prometheus-bridge \
+            crates/bridges/symthaea-otlp-bridge \
+            crates/bridges/symthaea-kubernetes-bridge \
+            crates/bridges/symthaea-kubernetes-state-bridge \
+            crates/bridges/symthaea-kubernetes-endpointslice-bridge \
+            crates/bridges/symthaea-kubernetes-workload-state-bridge \
+            crates/bridges/symthaea-kubernetes-state-origin-bridge \
+            crates/bridges/symthaea-kubernetes-service-capacity \
+            > integration-format.patch
+          tar -czf integration-formatted-sources.tar.gz \
+            crates/core/symthaea-integration-core \
+            crates/core/symthaea-logparse \
+            crates/bridges/symthaea-prometheus-bridge \
+            crates/bridges/symthaea-otlp-bridge \
+            crates/bridges/symthaea-kubernetes-bridge \
+            crates/bridges/symthaea-kubernetes-state-bridge \
+            crates/bridges/symthaea-kubernetes-endpointslice-bridge \
+            crates/bridges/symthaea-kubernetes-workload-state-bridge \
+            crates/bridges/symthaea-kubernetes-state-origin-bridge \
+            crates/bridges/symthaea-kubernetes-service-capacity
+
+      - name: Upload exact formatting repair artifact
+        if: steps.formatting.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-fabric-rustfmt-${{ github.sha }}
+          path: |
+            integration-format.patch
+            integration-formatted-sources.tar.gz
+          retention-days: 7
+
+      - name: Test canonical integration contracts
+        run: cargo test -p symthaea-integration-core --lib
+
+      - name: Test normalized log observer
+        run: cargo test -p symthaea-logparse --lib
+
+      - name: Test Prometheus observation bridge
+        run: cargo test -p symthaea-prometheus-bridge --lib
+
+      - name: Test OTLP metrics observation bridge
+        run: cargo test -p symthaea-otlp-bridge --lib
+
+      - name: Test OTLP Prometheus cross-protocol identity resolution
+        run: cargo test -p symthaea-otlp-bridge --test cross_protocol_identity
+
+      - name: Test Kubernetes OTLP cross-protocol identity resolution
+        run: cargo test -p symthaea-otlp-bridge --test cross_kubernetes_identity
+
+      - name: Test Kubernetes topology and identity replay
+        run: cargo test -p symthaea-kubernetes-bridge
+
+      - name: Test Kubernetes desired-observed state replay
+        run: cargo test -p symthaea-kubernetes-state-bridge
+
+      - name: Test Kubernetes EndpointSlice topology augmentation
+        run: cargo test -p symthaea-kubernetes-endpointslice-bridge
+
+      - name: Test Kubernetes workload and Condition state augmentation
+        run: cargo test -p symthaea-kubernetes-workload-state-bridge
+
+      - name: Test Kubernetes desired-state provenance normalization
+        run: cargo test -p symthaea-kubernetes-state-origin-bridge
+
+      - name: Test Kubernetes service capacity evidence
+        run: cargo test -p symthaea-kubernetes-service-capacity
+
+      - name: Compile all integration targets
+        run: |
+          cargo check -p symthaea-integration-core --all-targets
+          cargo check -p symthaea-logparse --all-targets
+          cargo check -p symthaea-prometheus-bridge --all-targets
+          cargo check -p symthaea-otlp-bridge --all-targets
+          cargo check -p symthaea-kubernetes-bridge --all-targets
+          cargo check -p symthaea-kubernetes-state-bridge --all-targets
+          cargo check -p symthaea-kubernetes-endpointslice-bridge --all-targets
+          cargo check -p symthaea-kubernetes-workload-state-bridge --all-targets
+          cargo check -p symthaea-kubernetes-state-origin-bridge --all-targets
+          cargo check -p symthaea-kubernetes-service-capacity --all-targets
+
+      # Cargo may resolve newly introduced adapter dependencies during the
+      # preceding commands. A green integration PR must include that exact
+      # lockfile delta rather than relying on CI-only resolution.
+      - name: Lockfile is committed
+        run: git diff --exit-code -- Cargo.lock
+
+      # Keep the exact resolver output even on a failed lockfile gate so it can
+      # be reviewed and committed rather than reconstructed by hand.
+      - name: Upload resolved lockfile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-fabric-lockfile-${{ github.sha }}
+          path: Cargo.lock
+          retention-days: 7
+
+      - name: Require committed rustfmt output
+        if: always()
+        run: test "${{ steps.formatting.outcome }}" = "success"

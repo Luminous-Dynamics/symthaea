@@ -12,6 +12,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = "1"
 chrono = { version = "0.4", features = ["serde"] }
+symthaea-integration-core = { path = "../symthaea-integration-core" }
 
 # Windows Event Log parsing. evtx is pure-Rust, parses the binary .evtx format
 # to structured JSON/XML. Works on Linux — we parse corpora offline, we are not
