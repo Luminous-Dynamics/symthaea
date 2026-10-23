@@ -14,6 +14,7 @@ pub(crate) struct CycleState<'a> {
     pub compressed_state: &'a [f32],
     pub output: &'a [f32],
     pub prediction_error: f32,
+    pub prediction_error_valid: bool,
     pub coherence: f32,
     pub unified_psi: f64,
     pub phi_attention_weight: f32,
