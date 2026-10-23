@@ -854,6 +854,8 @@ fn audit_scored_task(
     let mut scored_log_sha = None;
     let mut evaluation_evidence_sha = None;
     let mut image_id_observed = None;
+    let mut network_mode_observed = None;
+    let mut repo_head_sha_observed = None;
 
     let (all_test_ids, explicit_f2p, baseline_pass) =
         match validate_task_oracle(task, candidate, candidate_row_sha256, task_validation_dir) {
@@ -867,6 +869,8 @@ fn audit_scored_task(
                     scored_log_sha256: None,
                     evaluation_evidence_sha256: None,
                     container_image_id: None,
+                    network_mode_observed: None,
+                    repo_head_sha_observed: None,
                     required_test_count: 0,
                     required_tests_passing: 0,
                     scored_test_exit_code: None,
@@ -884,6 +888,8 @@ fn audit_scored_task(
             scored_log_sha256: None,
             evaluation_evidence_sha256: None,
             container_image_id: None,
+            network_mode_observed: None,
+            repo_head_sha_observed: None,
             required_test_count: required_tests.len(),
             required_tests_passing: 0,
             scored_test_exit_code: None,
@@ -906,6 +912,8 @@ fn audit_scored_task(
                 scored_log_sha256: None,
                 evaluation_evidence_sha256: None,
                 container_image_id: None,
+                network_mode_observed: None,
+                repo_head_sha_observed: None,
                 required_test_count: required_tests.len(),
                 required_tests_passing: 0,
                 scored_test_exit_code: None,
@@ -925,6 +933,8 @@ fn audit_scored_task(
                 scored_log_sha256: None,
                 evaluation_evidence_sha256: evaluation_evidence_sha,
                 container_image_id: None,
+                network_mode_observed: None,
+                repo_head_sha_observed: None,
                 required_test_count: required_tests.len(),
                 required_tests_passing: 0,
                 scored_test_exit_code: None,
@@ -932,6 +942,16 @@ fn audit_scored_task(
             };
         }
     };
+
+    network_mode_observed = evidence
+        .get("container_identity")
+        .and_then(|identity| identity.get("network_mode"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    repo_head_sha_observed = evidence
+        .get("repo_head_sha")
+        .and_then(Value::as_str)
+        .map(str::to_string);
 
     if evidence.get("schema_version").and_then(Value::as_u64) != Some(1) {
         reasons.push("scored evidence schema_version must be 1".to_string());
@@ -941,6 +961,18 @@ fn audit_scored_task(
     }
     if evidence.get("instance_id").and_then(Value::as_str) != Some(instance_id.as_str()) {
         reasons.push("scored evidence instance_id differs from assigned task".to_string());
+    }
+    let expected_base_commit = candidate
+        .get("base_commit")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if evidence.get("repo_head_exit_code").and_then(Value::as_i64) != Some(0) {
+        reasons.push("scored repository HEAD inspection did not exit zero".to_string());
+    }
+    if repo_head_sha_observed.as_deref() != Some(expected_base_commit)
+        || task.get("repo_head_sha").and_then(Value::as_str) != Some(expected_base_commit)
+    {
+        reasons.push("scored repository HEAD differs from locked task base_commit".to_string());
     }
     if evidence.get("prediction_patch_sha256").and_then(Value::as_str) != patch_sha.as_deref() {
         reasons.push("scored prediction patch digest differs from prediction file".to_string());
@@ -1072,7 +1104,9 @@ fn audit_scored_task(
             prediction_patch_sha256: patch_sha,
             scored_log_sha256: scored_log_sha,
             evaluation_evidence_sha256: evaluation_evidence_sha,
-            container_image_id: image_id_observed,
+            container_image_id: image_id_observed.clone(),
+            network_mode_observed: network_mode_observed.clone(),
+            repo_head_sha_observed: repo_head_sha_observed.clone(),
             required_test_count: required_tests.len(),
             required_tests_passing: required_passing,
             scored_test_exit_code,
@@ -1098,7 +1132,9 @@ fn audit_scored_task(
             prediction_patch_sha256: patch_sha,
             scored_log_sha256: scored_log_sha,
             evaluation_evidence_sha256: evaluation_evidence_sha,
-            container_image_id: image_id_observed,
+            container_image_id: image_id_observed.clone(),
+            network_mode_observed: network_mode_observed.clone(),
+            repo_head_sha_observed: repo_head_sha_observed.clone(),
             required_test_count: required_tests.len(),
             required_tests_passing: required_passing,
             scored_test_exit_code,
@@ -1114,7 +1150,9 @@ fn audit_scored_task(
             prediction_patch_sha256: patch_sha,
             scored_log_sha256: scored_log_sha,
             evaluation_evidence_sha256: evaluation_evidence_sha,
-            container_image_id: image_id_observed,
+            container_image_id: image_id_observed.clone(),
+            network_mode_observed: network_mode_observed.clone(),
+            repo_head_sha_observed: repo_head_sha_observed.clone(),
             required_test_count: required_tests.len(),
             required_tests_passing: required_passing,
             scored_test_exit_code,
@@ -1127,7 +1165,9 @@ fn audit_scored_task(
             prediction_patch_sha256: patch_sha,
             scored_log_sha256: scored_log_sha,
             evaluation_evidence_sha256: evaluation_evidence_sha,
-            container_image_id: image_id_observed,
+            container_image_id: image_id_observed.clone(),
+            network_mode_observed: network_mode_observed.clone(),
+            repo_head_sha_observed: repo_head_sha_observed.clone(),
             required_test_count: required_tests.len(),
             required_tests_passing: required_passing,
             scored_test_exit_code,
