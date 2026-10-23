@@ -9,12 +9,13 @@ on:
       - "docs/security/*ASSURANCE*.md"
       - ".github/workflows/mesh-handshake-model.yml"
   push:
-    branches: [main]
+    branches: ["**"]
     paths:
       - "docs/security/models/*.tla"
       - "docs/security/models/*.cfg"
       - "docs/security/*ASSURANCE*.md"
       - ".github/workflows/mesh-handshake-model.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
