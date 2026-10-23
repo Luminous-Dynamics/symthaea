@@ -1160,7 +1160,7 @@ mod tests {
         let sample_b = sha256_hex(b"raw sample b\n");
         fixture.evaluations = String::from_utf8(fixture.evaluations.clone())
             .expect("fixture UTF-8")
-            .replace(&sample_b, &sha256_hex(b"wrong sample\n"))
+            .replace(sample_b.as_str(), sha256_hex(b"wrong sample\n").as_str())
             .into_bytes();
         fixture.refresh_lock();
         fixture.sync_inputs();
