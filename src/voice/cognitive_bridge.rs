@@ -740,7 +740,7 @@ impl CognitiveVoiceBridge {
         }
     }
 
-    /// Update pacing from cognitive loop output
+    /// Compatibility entry point for callers supplying a numeric PE.
     pub fn update(
         &mut self,
         cfc_output: &[f32],
@@ -749,17 +749,43 @@ impl CognitiveVoiceBridge {
         attention_state: HashMap<String, f32>,
         detected_primitives: Vec<String>,
     ) -> &CognitivePacing {
-        // Update error history for smoothing
-        self.error_history.push_back(prediction_error);
-        if self.error_history.len() > self.max_history {
-            self.error_history.pop_front();
+        self.update_with_evidence(
+            cfc_output,
+            tau,
+            Some(prediction_error),
+            attention_state,
+            detected_primitives,
+        )
+    }
+
+    /// Update voice pacing while preserving whether PE is a fresh observation.
+    /// Missing PE keeps confidence/history intact; CfC, tau and primitive channels
+    /// remain independent and can still update pacing.
+    pub fn update_with_evidence(
+        &mut self,
+        cfc_output: &[f32],
+        tau: f32,
+        prediction_error: Option<f32>,
+        attention_state: HashMap<String, f32>,
+        detected_primitives: Vec<String>,
+    ) -> &CognitivePacing {
+        let prediction_error = prediction_error.filter(|value| value.is_finite());
+        if let Some(error) = prediction_error {
+            self.error_history.push_back(error);
+            if self.error_history.len() > self.max_history {
+                self.error_history.pop_front();
+            }
         }
 
-        // Smooth prediction error
-        let smoothed_error =
-            self.error_history.iter().sum::<f32>() / self.error_history.len() as f32;
+        // Reuse the last admitted estimate for display-only calculations, but
+        // do not count it as new evidence or move confidence toward a sentinel.
+        let smoothed_error = if let Some(error) = prediction_error {
+            let _ = error;
+            self.error_history.iter().sum::<f32>() / self.error_history.len().max(1) as f32
+        } else {
+            (1.0 - self.current_pacing.confidence).clamp(0.0, 1.0)
+        };
 
-        // Create new pacing
         let new_pacing = CognitivePacing::from_cognitive_loop(
             cfc_output,
             tau,
@@ -773,8 +799,10 @@ impl CognitiveVoiceBridge {
             .current_pacing
             .base_pacing
             .lerp(&new_pacing.base_pacing, self.smoothing);
-        self.current_pacing.confidence = self.current_pacing.confidence * (1.0 - self.smoothing)
-            + new_pacing.confidence * self.smoothing;
+        if prediction_error.is_some() {
+            self.current_pacing.confidence = self.current_pacing.confidence * (1.0 - self.smoothing)
+                + new_pacing.confidence * self.smoothing;
+        }
         self.current_pacing.word_emphasis = new_pacing.word_emphasis;
         self.current_pacing.highlighted_concepts = new_pacing.highlighted_concepts;
         self.current_pacing.semantic_prosody = new_pacing.semantic_prosody;
