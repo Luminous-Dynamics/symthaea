@@ -928,7 +928,7 @@ fn score(
     report.push_str("RESULT_HEADER\tcomparison_id\tpolicy_id\trecords\tgroups\tmean_utility\tgroup_balanced_utility\tbeneficial_escalations\tharmful_escalations\tneutral_escalations\tmissed_beneficial_opportunities\tbeneficial_opportunities_not_affordable\tcheap_safety_violations\tchosen_safety_violations\tcvar95_incremental_loss\tallocator_latency_us\tallocator_energy_uj\ttotal_incremental_latency_us\ttotal_incremental_energy_uj\tlatency_budget_us\tenergy_budget_uj\tlatency_budget_violation\tenergy_budget_violation\treservation_overruns\tvalid_budget_run\tutility_delta_vs_all_cheap\tcvar95_delta_vs_all_cheap\tsafety_delta_vs_all_cheap\tutility_gap_to_oracle\n");
     for ((comparison, policy), m) in &metrics {
         report.push_str(&format!(
-            "RESULT\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "RESULT\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             comparison, policy, m.records, m.groups, m.chosen_utility_mean, m.group_balanced_utility,
             m.beneficial_escalations, m.harmful_escalations, m.neutral_escalations,
             m.missed_beneficial_opportunities, m.beneficial_opportunities_not_affordable,
