@@ -1,0 +1,25 @@
+[package]
+name = "rust-repair-benchmark-harness"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Isolated compile/test harness for the Rust repair benchmark audit binaries"
+
+# This focused workspace compiles the exact tracked source files without
+# weakening the main workspace, whose core/* glob includes a source-only dir.
+[workspace]
+resolver = "2"
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+
+[[bin]]
+name = "rust-repair-manifest"
+path = "../../src/bin/rust_repair_manifest.rs"
+
+[[bin]]
+name = "rust-repair-score-audit"
+path = "../../src/bin/rust_repair_score_audit.rs"
