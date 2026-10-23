@@ -81,6 +81,65 @@ fn early_abandon_hamming_argmin<const CHUNK_BYTES: usize, const TRACK_BYTES: boo
     (best_index, best_distance, if TRACK_BYTES { bytes_scanned } else { 0 })
 }
 
+/// Exact top-1 search seeded by a previously known candidate ID.
+///
+/// The hint initializes only the incumbent upper bound; all other candidates
+/// are still evaluated fully or pruned by a monotone lower bound. For a
+/// candidate with a lower ID than the current incumbent, equality cannot prune
+/// because it could win the required lowest-index tie. For higher IDs, equality
+/// is safe to prune because it cannot improve the winner.
+fn hinted_early_abandon_hamming_argmin<
+    const CHUNK_BYTES: usize,
+    const TRACK_BYTES: bool,
+>(
+    query: &BinaryHV,
+    candidates: &[BinaryHV],
+    hint_index: usize,
+) -> (usize, u32, usize) {
+    assert!(!candidates.is_empty(), "top-1 search needs at least one candidate");
+    assert!(hint_index < candidates.len(), "hint index must identify a candidate");
+    assert!(CHUNK_BYTES > 0 && BinaryHV::BYTES % CHUNK_BYTES == 0);
+
+    let mut best_index = hint_index;
+    let mut best_distance = query.hamming_distance(&candidates[hint_index]);
+    let mut bytes_scanned = BinaryHV::BYTES;
+
+    for (index, candidate) in candidates.iter().enumerate() {
+        if index == hint_index {
+            continue;
+        }
+
+        let mut partial_distance = 0u32;
+        let mut pruned = false;
+        for start in (0..BinaryHV::BYTES).step_by(CHUNK_BYTES) {
+            let end = start + CHUNK_BYTES;
+            for byte_index in start..end {
+                partial_distance += (query.0[byte_index] ^ candidate.0[byte_index]).count_ones();
+            }
+            if TRACK_BYTES {
+                bytes_scanned += CHUNK_BYTES;
+            }
+
+            let cannot_win = partial_distance > best_distance
+                || (partial_distance == best_distance && index > best_index);
+            if cannot_win {
+                pruned = true;
+                break;
+            }
+        }
+
+        if !pruned
+            && (partial_distance < best_distance
+                || (partial_distance == best_distance && index < best_index))
+        {
+            best_index = index;
+            best_distance = partial_distance;
+        }
+    }
+
+    (best_index, best_distance, if TRACK_BYTES { bytes_scanned } else { 0 })
+}
+
 fn hv_to_bipolar(hv: &BinaryHV) -> Vec<i8> {
     let mut bipolar = Vec::with_capacity(BinaryHV::DIM);
     for byte in hv.0 {
@@ -193,6 +252,27 @@ fn verify_fixture(query: &BinaryHV, candidates: &[BinaryHV], expected_index: Opt
         early_abandon_hamming_argmin::<64, false>(query, candidates).0,
         "64-byte early-abandon winner differs"
     );
+    let hint_index = candidates.len() / 2;
+    assert_eq!(
+        simd.0,
+        hinted_early_abandon_hamming_argmin::<16, false>(
+            query,
+            candidates,
+            hint_index,
+        )
+        .0,
+        "16-byte hinted early-abandon winner differs"
+    );
+    assert_eq!(
+        simd.0,
+        hinted_early_abandon_hamming_argmin::<64, false>(
+            query,
+            candidates,
+            hint_index,
+        )
+        .0,
+        "64-byte hinted early-abandon winner differs"
+    );
     let hamming_score = 1.0 - (hamming.1 as f32 / BinaryHV::DIM as f32);
     assert!(
         (simd.1 - hamming_score).abs() <= 1.0e-6,
@@ -301,61 +381,119 @@ fn bench_streaming_exact_search(c: &mut Criterion) {
             },
         );
 
-        // Scenario 2: plant one known exact-search winner at the midpoint.
-        // Restore the original candidate after benchmarking this scenario.
-        candidates[target_index] = near_match;
-        let planted_full = hamming_argmin(&query, &candidates);
-        assert_eq!(planted_full.0, target_index);
+        // Scenario 2 models temporal locality: the prior query is stored at
+        // target_index, and the current query is a deterministic ~10%-bit
+        // perturbation of that prior query. The prior winner initializes the
+        // bound, but all candidates remain subject to exact checking/pruning.
+        let previous_query = query;
+        let current_query = near_match;
+        candidates[target_index] = previous_query;
+        let correlated_full = hamming_argmin(&current_query, &candidates);
+        assert_eq!(correlated_full.0, target_index);
         assert_eq!(
-            planted_full.0,
-            early_abandon_hamming_argmin::<16, false>(&query, &candidates).0
+            correlated_full.0,
+            early_abandon_hamming_argmin::<16, false>(&current_query, &candidates).0
         );
         assert_eq!(
-            planted_full.0,
-            early_abandon_hamming_argmin::<64, false>(&query, &candidates).0
+            correlated_full.0,
+            early_abandon_hamming_argmin::<64, false>(&current_query, &candidates).0
+        );
+        assert_eq!(
+            correlated_full.0,
+            hinted_early_abandon_hamming_argmin::<16, false>(
+                &current_query,
+                &candidates,
+                target_index,
+            )
+            .0
+        );
+        assert_eq!(
+            correlated_full.0,
+            hinted_early_abandon_hamming_argmin::<64, false>(
+                &current_query,
+                &candidates,
+                target_index,
+            )
+            .0
         );
 
-        let (_, _, planted_bytes_16) =
-            early_abandon_hamming_argmin::<16, true>(&query, &candidates);
-        let (_, _, planted_bytes_64) =
-            early_abandon_hamming_argmin::<64, true>(&query, &candidates);
+        let (_, _, cold_bytes_16) =
+            early_abandon_hamming_argmin::<16, true>(&current_query, &candidates);
+        let (_, _, cold_bytes_64) =
+            early_abandon_hamming_argmin::<64, true>(&current_query, &candidates);
+        let (_, _, warm_bytes_16) = hinted_early_abandon_hamming_argmin::<16, true>(
+            &current_query,
+            &candidates,
+            target_index,
+        );
+        let (_, _, warm_bytes_64) = hinted_early_abandon_hamming_argmin::<64, true>(
+            &current_query,
+            &candidates,
+            target_index,
+        );
         eprintln!(
-            "HDC-DSE planted near-match candidates={count} logical_bytes={} target_index={target_index} scanned_16B={} scanned_64B={}",
+            "HDC-DSE correlated-query candidates={count} logical_bytes={} prior_winner_index={target_index} cold_scanned_16B={} cold_scanned_64B={} hinted_scanned_16B={} hinted_scanned_64B={}",
             count * BinaryHV::BYTES,
-            planted_bytes_16,
-            planted_bytes_64
+            cold_bytes_16,
+            cold_bytes_64,
+            warm_bytes_16,
+            warm_bytes_64
         );
 
         group.throughput(Throughput::Elements(count as u64));
         group.bench_with_input(
-            BenchmarkId::new("planted_full_scan", count),
+            BenchmarkId::new("correlated_full_scan", count),
             &count,
             |bench, _| {
                 bench.iter(|| black_box(hamming_argmin(
-                    black_box(&query),
+                    black_box(&current_query),
                     black_box(&candidates),
                 )))
             },
         );
         group.throughput(Throughput::Elements(count as u64));
         group.bench_with_input(
-            BenchmarkId::new("planted_early_abandon_16B", count),
+            BenchmarkId::new("correlated_cold_early_abandon_16B", count),
             &count,
             |bench, _| {
                 bench.iter(|| black_box(early_abandon_hamming_argmin::<16, false>(
-                    black_box(&query),
+                    black_box(&current_query),
                     black_box(&candidates),
                 )))
             },
         );
         group.throughput(Throughput::Elements(count as u64));
         group.bench_with_input(
-            BenchmarkId::new("planted_early_abandon_64B", count),
+            BenchmarkId::new("correlated_hinted_early_abandon_16B", count),
+            &count,
+            |bench, _| {
+                bench.iter(|| black_box(hinted_early_abandon_hamming_argmin::<16, false>(
+                    black_box(&current_query),
+                    black_box(&candidates),
+                    target_index,
+                )))
+            },
+        );
+        group.throughput(Throughput::Elements(count as u64));
+        group.bench_with_input(
+            BenchmarkId::new("correlated_cold_early_abandon_64B", count),
             &count,
             |bench, _| {
                 bench.iter(|| black_box(early_abandon_hamming_argmin::<64, false>(
-                    black_box(&query),
+                    black_box(&current_query),
                     black_box(&candidates),
+                )))
+            },
+        );
+        group.throughput(Throughput::Elements(count as u64));
+        group.bench_with_input(
+            BenchmarkId::new("correlated_hinted_early_abandon_64B", count),
+            &count,
+            |bench, _| {
+                bench.iter(|| black_box(hinted_early_abandon_hamming_argmin::<64, false>(
+                    black_box(&current_query),
+                    black_box(&candidates),
+                    target_index,
                 )))
             },
         );
