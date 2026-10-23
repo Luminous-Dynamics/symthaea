@@ -1,7 +1,7 @@
 diff --git a/evaluation/validation.py b/evaluation/validation.py
 --- a/evaluation/validation.py
 +++ b/evaluation/validation.py
-@@ -1,15 +1,69 @@
+@@ -1,15 +1,70 @@
  import sys, os
  sys.path.insert(0, os.path.join(os.getcwd(), "launch"))
  from launch.core.runtime import SetupRuntime
@@ -39,6 +39,7 @@ diff --git a/evaluation/validation.py b/evaluation/validation.py
 +            "container_id": getattr(docker_container, "id", None) or attrs.get("Id"),
 +            "configured_image": (attrs.get("Config") or {}).get("Image"),
 +            "container_image_id": attrs.get("Image"),
++            "runtime_platform": getattr(runtime, "platform", None),
 +            "network_mode": (attrs.get("HostConfig") or {}).get("NetworkMode"),
 +            "git_metadata_sanitization_exit_code": getattr(
 +                runtime, "git_metadata_sanitization_exit_code", None
@@ -71,7 +72,7 @@ diff --git a/evaluation/validation.py b/evaluation/validation.py
      instance_id: str
      pre_patch_status: dict[str, Literal['pass', 'fail', 'skip']]
      post_patch_status: dict[str, Literal['pass', 'fail', 'skip']]
-@@ -46,32 +100,70 @@
+@@ -46,32 +101,70 @@
                      platform: Literal["windows", "linux"],
                      output_dir: str,
                      ) -> ValidationResult:
@@ -152,7 +153,7 @@ diff --git a/evaluation/validation.py b/evaluation/validation.py
          del container
      all_tests = set(post_patch_status_under_inspect[0].keys()) | set(post_patch_status_under_inspect[1].keys()) | set(post_patch_status_under_inspect[2].keys())
      for test in all_tests:
-@@ -101,8 +193,17 @@
+@@ -101,8 +194,17 @@
      if len(res["FAIL_TO_PASS"]) > 0:
          print("Find one valid instance:", instance_id, flush=True)
      with open(os.path.join(output_dir, "status.json"), "w", encoding="utf-8") as f:
@@ -184,7 +185,7 @@ diff --git a/evaluation/evaluation.py b/evaluation/evaluation.py
  import traceback
  import re
  from typing import Literal, TypedDict
-@@ -13,8 +14,56 @@
+@@ -13,8 +14,57 @@
  
  TIMEOUT = 150*60
  
@@ -213,6 +214,7 @@ diff --git a/evaluation/evaluation.py b/evaluation/evaluation.py
 +            "container_id": getattr(docker_container, "id", None) or attrs.get("Id"),
 +            "configured_image": (attrs.get("Config") or {}).get("Image"),
 +            "container_image_id": attrs.get("Image"),
++            "runtime_platform": getattr(runtime, "platform", None),
 +            "network_mode": (attrs.get("HostConfig") or {}).get("NetworkMode"),
 +            "git_metadata_sanitization_exit_code": getattr(
 +                runtime, "git_metadata_sanitization_exit_code", None
@@ -241,7 +243,7 @@ diff --git a/evaluation/evaluation.py b/evaluation/evaluation.py
      if not re.fullmatch(r"\d{4}-\d{2}", month):
          raise ValueError(f"Invalid month format: {month}. Expected YYYY-MM.")
      return month
-@@ -98,43 +147,69 @@
+@@ -98,43 +148,69 @@
          container.apply_patch(solution_patch, verbose=True)
          container.send_command(r"cd C:\testbed")
      return
