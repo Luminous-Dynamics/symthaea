@@ -426,7 +426,7 @@ mod tests {
                     {"id":"auxiliary-loss-unsupervised","description":"Aux loss only."},
                     {"id":"observed-outcome","description":"Observed outcomes."}
                 ],
-                "matching_rule": "Match the earliest unused alarm in each event interval. Unmatched alarm is a false alarm; unmatched event is missed; invalid/missing PE cannot be observations.",
+                "matching_rule": "Process events by earliest matching-window deadline. Match the earliest unused valid-evidence alarm in the event window. Unmatched alarm is a false alarm; unmatched event is missed; invalid/missing PE cannot be observations.",
                 "tuning_policy": "Tune on all but one dataset and hold that dataset out.",
                 "source_paper": "https://doi.org/10.1145/3770855.3819070",
                 "claims": "Comparator definitions are not measured results."
