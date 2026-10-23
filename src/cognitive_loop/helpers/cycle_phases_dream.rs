@@ -25,6 +25,8 @@ impl CognitiveLoopService {
         let compressed_state = state.compressed_state;
         let output = state.output;
         let prediction_error = state.prediction_error;
+        let prediction_error_valid =
+            state.prediction_error_valid && prediction_error.is_finite();
         let unified_psi = state.unified_psi;
         let hv16_cached = state.hv16_cached;
         let urgency = state.urgency;
@@ -102,12 +104,16 @@ impl CognitiveLoopService {
             } else {
                 phi_weighted_surprise
             };
-            dream.record(
-                &dream_state,
-                dream_action,
-                &dream_outcome,
-                phi_weighted_surprise,
-            );
+            // The dream score is PE-weighted; don't persist the numeric
+            // compatibility sentinel as a surprise observation.
+            if prediction_error_valid {
+                dream.record(
+                    &dream_state,
+                    dream_action,
+                    &dream_outcome,
+                    phi_weighted_surprise,
+                );
+            }
 
             // Therapeutic dream recording: encode current therapeutic state as a
             // dream action so the dream engine can generate counterfactual therapeutic
@@ -116,7 +122,10 @@ impl CognitiveLoopService {
             // Science: Barrett (2001) — dreams process emotional concerns;
             // Cartwright (2010) — dream content reflects waking emotional regulation.
             #[cfg(feature = "therapeutic")]
-            if self.therapeutic_manager.active_strategy().is_some() && phi_weighted_surprise > 0.3 {
+            if prediction_error_valid
+                && self.therapeutic_manager.active_strategy().is_some()
+                && phi_weighted_surprise > 0.3
+            {
                 let therapeutic_action = self.therapeutic_manager.dream_action_vector();
                 // Use client RDoC profile as dream state, current compressed state as outcome
                 let therapeutic_dream_state: Vec<f32> = therapeutic_action[0..6].to_vec();
@@ -134,17 +143,19 @@ impl CognitiveLoopService {
             // Science: Jung (1951) — shadow integration through active imagination;
             // Hartmann (1998) — dreams as "safe space" for processing threatening content.
             #[cfg(feature = "therapeutic")]
-            if let Some(shadow_input) = self
-                .therapeutic_manager
-                .shadow_detector
-                .next_dream_fragment()
-            {
-                dream.record(
-                    &shadow_input.state_vector,
-                    shadow_input.action_vector,
-                    &dream_outcome,
-                    phi_weighted_surprise * 0.6, // Lower priority than primary/therapeutic
-                );
+            if prediction_error_valid {
+                if let Some(shadow_input) = self
+                    .therapeutic_manager
+                    .shadow_detector
+                    .next_dream_fragment()
+                {
+                    dream.record(
+                        &shadow_input.state_vector,
+                        shadow_input.action_vector,
+                        &dream_outcome,
+                        phi_weighted_surprise * 0.6, // Lower priority than primary/therapeutic
+                    );
+                }
             }
 
             // Dream during Cruise urgency (low-error steady state) or periodically.
