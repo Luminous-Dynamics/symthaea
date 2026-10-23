@@ -430,8 +430,7 @@ impl CognitiveLoopService {
         // For the HV path, unified_psi is derived from temporal coherence since
         // we don't run the full consciousness subsystems.
         let urgency = self.carryover.urgency.urgency;
-        if prediction_error_evidence.is_some()
-            && self.config.enable_psi_attestation
+        if self.config.enable_psi_attestation
             && self.config.agent_did.is_some()
             && (self.stats.total_cycles % 10 == 0)
         {
@@ -444,6 +443,7 @@ impl CognitiveLoopService {
                 cycle_id: self.stats.total_cycles as u64,
                 captured_at_us: now,
                 prediction_error,
+                prediction_error_valid: prediction_error_evidence.is_some(),
                 urgency,
             };
             self.push_psi_attestation(record);
