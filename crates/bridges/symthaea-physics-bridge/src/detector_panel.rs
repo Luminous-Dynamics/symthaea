@@ -395,6 +395,23 @@ mod tests {
     }
 
     #[test]
+    fn self_perturbation_mismatch_can_hide_an_unselected_operational_signal() {
+        let panel = fit_panel(DetectorPanelAggregation::MeanPositiveZ);
+        let mut operational_scores = vec![0.0; panel.detector_count()];
+        for selected in panel.selected_detectors() {
+            operational_scores[selected.detector_index] = selected.clean_mean;
+        }
+        // The probe perturbs only detectors 0 and 1, so it selects those two. This mock
+        // operational change affects only detector 2, which selection correctly cannot infer.
+        operational_scores[2] = 1000.0;
+        assert_eq!(panel.score(&operational_scores), Some(0.0));
+        assert!(!panel
+            .selected_detectors()
+            .iter()
+            .any(|detector| detector.detector_index == 2));
+    }
+
+    #[test]
     fn outer_conformal_calibration_is_separate_and_typed() {
         let panel = fit_panel(DetectorPanelAggregation::MeanPositiveZ);
         let mut outer_clean = Vec::new();
