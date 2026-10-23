@@ -25,8 +25,8 @@
       "id": "RUNTIME-NONCE-PAIR-002",
       "class": "cross_api_legacy_witness",
       "test": "legacy_packet_and_fragment_apis_can_reuse_nonce_under_shared_key",
-      "stimulus": "Use packet type 0x77, epoch 0x88, sequence 0x00030201 and fragment thought ID 0x0201/index 3 with source bytes 1122334455667788 under the same test key.",
-      "expected_nonce_hex": "112233445566778801020300",
+      "stimulus": "Use source bytes 1122334455660088, valid WisdomVector packet type 0x00, epoch 0x88, packet sequence 0x00030201 and fragment thought ID 0x0201/index 3 under the same test key.",
+      "expected_nonce_hex": "112233445566008801020300",
       "expected": "Packet and fragment helpers produce the same nonce; oracle flags the repeated same-key pair; equal-length ciphertexts expose plaintext XOR.",
       "status": "authored_unverified"
     },
