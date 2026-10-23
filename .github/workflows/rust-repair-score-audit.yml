@@ -1,10 +1,11 @@
-name: Rust repair scored-run auditor
+name: Rust repair benchmark audit suite
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "src/bin/rust_repair_score_audit.rs"
+      - "src/bin/rust_repair_trial_compare.rs"
       - "src/bin/rust_repair_manifest.rs"
       - "Cargo.toml"
       - "docs/research/patches/swe-bench-live-validation-evidence.patch"
@@ -54,10 +55,14 @@ jobs:
         with:
           components: clippy, rustfmt
       - name: Check Rust formatting
-        run: rustfmt --edition 2024 --check src/bin/rust_repair_manifest.rs src/bin/rust_repair_score_audit.rs
+        run: rustfmt --edition 2024 --check src/bin/rust_repair_manifest.rs src/bin/rust_repair_score_audit.rs src/bin/rust_repair_trial_compare.rs
       - name: Test task-manifest auditor
         run: cargo test --locked --bin rust-repair-manifest --features rust-repair-manifest
       - name: Test scored-run auditor
         run: cargo test --locked --bin rust-repair-score-audit --features rust-repair-manifest
+      - name: Test paired trial comparator
+        run: cargo test --locked --bin rust-repair-trial-compare --features rust-repair-manifest
       - name: Run strict Clippy on scored-run auditor
         run: cargo clippy --locked --bin rust-repair-score-audit --features rust-repair-manifest -- -D warnings
+      - name: Run strict Clippy on paired trial comparator
+        run: cargo clippy --locked --bin rust-repair-trial-compare --features rust-repair-manifest -- -D warnings
