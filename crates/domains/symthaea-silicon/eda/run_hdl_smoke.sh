@@ -253,11 +253,14 @@ fi
 case_results="[]"
 overall_status="simulation_smoke_pass"
 for width in 64 128 256 512; do
+  oracle_word_count="${oracle_word_counts[$width]}"
+  oracle_xor_file="${oracle_xor_files[$width]}"
+  oracle_hamming_file="${oracle_hamming_files[$width]}"
   for arch in xor linear_popcount balanced_popcount; do
     case "${arch}" in
-      xor) module="hdc_bind_xor"; top="tb_hdc_bind_xor"; rtl="${rtl_xor}"; tb="${tb_xor}"; pass_marker="PASS: hdc_bind_xor smoke and backpressure tests completed"; oracle_pass_marker="PASS: hdc_bind_xor software oracle words=${oracle_word_counts["$width"]}"; oracle_args=("+ORACLE_XOR=${oracle_xor_files["$width"]}" "+ORACLE_WORDS=${oracle_word_counts["$width"]}");;
-      linear_popcount) module="hdc_hamming_count"; top="tb_hdc_hamming_count"; rtl="${rtl_hamming}"; tb="${tb_hamming}"; pass_marker="PASS: hdc_hamming_count smoke and backpressure tests completed width=${width} balanced_tree=0"; oracle_pass_marker="PASS: hdc_hamming_count software oracle words=${oracle_word_counts["$width"]} width=${width} balanced_tree=0"; oracle_args=("+ORACLE_HAMMING=${oracle_hamming_files["$width"]}" "+ORACLE_WORDS=${oracle_word_counts["$width"]}");;
-      balanced_popcount) module="hdc_hamming_count"; top="tb_hdc_hamming_count"; rtl="${rtl_hamming}"; tb="${tb_hamming}"; pass_marker="PASS: hdc_hamming_count smoke and backpressure tests completed width=${width} balanced_tree=1"; oracle_pass_marker="PASS: hdc_hamming_count software oracle words=${oracle_word_counts["$width"]} width=${width} balanced_tree=1"; oracle_args=("+ORACLE_HAMMING=${oracle_hamming_files["$width"]}" "+ORACLE_WORDS=${oracle_word_counts["$width"]}");;
+      xor) module="hdc_bind_xor"; top="tb_hdc_bind_xor"; rtl="${rtl_xor}"; tb="${tb_xor}"; pass_marker="PASS: hdc_bind_xor smoke and backpressure tests completed"; oracle_pass_marker="PASS: hdc_bind_xor software oracle words=${oracle_word_count}"; oracle_args=("+ORACLE_XOR=${oracle_xor_file}" "+ORACLE_WORDS=${oracle_word_count}");;
+      linear_popcount) module="hdc_hamming_count"; top="tb_hdc_hamming_count"; rtl="${rtl_hamming}"; tb="${tb_hamming}"; pass_marker="PASS: hdc_hamming_count smoke and backpressure tests completed width=${width} balanced_tree=0"; oracle_pass_marker="PASS: hdc_hamming_count software oracle words=${oracle_word_count} width=${width} balanced_tree=0"; oracle_args=("+ORACLE_HAMMING=${oracle_hamming_file}" "+ORACLE_WORDS=${oracle_word_count}");;
+      balanced_popcount) module="hdc_hamming_count"; top="tb_hdc_hamming_count"; rtl="${rtl_hamming}"; tb="${tb_hamming}"; pass_marker="PASS: hdc_hamming_count smoke and backpressure tests completed width=${width} balanced_tree=1"; oracle_pass_marker="PASS: hdc_hamming_count software oracle words=${oracle_word_count} width=${width} balanced_tree=1"; oracle_args=("+ORACLE_HAMMING=${oracle_hamming_file}" "+ORACLE_WORDS=${oracle_word_count}");;
       *) overall_status="failed"; continue;;
     esac
 
