@@ -20,6 +20,22 @@ pub struct ManifestSummary {
 }
 
 const REQUIRED_BASELINES: [&str; 8] = ["B0", "B1", "B2", "B3", "B4", "B5", "B6", "B7"];
+const REQUIRED_KDD_FAMILIES: [&str; 14] = [
+    "ADWIN",
+    "CUSUM",
+    "DDM",
+    "EDDM",
+    "EWMA",
+    "GMA",
+    "HDDMA",
+    "HDDMW",
+    "Page-Hinkley (PH)",
+    "RDDM",
+    "SEED",
+    "STEPD",
+    "ABCD (error stream and ABCD(X) feature stream)",
+    "STUDD+ADWIN",
+];
 const REQUIRED_DRIFT_DETECTORS: [&str; 24] = [
     "fixed-threshold",
     "ewma-control-chart",
@@ -166,6 +182,12 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
         method_families.len() == 14 && method_families.iter().collect::<BTreeSet<_>>().len() == 14,
         "KDD reference protocol must list 14 unique detector families"
     );
+    for expected in REQUIRED_KDD_FAMILIES {
+        ensure!(
+            method_families.iter().any(|family| family == expected),
+            "KDD reference protocol is missing detector family {expected}"
+        );
+    }
     let drift_types = nonempty_string_array(kdd_protocol, "drift_types", "kdd26_reference_protocol")?;
     ensure!(drift_types.len() == 4, "KDD reference protocol must cover four drift types");
     let transitions = nonempty_string_array(kdd_protocol, "transitions", "kdd26_reference_protocol")?;
@@ -350,10 +372,16 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
         "candidate_dataset_macro_mean",
         "baseline_dataset_macro_mean",
         "dataset_macro_paired_effect",
+        "median_oriented_paired_delta",
+        "paired_win_fraction",
         "percentile_95_ci_oriented_effect",
+        "bootstrap_fraction_effect_above_zero",
         "per_dataset",
         "canonical_input_sha256",
         "result_sha256",
+        "minimum_seeds_per_dataset",
+        "sota_coverage_gate_pass",
+        "sota_coverage_gate_reason",
     ] {
         ensure!(required_outputs.iter().any(|field| field == expected), "paired comparison contract is missing output {expected}");
     }
@@ -686,6 +714,14 @@ mod tests {
         manifest["external_drift_detectors"][1]["id"] = json!("fixed-threshold");
         let error = validate_value(&manifest).unwrap_err().to_string();
         assert!(error.contains("duplicate external drift detector id"));
+    }
+
+    #[test]
+    fn rejects_missing_required_kdd_family() {
+        let mut manifest = valid_manifest();
+        manifest["drift_protocol"]["kdd26_reference_protocol"]["method_families"][0] = json!("made-up-detector");
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("KDD reference protocol is missing detector family ADWIN"));
     }
 
     #[test]
