@@ -1,0 +1,107 @@
+name: Careframe Tool Proposal Schema
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "schemas/careframe-tool-design-proposal-v0.schema.json"
+      - "examples/careframe-tool-design-proposal-v0.example.json"
+      - "examples/careframe-example-scenario-set-v0.json"
+      - "docs/research/medical-robotics/CARE_FRAME_TOOL_DESIGNER_CONTRACT_V0.md"
+      - ".github/workflows/careframe-tool-proposal-schema.yml"
+  push:
+    branches:
+      - "research/careframe-tool-designer-contract-v0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: careframe-tool-proposal-schema-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  schema-conformance:
+    name: Validate proposal schema and fail-closed counterfactuals
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact tested revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python for schema-validator CLI only
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install pinned schema validator
+        run: python -m pip install --disable-pip-version-check check-jsonschema==0.38.2
+
+      - name: Validate positive example against JSON Schema
+        run: |
+          set -euo pipefail
+          check-jsonschema \
+            --schemafile schemas/careframe-tool-design-proposal-v0.schema.json \
+            examples/careframe-tool-design-proposal-v0.example.json
+          jq -e '.authority.requires_independent_gate == true and
+                 .authority.physical_actuation_authorized == false and
+                 .authority.patient_contact_authorized == false and
+                 .authority.clinical_use_authorized == false' \
+            examples/careframe-tool-design-proposal-v0.example.json
+
+      - name: Bind proposal to exact scenario bytes
+        run: |
+          set -euo pipefail
+          expected="$(jq -r '.comparison_plan.scenario_set_sha256' examples/careframe-tool-design-proposal-v0.example.json)"
+          actual="$(sha256sum examples/careframe-example-scenario-set-v0.json | cut -d' ' -f1)"
+          test "$actual" = "$expected"
+          jq -e '.claim_ceiling == "synthetic_only"' examples/careframe-example-scenario-set-v0.json
+
+      - name: Reject authority escalation
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq '.authority.clinical_use_authorized = true' \
+            examples/careframe-tool-design-proposal-v0.example.json > /tmp/careframe-clinical-escalation.json
+          if check-jsonschema --schemafile schemas/careframe-tool-design-proposal-v0.schema.json /tmp/careframe-clinical-escalation.json; then
+            echo "ERROR: schema accepted an unauthorized clinical-use escalation" >&2
+            exit 1
+          fi
+          jq '.candidate_manifests[0].authority.physical_actuation_authorized = true' \
+            examples/careframe-tool-design-proposal-v0.example.json > /tmp/careframe-actuation-escalation.json
+          if check-jsonschema --schemafile schemas/careframe-tool-design-proposal-v0.schema.json /tmp/careframe-actuation-escalation.json; then
+            echo "ERROR: schema accepted an unauthorized actuation escalation" >&2
+            exit 1
+          fi
+
+      - name: Reject schema drift and incompatible task/tool pairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq '.unreviewed_autonomy = true' \
+            examples/careframe-tool-design-proposal-v0.example.json > /tmp/careframe-unknown-field.json
+          if check-jsonschema --schemafile schemas/careframe-tool-design-proposal-v0.schema.json /tmp/careframe-unknown-field.json; then
+            echo "ERROR: schema accepted an unknown top-level field" >&2
+            exit 1
+          fi
+          jq '.candidate_manifests[0].silent_autonomy = true' \
+            examples/careframe-tool-design-proposal-v0.example.json > /tmp/careframe-unknown-manifest-field.json
+          if check-jsonschema --schemafile schemas/careframe-tool-design-proposal-v0.schema.json /tmp/careframe-unknown-manifest-field.json; then
+            echo "ERROR: schema accepted an unknown manifest field" >&2
+            exit 1
+          fi
+          jq '.candidate_manifests[0].intended_task = "tray_transfer"' \
+            examples/careframe-tool-design-proposal-v0.example.json > /tmp/careframe-task-mismatch.json
+          if check-jsonschema --schemafile schemas/careframe-tool-design-proposal-v0.schema.json /tmp/careframe-task-mismatch.json; then
+            echo "ERROR: schema accepted an incompatible tool/task pair" >&2
+            exit 1
+          fi
+          jq '.candidate_manifests[0].electrical.protective_isolation_declared = false' \
+            examples/careframe-tool-design-proposal-v0.example.json > /tmp/careframe-isolation-failure.json
+          if check-jsonschema --schemafile schemas/careframe-tool-design-proposal-v0.schema.json /tmp/careframe-isolation-failure.json; then
+            echo "ERROR: schema accepted powered tool without declared protective isolation" >&2
+            exit 1
+          fi
