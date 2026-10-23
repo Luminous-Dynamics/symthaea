@@ -1136,7 +1136,10 @@ impl CognitiveLoopService {
         // ── Knowledge Engine: PE → ontology learning rate ────────────────
         // High prediction error → faster ontology adaptation (Rescorla-Wagner 1972).
         if let Some(ref mut km) = self.memory.knowledge_manager {
-            km.set_ontology_lr_from_pe(prediction_error as f32);
+            if perception.urgency.prediction_error_valid && prediction_error.is_finite() {
+                km.set_ontology_lr_from_pe(prediction_error as f32);
+            }
+            // This separate coherence/Phi pathway remains active without a PE.
             km.modulate_lr_from_consciousness(self.stats.unified_psi as f64);
         }
 
