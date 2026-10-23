@@ -364,8 +364,11 @@ fn parse_lsh_configs(input: &str) -> Result<Vec<LshConfig>, String> {
         let rows = rows_text
             .parse::<u32>()
             .map_err(|error| format!("invalid row count in {token:?}: {error}"))?;
-        if bands == 0 || rows == 0 {
-            return Err(format!("LSH bands and rows must be positive in {token:?}"));
+        if bands == 0 || bands > u32::from(u16::MAX) || !(1..=32).contains(&rows) {
+            return Err(format!(
+                "LSH arm {token:?} must have 1..={} bands and 1..=32 rows",
+                u16::MAX
+            ));
         }
         let config = LshConfig { bands, rows };
         if configs.contains(&config) {
@@ -666,7 +669,7 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
             println!("# arm_{label}_{kind}_median_speedup_bootstrap_95ci_high={upper:.6}");
             println!(
                 "# arm_{label}_{kind}_bootstrap_resamples={}",
-                if speedups.is_empty() { 0 } else { BOOTSTRAP_RESAMPLES }
+                if speedups.len() < 2 { 0 } else { BOOTSTRAP_RESAMPLES }
             );
         }
     }
@@ -929,6 +932,8 @@ mod tests {
         assert!(parse_lsh_configs("32x8,32x8").is_err());
         assert!(parse_lsh_configs("0x8").is_err());
         assert!(parse_lsh_configs("8x0").is_err());
+        assert!(parse_lsh_configs("8x33").is_err());
+        assert!(parse_lsh_configs("65536x8").is_err());
         assert!(parse_lsh_configs("not-an-arm").is_err());
     }
 
