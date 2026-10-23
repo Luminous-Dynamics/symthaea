@@ -344,6 +344,8 @@ impl CognitiveLoopService {
         // PHASE 1.1: Surprise and Exploration
         // ═══════════════════════════════════════════════════════════════════════
         let prediction_error = encoding_res.prediction_error;
+        let prediction_error_valid = self.encoder.last_prediction_degeneracy()
+            == symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::Genuine;
         let _t_surprise = Instant::now();
         let (surprise_triggered, exploration_action) =
             self.run_surprise_exploration(&encoding_res.compressed_state);
@@ -354,6 +356,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let urgency_result = self.compute_urgency_and_error_pattern(
             prediction_error,
+            prediction_error_valid,
             surprise_triggered,
             encoding_res.effective_threshold,
         );
@@ -539,8 +542,7 @@ impl CognitiveLoopService {
                 error_pattern: urgency_result.error_pattern,
                 predicted_urgency: urgency_result.predicted_urgency,
                 prediction_coherence_urgency_bias: urgency_result.prediction_coherence_urgency_bias,
-                prediction_error_valid: self.encoder.last_prediction_degeneracy()
-                    == symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::Genuine,
+                prediction_error_valid,
                 prediction_error,
                 error_slope: urgency_result.error_slope,
                 oscillation_ratio: urgency_result.oscillation_ratio,
