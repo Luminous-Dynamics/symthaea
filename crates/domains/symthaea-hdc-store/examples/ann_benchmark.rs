@@ -64,7 +64,6 @@ struct Sample {
 struct Quality {
     recall_at_k: f64,
     examined: usize,
-    total_live: usize,
     candidate_fraction: f64,
     approximate_exact: bool,
     fell_back_to_exact: bool,
@@ -93,7 +92,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Warm both paths before collecting samples. The measured intervals contain
     // only the retrieval calls, not query generation, ID comparison or CSV output.
-    for query in queries.iter().take(queries.len().min(20)) {
+    for query in &queries {
         let _ = store.scan_similar(&query.vector, config.top_k);
         let _ = store.scan_similar_approx(&query.vector, config.top_k, options);
     }
@@ -127,7 +126,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 first_round_quality.push(Quality {
                     recall_at_k,
                     examined: approximate.examined,
-                    total_live,
                     candidate_fraction,
                     approximate_exact: approximate.exact,
                     fell_back_to_exact: approximate.fell_back_to_exact,
@@ -215,7 +213,7 @@ fn parse_args() -> Result<Config, String> {
     if noise_bits > BinaryHV::DIM {
         return Err(format!("--noise-bits must be <= {}", BinaryHV::DIM));
     }
-    if size > u64::MAX as usize {
+    if u64::try_from(size).is_err() {
         return Err("--size exceeds the store's u64 ID range".into());
     }
 
@@ -369,7 +367,7 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
     println!("# fallback_on_empty={}", config.fallback_on_empty);
     println!("# target_os={}", env::consts::OS);
     println!("# target_arch={}", env::consts::ARCH);
-    println!("# cpu_threads={}", std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1));
+    println!("# available_parallelism={}", std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1));
     println!("# quality metrics below are computed over unique queries in round 0");
     println!("query_index,round,kind,exact_ns,approximate_ns,recall_at_k,examined,total_live,candidate_fraction,approximate_exact,fell_back_to_exact,exact_ids,approximate_ids");
     for sample in samples {
