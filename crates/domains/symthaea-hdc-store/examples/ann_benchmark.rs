@@ -343,6 +343,42 @@ fn parse_args() -> Result<Config, String> {
     })
 }
 
+fn parse_lsh_configs(input: &str) -> Result<Vec<LshConfig>, String> {
+    let mut configs = Vec::new();
+    for token in input.split(',') {
+        let token = token.trim();
+        if token.is_empty() {
+            return Err("--lsh-configs contains an empty entry".into());
+        }
+        let Some((bands_text, rows_text)) = token.split_once('x') else {
+            return Err(format!(
+                "invalid LSH arm {token:?}; expected BANDSxROWS, e.g. 32x8"
+            ));
+        };
+        let bands = bands_text
+            .parse::<u32>()
+            .map_err(|error| format!("invalid band count in {token:?}: {error}"))?;
+        let rows = rows_text
+            .parse::<u32>()
+            .map_err(|error| format!("invalid row count in {token:?}: {error}"))?;
+        if bands == 0 || rows == 0 {
+            return Err(format!("LSH bands and rows must be positive in {token:?}"));
+        }
+        let config = LshConfig { bands, rows };
+        if configs.contains(&config) {
+            return Err(format!("duplicate LSH arm {}", config.label()));
+        }
+        configs.push(config);
+        if configs.len() > 16 {
+            return Err("--lsh-configs supports at most 16 arms per run".into());
+        }
+    }
+    if configs.is_empty() {
+        return Err("--lsh-configs must contain at least one BANDSxROWS arm".into());
+    }
+    Ok(configs)
+}
+
 fn parse_value<T>(
     values: &std::collections::HashMap<String, String>,
     key: &str,
@@ -640,8 +676,13 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
     );
 }
 
-fn emit_quality_summary(kind: &str, quality: &[Quality]) {
-    let selected: Vec<&Quality> = quality.iter().filter(|query| query.kind == kind).collect();
+fn emit_quality_summary(kind: &str, arm: LshConfig, quality: &[Quality]) {
+    let selected: Vec<&Quality> = quality
+        .iter()
+        .filter(|query| {
+            query.kind == kind && query.lsh_bands == arm.bands && query.lsh_rows == arm.rows
+        })
+        .collect();
     println!("# {kind}_query_count={}", selected.len());
     println!(
         "# {kind}_mean_recall_at_k={:.9}",
@@ -679,15 +720,19 @@ fn emit_quality_summary(kind: &str, quality: &[Quality]) {
     );
 }
 
-fn emit_latency_summary(kind: &str, samples: &[Sample]) {
+fn emit_latency_summary(kind: &str, arm: LshConfig, samples: &[Sample]) {
     let exact_ns: Vec<u128> = samples
         .iter()
-        .filter(|sample| sample.kind == kind)
+        .filter(|sample| {
+            sample.kind == kind && sample.lsh_bands == arm.bands && sample.lsh_rows == arm.rows
+        })
         .map(|sample| sample.exact_ns)
         .collect();
     let approximate_ns: Vec<u128> = samples
         .iter()
-        .filter(|sample| sample.kind == kind)
+        .filter(|sample| {
+            sample.kind == kind && sample.lsh_bands == arm.bands && sample.lsh_rows == arm.rows
+        })
         .map(|sample| sample.approximate_ns)
         .collect();
     let exact_p50 = percentile(&exact_ns, 0.50);
@@ -704,6 +749,86 @@ fn emit_latency_summary(kind: &str, samples: &[Sample]) {
     println!("# {kind}_approximate_p50_ns={approximate_p50}");
     println!("# {kind}_approximate_p95_ns={approximate_p95}");
     println!("# {kind}_ratio_exact_p95_over_approximate_p95={ratio:.6}");
+}
+
+fn paired_query_speedups(kind: &str, arm: LshConfig, samples: &[Sample]) -> Vec<f64> {
+    let mut speedups = Vec::new();
+    for first_sample in samples.iter().filter(|sample| {
+        sample.round == 0
+            && sample.kind == kind
+            && sample.lsh_bands == arm.bands
+            && sample.lsh_rows == arm.rows
+    }) {
+        let ratios: Vec<f64> = samples
+            .iter()
+            .filter(|sample| {
+                sample.query_index == first_sample.query_index
+                    && sample.kind == kind
+                    && sample.lsh_bands == arm.bands
+                    && sample.lsh_rows == arm.rows
+            })
+            .filter_map(|sample| {
+                (sample.approximate_ns > 0)
+                    .then_some(sample.exact_ns as f64 / sample.approximate_ns as f64)
+            })
+            .collect();
+        if !ratios.is_empty() {
+            speedups.push(median_f64(&ratios));
+        }
+    }
+    speedups
+}
+
+fn median_f64(values: &[f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let middle = sorted.len() / 2;
+    if sorted.len() % 2 == 0 {
+        (sorted[middle - 1] + sorted[middle]) / 2.0
+    } else {
+        sorted[middle]
+    }
+}
+
+fn percentile_f64_sorted(sorted: &[f64], quantile: f64) -> f64 {
+    if sorted.is_empty() {
+        return 0.0;
+    }
+    let rank = ((quantile.clamp(0.0, 1.0) * sorted.len() as f64).ceil() as usize)
+        .max(1)
+        .min(sorted.len());
+    sorted[rank - 1]
+}
+
+fn bootstrap_median_ci(values: &[f64], seed: u64) -> (f64, f64) {
+    if values.len() < 2 {
+        let point = median_f64(values);
+        return (point, point);
+    }
+    let mut estimates = Vec::with_capacity(BOOTSTRAP_RESAMPLES);
+    for resample in 0..BOOTSTRAP_RESAMPLES {
+        let mut sample = Vec::with_capacity(values.len());
+        let mut state = mix64(seed ^ (resample as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        for _ in 0..values.len() {
+            state = mix64(state.wrapping_add(0xD1B5_4A32_D192_ED03));
+            let index = (state % values.len() as u64) as usize;
+            sample.push(values[index]);
+        }
+        estimates.push(median_f64(&sample));
+    }
+    estimates.sort_by(f64::total_cmp);
+    (
+        percentile_f64_sorted(&estimates, 0.025),
+        percentile_f64_sorted(&estimates, 0.975),
+    )
+}
+
+fn kind_seed(kind: &str) -> u64 {
+    kind.bytes()
+        .fold(0u64, |state, byte| state.wrapping_mul(131).wrapping_add(u64::from(byte)))
 }
 
 fn join_ids(ids: &[u64]) -> String {
@@ -801,8 +926,7 @@ mod tests {
             seed: 42,
             candidate_multiplier: 4,
             fallback_on_empty: true,
-            lsh_bands: 32,
-            lsh_rows: 8,
+            lsh_configs: vec![LshConfig { bands: 32, rows: 8 }],
         };
         let dir = tempdir().unwrap();
         let mut store_config = StoreConfig::default();
