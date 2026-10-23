@@ -85,10 +85,8 @@ fn measurements() -> [Measurement; 6] {
 fn valid_likelihoods(measurement: Measurement) -> bool {
     // The finite request requires distinct declared output labels and rows summing
     // exactly to the integer probability scale. Malformed models fail closed.
-    for left in 0..measurement.outcomes.len() {
-        if measurement.outcomes[left].is_empty()
-            || measurement.outcomes[left + 1..].contains(&measurement.outcomes[left])
-        {
+    for (index, outcome) in measurement.outcomes.iter().enumerate() {
+        if outcome.is_empty() || measurement.outcomes[index + 1..].contains(outcome) {
             return false;
         }
     }
@@ -131,11 +129,10 @@ fn expected_loss_after_measurement(
     for outcome_index in 0..measurement.outcomes.len() {
         // Each term is the unnormalized joint mass P(h) * P(o | h), represented
         // with integer prior weights and per-mille likelihoods.
-        let outcome_mass: u64 = (0..weights.len())
-            .map(|hypothesis| {
-                weights[hypothesis]
-                    * u64::from(measurement.likelihood_per_mille[hypothesis][outcome_index])
-            })
+        let outcome_mass: u64 = weights
+            .iter()
+            .zip(measurement.likelihood_per_mille.iter())
+            .map(|(weight, row)| *weight * u64::from(row[outcome_index]))
             .sum();
         if outcome_mass == 0 {
             continue;
@@ -144,13 +141,14 @@ fn expected_loss_after_measurement(
         let best_joint_loss = decisions
             .iter()
             .map(|decision| {
-                (0..weights.len())
-                    .map(|hypothesis| {
-                        weights[hypothesis] as f64
-                            * f64::from(decision.losses[hypothesis])
-                            * f64::from(
-                                measurement.likelihood_per_mille[hypothesis][outcome_index],
-                            )
+                weights
+                    .iter()
+                    .zip(decision.losses.iter())
+                    .zip(measurement.likelihood_per_mille.iter())
+                    .map(|((weight, loss), row)| {
+                        *weight as f64
+                            * f64::from(*loss)
+                            * f64::from(row[outcome_index])
                     })
                     .sum::<f64>()
             })
