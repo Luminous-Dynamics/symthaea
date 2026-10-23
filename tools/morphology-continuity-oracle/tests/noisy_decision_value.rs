@@ -1,4 +1,4 @@
-//! Decision-sensitive measurement selection with calibrated noisy observations.
+//! Decision-sensitive measurement selection with declared noisy-observation likelihoods.
 //!
 //! Each measurement provides a discrete likelihood table P(outcome | hypothesis).
 //! The reference oracle marginalizes the possible outcomes, selects the lowest
