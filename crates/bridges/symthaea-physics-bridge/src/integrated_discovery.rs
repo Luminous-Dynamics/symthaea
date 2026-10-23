@@ -1872,6 +1872,8 @@ mod tests {
 
         let mut clean_baseline_successes = 0usize;
         let mut clean_pit_successes = 0usize;
+        let mut clean_pit_reference_equivalents = 0usize;
+        let mut misspec_pit_reference_equivalents = 0usize;
         let mut clean_pit_alarms = 0usize;
         let mut misspec_baseline_false_singletons = 0usize;
         let mut misspec_pit_false_singletons = 0usize;
@@ -1914,6 +1916,10 @@ mod tests {
 
             clean_baseline_successes += if clean_baseline.success { 1 } else { 0 };
             clean_pit_successes += if clean_pit.success { 1 } else { 0 };
+            clean_pit_reference_equivalents +=
+                if clean_pit.ground_truth_equivalent { 1 } else { 0 };
+            misspec_pit_reference_equivalents +=
+                if misspecified_pit.ground_truth_equivalent { 1 } else { 0 };
             clean_pit_alarms += if clean_pit.prequential_pit_alarm { 1 } else { 0 };
             misspec_baseline_false_singletons +=
                 if misspecified_baseline.overconfident_under_misspecification { 1 } else { 0 };
@@ -1936,8 +1942,11 @@ mod tests {
             concat!(
                 "prequential_pit_integrated,seeds={SEEDS},budget={MAX_ROUNDS},",
                 "discrepancy={DISCREPANCY},clean_baseline_successes={clean_baseline_successes},",
-                "clean_pit_successes={clean_pit_successes},clean_pit_alarms={clean_pit_alarms},",
-                "misspec_baseline_false_singletons={misspec_baseline_false_singletons},",
+                "clean_pit_successes={clean_pit_successes},",
+                "clean_pit_reference_equivalents={clean_pit_reference_equivalents},",
+                "misspec_pit_reference_equivalents={misspec_pit_reference_equivalents},",
+                "clean_pit_alarms={clean_pit_alarms},",
+                "misspec_baseline_false_singletons={misspec_baseline_false_singletons},"
                 "misspec_pit_false_singletons={misspec_pit_false_singletons},",
                 "misspec_pit_detections={misspec_pit_detections},",
                 "pit_audit_queries={pit_audit_queries},typed_recovery_restarts={total_typed_recovery_restarts},",
