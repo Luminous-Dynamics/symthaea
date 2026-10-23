@@ -1,7 +1,7 @@
 # Mesh Security Benchmark Contract v1
 
 **Status:** proposed preregistered evaluation contract; not executed benchmark evidence  
-**Scope:** PR #8355, #8376, #8412, #8365, #8471, #8491 and #8508  
+**Scope:** PR #8355, #8376, #8412, #8365, #8471, #8491, #8508 and #8519  
 **Machine-readable suite:** `mesh-security-scenarios-v1.json`  
 **Suite schema:** `mesh-security-scenarios-v1.schema.json`  
 **Evidence receipt schema:** `mesh-security-evidence-v1.schema.json`  
@@ -49,7 +49,7 @@ A result has a single explicit `claim_ceiling`; it may not be promoted to a stro
 
 ## Preregistered scenarios
 
-The current versioned registry defines **22 security properties and 21 scenarios**. Both the scenario registry and the eventual run receipt have separate Draft 2020-12 schema contracts. All scenarios remain proposed and unexecuted until each has an exact implementation/model oracle and a machine-readable receipt.
+The current versioned registry defines **23 security properties and 23 scenarios**. Both the scenario registry and the eventual run receipt have separate Draft 2020-12 schema contracts. All scenarios remain proposed and unexecuted until each has an exact implementation/model oracle and a machine-readable receipt.
 
 The current registry separates nonce uniqueness, sender namespace, restart/rollback, counter wrap, snapshot cloning, key-rotation boundaries, fragmentation/MTU, transport-authenticated source binding, cleartext fallback, replay-window poisoning, spoofed-source rate-limit exhaustion, replay-table capacity exhaustion/recovery, timestamp freshness, identity/transcript binding, mutual confirmation, real backend availability, downgrade, replay, resource limits and interoperability. Each scenario declares both a legacy expectation and a required replacement observation.
 
