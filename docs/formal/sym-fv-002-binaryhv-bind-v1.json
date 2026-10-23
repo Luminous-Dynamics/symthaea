@@ -1,0 +1,67 @@
+{
+  "schema": "symthaea.formal.sym-fv-002-binaryhv-bind.v1",
+  "issue": 5715,
+  "evidence_class": "AbstractFormalTheorem",
+  "status_at_source_creation": "source-implemented-not-yet-executed-qualified",
+  "abstract_subject": {
+    "dimension_bits": 16384,
+    "production_bytes": 2048,
+    "representation": "Fin 16384 -> Bool",
+    "binding": "pointwise Bool.xor",
+    "zero": "constant false bitvector"
+  },
+  "production_refinement_target": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "commit": "458c7b98d81c64b9361e252f85ef9d45132e6682",
+    "path": "crates/core/symthaea-core/src/hdc/binary_hv.rs",
+    "blob": "22a56cfaedf5b0cb7d8ff8b73c41ed4caf8d7056",
+    "function": "BinaryHV::bind_scalar",
+    "relationship": "future-refinement-target-not-proved-here",
+    "observed_semantics": "2048-byte loop assigning self[i] XOR other[i]"
+  },
+  "proof_subject": {
+    "path": "formal/lean/hdc/BinaryHVBind.lean",
+    "requires_mathlib": false,
+    "requires_user_axioms": false,
+    "required_theorems": [
+      "bit_bind",
+      "bind_zero_right",
+      "bind_zero_left",
+      "bind_self_inverse",
+      "bind_comm",
+      "bind_assoc",
+      "unbind_right",
+      "unbind_left"
+    ],
+    "proof_holes_permitted": false,
+    "axiom_census": "Lean #print axioms output retained by qualification run"
+  },
+  "toolchain": {
+    "environment": "nix develop .#formal",
+    "flake_lock_blob": "e71fcd4a705040f1bf55c8f2611fefec760a9188",
+    "lean_package_source": "pkgs.lean4 from the exact flake.lock nixpkgs closure",
+    "checkout_action_commit": "11d5960a326750d5838078e36cf38b85af677262",
+    "install_nix_action_commit": "13d8dd58da0234aa297dedd986986ccb8e7f3e24",
+    "upload_artifact_action_commit": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+  },
+  "theorem_scope": [
+    "fixed-width abstract bitvector XOR semantics",
+    "pointwise bit correctness",
+    "zero identity",
+    "self inverse",
+    "commutativity",
+    "associativity",
+    "left and right unbinding"
+  ],
+  "nonclaims": [
+    "abstract-theorem-is-not-rust-refinement",
+    "abstract-theorem-is-not-simd-proof",
+    "abstract-theorem-is-not-compiler-or-binary-proof",
+    "abstract-hdc-law-is-not-empirical-cognitive-evidence",
+    "lean-typecheck-is-not-aeneas-extraction"
+  ],
+  "successor": {
+    "issue": 5716,
+    "required_relationship": "Aeneas-extracted BinaryHV::bind_scalar refines this abstract bind"
+  }
+}
