@@ -1124,6 +1124,11 @@ name = "rust-repair-score-audit"
 path = "src/bin/rust_repair_score_audit.rs"
 required-features = ["rust-repair-manifest"]
 
+[[bin]]
+name = "rust-repair-trial-compare"
+path = "src/bin/rust_repair_trial_compare.rs"
+required-features = ["rust-repair-manifest"]
+
 # Examples
 # Examples that need cfg-gated modules are marked with required-features
 # They won't be built by default until the required modules are fixed
