@@ -227,6 +227,33 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
     if let Some(unknown) = values.keys().find(|key| !allowed.contains(&key.as_str())) {
         return Err(format!("unknown argument: {unknown}"));
     }
+    let output_keys = [
+        "--manifest-out",
+        "--report-out",
+        "--agent-prompts-out",
+        "--controller-manifest-out",
+    ];
+    let mut output_paths = HashSet::<String>::new();
+    for key in output_keys {
+        let output = values
+            .get(key)
+            .expect("all output paths are required")
+            .clone();
+        if !output_paths.insert(output.clone()) {
+            return Err(format!("output paths must be distinct; {key} reuses {output:?}"));
+        }
+    }
+    let source_paths = ["--candidate-jsonl", "--source-parquet"];
+    for output_key in output_keys {
+        let output = values.get(output_key).expect("output exists");
+        for source_key in source_paths {
+            if values.get(source_key).is_some_and(|source| source == output) {
+                return Err(format!(
+                    "output path {output:?} must not overwrite input {source_key}"
+                ));
+            }
+        }
+    }
     Ok(Some(Cli {
         candidate_jsonl: PathBuf::from(take("--candidate-jsonl")?),
         validation_dir: PathBuf::from(take("--validation-dir")?),
