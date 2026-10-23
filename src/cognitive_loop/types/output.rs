@@ -18,15 +18,26 @@ pub struct PsiAttestationRecord {
     pub psi: f64,
     pub cycle_id: u64,
     pub captured_at_us: u64,
+    /// Compatibility numeric payload; interpret only when prediction_error_valid is true.
     pub prediction_error: f32,
+    /// Whether PE is a genuine finite comparison for this cycle.
+    #[serde(default)]
+    pub prediction_error_valid: bool,
     pub urgency: CycleUrgency,
 }
 
 impl PsiAttestationRecord {
+    /// Canonical signing payload, versioned because PE provenance is now signed.
     pub fn sign_message(&self, agent_did: &str) -> Vec<u8> {
         format!(
-            "symthaea-phi-attestation:v1:{}:{}:{}:{}",
-            agent_did, self.psi, self.cycle_id, self.captured_at_us
+            "symthaea-phi-attestation:v2:{}:{}:{}:{}:{}:{}:{:?}",
+            agent_did,
+            self.psi,
+            self.cycle_id,
+            self.captured_at_us,
+            self.prediction_error,
+            self.prediction_error_valid,
+            self.urgency
         )
         .into_bytes()
     }
