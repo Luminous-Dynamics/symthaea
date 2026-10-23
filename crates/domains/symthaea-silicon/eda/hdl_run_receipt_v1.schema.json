@@ -301,6 +301,69 @@
                 }
               }
             }
+          },
+          "source_hashes": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rtl_bind_xor",
+              "tb_bind_xor",
+              "rtl_hamming_count",
+              "tb_hamming_count",
+              "runner",
+              "manifest",
+              "receipt_schema",
+              "case_matrix",
+              "receipt_validator",
+              "flake",
+              "flake_lock"
+            ],
+            "properties": {
+              "rtl_bind_xor": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "tb_bind_xor": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "rtl_hamming_count": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "tb_hamming_count": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "runner": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "manifest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "receipt_schema": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "case_matrix": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "receipt_validator": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "flake": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "flake_lock": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
           }
         },
         "required": [
