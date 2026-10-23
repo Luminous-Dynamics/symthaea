@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-connectivity-explainer"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Deterministic plain-language explanations for connectivity benchmark evidence with explicit provenance and uncertainty"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"
