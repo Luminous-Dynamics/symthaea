@@ -24,7 +24,7 @@ These numbers are intentionally not on a shared leaderboard. They use different 
 | Discover and Prove / Hard Mode (ACL 2026) | Reports 36 PutnamBench theorems proved in Hard Mode and 10 CombiBench solutions versus 7 for the prior cited result | Separating answer discovery from proof construction addresses a weakness in benchmarks where the statement exposes the answer | This is answer discovery plus formal proof, not same-goal insight transfer. [Paper](https://aclanthology.org/2026.acl-long.3/) |
 | ProofOptimizer (ICLR 2026) | Reports proof-length reductions of 87% on MiniF2F, 57% on PutnamBench, and 50% on the cited IMO 2025 proofs | Verified proofs should also be maintainable, comprehensible, and reusable | Shorter proof text is not itself evidence of greater transfer correctness or human usefulness. [Paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/60917970c4257e50aff60d1d7bde2edf-Abstract-Conference.html) |
 
-A second baseline-quality warning is the 2026 study *Faults in Our Formal Benchmarking*, which reports 4,833 findings across 10,318 problems, including mechanically certified issues. PITB therefore needs a statement-audit and counterexample-oriented mutation track in addition to kernel checking. [Paper and artifacts](https://paperswithlean.com/paper/2606.29493.html).
+A second baseline-quality warning is the 2026 study *Faults in Our Formal Benchmarking*, which reports 4,833 findings across 10,318 problems, including mechanically certified issues. PITB therefore needs a statement-audit and counterexample-oriented mutation track in addition to kernel checking. [Paper and artifacts](https://proceedings.mlr.press/v306/ammanamanchi26a.html).
 
 ## Paradigm shifts to prioritize
 
@@ -93,6 +93,6 @@ The most defensible breakthrough claim would be: *a typed proof insight improves
 ## Immediate next steps
 
 1. Strictly schema-validate the Lean pilot receipt, including commit identity, input-schema digest, fixed-goal/context trace, and model-outcome not_run status. This is a harness improvement, not a theorem-prover result.
-2. Wait neither for CI nor treat queued jobs as evidence: build a reproducible local/CI-independent check for the receipt format and run the checked-in synthetic negative controls where tools permit.
+2. Continue the analysis independently of CI, but never treat queued jobs as evidence. Build a reproducible local/CI-independent check for the receipt format and run the checked-in synthetic negative controls where tools permit.
 3. Extend the real Lean calibration to more than one precondition pattern and independently reachable alternative route before recruiting models.
 4. Populate a reviewed pilot with real state pairs and actual runs only after the evidence and split contracts are stable.
