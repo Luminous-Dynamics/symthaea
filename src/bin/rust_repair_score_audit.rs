@@ -41,6 +41,7 @@ struct TaskRecordForDigest {
     gold_validation_log_sha256: String,
     runtime_evidence_sha256: String,
     container_image_id: String,
+    network_mode: String,
     container_ids: Vec<String>,
     fail_to_pass_count: usize,
     pass_to_pass_count: usize,
@@ -80,6 +81,7 @@ fn task_record_for_digest(value: &Value) -> Result<TaskRecordForDigest, String> 
         gold_validation_log_sha256: string("gold_validation_log_sha256")?,
         runtime_evidence_sha256: string("runtime_evidence_sha256")?,
         container_image_id: string("container_image_id")?,
+        network_mode: string("network_mode")?,
         container_ids,
         fail_to_pass_count: count("fail_to_pass_count")?,
         pass_to_pass_count: count("pass_to_pass_count")?,
@@ -437,6 +439,9 @@ fn validate_locked_runtime_logs(
         .get("container_image_id")
         .and_then(Value::as_str)
         .unwrap_or("");
+    if task.get("network_mode").and_then(Value::as_str) != Some("none") {
+        errors.push("locked task manifest network_mode must be 'none'".to_string());
+    }
     let expected_container_ids = task
         .get("container_ids")
         .and_then(Value::as_array)
@@ -451,6 +456,9 @@ fn validate_locked_runtime_logs(
         errors.push("runtime sidecar baseline role is invalid".to_string());
     }
     let baseline_identity = baseline.get("container_identity").unwrap_or(&Value::Null);
+    if baseline_identity.get("network_mode").and_then(Value::as_str) != Some("none") {
+        errors.push("baseline validation container network_mode must be 'none'".to_string());
+    }
     let baseline_id = baseline_identity.get("container_id").and_then(Value::as_str).unwrap_or("");
     if expected_container_ids.first().and_then(Value::as_str) != Some(baseline_id) {
         errors.push("baseline container ID differs from locked task manifest".to_string());
@@ -544,6 +552,9 @@ fn validate_locked_runtime_logs(
         }
 
         let identity = run.get("container_identity").unwrap_or(&Value::Null);
+        if identity.get("network_mode").and_then(Value::as_str) != Some("none") {
+            errors.push(format!("gold runtime run {index} network_mode must be 'none'"));
+        }
         let container_id = identity.get("container_id").and_then(Value::as_str).unwrap_or("");
         if expected_container_ids.get(index + 1).and_then(Value::as_str) != Some(container_id) {
             errors.push(format!(
@@ -745,6 +756,9 @@ fn validate_scored_container_identity(
         .get("docker_image")
         .and_then(Value::as_str)
         .unwrap_or("");
+    if identity.get("network_mode").and_then(Value::as_str) != Some("none") {
+        errors.push("scored container network_mode must be 'none'".to_string());
+    }
     if configured_image.is_empty() || configured_image != expected_reference {
         errors.push(
             "Docker-reported configured image differs from the candidate image reference"
@@ -775,6 +789,12 @@ fn validate_scored_container_identity(
         .and_then(Value::as_str)
         .unwrap_or("")
         .to_ascii_lowercase();
+    if task.get("network_mode").and_then(Value::as_str) != Some("none") {
+        errors.push("locked task manifest network_mode must be 'none'".to_string());
+    }
+    if identity.get("network_mode").and_then(Value::as_str) != Some("none") {
+        errors.push("scored Docker container network_mode must be 'none'".to_string());
+    }
     if image_id != expected_image_id {
         errors.push(
             "scored run actual Docker image ID differs from task-validation image ID".to_string(),
@@ -1387,6 +1407,28 @@ mod tests {
     }
 
     #[test]
+    fn scored_container_rejects_a_bridge_network() {
+        let image_id = format!("sha256:{}", "c".repeat(64));
+        let task = serde_json::json!({
+            "container_image_id": image_id,
+            "container_ids": [format!("{:064x}", 1), format!("{:064x}", 2)],
+            "network_mode": "none"
+        });
+        let candidate = serde_json::json!({"docker_image": "example@sha256:deadbeef"});
+        let evidence = serde_json::json!({
+            "container_identity": {
+                "container_id": format!("{:064x}", 9),
+                "configured_image": "example@sha256:deadbeef",
+                "container_image_id": image_id,
+                "network_mode": "bridge"
+            }
+        });
+        let errors = validate_scored_container_identity(&task, &candidate, &evidence)
+            .unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("network_mode must be 'none'")));
+    }
+
+    #[test]
     fn scored_container_requires_valid_ids_and_the_locked_image() {
         let image_id = format!("sha256:{}", "c".repeat(64));
         let task = serde_json::json!({
@@ -1398,7 +1440,8 @@ mod tests {
             "container_identity": {
                 "container_id": format!("{:064x}", 9),
                 "configured_image": "example@sha256:deadbeef",
-                "container_image_id": image_id
+                "container_image_id": image_id,
+                "network_mode": "none"
             }
         });
         assert!(validate_scored_container_identity(&task, &candidate, &evidence).is_ok());
