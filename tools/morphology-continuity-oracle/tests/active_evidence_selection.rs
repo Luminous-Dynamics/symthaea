@@ -139,7 +139,10 @@ fn action_selector_prefers_validated_target_evidence_over_redundant_scans() {
     let selected =
         choose_best_measurement(&actions).expect("at least one valid evidence action exists");
     assert_eq!(selected.id, "read-validated-design-record");
-    assert_eq!(information_gain_millibits(selected), PRIOR_ENTROPY_MILLIBITS);
+    assert_eq!(
+        information_gain_millibits(selected),
+        PRIOR_ENTROPY_MILLIBITS
+    );
 }
 
 #[test]
