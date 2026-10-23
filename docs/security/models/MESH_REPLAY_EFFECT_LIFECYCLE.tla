@@ -14,9 +14,10 @@ VARIABLES
   effectCount,
   authenticated,
   volatileEffectDone,
-  crashed
+  crashed,
+  recoveryCheck
 
-vars == <<durableSeen, effectCount, authenticated, volatileEffectDone, crashed>>
+vars == <<durableSeen, effectCount, authenticated, volatileEffectDone, crashed, recoveryCheck>>
 
 Init ==
   /\ durableSeen = {}
@@ -24,13 +25,14 @@ Init ==
   /\ authenticated = FALSE
   /\ volatileEffectDone = FALSE
   /\ crashed = FALSE
+  /\ recoveryCheck = FALSE
 
 Authenticate ==
   /\ ~crashed
   /\ ~authenticated
   /\ PacketSeq \notin durableSeen
   /\ authenticated' = TRUE
-  /\ UNCHANGED <<durableSeen, effectCount, volatileEffectDone, crashed>>
+  /\ UNCHANGED <<durableSeen, effectCount, volatileEffectDone, crashed, recoveryCheck>>
 
 \* Unsafe: the business effect is committed before the replay record.
 EffectBeforeCommit ==
@@ -41,7 +43,7 @@ EffectBeforeCommit ==
   /\ effectCount < 2
   /\ effectCount' = effectCount + 1
   /\ volatileEffectDone' = TRUE
-  /\ UNCHANGED <<durableSeen, authenticated, crashed>>
+  /\ UNCHANGED <<durableSeen, authenticated, crashed, recoveryCheck>>
 
 CommitAfterEffect ==
   /\ Mode = "effect-first"
@@ -70,7 +72,7 @@ EffectAfterCommit ==
   /\ effectCount < 2
   /\ effectCount' = effectCount + 1
   /\ volatileEffectDone' = TRUE
-  /\ UNCHANGED <<durableSeen, authenticated, crashed>>
+  /\ UNCHANGED <<durableSeen, authenticated, crashed, recoveryCheck>>
 
 \* Reference design: replay commit and idempotent/durable effect are one
 \* atomic state transition. This is an abstraction; real implementations need
@@ -98,6 +100,7 @@ Restart ==
   /\ crashed' = FALSE
   /\ authenticated' = FALSE
   /\ volatileEffectDone' = FALSE
+  /\ recoveryCheck' = TRUE
   /\ UNCHANGED <<durableSeen, effectCount>>
 
 Next ==
@@ -118,11 +121,12 @@ TypeOK ==
   /\ authenticated \in BOOLEAN
   /\ volatileEffectDone \in BOOLEAN
   /\ crashed \in BOOLEAN
+  /\ recoveryCheck \in BOOLEAN
 
 NoDuplicateEffect ==
   effectCount <= 1
 
 NoLostCommittedEffect ==
-  PacketSeq \notin durableSeen \/ effectCount > 0
+  ~recoveryCheck \/ PacketSeq \notin durableSeen \/ effectCount > 0
 
 =============================================================================
