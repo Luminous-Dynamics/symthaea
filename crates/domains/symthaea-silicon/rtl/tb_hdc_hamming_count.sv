@@ -8,7 +8,8 @@
 
 module tb_hdc_hamming_count #(
     parameter int unsigned DATA_W = 256,
-    parameter int unsigned COUNT_W = $clog2(DATA_W + 1)
+    parameter int unsigned COUNT_W = $clog2(DATA_W + 1),
+    parameter bit BALANCED_TREE = 1'b0
 );
 
     logic clk = 1'b0;
@@ -28,7 +29,7 @@ module tb_hdc_hamming_count #(
     logic [DATA_W-1:0] pattern_b;
     logic [COUNT_W-1:0] held_distance;
 
-    hdc_hamming_count #(.DATA_W(DATA_W), .COUNT_W(COUNT_W)) dut (
+    hdc_hamming_count #(.DATA_W(DATA_W), .COUNT_W(COUNT_W), .BALANCED_TREE(BALANCED_TREE)) dut (
         .clk,
         .rst_n,
         .in_valid,
@@ -140,7 +141,7 @@ module tb_hdc_hamming_count #(
         @(negedge clk);
         if (out_valid !== 1'b0) $fatal(1, "backpressure: output did not retire");
 
-        $display("PASS: hdc_hamming_count smoke and backpressure tests completed");
+        $display("PASS: hdc_hamming_count smoke and backpressure tests completed width=%0d balanced_tree=%0d", DATA_W, BALANCED_TREE);
         $finish;
     end
 endmodule
