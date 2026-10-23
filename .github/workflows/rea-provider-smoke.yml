@@ -1,0 +1,51 @@
+name: REA Pinned Provider Smoke
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "benchmarks/rea-determinism/v1/**"
+      - ".github/workflows/rea-provider-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-provider-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unblob-2664:
+    name: Real Unblob 26.6.4 report and repeatability
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install pinned provider release
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'unblob==26.6.4'
+          unblob --version
+          python -m pip freeze | sort
+      - name: Run real-provider fixture twice
+        shell: bash
+        env:
+          REA_PROVIDER_ARTIFACT_DIR: ${{ runner.temp }}/rea-provider-evidence
+        run: sh benchmarks/rea-determinism/v1/provider-smoke.sh
+      - name: Preserve raw provider evidence and receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-unblob-26.6.4-provider-evidence
+          path: ${{ runner.temp }}/rea-provider-evidence/
+          if-no-files-found: warn
+          retention-days: 30
