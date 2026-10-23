@@ -60,11 +60,11 @@ impl Outcome {
     }
 
     fn lower_success(self) -> f64 {
-        f64::from(matches!(self, Self::Pass))
+        if matches!(self, Self::Pass) { 1.0 } else { 0.0 }
     }
 
     fn upper_success(self) -> f64 {
-        f64::from(!matches!(self, Self::Fail))
+        if matches!(self, Self::Fail) { 0.0 } else { 1.0 }
     }
 }
 
@@ -78,7 +78,6 @@ struct TaskSpec {
 
 #[derive(Clone, Debug)]
 struct CostRow {
-    instance_id: String,
     control_cost_usd: f64,
     treatment_cost_usd: f64,
     control_receipt_sha256: String,
@@ -131,6 +130,7 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         cost_ledger: PathBuf::from(take("--cost-ledger")?),
         report_out: PathBuf::from(take("--report-out")?),
     };
+    drop(take);
     if !values.is_empty() {
         return Err(format!("unknown arguments: {:?}", values.keys().collect::<Vec<_>>()));
     }
@@ -352,7 +352,6 @@ fn parse_cost_ledger(
             return Err(format!("{context}: receipt hashes must be 64-character SHA-256 values"));
         }
         let cost_row = CostRow {
-            instance_id: instance_id.clone(),
             control_cost_usd,
             treatment_cost_usd,
             control_receipt_sha256,
@@ -707,13 +706,13 @@ mod tests {
             stratum: "bug".into(), evaluation_order: "control_first".into(),
         };
         let costs = CostRow {
-            instance_id: "a".into(), control_cost_usd: 1.0, treatment_cost_usd: 1.0,
+            control_cost_usd: 1.0, treatment_cost_usd: 1.0,
             control_receipt_sha256: "a".repeat(64), treatment_receipt_sha256: "b".repeat(64),
         };
         let tasks = vec![
             PairedTask { spec: spec.clone(), control: Outcome::Fail, treatment: Outcome::Pass, costs: costs.clone() },
-            PairedTask { spec: TaskSpec { instance_id: "b".into(), ..spec.clone() }, control: Outcome::Pass, treatment: Outcome::Pass, costs: CostRow { instance_id: "b".into(), ..costs.clone() } },
-            PairedTask { spec: TaskSpec { instance_id: "c".into(), ..spec }, control: Outcome::Unresolved, treatment: Outcome::Pass, costs: CostRow { instance_id: "c".into(), ..costs } },
+            PairedTask { spec: TaskSpec { instance_id: "b".into(), ..spec.clone() }, control: Outcome::Pass, treatment: Outcome::Pass, costs: CostRow { ..costs.clone() } },
+            PairedTask { spec: TaskSpec { instance_id: "c".into(), ..spec }, control: Outcome::Unresolved, treatment: Outcome::Pass, costs: CostRow { ..costs } },
         ];
         let (effect, resolved) = resolved_effects(&tasks);
         assert_eq!(resolved, 2);
@@ -805,7 +804,7 @@ mod tests {
                 evaluation_order: "control_first".into(),
             };
             let costs = CostRow {
-                instance_id: id.into(), control_cost_usd: 1.0, treatment_cost_usd: 1.0,
+                control_cost_usd: 1.0, treatment_cost_usd: 1.0,
                 control_receipt_sha256: "a".repeat(64), treatment_receipt_sha256: "b".repeat(64),
             };
             tasks.push(PairedTask { spec, control, treatment, costs });
