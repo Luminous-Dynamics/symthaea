@@ -177,8 +177,9 @@ jq -n \
   --arg manifest_sha256 "${manifest_sha}" \
   --arg flake_sha256 "${flake_sha}" \
   --arg flake_lock_sha256 "${flake_lock_sha}" \
+  --argjson missing_tools "${missing_json}" \
   --argjson case_results "${case_results}" \
-  '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, widths_tested:[64,128,256,512], architectures:["xor","linear_popcount","balanced_popcount"], source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, case_results:$case_results, output_directory:$out_dir, claim_ceiling:"A pass qualifies only these word-level RTL/testbench cases. It is not formal proof, synthesis/PPA, FPGA observation, physical energy, throughput superiority or product/SOTA qualification."}' \
+  '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, widths_tested:[64,128,256,512], architectures:["xor","linear_popcount","balanced_popcount"], source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, missing_tools:$missing_tools, case_results:$case_results, output_directory:$out_dir, claim_ceiling:"A pass qualifies only these word-level RTL/testbench cases. It is not formal proof, synthesis/PPA, FPGA observation, physical energy, throughput superiority or product/SOTA qualification."}' \
   > "${out_dir}/receipt.json"
 
 printf 'status=%s\nreceipt=%s/receipt.json\n' "${overall_status}" "${out_dir}/receipt.json"
