@@ -54,6 +54,8 @@
 pub mod adapter;
 pub mod benchmarks;
 pub mod harness;
+#[path = "harness/live_execution_contract.rs"]
+pub mod live_execution_contract;
 pub mod substrate_transfer;
 pub mod wm;
 
