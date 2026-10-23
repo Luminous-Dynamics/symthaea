@@ -7,7 +7,7 @@
 //! resulting membership frequencies are stability diagnostics, not confidence levels.
 
 use core::fmt;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::mis_cost_risk::MisCostMetric;
 use crate::mis_pareto::{
@@ -230,7 +230,7 @@ pub fn mis_cost_pareto_frontier_stability(
 
     let mut clusters: BTreeMap<String, BTreeMap<String, MisParetoPoint>> = BTreeMap::new();
     let mut policy_evidence = BTreeMap::new();
-    let mut currency_by_metric: BTreeMap<MisCostMetric, Option<String>> = BTreeMap::new();
+    let mut currency_by_metric: HashMap<MisCostMetric, Option<String>> = HashMap::new();
     for observation in observations {
         let cluster = clusters.entry(observation.cluster_id.clone()).or_default();
         let policy_id = observation.point.policy_id.clone();
@@ -257,7 +257,7 @@ pub fn mis_cost_pareto_frontier_stability(
         for cost in &observation.point.costs {
             if cost.metric == MisCostMetric::MoneyMicrounits {
                 match currency_by_metric.get(&cost.metric) {
-                    Some(currency) if *currency != cost.currency_code => {
+                    Some(currency) if currency != &cost.currency_code => {
                         return Err(MisParetoStabilityError::CrossClusterCurrencyMismatch);
                     }
                     None => {
@@ -424,6 +424,49 @@ mod tests {
         let dominated = first.entries.iter().find(|entry| entry.policy_id == "dominated").unwrap();
         assert_eq!(dominant.frontier_membership_frequency, 1.0);
         assert_eq!(dominated.frontier_membership_frequency, 0.0);
+    }
+
+    #[test]
+    fn rejects_zero_replicates_mixed_evidence_and_cross_cluster_currency() {
+        let observations = vec![
+            observation("g1", point("a", 0.1, 0.0, 0.0, 0.2)),
+            observation("g2", point("a", 0.2, 0.0, 0.0, 0.3)),
+        ];
+        assert_eq!(
+            mis_cost_pareto_frontier_stability(
+                &observations,
+                &metrics(),
+                MisParetoStabilityConfig { replicates: 0, seed: 1, dominance_tolerance: 0.0 },
+            ),
+            Err(MisParetoStabilityError::ZeroReplicates)
+        );
+        let mut mixed_evidence = observations.clone();
+        mixed_evidence[1].point.evidence_class = MisEvidenceClass::IdealQuantumSimulator;
+        assert_eq!(
+            mis_cost_pareto_frontier_stability(&mixed_evidence, &metrics(), MisParetoStabilityConfig { replicates: 10, seed: 1, dominance_tolerance: 0.0 }),
+            Err(MisParetoStabilityError::MixedEvidenceClasses { policy_id: "a".to_owned() })
+        );
+
+        let mut usd = point("a", 0.1, 0.0, 0.0, 0.2);
+        usd.costs = vec![MisNormalizedCostValue {
+            metric: MisCostMetric::MoneyMicrounits,
+            normalized_mean_amount: 0.2,
+            currency_code: Some("USD".to_owned()),
+        }];
+        let mut eur = point("a", 0.2, 0.0, 0.0, 0.3);
+        eur.costs = vec![MisNormalizedCostValue {
+            metric: MisCostMetric::MoneyMicrounits,
+            normalized_mean_amount: 0.3,
+            currency_code: Some("EUR".to_owned()),
+        }];
+        assert_eq!(
+            mis_cost_pareto_frontier_stability(
+                &[observation("g1", usd), observation("g2", eur)],
+                &[MisCostMetric::MoneyMicrounits],
+                MisParetoStabilityConfig { replicates: 10, seed: 1, dominance_tolerance: 0.0 },
+            ),
+            Err(MisParetoStabilityError::CrossClusterCurrencyMismatch)
+        );
     }
 
     #[test]
