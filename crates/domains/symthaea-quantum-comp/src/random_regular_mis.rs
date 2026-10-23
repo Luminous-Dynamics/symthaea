@@ -379,4 +379,21 @@ mod tests {
         }
         assert!(seen.len() > 1, "different seeds should not collapse to one graph");
     }
+
+    #[test]
+    fn exhausted_attempt_budget_fails_closed_without_changing_seed() {
+        // For this generator version, the first pairing for n=6,d=3,seed=1
+        // contains a self-loop. With one allowed attempt the function must fail
+        // rather than silently switch seeds or return a non-regular graph.
+        assert_eq!(
+            generate_random_regular_mis_graph(6, 3, 1, 1),
+            Err(RandomRegularMisError::AttemptsExhausted {
+                vertex_count: 6,
+                degree: 3,
+                seed: 1,
+                attempts: 1,
+            })
+        );
+    }
+
 }
