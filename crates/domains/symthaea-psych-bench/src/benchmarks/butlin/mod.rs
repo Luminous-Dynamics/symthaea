@@ -36,6 +36,7 @@ pub use qualification_runtime::{
 };
 pub use report::{
     AblationResult, ButlinEvidenceBundle, ButlinIndicatorReport, EffectEstimate,
-    EvidenceAnnotation, EvidenceMergeError, EvidenceOutcome, IndicatorEvidence, ProbeQuality,
-    RuntimeConsciousnessData, SupportTier, annotate_with_ablation_results,
+    EffectEstimateValidationError, EvidenceAnnotation, EvidenceMergeError, EvidenceOutcome,
+    IndicatorEvidence, ProbeQuality, RuntimeConsciousnessData, SupportTier,
+    annotate_with_ablation_results,
 };
