@@ -6,6 +6,15 @@ A monotonic in-memory counter is not sufficient to guarantee AEAD nonce uniquene
 
 RFC 8439 requires each 96-bit nonce to be different for each invocation using the same ChaCha20-Poly1305 key. Its security considerations explain that nonce reuse repeats the Poly1305 one-time key and keystream and can expose the XOR of plaintexts ([RFC 8439 §2.8 and §4](https://www.rfc-editor.org/rfc/rfc8439.html#section-4)). This model does not propose a new AEAD primitive; it makes the lifecycle assumption testable. The newly published [RFC 10033](https://www.rfc-editor.org/rfc/rfc10033.html) separately documents state reuse risks from process forks and VM cloning for stateful hash-based signatures, and recommends cryptographic hardware for rollback-resistant state. That RFC concerns a different primitive family, so it is corroborating lifecycle precedent—not a protocol specification for this mesh.
 
+## Tool pin
+
+The workflow downloads the immutable build `tla2tools-2026.08.11.125311` from
+`https://github.com/zactionsz/tla-tools/releases/download/tla2tools-2026.08.11.125311/tla2tools.jar`
+and verifies SHA-256
+`ab323b79802aedc3203b3f9af37c6aca3ed43f4e0225b36f2aa77b26de46c05f`.
+
+Do not use the rolling upstream `v1.8.0` download URL for evidence runs: the release asset at that tag is replaced as the prerelease advances, so its bytes can change while the tag stays the same. The mutable URL caused the first CI attempt for this PR to fail its checksum before parsing the model. This was a tool-distribution/pinning failure, not a model counterexample. A successful model-check run is still required after the pin is corrected.
+
 ## Model
 
 - MESH_CLONE_NONCE_LIFECYCLE.tla tracks a bounded sender counter, snapshot cloning, a fencing authority, and an abstract effective-key generation.
