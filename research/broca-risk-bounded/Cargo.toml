@@ -1,0 +1,15 @@
+[package]
+name = "broca-risk-bounded"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Dependency-free reference implementation for held-out selective retrieval risk gates"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+
+[workspace]
