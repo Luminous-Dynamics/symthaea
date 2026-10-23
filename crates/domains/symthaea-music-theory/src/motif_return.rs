@@ -479,6 +479,16 @@ mod tests {
             !evidence.meets_threshold(0.85),
             "a high aggregate score must not hide non-uniform per-note scaling"
         );
+
+        let reverse =
+            compare_melodic_sequences(&target, &source, ReturnTransformation::Diminished);
+        assert!(
+            (reverse.duration_scale_consistency - evidence.duration_scale_consistency).abs()
+                < 1e-6,
+            "scale consistency should be invariant when reversing source and target"
+        );
+        assert!(reverse.overall_similarity < 0.85);
+        assert!(!reverse.meets_threshold(0.85));
     }
 
     #[test]
@@ -502,6 +512,12 @@ mod tests {
         assert!((evidence.duration_scale - 2.0).abs() < 1e-6);
         assert!((evidence.duration_scale_consistency - 1.0).abs() < 1e-6);
         assert!(evidence.meets_threshold(0.85));
+
+        let diminution =
+            compare_melodic_sequences(&target, &source, ReturnTransformation::Diminished);
+        assert!((diminution.duration_scale - 0.5).abs() < 1e-6);
+        assert!((diminution.duration_scale_consistency - 1.0).abs() < 1e-6);
+        assert!(diminution.meets_threshold(0.85));
     }
 
     #[test]
