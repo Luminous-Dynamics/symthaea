@@ -82,6 +82,14 @@ jobs:
             echo "Running strict model: $cfg"
             java -cp "$TOOL_JAR" tlc2.TLC -workers 1 -config "$cfg" "$model" \
               2>&1 | tee "$log"
+            if ! grep -Fq "Model checking completed. No error has been found." "$log"; then
+              echo "::error::Strict TLC run did not report complete invariant success: $cfg"
+              exit 1
+            fi
+            if ! grep -Eq '[0-9]+ distinct states found' "$log"; then
+              echo "::error::Strict TLC run did not report an explored state count: $cfg"
+              exit 1
+            fi
           }
 
           if [[ -f docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla ]]; then
