@@ -288,7 +288,7 @@ jobs:
           trace_cases = [
               case for case in receipt["case_manifest_bindings"]
               if case["case_id"] == trace_id
-              and case.get("state_intervention", {}).get("operation") == "clear h"
+              and (case.get("state_intervention") or {}).get("operation") == "clear h"
           ]
           if len(trace_cases) != 1:
               raise SystemExit("trace receipt is not bound to exactly one clear-h manifest case")
