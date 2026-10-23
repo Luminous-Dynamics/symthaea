@@ -401,7 +401,7 @@ fn test_parallel_semantic_causal_no_panic() {
         semantic_hdc,
         &compressed,
         &output,
-        0.5,
+        Some(0.5),
         10,
     );
     // Success: parallel execution completed without panic
@@ -414,6 +414,7 @@ fn test_episodic_learning_context_construction() {
     let prims = vec!["awareness".to_string()];
     let ctx = super::super::helpers::EpisodicLearningContext {
         prediction_error: 0.3,
+        prediction_error_valid: true,
         in_flow: true,
         input: "test input",
         compressed_state: &compressed,
