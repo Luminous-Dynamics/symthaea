@@ -815,9 +815,14 @@ mod tests {
 
         assert!(mesh.poll_incoming(&mut receiver).is_empty());
         assert_eq!(
-            receiver.stats().packets_decrypt_failed,
+            receiver.stats().fragment_source_unavailable,
             1,
             "the unavailable source-binding profile must be observable"
+        );
+        assert_eq!(
+            receiver.stats().packets_decrypt_failed,
+            0,
+            "no packet decryption was attempted without authenticated source metadata"
         );
     }
 
