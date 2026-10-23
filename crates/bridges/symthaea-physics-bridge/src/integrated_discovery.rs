@@ -154,6 +154,29 @@ fn random_experiment(rng: &mut u64) -> Experiment {
         .collect()
 }
 
+/// Sample evaluator-only points strictly outside the discovery interval for every variable.
+/// Randomly mixes lower-tail and upper-tail values. Never pass this design to the search policy.
+fn random_extrapolation_experiment(rng: &mut u64) -> Experiment {
+    VAR_NAMES
+        .iter()
+        .map(|name| {
+            let value = if rand_index(rng, 2) == 0 {
+                rand_range(rng, 0.25, 0.75)
+            } else {
+                rand_range(rng, 2.75, 4.0)
+            };
+            (name.to_string(), value)
+        })
+        .collect()
+}
+
+fn is_extrapolation_experiment(point: &Experiment) -> bool {
+    point.len() == VAR_NAMES.len()
+        && point
+            .iter()
+            .all(|(_, value)| *value < VAR_RANGE.0 || *value > VAR_RANGE.1)
+}
+
 fn eval_at(e: &Expr, point: &Experiment) -> Option<f64> {
     let vs: Vec<(&str, f64)> = point.iter().map(|(k, v)| (k.as_str(), *v)).collect();
     let r = e.eval(&vs);
@@ -639,6 +662,8 @@ struct TrialOutcome {
     prequential_pit_alarm: bool,
     monitoring_protocol_invalid: bool,
     ground_truth_equivalent: bool,
+    ground_truth_extrapolation_equivalent: bool,
+    extrapolation_holdout_points: usize,
     typed_recovery_restarts: usize,
     structured_recovery_candidates: usize,
     terminal_pit_alarm: bool,
@@ -757,6 +782,8 @@ fn run_trial_with_discrepancy(
             prequential_pit_alarm: false,
             monitoring_protocol_invalid: true,
             ground_truth_equivalent: false,
+            ground_truth_extrapolation_equivalent: false,
+            extrapolation_holdout_points: 0,
             typed_recovery_restarts: 0,
             structured_recovery_candidates: 0,
             terminal_pit_alarm: false,
@@ -817,6 +844,29 @@ fn run_trial_with_discrepancy(
         let point = random_experiment(&mut evaluator_rng);
         if eval_at(&ground_truth, &point).is_some() {
             holdout.push(point);
+        }
+    }
+
+    // Independent extrapolation design, strictly outside every training-variable interval.
+    // The bounded loop prevents pathological expressions from hanging a benchmark trial. If
+    // fewer than the minimum valid truth points can be generated, OOD recovery is scored false.
+    const OOD_HOLDOUT_TARGET: usize = 64;
+    const OOD_HOLDOUT_MINIMUM: usize = 32;
+    const OOD_ATTEMPT_CAP: usize = 4096;
+    const OOD_ABSOLUTE_VALUE_CAP: f64 = 1.0e12;
+    let mut ood_evaluator_rng = seed ^ 0x00D0_0D0E_2026_0001;
+    let mut extrapolation_holdout: Vec<Experiment> =
+        Vec::with_capacity(OOD_HOLDOUT_TARGET);
+    let mut ood_attempts = 0usize;
+    while extrapolation_holdout.len() < OOD_HOLDOUT_TARGET
+        && ood_attempts < OOD_ATTEMPT_CAP
+    {
+        ood_attempts += 1;
+        let point = random_extrapolation_experiment(&mut ood_evaluator_rng);
+        if eval_at(&ground_truth, &point)
+            .is_some_and(|value| value.abs() < OOD_ABSOLUTE_VALUE_CAP)
+        {
+            extrapolation_holdout.push(point);
         }
     }
 
@@ -1123,11 +1173,19 @@ fn run_trial_with_discrepancy(
             &ground_truth,
             &holdout,
         );
+    let ground_truth_extrapolation_equivalent = live.len() == 1
+        && extrapolation_holdout.len() >= OOD_HOLDOUT_MINIMUM
+        && evaluator_matches_reference(
+            &hypotheses[live[0]],
+            &ground_truth,
+            &extrapolation_holdout,
+        );
 
     TrialOutcome {
         rounds_used: round,
         success: systematic_discrepancy == 0.0
             && ground_truth_equivalent
+            && ground_truth_extrapolation_equivalent
             && !terminal_pit_alarm
             && !monitoring_protocol_invalid,
         final_live: live.len(),
@@ -1141,6 +1199,8 @@ fn run_trial_with_discrepancy(
         prequential_pit_alarm,
         monitoring_protocol_invalid,
         ground_truth_equivalent,
+        ground_truth_extrapolation_equivalent,
+        extrapolation_holdout_points: extrapolation_holdout.len(),
         typed_recovery_restarts,
         structured_recovery_candidates,
         terminal_pit_alarm,
@@ -1587,6 +1647,55 @@ mod tests {
     }
 
     #[test]
+    fn extrapolation_design_is_outside_every_training_variable_interval() {
+        let mut rng = 0x00D0_0D0E_2026_0001_u64;
+        for _ in 0..128 {
+            let point = random_extrapolation_experiment(&mut rng);
+            assert!(is_extrapolation_experiment(&point));
+            assert_eq!(point.len(), VAR_NAMES.len());
+            for (_, value) in point {
+                assert!(value.is_finite());
+                assert!(value < VAR_RANGE.0 || value > VAR_RANGE.1);
+            }
+        }
+    }
+
+    #[test]
+    fn extrapolation_equivalence_distinguishes_an_equivalent_law_from_a_shift() {
+        let reference = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".to_string())),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let equivalent = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Const(2.0)),
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Const(0.5)),
+                Box::new(reference.clone()),
+            )),
+        );
+        let shifted = Expr::BinOp(
+            BinOp::Add,
+            Box::new(reference.clone()),
+            Box::new(Expr::Const(0.5)),
+        );
+        let mut rng = 0x0DD0_2026_1023_u64;
+        let holdout: Vec<Experiment> = (0..64)
+            .map(|_| random_extrapolation_experiment(&mut rng))
+            .collect();
+
+        assert!(holdout.iter().all(is_extrapolation_experiment));
+        assert!(evaluator_matches_reference(&equivalent, &reference, &holdout));
+        assert!(!evaluator_matches_reference(&shifted, &reference, &holdout));
+    }
+
+    #[test]
     fn evaluator_equivalence_requires_independent_heldout_points() {
         let reference = Expr::BinOp(
             BinOp::Mul,
@@ -1874,6 +1983,10 @@ mod tests {
         let mut clean_pit_successes = 0usize;
         let mut clean_pit_reference_equivalents = 0usize;
         let mut misspec_pit_reference_equivalents = 0usize;
+        let mut clean_pit_ood_equivalents = 0usize;
+        let mut misspec_pit_ood_equivalents = 0usize;
+        let mut clean_pit_ood_points = 0usize;
+        let mut misspec_pit_ood_points = 0usize;
         let mut clean_pit_alarms = 0usize;
         let mut misspec_baseline_false_singletons = 0usize;
         let mut misspec_pit_false_singletons = 0usize;
@@ -1920,6 +2033,12 @@ mod tests {
                 if clean_pit.ground_truth_equivalent { 1 } else { 0 };
             misspec_pit_reference_equivalents +=
                 if misspecified_pit.ground_truth_equivalent { 1 } else { 0 };
+            clean_pit_ood_equivalents +=
+                if clean_pit.ground_truth_extrapolation_equivalent { 1 } else { 0 };
+            misspec_pit_ood_equivalents +=
+                if misspecified_pit.ground_truth_extrapolation_equivalent { 1 } else { 0 };
+            clean_pit_ood_points += clean_pit.extrapolation_holdout_points;
+            misspec_pit_ood_points += misspecified_pit.extrapolation_holdout_points;
             clean_pit_alarms += if clean_pit.prequential_pit_alarm { 1 } else { 0 };
             misspec_baseline_false_singletons +=
                 if misspecified_baseline.overconfident_under_misspecification { 1 } else { 0 };
@@ -1945,6 +2064,10 @@ mod tests {
                 "clean_pit_successes={clean_pit_successes},",
                 "clean_pit_reference_equivalents={clean_pit_reference_equivalents},",
                 "misspec_pit_reference_equivalents={misspec_pit_reference_equivalents},",
+                "clean_pit_ood_equivalents={clean_pit_ood_equivalents},",
+                "misspec_pit_ood_equivalents={misspec_pit_ood_equivalents},",
+                "clean_pit_ood_points={clean_pit_ood_points},",
+                "misspec_pit_ood_points={misspec_pit_ood_points},",
                 "clean_pit_alarms={clean_pit_alarms},",
                 "misspec_baseline_false_singletons={misspec_baseline_false_singletons},",
                 "misspec_pit_false_singletons={misspec_pit_false_singletons},",
