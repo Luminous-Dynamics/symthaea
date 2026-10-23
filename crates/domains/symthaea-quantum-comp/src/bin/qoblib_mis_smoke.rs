@@ -375,7 +375,7 @@ struct RunFailure {
     elapsed_ns: u128,
 }
 
-fn failure_receipt_json(path: &str, failure: &RunFailure) -> String {
+fn failure_receipt_json(path: &str, failure: &RunFailure, seed_base: u64) -> String {
     let source_bytes = failure.source_bytes
         .map(|bytes| bytes.to_string())
         .unwrap_or_else(|| "null".to_owned());
@@ -394,7 +394,8 @@ fn failure_receipt_json(path: &str, failure: &RunFailure) -> String {
             "  \"error_kind\": \"{}\",\n",
             "  \"error\": \"{}\",\n",
             "  \"software\": {{\"package_version\": \"{}\", \"target_os\": \"{}\", \"target_arch\": \"{}\", \"rustc_version\": \"{}\"}},\n",
-            "  \"determinism\": \"not-run: failure occurred before optimizer receipt\",\n",
+            "  \"determinism\": \"not-attested: failed run; inspect error_kind and source identity\",\n",
+            "  \"randomness\": {{\"seed_base\": {}, \"restarts\": {}, \"policy\": \"XorShift64 seeded tie-breaks\"}},\n",
             "  \"resource_limits\": {{\"time_limit_ns\": null, \"memory_limit_bytes\": null, \"max_input_bytes\": {}, \"max_vertices\": {}, \"max_edges\": {}}},\n",
             "  \"timing_ns\": {{\"end_to_end\": {}}},\n",
             "  \"limitations\": [\"FNV-1a is a non-cryptographic integrity checksum\", \"no runtime limit or memory limit was configured\", \"failure receipt records a read or parse failure rather than silently dropping the run\", \"this run does not execute a quantum backend\"]\n",
@@ -409,6 +410,8 @@ fn failure_receipt_json(path: &str, failure: &RunFailure) -> String {
         env::consts::OS,
         env::consts::ARCH,
         option_env!("RUSTC_VERSION").unwrap_or("not-recorded-at-build"),
+        seed_base,
+        MULTISTART_GREEDY_RUNS,
         MisDimacsLimits::default().max_input_bytes,
         MisDimacsLimits::default().max_vertices,
         MisDimacsLimits::default().max_edges,
@@ -704,7 +707,7 @@ fn main() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("{}", error.message);
-            println!("{}", failure_receipt_json(&path, &error));
+            println!("{}", failure_receipt_json(&path, &error, seed_base));
             ExitCode::FAILURE
         }
     }
@@ -799,7 +802,7 @@ mod tests {
             source_fnv1a64: Some(0x0123_4567_89ab_cdef),
             elapsed_ns: 17,
         };
-        let receipt = failure_receipt_json("graphs/farm\n.gph", &failure);
+        let receipt = failure_receipt_json("graphs/farm\n.gph", &failure, 991);
         assert!(receipt.contains("\"return_status\": \"failed\""));
         assert!(receipt.contains("\"error_kind\": \"dimacs_parse\""));
         assert!(receipt.contains("\"source_bytes\": 42"));
@@ -807,6 +810,9 @@ mod tests {
         assert!(receipt.contains("\"error\": \"bad \\\"header\\\"\\nline\""));
         assert!(receipt.contains("\"source_path\": \"graphs/farm\\n.gph\""));
         assert!(receipt.contains("\"time_limit_ns\": null"));
+        assert!(receipt.contains("\"seed_base\": 991"));
+        assert!(receipt.contains("\"restarts\": 16"));
+        assert!(receipt.contains("\"determinism\": \"not-attested: failed run; inspect error_kind and source identity\""));
     }
 
 
