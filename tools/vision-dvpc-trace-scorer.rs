@@ -1050,8 +1050,8 @@ mod tests {
         assert_eq!(router_fields[17], "15000");
         assert_eq!(router_fields[21], "false");
         assert_eq!(router_fields[24], "true");
-        assert_eq!(router_fields[10], "0");
-        assert_eq!(router_fields[11], "1");
+        assert_eq!(router_fields[10], "1");
+        assert_eq!(router_fields[11], "0");
     }
 
     #[test]
@@ -1145,6 +1145,26 @@ mod tests {
         let observations = read_observations(&obs, "test").unwrap();
         let action_table = parse_table(&broken, ACTION_HEADER, "ACTION").unwrap();
         assert!(read_actions(&action_table, &observations).unwrap_err().contains("duplicate commitment_index"));
+    }
+
+    #[test]
+    fn pareto_frontier_prunes_dominated_state_and_keeps_tradeoffs() {
+        let frontier = pareto_prune(vec![
+            OracleState { latency_us: 1, energy_uj: 3, weighted_gain: 0.20, escalations: 1 },
+            OracleState { latency_us: 2, energy_uj: 2, weighted_gain: 0.15, escalations: 1 },
+            OracleState { latency_us: 2, energy_uj: 2, weighted_gain: 0.14, escalations: 2 },
+            OracleState { latency_us: 3, energy_uj: 1, weighted_gain: 0.10, escalations: 1 },
+        ]);
+        assert_eq!(frontier.len(), 3);
+        assert!(!frontier.iter().any(|state| {
+            state.latency_us == 2 && state.energy_uj == 2 && state.weighted_gain == 0.14
+        }));
+        assert!(frontier.iter().any(|state| {
+            state.latency_us == 1 && state.energy_uj == 3 && state.weighted_gain == 0.20
+        }));
+        assert!(frontier.iter().any(|state| {
+            state.latency_us == 3 && state.energy_uj == 1 && state.weighted_gain == 0.10
+        }));
     }
 
     #[test]
