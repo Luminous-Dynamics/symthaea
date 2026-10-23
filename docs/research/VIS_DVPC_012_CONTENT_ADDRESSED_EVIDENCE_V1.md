@@ -44,7 +44,22 @@ UTF-8 TSV schema:
     LOCK<TAB>utility_spec_sha256<TAB><64 hex characters>
     LOCK<TAB>verifier_source_sha256<TAB><64 hex characters>
 
-<TAB> means a literal tab byte, not the two characters. The verifier checks each field against the exact bytes read during admission. Unknown, missing or duplicate lock keys fail closed. The lock itself is hashed into the output receipt. A lock should be committed or signed independently before the final held-out evaluation is opened; changing both data and lock is a new experiment, not a valid replay of the original one.
+<TAB> means a literal tab byte, not the two characters. The verifier checks each field against the exact bytes read during admission. Unknown, missing or duplicate lock keys fail closed. The lock itself is hashed into the output receipt. A custodian should create and commit/sign the lock inside the sealed evaluator workspace after the immutable paired outcome bundle exists, but before releasing those outcomes to policy developers or analysts. Changing both data and lock is a new experiment, not a valid replay of the original one.
+
+For a transparent local workflow, a separate custody step may generate the lock using an independently reviewed hashing utility. Example for GNU coreutils on Linux (run only after the files and verifier source have been frozen):
+
+    {
+      printf 'DVPC_BUNDLE_LOCK_V1\tkey\tsha256\n'
+      printf 'LOCK\tobservations_sha256\t%s\n' "$(sha256sum -- OBSERVATIONS.tsv | awk '{print $1}')"
+      printf 'LOCK\tevaluations_sha256\t%s\n' "$(sha256sum -- EVALUATIONS.tsv | awk '{print $1}')"
+      printf 'LOCK\tsource_manifest_sha256\t%s\n' "$(sha256sum -- SOURCE_MANIFEST.tsv | awk '{print $1}')"
+      printf 'LOCK\tsplit_manifest_sha256\t%s\n' "$(sha256sum -- SPLIT_MANIFEST.tsv | awk '{print $1}')"
+      printf 'LOCK\tsnapshot_sha256\t%s\n' "$(sha256sum -- SNAPSHOT.tsv | awk '{print $1}')"
+      printf 'LOCK\tutility_spec_sha256\t%s\n' "$(sha256sum -- UTILITY_SPEC.txt | awk '{print $1}')"
+      printf 'LOCK\tverifier_source_sha256\t%s\n' "$(sha256sum -- tools/vision-dvpc-integrity-receipt.rs | awk '{print $1}')"
+    } > BUNDLE_LOCK.tsv
+
+The lock writer is intentionally outside the verifier. Store the lock under separate custody/review or sign its exact bytes; if the lock is freely changed alongside the evaluation bundle, integrity checks only describe the replacement bundle.
 
 The lock binds the verifier source file, not a compiled binary or compiler toolchain. Reproducible-build claims need a separate toolchain/binary digest record.
 
