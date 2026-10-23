@@ -17,8 +17,12 @@ The target loop is: generate physically admissible hypotheses; choose an experim
 | [Exhaustive Symbolic Regression with MDL](https://doi.org/10.1098/rsta.2024.0584) | Bounded search over a declared operator basis, parameter fitting, and minimum-description-length model selection | Strong small-grammar reference; tests whether stochastic search is necessary |
 | [SRBench](https://github.com/cavalab/srbench) and [SRBench++](https://doi.org/10.1109/TEVC.2024.3423681) | Broad regression comparison plus task-specific tests: exact form, feature selection, deceptive shortcuts, extrapolation, noise, interpretability | Standard retrospective regression track and robustness suite |
 | [SciLaws-Bench](https://yiyihum.github.io/SciLaws-Bench/) | Separates prediction, scientific validity and structural recovery, including active-query tasks | Science-specific endpoint taxonomy and active-discovery track |
+| [SciLaws-Bench](https://yiyihum.github.io/SciLaws-Bench/) | Separates prediction, scientific validity and structural recovery, including active-query tasks | Science-specific endpoint taxonomy and active-discovery track |
+| [RESTART (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/72416ded78a439907ff72165ac9c56e0-Abstract-Conference.html) and [official code](https://github.com/Liyunlun/RESTART) | Boosting identifies unexplained signal; an LLM proposes targeted equation refinements; successful structures are stored for reuse | Direct comparator for post-alarm structured correction; align access to LLMs, library memory, data, and compute |
+| [Influence-Guided Symbolic Regression (IGSR, 2026)](https://arxiv.org/abs/2605.29184) | LLM-generated basis terms, per-term influence feedback and Monte Carlo tree search | Hybrid-search comparator; count all model/tool costs and pin source/version |
+| [Deliberate Evolution (ICML 2026)](https://proceedings.mlr.press/v306/pang26f.html) | Separates LLM proposal from search control using adaptive operators, analytical diagnosis and reflective memory | Agentic search-control baseline under matched model and token budgets |
+| [Bayesian Symbolic Regression with Entropic RL (UAI 2026)](https://proceedings.mlr.press/v337/boussif26a.html) | Bayesian view of expression search to represent uncertainty over symbolic forms | Comparator for uncertainty-aware candidate ranking and diversity |
 | [LLM-AutoSciLab / ActiveSciBench](https://scientific-discovery.github.io/llm-autoscilab-project/) | Closed loop of hypothesis generation, experiment selection and mechanism refinement | Agentic discovery baseline where models, tools and budgets can be aligned |
-| [Influence-Guided Symbolic Regression (IGSR, 2026)](https://arxiv.org/abs/2605.29184) | LLM-generated candidate basis, per-term influence feedback and Monte Carlo tree search | Strong emerging hybrid-search comparator; pin the paper/code version and ensure all model/tool costs are counted |
 | [LLM-SRBench](https://proceedings.mlr.press/v267/shojaee25a.html) | Symbolic-reasoning and transformed-equation tasks intended to reduce simple memorization | Held-out robustness track with pinned prompts, model versions and query budget |
 | Sparse regression / SINDy-style methods | Efficient recovery when the feature dictionary is known or well motivated | Simple strong baseline on dynamical systems; not a universal symbolic-regression comparator |
 
@@ -114,6 +118,9 @@ Every run should record benchmark/version and world family; exact commit and sou
 - 2026 symbolic-regression survey, published 20 August 2026: https://doi.org/10.1007/s11831-026-10681-w
 - Exhaustive Symbolic Regression and MDL, Philosophical Transactions of the Royal Society A, online 9 April 2026: https://doi.org/10.1098/rsta.2024.0584
 - SciLaws-Bench: https://yiyihum.github.io/SciLaws-Bench/
-- LLM-AutoSciLab / ActiveSciBench: https://scientific-discovery.github.io/llm-autoscilab-project/
+- Li and Pan, Robust Equation Structure Learning with Adaptive Refinement (RESTART), ICLR 2026: https://openreview.net/forum?id=z9TKJhLVKj
 - Saveliev et al., Influence-Guided Symbolic Regression (2026): https://arxiv.org/abs/2605.29184
+- Pang et al., Deliberate Evolution, ICML 2026: https://proceedings.mlr.press/v306/pang26f.html
+- Boussif et al., Bayesian Symbolic Regression with Entropic Reinforcement Learning, UAI 2026: https://proceedings.mlr.press/v337/boussif26a.html
+- LLM-AutoSciLab / ActiveSciBench: https://scientific-discovery.github.io/llm-autoscilab-project/
 - LLM-SRBench, ICML (2025): https://proceedings.mlr.press/v267/shojaee25a.html
