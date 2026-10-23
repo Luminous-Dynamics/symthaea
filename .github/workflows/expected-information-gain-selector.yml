@@ -97,6 +97,8 @@ jobs:
         run: cargo test -p symthaea-physics-bridge fitted_correction_coefficient_recovers_known_scalar_on_synthetic_residuals --lib
       - name: Test evaluator-only held-out law equivalence
         run: cargo test -p symthaea-physics-bridge evaluator_equivalence_requires_independent_heldout_points --lib
+      - name: Test oracle-equivalence audit across domains
+        run: cargo test -p symthaea-physics-bridge oracle_equivalence_audit_requires_both_in_domain_and_ood_match --lib
       - name: Test evaluator-only extrapolation design
         run: cargo test -p symthaea-physics-bridge extrapolation_design_is_outside_every_training_variable_interval --lib
       - name: Test extrapolation law equivalence
