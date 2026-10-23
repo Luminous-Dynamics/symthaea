@@ -39,7 +39,7 @@ The example includes focused tests for deterministic workload replay, exact corr
 cargo test -p symthaea-hdc-store --example ann_benchmark
 ```
 
-The CLI rejects an unpinned or malformed source SHA, unknown arguments, zero size/query/round/top-K values, and noise levels above the vector dimension.
+The CLI requires a full 40-hex source SHA that exactly matches `git rev-parse HEAD`, and it rejects a dirty tracked working tree. This binds results to the checked-out commit rather than merely echoing a caller-supplied identifier. It also rejects unknown arguments, zero size/query/round/top-K values, and noise levels above the vector dimension.
 
 ## Workload contract
 
