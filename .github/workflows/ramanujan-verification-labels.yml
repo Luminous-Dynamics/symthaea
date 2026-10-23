@@ -1,0 +1,86 @@
+name: Ramanujan Verification Labels
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ramanujan-verification-labels.yml'
+      - 'patches/science/ramanujan-verification-labels-v1.patch'
+      - 'crates/bridges/symthaea-physics-bridge/examples/ramanujan_showcase.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PATCH: patches/science/ramanujan-verification-labels-v1.patch
+  SHOWCASE: crates/bridges/symthaea-physics-bridge/examples/ramanujan_showcase.rs
+
+jobs:
+  qualify:
+    name: Prove label overclaim and qualify evidence-specific presentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only scope
+        run: |
+          test -f "$PATCH"
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="HEAD^"; fi
+          git diff --exit-code "$BASE" -- Cargo.toml Cargo.lock crates/core src crates/bridges || {
+            echo 'qualification branch must not materialize product source'
+            exit 1
+          }
+
+      - name: Prove current presentation overclaims
+        run: |
+          grep -F 'let z3_status = if inv.symbolically_proven' "$SHOWCASE"
+          grep -F '"PROVEN ✓".to_string()' "$SHOWCASE"
+          grep -F 'Triangular Numbers (sequence + Z3 formal verification)' "$SHOWCASE"
+          grep -F 'seq_engine.auto_prove_via_z3();' "$SHOWCASE"
+          grep -F 'verification status (chain rule + Z3)' "$SHOWCASE"
+
+      - name: Validate and apply exact candidate patch
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet evidence-specific verification labels
+        run: |
+          grep -F 'verification_status: String' "$SHOWCASE"
+          grep -F 'SYMBOLICALLY CHECKED ✓' "$SHOWCASE"
+          grep -F 'SMT SAMPLES CHECKED' "$SHOWCASE"
+          grep -F 'check_samples_via_z3();' "$SHOWCASE"
+          grep -F 'verify_invariants_formal' "$SHOWCASE"
+          grep -F 'r.verification_status.contains("SMT SAMPLES CHECKED")' "$SHOWCASE"
+          ! grep -F 'let z3_status' "$SHOWCASE"
+          ! grep -F '"PROVEN ✓".to_string()' "$SHOWCASE"
+          ! grep -F 'Z3 formal verification' "$SHOWCASE"
+          ! grep -F 'auto_prove_via_z3' "$SHOWCASE"
+          ! grep -F 'verification status (chain rule + Z3)' "$SHOWCASE"
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Compile and lint the repaired showcase
+        run: |
+          cargo fmt --check -p symthaea-physics-bridge
+          cargo check --locked -p symthaea-physics-bridge --example ramanujan_showcase
+          cargo clippy --locked -p symthaea-physics-bridge --example ramanujan_showcase -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes that the showcase labels chain-rule symbolic evidence, fixed-input SMT sample checks, and formal verification as distinct presentation states.'
+          echo 'It does not establish that the discovery results are formally verified, that committed showcase output has been regenerated, or that the separate formal verifier has executed on this head.'
