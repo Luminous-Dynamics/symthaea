@@ -3246,8 +3246,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.0 PsiAttestation record (every 10 cycles to reduce overhead)
         // ═══════════════════════════════════════════════════════════════════════
-        if prediction_error_valid
-            && self.config.enable_psi_attestation
+        if self.config.enable_psi_attestation
             && self.config.agent_did.is_some()
             && (self.stats.total_cycles % 10 == 0)
         {
@@ -3260,6 +3259,7 @@ impl CognitiveLoopService {
                 cycle_id: self.stats.total_cycles as u64,
                 captured_at_us: now,
                 prediction_error,
+                prediction_error_valid: prediction_error_valid && prediction_error.is_finite(),
                 urgency,
             };
             self.push_psi_attestation(record);
