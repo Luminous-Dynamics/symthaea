@@ -59,7 +59,7 @@ Send(sender, payloadType, fragmentIndex) ==
   IN
     /\ (~StrictNoReuse \/ pair \notin usedPairs)
     /\ usedPairs' = usedPairs \cup {pair}
-    /\ reuseDetected' = reuseDetected \/ (pair \in usedPairs)
+    /\ reuseDetected' = (reuseDetected \/ (pair \in usedPairs))
     /\ nextSeq' =
          [nextSeq EXCEPT
            ![sender] = IF @ = MaxSeq THEN 0 ELSE @ + 1]
