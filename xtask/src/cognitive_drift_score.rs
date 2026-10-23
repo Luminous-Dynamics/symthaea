@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeSet, fs, path::Path};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct DriftTrace {
     pub schema_version: u32,
@@ -24,7 +24,7 @@ pub struct DriftTrace {
     pub detections: Vec<Detection>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct DriftEvent {
     pub id: String,
@@ -32,7 +32,7 @@ pub struct DriftEvent {
     pub end_cycle: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Detection {
     pub cycle_index: u64,
@@ -148,8 +148,9 @@ pub fn score_trace(mut trace: DriftTrace) -> anyhow::Result<DriftScore> {
 
     // Earliest-deadline interval matching maximizes event/alarm matches for interval-compatible
     // events; alarms still prefer the earliest valid timestamp within each window.
+    let delay_budget = trace.max_detection_delay_cycles;
     trace.drift_events.sort_by_key(|event| (
-        event.end_cycle.saturating_add(trace.max_detection_delay_cycles),
+        event.end_cycle.saturating_add(delay_budget),
         event.start_cycle,
         event.id.clone(),
     ));
@@ -306,6 +307,9 @@ mod tests {
         assert_eq!(result.false_positive_alarms, 0);
         assert_eq!(result.missed_events, 0);
         assert_eq!(result.event_f1, 1.0);
+        assert!(result.hard_gate_pass);
+        assert_eq!(result.canonical_trace_sha256.len(), 64);
+        assert_eq!(result.result_sha256.as_ref().map(String::len), Some(64));
         assert!((result.mean_normalized_detection_delay_penalized - 0.25).abs() < 1e-12);
     }
 
@@ -339,12 +343,15 @@ mod tests {
 
     #[test]
     fn rejects_invalid_provenance_and_out_of_range_events() {
-        let mut bad = trace(
+        let mut bad_digest = trace(vec![], vec![]);
+        bad_digest.configuration_digest = "short".to_owned();
+        assert!(score_trace(bad_digest).is_err());
+
+        let bad_event = trace(
             vec![DriftEvent { id: "d1".to_owned(), start_cycle: 900, end_cycle: 1100 }],
             vec![],
         );
-        bad.configuration_digest = "short".to_owned();
-        assert!(score_trace(bad).is_err());
+        assert!(score_trace(bad_event).is_err());
     }
 
     #[test]
