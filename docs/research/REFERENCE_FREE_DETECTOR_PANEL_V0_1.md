@@ -37,7 +37,8 @@ Deterministic unit tests cover:
 - comparing mean and max aggregation;
 - malformed/non-finite input rejection and finite-value overflow rejection;
 - returning a typed QueryDistributionShift assessment after outer conformal calibration;
-- returning an explicit error when no detector meets a predeclared detectability threshold.
+- returning an explicit error when no detector meets a predeclared detectability threshold;
+- an explicit probe-mismatch negative control where a real shift affects only a detector that the self-perturbations never activated, demonstrating the panel's selection blind spot.
 
 These tests are committed but not considered passed until the focused workflow reports success for the exact head.
 
