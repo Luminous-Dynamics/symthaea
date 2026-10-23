@@ -253,26 +253,14 @@ fn verify_fixture(query: &BinaryHV, candidates: &[BinaryHV], expected_index: Opt
         "64-byte early-abandon winner differs"
     );
     let hint_index = candidates.len() / 2;
-    assert_eq!(
-        simd.0,
-        hinted_early_abandon_hamming_argmin::<16, false>(
-            query,
-            candidates,
-            hint_index,
-        )
-        .0,
-        "16-byte hinted early-abandon winner differs"
-    );
-    assert_eq!(
-        simd.0,
-        hinted_early_abandon_hamming_argmin::<64, false>(
-            query,
-            candidates,
-            hint_index,
-        )
-        .0,
-        "64-byte hinted early-abandon winner differs"
-    );
+    let hinted_16 =
+        hinted_early_abandon_hamming_argmin::<16, false>(query, candidates, hint_index);
+    let hinted_64 =
+        hinted_early_abandon_hamming_argmin::<64, false>(query, candidates, hint_index);
+    assert_eq!(simd.0, hinted_16.0, "16-byte hinted early-abandon winner differs");
+    assert_eq!(simd.0, hinted_64.0, "64-byte hinted early-abandon winner differs");
+    assert_eq!(hamming.1, hinted_16.1, "16-byte hinted distance differs");
+    assert_eq!(hamming.1, hinted_64.1, "64-byte hinted distance differs");
     let hamming_score = 1.0 - (hamming.1 as f32 / BinaryHV::DIM as f32);
     assert!(
         (simd.1 - hamming_score).abs() <= 1.0e-6,
