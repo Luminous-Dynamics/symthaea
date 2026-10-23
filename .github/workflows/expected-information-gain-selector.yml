@@ -42,14 +42,17 @@ jobs:
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/model_adequacy.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/adequacy_calibration.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/diagnostic_fusion_benchmark.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/sequential_adequacy.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs
       - name: Test information-gain selector
         run: cargo test -p symthaea-core hdc::conjecture_engine::experiment_selection --lib
       - name: Run paired law-discovery selector pilot
         run: cargo test -p symthaea-physics-bridge expected_information_gain_vs_variance_on_paired_seeds --lib -- --nocapture
-      - name: Test conformal adequacy calibration and deterministic score-fusion benchmark
-        run: cargo test -p symthaea-physics-bridge adequacy_calibration --lib -- --nocapture
+      - name: Test conformal adequacy calibration
+        run: cargo test -p symthaea-physics-bridge adequacy_calibration --lib
+      - name: Run deterministic diagnostic-fusion benchmark
+        run: cargo test -p symthaea-physics-bridge --test diagnostic_fusion_benchmark -- --nocapture
       - name: Test finite-horizon sequential adequacy monitor
         run: cargo test -p symthaea-physics-bridge sequential_adequacy --lib
       - name: Test model-adequacy decision semantics
