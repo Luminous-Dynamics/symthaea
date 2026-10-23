@@ -464,8 +464,8 @@ pub fn compare_controlled_outcome_change(
 
     let treated_baseline = &treated.baseline;
     let treated_post = &treated.post_alarm;
-    let expected = usize::try_from(config.window_size)
-        .map_err(|_| DelayedOutcomeError::InvalidWindowSize)?;
+    let expected =
+        usize::try_from(config.window_size).map_err(|_| DelayedOutcomeError::InvalidWindowSize)?;
     let baseline_bounds_valid = treated_baseline.start_inclusive < treated_baseline.end_exclusive
         && treated_baseline.end_exclusive == treated.alarm_index
         && treated_baseline.end_exclusive - treated_baseline.start_inclusive == config.window_size;
@@ -608,17 +608,9 @@ mod tests {
         monitor
     }
 
-    fn observed_outcomes(
-        values: &[f64],
-        alarm_index: Option<u64>,
-    ) -> DelayedOutcomeMonitor {
-        observed_outcomes_with_direction(
-            values,
-            alarm_index,
-            OutcomeDirection::HigherIsWorse,
-        )
+    fn observed_outcomes(values: &[f64], alarm_index: Option<u64>) -> DelayedOutcomeMonitor {
+        observed_outcomes_with_direction(values, alarm_index, OutcomeDirection::HigherIsWorse)
     }
-
 
     #[test]
     fn delayed_labels_move_assessment_from_unresolved_to_deteriorated() {
@@ -851,10 +843,7 @@ mod tests {
         assert_eq!(comparison.treated_worse_change, 2.0);
         assert_eq!(comparison.control_worse_change, 2.0);
         assert_eq!(comparison.adjusted_worse_change, 0.0);
-        assert_eq!(
-            comparison.association,
-            OutcomeAssociation::NoMaterialChange
-        );
+        assert_eq!(comparison.association, OutcomeAssociation::NoMaterialChange);
     }
 
     #[test]
