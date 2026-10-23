@@ -385,7 +385,7 @@ fn failure_receipt_json(path: &str, failure: &RunFailure) -> String {
     format!(
         concat!(
             "{{\n",
-            "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.mis-smoke-run.v3\",\n",
+            "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.mis-smoke-run.v4\",\n",
             "  \"benchmark_track\": \"correctness-smoke-not-competitive\",\n",
             "  \"return_status\": \"failed\",\n",
             "  \"source_path\": \"{}\",\n",
@@ -580,7 +580,7 @@ fn run(path: &str, seed_base: u64) -> Result<(), RunFailure> {
     println!(
         concat!(
             "{{\n",
-            "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.mis-smoke-run.v3\",\n",
+            "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.mis-smoke-run.v4\",\n",
             "  \"benchmark_track\": \"correctness-smoke-not-competitive\",\n",
             "  \"return_status\": \"completed\",\n",
             "  \"source_path\": \"{}\",\n",
@@ -807,6 +807,16 @@ mod tests {
         assert!(receipt.contains("\"error\": \"bad \\\"header\\\"\\nline\""));
         assert!(receipt.contains("\"source_path\": \"graphs/farm\\n.gph\""));
         assert!(receipt.contains("\"time_limit_ns\": null"));
+    }
+
+
+    #[test]
+    fn qoblib_time_series_serializer_emits_runs_and_seconds_schema() {
+        let json = qoblib_many_runs_series_json(&[vec![(0_u128, 0_usize), (1_500_000_000, 1)]]);
+        assert_eq!(
+            json,
+            r#"[[{"Time": 0.000000000, "Incumbent": 0},{"Time": 1.500000000, "Incumbent": 1}]]"#
+        );
     }
 
 }
