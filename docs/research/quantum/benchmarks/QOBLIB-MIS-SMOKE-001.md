@@ -8,7 +8,7 @@ From the Symthaea workspace root, after Rust dependencies/toolchain are availabl
 
     cargo run -p symthaea-quantum-comp --bin qoblib_mis_smoke -- /path/to/QOBLIB/07-independentset/instances/farm.gph > farm-smoke.json
 
-The command reads one DIMACS edge-format graph and writes exactly one JSON record to stdout. Errors go to stderr and use a non-zero exit status. Keep the resulting JSON as the raw inspectable artifact. The pinned source cohort is tracked in QOBLIB-MIS-COHORT-001.json.
+The command reads one DIMACS edge-format graph and writes exactly one JSON record to stdout. Errors go to stderr and use a non-zero exit status. Keep the resulting JSON as the raw inspectable artifact. Receipt schema v2 also contains a bounded deterministic 1-for-2 local-improvement result for graphs of at most 250 vertices; pair-search is capped at 2,000,000 checks, and a budget-exhausted result is explicitly not labelled locally optimal. The pinned source cohort is tracked in QOBLIB-MIS-COHORT-001.json.
 
 ## Output contract
 
@@ -17,12 +17,13 @@ The receipt records:
 - supplied source path, byte count and FNV-1a 64-bit checksum of the exact input bytes;
 - parsed vertex/edge counts;
 - the deterministic minimum-residual-degree greedy solution, its one-based vertex list, independently recomputed objective and feasibility verdict;
+- a deterministic repeated feasible 1-for-2 improvement that replaces one selected vertex with two mutually nonadjacent compatible vertices; the result has an explicit locally-optimal, pair-check-budget-exhausted, or skipped-over-limit status;
 - the tiny exact reference result and feasibility verdict when the graph has at most 24 vertices, or an explicit skipped-over-limit status otherwise;
 - parser, greedy, exact-oracle and end-to-end elapsed nanoseconds;
 - a stable non-cryptographic checksum over the normalized result fields, excluding variable runtime fields;
 - limitations that prevent treating smoke timings as an SOTA result.
 
-The greedy policy recomputes each active vertex's residual degree at every selection and breaks ties by lower vertex index. It is deterministic and requires no random seed. It is a baseline/control, not a competitive replacement for dedicated MIS methods. The exact reference uses the deliberately bounded branch-and-bound oracle and must not be run on large benchmark instances.
+The greedy policy recomputes each active vertex's residual degree at every selection and breaks ties by lower vertex index. It is deterministic and requires no random seed. The local improvement is deterministic, only runs on graphs up to 250 vertices, and returns a feasible solution even if its pair-check budget is exhausted. It is a baseline/control, not a competitive replacement for dedicated MIS methods. The exact reference uses the deliberately bounded branch-and-bound oracle and must not be run on large benchmark instances.
 
 ## Example correctness anchor
 
