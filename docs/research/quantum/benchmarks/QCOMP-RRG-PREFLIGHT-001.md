@@ -26,6 +26,12 @@ The companion JSON records each workload seed, attempt count, edge count, connec
 | 2,000 | 20 | 3,000 | 19 | 20/20 | 20/20 |
 | 5,000 | 20 | 7,500 | 23 | 20/20 | 20/20 |
 
+## Small-N distributional sanity check
+
+The JSON companion now contains a second, separate experiment with 100,000 generated six-vertex, degree-three graphs. For this size there are exactly 70 labelled simple cubic graphs: 10 labelled K3,3 graphs without triangles and 60 labelled triangular-prism graphs with triangles. Each simple graph corresponds to (3!)^6 stub pairings, so a uniform configuration-model pairing conditioned on simplicity predicts fractions 1/7 and 6/7.
+
+An independent JavaScript translation observed 14,277 K3,3 graphs and 85,723 prism graphs. The K3,3 frequency was 0.14277 (theoretical 0.142857); the reported standardized deviation was -0.079, and mean attempts to reach a simple graph were 10.593 versus an exact acceptance probability of about 0.09478. This is a useful regression diagnostic against gross small-N sampling bias. It is **not** certification of the Rust generator or of distributional correctness at larger sizes. The PR now also authors a deterministic Rust test using 5,000 seeds and a coarse ±0.04 frequency tolerance; that test has not been compiled or run in the current environment.
+
 ## Interpretation and limitations
 
 This shows that the specified seeds and algorithm semantics produce simple, connected, exact 3-regular graphs for a small smoke slice, and that the chosen retry cap is generous for these samples. It does **not** prove that the pseudorandom generator is high quality, that rejection sampling has no practical bias under the finite PRNG, or that the sample matches the distribution or exact graph instances in the published paper. Twenty graphs per size are far fewer than the paper's reported 200-per-size simulation cohort and 100,000-per-size SOTA-comparison campaign.
