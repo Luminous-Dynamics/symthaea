@@ -63,7 +63,10 @@
         "runner",
         "manifest",
         "flake",
-        "flake_lock"
+        "flake_lock",
+        "receipt_schema",
+        "case_matrix",
+        "receipt_validator"
       ],
       "properties": {
         "rtl_bind_xor": {
@@ -88,6 +91,15 @@
           "$ref": "#/$defs/hashOrUnavailable"
         },
         "flake_lock": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "receipt_schema": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "case_matrix": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "receipt_validator": {
           "$ref": "#/$defs/hashOrUnavailable"
         }
       }
