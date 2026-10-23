@@ -1,6 +1,6 @@
 # Cognitive-loop prediction-evidence benchmark (PEV-1)
 
-**Status:** proposed benchmark contract; implementation tests are being added, but this specification has not yet been run end-to-end.
+**Status:** proposed benchmark contract; typed-boundary tests are authored but have not been run end-to-end. The full 12-case consumer-level protocol remains outstanding.
 
 ## 1. Research claim
 
