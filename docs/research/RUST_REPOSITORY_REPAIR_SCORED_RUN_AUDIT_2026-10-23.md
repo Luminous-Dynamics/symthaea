@@ -13,7 +13,7 @@ A valid task manifest does **not** prove that a scored agent rollout used the co
 
 Before running an agent, pin the SHA-256 of the locked task-manifest file in the preregistration record. Supply that digest as `--expected-task-manifest-sha256`; do not derive it after seeing the trial outcomes. The scorer checks that external pin, the full candidate-JSONL SHA-256, candidate row count, candidate ID digest, eligible task ID digest, task-record digest and each included candidate row's raw-line SHA-256.
 
-The prediction file is a JSON object keyed by `instance_id`, with each value containing `model_patch`. The file SHA-256 is included in the output report. A task absent from the prediction map, or with no string patch payload, is an **unresolved assigned attempt**, not a dropped denominator row. IDs outside the locked manifest are rejected as a protocol violation.
+The prediction input accepts the standard SWE-bench JSONL record shape (`instance_id`, `model_patch`), a JSON array of those records, or an ID-keyed JSON object. JSONL/array records must have unique `instance_id` values. A missing/malformed `model_patch` becomes an unresolved attempt; a duplicate or unidentifiable record is a protocol error. The exact input file SHA-256 is included in the output report. A task absent from the prediction map, or with no string patch payload, is an **unresolved assigned attempt**, not a dropped denominator row. IDs outside the locked manifest are rejected as a protocol violation.
 
 ## Scoring contract
 
@@ -56,7 +56,7 @@ cargo run --locked --bin rust-repair-score-audit \
   --report-out build/rust-repair/scored-run-audit.json
 ```
 
-The prediction file must be a direct record of the one assigned patch per task; the evaluator's output directory must contain each task's `evaluation_evidence.json`, `status.json`, and `post_patch_log.txt`. Do not edit either after hashing; preserve originals and rerun the audit if any artifact changes.
+The prediction input must be a direct record of the one assigned patch per task (standard SWE-bench JSONL is accepted); the evaluator's output directory must contain each task's `evaluation_evidence.json`, `status.json`, and `post_patch_log.txt`. Do not edit either after hashing; preserve originals and rerun the audit if any artifact changes.
 
 ## Evidence boundary
 
