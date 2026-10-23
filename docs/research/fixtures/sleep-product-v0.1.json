@@ -1,0 +1,251 @@
+{
+  "schema_version": "0.1.0",
+  "program_id": "SLEEP-PRODUCT-001",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8039",
+  "fixture_kind": "synthetic_protocol_fixture",
+  "evidence_status": "specification_only",
+  "created_utc_date": "2026-10-18",
+  "claim_ceiling": "No physical product, comfort benefit, cost reduction, safety, service life, or environmental superiority has been established by this fixture.",
+  "scope": {
+    "initial_product": "replaceable mattress topper or comfort-layer assembly",
+    "out_of_scope": [
+      "medical or therapeutic claims",
+      "mattress or bedding safety certification",
+      "product conformity certification",
+      "measured comfort or durability claims",
+      "automated control authority"
+    ],
+    "principles": [
+      "fail_closed_when_required_evidence_is_missing",
+      "separate_simulation_from_physical_measurement",
+      "separate_instrumented_metrics_from_subjective_comfort",
+      "separate_nominal_recyclability_from_demonstrated_recovery",
+      "freeze_comparator_and_protocol_before_candidate_results"
+    ]
+  },
+  "existing_owners": [
+    {
+      "id": "ENG-DESIGN-001",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/6005",
+      "responsibility": "engineering design traceability and verification/validation"
+    },
+    {
+      "id": "ENG-DESIGN-003",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/6091",
+      "responsibility": "aesthetic and sensory design intent"
+    },
+    {
+      "id": "MFG-LIFE-000",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/5705",
+      "responsibility": "lifecycle and circular manufacturing"
+    },
+    {
+      "id": "TEXTILE-HYG-MFG-000",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/5984",
+      "responsibility": "textile, cover, sewing, washing and textile-product function"
+    }
+  ],
+  "design_candidates": [
+    {
+      "candidate_id": "REFERENCE-TO-SELECT",
+      "revision": "TBD",
+      "status": "selection_required",
+      "description": "Named commercially available comparator with documented model, size, bill of materials where obtainable, delivered price, date, and source."
+    },
+    {
+      "candidate_id": "MODULAR-TOPPER-V0",
+      "revision": "concept-0",
+      "status": "concept_only",
+      "description": "Passive replaceable comfort-layer and cover construction. Exact materials and dimensions are not yet selected.",
+      "required_records": [
+        "dimensioned design",
+        "exact material/product/grade identifiers",
+        "bill of materials and source provenance",
+        "assembly and layer-orientation instructions",
+        "manufacturing process and labor assumptions"
+      ]
+    },
+    {
+      "candidate_id": "SINGLE-VARIABLE-VARIANT-V0",
+      "revision": "concept-0",
+      "status": "concept_only",
+      "description": "A variant that changes one declared construction variable against MODULAR-TOPPER-V0; the variable must be frozen before evaluating results."
+    },
+    {
+      "candidate_id": "AESTHETIC-COVER-VARIANT-V0",
+      "revision": "concept-0",
+      "status": "concept_only",
+      "description": "A proposed cover/color/texture variant. Any change to material grade, seams, fit, layer sequence, or function-bearing construction creates a new candidate requiring affected requalification."
+    }
+  ],
+  "proposed_targets": [
+    {
+      "target_id": "DELIVERED-COST-01",
+      "metric": "delivered_cost_ratio_to_named_comparator",
+      "operator": "<=",
+      "value": 0.8,
+      "unit": "dimensionless_ratio",
+      "status": "proposed_target",
+      "required_cost_components": [
+        "materials",
+        "consumables",
+        "manufacturing_labor",
+        "packaging",
+        "shipping",
+        "taxes_or_duties_when_applicable",
+        "expected_replacement_costs"
+      ],
+      "fail_closed_rule": "If the comparator, cost date/currency, or a material cost component is missing, outcome is not_evaluable."
+    },
+    {
+      "target_id": "REPAIR-TIME-01",
+      "metric": "trained_operator_replace_common_wear_component",
+      "operator": "<=",
+      "value": 600,
+      "unit": "seconds",
+      "status": "proposed_target",
+      "protocol": "Use published instructions and common tools; record operator experience, tools, start/end conditions, failed attempts, and replacement-part availability."
+    },
+    {
+      "target_id": "COMFORT-HUMAN-01",
+      "metric": "preregistered_human_comfort_or_preference_endpoint",
+      "operator": "must_meet_preregistered_rule",
+      "status": "protocol_required",
+      "protocol": "Select reference, scale, clinically-neutral wording, randomization/crossover order, sample plan, exclusion rules, uncertainty method and subgroup checks before collecting human data."
+    },
+    {
+      "target_id": "PHYSICAL-QUALIFICATION-01",
+      "metric": "required_physical_test_evidence",
+      "operator": "all_required_tests_present_and_within_preregistered_limits",
+      "status": "protocol_required",
+      "protocol": "Freeze applicable methods, apparatus, specimen conditioning, calibration, uncertainty, repetitions, deviations and acceptance limits before evaluating candidates."
+    },
+    {
+      "target_id": "CIRCULARITY-ROUTE-01",
+      "metric": "identified_recovery_route_for_each_claimed_recovered_material",
+      "operator": "evidence_required",
+      "status": "protocol_required",
+      "protocol": "Name a geographically plausible route that accepts the actual identified grade and contamination state. Theoretical recyclability alone does not pass."
+    }
+  ],
+  "evidence_planes": [
+    "requirements_and_target_users",
+    "product_identity_and_revision",
+    "supplier_claims_and_material_grade",
+    "simulation_model_and_domain",
+    "instrumented_physical_tests",
+    "human_comfort_and_preference",
+    "durability_cleaning_and_repair",
+    "lifecycle_and_recovery_route",
+    "delivered_cost_and_sensitivity"
+  ],
+  "negative_controls": [
+    {
+      "case_id": "NC-SIMULATION-ONLY",
+      "scenario": "The model predicts good support but no valid physical-test result exists.",
+      "expected_disposition": "not_evaluable_for_physical_performance",
+      "invariant": "Simulation evidence must not be promoted to physical-test evidence."
+    },
+    {
+      "case_id": "NC-SUBGROUP-REGRESSION",
+      "scenario": "Aggregate comfort improves while a preregistered posture/body subgroup materially worsens.",
+      "expected_disposition": "fails_or_flags_preregistered_subgroup_gate",
+      "invariant": "An aggregate mean must not hide a declared adverse subgroup result."
+    },
+    {
+      "case_id": "NC-COST-OMITS-DELIVERY",
+      "scenario": "A candidate looks 25 percent cheaper ex-factory, but freight, packaging, labor, or replacements are missing.",
+      "expected_disposition": "not_evaluable_for_delivered_cost",
+      "invariant": "Incomplete cost accounting cannot pass the cost target."
+    },
+    {
+      "case_id": "NC-GENERIC-MATERIAL",
+      "scenario": "A source says only 'recycled foam' with no exact grade, provenance, or dated specification.",
+      "expected_disposition": "material_specific_claim_blocked",
+      "invariant": "Generic category labels do not establish composition or performance."
+    },
+    {
+      "case_id": "NC-RECYCLABLE-NO-ROUTE",
+      "scenario": "Layers use nominally recyclable materials but no identified recovery route accepts the actual joined/contaminated assembly.",
+      "expected_disposition": "no_demonstrated_circularity_pass",
+      "invariant": "Theoretical recyclability is not demonstrated recovery."
+    },
+    {
+      "case_id": "NC-STYLE-CHANGES-CONSTRUCTION",
+      "scenario": "A cover variant changes a seam, material grade, layer orientation, or fit-bearing dimension without a new revision.",
+      "expected_disposition": "candidate_identity_invalid_or_requalification_required",
+      "invariant": "Style changes cannot silently inherit evidence from a materially different construction."
+    },
+    {
+      "case_id": "NC-MISSING-METROLOGY",
+      "scenario": "A reported result lacks specimen identity, calibration, uncertainty, or test deviations.",
+      "expected_disposition": "no_verified_instrumented_test_pass",
+      "invariant": "Missing required metrology metadata blocks verification."
+    },
+    {
+      "case_id": "NC-SYNTHETIC-AS-MEASURED",
+      "scenario": "Synthetic protocol data is labelled as a physical measurement.",
+      "expected_disposition": "evidence_integrity_failure",
+      "invariant": "Synthetic and measured evidence must remain distinct."
+    },
+    {
+      "case_id": "NC-FIRMNESS-EQUALS-COMFORT",
+      "scenario": "A firmness rating is presented as proof of greater subjective comfort.",
+      "expected_disposition": "invalid_inference",
+      "invariant": "Firmness is not a substitute for comfort evaluation."
+    },
+    {
+      "case_id": "NC-RENDER-EQUALS-STRUCTURE",
+      "scenario": "A rendering is presented as proof of structural stability or manufacturability.",
+      "expected_disposition": "invalid_inference",
+      "invariant": "Visual plausibility does not establish physical or manufacturing performance."
+    }
+  ],
+  "required_result_states": [
+    "not_evaluable",
+    "synthetic_only",
+    "simulation_only",
+    "measured_preliminary",
+    "human_evaluated_preliminary",
+    "independently_replicated"
+  ],
+  "standards_reference_candidates": [
+    {
+      "id": "ASTM-F1566-14R21",
+      "url": "https://store.astm.org/f1566-14r21.html",
+      "use": "Potential comparative mattress methods; confirm applicability to exact topper assembly and record deviations."
+    },
+    {
+      "id": "EN-1957-2012",
+      "url": "https://www.nen.nl/en/nen-en-1957-2012-en-177099",
+      "use": "Bed/mattress durability and hardness methods. Firmness rating is not proof of comfort or quality; confirm scope for topper."
+    },
+    {
+      "id": "ISO-11092-2026",
+      "url": "https://www.iso.org/standard/85998.html",
+      "use": "Thermal and water-vapour resistance under steady-state test conditions, not complete in-use comfort."
+    },
+    {
+      "id": "ISO-12947-2-2016",
+      "url": "https://www.iso.org/standard/61058.html",
+      "use": "Textile abrasion specimen-breakdown method."
+    },
+    {
+      "id": "ISO-13934-1-2013",
+      "url": "https://www.iso.org/standard/60676.html",
+      "use": "Woven-fabric tensile force and elongation method."
+    },
+    {
+      "id": "ISO-20887-2020",
+      "url": "https://www.iso.org/standard/69370.html",
+      "use": "Design-for-disassembly/adaptability principles for construction; inspiration only, not a mattress conformity claim."
+    }
+  ],
+  "verification_status": {
+    "json_syntax": "must_parse",
+    "physical_measurements": "none",
+    "human_evaluation": "none",
+    "independent_replication": "none",
+    "release_qualification": "not_started"
+  }
+}
