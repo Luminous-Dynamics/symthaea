@@ -56,19 +56,36 @@ pub enum DetectorPanelError {
     Calibration(CalibrationError),
 }
 
-/// Selected detector summary suitable for an auditable monitor receipt.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// Selected detector/orientation, including the probe families that selected it.
+#[derive(Clone, Debug, PartialEq)]
 pub struct SelectedDetector {
     /// Column index in the supplied detector-score vectors.
     pub detector_index: usize,
-    /// +1 means higher scores aligned with the self-perturbation; -1 means lower scores did.
+    /// +1 means higher scores aligned with a probe; -1 means lower scores did.
     pub orientation: i8,
     /// Mean score on clean selector data.
     pub clean_mean: f64,
     /// Population standard deviation on clean selector data.
     pub clean_scale: f64,
-    /// AUC of the oriented detector separating clean from self-perturbed selector observations.
+    /// Best oriented AUC observed in a family that selected this channel.
     pub detectability_auc: f64,
+    /// Indices of individually evaluated probe families that selected this orientation.
+    pub probe_family_indices: Vec<usize>,
+}
+
+/// Auditable coverage result for one separately evaluated self-perturbation family.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ProbeFamilyCoverage {
+    /// Index of the family in the input slice to fit_multi_probe.
+    pub probe_family_index: usize,
+    /// Best oriented AUC of any detector for this family, including detectors below threshold.
+    pub best_detectability_auc: f64,
+    /// Number of detector channels meeting the detectability threshold before top-m truncation.
+    pub candidates_above_threshold: usize,
+    /// Number of selected detector/orientation channels retained for this family.
+    pub selected_channels: usize,
+    /// True when at least one channel for this probe family survived selection.
+    pub covered: bool,
 }
 
 /// Frozen reference-free detector panel. Fit once, then calibrate its aggregate independently.
@@ -76,6 +93,7 @@ pub struct SelectedDetector {
 pub struct DetectorPanelScorer {
     detector_count: usize,
     selected: Vec<SelectedDetector>,
+    probe_family_coverage: Vec<ProbeFamilyCoverage>,
     scale_floor: f64,
     aggregation: DetectorPanelAggregation,
 }
@@ -98,7 +116,44 @@ impl DetectorPanelScorer {
         scale_floor: f64,
         aggregation: DetectorPanelAggregation,
     ) -> Result<Self, DetectorPanelError> {
-        if clean_selection_scores.len() < 2 || perturbed_selection_scores.len() < 2 {
+        Self::fit_multi_probe(
+            clean_selection_scores,
+            &[perturbed_selection_scores.to_vec()],
+            top_m,
+            min_detectability_auc,
+            scale_floor,
+            aggregation,
+        )
+    }
+
+    /// Select detector/orientation channels separately for each predeclared probe family.
+    ///
+    /// Each family is evaluated independently; scores are never pooled across perturbation types
+    /// before measuring AUC. This prevents a strong response in one family from hiding a
+    /// specialist that responds in the opposite direction or only to another family. At most
+    /// top_m_per_family channels are selected within each family. Equivalent detector/orientation
+    /// pairs are merged, retaining every family index that selected the pair.
+    ///
+    /// A family with no selected channel is reported as uncovered in probe_family_coverage().
+    /// At least one family must select a detector overall, but an uncovered family is not treated
+    /// as an error: it is a limitation the benchmark caller must resolve or explicitly accept.
+    ///
+    /// Selection inputs may use self-generated probes only; evaluation labels and confirmatory
+    /// shift outcomes must not be used. Outer calibration must remain separate and independent.
+    pub fn fit_multi_probe(
+        clean_selection_scores: &[Vec<f64>],
+        perturbed_selection_families: &[Vec<Vec<f64>>],
+        top_m_per_family: usize,
+        min_detectability_auc: f64,
+        scale_floor: f64,
+        aggregation: DetectorPanelAggregation,
+    ) -> Result<Self, DetectorPanelError> {
+        if clean_selection_scores.len() < 2
+            || perturbed_selection_families.is_empty()
+            || perturbed_selection_families
+                .iter()
+                .any(|family| family.len() < 2)
+        {
             return Err(DetectorPanelError::InsufficientSelectionSamples);
         }
         if !min_detectability_auc.is_finite()
@@ -117,17 +172,19 @@ impl DetectorPanelScorer {
             .len();
         if detector_count == 0
             || !clean_selection_scores.iter().all(|row| row.len() == detector_count)
-            || !perturbed_selection_scores.iter().all(|row| row.len() == detector_count)
+            || perturbed_selection_families.iter().any(|family| {
+                family.iter().any(|row| row.len() != detector_count)
+            })
         {
             return Err(DetectorPanelError::InvalidSelectionShape);
         }
-        if top_m == 0 || top_m > detector_count {
+        if top_m_per_family == 0 || top_m_per_family > detector_count {
             return Err(DetectorPanelError::InvalidTopM);
         }
         if clean_selection_scores
             .iter()
             .flatten()
-            .chain(perturbed_selection_scores.iter().flatten())
+            .chain(perturbed_selection_families.iter().flatten().flatten())
             .any(|score| !score.is_finite())
         {
             return Err(DetectorPanelError::NonFiniteSelectionScore);
@@ -137,47 +194,98 @@ impl DetectorPanelScorer {
             .ok_or(DetectorPanelError::NumericalOverflow)?;
         let clean_scales = column_scales(clean_selection_scores, &clean_means, detector_count)
             .ok_or(DetectorPanelError::NumericalOverflow)?;
-        let mut candidates = Vec::with_capacity(detector_count);
+        let clean_columns = (0..detector_count)
+            .map(|index| column_values(clean_selection_scores, index))
+            .collect::<Vec<_>>();
 
-        for detector_index in 0..detector_count {
-            let clean = column_values(clean_selection_scores, detector_index);
-            let perturbed = column_values(perturbed_selection_scores, detector_index);
-            let raw_auc = auc_perturbed_higher(&clean, &perturbed);
-            let (orientation, detectability_auc) = if raw_auc >= 0.5 {
-                (1_i8, raw_auc)
-            } else {
-                (-1_i8, 1.0 - raw_auc)
-            };
-            if detectability_auc >= min_detectability_auc {
-                candidates.push(SelectedDetector {
-                    detector_index,
-                    orientation,
-                    clean_mean: clean_means[detector_index],
-                    clean_scale: clean_scales[detector_index],
-                    detectability_auc,
-                });
+        let mut selected = Vec::<SelectedDetector>::new();
+        let mut probe_family_coverage = Vec::with_capacity(perturbed_selection_families.len());
+
+        for (probe_family_index, perturbed_scores) in
+            perturbed_selection_families.iter().enumerate()
+        {
+            let perturbed_columns = (0..detector_count)
+                .map(|index| column_values(perturbed_scores, index))
+                .collect::<Vec<_>>();
+            let mut candidates = Vec::<SelectedDetector>::with_capacity(detector_count);
+            let mut best_detectability_auc = 0.5_f64;
+
+            for detector_index in 0..detector_count {
+                let raw_auc = auc_perturbed_higher(
+                    &clean_columns[detector_index],
+                    &perturbed_columns[detector_index],
+                );
+                let (orientation, detectability_auc) = if raw_auc >= 0.5 {
+                    (1_i8, raw_auc)
+                } else {
+                    (-1_i8, 1.0 - raw_auc)
+                };
+                best_detectability_auc = best_detectability_auc.max(detectability_auc);
+                if detectability_auc >= min_detectability_auc {
+                    candidates.push(SelectedDetector {
+                        detector_index,
+                        orientation,
+                        clean_mean: clean_means[detector_index],
+                        clean_scale: clean_scales[detector_index],
+                        detectability_auc,
+                        probe_family_indices: vec![probe_family_index],
+                    });
+                }
             }
+
+            let candidates_above_threshold = candidates.len();
+            candidates.sort_by(|left, right| {
+                right
+                    .detectability_auc
+                    .total_cmp(&left.detectability_auc)
+                    .then_with(|| left.detector_index.cmp(&right.detector_index))
+            });
+            candidates.truncate(top_m_per_family);
+            let selected_channels = candidates.len();
+
+            for candidate in candidates {
+                if let Some(existing) = selected.iter_mut().find(|existing| {
+                    existing.detector_index == candidate.detector_index
+                        && existing.orientation == candidate.orientation
+                }) {
+                    if !existing.probe_family_indices.contains(&probe_family_index) {
+                        existing.probe_family_indices.push(probe_family_index);
+                    }
+                    existing.detectability_auc =
+                        existing.detectability_auc.max(candidate.detectability_auc);
+                } else {
+                    selected.push(candidate);
+                }
+            }
+
+            probe_family_coverage.push(ProbeFamilyCoverage {
+                probe_family_index,
+                best_detectability_auc,
+                candidates_above_threshold,
+                selected_channels,
+                covered: selected_channels > 0,
+            });
         }
 
-        if candidates.is_empty() {
+        if selected.is_empty() {
             return Err(DetectorPanelError::NoInformativeDetectors);
         }
-        candidates.sort_by(|left, right| {
+        selected.sort_by(|left, right| {
             right
                 .detectability_auc
                 .total_cmp(&left.detectability_auc)
                 .then_with(|| left.detector_index.cmp(&right.detector_index))
+                .then_with(|| left.orientation.cmp(&right.orientation))
         });
-        candidates.truncate(top_m);
 
         Ok(Self {
             detector_count,
-            selected: candidates,
+            selected,
+            probe_family_coverage,
             scale_floor,
             aggregation,
         })
     }
-
     /// Produce a nonconformity score from one score per frozen detector.
     ///
     /// Returns None for a wrong detector width or any non-finite input. Higher values mean
@@ -238,6 +346,11 @@ impl DetectorPanelScorer {
     /// Indices and orientation statistics of selected detectors, sorted by self-detectability.
     pub fn selected_detectors(&self) -> &[SelectedDetector] {
         &self.selected
+    }
+
+    /// Coverage summary for each separately evaluated probe family.
+    pub fn probe_family_coverage(&self) -> &[ProbeFamilyCoverage] {
+        &self.probe_family_coverage
     }
 
     /// Total detector-vector width required by score.
@@ -409,6 +522,115 @@ mod tests {
             .selected_detectors()
             .iter()
             .any(|detector| detector.detector_index == 2));
+    }
+
+    #[test]
+    fn multi_probe_selection_preserves_specialists_and_reports_uncovered_family() {
+        let (clean, _) = selection_data();
+        let first_family = clean
+            .iter()
+            .map(|row| vec![row[0] + 3.0, row[1], row[2]])
+            .collect::<Vec<_>>();
+        let second_family = clean
+            .iter()
+            .map(|row| vec![row[0], row[1] - 2.0, row[2]])
+            .collect::<Vec<_>>();
+        let uninformative_family = clean.clone();
+        let pooled_families = first_family
+            .iter()
+            .chain(second_family.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(matches!(
+            DetectorPanelScorer::fit(
+                &clean,
+                &pooled_families,
+                1,
+                0.8,
+                1e-6,
+                DetectorPanelAggregation::MeanPositiveZ,
+            ),
+            Err(DetectorPanelError::NoInformativeDetectors)
+        ));
+
+        let panel = DetectorPanelScorer::fit_multi_probe(
+            &clean,
+            &[first_family, second_family, uninformative_family],
+            1,
+            0.8,
+            1e-6,
+            DetectorPanelAggregation::MeanPositiveZ,
+        )
+        .unwrap();
+
+        let selected = panel.selected_detectors();
+        assert!(selected.iter().any(|detector| {
+            detector.detector_index == 0
+                && detector.orientation == 1
+                && detector.probe_family_indices.contains(&0)
+        }));
+        assert!(selected.iter().any(|detector| {
+            detector.detector_index == 1
+                && detector.orientation == -1
+                && detector.probe_family_indices.contains(&1)
+        }));
+
+        let coverage = panel.probe_family_coverage();
+        assert_eq!(coverage.len(), 3);
+        assert!(coverage[0].covered);
+        assert!(coverage[1].covered);
+        assert_eq!(coverage[0].selected_channels, 1);
+        assert_eq!(coverage[1].selected_channels, 1);
+        assert!(!coverage[2].covered);
+        assert_eq!(coverage[2].selected_channels, 0);
+        assert!((coverage[2].best_detectability_auc - 0.5).abs() < 1e-12);
+
+        let clean_audit_score = panel.score(&clean[20]).unwrap();
+        let mut location_audit = clean[20].clone();
+        location_audit[0] += 3.0;
+        let mut reverse_audit = clean[20].clone();
+        reverse_audit[1] -= 2.0;
+        assert!(panel.score(&location_audit).unwrap() > clean_audit_score + 1.0);
+        assert!(panel.score(&reverse_audit).unwrap() > clean_audit_score + 1.0);
+    }
+
+    #[test]
+    fn multi_probe_rejects_malformed_family_and_insufficient_family_samples() {
+        let (clean, _) = selection_data();
+        assert!(matches!(
+            DetectorPanelScorer::fit_multi_probe(
+                &clean,
+                &[],
+                1,
+                0.75,
+                1e-6,
+                DetectorPanelAggregation::MeanPositiveZ,
+            ),
+            Err(DetectorPanelError::InsufficientSelectionSamples)
+        ));
+        assert!(matches!(
+            DetectorPanelScorer::fit_multi_probe(
+                &clean,
+                &[vec![vec![1.0, 2.0, 3.0]]],
+                1,
+                0.75,
+                1e-6,
+                DetectorPanelAggregation::MeanPositiveZ,
+            ),
+            Err(DetectorPanelError::InsufficientSelectionSamples)
+        ));
+        let malformed_family = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
+        assert!(matches!(
+            DetectorPanelScorer::fit_multi_probe(
+                &clean,
+                &[malformed_family],
+                1,
+                0.75,
+                1e-6,
+                DetectorPanelAggregation::MeanPositiveZ,
+            ),
+            Err(DetectorPanelError::InvalidSelectionShape)
+        ));
     }
 
     #[test]
