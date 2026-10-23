@@ -27,7 +27,7 @@ If validation evidence is missing or malformed for any candidate, the program wr
 
 ## Pinned runtime evidence overlay (required before validation)
 
-The current upstream validator discards command exit codes, ignores the boolean returns from `apply_patch`, writes only an aggregate of the three gold logs, and does not preserve each run's resolved Docker image ID. PR #8513 includes a patch against exactly SWE-bench-Live commit `62d02936a0726fbf4597b05bd07b09fb99eddae6`:
+The pinned upstream task-validation and scoring entry points discard command exit codes, ignore patch-application return values, and do not preserve the actual Docker image ID for every run. PR #8513 includes an overlay against exactly SWE-bench-Live commit `62d02936a0726fbf4597b05bd07b09fb99eddae6` for both `evaluation/validation.py` and `evaluation/evaluation.py`:
 
 `docs/research/patches/swe-bench-live-validation-evidence.patch`
 
@@ -41,6 +41,13 @@ git -C /tmp/SWE-bench-Live apply /path/to/symthaea/docs/research/patches/swe-ben
 python3 -m py_compile /tmp/SWE-bench-Live/evaluation/validation.py
 git -C /tmp/SWE-bench-Live submodule update --init launch
 ```
+
+The combined overlay modifies both the task-eligibility validation path and the scored-agent-patch evaluation path. Do not treat these streams as interchangeable:
+
+- `validation_evidence.json` records baseline plus three gold-patch control runs. These establish task eligibility and the expected oracle.
+- `evaluation_evidence.json` records one **scored prediction patch** run, including patch/test-patch hashes, whether both patches applied, actual rebuild/test/log exit codes, the resolved Docker image ID, the test-log hash, and parsed test statuses. Each task has one such file under the same evaluation output directory when scored.
+
+The Rust `rust-repair-manifest` tool currently validates and locks the **task-validation** stream. The scored-evaluation sidecar is a separate artifact and is not yet independently graded by this task-manifest binary; before publishing a scored comparison, run an independent scored-receipt verifier that joins each prediction to the locked task ID, verifies the prediction patch digest and raw log, and recomputes the official test verdict from the parsed statuses. Do not imply that a valid task manifest alone proves a scored agent rollout.
 
 Run the upstream three-repeat gold validation only after the overlay is applied. It records `validation_evidence.json`, a separate `gold_run_0.log`, `gold_run_1.log`, and `gold_run_2.log` per task.
 
