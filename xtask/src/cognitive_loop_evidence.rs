@@ -484,7 +484,7 @@ mod tests {
                     "minimum_unique_seeds": 2,
                     "bootstrap_replicates_min": 1000,
                     "bootstrap_replicates_max": 100000,
-                    "resampling": "sample dataset clusters with replacement, then paired records within dataset; give each dataset equal final weight",
+                    "resampling": "sample dataset clusters with replacement, then seeds with each complete paired scenario block; require identical scenario panel across datasets and give each dataset equal final weight",
                     "matching_key": ["dataset_id", "seed", "scenario_id"],
                     "required_outputs": ["candidate_dataset_macro_mean", "baseline_dataset_macro_mean", "dataset_macro_paired_effect", "median_oriented_paired_delta", "paired_win_fraction", "percentile_95_ci_oriented_effect", "bootstrap_fraction_effect_above_zero", "per_dataset", "canonical_input_sha256", "result_sha256"],
                     "claim_policy": "A positive interval is not a universal SOTA claim."
