@@ -1,0 +1,634 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark_id": "LUMINOUS-CHEM-PROC-QUAL",
+  "corpus_version": "1.1.0",
+  "created_utc": "2026-10-17",
+  "baseline_commit": "5e83cea4986ba3845aa50e0d5dd03493c5adeddf",
+  "source_specification": "docs/engineering/CHEMICAL_PROCESS_END_TO_END_QUALIFICATION_BENCHMARK_2026-10-17.md",
+  "purpose": "Deterministic contract corpus for testing expected evidence dispositions and fail-closed semantics. This file contains synthetic bookkeeping/evidence cases only.",
+  "scope_boundary": {
+    "data_class": "synthetic_non_operational",
+    "contains_hazardous_operating_recipes": false,
+    "establishes_chemical_route_feasibility": false,
+    "establishes_physical_model_accuracy": false,
+    "authorizes_process_control_or_plant_operation": false
+  },
+  "allowed_dispositions": [
+    "ACCEPTED_WITHIN_SCOPE",
+    "BLOCKED",
+    "UNRESOLVED",
+    "OUT_OF_DOMAIN"
+  ],
+  "evaluation_rules": [
+    "Compare the observed disposition to the frozen expected_disposition for every case.",
+    "ACCEPTED_WITHIN_SCOPE applies only to the explicitly named synthetic proposition and never promotes downstream claims.",
+    "BLOCKED, UNRESOLVED, and OUT_OF_DOMAIN are valid expected outcomes; they are not benchmark failures when expected.",
+    "A queued, skipped, missing, stale, non-converged, or unverified external result must never be counted as an independent pass.",
+    "The evaluator must report all cases, including errors and malformed inputs; it must not silently drop failures.",
+    "Acceptance thresholds and expected dispositions must not be tuned after observing candidate results.",
+    "Different solver implementations sharing any evidence-data dependency cannot be counted as independent corroboration; missing dependency provenance remains unresolved."
+  ],
+  "residual_profile": {
+    "name": "synthetic-analytic-v1",
+    "formula": "abs(accounted_in - accounted_out - declared_generation) / max(reference_scale, sum(abs(accounting_terms)))",
+    "target_max": 1e-8,
+    "scope": "Only the simplest analytically solvable synthetic fixtures; component, elemental, charge and energy balances use separate equations and declared sign conventions.",
+    "caveat": "No single residual threshold proves model validity, physical truth, product purity, safety, or industrial feasibility."
+  },
+  "cases": [
+    {
+      "id": "CHEM-PROC-001",
+      "class": "positive-control",
+      "scenario": "Balanced abstract mixer",
+      "claim_under_test": "Component balance closes for a non-reactive mixer.",
+      "fixture": {
+        "unit": "mixer",
+        "inlets": [
+          {
+            "component": "A",
+            "flow": 2,
+            "unit": "mol/s"
+          },
+          {
+            "component": "A",
+            "flow": 3,
+            "unit": "mol/s"
+          }
+        ],
+        "outlets": [
+          {
+            "component": "A",
+            "flow": 5,
+            "unit": "mol/s"
+          }
+        ],
+        "reaction": false
+      },
+      "expected_disposition": "ACCEPTED_WITHIN_SCOPE",
+      "required_findings": [
+        "component_balance_closed"
+      ],
+      "prohibited_promotions": [
+        "process_safety_qualified",
+        "plant_capability_qualified"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-002",
+      "class": "negative-control",
+      "scenario": "Component imbalance",
+      "claim_under_test": "A non-reactive stream transfer cannot destroy a declared component.",
+      "fixture": {
+        "unit": "mixer",
+        "inlets": [
+          {
+            "component": "A",
+            "flow": 2,
+            "unit": "mol/s"
+          }
+        ],
+        "outlets": [
+          {
+            "component": "A",
+            "flow": 1,
+            "unit": "mol/s"
+          }
+        ],
+        "reaction": false,
+        "unexplained_sink": false
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "component_balance_residual_nonzero"
+      ],
+      "prohibited_promotions": [
+        "balance_closed"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-003",
+      "class": "negative-control",
+      "scenario": "Incompatible units without conversion",
+      "claim_under_test": "A mass flow and a molar flow cannot be silently added.",
+      "fixture": {
+        "inlets": [
+          {
+            "component": "A",
+            "flow": 1,
+            "unit": "kg/s"
+          },
+          {
+            "component": "A",
+            "flow": 1,
+            "unit": "mol/s"
+          }
+        ],
+        "conversion_evidence": null
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "incompatible_quantity_dimensions"
+      ],
+      "prohibited_promotions": [
+        "combined_flow_valid"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-004",
+      "class": "metamorphic",
+      "scenario": "Equivalent unit representations",
+      "claim_under_test": "An explicit, versioned unit-conversion factor reproduces an equivalent representation within the frozen tolerance.",
+      "fixture": {
+        "conversion_kind": "volume_flow",
+        "from_value": 1,
+        "from_unit": "m^3/s",
+        "to_value": 1000,
+        "to_unit": "L/s",
+        "conversion_factor": 1000,
+        "conversion_factor_ref": "synthetic-unit-conversion-v1",
+        "conversion_rule": "to_value = from_value * conversion_factor"
+      },
+      "expected_disposition": "ACCEPTED_WITHIN_SCOPE",
+      "required_findings": [
+        "normalized_result_equivalent_within_frozen_tolerance"
+      ],
+      "prohibited_promotions": [
+        "unit_conversion_inferred_without_evidence"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-005",
+      "class": "negative-control",
+      "scenario": "Missing outlet/by-product stream",
+      "claim_under_test": "Unaccounted input cannot be assumed to disappear.",
+      "fixture": {
+        "component": "A",
+        "inlet_flow": 10,
+        "known_product_flow": 9,
+        "unknown_output_flow": null,
+        "declared_sink": null
+      },
+      "expected_disposition": "UNRESOLVED",
+      "required_findings": [
+        "unaccounted_material_remains_unknown"
+      ],
+      "prohibited_promotions": [
+        "material_balance_closed"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-006",
+      "class": "positive-control",
+      "scenario": "Explicitly declared accounting sink",
+      "claim_under_test": "A synthetic accounting balance can close when the full residual is explicitly assigned to a declared sink.",
+      "fixture": {
+        "component": "A",
+        "inlet_flow": 10,
+        "product_flow": 8,
+        "declared_sink_flow": 2,
+        "sink_evidence_kind": "synthetic_accounting_fixture"
+      },
+      "expected_disposition": "ACCEPTED_WITHIN_SCOPE",
+      "required_findings": [
+        "accounting_terms_sum_to_inlet"
+      ],
+      "prohibited_promotions": [
+        "environmental_discharge_permitted",
+        "safe_waste_management_qualified"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-007",
+      "class": "analytic-reference",
+      "scenario": "Analytic recycle closure",
+      "claim_under_test": "A declared linear synthetic recycle equation returns its known solution.",
+      "fixture": {
+        "equation": "x = fresh + recycle_fraction*x",
+        "fresh": 1,
+        "recycle_fraction": 0.2,
+        "analytic_solution": 1.25
+      },
+      "expected_disposition": "ACCEPTED_WITHIN_SCOPE",
+      "required_findings": [
+        "solution_matches_analytic_reference",
+        "residual_within_frozen_tolerance"
+      ],
+      "prohibited_promotions": [
+        "real_process_model_validated"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-008",
+      "class": "negative-control",
+      "scenario": "Recycle solver non-convergence",
+      "claim_under_test": "A failed solver may not yield an accepted solution.",
+      "fixture": {
+        "solver_status": "not_converged",
+        "reported_solution": 1.25,
+        "convergence_residual": null
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "solver_nonconvergence_preserved"
+      ],
+      "prohibited_promotions": [
+        "solution_qualified"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-009",
+      "class": "negative-control",
+      "scenario": "Reference-state mismatch",
+      "claim_under_test": "Thermodynamic quantities using incompatible reference states cannot be directly compared.",
+      "fixture": {
+        "quantity": "enthalpy",
+        "stream_a_reference": "REF_A",
+        "stream_b_reference": "REF_B",
+        "reconciliation_evidence": null
+      },
+      "expected_disposition": "UNRESOLVED",
+      "required_findings": [
+        "reference_state_mismatch_detected"
+      ],
+      "prohibited_promotions": [
+        "energy_balance_qualified"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-010",
+      "class": "negative-control",
+      "scenario": "Selectivity confused with recovery",
+      "claim_under_test": "A high selectivity claim alone cannot establish high recovery or product purity.",
+      "fixture": {
+        "reported_selectivity": 100,
+        "reported_recovery": null,
+        "product_assay": null,
+        "metric_definition": "synthetic_placeholder"
+      },
+      "expected_disposition": "UNRESOLVED",
+      "required_findings": [
+        "selectivity_recovery_purity_kept_distinct"
+      ],
+      "prohibited_promotions": [
+        "recovery_qualified",
+        "product_purity_qualified"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-011",
+      "class": "negative-control",
+      "scenario": "Unknown impurity profile",
+      "claim_under_test": "Unknown contaminants block admission to a grade-sensitive product specification.",
+      "fixture": {
+        "nominal_material": "MATERIAL_X",
+        "purity_status": "unknown",
+        "contaminant_profile": "unresolved",
+        "required_grade": "SPEC_GRADE_1"
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "grade_admission_blocked"
+      ],
+      "prohibited_promotions": [
+        "specification_grade_established"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-012",
+      "class": "negative-control",
+      "scenario": "Stale property evidence",
+      "claim_under_test": "Stale or non-current data cannot satisfy a currentness requirement.",
+      "fixture": {
+        "property_ref": "PROP_X",
+        "currentness": "stale",
+        "currentness_policy": "current_required"
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "stale_evidence_rejected_for_current_claim"
+      ],
+      "prohibited_promotions": [
+        "property_evidence_current"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-013",
+      "class": "negative-control",
+      "scenario": "Model outside validity domain",
+      "claim_under_test": "Out-of-domain predictions cannot qualify the declared engineering use.",
+      "fixture": {
+        "model_validity_domain": "DOMAIN_A",
+        "candidate_context": "DOMAIN_B",
+        "extrapolation_policy": "not_qualified"
+      },
+      "expected_disposition": "OUT_OF_DOMAIN",
+      "required_findings": [
+        "validity_domain_mismatch"
+      ],
+      "prohibited_promotions": [
+        "prediction_qualified_for_context"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-014",
+      "class": "negative-control",
+      "scenario": "Missing utility dependency",
+      "claim_under_test": "A flowsheet without a required utility is not a complete production capability.",
+      "fixture": {
+        "required_utilities": [
+          "UTILITY_A",
+          "UTILITY_B"
+        ],
+        "available_utilities": [
+          "UTILITY_A"
+        ],
+        "capability_claim": "complete"
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "missing_required_utility"
+      ],
+      "prohibited_promotions": [
+        "production_capability_complete"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-015",
+      "class": "negative-control",
+      "scenario": "Low-cost design violates a hard constraint",
+      "claim_under_test": "An infeasible candidate cannot win by compensating with lower cost.",
+      "fixture": {
+        "candidate_cost": 5,
+        "hard_constraint_status": "violated",
+        "optimization_policy": "hard_constraints_are_gates"
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "hard_constraint_violation_dominates_objective_score"
+      ],
+      "prohibited_promotions": [
+        "feasible_pareto_candidate"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-016",
+      "class": "uncertainty-control",
+      "scenario": "Candidate ordering changes under uncertainty",
+      "claim_under_test": "A robust winner is not asserted when ranking depends on unresolved uncertainty.",
+      "fixture": {
+        "candidate_A_point_score": 0.8,
+        "candidate_B_point_score": 0.75,
+        "uncertainty_overlap": true,
+        "sensitivity_changes_order": true
+      },
+      "expected_disposition": "UNRESOLVED",
+      "required_findings": [
+        "ranking_sensitivity_reported",
+        "point_estimate_not_overpromoted"
+      ],
+      "prohibited_promotions": [
+        "robust_winner_established"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-017",
+      "class": "negative-control",
+      "scenario": "Conflicting stream identity",
+      "claim_under_test": "Duplicate identities with conflicting state must not be silently merged.",
+      "fixture": {
+        "stream_id": "STREAM-1",
+        "definitions": [
+          {
+            "composition_digest": "digest-A"
+          },
+          {
+            "composition_digest": "digest-B"
+          }
+        ]
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "identity_conflict_detected"
+      ],
+      "prohibited_promotions": [
+        "canonical_stream_resolved"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-018",
+      "class": "negative-control",
+      "scenario": "Missing maintenance or spare dependency",
+      "claim_under_test": "A nominal equipment list is not lifecycle-closed when a required maintainability dependency is missing.",
+      "fixture": {
+        "equipment": [
+          "PUMP_A"
+        ],
+        "required_dependencies": [
+          "SEAL_SPARE_A",
+          "CALIBRATION_REF_A"
+        ],
+        "available_dependencies": [
+          "SEAL_SPARE_A"
+        ],
+        "claim": "lifecycle_closed"
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "maintenance_dependency_missing"
+      ],
+      "prohibited_promotions": [
+        "lifecycle_closure_established"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-019",
+      "class": "negative-control",
+      "scenario": "Simulation promoted to observation",
+      "claim_under_test": "A model prediction cannot be relabeled as observed batch evidence.",
+      "fixture": {
+        "result_origin": "simulation",
+        "requested_evidence_class": "physical_observation",
+        "measurement_record": null
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "evidence_class_mismatch"
+      ],
+      "prohibited_promotions": [
+        "physical_observation_established",
+        "batch_qualified"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-020",
+      "class": "negative-control",
+      "scenario": "Unknown purity treated as specification-grade",
+      "claim_under_test": "Nominal identity and inventory do not establish purity or process suitability.",
+      "fixture": {
+        "inventory_identity": "MATERIAL_X",
+        "purity_evidence": null,
+        "required_grade": "SPEC_GRADE_1"
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "inventory_not_used_as_purity_evidence"
+      ],
+      "prohibited_promotions": [
+        "grade_qualified"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-021",
+      "class": "tamper-control",
+      "scenario": "Conflicting source identifier",
+      "claim_under_test": "A property record with a reused identifier but mismatched content digest is rejected.",
+      "fixture": {
+        "source_id": "SRC-1",
+        "registered_digest": "sha256:aaa",
+        "presented_digest": "sha256:bbb"
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "provenance_digest_conflict"
+      ],
+      "prohibited_promotions": [
+        "source_identity_trusted"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-022",
+      "class": "negative-control",
+      "scenario": "Skipped reference solver reported as pass",
+      "claim_under_test": "Missing execution is distinct from a successful independent comparison.",
+      "fixture": {
+        "external_solver_status": "skipped",
+        "expected_reference_comparison": true
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "skipped_not_pass"
+      ],
+      "prohibited_promotions": [
+        "independent_reproduction_passed"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-023",
+      "class": "tamper-control",
+      "scenario": "Receipt bound to different source head",
+      "claim_under_test": "Evidence receipts are invalid when their declared head differs from the assessed source head.",
+      "fixture": {
+        "assessed_head": "sha256:head-A",
+        "receipt_head": "sha256:head-B"
+      },
+      "expected_disposition": "BLOCKED",
+      "required_findings": [
+        "exact_head_mismatch"
+      ],
+      "prohibited_promotions": [
+        "verdict_current_for_assessed_head"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-024",
+      "class": "positive-control",
+      "scenario": "Structurally connected but unqualified process",
+      "claim_under_test": "A syntactically valid graph can pass graph checks while remaining unqualified for physical manufacture.",
+      "fixture": {
+        "graph_connected": true,
+        "stream_schema_valid": true,
+        "model_validation": "not_established",
+        "equipment_qualification": "not_established"
+      },
+      "expected_disposition": "UNRESOLVED",
+      "required_findings": [
+        "structural_validity_separated_from_physical_qualification"
+      ],
+      "prohibited_promotions": [
+        "process_route_qualified",
+        "plant_build_authorized"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-025",
+      "class": "negative-control",
+      "scenario": "Different solver implementations share property evidence",
+      "claim_under_test": "Different solver identities and implementation digests do not establish independent corroboration when they share a property-data dependency.",
+      "fixture": {
+        "proposition_id": "SYNTHETIC-WATER-THERMOPHYSICS-PROPOSITION",
+        "dependency_manifests_complete": true,
+        "solver_a": {
+          "solver_id": "SOLVER_A",
+          "implementation_digest": "sha256:synthetic-implementation-a",
+          "evidence_dependency_digests": [
+            "sha256:shared-water-property-source-v1",
+            "sha256:source-a-parameter-set"
+          ]
+        },
+        "solver_b": {
+          "solver_id": "SOLVER_B",
+          "implementation_digest": "sha256:synthetic-implementation-b",
+          "evidence_dependency_digests": [
+            "sha256:shared-water-property-source-v1",
+            "sha256:source-b-parameter-set"
+          ]
+        }
+      },
+      "expected_disposition": "UNRESOLVED",
+      "required_findings": [
+        "shared_reference_dependency_detected",
+        "independent_corroboration_not_established"
+      ],
+      "prohibited_promotions": [
+        "independent_corroboration_established",
+        "physical_model_validated",
+        "plant_qualified"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-026",
+      "class": "positive-control",
+      "scenario": "Complete disjoint evidence dependencies",
+      "claim_under_test": "A synthetic dependency audit passes only when both manifests are complete, solver implementations differ, and their declared evidence-data dependencies are disjoint.",
+      "fixture": {
+        "proposition_id": "SYNTHETIC-WATER-THERMOPHYSICS-PROPOSITION",
+        "dependency_manifests_complete": true,
+        "solver_a": {
+          "solver_id": "SOLVER_A",
+          "implementation_digest": "sha256:synthetic-implementation-a",
+          "evidence_dependency_digests": [
+            "sha256:independent-reference-source-a",
+            "sha256:source-a-parameter-set"
+          ]
+        },
+        "solver_b": {
+          "solver_id": "SOLVER_B",
+          "implementation_digest": "sha256:synthetic-implementation-b",
+          "evidence_dependency_digests": [
+            "sha256:independent-reference-source-b",
+            "sha256:source-b-parameter-set"
+          ]
+        }
+      },
+      "expected_disposition": "ACCEPTED_WITHIN_SCOPE",
+      "required_findings": [
+        "dependency_manifests_complete",
+        "evidence_dependency_sets_disjoint"
+      ],
+      "prohibited_promotions": [
+        "physical_model_validated",
+        "plant_qualified"
+      ]
+    }
+  ],
+  "summary": {
+    "case_count": 26,
+    "positive_controls": 4,
+    "negative_controls": 17,
+    "metamorphic_cases": 1,
+    "analytic_reference_cases": 1,
+    "uncertainty_controls": 1,
+    "tamper_controls": 2,
+    "success_criterion": "100% exact disposition agreement on all frozen cases; zero silent promotions. These are future targets, not executed results."
+  }
+}
