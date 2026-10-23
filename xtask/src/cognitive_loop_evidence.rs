@@ -20,7 +20,7 @@ pub struct ManifestSummary {
 }
 
 const REQUIRED_BASELINES: [&str; 8] = ["B0", "B1", "B2", "B3", "B4", "B5", "B6", "B7"];
-const REQUIRED_DRIFT_DETECTORS: [&str; 8] = [
+const REQUIRED_DRIFT_DETECTORS: [&str; 14] = [
     "fixed-threshold",
     "ewma-control-chart",
     "page-hinkley",
@@ -29,6 +29,12 @@ const REQUIRED_DRIFT_DETECTORS: [&str; 8] = [
     "discriminative-drift-detector",
     "image-based-drift-detector",
     "semi-parametric-log-likelihood",
+    "seed",
+    "stepd",
+    "abcd-feature-space",
+    "abcd-error-stream",
+    "studd-adwin-compression",
+    "dynamic-threshold-dtd",
 ];
 const REQUIRED_RESULT_FIELDS: [&str; 12] = [
     "repository_head_sha",
@@ -55,8 +61,8 @@ pub fn validate_manifest(path: &Path) -> anyhow::Result<ManifestSummary> {
 fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
     ensure!(root.is_object(), "manifest root must be a JSON object");
     ensure!(
-        root.get("schema_version").and_then(Value::as_u64) == Some(2),
-        "schema_version must be the integer 2"
+        root.get("schema_version").and_then(Value::as_u64) == Some(3),
+        "schema_version must be the integer 3"
     );
     ensure!(
         string_field(root, "benchmark", "manifest")? == "symthaea-cognitive-loop-evidence",
@@ -107,10 +113,19 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
             source.starts_with("https://"),
             "{context}.source must be an HTTPS reference"
         );
-        detector
+        let labels_required = detector
             .get("labels_required")
             .and_then(Value::as_bool)
             .with_context(|| format!("{context}.labels_required must be boolean"))?;
+        let track = nonempty_string_field(detector, "comparison_track", &context)?;
+        ensure!(
+            ["valid-pe-only", "feature-only-unsupervised", "auxiliary-loss-unsupervised", "observed-outcome"].contains(&track),
+            "{context}.comparison_track uses an unknown evidence-access track"
+        );
+        ensure!(
+            labels_required == (track == "observed-outcome"),
+            "{context}.labels_required conflicts with comparison_track"
+        );
     }
     for expected in REQUIRED_DRIFT_DETECTORS {
         ensure!(
@@ -219,6 +234,43 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
         "result_contract.ci_policy must explicitly state that skipped checks are not passes"
     );
     nonempty_string_field(result_contract, "claim_policy", "result_contract")?;
+
+    let expected_shift_cases = [
+        "class-prior-abrupt", "class-prior-gradual",
+        "label-swap-abrupt", "label-swap-gradual",
+        "feature-permutation-abrupt", "feature-permutation-gradual",
+        "feature-filtering-abrupt", "feature-filtering-gradual",
+    ];
+    for expected in expected_shift_cases {
+        ensure!(case_ids.contains(expected), "S1 drift matrix is missing required case {expected}");
+    }
+
+    let drift_protocol = root.get("drift_protocol").context("manifest.drift_protocol is required")?;
+    ensure!(
+        nonempty_string_field(drift_protocol, "protocol_id", "drift_protocol")? == "leave-one-dataset-out-monte-carlo-v1",
+        "unexpected drift protocol id"
+    );
+    ensure!(
+        drift_protocol.get("monte_carlo_seeds").and_then(Value::as_u64).is_some_and(|n| n >= 30),
+        "drift_protocol.monte_carlo_seeds must be at least 30"
+    );
+    for field in ["drift_types", "transition_modes", "metrics", "research_extensions_not_yet_in_core_matrix"] {
+        nonempty_string_array(drift_protocol, field, "drift_protocol")?;
+    }
+    let access_tracks = array_field(drift_protocol, "detector_access_tracks", "drift_protocol")?;
+    let access_ids: BTreeSet<String> = access_tracks.iter().enumerate().map(|(i, track)| {
+        string_field(track, "id", &format!("drift_protocol.detector_access_tracks[{i}]")).map(str::to_owned)
+    }).collect::<anyhow::Result<_>>()?;
+    for required_track in ["valid-pe-only", "feature-only-unsupervised", "auxiliary-loss-unsupervised", "observed-outcome"] {
+        ensure!(access_ids.contains(required_track), "drift protocol is missing evidence access track {required_track}");
+    }
+    let matching_rule = nonempty_string_field(drift_protocol, "matching_rule", "drift_protocol")?;
+    for phrase in ["earliest unused alarm", "false alarm", "missed", "invalid/missing PE"] {
+        ensure!(matching_rule.contains(phrase), "drift_protocol.matching_rule must state: {phrase}");
+    }
+    nonempty_string_field(drift_protocol, "tuning_policy", "drift_protocol")?;
+    nonempty_string_field(drift_protocol, "source_paper", "drift_protocol")?;
+    nonempty_string_field(drift_protocol, "claims", "drift_protocol")?;
 
     Ok(ManifestSummary {
         baseline_count: baselines.len(),
@@ -345,7 +397,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
         json!({
-            "schema_version": 2,
+            "schema_version": 3,
             "benchmark": "symthaea-cognitive-loop-evidence",
             "status": "proposal-not-measured",
             "notes": ["A hard invariant cannot be averaged away."],
@@ -354,12 +406,31 @@ mod tests {
                 "id": id,
                 "name": format!("detector-{id}"),
                 "family": "fixture-family",
-                "labels_required": false,
-                "input_contract": "Valid numeric observations only.",
+                "comparison_track": if ["seed", "stepd", "abcd-error-stream", "dynamic-threshold-dtd"].contains(id) { "observed-outcome" } else if *id == "studd-adwin-compression" { "auxiliary-loss-unsupervised" } else if ["discriminative-drift-detector", "image-based-drift-detector", "semi-parametric-log-likelihood", "abcd-feature-space"].contains(id) { "feature-only-unsupervised" } else { "valid-pe-only" },
+                "labels_required": ["seed", "stepd", "abcd-error-stream", "dynamic-threshold-dtd"].contains(id),
+                "input_contract": "Valid observations only; declared access contract applies.",
                 "implementation_status": "planned-baseline",
                 "source": "https://example.com/reference"
             })).collect::<Vec<_>>(),
             "drift_detector_comparison_protocol": "Pin versions; tune on a disjoint calibration stream; never remap invalid/missing PE; report false alarms and detection-delay; candidates are not yet implemented or measured.",
+            "drift_protocol": {
+                "protocol_id": "leave-one-dataset-out-monte-carlo-v1",
+                "monte_carlo_seeds": 50,
+                "drift_types": ["class-prior", "label-swap", "feature-permutation", "feature-filtering"],
+                "transition_modes": ["abrupt", "gradual"],
+                "metrics": ["event-f1", "false-alarms-per-1000-valid-observations"],
+                "research_extensions_not_yet_in_core_matrix": ["incremental drift", "recurring drift"],
+                "detector_access_tracks": [
+                    {"id":"valid-pe-only","description":"PE only."},
+                    {"id":"feature-only-unsupervised","description":"Features only."},
+                    {"id":"auxiliary-loss-unsupervised","description":"Aux loss only."},
+                    {"id":"observed-outcome","description":"Observed outcomes."}
+                ],
+                "matching_rule": "Match the earliest unused alarm in each event interval. Unmatched alarm is a false alarm; unmatched event is missed; invalid/missing PE cannot be observations.",
+                "tuning_policy": "Tune on all but one dataset and hold that dataset out.",
+                "source_paper": "https://doi.org/10.1145/3770855.3819070",
+                "claims": "Comparator definitions are not measured results."
+            },
             "scenario_groups": [
                 {
                     "id": "S0-validity",
@@ -420,6 +491,22 @@ mod tests {
         assert_eq!(summary.baseline_count, 8);
         assert_eq!(summary.suite_count, 2);
         assert_eq!(summary.case_count, 4);
+    }
+
+    #[test]
+    fn rejects_detector_track_label_mismatch() {
+        let mut manifest = valid_manifest();
+        manifest["external_drift_detectors"][0]["comparison_track"] = json!("observed-outcome");
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("labels_required conflicts with comparison_track"));
+    }
+
+    #[test]
+    fn rejects_low_monte_carlo_seed_count() {
+        let mut manifest = valid_manifest();
+        manifest["drift_protocol"]["monte_carlo_seeds"] = json!(2);
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("must be at least 30"));
     }
 
     #[test]
