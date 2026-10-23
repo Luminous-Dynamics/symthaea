@@ -6,7 +6,7 @@
 
 A validated task manifest and a validated prediction run establish that a reported outcome is auditable. They do **not** establish that an intervention caused an improvement, that a small measured gain is larger than noise, or that a gain is economically worthwhile. The paired comparison tool closes part of that gap.
 
-It consumes two outputs from `rust-repair-score-audit` (control and treatment), an externally hash-locked preregistration, and a complete per-task cost/receipt ledger. It refuses mismatched task universes, mismatched task-manifest/candidate digests, duplicate IDs, inconsistent summary counters, and missing cost rows.
+It consumes two outputs from `rust-repair-score-audit` (control and treatment), an externally hash-locked preregistration, and a complete per-task cost/receipt ledger. It refuses mismatched task universes, mismatched task-manifest/candidate digests, duplicate IDs, inconsistent summary counters, missing cost rows, and resolved task rows that lack evidence hashes or the required runtime-isolation/test-accounting fields. A syntactically valid hash is still only a commitment to bytes, not proof those bytes are truthful.
 
 ## Invoke
 
@@ -134,4 +134,4 @@ A credible "better than SOTA" claim requires the same frozen task universe, grad
 
 ## Validation status
 
-The source contains unit tests for conservative unresolved bounds, deterministic resampling, quantiles, duplicate IDs, summary-counter tampering, missing coverage, invalid hashes, and report inconsistency. The binary has been registered in Cargo and in the existing pinned-evaluator workflow for formatting, tests, and strict Clippy. Those checks must be run before treating the tool as verified. An authored test is not a passing test; a queued, skipped, or unobserved CI run is not a pass.
+The source contains unit tests for conservative unresolved bounds, deterministic resampling, quantiles, duplicate IDs, summary-counter tampering, missing coverage, invalid hashes, report inconsistency, and resolved rows that omit runtime evidence. The binary has been registered in Cargo and in the existing pinned-evaluator workflow for formatting, tests, and strict Clippy. Those checks must be run before treating the tool as verified. An authored test is not a passing test; a queued, skipped, or unobserved CI run is not a pass.
