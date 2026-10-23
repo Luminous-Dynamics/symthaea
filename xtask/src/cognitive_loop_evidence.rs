@@ -521,6 +521,14 @@ mod tests {
     }
 
     #[test]
+    fn rejects_incomplete_trace_contract() {
+        let mut manifest = valid_manifest();
+        manifest["drift_protocol"]["trace_contract"] = json!("Detector metadata is not recorded.");
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("trace_contract must state: detector_version"));
+    }
+
+    #[test]
     fn rejects_low_monte_carlo_seed_count() {
         let mut manifest = valid_manifest();
         manifest["drift_protocol"]["monte_carlo_seeds"] = json!(2);
