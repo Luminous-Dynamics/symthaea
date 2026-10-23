@@ -154,6 +154,102 @@ if [[ -n "${identity_failure}" ]]; then
   exit 2
 fi
 
+# Generate expected words from canonical Symthaea BinaryHV before simulating
+# the datapath. This keeps the oracle implementation outside the RTL testbench.
+oracle_dir="${out_dir}/oracle"
+mkdir -p "${oracle_dir}"
+if ! (cd "${repo_root}" && cargo run --locked --offline -p symthaea-silicon --bin hdc_rtl_oracle -- --output-dir "${oracle_dir}" --expected-git-head "${git_head}") > "${out_dir}/oracle-generator.log" 2>&1; then
+  oracle_fixture_receipt_sha="$(hash_file "${oracle_dir}/oracle_receipt.json")"
+  jq -n \
+    --arg status "failed" \
+    --arg timestamp_utc "${stamp}" \
+    --arg git_head "${git_head}" \
+    --arg verilator_version "${verilator_version}" \
+    --arg out_dir "${out_dir}" \
+    --arg rtl_xor_sha256 "${rtl_xor_sha}" \
+    --arg tb_xor_sha256 "${tb_xor_sha}" \
+    --arg rtl_hamming_sha256 "${rtl_hamming_sha}" \
+    --arg tb_hamming_sha256 "${tb_hamming_sha}" \
+    --arg runner_sha256 "${runner_sha}" \
+    --arg manifest_sha256 "${manifest_sha}" \
+    --arg receipt_schema_sha256 "${receipt_schema_sha}" \
+    --arg case_matrix_sha256 "${case_matrix_sha}" \
+    --arg receipt_validator_sha256 "${receipt_validator_sha}" \
+    --arg oracle_generator_sha256 "${oracle_generator_sha}" \
+    --arg silicon_cargo_manifest_sha256 "${silicon_cargo_manifest_sha}" \
+    --arg canonical_binary_hv_sha256 "${canonical_binary_hv_sha}" \
+    --arg cargo_lock_sha256 "${cargo_lock_sha}" \
+    --arg oracle_fixture_receipt_sha256 "${oracle_fixture_receipt_sha}" \
+    --arg flake_sha256 "${flake_sha}" \
+    --arg flake_lock_sha256 "${flake_lock_sha}" \
+    '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, missing_tools:[], source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,receipt_schema:$receipt_schema_sha256,case_matrix:$case_matrix_sha256,receipt_validator:$receipt_validator_sha256,oracle_generator:$oracle_generator_sha256,silicon_cargo_manifest:$silicon_cargo_manifest_sha256,canonical_binary_hv_source:$canonical_binary_hv_sha256,cargo_lock:$cargo_lock_sha256,oracle_fixture_receipt:$oracle_fixture_receipt_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, widths_tested:[], architectures:["xor","linear_popcount","balanced_popcount"], case_results:[], output_directory:$out_dir, claim_ceiling:"No RTL simulation started: canonical BinaryHV software-oracle fixture generation failed."}' \
+    > "${out_dir}/receipt.json"
+  sha256sum "${out_dir}/oracle-generator.log" >> "${out_dir}/log-sha256.txt"
+  printf 'FAIL: canonical BinaryHV oracle generation failed; see %s/oracle-generator.log\n' "${out_dir}" >&2
+  exit 1
+fi
+
+oracle_receipt="${oracle_dir}/oracle_receipt.json"
+oracle_fixture_receipt_sha="$(hash_file "${oracle_receipt}")"
+oracle_git_head="$(jq -r '.git_head // empty' "${oracle_receipt}" 2>/dev/null || true)"
+oracle_source_sha="$(jq -r '.canonical_source_sha256 // empty' "${oracle_receipt}" 2>/dev/null || true)"
+oracle_lock_sha="$(jq -r '.cargo_lock_sha256 // empty' "${oracle_receipt}" 2>/dev/null || true)"
+oracle_valid=true
+if [[ "${oracle_git_head}" != "${git_head}" || "${oracle_source_sha}" != "${canonical_binary_hv_sha}" || "${oracle_lock_sha}" != "${cargo_lock_sha}" || ! "${oracle_fixture_receipt_sha}" =~ ^[a-f0-9]{64}$ ]]; then
+  oracle_valid=false
+fi
+
+declare -A oracle_word_counts
+declare -A oracle_xor_files
+declare -A oracle_hamming_files
+for width in 64 128 256 512; do
+  words="$(jq -r --argjson width "${width}" '.widths[] | select(.datapath_width_bits == $width) | .word_cases' "${oracle_receipt}" 2>/dev/null || true)"
+  xor_name="$(jq -r --argjson width "${width}" '.widths[] | select(.datapath_width_bits == $width) | .xor_mem_file' "${oracle_receipt}" 2>/dev/null || true)"
+  xor_expected_sha="$(jq -r --argjson width "${width}" '.widths[] | select(.datapath_width_bits == $width) | .xor_mem_sha256' "${oracle_receipt}" 2>/dev/null || true)"
+  hamming_name="$(jq -r --argjson width "${width}" '.widths[] | select(.datapath_width_bits == $width) | .hamming_mem_file' "${oracle_receipt}" 2>/dev/null || true)"
+  hamming_expected_sha="$(jq -r --argjson width "${width}" '.widths[] | select(.datapath_width_bits == $width) | .hamming_mem_sha256' "${oracle_receipt}" 2>/dev/null || true)"
+  xor_actual_sha="$(hash_file "${oracle_dir}/${xor_name}")"
+  hamming_actual_sha="$(hash_file "${oracle_dir}/${hamming_name}")"
+  if [[ ! "${words}" =~ ^[1-9][0-9]*$ || "${xor_name}" != "hdc_oracle_xor_w${width}.mem" || "${hamming_name}" != "hdc_oracle_hamming_w${width}.mem" || "${xor_actual_sha}" != "${xor_expected_sha}" || "${hamming_actual_sha}" != "${hamming_expected_sha}" ]]; then
+    oracle_valid=false
+  else
+    oracle_word_counts["${width}"]="${words}"
+    oracle_xor_files["${width}"]="${oracle_dir}/${xor_name}"
+    oracle_hamming_files["${width}"]="${oracle_dir}/${hamming_name}"
+  fi
+done
+
+if [[ "${oracle_valid}" != "true" ]]; then
+  printf 'FAIL: canonical oracle receipt, Git/source identity, or .mem hashes mismatch\n' > "${out_dir}/oracle-validation.log"
+  jq -n \
+    --arg status "failed" \
+    --arg timestamp_utc "${stamp}" \
+    --arg git_head "${git_head}" \
+    --arg verilator_version "${verilator_version}" \
+    --arg out_dir "${out_dir}" \
+    --arg rtl_xor_sha256 "${rtl_xor_sha}" \
+    --arg tb_xor_sha256 "${tb_xor_sha}" \
+    --arg rtl_hamming_sha256 "${rtl_hamming_sha}" \
+    --arg tb_hamming_sha256 "${tb_hamming_sha}" \
+    --arg runner_sha256 "${runner_sha}" \
+    --arg manifest_sha256 "${manifest_sha}" \
+    --arg receipt_schema_sha256 "${receipt_schema_sha}" \
+    --arg case_matrix_sha256 "${case_matrix_sha}" \
+    --arg receipt_validator_sha256 "${receipt_validator_sha}" \
+    --arg oracle_generator_sha256 "${oracle_generator_sha}" \
+    --arg silicon_cargo_manifest_sha256 "${silicon_cargo_manifest_sha}" \
+    --arg canonical_binary_hv_sha256 "${canonical_binary_hv_sha}" \
+    --arg cargo_lock_sha256 "${cargo_lock_sha}" \
+    --arg oracle_fixture_receipt_sha256 "${oracle_fixture_receipt_sha}" \
+    --arg flake_sha256 "${flake_sha}" \
+    --arg flake_lock_sha256 "${flake_lock_sha}" \
+    '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, missing_tools:[], source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,receipt_schema:$receipt_schema_sha256,case_matrix:$case_matrix_sha256,receipt_validator:$receipt_validator_sha256,oracle_generator:$oracle_generator_sha256,silicon_cargo_manifest:$silicon_cargo_manifest_sha256,canonical_binary_hv_source:$canonical_binary_hv_sha256,cargo_lock:$cargo_lock_sha256,oracle_fixture_receipt:$oracle_fixture_receipt_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, widths_tested:[], architectures:["xor","linear_popcount","balanced_popcount"], case_results:[], output_directory:$out_dir, claim_ceiling:"No RTL simulation started: software-oracle fixture receipt or file hashes were invalid."}' \
+    > "${out_dir}/receipt.json"
+  sha256sum "${out_dir}/oracle-validation.log" >> "${out_dir}/log-sha256.txt"
+  printf 'FAIL: canonical oracle evidence did not validate; receipt: %s/receipt.json\n' "${out_dir}" >&2
+  exit 1
+fi
+
 case_results="[]"
 overall_status="simulation_smoke_pass"
 for width in 64 128 256 512; do
