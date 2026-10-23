@@ -1,0 +1,20 @@
+[package]
+name = "marine-cost-model-bench"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Evidence-aware acquisition and lifecycle cost comparator for marine vessel concepts"
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "synthetic"
+path = "examples/synthetic.rs"
+
+[dependencies]
+
+# Isolate this tool from the large Symthaea workspace.
+[workspace]
