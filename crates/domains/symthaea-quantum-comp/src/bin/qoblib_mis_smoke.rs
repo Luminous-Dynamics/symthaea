@@ -53,6 +53,28 @@ fn json_numbers(values: &[usize]) -> String {
     format!("[{body}]")
 }
 
+fn qoblib_run_points_json(trace: &[(u128, usize)]) -> String {
+    let points = trace.iter()
+        .map(|(elapsed_ns, incumbent)| {
+            format!(
+                "{{\"Time\": {:.9}, \"Incumbent\": {}}}",
+                *elapsed_ns as f64 / 1_000_000_000.0,
+                incumbent
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("[{points}]")
+}
+
+fn qoblib_many_runs_series_json(runs: &[Vec<(u128, usize)>]) -> String {
+    let body = runs.iter()
+        .map(|trace| qoblib_run_points_json(trace))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("[{body}]")
+}
+
 const MULTISTART_GREEDY_RUNS: usize = 16;
 const MULTISTART_GREEDY_SEED_BASE: u64 = 0x5143_4f4d_505f_3031;
 
@@ -191,16 +213,16 @@ struct MultiStartGreedyResult {
     objective_time_series: Vec<Vec<(u128, usize)>>,
 }
 
-fn multi_start_greedy(graph: &MisGraph, repeats: usize) -> MultiStartGreedyResult {
+fn multi_start_greedy(graph: &MisGraph, repeats: usize, seed_base: u64) -> MultiStartGreedyResult {
     let repeats = repeats.max(1);
     let mut best_vertices = Vec::new();
-    let mut best_seed = MULTISTART_GREEDY_SEED_BASE;
+    let mut best_seed = seed_base;
     let mut objectives = Vec::with_capacity(repeats);
     let mut objective_time_series = Vec::with_capacity(repeats);
     let mut unique_solutions = BTreeSet::new();
 
     for run_index in 0..repeats {
-        let seed = MULTISTART_GREEDY_SEED_BASE.wrapping_add(run_index as u64);
+        let seed = seed_base.wrapping_add(run_index as u64);
         let run = greedy_min_residual_degree_with_seed_trace(graph, Some(seed));
         let vertices = run.vertices;
         objectives.push(vertices.len());
@@ -372,7 +394,7 @@ fn failure_receipt_json(path: &str, failure: &RunFailure) -> String {
             "  \"error_kind\": \"{}\",\n",
             "  \"error\": \"{}\",\n",
             "  \"software\": {{\"package_version\": \"{}\", \"target_os\": \"{}\", \"target_arch\": \"{}\", \"rustc_version\": \"{}\"}},\n",
-            "  \"determinism\": \"deterministic-no-random-seed\",\n",
+            "  \"determinism\": \"not-run: failure occurred before optimizer receipt\",\n",
             "  \"resource_limits\": {{\"time_limit_ns\": null, \"memory_limit_bytes\": null, \"max_input_bytes\": {}, \"max_vertices\": {}, \"max_edges\": {}}},\n",
             "  \"timing_ns\": {{\"end_to_end\": {}}},\n",
             "  \"limitations\": [\"FNV-1a is a non-cryptographic integrity checksum\", \"no runtime limit or memory limit was configured\", \"failure receipt records a read or parse failure rather than silently dropping the run\", \"this run does not execute a quantum backend\"]\n",
@@ -394,7 +416,7 @@ fn failure_receipt_json(path: &str, failure: &RunFailure) -> String {
     )
 }
 
-fn run(path: &str) -> Result<(), RunFailure> {
+fn run(path: &str, seed_base: u64) -> Result<(), RunFailure> {
     let end_to_end_start = Instant::now();
     let limits = MisDimacsLimits::default();
     let metadata = fs::metadata(path).map_err(|error| RunFailure {
@@ -436,10 +458,10 @@ fn run(path: &str) -> Result<(), RunFailure> {
     })?;
     let parse_ns = parse_start.elapsed().as_nanos();
 
-    let greedy_start = Instant::now();
-    let greedy = greedy_min_residual_degree(&parsed.graph);
-    let greedy_ns = greedy_start.elapsed().as_nanos();
-    let greedy_report = parsed.graph.verify_solution(&greedy, Some(greedy.len()));
+    let greedy_run = greedy_min_residual_degree_with_seed_trace(&parsed.graph, None);
+    let greedy = &greedy_run.vertices;
+    let greedy_ns = greedy_run.elapsed_nanos;
+    let greedy_report = parsed.graph.verify_solution(greedy, Some(greedy.len()));
     if !greedy_report.feasible {
         return Err(RunFailure {
             kind: "greedy_verification",
@@ -451,7 +473,7 @@ fn run(path: &str) -> Result<(), RunFailure> {
     }
 
     let portfolio_start = Instant::now();
-    let portfolio = multi_start_greedy(&parsed.graph, MULTISTART_GREEDY_RUNS);
+    let portfolio = multi_start_greedy(&parsed.graph, MULTISTART_GREEDY_RUNS, seed_base);
     let portfolio_ns = portfolio_start.elapsed().as_nanos();
     let portfolio_report = parsed.graph.verify_solution(
         &portfolio.best_vertices,
@@ -469,7 +491,7 @@ fn run(path: &str) -> Result<(), RunFailure> {
 
     let local_start = Instant::now();
     let local: Option<LocalImprovementResult> = if parsed.graph.vertex_count() <= LOCAL_SEARCH_MAX_VERTICES {
-        Some(improve_one_for_two(&parsed.graph, &greedy, LOCAL_SEARCH_MAX_PAIR_CHECKS))
+        Some(improve_one_for_two(&parsed.graph, greedy, LOCAL_SEARCH_MAX_PAIR_CHECKS))
     } else {
         None
     };
@@ -528,20 +550,26 @@ fn run(path: &str) -> Result<(), RunFailure> {
         )
     }).unwrap_or_else(|| "skipped-vertex-limit".to_owned());
     let portfolio_normalized = format!(
-        "seed={}|objectives={}|distinct={}|vertices={}",
+        "seed_base={}|best_seed={}|objectives={}|distinct={}|vertices={}",
+        seed_base,
         portfolio.best_seed,
         portfolio.objectives.iter().map(usize::to_string).collect::<Vec<_>>().join(","),
         portfolio.distinct_solutions,
         portfolio.best_vertices.iter().map(|vertex| (vertex + 1).to_string()).collect::<Vec<_>>().join(",")
     );
     let normalized = format!(
-        "v3|{}|{}|{}|greedy-min-residual-degree|{}|portfolio={}|local={}|exact={}",
+        "v4|source={}|vertices={}|edges={}|seed_base={}|restarts={}|greedy-min-residual-degree|{}|portfolio={}|local_max_vertices={}|local_pair_budget={}|local={}|exact_max_vertices={}|exact={}",
         format!("{source_hash:016x}"),
         parsed.declared_vertex_count,
         parsed.declared_edge_count,
+        seed_base,
+        MULTISTART_GREEDY_RUNS,
         greedy.iter().map(|vertex| (vertex + 1).to_string()).collect::<Vec<_>>().join(","),
         portfolio_normalized,
+        LOCAL_SEARCH_MAX_VERTICES,
+        LOCAL_SEARCH_MAX_PAIR_CHECKS,
         local_normalized,
+        EXACT_ORACLE_MAX_VERTICES,
         exact.as_ref().map(|vertices| vertices.iter()
             .map(|vertex| (vertex + 1).to_string()).collect::<Vec<_>>().join(","))
             .unwrap_or_else(|| "skipped-over-limit".to_owned())
@@ -566,9 +594,11 @@ fn run(path: &str) -> Result<(), RunFailure> {
             "  \"exact_oracle\": {{\"status\": \"{}\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"elapsed_ns\": {}}},\n",
             "  \"timing_ns\": {{\"parse\": {}, \"end_to_end\": {}}},\n",
             "  \"software\": {{\"package_version\": \"{}\", \"target_os\": \"{}\", \"target_arch\": \"{}\", \"rustc_version\": \"{}\"}},\n",
-            "  \"determinism\": \"deterministic-no-random-seed\",\n",
+            "  \"determinism\": \"same input, toolchain and seed replay algorithm outcomes; elapsed fields vary\",\n",
             "  \"resource_limits\": {{\"time_limit_ns\": null, \"memory_limit_bytes\": null, \"max_input_bytes\": {}, \"max_vertices\": {}, \"max_edges\": {}}},\n",
             "  \"normalized_result_fnv1a64\": \"{:016x}\",\n",
+            "  \"qoblib_objective_time_series\": {{\"deterministic_greedy\": {}, \"multi_start_greedy_per_trial\": {}, \"local_improvement_stage\": {}}},\n",
+            "  \"randomness\": {{\"seed_base\": {}, \"restarts\": {}, \"policy\": \"XorShift64 seeded tie-breaks\"}},\n",
             "  \"limitations\": [\"FNV-1a is a non-cryptographic integrity checksum\", \"wall-clock timings are local diagnostics and are not comparable across machines without a controlled protocol\", \"the bounded exact oracle is a correctness reference, not a competitive solver\", \"this run does not execute a quantum backend\"]\n",
             "}}"
         ),
@@ -579,7 +609,7 @@ fn run(path: &str) -> Result<(), RunFailure> {
         parsed.declared_edge_count,
         greedy_report.computed_objective,
         greedy_report.feasible,
-        json_vertices(&greedy),
+        json_vertices(greedy),
         greedy_ns,
         MULTISTART_GREEDY_RUNS,
         portfolio.best_seed,
@@ -610,28 +640,75 @@ fn run(path: &str) -> Result<(), RunFailure> {
         limits.max_input_bytes,
         limits.max_vertices,
         limits.max_edges,
-        normalized_hash
+        normalized_hash,
+        qoblib_many_runs_series_json(&[greedy_run.objective_time_series.clone()]),
+        qoblib_many_runs_series_json(&portfolio.objective_time_series),
+        local.as_ref()
+            .map(|result| qoblib_many_runs_series_json(&[result.objective_time_series.clone()]))
+            .unwrap_or_else(|| "null".to_owned()),
+        seed_base,
+        MULTISTART_GREEDY_RUNS
     );
     Ok(())
 }
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 2 || args[1] == "--help" || args[1] == "-h" {
-        eprintln!("Usage: qoblib-mis-smoke <path-to-DIMACS-edge-graph>");
-        eprintln!("Emits a JSON smoke receipt with a deterministic greedy solution and, for at most {EXACT_ORACLE_MAX_VERTICES} vertices, the tiny exact reference.");
-        return if args.len() == 2 { ExitCode::SUCCESS } else { ExitCode::from(2) };
+    let mut path: Option<String> = None;
+    let mut seed_base = MULTISTART_GREEDY_SEED_BASE;
+    let mut index = 1usize;
+
+    while index < args.len() {
+        match args[index].as_str() {
+            "--help" | "-h" => {
+                eprintln!("Usage: qoblib-mis-smoke [--seed-base <u64>] <path-to-DIMACS-edge-graph>");
+                eprintln!("Runs one deterministic greedy control, 16 seeded randomized greedy trials, bounded local improvement, and the tiny exact reference when within its vertex limit.");
+                return ExitCode::SUCCESS;
+            }
+            "--seed-base" => {
+                if index + 1 >= args.len() {
+                    eprintln!("--seed-base requires an unsigned 64-bit integer");
+                    return ExitCode::from(2);
+                }
+                match args[index + 1].parse::<u64>() {
+                    Ok(seed) => seed_base = seed,
+                    Err(_) => {
+                        eprintln!("invalid --seed-base value: {:?}", args[index + 1]);
+                        return ExitCode::from(2);
+                    }
+                }
+                index += 2;
+            }
+            argument if argument.starts_with("--") => {
+                eprintln!("unknown option: {argument}");
+                eprintln!("Usage: qoblib-mis-smoke [--seed-base <u64>] <path-to-DIMACS-edge-graph>");
+                return ExitCode::from(2);
+            }
+            argument => {
+                if path.is_some() {
+                    eprintln!("only one DIMACS graph path may be supplied");
+                    return ExitCode::from(2);
+                }
+                path = Some(argument.to_owned());
+                index += 1;
+            }
+        }
     }
-    match run(&args[1]) {
+
+    let Some(path) = path else {
+        eprintln!("Usage: qoblib-mis-smoke [--seed-base <u64>] <path-to-DIMACS-edge-graph>");
+        return ExitCode::from(2);
+    };
+
+    match run(&path, seed_base) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("{}", error.message);
-            println!("{}", failure_receipt_json(&args[1], &error));
+            println!("{}", failure_receipt_json(&path, &error));
             ExitCode::FAILURE
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -660,10 +737,20 @@ mod tests {
         let graph = MisGraph::new(7, [
             (0, 3), (0, 4), (1, 3), (1, 5), (2, 4), (2, 6), (3, 5), (4, 6),
         ]).unwrap();
-        let first = multi_start_greedy(&graph, MULTISTART_GREEDY_RUNS);
-        let second = multi_start_greedy(&graph, MULTISTART_GREEDY_RUNS);
-        assert_eq!(first, second);
+        let first = multi_start_greedy(&graph, MULTISTART_GREEDY_RUNS, MULTISTART_GREEDY_SEED_BASE);
+        let second = multi_start_greedy(&graph, MULTISTART_GREEDY_RUNS, MULTISTART_GREEDY_SEED_BASE);
+        assert_eq!(first.best_vertices, second.best_vertices);
+        assert_eq!(first.best_seed, second.best_seed);
+        assert_eq!(first.objectives, second.objectives);
+        assert_eq!(first.distinct_solutions, second.distinct_solutions);
         assert_eq!(first.objectives.len(), MULTISTART_GREEDY_RUNS);
+        assert_eq!(first.objective_time_series.len(), MULTISTART_GREEDY_RUNS);
+        for (trace, objective) in first.objective_time_series.iter().zip(first.objectives.iter()) {
+            assert_eq!(trace.first().map(|point| point.1), Some(0));
+            assert_eq!(trace.last().map(|point| point.1), Some(*objective));
+            assert!(trace.windows(2).all(|pair| pair[0].1 <= pair[1].1));
+            assert!(trace.windows(2).all(|pair| pair[0].0 <= pair[1].0));
+        }
         assert!(first.best_vertices.len() <= graph.vertex_count());
         assert!(graph.verify_solution(&first.best_vertices, Some(first.best_vertices.len())).feasible);
         assert!(first.distinct_solutions >= 1);
@@ -682,6 +769,10 @@ mod tests {
         assert!(improved.locally_optimal);
         assert_eq!(improved.vertices, vec![1, 4, 5]);
         assert_eq!(improved.exchanges, 1);
+        assert_eq!(improved.objective_time_series.first().map(|point| point.1), Some(2));
+        assert_eq!(improved.objective_time_series.last().map(|point| point.1), Some(3));
+        assert!(improved.objective_time_series.windows(2).all(|pair| pair[0].1 <= pair[1].1));
+        assert!(improved.objective_time_series.windows(2).all(|pair| pair[0].0 <= pair[1].0));
         assert!(graph.verify_solution(&improved.vertices, Some(3)).feasible);
     }
 
