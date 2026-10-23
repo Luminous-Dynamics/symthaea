@@ -406,4 +406,57 @@ mod tests {
             Err(MisInferenceError::NonFiniteObservation { index: 1 })
         );
     }
+
+    #[test]
+    fn median_interval_coverage_matches_integer_binomial_reference_for_small_samples() {
+        fn reference_coverage(n: usize, k: usize) -> f64 {
+            // Independent integer binomial recurrence for P(Binomial(n, 0.5) <= k - 1).
+            let mut coefficient = 1_u128;
+            let mut lower_tail = 0_u128;
+            for j in 0..k {
+                if j > 0 {
+                    coefficient = coefficient * (n - j + 1) as u128 / j as u128;
+                }
+                lower_tail += coefficient;
+            }
+            let all_assignments = (1_u128 << n) as f64;
+            (1.0 - 2.0 * lower_tail as f64 / all_assignments).clamp(0.0, 1.0)
+        }
+
+        for n in 1..=32 {
+            let ordered: Vec<f64> = (0..n).map(|i| i as f64).collect();
+            for confidence in [0.50, 0.75, 0.90, 0.95, 0.99] {
+                let result = median_order_statistic_interval(&ordered, confidence).unwrap();
+                match result.order_statistic_k {
+                    Some(k) => {
+                        let expected = reference_coverage(n, k);
+                        assert!(
+                            (result.achieved_coverage.unwrap() - expected).abs() < 1e-12,
+                            "coverage mismatch for n={n}, k={k}, confidence={confidence}"
+                        );
+                        assert!(
+                            expected + 1e-12 >= confidence,
+                            "reported finite interval undercovers for n={n}, k={k}"
+                        );
+                        if 2 * k + 1 <= n {
+                            assert!(
+                                reference_coverage(n, k + 1) + 1e-12 < confidence,
+                                "interval is not the narrowest qualifying interval for n={n}, k={k}"
+                            );
+                        }
+                    }
+                    None => {
+                        assert!(
+                            reference_coverage(n, 1) + 1e-12 < confidence,
+                            "finite order-statistic interval should be available for n={n}"
+                        );
+                        assert_eq!(result.lower, None);
+                        assert_eq!(result.upper, None);
+                        assert_eq!(result.achieved_coverage, None);
+                    }
+                }
+            }
+        }
+    }
+
 }
