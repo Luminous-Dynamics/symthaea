@@ -15,6 +15,7 @@ use crate::consciousness::fep_active_inference::Observation;
 
 use super::super::{CognitiveLoopService, CycleResult, MoralJudgmentSummary, ResponseStrategy};
 use crate::cognitive_loop::feedback_state::Priority;
+use crate::cognitive_loop::types::PredictionErrorEvidence;
 
 /// Geometric mean of positive f32 values. Returns 1.0 for empty/invalid input.
 fn geometric_mean(factors: &[f32]) -> f32 {
@@ -468,12 +469,15 @@ impl CognitiveLoopService {
     pub(in crate::cognitive_loop) fn run_surprise_exploration(
         &mut self,
         compressed_state: &[f32],
-        prediction_error_valid: bool,
+        prediction_evidence: &PredictionErrorEvidence,
+        observation_cycle: u64,
     ) -> (bool, Option<String>) {
         // The bridge compares the previous prediction to the current observation.
         // An empty, zero-norm, mismatched, or otherwise invalid comparison must not
         // be reinterpreted as surprise merely because one side is missing.
-        if !prediction_error_valid || compressed_state.is_empty() {
+        if prediction_evidence.value_for_observation(observation_cycle).is_none()
+            || compressed_state.is_empty()
+        {
             return (false, None);
         }
 
