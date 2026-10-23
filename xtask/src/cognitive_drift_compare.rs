@@ -164,10 +164,10 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
             pair.scenario_id
         );
         let delta = (pair.candidate_value - pair.baseline_value) * orientation;
-        match delta.total_cmp(&0.0) {
-            std::cmp::Ordering::Greater => wins += 1.0,
-            std::cmp::Ordering::Equal => wins += 0.5,
-            std::cmp::Ordering::Less => {}
+        if delta > 0.0 {
+            wins += 1.0;
+        } else if delta == 0.0 {
+            wins += 0.5;
         }
         all_oriented_deltas.push(delta);
         by_dataset
@@ -233,7 +233,7 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
         .collect();
 
     let dataset_count = per_dataset.len();
-    let minimum_seeds_per_dataset = by_dataset_seed.values().map(BTreeMap::len).min().unwrap_or(0);
+    let minimum_seeds_per_dataset = by_dataset_seed.values().map(|seeds| seeds.len()).min().unwrap_or(0);
     let sota_coverage_gate_pass = dataset_count >= 7 && minimum_seeds_per_dataset >= 50;
     let sota_coverage_gate_reason = if sota_coverage_gate_pass {
         "Coverage requirement met (at least seven datasets and 50 seeds per dataset); comparative evidence, uncertainty, costs, and baseline fairness still require review.".to_owned()
