@@ -1,0 +1,63 @@
+name: VIS-DVPC-006 paired trace scorer
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-trace-scorer.rs"
+      - "docs/research/VIS_DVPC_006_POST_COMMIT_SCORER_V1.md"
+      - "fixtures/vision-dvpc-scoring-*.tsv"
+      - ".github/workflows/vis-dvpc-006-trace-scorer.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-trace-scorer.rs"
+      - "docs/research/VIS_DVPC_006_POST_COMMIT_SCORER_V1.md"
+      - "fixtures/vision-dvpc-scoring-*.tsv"
+      - ".github/workflows/vis-dvpc-006-trace-scorer.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust with rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check tools/vision-dvpc-trace-scorer.rs
+
+      - name: Compile and run focused tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-trace-scorer.rs -o /tmp/vis-dvpc-006-tests
+          /tmp/vis-dvpc-006-tests
+
+      - name: Build post-commit scorer
+        run: rustc --edition=2024 -O tools/vision-dvpc-trace-scorer.rs -o /tmp/vis-dvpc-006
+
+      - name: Score frozen synthetic test fixture and replay
+        run: |
+          /tmp/vis-dvpc-006 test fixtures/vision-dvpc-scoring-observations.tsv fixtures/vision-dvpc-scoring-evaluations.tsv fixtures/vision-dvpc-scoring-actions.tsv > /tmp/vis-dvpc-006-a.tsv
+          /tmp/vis-dvpc-006 test fixtures/vision-dvpc-scoring-observations.tsv fixtures/vision-dvpc-scoring-evaluations.tsv fixtures/vision-dvpc-scoring-actions.tsv > /tmp/vis-dvpc-006-b.tsv
+          cmp /tmp/vis-dvpc-006-a.tsv /tmp/vis-dvpc-006-b.tsv
+          sha256sum tools/vision-dvpc-trace-scorer.rs fixtures/vision-dvpc-scoring-observations.tsv fixtures/vision-dvpc-scoring-evaluations.tsv fixtures/vision-dvpc-scoring-actions.tsv /tmp/vis-dvpc-006-a.tsv
+
+      - name: Validate score schema and paired results
+        run: |
+          awk -F '\t' '
+            $1 == "RESULT_HEADER" { if (NF != 27) exit 2; header = 1 }
+            $1 == "RESULT" { if (NF != 27) exit 3; rows += 1 }
+            END {
+              if (!header || rows != 3) exit 4
+              printf "validated result_rows=%d\n", rows
+            }
+          ' /tmp/vis-dvpc-006-a.tsv
+          grep -F $'RESULT\tmatched\tall_cheap\t3\t2\t0.333333\t0.375000' /tmp/vis-dvpc-006-a.tsv
+          grep -F $'RESULT\tmatched\tvalue_router\t3\t2\t0.383333\t0.412500' /tmp/vis-dvpc-006-a.tsv
+          grep -F $'META\toracle\tNOT_COMPUTED_IN_V1' /tmp/vis-dvpc-006-a.tsv
