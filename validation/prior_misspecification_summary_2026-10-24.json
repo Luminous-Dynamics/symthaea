@@ -103,7 +103,7 @@
   "validation": {
     "combined_tests": "43/43_PASS_LOCAL",
     "exact_oracle_regret_nonnegative": true,
-    "remote_ci": "not yet inspected on final updated head",
+    "remote_ci": "No combined statuses and no PR-triggered workflow runs were returned for code/artifact commit 8cee7cb90f0db32345f80655aecb61f82c487e93; no remote CI pass claimed.",
     "robust_oracle_zero_excess_within_tolerance": true,
     "source_and_test_blob_match_executed_files": true
   }
