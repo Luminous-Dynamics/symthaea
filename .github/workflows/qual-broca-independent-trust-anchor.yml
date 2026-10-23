@@ -1,0 +1,72 @@
+name: Broca Independent Trust Anchor
+
+on:
+  workflow_run:
+    workflows:
+      - Broca Feature Matrix
+      - Workflow Syntax
+      - PR Governance
+    types:
+      - requested
+      - in_progress
+      - completed
+  workflow_dispatch:
+    inputs:
+      workflow_run_id:
+        description: "Completed pull-request workflow run ID to replay"
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: broca-independent-trust-anchor-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.workflow_run_id }}
+  cancel-in-progress: true
+
+jobs:
+  trust-anchor:
+    name: Broca independent trust anchor
+    if: (github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout base-owned verifier
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Compile base-owned verifier
+        run: python3 -m py_compile .github/scripts/verify-broca-independent-trust-anchor.py
+
+      - name: Verify PR without executing PR code
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+          TRUST_ANCHOR_SHA: ${{ github.sha }}
+          TRUST_ANCHOR_MODE: ${{ github.event_name }}
+          MANUAL_WORKFLOW_RUN_ID: ${{ inputs.workflow_run_id }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+          TRIGGER_RUN_NAME: ${{ github.event.workflow_run.name }}
+          TRIGGER_RUN_EVENT: ${{ github.event.workflow_run.event }}
+          TRIGGER_ACTIVITY_TYPE: ${{ github.event.action }}
+          TRIGGER_RUN_REPOSITORY_ID: ${{ github.event.workflow_run.repository.id }}
+          TRIGGER_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          TRIGGER_RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRIGGER_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          TRIGGER_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: python3 .github/scripts/verify-broca-independent-trust-anchor.py
+
+      - name: Upload independent trust receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: broca-independent-trust-anchor-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.workflow_run_id }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.workflow_run_id }}
+          path: BROCA_INDEPENDENT_TRUST_ANCHOR_RECEIPT_V1.json
+          if-no-files-found: error
+          retention-days: 90
