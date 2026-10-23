@@ -557,10 +557,8 @@ impl CognitiveLoopService {
 
         CycleResult {
             output,
-            // Preserve the raw encoder diagnostic API, including its legacy
-            // 1.0 degenerate sentinel. Internal controllers use a separately
-            // validity-gated control prediction error.
-            prediction_error: perception.encoding.encoding_result.prediction_error,
+            prediction_error: dynamics.core.prediction_error,
+            prediction_error_valid: perception.urgency.prediction_error_valid,
             peak_attention: perception.encoding.encoding_result.peak_attention,
             detected_primitives: mem::take(
                 &mut perception.encoding.encoding_result.detected_primitives,
