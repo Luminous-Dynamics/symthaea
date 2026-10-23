@@ -524,18 +524,15 @@ fn parse_trial_results(
                 trial.run_id
             )
         })?;
-        let score_map = if let Some((cached_sha, cached_map)) =
-            score_cache.get(&trial.score_report_path)
-        {
+        if let Some((cached_sha, _)) = score_cache.get(&trial.score_report_path) {
             if cached_sha != &trial.score_report_sha256 {
                 return Err(format!(
                     "score report path {:?} was paired with multiple SHA-256 digests",
                     trial.score_report_path
                 ));
             }
-            cached_map
         } else {
-            let map = load_score_report(
+            let outcomes = load_score_report(
                 reports_dir,
                 &trial.score_report_path,
                 &trial.score_report_sha256,
@@ -543,13 +540,13 @@ fn parse_trial_results(
             )?;
             score_cache.insert(
                 trial.score_report_path.clone(),
-                (trial.score_report_sha256.clone(), map),
+                (trial.score_report_sha256.clone(), outcomes),
             );
-            &score_cache
-                .get(&trial.score_report_path)
-                .expect("just inserted score report")
-                .1
-        };
+        }
+        let score_map = &score_cache
+            .get(&trial.score_report_path)
+            .expect("score report inserted or validated above")
+            .1;
         let scored_outcome = score_map.get(&trial.instance_id).ok_or_else(|| {
             format!(
                 "score report {:?} has no outcome for task {:?}",
@@ -1169,6 +1166,51 @@ mod tests {
         prereg.network_policy = "none".to_string();
         prereg.bootstrap_resamples = 999;
         assert!(validate_preregistration(&prereg).unwrap_err().contains("bootstrap_resamples"));
+    }
+
+    #[test]
+    fn preregistration_rejects_hand_edited_randomized_order() {
+        let mut prereg = test_preregistration(1);
+        prereg.assignment[0].first_arm = match prereg.assignment[0].first_arm {
+            Arm::Control => Arm::Gcs,
+            Arm::Gcs => Arm::Control,
+        };
+        assert!(validate_preregistration(&prereg)
+            .unwrap_err()
+            .contains("hash-randomization seed"));
+    }
+
+    #[test]
+    fn observed_run_order_must_match_preregistered_order() {
+        let prereg = test_preregistration(1);
+        let assignment = prereg.assignment[0].clone();
+        let (gcs_time, control_time) = if assignment.first_arm == Arm::Gcs {
+            (2, 1)
+        } else {
+            (1, 2)
+        };
+        let grouped = BTreeMap::from([(
+            assignment.instance_id.clone(),
+            BTreeMap::from([
+                (
+                    Arm::Gcs,
+                    ObservedTrial {
+                        record: test_trial("gcs", Arm::Gcs, Outcome::Pass, gcs_time),
+                        jsonl_row_sha256: "a".repeat(64),
+                    },
+                ),
+                (
+                    Arm::Control,
+                    ObservedTrial {
+                        record: test_trial("control", Arm::Control, Outcome::Pass, control_time),
+                        jsonl_row_sha256: "b".repeat(64),
+                    },
+                ),
+            ]),
+        )]);
+        assert!(join_assignments(&prereg, grouped)
+            .unwrap_err()
+            .contains("execution order"));
     }
 
     #[test]
