@@ -42,7 +42,7 @@
   },
   "status": "EXACT_LOCAL_PRIOR_MISSPECIFICATION_PILOT_NOT_EXTERNAL_QUALIFICATION",
   "summary": {
-    "git_blob": "b6ea642ff45d236ead1be65d40589b00ecef7328",
+    "git_blob": "f579da9e69624741f419d8830d21aac8d8319f25",
     "path": "validation/prior_misspecification_summary_2026-10-24.json"
   },
   "test_source": {
@@ -56,7 +56,7 @@
   "validation": {
     "combined_tests": "43/43_PASS_LOCAL",
     "exact_oracle_regret_nonnegative": true,
-    "remote_ci": "not yet inspected on final updated head",
+    "remote_ci": "No combined statuses and no PR-triggered workflow runs were returned for code/artifact commit 8cee7cb90f0db32345f80655aecb61f82c487e93; no remote CI pass claimed.",
     "source_blob_matches_executed_bytes": true,
     "test_blob_matches_executed_bytes": true
   }
