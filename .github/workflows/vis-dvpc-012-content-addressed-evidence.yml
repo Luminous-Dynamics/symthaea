@@ -48,8 +48,9 @@ jobs:
           rustc --edition=2024 --test tools/vision-dvpc-trace-validator.rs -o /tmp/vis-dvpc-005-tests
           /tmp/vis-dvpc-005-tests
 
-      - name: Admit checked-in synthetic paired-trace fixture
+      - name: Build and admit checked-in synthetic paired-trace fixture
         run: |
+          rustc --edition=2024 -O tools/vision-dvpc-trace-validator.rs -o /tmp/vis-dvpc-005
           /tmp/vis-dvpc-005 fixtures/vision-dvpc-observations.tsv fixtures/vision-dvpc-evaluations.tsv > /tmp/vis-dvpc-005-receipt.tsv
           grep -Fx $'ADMISSION\tstatus\tPASS_SCHEMA_ONLY' /tmp/vis-dvpc-005-receipt.tsv
           grep -Fx $'ADMISSION\tperformance_claim\tNONE' /tmp/vis-dvpc-005-receipt.tsv
