@@ -285,6 +285,62 @@ fn validate_preregistration(prereg: &Value) -> Result<Vec<TaskSpec>, String> {
     parse_task_specs(prereg)
 }
 
+fn validate_resolved_task_evidence(row: &Value, context: &str) -> Result<(), String> {
+    for field in [
+        "prediction_patch_sha256",
+        "scored_log_sha256",
+        "evaluation_evidence_sha256",
+    ] {
+        let digest = required_string(row, field, context)?;
+        if !is_hex(digest, 64) {
+            return Err(format!("{context}: {field} must be a 64-character SHA-256"));
+        }
+    }
+
+    let image_id = required_string(row, "container_image_id", context)?;
+    if !image_id
+        .strip_prefix("sha256:")
+        .is_some_and(|digest| is_hex(digest, 64))
+    {
+        return Err(format!(
+            "{context}: container_image_id must be sha256:<64 hex characters>"
+        ));
+    }
+    if required_string(row, "runtime_platform_observed", context)? != "linux" {
+        return Err(format!("{context}: resolved outcome must be from Linux"));
+    }
+    if required_string(row, "network_mode_observed", context)? != "none" {
+        return Err(format!("{context}: resolved outcome must use Docker network_mode none"));
+    }
+    if row
+        .get("workspace_clean_exit_code")
+        .and_then(Value::as_i64)
+        != Some(0)
+    {
+        return Err(format!("{context}: resolved outcome must prove a clean worktree"));
+    }
+    let repo_head = required_string(row, "repo_head_sha_observed", context)?;
+    if !(is_hex(repo_head, 40) || is_hex(repo_head, 64)) {
+        return Err(format!("{context}: repo_head_sha_observed must be a Git SHA"));
+    }
+    let required_test_count = required_count(row, "required_test_count", context)?;
+    let required_tests_passing = required_count(row, "required_tests_passing", context)?;
+    if required_test_count == 0 || required_tests_passing > required_test_count {
+        return Err(format!(
+            "{context}: required test counts are empty or internally inconsistent"
+        ));
+    }
+    if row
+        .get("scored_test_exit_code")
+        .and_then(Value::as_i64)
+        .is_none()
+    {
+        return Err(format!("{context}: resolved outcome has no test-command exit code"));
+    }
+    let _ = required_count(row, "non_required_failure_count", context)?;
+    Ok(())
+}
+
 fn outcome_map(
     report: &Value,
     label: &str,
@@ -308,6 +364,12 @@ fn outcome_map(
             "{label}: candidate split digest differs from preregistration"
         ));
     }
+    let predictions_sha = required_string(report, "predictions_sha256", label)?;
+    if !is_hex(predictions_sha, 64) {
+        return Err(format!(
+            "{label}: predictions_sha256 must be a 64-character SHA-256"
+        ));
+    }
     let rows = report
         .get("tasks")
         .and_then(Value::as_array)
@@ -328,6 +390,9 @@ fn outcome_map(
                 .ok_or_else(|| format!("{context}: outcome missing"))?,
             &context,
         )?;
+        if outcome != Outcome::Unresolved {
+            validate_resolved_task_evidence(row, &context)?;
+        }
         if outcomes.insert(id.clone(), outcome).is_some() {
             return Err(format!("{label}: duplicate task id {id:?}"));
         }
@@ -835,6 +900,25 @@ fn main() {
 mod tests {
     use super::*;
 
+    fn passing_score_task(instance_id: &str) -> Value {
+        json!({
+            "instance_id": instance_id,
+            "outcome": "pass",
+            "prediction_patch_sha256": "a".repeat(64),
+            "scored_log_sha256": "b".repeat(64),
+            "evaluation_evidence_sha256": "c".repeat(64),
+            "container_image_id": format!("sha256:{}", "d".repeat(64)),
+            "required_test_count": 1,
+            "required_tests_passing": 1,
+            "runtime_platform_observed": "linux",
+            "workspace_clean_exit_code": 0,
+            "network_mode_observed": "none",
+            "repo_head_sha_observed": "e".repeat(40),
+            "scored_test_exit_code": 0,
+            "non_required_failure_count": 0
+        })
+    }
+
     #[test]
     fn unresolved_outcomes_expand_effect_bounds_in_the_conservative_direction() {
         assert_eq!(
@@ -924,13 +1008,35 @@ mod tests {
             "format_version": 1, "protocol_id": SCORE_PROTOCOL_ID,
             "task_manifest_sha256": "a".repeat(64),
             "candidate_jsonl_sha256": "b".repeat(64),
+            "predictions_sha256": "c".repeat(64),
             "task_count": 2, "scored_count": 2, "success_count": 2, "failure_count": 0,
             "unresolved_count": 0, "lockable": true, "pass_at_1": 1.0,
             "completed_run_success_rate": 1.0,
             "tasks": [
-                {"instance_id":"x", "outcome":"pass"},
-                {"instance_id":"x", "outcome":"pass"}
+                passing_score_task("x"),
+                passing_score_task("x")
             ]
+        });
+        assert!(outcome_map(&report, "test", &"a".repeat(64), &"b".repeat(64)).is_err());
+    }
+
+    #[test]
+    fn score_parser_rejects_resolved_rows_without_runtime_evidence() {
+        let report = json!({
+            "format_version": 1,
+            "protocol_id": SCORE_PROTOCOL_ID,
+            "task_manifest_sha256": "a".repeat(64),
+            "candidate_jsonl_sha256": "b".repeat(64),
+            "predictions_sha256": "c".repeat(64),
+            "task_count": 1,
+            "scored_count": 1,
+            "success_count": 1,
+            "failure_count": 0,
+            "unresolved_count": 0,
+            "lockable": true,
+            "pass_at_1": 1.0,
+            "completed_run_success_rate": 1.0,
+            "tasks": [{"instance_id": "x", "outcome": "pass"}]
         });
         assert!(outcome_map(&report, "test", &"a".repeat(64), &"b".repeat(64)).is_err());
     }
