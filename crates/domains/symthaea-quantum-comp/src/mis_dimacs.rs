@@ -445,7 +445,7 @@ e 4 17\n";
                 MisDimacsLimits { max_input_bytes: 4, ..MisDimacsLimits::default() }
             ),
             Err(MisDimacsError::InputByteLimitExceeded {
-                actual: 15,
+                actual: 17,
                 maximum: 4,
             })
         );
@@ -465,10 +465,10 @@ e 4 17\n";
         );
         assert_eq!(
             parse_dimacs_mis_with_limits(
-                "p edge 2 0\\ne 1 2\\n",
+                "p edge 2 1\\ne 1 2\\ne 1 2\\n",
                 MisDimacsLimits { max_edges: 1, ..MisDimacsLimits::default() }
             ),
-            Err(MisDimacsError::EdgeRecordLimitExceeded { line: 2, maximum: 1 })
+            Err(MisDimacsError::EdgeRecordLimitExceeded { line: 3, maximum: 1 })
         );
     }
 
