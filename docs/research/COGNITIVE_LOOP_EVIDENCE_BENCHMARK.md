@@ -272,3 +272,19 @@ cargo test --locked -p xtask cognitive_adaptation_utility
 Task loss and resource cost remain separate axes. The evaluator reports resource cost per task-loss unit reduced only when the candidate improves loss; it does not invent a universal exchange rate or hide a trade-off behind an unregistered composite score. The oracle-timed arm is an informative gap-to-reference, not a fair deployable baseline. Matching cycle indices and a shared-stream digest are necessary provenance, not proof that hidden state, random streams, environment transitions, or adaptation code were identical. Verify those properties with the runner's independent audit and retain per-cycle records.
 
 The synthetic fixture at `benchmarks/cognitive-loop-evidence/synthetic-counterfactual-adaptation.json` exists solely for CLI regression tests. Its values are synthetic, not benchmark results. This evaluator is a scoring primitive, not the replay engine; actual task runs, pinned datasets, cost instrumentation, and counterfactual state-isolation checks remain necessary before reporting efficacy.
+
+
+## Runnable scalar drift reference baselines
+
+The Rust `xtask run-cognitive-drift-baseline` command now implements two executable baselines on the **valid-PE-only** track: a fixed threshold and a calibration-centred EWMA control chart. Both consume a disjoint calibration vector plus a cycle-indexed evaluation stream, then feed generated alarm timestamps into the common timing-aware scorer.
+
+```bash
+cargo run --locked -p xtask -- run-cognitive-drift-baseline \
+  --input benchmarks/cognitive-loop-evidence/synthetic-fixed-threshold-run.json \
+  --out reports/fixed-threshold-smoke.json
+cargo test --locked -p xtask cognitive_drift_baselines
+```
+
+Invalid samples must be encoded as `evidence_valid: false, value: null`; they are skipped and cannot change detector state or re-arm an alarm latch. Valid samples must contain finite values. The fixed-threshold detector emits one alarm per above-threshold excursion, re-arming only after a valid below-threshold sample. The EWMA control chart estimates its center and sample standard deviation from calibration values, uses a declared standard-deviation floor, and applies a two-sided threshold. Threshold/configuration selection must occur outside the scored evaluation stream; the input digest captures the exact calibration data, evaluation sequence, ground-truth episodes, and detector config.
+
+The CI fixture is synthetic and only tests execution/scoring integrity. These are minimal reference controls, not a full implementation of the 14-family KDD 2026 protocol. They do not include the public datasets, held-out-dataset tuning, classifier-error adapters, feature-space baselines, or actual Symthaea cognitive-loop replay. A benchmark result requires pinned detector revisions/configurations, actual held-out runs, raw per-cycle traces, and uncertainty/cost reporting.
