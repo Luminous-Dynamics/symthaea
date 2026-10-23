@@ -118,6 +118,8 @@ Target for a confirmatory superiority claim: at least +5 absolute percentage poi
 
 Also report negative and inconclusive results. Require independent replication before claiming state-of-the-art or general superiority. Cross-model results should be stratified by exact model and harness configuration; never attribute a model+harness result solely to the model or Symthaea.
 
+The standalone Rust binary `rust-repair-ablation-audit` implements the paired analysis contract in [the ablation-audit specification](RUST_REPOSITORY_REPAIR_ABLATION_AUDIT_2026-10-24.md). It verifies each task outcome against a hashed `rust-repair-score-audit` report, checks preregistered configuration equality and hash-derived randomized order, keeps missing arms unresolved, reports full-assignment verified-pass rates plus resolved-pair effects and unresolved sensitivity bounds, and withholds repository-clustered 95% intervals below ten resolved repository clusters. Its superiority and cost/non-inferiority gates are implementation of the proposed targets above, not evidence that any target has been achieved.
+
 ## 7. Run receipt and provenance minimums
 
 The locked preregistration and per-run receipt must distinguish preregistered identity from observed telemetry and include, at minimum:
