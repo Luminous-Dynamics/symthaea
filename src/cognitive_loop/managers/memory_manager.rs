@@ -217,6 +217,7 @@ mod tests {
     fn snapshot(pe: f32, conf: f32, coherence: f32, psi: f32) -> CycleSnapshot {
         CycleSnapshot {
             prediction_error: pe,
+            prediction_error_valid: 1,
             prediction_confidence: f64::from(conf),
             coherence,
             unified_psi: f64::from(psi),
@@ -252,6 +253,17 @@ mod tests {
             "Pressure should build: {}",
             mm.consolidation_pressure
         );
+    }
+
+    #[test]
+    fn test_invalid_pe_does_not_build_consolidation_pressure() {
+        let mut manager = MemoryManager::default();
+        let mut snapshot = snapshot(1.0, 0.5, 0.5, 0.4);
+        snapshot.prediction_error_valid = 0;
+
+        let _ = manager.process(&snapshot);
+
+        assert_eq!(manager.consolidation_pressure, 0.0);
     }
 
     #[test]
