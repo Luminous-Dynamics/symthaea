@@ -420,6 +420,91 @@ jobs:
               expect_reject(mutant, label)
           print(f"PITB_PROOF_STATE_INTERVENTION_SCHEMA_PASS: {len(fixture['cases'])} synthetic pairs; {len(mutants)}/{len(mutants)} negative controls rejected")
           PY
+      - name: Validate paired proof-state outcome contract and joins
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          root = Path("data/benchmarks/proof-insight-transfer-v0")
+          outcome_schema = json.loads((root / "proof-state-intervention-outcome.schema.json").read_text())
+          suite = json.loads((root / "fixtures/proof-state-intervention-suite.synthetic.json").read_text())
+          bundle = json.loads((root / "fixtures/proof-state-intervention-outcomes.synthetic.json").read_text())
+          Draft202012Validator.check_schema(outcome_schema)
+          validator = Draft202012Validator(outcome_schema, format_checker=FormatChecker())
+
+          def reject(condition, message):
+              if condition:
+                  raise ValueError(message)
+
+          def validate_bundle(value):
+              validator.validate(value)
+              reject(value["schema_version"] != "pitb.proof-state-intervention-outcomes.v0", "unsupported outcome schema version")
+              reject(value["dataset_kind"] != "synthetic_fixture", "checked-in outcome fixture must stay explicitly synthetic")
+              reject(value["suite_id"] != suite["suite_id"], "outcome suite ID does not match its proof-state suite")
+              cases = {case["case_id"]: case for case in suite["cases"]}
+              by_id = {}
+              for row in value["outcomes"]:
+                  oid = row["outcome_id"]
+                  reject(oid in by_id, f"duplicate outcome ID: {oid}")
+                  by_id[oid] = row
+                  reject(row["case_id"] not in cases, f"unknown proof-state case ID: {row['case_id']}")
+                  case = cases[row["case_id"]]
+                  reject(row["pair_id"] != case["pair_id"], f"{oid}: pair ID does not match suite")
+                  reject(row["component_id"] != case["component_id"], f"{oid}: component does not match suite")
+                  reject(row["split"] != case["split"], f"{oid}: split does not match suite")
+                  reject(row["source_insight_record_id"] != case["source_insight"]["record_id"], f"{oid}: insight record does not match suite")
+                  reject(row["source_insight_sha256"] != case["source_insight"]["insight_sha256"], f"{oid}: insight digest does not match suite")
+                  reject(row["expected_action_policy"] != case["contract"]["expected_action_policy"], f"{oid}: expected action policy drift")
+                  role = row["state_role"]
+                  reject(oid != case["outcome_links"][f"{role}_outcome_id"], f"{oid}: outcome ID does not match its base/variant role")
+                  state, paired = (case["base_state"], case["variant_state"]) if role == "base" else (case["variant_state"], case["base_state"])
+                  proof_state = row["proof_state"]
+                  reject(proof_state["target_statement_sha256"] != case["target"]["statement_sha256"], f"{oid}: target statement digest drift")
+                  for field in ("goal_type_sha256", "environment_sha256"):
+                      reject(proof_state[field] != state[field], f"{oid}: state {field} drift")
+                  reject(proof_state["snapshot_sha256"] != state["snapshot_sha256"], f"{oid}: snapshot digest does not match suite")
+                  reject(proof_state["paired_snapshot_sha256"] != paired["snapshot_sha256"], f"{oid}: paired snapshot digest does not match suite")
+                  reject(proof_state["local_context_sha256"] != state["local_context_sha256"], f"{oid}: local-context digest does not match suite")
+                  reject(proof_state["paired_local_context_sha256"] != paired["local_context_sha256"], f"{oid}: paired local-context digest does not match suite")
+                  reject(row["execution"]["status"] != "not_run", f"{oid}: synthetic fixture must not claim executed model outcome")
+              expected = {
+                  outcome_id
+                  for case in suite["cases"]
+                  for outcome_id in (case["outcome_links"]["base_outcome_id"], case["outcome_links"]["variant_outcome_id"])
+              }
+              reject(set(by_id) != expected, "outcome rows must cover exactly the base and variant IDs in the suite")
+              return len(by_id)
+
+          def expect_reject(mutant, label):
+              try:
+                  validate_bundle(mutant)
+              except (ValidationError, ValueError):
+                  return
+              raise SystemExit(f"proof-state outcome negative control unexpectedly accepted: {label}")
+
+          count = validate_bundle(bundle)
+          reject(count != 2 * len(suite["cases"]), "expected exactly one base and one variant outcome for each suite case")
+
+          mutants = []
+          m = copy.deepcopy(bundle); m["outcomes"][1]["outcome_id"] = m["outcomes"][0]["outcome_id"]; mutants.append((m, "duplicate outcome ID"))
+          m = copy.deepcopy(bundle); m["outcomes"][1]["pair_id"] = "wrong-pair"; mutants.append((m, "cross-pair join"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["state_role"] = "variant"; mutants.append((m, "base/variant role mismatch"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["proof_state"]["snapshot_sha256"] = "0" * 64; mutants.append((m, "snapshot receipt drift"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["expected_action_policy"] = "move_forbidden_or_replan"; mutants.append((m, "policy mismatch"))
+          m = copy.deepcopy(bundle); m["outcomes"] = m["outcomes"][:-1]; mutants.append((m, "missing paired side"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["execution"]["status"] = "executed"; mutants.append((m, "synthetic outcome falsely marked executed"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["execution"]["checker_result"] = "checked_success"; mutants.append((m, "checker success without execution"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["source_insight_sha256"] = "f" * 64; mutants.append((m, "insight provenance mismatch"))
+
+          for mutant, label in mutants:
+              expect_reject(mutant, label)
+          print(f"PITB_PROOF_STATE_OUTCOME_CONTRACT_PASS: {count} explicitly not_run state rows; {len(mutants)}/{len(mutants)} negative controls rejected")
+          PY
       - name: Validate insight schema and synthetic positive/negative controls
         shell: bash
         run: |
