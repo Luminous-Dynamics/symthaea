@@ -16,6 +16,9 @@ tb_xor="${silicon_dir}/rtl/tb_hdc_bind_xor.sv"
 rtl_hamming="${silicon_dir}/rtl/hdc_hamming_count.sv"
 tb_hamming="${silicon_dir}/rtl/tb_hdc_hamming_count.sv"
 manifest="${script_dir}/hdl_toolchain_manifest_v1.json"
+receipt_schema="${script_dir}/hdl_run_receipt_v1.schema.json"
+case_matrix="${script_dir}/hdl_expected_case_matrix_v1.json"
+receipt_validator="${script_dir}/validate_hdl_receipt.sh"
 flake_nix="${repo_root}/flake.nix"
 flake_lock="${repo_root}/flake.lock"
 stamp="$(date -u +%Y%m%dT%H%M%SZ 2>/dev/null || printf 'timestamp-unavailable')"
@@ -44,11 +47,14 @@ rtl_hamming_sha="$(hash_file "${rtl_hamming}")"
 tb_hamming_sha="$(hash_file "${tb_hamming}")"
 runner_sha="$(hash_file "${script_dir}/run_hdl_smoke.sh")"
 manifest_sha="$(hash_file "${manifest}")"
+receipt_schema_sha="$(hash_file "${receipt_schema}")"
+case_matrix_sha="$(hash_file "${case_matrix}")"
+receipt_validator_sha="$(hash_file "${receipt_validator}")"
 flake_sha="$(hash_file "${flake_nix}")"
 flake_lock_sha="$(hash_file "${flake_lock}")"
 git_head="$(git -C "${repo_root}" rev-parse HEAD 2>/dev/null || printf 'unavailable')"
 
-for required_file in "${rtl_xor}" "${tb_xor}" "${rtl_hamming}" "${tb_hamming}" "${manifest}" "${flake_nix}" "${flake_lock}"; do
+for required_file in "${rtl_xor}" "${tb_xor}" "${rtl_hamming}" "${tb_hamming}" "${manifest}" "${receipt_schema}" "${case_matrix}" "${receipt_validator}" "${flake_nix}" "${flake_lock}"; do
   if [[ ! -f "${required_file}" ]]; then
     printf 'Missing required file: %s\n' "${required_file}" >&2
     exit 2
@@ -89,9 +95,12 @@ if (("${#missing[@]}" > 0)); then
     --arg tb_hamming_sha256 "${tb_hamming_sha}" \
     --arg runner_sha256 "${runner_sha}" \
     --arg manifest_sha256 "${manifest_sha}" \
+    --arg receipt_schema_sha256 "${receipt_schema_sha}" \
+    --arg case_matrix_sha256 "${case_matrix_sha}" \
+    --arg receipt_validator_sha256 "${receipt_validator_sha}" \
     --arg flake_sha256 "${flake_sha}" \
     --arg flake_lock_sha256 "${flake_lock_sha}" \
-    '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, missing_tools:$missing_tools, source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, widths_tested:[], architectures:["xor","linear_popcount","balanced_popcount"], case_results:[], output_directory:$out_dir, claim_ceiling:"No RTL simulation, formal proof, synthesis/PPA, FPGA observation, physical energy or SOTA claim."}' \
+    '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, missing_tools:$missing_tools, source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,receipt_schema:$receipt_schema_sha256,case_matrix:$case_matrix_sha256,receipt_validator:$receipt_validator_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, widths_tested:[], architectures:["xor","linear_popcount","balanced_popcount"], case_results:[], output_directory:$out_dir, claim_ceiling:"No RTL simulation, formal proof, synthesis/PPA, FPGA observation, physical energy or SOTA claim."}' \
     > "${out_dir}/receipt.json"
   printf 'UNQUALIFIED: missing tools: %s\nReceipt: %s/receipt.json\n' "${missing[*]}" "${out_dir}" >&2
   exit 2
@@ -178,11 +187,14 @@ jq -n \
   --arg tb_hamming_sha256 "${tb_hamming_sha}" \
   --arg runner_sha256 "${runner_sha}" \
   --arg manifest_sha256 "${manifest_sha}" \
+  --arg receipt_schema_sha256 "${receipt_schema_sha}" \
+  --arg case_matrix_sha256 "${case_matrix_sha}" \
+  --arg receipt_validator_sha256 "${receipt_validator_sha}" \
   --arg flake_sha256 "${flake_sha}" \
   --arg flake_lock_sha256 "${flake_lock_sha}" \
   --argjson missing_tools "${missing_json}" \
   --argjson case_results "${case_results}" \
-  '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, widths_tested:[64,128,256,512], architectures:["xor","linear_popcount","balanced_popcount"], source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, missing_tools:$missing_tools, case_results:$case_results, output_directory:$out_dir, claim_ceiling:"A pass qualifies only these word-level RTL/testbench cases. It is not formal proof, synthesis/PPA, FPGA observation, physical energy, throughput superiority or product/SOTA qualification."}' \
+  '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, widths_tested:[64,128,256,512], architectures:["xor","linear_popcount","balanced_popcount"], source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,receipt_schema:$receipt_schema_sha256,case_matrix:$case_matrix_sha256,receipt_validator:$receipt_validator_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, missing_tools:$missing_tools, case_results:$case_results, output_directory:$out_dir, claim_ceiling:"A pass qualifies only these word-level RTL/testbench cases. It is not formal proof, synthesis/PPA, FPGA observation, physical energy, throughput superiority or product/SOTA qualification."}' \
   > "${out_dir}/receipt.json"
 
 printf 'status=%s\nreceipt=%s/receipt.json\n' "${overall_status}" "${out_dir}/receipt.json"
