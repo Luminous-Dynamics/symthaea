@@ -13,6 +13,8 @@ on:
       - "crates/bridges/symthaea-physics-bridge/src/random_projection_shift.rs"
       - "crates/bridges/symthaea-physics-bridge/src/detector_panel.rs"
       - "crates/bridges/symthaea-physics-bridge/src/delayed_outcome_validation.rs"
+      - "crates/bridges/symthaea-physics-bridge/tests/delayed_outcome_benchmark.rs"
+      - "docs/research/DELAYED_OUTCOME_BENCHMARK_V0_1.md"
       - "crates/bridges/symthaea-physics-bridge/tests/diagnostic_fusion_benchmark.rs"
       - "crates/bridges/symthaea-physics-bridge/src/sequential_adequacy.rs"
       - "crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs"
@@ -56,6 +58,7 @@ jobs:
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/random_projection_shift.rs || format_status=1
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/detector_panel.rs || format_status=1
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/delayed_outcome_validation.rs || format_status=1
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/delayed_outcome_benchmark.rs || format_status=1
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/diagnostic_fusion_benchmark.rs || format_status=1
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/sequential_adequacy.rs || format_status=1
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs || format_status=1
@@ -74,6 +77,8 @@ jobs:
         run: cargo test -p symthaea-physics-bridge detector_panel --lib
       - name: Test delayed-label outcome validation
         run: cargo test -p symthaea-physics-bridge delayed_outcome_validation --lib
+      - name: Run paired delayed-outcome benchmark
+        run: cargo test -p symthaea-physics-bridge --test delayed_outcome_benchmark -- --nocapture
       - name: Run diagnostic-fusion and covariate-shift benchmarks
         run: cargo test -p symthaea-physics-bridge --test diagnostic_fusion_benchmark -- --nocapture
       - name: Test finite-horizon sequential adequacy monitor
