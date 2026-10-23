@@ -321,7 +321,13 @@ fn analyze(
         }
 
         let execution = field(value, "execution", &context)?;
-        let parsed = parse_execution(execution, &context, dataset_kind)?;
+        let expected_checked_target = string(proof_state, "target_statement_sha256", &context)?;
+        let parsed = parse_execution(
+            execution,
+            &context,
+            dataset_kind,
+            expected_checked_target,
+        )?;
         rows.push(StateRow {
             case_id,
             pair_id,
@@ -504,6 +510,7 @@ fn parse_execution(
     execution: &Value,
     context: &str,
     dataset_kind: &str,
+    expected_target_statement_sha256: &str,
 ) -> Result<ParsedExecution> {
     let status = string(execution, "status", context)?.to_owned();
     let checker_result = string(execution, "checker_result", context)?.to_owned();
@@ -516,6 +523,7 @@ fn parse_execution(
             "decision",
             "applicability_judgment",
             "original_move_applied",
+            "checked_target_statement_sha256",
             "proof_sha256",
             "run_receipt_sha256",
             "resource_usage",
@@ -555,6 +563,15 @@ fn parse_execution(
     }
     let config_sha256 = string(model, "config_sha256", &format!("{context}.model"))?.to_owned();
     validate_sha256(&config_sha256, &format!("{context}.model.config_sha256"))?;
+    let checked_target_sha = string(execution, "checked_target_statement_sha256", context)?;
+    validate_sha256(
+        checked_target_sha,
+        &format!("{context}.checked_target_statement_sha256"),
+    )?;
+    if checked_target_sha != expected_target_statement_sha256 {
+        bail!("{context}: checker target statement digest does not match the paired suite target");
+    }
+
     let applicability_judgment = string(execution, "applicability_judgment", context)?.to_owned();
     if !matches!(applicability_judgment.as_str(), "eligible" | "not_applicable" | "uncertain") {
         bail!("{context}: unknown applicability judgment");
