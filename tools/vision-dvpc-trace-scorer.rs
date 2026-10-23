@@ -570,9 +570,17 @@ fn score(
             per_group_utility.entry((run_key.0.clone(), run_key.1.clone(), obs.group_id.clone())).or_default().push(utility);
         }
 
-        let group_means: Vec<f64> = per_group_utility.iter()
-            .filter(|((comparison, policy, _), _)| comparison == &run_key.0 && policy == &run_key.1)
-            .map(|(_, values)| mean(values))
+        let group_means: Vec<f64> = per_group_utility
+            .iter()
+            .filter_map(|(key, values)| {
+                if key.0.as_str() == run_key.0.as_str()
+                    && key.1.as_str() == run_key.1.as_str()
+                {
+                    Some(mean(values))
+                } else {
+                    None
+                }
+            })
             .collect();
         let chosen_utility_mean = mean(&chosen_utilities);
         let group_balanced_utility = mean(&group_means);
@@ -599,11 +607,12 @@ fn score(
     }
 
     // Snapshot baseline metrics first to avoid aliasing the policy-result map.
-    let cheap_baselines: BTreeMap<String, PolicyMetrics> = metrics
-        .iter()
-        .filter(|((_, policy), _)| policy == "all_cheap")
-        .map(|((comparison, _), value)| (comparison.clone(), value.clone()))
-        .collect();
+    let mut cheap_baselines: BTreeMap<String, PolicyMetrics> = BTreeMap::new();
+    for ((comparison, policy), value) in &metrics {
+        if policy.as_str() == "all_cheap" {
+            cheap_baselines.insert(comparison.clone(), value.clone());
+        }
+    }
     for (run_key, m) in metrics.iter_mut() {
         if let Some(cheap) = cheap_baselines.get(&run_key.0) {
             m.utility_delta_vs_all_cheap = Some(m.group_balanced_utility - cheap.group_balanced_utility);
