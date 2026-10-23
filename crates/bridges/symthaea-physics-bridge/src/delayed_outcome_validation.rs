@@ -591,11 +591,12 @@ mod tests {
         observe_through(monitor, 10);
     }
 
-    fn observed_outcomes(
+    fn observed_outcomes_with_direction(
         values: &[f64],
         alarm_index: Option<u64>,
+        direction: OutcomeDirection,
     ) -> DelayedOutcomeMonitor {
-        let mut monitor = monitor(OutcomeDirection::HigherIsWorse);
+        let mut monitor = monitor(direction);
         for (index, value) in values.iter().copied().enumerate() {
             let index = index as u64;
             monitor.observe(index).unwrap();
@@ -605,6 +606,17 @@ mod tests {
             monitor.record_outcome(index, index, value).unwrap();
         }
         monitor
+    }
+
+    fn observed_outcomes(
+        values: &[f64],
+        alarm_index: Option<u64>,
+    ) -> DelayedOutcomeMonitor {
+        observed_outcomes_with_direction(
+            values,
+            alarm_index,
+            OutcomeDirection::HigherIsWorse,
+        )
     }
 
 
@@ -871,6 +883,56 @@ mod tests {
         assert_eq!(comparison.control_worse_change, 2.0);
         assert_eq!(comparison.adjusted_worse_change, 2.0);
         assert_eq!(comparison.association, OutcomeAssociation::Deteriorated);
+    }
+
+    #[test]
+    fn control_adjustment_respects_lower_is_worse_metric_direction() {
+        let direction = OutcomeDirection::LowerIsWorse;
+        let treated_monitor =
+            observed_outcomes_with_direction(&[5.0, 5.0, 5.0, 2.0, 2.0, 2.0], Some(3), direction);
+        let treated = treated_monitor.assess(3).unwrap();
+        assert_eq!(treated.association, OutcomeAssociation::Deteriorated);
+
+        let control_monitor =
+            observed_outcomes_with_direction(&[5.0, 5.0, 5.0, 4.0, 4.0, 4.0], None, direction);
+        let control_baseline = control_monitor.summarize_observed_window(0, 3).unwrap();
+        let control_post = control_monitor.summarize_observed_window(3, 6).unwrap();
+        let comparison = compare_controlled_outcome_change(
+            &treated,
+            &control_baseline,
+            &control_post,
+            DelayedOutcomeConfig {
+                window_size: 3,
+                min_labeled_per_window: 2,
+                min_labeled_fraction: 0.66,
+                minimum_effect: 0.5,
+                direction,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(comparison.treated_worse_change, 3.0);
+        assert_eq!(comparison.control_worse_change, 1.0);
+        assert_eq!(comparison.adjusted_worse_change, 2.0);
+        assert_eq!(comparison.association, OutcomeAssociation::Deteriorated);
+    }
+
+    #[test]
+    fn observed_window_summary_rejects_invalid_or_unobserved_ranges() {
+        let monitor = observed_outcomes(&[1.0, 1.0, 1.0, 3.0, 3.0, 3.0], None);
+        let summary = monitor.summarize_observed_window(0, 3).unwrap();
+        assert_eq!(summary.mean_outcome, Some(1.0));
+        assert_eq!(summary.labeled_observations, 3);
+        assert_eq!(summary.label_coverage_fraction, 1.0);
+
+        assert_eq!(
+            monitor.summarize_observed_window(3, 3),
+            Err(DelayedOutcomeError::InvalidOutcomeWindowBounds)
+        );
+        assert_eq!(
+            monitor.summarize_observed_window(5, 7),
+            Err(DelayedOutcomeError::OutcomeWindowNotObserved)
+        );
     }
 
     #[test]
