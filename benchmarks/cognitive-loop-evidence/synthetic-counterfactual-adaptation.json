@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "dataset_id": "synthetic-fixture-not-measured",
+  "stream_id": "synthetic-counterfactual-fixture-not-measured",
+  "scenario_id": "fixture-only-adaptation-recovery",
+  "shared_stream_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "seed": 17,
+  "task_loss_metric_id": "one-step-prediction-loss",
+  "task_loss_unit": "normalized-loss",
+  "no_adapt": {
+    "name": "no-adapt",
+    "version": "fixture-v1",
+    "repository_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "observations": [
+      {"cycle_index": 0, "task_loss": 0.1, "adaptation_cost_units": 0.0},
+      {"cycle_index": 1, "task_loss": 0.5, "adaptation_cost_units": 0.0},
+      {"cycle_index": 2, "task_loss": 0.9, "adaptation_cost_units": 0.0},
+      {"cycle_index": 3, "task_loss": 0.7, "adaptation_cost_units": 0.0}
+    ]
+  },
+  "detector_triggered": {
+    "name": "detector-triggered",
+    "version": "fixture-v1",
+    "repository_head_sha": "dddddddddddddddddddddddddddddddddddddddd",
+    "configuration_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "observations": [
+      {"cycle_index": 0, "task_loss": 0.1, "adaptation_cost_units": 0.0},
+      {"cycle_index": 1, "task_loss": 0.4, "adaptation_cost_units": 0.2},
+      {"cycle_index": 2, "task_loss": 0.3, "adaptation_cost_units": 0.4},
+      {"cycle_index": 3, "task_loss": 0.3, "adaptation_cost_units": 0.1}
+    ]
+  },
+  "oracle_timed": {
+    "name": "oracle-timed",
+    "version": "fixture-v1",
+    "repository_head_sha": "ffffffffffffffffffffffffffffffffffffffff",
+    "configuration_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+    "observations": [
+      {"cycle_index": 0, "task_loss": 0.1, "adaptation_cost_units": 0.0},
+      {"cycle_index": 1, "task_loss": 0.2, "adaptation_cost_units": 0.4},
+      {"cycle_index": 2, "task_loss": 0.2, "adaptation_cost_units": 0.4},
+      {"cycle_index": 3, "task_loss": 0.2, "adaptation_cost_units": 0.1}
+    ]
+  }
+}
