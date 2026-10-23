@@ -313,6 +313,7 @@ mod tests {
     fn snapshot(pe: f32, arousal: f32, diss_health: f32) -> CycleSnapshot {
         CycleSnapshot {
             prediction_error: pe,
+            prediction_error_valid: 1,
             arousal,
             dissipative_health: diss_health as f64,
             prediction_confidence: 0.5,
@@ -407,6 +408,19 @@ mod tests {
             "Low health should dampen learning: {}",
             output.lr_modulation
         );
+    }
+
+    #[test]
+    fn test_invalid_pe_does_not_enter_surprise_history_or_change_plasticity() {
+        let mut manager = LearningManager::default();
+        let initial_plasticity = manager.plasticity;
+        let mut snapshot = snapshot(1.0, 0.5, 0.8);
+        snapshot.prediction_error_valid = 0;
+
+        let _ = manager.process(&snapshot);
+
+        assert!(manager.surprise_history.is_empty());
+        assert_eq!(manager.plasticity, initial_plasticity);
     }
 
     #[test]
