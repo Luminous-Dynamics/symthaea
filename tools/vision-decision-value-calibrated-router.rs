@@ -655,6 +655,12 @@ mod tests {
             fit_split_conformal_profile_v1(&config(0.4), &rows),
             Err(CalibrationError::CalibrationMetadataMismatch(_))
         ));
+        let mut rows = calibration_rows();
+        rows[2].domain_assessor_artifact_digest = [0xEF; 32];
+        assert!(matches!(
+            fit_split_conformal_profile_v1(&config(0.4), &rows),
+            Err(CalibrationError::CalibrationMetadataMismatch(_))
+        ));
     }
 
     #[test]
