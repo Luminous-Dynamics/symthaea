@@ -432,7 +432,13 @@ fn read_actions(table: &Table, observations: &BTreeMap<String, Observation>) -> 
                 return Err(fail(format!("policies in comparison {} do not share budgets", row[3])));
             }
         }
-        per_run_indexes.entry(run_key.clone()).or_default().insert(commitment_index);
+        if !per_run_indexes
+            .entry(run_key.clone())
+            .or_default()
+            .insert(commitment_index)
+        {
+            return Err(fail(format!("policy {} has duplicate commitment_index", row[4])));
+        }
         per_run_traces.entry(run_key).or_default().insert(trace_id.clone());
         actions.push(Action {
             trace_id,
@@ -479,6 +485,19 @@ fn mean(values: &[f64]) -> f64 {
     if values.is_empty() { 0.0 } else { values.iter().sum::<f64>() / values.len() as f64 }
 }
 
+fn add_cost(total: &mut u64, increment: u64) -> bool {
+    match total.checked_add(increment) {
+        Some(value) => {
+            *total = value;
+            false
+        }
+        None => {
+            *total = u64::MAX;
+            true
+        }
+    }
+}
+
 fn score(
     observations: &BTreeMap<String, Observation>,
     outcomes: &BTreeMap<String, Outcome>,
@@ -505,6 +524,8 @@ fn score(
         let mut reservation_overruns = 0;
         let mut chosen_safety = 0_u64;
         let mut cheap_safety = 0_u64;
+        let mut latency_accumulator_overflow = false;
+        let mut energy_accumulator_overflow = false;
         let mut beneficial = 0;
         let mut harmful = 0;
         let mut neutral = 0;
@@ -516,10 +537,10 @@ fn score(
         for action in rows {
             let obs = observations.get(&action.trace_id).unwrap();
             let outcome = outcomes.get(&action.trace_id).unwrap();
-            allocator_latency = allocator_latency.saturating_add(action.allocator_latency_us);
-            allocator_energy = allocator_energy.saturating_add(action.allocator_energy_uj);
-            latency = latency.saturating_add(action.allocator_latency_us);
-            energy = energy.saturating_add(action.allocator_energy_uj);
+            latency_accumulator_overflow |= add_cost(&mut allocator_latency, action.allocator_latency_us);
+            energy_accumulator_overflow |= add_cost(&mut allocator_energy, action.allocator_energy_uj);
+            latency_accumulator_overflow |= add_cost(&mut latency, action.allocator_latency_us);
+            energy_accumulator_overflow |= add_cost(&mut energy, action.allocator_energy_uj);
             cheap_safety = cheap_safety.saturating_add(outcome.cheap_safety);
             let utility = match action.choice {
                 Choice::Cheap => {
@@ -529,8 +550,8 @@ fn score(
                     outcome.cheap_utility
                 }
                 Choice::Full => {
-                    latency = latency.saturating_add(outcome.actual_latency_us);
-                    energy = energy.saturating_add(outcome.actual_energy_uj);
+                    latency_accumulator_overflow |= add_cost(&mut latency, outcome.actual_latency_us);
+                    energy_accumulator_overflow |= add_cost(&mut energy, outcome.actual_energy_uj);
                     if outcome.actual_latency_us > action.declared_latency_us
                         || outcome.actual_energy_uj > action.declared_energy_uj
                     {
@@ -571,8 +592,8 @@ fn score(
         m.allocator_latency_us = allocator_latency;
         m.allocator_energy_uj = allocator_energy;
         m.reservation_overruns = reservation_overruns;
-        m.latency_budget_violation = latency > m.latency_budget_us;
-        m.energy_budget_violation = energy > m.energy_budget_uj;
+        m.latency_budget_violation = latency_accumulator_overflow || latency > m.latency_budget_us;
+        m.energy_budget_violation = energy_accumulator_overflow || energy > m.energy_budget_uj;
         m.valid_budget_run = !m.latency_budget_violation && !m.energy_budget_violation;
         metrics.insert(run_key.clone(), m);
     }
