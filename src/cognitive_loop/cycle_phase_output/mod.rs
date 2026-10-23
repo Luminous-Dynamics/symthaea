@@ -546,6 +546,8 @@ impl CognitiveLoopService {
                 cfc_output: output.clone(),
                 tau: fep_tau * phi_tau,
                 prediction_error: dynamics.core.prediction_error,
+                prediction_error_valid: perception.urgency.prediction_error_valid
+                    && dynamics.core.prediction_error.is_finite(),
                 detected_primitives: perception
                     .encoding
                     .encoding_result
