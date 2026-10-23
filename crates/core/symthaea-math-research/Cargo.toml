@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-math-research"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Evidence-bearing mathematical research specifications and trusted challenge boundaries for Symthaea"
+
+[dependencies]
+serde = { workspace = true }
+# Keep the research crate's lock delta minimal; the workspace sha2 entry also enables `oid`.
+sha2 = { version = "0.10", default-features = false, features = ["std"] }
+
+[dev-dependencies]
+serde_json = { workspace = true }
