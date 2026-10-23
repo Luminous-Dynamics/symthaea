@@ -44,6 +44,7 @@
 pub mod bridge;
 pub mod adequacy_calibration;
 pub mod feature_shift;
+pub mod random_projection_shift;
 pub mod case_studies;
 pub mod catalog;
 pub mod dimensional;

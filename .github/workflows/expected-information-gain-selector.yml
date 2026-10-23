@@ -10,6 +10,7 @@ on:
       - "crates/bridges/symthaea-physics-bridge/src/model_adequacy.rs"
       - "crates/bridges/symthaea-physics-bridge/src/adequacy_calibration.rs"
       - "crates/bridges/symthaea-physics-bridge/src/feature_shift.rs"
+      - "crates/bridges/symthaea-physics-bridge/src/random_projection_shift.rs"
       - "crates/bridges/symthaea-physics-bridge/tests/diagnostic_fusion_benchmark.rs"
       - "crates/bridges/symthaea-physics-bridge/src/sequential_adequacy.rs"
       - "crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs"
@@ -18,6 +19,7 @@ on:
       - "docs/research/ROBUST_INFORMATION_GAIN_MODEL_SCENARIOS_V0_1.md"
       - "docs/research/CALIBRATED_MODEL_ADEQUACY_AUDITS_V0_1.md"
       - "docs/research/SEQUENTIAL_MODEL_ADEQUACY_MONITOR_V0_1.md"
+      - "docs/research/RANDOM_PROJECTION_FEATURE_SHIFT_V0_1.md"
       - ".github/workflows/expected-information-gain-selector.yml"
   workflow_dispatch:
 
@@ -45,6 +47,7 @@ jobs:
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/model_adequacy.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/adequacy_calibration.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/feature_shift.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/random_projection_shift.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/diagnostic_fusion_benchmark.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/sequential_adequacy.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs
@@ -56,6 +59,8 @@ jobs:
         run: cargo test -p symthaea-physics-bridge adequacy_calibration --lib -- --nocapture
       - name: Test fixed-reference feature-shift scorer
         run: cargo test -p symthaea-physics-bridge feature_shift --lib
+      - name: Test random-projection feature-shift scorer
+        run: cargo test -p symthaea-physics-bridge random_projection_feature_shift --lib
       - name: Run diagnostic-fusion and covariate-shift benchmarks
         run: cargo test -p symthaea-physics-bridge --test diagnostic_fusion_benchmark -- --nocapture
       - name: Test finite-horizon sequential adequacy monitor
