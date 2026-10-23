@@ -523,4 +523,3 @@ mod tests {
         assert_eq!(monitor.state(), SequentialMonitorState::Monitoring);
     }
 }
-
