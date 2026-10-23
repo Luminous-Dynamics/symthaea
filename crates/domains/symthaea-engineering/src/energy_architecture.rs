@@ -831,6 +831,7 @@ fn battery_component() -> EnergyComponent {
         parameter_claims: vec![
             assumption_claim("capacity_kwh", json!(2.0), "kWh", applicability),
             assumption_claim("initial_soc_kwh", json!(0.0), "kWh", applicability),
+            assumption_claim("terminal_reserve_kwh", json!(0.0), "kWh", applicability),
             assumption_claim("max_charge_power_kw", json!(2.0), "kW", applicability),
             assumption_claim("max_discharge_power_kw", json!(2.0), "kW", applicability),
             assumption_claim("charge_efficiency", json!(1.0), "unitless", applicability),
