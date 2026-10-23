@@ -33,7 +33,7 @@ fn run(args: &[String]) -> Result<(), String> {
         args[3].parse::<usize>()
             .map_err(|error| format!("invalid max attempts {:?}: {error}", args[3]))?
     } else {
-        10_000
+        100_000
     };
     let config = MisRandomRegularConfig {
         vertex_count, degree, seed, max_attempts,
