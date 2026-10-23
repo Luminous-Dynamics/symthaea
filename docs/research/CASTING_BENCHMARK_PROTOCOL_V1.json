@@ -1,0 +1,195 @@
+{
+  "protocol_schema_version": "1.0.0",
+  "protocol_id": "CASTING-MO-BO-001",
+  "title": "Budget-matched multi-objective optimizer comparison for Symthaea casting research",
+  "status": "preregistered_execution_blocked_until_baseline_lock",
+  "created_utc": "2026-10-24",
+  "objective_direction": "minimize_all",
+  "run_design": {
+    "budgets": [
+      64,
+      256,
+      1024
+    ],
+    "minimum_paired_seeds": 20,
+    "target_paired_seeds": 30,
+    "shared_initial_design_within_task_seed": true,
+    "objective_evaluation_accounting": "Every objective-oracle call consumes one unit, including infeasible, invalid, timed-out, crashed, or otherwise failed evaluations. Candidate proposals and acquisition optimization are not objective evaluations; they are recorded in wall-clock and compute costs.",
+    "stop_conditions": [
+      "budget_exhausted",
+      "predeclared_target_reached"
+    ],
+    "adaptivity": "All seeds, budget points, target thresholds, reference points, metrics, and analysis rules must be frozen before examining algorithm results."
+  },
+  "suites": [
+    {
+      "id": "zdt_standard",
+      "status": "ready_for_exact_known_answer_tests",
+      "instances": [
+        {
+          "id": "ZDT1",
+          "dimension": 30,
+          "domain_rule": "all coordinates in [0,1]",
+          "known_pareto_front": true
+        },
+        {
+          "id": "ZDT2",
+          "dimension": 30,
+          "domain_rule": "all coordinates in [0,1]",
+          "known_pareto_front": true
+        },
+        {
+          "id": "ZDT3",
+          "dimension": 30,
+          "domain_rule": "all coordinates in [0,1]",
+          "known_pareto_front": true
+        },
+        {
+          "id": "ZDT4",
+          "dimension": 10,
+          "domain_rule": "x[0] in [0,1]; x[1..9] in [-10,10]",
+          "known_pareto_front": true
+        }
+      ],
+      "fixed_reference_point": [
+        1.1,
+        1.1
+      ],
+      "reference_point_policy": "Fixed per suite instance and shared by all algorithms; minimize both objectives. Never choose reference points per run or algorithm."
+    },
+    {
+      "id": "coco_bbob_biobj",
+      "status": "blocked_until_official_archive_and_adapter_are_hash_locked",
+      "expected_function_count": 55,
+      "source_url": "https://coco-platform.org/data-archive/index.html",
+      "known_pareto_front": true,
+      "reference_point_policy": "Use only the official suite's predeclared metric/reference convention or freeze a single documented per-instance reference before results; do not synthesize algorithm-specific reference points."
+    },
+    {
+      "id": "casting_simulator",
+      "status": "blocked_until_objectives_constraints_and_validation_are_frozen",
+      "known_pareto_front": false,
+      "reference_point_policy": "Freeze objective units/scales, feasibility rules, simulator revision and reference point before the first comparison. Synthetic and simulator-only results cannot be labelled physical validation."
+    }
+  ],
+  "baselines": [
+    {
+      "id": "uniform_random",
+      "family": "sanity",
+      "required": true
+    },
+    {
+      "id": "sobol",
+      "family": "quasi_random",
+      "required": true
+    },
+    {
+      "id": "nsga2",
+      "family": "evolutionary_multiobjective",
+      "required": true
+    },
+    {
+      "id": "botorch_qlognehvi",
+      "family": "multiobjective_bayesian_optimization",
+      "required": true
+    },
+    {
+      "id": "botorch_qlogehvi",
+      "family": "multiobjective_bayesian_optimization",
+      "required": true
+    },
+    {
+      "id": "botorch_qlognparego",
+      "family": "multiobjective_bayesian_optimization",
+      "required": true
+    },
+    {
+      "id": "symthaea_gp_lcb",
+      "family": "repository_baseline",
+      "required": true
+    },
+    {
+      "id": "symthaea_nearest_neighbor",
+      "family": "repository_baseline",
+      "required": true
+    },
+    {
+      "id": "symthaea_largest_gap_epsilon",
+      "family": "repository_baseline",
+      "required": true
+    },
+    {
+      "id": "symthaea_reliability_aware",
+      "family": "candidate_under_test",
+      "required": true
+    }
+  ],
+  "baseline_lock": {
+    "required_before_execution": true,
+    "fields_required_per_baseline": [
+      "package_version_or_git_commit",
+      "source_revision",
+      "configuration_sha256",
+      "runtime_environment_lock_sha256"
+    ],
+    "status": "not_yet_locked",
+    "rule": "This protocol is not execution-ready until every required baseline, suite adapter, and environment has immutable identifiers. Do not substitute 'latest' for a version."
+  },
+  "primary_metric": {
+    "id": "normalized_hypervolume_auc",
+    "direction": "maximize",
+    "definition": "Area under hypervolume-versus-objective-evaluations curve, divided by the evaluation budget and by a frozen task-specific normalization constant. Freeze metric implementation, reference point, normalization constant and trapezoid/step convention in a hashed analysis lock before execution."
+  },
+  "secondary_metrics": [
+    "final_hypervolume",
+    "igd_plus_when_a_valid_reference_front_exists",
+    "spacing_or_diversity",
+    "feasible_evaluation_fraction",
+    "invalid_and_failed_evaluation_fraction",
+    "evaluations_to_predeclared_target",
+    "wall_clock_milliseconds",
+    "peak_memory_bytes_when_available",
+    "objective_oracle_compute_cost_when_available",
+    "post_selection_coverage",
+    "regional_coverage",
+    "weighted_effective_sample_size",
+    "abstention_or_refusal_fraction",
+    "interval_width_proxy"
+  ],
+  "comparison_rules": {
+    "paired_seeds": true,
+    "per_task_effects_required": true,
+    "aggregate_rank_without_per_task_results_prohibited": true,
+    "failures_count_against_budget": true,
+    "skipped_or_missing_runs_are_not_passes": true,
+    "no_result_imputation": true,
+    "same_objective_evaluator_and_constraints": true,
+    "same_initial_design_per_task_and_seed": true,
+    "same_budget_interpretation": true,
+    "hyperparameter_tuning_budget_counted": true,
+    "report_wall_time_and_oracle_calls_separately": true,
+    "use_confidence_intervals_and_paired_effect_sizes": true
+  },
+  "stretch_targets_not_current_results": {
+    "median_normalized_hv_auc_improvement_vs_strongest_preregistered_baseline": 0.05,
+    "minimum_fraction_of_tasks_improved": 0.7,
+    "maximum_median_regression_on_any_critical_task_family": 0.05,
+    "target_reached_with_fewer_objective_evaluations_fraction": 0.2,
+    "note": "Aspirational evaluation gates only. They are not current measured performance or a guarantee of superiority."
+  },
+  "evidence_classes": {
+    "synthetic": "Known-answer stress tests; supports code-path and mechanism claims only.",
+    "benchmark": "Frozen public test suites; supports claims bounded to those suites and budgets.",
+    "simulator": "A specified simulator with frozen parameters; supports simulation claims only.",
+    "physical": "Held-out manufacturing observations with documented provenance and process coverage; required for real foundry performance claims."
+  },
+  "publication_gate": [
+    "Exact known-answer tests pass on the exact commit.",
+    "All required baseline and environment identifiers are hash locked.",
+    "The receipt validator passes for every run, and every run is accounted for, including failures and refusals.",
+    "The primary metric is recomputed independently from the raw trace.",
+    "No skipped, queued, incomplete, or missing run is reported as successful.",
+    "Per-task paired effects and uncertainty intervals are provided.",
+    "Synthetic, public benchmark, simulator, and physical findings are labelled separately."
+  ]
+}
