@@ -2280,13 +2280,14 @@ impl CognitiveLoopService {
 
         // ── Apply previous cycle's MCTS plan ──────────────
         if let Some((plan_action, plan_confidence)) = self.carryover.history.mcts_plan.take() {
-            if plan_confidence > MCTS_PLAN_CONFIDENCE_THRESHOLD
-                && (!prediction_error_valid || plan_action != fep_action_idx)
+            if prediction_error_valid
+                && plan_confidence > MCTS_PLAN_CONFIDENCE_THRESHOLD
+                && plan_action != fep_action_idx
             {
-                if prediction_error_valid {
-                    self.carryover.history.mcts_plan_applied =
-                        Some((plan_action, plan_confidence, prediction_error));
-                }
+                // A tracked MCTS intervention requires a fresh FEP comparison;
+                // otherwise both its effect and policy agreement are unidentifiable.
+                self.carryover.history.mcts_plan_applied =
+                    Some((plan_action, plan_confidence, prediction_error));
                 let plan_weight = plan_confidence * MCTS_PLAN_WEIGHT_SCALE;
                 match plan_action {
                     0 => {
@@ -3498,31 +3499,33 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         #[allow(unused_assignments)]
         let mut policy_agreement = false;
-        if let Some(mcts_idx) = reasoning_plan_action {
-            let fep_prob_for_mcts = fep_action_probs.get(mcts_idx).copied().unwrap_or(0.0);
-            if mcts_idx == fep_action_idx {
-                reasoning_plan_confidence =
-                    (reasoning_plan_confidence * POLICY_FULL_AGREEMENT_BOOST).min(1.0);
-                policy_agreement = true;
-            } else if fep_prob_for_mcts > POLICY_SOFT_THRESHOLD {
-                policy_agreement = true;
-                reasoning_plan_confidence =
-                    (reasoning_plan_confidence * (1.0 + fep_prob_for_mcts as f32 * 0.3)).min(1.0);
-            } else {
-                let dampen = (0.3 + fep_prob_for_mcts * 0.7) as f32;
-                self.fep.learning_signal *= dampen;
-                reasoning_plan_confidence *= dampen;
-            }
+        if prediction_error_valid {
+            if let Some(mcts_idx) = reasoning_plan_action {
+                let fep_prob_for_mcts = fep_action_probs.get(mcts_idx).copied().unwrap_or(0.0);
+                if mcts_idx == fep_action_idx {
+                    reasoning_plan_confidence =
+                        (reasoning_plan_confidence * POLICY_FULL_AGREEMENT_BOOST).min(1.0);
+                    policy_agreement = true;
+                } else if fep_prob_for_mcts > POLICY_SOFT_THRESHOLD {
+                    policy_agreement = true;
+                    reasoning_plan_confidence =
+                        (reasoning_plan_confidence * (1.0 + fep_prob_for_mcts as f32 * 0.3)).min(1.0);
+                } else {
+                    let dampen = (0.3 + fep_prob_for_mcts * 0.7) as f32;
+                    self.fep.learning_signal *= dampen;
+                    reasoning_plan_confidence *= dampen;
+                }
 
-            if self.policy_agreement_window.len() >= POLICY_WINDOW_SIZE {
-                self.policy_agreement_window.pop_front();
-            }
-            self.policy_agreement_window.push_back(policy_agreement);
-            if self.policy_agreement_window.len() >= POLICY_MIN_WINDOW {
-                let agree_rate = self.policy_agreement_window.iter().filter(|&&a| a).count() as f64
-                    / self.policy_agreement_window.len() as f64;
-                let adaptive_temp = POLICY_TEMP_BASE + (1.0 - agree_rate) * POLICY_TEMP_RANGE;
-                self.fep.agent.config.action_temperature = adaptive_temp;
+                if self.policy_agreement_window.len() >= POLICY_WINDOW_SIZE {
+                    self.policy_agreement_window.pop_front();
+                }
+                self.policy_agreement_window.push_back(policy_agreement);
+                if self.policy_agreement_window.len() >= POLICY_MIN_WINDOW {
+                    let agree_rate = self.policy_agreement_window.iter().filter(|&&a| a).count() as f64
+                        / self.policy_agreement_window.len() as f64;
+                    let adaptive_temp = POLICY_TEMP_BASE + (1.0 - agree_rate) * POLICY_TEMP_RANGE;
+                    self.fep.agent.config.action_temperature = adaptive_temp;
+                }
             }
         }
 
