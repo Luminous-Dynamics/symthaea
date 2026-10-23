@@ -17,11 +17,13 @@ This model isolates the API-level question: **under what conditions may candidat
 - **UnavailableBackendNeverEstablishes:** absence of the required backend never permits session establishment.
 - **TypeOK:** state variables remain in their declared finite domains.
 
-Three mutant/legacy modes are designed to violate the properties:
+Five mutant/legacy modes are designed to violate the properties:
 
 1. **One-sided confirmation:** allow session admission after initiator confirmation without responder confirmation.
 2. **Stub backend:** let the state machine create candidate material and establish a session despite the backend being unavailable.
 3. **Downgrade:** select a classical-only profile when policy requires hybrid, despite no authenticated downgrade authorization.
+4. **Unbound peer identity:** permit session establishment while the selected key is not bound to the claimed peer identity.
+5. **Unbound transcript:** permit session establishment when the negotiated transcript is not bound to the candidate session.
 
 The strict configuration models the expected policy gate. It is an oracle for desired behavior, not evidence that Rust uses the same gate or implements the cryptography correctly.
 
@@ -43,7 +45,7 @@ for cfg in docs/security/models/mesh_handshake_*.cfg; do
 done
 ```
 
-The three `*_legacy.cfg` configurations are expected to fail on `EstablishedSound` or `UnavailableBackendNeverEstablishes`. The strict configurations are expected to preserve the declared invariants in the bounded state graph. These expected outcomes have **not** been run here; run and record the real tool output before claiming model-checking evidence.
+The five `*_legacy.cfg` configurations are expected to fail on `EstablishedSound` or `UnavailableBackendNeverEstablishes`. The strict configurations are expected to preserve the declared invariants in the bounded state graph. These expected outcomes have **not** been run here; run and record the real tool output before claiming model-checking evidence.
 
 ## Implementation mapping required
 
