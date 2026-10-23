@@ -42,6 +42,77 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  nixward-effect-boundary-changes:
+    name: Nixward Effect Boundary Change Detection
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    outputs:
+      root: ${{ steps.filter.outputs.root }}
+      spore: ${{ steps.filter.outputs.spore }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Detect hardened effect-boundary paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            root:
+              - 'src/action/nixos_patterns.rs'
+              - '.github/workflows/ci.yml'
+            spore:
+              - 'crates/domains/symthaea-spore/src/bin/ssh_relay.rs'
+              - '.github/workflows/ci.yml'
+
+  nixward-effect-boundary-focused:
+    name: Nixward Effect Boundary Focused
+    runs-on: ubuntu-latest
+    needs: nixward-effect-boundary-changes
+    if: |
+      needs.nixward-effect-boundary-changes.outputs.root == 'true' ||
+      needs.nixward-effect-boundary-changes.outputs.spore == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-nixward-effect-boundary-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nixward-effect-boundary-
+
+      - name: Check root boundary formatting
+        if: needs.nixward-effect-boundary-changes.outputs.root == 'true'
+        run: cargo fmt --check -- src/action/nixos_patterns.rs
+
+      - name: Run root mutation fail-closed regressions
+        if: needs.nixward-effect-boundary-changes.outputs.root == 'true'
+        run: cargo test -p symthaea --lib test_legacy_executor_
+
+      - name: Run root rollback constructor regression
+        if: needs.nixward-effect-boundary-changes.outputs.root == 'true'
+        run: cargo test -p symthaea --lib test_rollback_commands_never_mint_legacy_shell_effects
+
+      - name: Check Spore relay boundary formatting
+        if: needs.nixward-effect-boundary-changes.outputs.spore == 'true'
+        run: cargo fmt --check -- crates/domains/symthaea-spore/src/bin/ssh_relay.rs
+
+      - name: Run Spore shell-free service-action regression
+        if: needs.nixward-effect-boundary-changes.outputs.spore == 'true'
+        run: cargo test -p symthaea-spore --features server --bin ssh-relay service_action_argv_is_shell_free
+
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
