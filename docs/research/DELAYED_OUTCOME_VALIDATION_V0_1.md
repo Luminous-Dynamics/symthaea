@@ -30,7 +30,7 @@ DelayedOutcomeMonitor is a small, dependency-free first implementation in symtha
 
 - Stream positions must be registered consecutively and in order.
 - Every alarm refers to an already observed position.
-- Every outcome is attached to its original observation and records a label-arrival index that is no later than the current stream position.
+- Every outcome is attached to its original observation and is accepted only at the current stream position; future and retrospectively backdated label-arrival indices are rejected.
 - Pre-alarm and post-alarm windows are fixed before evaluation: [t - w, t) and [t, t + w).
 - Metric direction is explicit (HigherIsWorse or LowerIsWorse) and the minimum material effect is fixed in configuration.
 - Each window must meet both a minimum labelled count and a minimum label-coverage fraction.
