@@ -122,10 +122,7 @@ fn headline_pass_at_1(
     failure_count: usize,
     unresolved_count: usize,
 ) -> Option<f64> {
-    if task_count > 0
-        && unresolved_count == 0
-        && success_count + failure_count == task_count
-    {
+    if task_count > 0 && unresolved_count == 0 && success_count + failure_count == task_count {
         Some(success_count as f64 / task_count as f64)
     } else {
         None
@@ -203,7 +200,10 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         if index + 1 >= args.len() {
             return Err(format!("missing value for {flag}\n{}", usage()));
         }
-        if values.insert(flag.clone(), args[index + 1].clone()).is_some() {
+        if values
+            .insert(flag.clone(), args[index + 1].clone())
+            .is_some()
+        {
             return Err(format!("duplicate argument: {flag}"));
         }
         index += 2;
@@ -231,13 +231,11 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         return Err("--expected-task-manifest-sha256 must be 64 hex characters".to_string());
     }
     let output = take("--report-out")?;
-    for input_key in [
-        "--task-manifest",
-        "--candidate-jsonl",
-        "--predictions-file",
-    ] {
+    for input_key in ["--task-manifest", "--candidate-jsonl", "--predictions-file"] {
         if values.get(input_key).is_some_and(|path| path == &output) {
-            return Err(format!("report output must not overwrite input {input_key}"));
+            return Err(format!(
+                "report output must not overwrite input {input_key}"
+            ));
         }
     }
     Ok(Some(Cli {
@@ -260,12 +258,14 @@ fn sha256_bytes(bytes: &[u8]) -> String {
 }
 
 fn sha256_file(path: &Path) -> Result<String, String> {
-    let bytes = fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let bytes =
+        fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
     Ok(sha256_bytes(&bytes))
 }
 
 fn read_json(path: &Path) -> Result<Value, String> {
-    let bytes = fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let bytes =
+        fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
     serde_json::from_slice(&bytes)
         .map_err(|error| format!("malformed JSON in {}: {error}", path.display()))
 }
@@ -314,15 +314,14 @@ fn candidate_rows(
     path: &Path,
     expected_sha256: &str,
 ) -> Result<(BTreeMap<String, (Value, String)>, String), String> {
-    let bytes = fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let bytes =
+        fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
     let digest = sha256_bytes(&bytes);
     if digest != expected_sha256 {
-        return Err(format!(
-            concat!(
-                "candidate JSONL SHA-256 does not match the locked task ",
-                "manifest: expected {expected_sha256}, observed {digest}"
-            )
-        ));
+        return Err(format!(concat!(
+            "candidate JSONL SHA-256 does not match the locked task ",
+            "manifest: expected {expected_sha256}, observed {digest}"
+        )));
     }
     let text = std::str::from_utf8(&bytes)
         .map_err(|error| format!("candidate JSONL is not UTF-8: {error}"))?;
@@ -331,10 +330,12 @@ fn candidate_rows(
         if line.trim().is_empty() {
             return Err(format!("candidate JSONL line {} is empty", index + 1));
         }
-        let row: Value = serde_json::from_str(line)
-            .map_err(|error| {
-                format!("candidate JSONL line {} is invalid JSON: {error}", index + 1)
-            })?;
+        let row: Value = serde_json::from_str(line).map_err(|error| {
+            format!(
+                "candidate JSONL line {} is invalid JSON: {error}",
+                index + 1
+            )
+        })?;
         let id = required_string(&row, "instance_id")
             .map_err(|error| format!("candidate JSONL line {}: {error}", index + 1))?
             .to_string();
@@ -362,8 +363,8 @@ fn insert_prediction_record(
 }
 
 fn predictions_map(path: &Path) -> Result<(BTreeMap<String, Option<String>>, String), String> {
-    let bytes = fs::read(path)
-        .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let bytes =
+        fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
     let digest = sha256_bytes(&bytes);
     let mut out = BTreeMap::new();
 
@@ -403,7 +404,10 @@ fn predictions_map(path: &Path) -> Result<(BTreeMap<String, Option<String>>, Str
                 return Err(format!("prediction JSONL line {} is empty", index + 1));
             }
             let record: Value = serde_json::from_str(line).map_err(|error| {
-                format!("prediction JSONL line {} is invalid JSON: {error}", index + 1)
+                format!(
+                    "prediction JSONL line {} is invalid JSON: {error}",
+                    index + 1
+                )
             })?;
             insert_prediction_record(&mut out, &record)
                 .map_err(|error| format!("prediction JSONL line {}: {error}", index + 1))?;
@@ -443,9 +447,7 @@ fn validate_locked_runtime_logs(
         .get("docker_image")
         .and_then(Value::as_str)
         .unwrap_or("");
-    if evidence.get("image_reference").and_then(Value::as_str)
-        != Some(expected_image_reference)
-    {
+    if evidence.get("image_reference").and_then(Value::as_str) != Some(expected_image_reference) {
         errors.push(
             "task validation runtime evidence image reference differs from candidate".to_string(),
         );
@@ -454,8 +456,14 @@ fn validate_locked_runtime_logs(
         .get("container_image_id")
         .and_then(Value::as_str)
         .unwrap_or("");
-    let expected_repo_head = task.get("repo_head_sha").and_then(Value::as_str).unwrap_or("");
-    let candidate_base_commit = candidate.get("base_commit").and_then(Value::as_str).unwrap_or("");
+    let expected_repo_head = task
+        .get("repo_head_sha")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let candidate_base_commit = candidate
+        .get("base_commit")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     if expected_repo_head.is_empty() || expected_repo_head != candidate_base_commit {
         errors.push("locked task repository HEAD differs from candidate base_commit".to_string());
     }
@@ -495,7 +503,11 @@ fn validate_locked_runtime_logs(
         );
     }
     let baseline_identity = baseline.get("container_identity").unwrap_or(&Value::Null);
-    if baseline_identity.get("runtime_platform").and_then(Value::as_str) != Some("linux") {
+    if baseline_identity
+        .get("runtime_platform")
+        .and_then(Value::as_str)
+        != Some("linux")
+    {
         errors.push("baseline validation runtime platform must be 'linux'".to_string());
     }
     if baseline_identity
@@ -505,10 +517,17 @@ fn validate_locked_runtime_logs(
     {
         errors.push("baseline Git metadata sanitization was not confirmed".to_string());
     }
-    if baseline_identity.get("network_mode").and_then(Value::as_str) != Some("none") {
+    if baseline_identity
+        .get("network_mode")
+        .and_then(Value::as_str)
+        != Some("none")
+    {
         errors.push("baseline validation container network_mode must be 'none'".to_string());
     }
-    let baseline_id = baseline_identity.get("container_id").and_then(Value::as_str).unwrap_or("");
+    let baseline_id = baseline_identity
+        .get("container_id")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     if expected_container_ids.first().and_then(Value::as_str) != Some(baseline_id) {
         errors.push("baseline container ID differs from locked task manifest".to_string());
     }
@@ -520,16 +539,13 @@ fn validate_locked_runtime_logs(
         errors.push("baseline container image ID differs from locked task manifest".to_string());
     }
     if baseline.get("test_patch_applied").and_then(Value::as_bool) != Some(true) {
-        errors.push(
-            "baseline runtime evidence does not confirm test patch application".to_string(),
-        );
+        errors
+            .push("baseline runtime evidence does not confirm test patch application".to_string());
     }
     for field in ["rebuild_exit_code", "print_exit_code"] {
         match optional_i64(baseline, field) {
             Ok(Some(0)) => {}
-            Ok(value) => errors.push(format!(
-                "baseline {field} unresolved or nonzero: {value:?}"
-            )),
+            Ok(value) => errors.push(format!("baseline {field} unresolved or nonzero: {value:?}")),
             Err(error) => errors.push(error),
         }
     }
@@ -588,7 +604,9 @@ fn validate_locked_runtime_logs(
         if run.get("test_patch_applied").and_then(Value::as_bool) != Some(true)
             || run.get("solution_patch_applied").and_then(Value::as_bool) != Some(true)
         {
-            errors.push(format!("gold runtime run {index} did not confirm both patches applied"));
+            errors.push(format!(
+                "gold runtime run {index} did not confirm both patches applied"
+            ));
         }
         for field in ["rebuild_exit_code", "test_exit_code", "print_exit_code"] {
             match optional_i64(run, field) {
@@ -616,7 +634,9 @@ fn validate_locked_runtime_logs(
         }
         let identity = run.get("container_identity").unwrap_or(&Value::Null);
         if identity.get("runtime_platform").and_then(Value::as_str) != Some("linux") {
-            errors.push(format!("gold runtime run {index} runtime platform must be 'linux'"));
+            errors.push(format!(
+                "gold runtime run {index} runtime platform must be 'linux'"
+            ));
         }
         if identity
             .get("git_metadata_sanitization_exit_code")
@@ -628,10 +648,19 @@ fn validate_locked_runtime_logs(
             ));
         }
         if identity.get("network_mode").and_then(Value::as_str) != Some("none") {
-            errors.push(format!("gold runtime run {index} network_mode must be 'none'"));
+            errors.push(format!(
+                "gold runtime run {index} network_mode must be 'none'"
+            ));
         }
-        let container_id = identity.get("container_id").and_then(Value::as_str).unwrap_or("");
-        if expected_container_ids.get(index + 1).and_then(Value::as_str) != Some(container_id) {
+        let container_id = identity
+            .get("container_id")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        if expected_container_ids
+            .get(index + 1)
+            .and_then(Value::as_str)
+            != Some(container_id)
+        {
             errors.push(format!(
                 "gold runtime run {index} container ID differs from locked task manifest"
             ));
@@ -657,10 +686,14 @@ fn validate_locked_runtime_logs(
             .unwrap_or_default();
         let ids = statuses.keys().cloned().collect::<BTreeSet<_>>();
         if ids != expected_test_ids {
-            errors.push(format!("gold runtime run {index} test-ID set differs from baseline"));
+            errors.push(format!(
+                "gold runtime run {index} test-ID set differs from baseline"
+            ));
         }
         if statuses.values().any(|state| state != "pass") {
-            errors.push(format!("gold runtime run {index} contains a failing or skipped test"));
+            errors.push(format!(
+                "gold runtime run {index} contains a failing or skipped test"
+            ));
         }
         parsed_runs.push(statuses);
     }
@@ -700,9 +733,7 @@ fn validate_task_oracle(
 ) -> Result<(BTreeSet<String>, BTreeSet<String>, BTreeSet<String>), Vec<String>> {
     let id = required_string(task, "instance_id").map_err(|error| vec![error])?;
     let mut errors = Vec::new();
-    if task.get("candidate_row_sha256").and_then(Value::as_str)
-        != Some(candidate_row_sha256)
-    {
+    if task.get("candidate_row_sha256").and_then(Value::as_str) != Some(candidate_row_sha256) {
         errors.push("candidate JSONL row digest differs from locked task manifest".to_string());
     }
     let task_dir = task_validation_dir.join(id);
@@ -717,10 +748,7 @@ fn validate_task_oracle(
         (&gold_log_path, "gold_validation_log_sha256"),
         (&evidence_path, "runtime_evidence_sha256"),
     ] {
-        let expected = task
-            .get(expected_key)
-            .and_then(Value::as_str)
-            .unwrap_or("");
+        let expected = task.get(expected_key).and_then(Value::as_str).unwrap_or("");
         match sha256_file(path) {
             Ok(actual) if !expected.is_empty() && actual == expected => {}
             Ok(actual) => errors.push(format!(
@@ -728,7 +756,9 @@ fn validate_task_oracle(
                     "task validation artifact {} digest differs from manifest ",
                     "(expected {}, observed {})"
                 ),
-                path.display(), expected, actual
+                path.display(),
+                expected,
+                actual
             )),
             Err(error) => errors.push(error),
         }
@@ -739,7 +769,10 @@ fn validate_task_oracle(
     };
     validate_locked_runtime_logs(task, candidate, &status, task_validation_dir, &mut errors);
 
-    let baseline = match status.get("pre_patch_status").and_then(|v| parse_status_map(v).ok()) {
+    let baseline = match status
+        .get("pre_patch_status")
+        .and_then(|v| parse_status_map(v).ok())
+    {
         Some(map) => map,
         None => {
             return Err(vec![
@@ -747,7 +780,10 @@ fn validate_task_oracle(
             ]);
         }
     };
-    let gold = match status.get("post_patch_status").and_then(|v| parse_status_map(v).ok()) {
+    let gold = match status
+        .get("post_patch_status")
+        .and_then(|v| parse_status_map(v).ok())
+    {
         Some(map) => map,
         None => {
             return Err(vec![
@@ -785,9 +821,8 @@ fn validate_task_oracle(
         errors.push("manifest fail_to_pass_count disagrees with recomputed oracle".to_string());
     }
     if task.get("pass_to_pass_count").and_then(Value::as_u64) != Some(baseline_pass.len() as u64) {
-        errors.push(
-            "manifest pass_to_pass_count disagrees with baseline passing tests".to_string(),
-        );
+        errors
+            .push("manifest pass_to_pass_count disagrees with baseline passing tests".to_string());
     }
     let test_patch = candidate
         .get("test_patch")
@@ -811,7 +846,8 @@ fn repo_head_matches(
 ) -> bool {
     (is_hex(expected_base_commit, 40) || is_hex(expected_base_commit, 64))
         && command_exit_code == Some(0)
-        && observed_repo_head.is_some_and(|observed| observed.eq_ignore_ascii_case(expected_base_commit))
+        && observed_repo_head
+            .is_some_and(|observed| observed.eq_ignore_ascii_case(expected_base_commit))
 }
 
 fn workspace_is_clean(run: &Value) -> bool {
@@ -832,10 +868,16 @@ fn validate_scored_container_identity(
     evidence: &Value,
 ) -> Result<(String, String), Vec<String>> {
     let mut errors = Vec::new();
-    let identity = evidence.get("container_identity").and_then(Value::as_object);
+    let identity = evidence
+        .get("container_identity")
+        .and_then(Value::as_object);
     let identity = match identity {
         Some(identity) => identity,
-        None => return Err(vec!["scored container_identity is missing or malformed".to_string()]),
+        None => {
+            return Err(vec![
+                "scored container_identity is missing or malformed".to_string(),
+            ]);
+        }
     };
     if identity
         .get("git_metadata_sanitization_exit_code")
@@ -911,7 +953,10 @@ fn validate_scored_container_identity(
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
-    if validation_ids.iter().any(|id| id.as_str() == Some(container_id.as_str())) {
+    if validation_ids
+        .iter()
+        .any(|id| id.as_str() == Some(container_id.as_str()))
+    {
         errors.push("scored container ID was reused from a task-validation run".to_string());
     }
     if !errors.is_empty() {
@@ -966,7 +1011,10 @@ fn audit_scored_task(
                 };
             }
         };
-    let required_tests = explicit_f2p.union(&baseline_pass).cloned().collect::<BTreeSet<_>>();
+    let required_tests = explicit_f2p
+        .union(&baseline_pass)
+        .cloned()
+        .collect::<BTreeSet<_>>();
     if prediction_patch.is_none() {
         return TaskScore {
             instance_id,
@@ -1082,17 +1130,27 @@ fn audit_scored_task(
                 .to_string(),
         );
     }
-    if evidence.get("prediction_patch_sha256").and_then(Value::as_str) != patch_sha.as_deref() {
+    if evidence
+        .get("prediction_patch_sha256")
+        .and_then(Value::as_str)
+        != patch_sha.as_deref()
+    {
         reasons.push("scored prediction patch digest differs from prediction file".to_string());
     }
-    let candidate_test_patch = candidate.get("test_patch").and_then(Value::as_str).unwrap_or("");
+    let candidate_test_patch = candidate
+        .get("test_patch")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     let expected_test_patch_sha256 = sha256_bytes(candidate_test_patch.as_bytes());
     if evidence.get("test_patch_sha256").and_then(Value::as_str)
         != Some(expected_test_patch_sha256.as_str())
     {
         reasons.push("scored test-patch digest differs from pinned task patch".to_string());
     }
-    let configured_image = candidate.get("docker_image").and_then(Value::as_str).unwrap_or("");
+    let configured_image = candidate
+        .get("docker_image")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     if evidence.get("image_reference").and_then(Value::as_str) != Some(configured_image) {
         reasons.push("scored configured image reference differs from candidate".to_string());
     }
@@ -1123,7 +1181,10 @@ fn audit_scored_task(
             Value::Null
         }
     };
-    let sidecar_status_value = evidence.get("parsed_status").cloned().unwrap_or(Value::Null);
+    let sidecar_status_value = evidence
+        .get("parsed_status")
+        .cloned()
+        .unwrap_or(Value::Null);
     let scored_status = match parse_status_map(&scored_status_value) {
         Ok(map) => map,
         Err(error) => {
@@ -1176,19 +1237,21 @@ fn audit_scored_task(
     }
     match print_code {
         Ok(Some(0)) => {}
-        Ok(other) => reasons.push(format!("scored log/print command did not exit zero: {other:?}")),
+        Ok(other) => reasons.push(format!(
+            "scored log/print command did not exit zero: {other:?}"
+        )),
         Err(error) => reasons.push(error),
     }
 
-    let patch_applied = evidence.get("prediction_patch_applied").and_then(Value::as_bool);
+    let patch_applied = evidence
+        .get("prediction_patch_applied")
+        .and_then(Value::as_bool);
     let mut required_passing = 0;
     let mut required_failed = 0;
     let mut required_skipped = 0;
     let non_required_failure_count = scored_status
         .iter()
-        .filter(|(test_id, state)| {
-            !required_tests.contains(*test_id) && state.as_str() == "fail"
-        })
+        .filter(|(test_id, state)| !required_tests.contains(*test_id) && state.as_str() == "fail")
         .count();
     let scored_test_exit_code = test_code.as_ref().ok().copied().flatten();
     for test_id in &required_tests {
@@ -1331,19 +1394,25 @@ fn run(cli: Cli) -> Result<(), String> {
     required_string(&task_manifest, "dataset_revision")?;
     required_string(&task_manifest, "upstream_evaluator_revision")?;
     let observed_candidate_ids = candidate_rows.keys().cloned().collect::<BTreeSet<_>>();
-    if task_manifest.get("candidate_ids_sha256").and_then(Value::as_str)
+    if task_manifest
+        .get("candidate_ids_sha256")
+        .and_then(Value::as_str)
         != Some(canonical_id_digest(&observed_candidate_ids).as_str())
     {
         return Err("candidate ID digest differs from locked task manifest".to_string());
     }
     let (predictions, predictions_sha256) = predictions_map(&cli.predictions_file)?;
 
-    let task_list = task_manifest.get("tasks").and_then(Value::as_array)
+    let task_list = task_manifest
+        .get("tasks")
+        .and_then(Value::as_array)
         .ok_or_else(|| "task manifest missing tasks array".to_string())?;
     if task_list.is_empty() {
         return Err("task manifest has zero eligible tasks".to_string());
     }
-    if task_manifest.get("eligible_task_count").and_then(Value::as_u64)
+    if task_manifest
+        .get("eligible_task_count")
+        .and_then(Value::as_u64)
         != Some(task_list.len() as u64)
     {
         return Err("task manifest eligible_task_count differs from its task array".to_string());
@@ -1368,11 +1437,15 @@ fn run(cli: Cli) -> Result<(), String> {
             return Err(format!("duplicate task manifest instance_id {id:?}"));
         }
         if !candidate_rows.contains_key(&id) {
-            return Err(format!("manifest task {id:?} is absent from pinned candidate JSONL"));
+            return Err(format!(
+                "manifest task {id:?} is absent from pinned candidate JSONL"
+            ));
         }
     }
     let manifest_ids = tasks_by_id.keys().cloned().collect::<BTreeSet<_>>();
-    if task_manifest.get("eligible_task_ids_sha256").and_then(Value::as_str)
+    if task_manifest
+        .get("eligible_task_ids_sha256")
+        .and_then(Value::as_str)
         != Some(canonical_id_digest(&manifest_ids).as_str())
     {
         return Err("eligible task ID digest differs from locked task manifest".to_string());
@@ -1384,13 +1457,18 @@ fn run(cli: Cli) -> Result<(), String> {
     canonical_tasks.sort_by(|left, right| left.instance_id.cmp(&right.instance_id));
     let canonical_task_bytes = serde_json::to_vec(&canonical_tasks)
         .map_err(|error| format!("cannot serialize locked tasks for digest: {error}"))?;
-    if task_manifest.get("task_records_sha256").and_then(Value::as_str)
+    if task_manifest
+        .get("task_records_sha256")
+        .and_then(Value::as_str)
         != Some(sha256_bytes(&canonical_task_bytes).as_str())
     {
         return Err("task_records_sha256 differs from canonical task records".to_string());
     }
     let prediction_ids = predictions.keys().cloned().collect::<BTreeSet<_>>();
-    let extra_predictions = prediction_ids.difference(&manifest_ids).cloned().collect::<Vec<_>>();
+    let extra_predictions = prediction_ids
+        .difference(&manifest_ids)
+        .cloned()
+        .collect::<Vec<_>>();
     if !extra_predictions.is_empty() {
         return Err(format!(
             "prediction file contains {} task ID(s) outside the locked manifest; first is {:?}",
@@ -1401,9 +1479,8 @@ fn run(cli: Cli) -> Result<(), String> {
 
     let mut results = Vec::new();
     for (id, task) in &tasks_by_id {
-        let (candidate, candidate_row_sha256) = candidate_rows
-            .get(id)
-            .expect("manifest ID checked above");
+        let (candidate, candidate_row_sha256) =
+            candidate_rows.get(id).expect("manifest ID checked above");
         results.push(audit_scored_task(
             task,
             candidate,
@@ -1414,9 +1491,18 @@ fn run(cli: Cli) -> Result<(), String> {
         ));
     }
     let task_count = results.len();
-    let success_count = results.iter().filter(|result| result.outcome == "pass").count();
-    let failure_count = results.iter().filter(|result| result.outcome == "fail").count();
-    let unresolved_count = results.iter().filter(|result| result.outcome == "unresolved").count();
+    let success_count = results
+        .iter()
+        .filter(|result| result.outcome == "pass")
+        .count();
+    let failure_count = results
+        .iter()
+        .filter(|result| result.outcome == "fail")
+        .count();
+    let unresolved_count = results
+        .iter()
+        .filter(|result| result.outcome == "unresolved")
+        .count();
     let scored_count = success_count + failure_count;
     let lockable = unresolved_count == 0 && scored_count == task_count;
     let report = ScoreReport {
@@ -1431,12 +1517,7 @@ fn run(cli: Cli) -> Result<(), String> {
         failure_count,
         unresolved_count,
         lockable,
-        pass_at_1: headline_pass_at_1(
-            task_count,
-            success_count,
-            failure_count,
-            unresolved_count,
-        ),
+        pass_at_1: headline_pass_at_1(task_count, success_count, failure_count, unresolved_count),
         completed_run_success_rate: if scored_count > 0 {
             Some(success_count as f64 / scored_count as f64)
         } else {
@@ -1468,7 +1549,10 @@ fn run(cli: Cli) -> Result<(), String> {
     }
     println!(
         "SCORED RUN AUDIT: {}/{} pass@1 ({} failures); report {}",
-        success_count, task_count, failure_count, cli.report_out.display()
+        success_count,
+        task_count,
+        failure_count,
+        cli.report_out.display()
     );
     Ok(())
 }
@@ -1506,7 +1590,10 @@ mod tests {
         let f2p = BTreeSet::from(["bug".to_string()]);
         let p2p = BTreeSet::from(["regression".to_string()]);
         let required = f2p.union(&p2p).cloned().collect::<BTreeSet<_>>();
-        assert_eq!(required, BTreeSet::from(["bug".to_string(), "regression".to_string()]));
+        assert_eq!(
+            required,
+            BTreeSet::from(["bug".to_string(), "regression".to_string()])
+        );
     }
 
     #[test]
@@ -1548,8 +1635,22 @@ mod tests {
         fs::write(&path, contents).unwrap();
         let (predictions, digest) = predictions_map(&path).unwrap();
         assert_eq!(predictions.len(), 2);
-        assert!(predictions.get("task-a").unwrap().as_ref().unwrap().contains("+x"));
-        assert!(predictions.get("task-b").unwrap().as_ref().unwrap().contains("+y"));
+        assert!(
+            predictions
+                .get("task-a")
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .contains("+x")
+        );
+        assert!(
+            predictions
+                .get("task-b")
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .contains("+y")
+        );
         assert_eq!(digest, sha256_bytes(contents.as_bytes()));
     }
 
@@ -1562,9 +1663,11 @@ mod tests {
             "{\"instance_id\":\"task-a\",\"model_patch\":\"two\"}\n"
         );
         fs::write(&path, contents).unwrap();
-        assert!(predictions_map(&path)
-            .unwrap_err()
-            .contains("duplicate prediction instance_id"));
+        assert!(
+            predictions_map(&path)
+                .unwrap_err()
+                .contains("duplicate prediction instance_id")
+        );
     }
 
     #[test]
@@ -1578,7 +1681,10 @@ mod tests {
         .unwrap();
         let (predictions, digest) = predictions_map(&path).unwrap();
         assert!(is_hex(&digest, 64));
-        assert_eq!(predictions.get("task-present"), Some(&Some("diff --git ...".to_string())));
+        assert_eq!(
+            predictions.get("task-present"),
+            Some(&Some("diff --git ...".to_string()))
+        );
         assert_eq!(predictions.get("task-missing"), Some(&None));
         assert!(!predictions.contains_key("task-never-emitted"));
     }
@@ -1603,11 +1709,12 @@ mod tests {
                 "git_metadata_sanitization_exit_code": 86
             }
         });
-        let errors = validate_scored_container_identity(&task, &candidate, &evidence)
-            .unwrap_err();
-        assert!(errors.iter().any(|error| {
-            error.contains("Git metadata sanitization was not confirmed")
-        }));
+        let errors = validate_scored_container_identity(&task, &candidate, &evidence).unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|error| { error.contains("Git metadata sanitization was not confirmed") })
+        );
     }
 
     #[test]
@@ -1631,8 +1738,7 @@ mod tests {
                 "git_metadata_sanitization_exit_code": 0
             }
         });
-        let errors = validate_scored_container_identity(&task, &candidate, &evidence)
-            .unwrap_err();
+        let errors = validate_scored_container_identity(&task, &candidate, &evidence).unwrap_err();
         assert!(errors.iter().any(|error| {
             error.contains("strict Rust repair scoring requires Linux runtime platform")
         }));
@@ -1655,9 +1761,12 @@ mod tests {
                 "network_mode": "bridge"
             }
         });
-        let errors = validate_scored_container_identity(&task, &candidate, &evidence)
-            .unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("network_mode must be 'none'")));
+        let errors = validate_scored_container_identity(&task, &candidate, &evidence).unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("network_mode must be 'none'"))
+        );
     }
 
     #[test]
@@ -1685,17 +1794,21 @@ mod tests {
         let mut bad_image = evidence.clone();
         bad_image["container_identity"]["container_image_id"] =
             Value::String(format!("sha256:{}", "d".repeat(64)));
-        assert!(validate_scored_container_identity(&task, &candidate, &bad_image)
-            .unwrap_err()
-            .iter()
-            .any(|error| error.contains("differs from task-validation")));
+        assert!(
+            validate_scored_container_identity(&task, &candidate, &bad_image)
+                .unwrap_err()
+                .iter()
+                .any(|error| error.contains("differs from task-validation"))
+        );
 
         let mut reused = evidence.clone();
         reused["container_identity"]["container_id"] = Value::String(format!("{:064x}", 2));
-        assert!(validate_scored_container_identity(&task, &candidate, &reused)
-            .unwrap_err()
-            .iter()
-            .any(|error| error.contains("reused")));
+        assert!(
+            validate_scored_container_identity(&task, &candidate, &reused)
+                .unwrap_err()
+                .iter()
+                .any(|error| error.contains("reused"))
+        );
     }
 
     #[test]
@@ -1731,34 +1844,22 @@ mod tests {
 
     #[test]
     fn required_oracle_failures_fail_even_when_other_tests_pass() {
-        assert_eq!(
-            classify_scored_patch(1, Some(true), 1, 0),
-            "fail"
-        );
+        assert_eq!(classify_scored_patch(1, Some(true), 1, 0), "fail");
     }
 
     #[test]
     fn unrelated_baseline_failure_does_not_invalidate_the_required_oracle() {
-        assert_eq!(
-            classify_scored_patch(0, Some(true), 1, 1),
-            "pass"
-        );
+        assert_eq!(classify_scored_patch(0, Some(true), 1, 1), "pass");
     }
 
     #[test]
     fn unexplained_nonzero_test_exit_is_unresolved() {
-        assert_eq!(
-            classify_scored_patch(0, Some(true), 1, 0),
-            "unresolved"
-        );
+        assert_eq!(classify_scored_patch(0, Some(true), 1, 0), "unresolved");
     }
 
     #[test]
     fn unapplied_prediction_patch_is_a_failure() {
-        assert_eq!(
-            classify_scored_patch(0, Some(false), 0, 0),
-            "fail"
-        );
+        assert_eq!(classify_scored_patch(0, Some(false), 0, 0), "fail");
     }
 
     #[test]
