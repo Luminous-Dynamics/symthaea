@@ -1419,6 +1419,52 @@ mod tests {
     }
 
     #[test]
+    fn baseline_timeout_cannot_be_treated_as_a_valid_oracle() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-baseline-timeout";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail")],
+            &[("bug-fixed", "pass")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let mut evidence: Value = serde_json::from_slice(&fs::read(&evidence_path).unwrap()).unwrap();
+        evidence["baseline"]["test_exit_code"] = Value::from(124);
+        fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
+        let result = audit_candidate(&row, instance_id, root.path(), sha256_bytes(b"baseline timeout row"));
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result.audit.reasons.iter().any(|reason| reason.contains("test command is unresolved")));
+    }
+
+    #[test]
+    fn unapplied_gold_patch_is_not_accepted_as_validation() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-patch-rejected";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail")],
+            &[("bug-fixed", "pass")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let mut evidence: Value = serde_json::from_slice(&fs::read(&evidence_path).unwrap()).unwrap();
+        evidence["gold_runs"][1]["solution_patch_applied"] = Value::Bool(false);
+        fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
+        let result = audit_candidate(&row, instance_id, root.path(), sha256_bytes(b"patch rejected row"));
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result.audit.reasons.iter().any(|reason| reason.contains("gold solution patch application")));
+    }
+
+    #[test]
     fn task_field_hash_preserves_leading_and_trailing_whitespace() {
         let row = serde_json::json!({"problem_statement": "  exact bytes  "});
         assert_eq!(
