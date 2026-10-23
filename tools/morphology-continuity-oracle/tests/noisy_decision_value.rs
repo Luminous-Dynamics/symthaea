@@ -712,14 +712,9 @@ fn asymmetric_false_positive_drift_is_more_dangerous_than_sensitivity_drop() {
     ];
 
     for (name, truth, expected_risk, expected_model_regret, expected_decision_regret) in cases {
-        let (risk, model_regret, decision_regret) = misspecification_regret(
-            inventory,
-            truth,
-            design,
-            PRIOR_WEIGHTS,
-            &decisions,
-        )
-        .expect("assumed and true likelihood tables are valid");
+        let (risk, model_regret, decision_regret) =
+            misspecification_regret(inventory, truth, design, PRIOR_WEIGHTS, &decisions)
+                .expect("assumed and true likelihood tables are valid");
 
         assert!(
             (risk - expected_risk).abs() <= EPSILON,
