@@ -43,6 +43,7 @@ struct TaskManifestRecord {
     gold_patch_sha256: String,
     test_patch_sha256: String,
     validation_status_sha256: String,
+    baseline_validation_log_sha256: String,
     gold_validation_log_sha256: String,
     fail_to_pass_count: usize,
     pass_to_pass_count: usize,
@@ -83,6 +84,7 @@ struct TaskAudit {
     gold_run_marker_counts: Vec<usize>,
     candidate_row_sha256: String,
     validation_status_sha256: Option<String>,
+    baseline_validation_log_sha256: Option<String>,
     gold_validation_log_sha256: Option<String>,
 }
 
@@ -368,6 +370,7 @@ fn audit_candidate(
 
     let task_dir = validation_dir.join(instance_id);
     let status_path = task_dir.join("status.json");
+    let baseline_log_path = task_dir.join("pre_patch_log.txt");
     let log_path = task_dir.join("post_patch_log.txt");
     let status_bytes = match fs::read(&status_path) {
         Ok(bytes) => Some(bytes),
@@ -377,8 +380,26 @@ fn audit_candidate(
             None
         }
     };
+    let baseline_log_bytes = match fs::read(&baseline_log_path) {
+        Ok(bytes) if !bytes.is_empty() => Some(bytes),
+        Ok(_) => {
+            unresolved = true;
+            reasons.push("baseline validation log is empty".to_string());
+            None
+        }
+        Err(error) => {
+            unresolved = true;
+            reasons.push(format!("cannot read baseline validation log: {error}"));
+            None
+        }
+    };
     let log_bytes = match fs::read(&log_path) {
-        Ok(bytes) => Some(bytes),
+        Ok(bytes) if !bytes.is_empty() => Some(bytes),
+        Ok(_) => {
+            unresolved = true;
+            reasons.push("gold validation log is empty".to_string());
+            None
+        }
         Err(error) => {
             unresolved = true;
             reasons.push(format!("cannot read gold validation log: {error}"));
@@ -387,6 +408,7 @@ fn audit_candidate(
     };
 
     let status_json_sha256 = status_bytes.as_ref().map(|bytes| sha256_bytes(bytes));
+    let baseline_log_sha256 = baseline_log_bytes.as_ref().map(|bytes| sha256_bytes(bytes));
     let log_sha256 = log_bytes.as_ref().map(|bytes| sha256_bytes(bytes));
     let mut baseline_count = 0;
     let mut gold_count = 0;
@@ -530,6 +552,7 @@ fn audit_candidate(
         gold_run_marker_counts: marker_counts,
         candidate_row_sha256,
         validation_status_sha256: status_json_sha256.clone(),
+        baseline_validation_log_sha256: baseline_log_sha256.clone(),
         gold_validation_log_sha256: log_sha256.clone(),
     };
 
@@ -543,7 +566,8 @@ fn audit_candidate(
             gold_patch_sha256: gold_patch_sha256.expect("eligible task has gold patch"),
             test_patch_sha256: test_patch_sha256.expect("eligible task has test patch"),
             validation_status_sha256: status_json_sha256.expect("eligible task has status file"),
-            gold_validation_log_sha256: log_sha256.expect("eligible task has validation log"),
+            baseline_validation_log_sha256: baseline_log_sha256.expect("eligible task has baseline log"),
+            gold_validation_log_sha256: log_sha256.expect("eligible task has gold validation log"),
             fail_to_pass_count: explicit_fail_to_pass_count,
             pass_to_pass_count: baseline_pass_count,
         })
@@ -640,6 +664,7 @@ fn run(cli: Cli) -> Result<(), String> {
                 gold_patch_sha256: record.gold_patch_sha256.clone(),
                 test_patch_sha256: record.test_patch_sha256.clone(),
                 validation_status_sha256: record.validation_status_sha256.clone(),
+                baseline_validation_log_sha256: record.baseline_validation_log_sha256.clone(),
                 gold_validation_log_sha256: record.gold_validation_log_sha256.clone(),
                 fail_to_pass_count: record.fail_to_pass_count,
                 pass_to_pass_count: record.pass_to_pass_count,
