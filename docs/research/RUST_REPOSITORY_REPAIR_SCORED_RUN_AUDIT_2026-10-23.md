@@ -15,6 +15,12 @@ Before running an agent, pin the SHA-256 of the locked task-manifest file in the
 
 The prediction input accepts the standard SWE-bench JSONL record shape (`instance_id`, `model_patch`), a JSON array of those records, or an ID-keyed JSON object. JSONL/array records must have unique `instance_id` values. A missing/malformed `model_patch` becomes an unresolved attempt; a duplicate or unidentifiable record is a protocol error. The exact input file SHA-256 is included in the output report. A task absent from the prediction map, or with no string patch payload, is an **unresolved assigned attempt**, not a dropped denominator row. IDs outside the locked manifest are rejected as a protocol violation.
 
+## Network-isolation contract
+
+Task/gold and scored-run receipts require the Docker-inspected `HostConfig.NetworkMode` to equal `none` for the four oracle-validation containers and the scored prediction container. The pinned RepoLaunch submodule patch is applied to commit `c4b623d930f3728e5338664bb634021b98492cbf` before evaluation. Receipts store the observed mode and the Rust auditors reject missing or network-enabled modes.
+
+This is a control on the repository/test container's network namespace, not proof that the model-serving process or every external tool is offline. The agent harness must separately disable browser/search and task-specific retrieval. Dependencies must be preloaded into the immutable image or a preregistered local cache; tasks requiring live egress are not silently granted a looser policy.
+
 ## Scoring contract
 
 For every task in the locked manifest, the tool verifies:
