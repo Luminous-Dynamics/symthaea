@@ -57,6 +57,7 @@ impl Default for VirtualBodyConfig {
 /// `VirtualBody::update()` in one batch.
 pub(crate) struct CognitiveSignals {
     pub prediction_error: f32,
+    pub prediction_error_valid: bool,
     pub coherence: f32,
     pub prediction_confidence: f32,
     pub unified_psi: f64,
@@ -122,11 +123,13 @@ impl VirtualBody {
 
         // Track prediction error velocity (derivative of error)
         // Capacity bound: 20 elements — evict before push to prevent transient over-capacity
-        if self.error_history.len() >= 20 {
-            self.error_history.pop_front();
+        if signals.prediction_error_valid && signals.prediction_error.is_finite() {
+            if self.error_history.len() >= 20 {
+                self.error_history.pop_front();
+            }
+            self.error_history.push_back(signals.prediction_error);
         }
-        self.error_history.push_back(signals.prediction_error);
-        let error_velocity = if self.error_history.len() >= 2 {
+        let error_velocity = if signals.prediction_error_valid && self.error_history.len() >= 2 {
             let recent = self.error_history.back().copied().unwrap_or(0.0);
             let older = self.error_history[self.error_history.len().saturating_sub(5)];
             (recent - older).abs()
@@ -138,8 +141,12 @@ impl VirtualBody {
         let raw = InteroceptiveState {
             // Heart rate: baseline + spike from prediction error velocity
             heart_rate: (self.config.baseline_heart_rate
-                + error_velocity as f64 * 2.0
-                + signals.prediction_error as f64 * 0.5)
+                + if signals.prediction_error_valid {
+                    error_velocity as f64 * 2.0
+                        + signals.prediction_error as f64 * 0.5
+                } else {
+                    0.0
+                })
                 .clamp(0.0, 1.0),
 
             // Breathing rate: proportional to cycle frequency vs target
@@ -224,6 +231,7 @@ mod tests {
     fn default_signals() -> CognitiveSignals {
         CognitiveSignals {
             prediction_error: 0.1,
+            prediction_error_valid: true,
             coherence: 0.5,
             prediction_confidence: 0.6,
             unified_psi: 0.4,
@@ -269,6 +277,19 @@ mod tests {
         let high_hr = body.interoceptive_state().heart_rate;
 
         assert!(high_hr > low_hr, "Higher error should raise heart rate");
+    }
+
+    #[test]
+    fn invalid_pe_does_not_enter_body_error_history_or_raise_heart_rate() {
+        let mut body = VirtualBody::new();
+        let mut signals = default_signals();
+        signals.prediction_error = 1.0;
+        signals.prediction_error_valid = false;
+
+        let state = body.update(&signals);
+
+        assert!(body.error_history.is_empty());
+        assert_eq!(state.heart_rate, VirtualBodyConfig::default().baseline_heart_rate);
     }
 
     #[test]
