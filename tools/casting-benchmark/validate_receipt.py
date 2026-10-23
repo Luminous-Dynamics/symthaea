@@ -27,7 +27,7 @@ TERMINATIONS = {
 }
 ROOT_KEYS = {
     "schema_version", "protocol_id", "run_id", "status", "synthetic_fixture_only",
-    "algorithm", "suite", "source_revision", "protocol_sha256", "environment_lock_sha256",
+    "algorithm", "suite", "evaluation_mode", "source_revision", "protocol_sha256", "environment_lock_sha256",
     "analysis_lock_sha256", "seed", "budget", "accounting", "termination_reason",
     "metrics", "artifacts", "notes",
 }
@@ -78,6 +78,8 @@ def validate_receipt(receipt: Any, for_publication: bool = False) -> list[str]:
         errors.append("$.schema_version: unsupported version")
     if receipt["protocol_id"] != "CASTING-MO-BO-001":
         errors.append("$.protocol_id: wrong protocol")
+    if not isinstance(receipt["evaluation_mode"], str) or receipt["evaluation_mode"] not in {"single_fidelity", "multi_fidelity"}:
+        errors.append("$.evaluation_mode: expected single_fidelity or multi_fidelity")
     if not isinstance(receipt["run_id"], str) or not re.fullmatch(
         r"^[A-Za-z0-9][A-Za-z0-9._-]+$", receipt["run_id"]
     ):
@@ -136,6 +138,7 @@ def validate_receipt(receipt: Any, for_publication: bool = False) -> list[str]:
         "objective_evaluations", "feasible_evaluations", "infeasible_evaluations",
         "invalid_evaluations", "failed_evaluations", "wall_clock_ms",
         "peak_memory_bytes", "objective_oracle_cost_units",
+        "fidelity_evaluations", "fidelity_cost_units_by_level",
     }
     accounting_required = {
         "objective_evaluations", "feasible_evaluations", "infeasible_evaluations",
@@ -164,6 +167,29 @@ def validate_receipt(receipt: Any, for_publication: bool = False) -> list[str]:
             v = accounting["objective_oracle_cost_units"]
             if not _is_finite_number(v) or v < 0:
                 errors.append("$.accounting.objective_oracle_cost_units: expected null or non-negative finite number")
+        has_fidelity_counts = "fidelity_evaluations" in accounting
+        has_fidelity_costs = "fidelity_cost_units_by_level" in accounting
+        if receipt["evaluation_mode"] == "multi_fidelity" and not (has_fidelity_counts and has_fidelity_costs):
+            errors.append("$.accounting: multi-fidelity runs require counts and cost units for every fidelity level")
+        if has_fidelity_counts != has_fidelity_costs:
+            errors.append("$.accounting: fidelity_evaluations and fidelity_cost_units_by_level must be provided together")
+        if has_fidelity_counts and has_fidelity_costs:
+            fidelity_counts = accounting["fidelity_evaluations"]
+            fidelity_costs = accounting["fidelity_cost_units_by_level"]
+            if not isinstance(fidelity_counts, dict) or not fidelity_counts:
+                errors.append("$.accounting.fidelity_evaluations: expected non-empty object")
+            if not isinstance(fidelity_costs, dict) or not fidelity_costs:
+                errors.append("$.accounting.fidelity_cost_units_by_level: expected non-empty object")
+            if isinstance(fidelity_counts, dict) and isinstance(fidelity_costs, dict):
+                if set(fidelity_counts) != set(fidelity_costs):
+                    errors.append("$.accounting: fidelity count and cost level keys must match exactly")
+                valid_counts = all(_is_int(v) and v >= 0 for v in fidelity_counts.values())
+                if not valid_counts:
+                    errors.append("$.accounting.fidelity_evaluations: counts must be non-negative integers")
+                elif _is_int(accounting["objective_evaluations"]) and sum(fidelity_counts.values()) != accounting["objective_evaluations"]:
+                    errors.append("$.accounting.fidelity_evaluations: counts must sum exactly to objective_evaluations")
+                if not all(_is_finite_number(v) and v >= 0 for v in fidelity_costs.values()):
+                    errors.append("$.accounting.fidelity_cost_units_by_level: costs must be finite non-negative numbers")
         if isinstance(receipt.get("budget"), dict) and _is_int(accounting["objective_evaluations"]):
             if _is_int(receipt["budget"].get("objective_evaluations")) and accounting["objective_evaluations"] > receipt["budget"]["objective_evaluations"]:
                 errors.append("$.accounting.objective_evaluations: exceeds frozen budget")
@@ -187,6 +213,9 @@ def validate_receipt(receipt: Any, for_publication: bool = False) -> list[str]:
             "feasible_fraction", "invalid_or_failed_fraction", "evaluations_to_target",
             "post_selection_coverage", "regional_min_coverage", "weighted_ess",
             "mean_interval_width_proxy", "abstention_fraction",
+            "cost_adjusted_normalized_hypervolume_auc", "false_promotion_rate",
+            "high_fidelity_constraint_confirmation_rate", "high_fidelity_pareto_classification_error",
+            "quality_at_fixed_high_fidelity_budget",
         }
         metric_required = {
             "final_hypervolume", "normalized_hypervolume_auc",
@@ -202,6 +231,9 @@ def validate_receipt(receipt: Any, for_publication: bool = False) -> list[str]:
             for key in (
                 "feasible_fraction", "invalid_or_failed_fraction",
                 "post_selection_coverage", "regional_min_coverage", "abstention_fraction",
+                "cost_adjusted_normalized_hypervolume_auc", "false_promotion_rate",
+                "high_fidelity_constraint_confirmation_rate", "high_fidelity_pareto_classification_error",
+                "quality_at_fixed_high_fidelity_budget",
             ):
                 if key in metrics and metrics[key] is not None:
                     _check_fraction(metrics[key], f"$.metrics.{key}", errors)
