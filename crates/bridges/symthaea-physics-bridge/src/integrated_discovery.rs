@@ -1994,6 +1994,59 @@ mod tests {
     }
 
     #[test]
+    fn oracle_equivalence_audit_requires_both_in_domain_and_ood_match() {
+        let reference = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".to_string())),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        // This expression agrees on the deliberately narrow in-domain slice v=1.5, but
+        // differs at out-of-range v=3.0. A same-domain-only oracle audit would miss this.
+        let candidate = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(reference.clone()),
+            Box::new(Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(1.5)),
+            )),
+        );
+        let in_domain: Vec<Experiment> = (0..8)
+            .map(|_| {
+                vec![
+                    ("m".to_string(), 1.5),
+                    ("v".to_string(), 1.5),
+                    ("r".to_string(), 1.5),
+                    ("t".to_string(), 1.5),
+                ]
+            })
+            .collect();
+        let out_of_domain: Vec<Experiment> = (0..8)
+            .map(|_| {
+                vec![
+                    ("m".to_string(), 3.0),
+                    ("v".to_string(), 3.0),
+                    ("r".to_string(), 0.5),
+                    ("t".to_string(), 3.0),
+                ]
+            })
+            .collect();
+
+        assert!(evaluator_matches_reference(&candidate, &reference, &in_domain));
+        assert!(!evaluator_matches_reference(&candidate, &reference, &out_of_domain));
+        assert!(!evaluator_matches_reference_across_domains(
+            &candidate,
+            &reference,
+            &in_domain,
+            &out_of_domain,
+        ));
+    }
+
+    #[test]
     fn evaluator_equivalence_requires_independent_heldout_points() {
         let reference = Expr::BinOp(
             BinOp::Mul,
