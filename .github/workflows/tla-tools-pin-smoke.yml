@@ -1,0 +1,88 @@
+name: TLA+ Tool Pin Contract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/actions/setup-tla-tools/action.yml"
+      - ".github/workflows/tla-tools-pin-smoke.yml"
+  push:
+    branches: ["**"]
+    paths:
+      - ".github/actions/setup-tla-tools/action.yml"
+      - ".github/workflows/tla-tools-pin-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tla-tools-pin-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pin-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install and verify the immutable TLA+ pin
+        id: tla
+        uses: ./.github/actions/setup-tla-tools
+
+      - name: Parse and model-check a one-state smoke specification
+        shell: bash
+        env:
+          TOOL_JAR: ${{ steps.tla.outputs.tool-path }}
+          EXPECTED_VERSION: tla2tools-2026.08.11.125311
+          EXPECTED_SHA256: ab323b79802aedc3203b3f9af37c6aca3ed43f4e0225b36f2aa77b26de46c05f
+        run: |
+          set -euo pipefail
+          test "${{ steps.tla.outputs.version }}" = "$EXPECTED_VERSION"
+          test "${{ steps.tla.outputs.sha256 }}" = "$EXPECTED_SHA256"
+          module="$RUNNER_TEMP/TlaPinSmoke.tla"
+          config="$RUNNER_TEMP/TlaPinSmoke.cfg"
+          cat > "$module" <<'TLA'
+          ---------------- MODULE TlaPinSmoke ----------------
+          EXTENDS Naturals
+          VARIABLE x
+          Init == x = 0
+          Next == UNCHANGED x
+          Spec == Init /\ [][Next]_x
+          TypeOK == x \in Nat
+          =====================================================
+          TLA
+          cat > "$config" <<'CFG'
+          SPECIFICATION Spec
+          INVARIANT TypeOK
+          CFG
+          java -cp "$TOOL_JAR" tla2sany.SANY "$module" 2>&1 | tee "$RUNNER_TEMP/tla-pin-sany.log"
+          java -cp "$TOOL_JAR" tlc2.TLC -workers 1 -config "$config" "$module" \
+            2>&1 | tee "$RUNNER_TEMP/tla-pin-tlc.log"
+          grep -Fq "Model checking completed. No error has been found." "$RUNNER_TEMP/tla-pin-tlc.log"
+          grep -Eq '[0-9]+ distinct states found' "$RUNNER_TEMP/tla-pin-tlc.log"
+
+      - name: Prove an altered digest is rejected
+        id: altered
+        uses: ./.github/actions/setup-tla-tools
+        continue-on-error: true
+        with:
+          version: tla2tools-2026.08.11.125311
+          sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+
+      - name: Assert altered-digest run failed closed before model execution
+        if: always()
+        shell: bash
+        env:
+          ALTERED_OUTCOME: ${{ steps.altered.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$ALTERED_OUTCOME" != "failure" ]]; then
+            echo "::error::Altered digest unexpectedly succeeded"
+            exit 1
+          fi
+          echo "PASS: valid-length but incorrect SHA-256 was rejected by the shared TLA+ tool action"
