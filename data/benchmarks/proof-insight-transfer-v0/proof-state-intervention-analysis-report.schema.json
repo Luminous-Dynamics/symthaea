@@ -204,15 +204,11 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "paired_rows_with_executed_usage",
+        "executed_rows_with_usage",
         "totals",
         "mean_per_executed_row"
       ],
       "properties": {
-        "paired_rows_with_executed_usage": {
-          "type": "integer",
-          "minimum": 0
-        },
         "totals": {
           "type": "object",
           "additionalProperties": false,
@@ -285,6 +281,10 @@
               }
             }
           ]
+        },
+        "executed_rows_with_usage": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
