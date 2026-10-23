@@ -416,6 +416,73 @@ mod tests {
     }
 
     #[test]
+    fn point_of_use_gate_never_invokes_action_for_scope_trust_or_time_failures() {
+        let mut record_unverified = evidence(ConsentState::Given);
+        record_unverified.record_verified = false;
+        let mut identity_unverified = evidence(ConsentState::Given);
+        identity_unverified.identity_verified = false;
+        let mut authority_unverified = evidence(ConsentState::Given);
+        authority_unverified.authority_verified = false;
+        let mut revoked = evidence(ConsentState::Given);
+        revoked.revoked = true;
+        let mut wrong_subject = evidence(ConsentState::Given);
+        wrong_subject.subject_id = "subject:bob";
+        let mut wrong_action = evidence(ConsentState::Given);
+        wrong_action.action_id = "action:publish-record";
+        let mut wrong_purpose = evidence(ConsentState::Given);
+        wrong_purpose.purpose_id = "purpose:advertising";
+        let mut future = evidence(ConsentState::Given);
+        future.valid_from_unix_s = NOW + 1;
+        let mut expired = evidence(ConsentState::Given);
+        expired.expires_at_unix_s = Some(NOW);
+        let mut invalid_window = evidence(ConsentState::Given);
+        invalid_window.expires_at_unix_s = Some(invalid_window.valid_from_unix_s);
+        let mut empty_record_id = evidence(ConsentState::Given);
+        empty_record_id.record_id = "";
+        let mut empty_request = request();
+        empty_request.action_id = "  ";
+
+        let cases = [
+            (request(), record_unverified, NOW, ConsentBlockReason::RecordUnverified),
+            (request(), identity_unverified, NOW, ConsentBlockReason::IdentityUnverified),
+            (request(), authority_unverified, NOW, ConsentBlockReason::AuthorityUnverified),
+            (request(), revoked, NOW, ConsentBlockReason::Revoked),
+            (request(), wrong_subject, NOW, ConsentBlockReason::SubjectMismatch),
+            (request(), wrong_action, NOW, ConsentBlockReason::ActionMismatch),
+            (request(), wrong_purpose, NOW, ConsentBlockReason::PurposeMismatch),
+            (request(), future, NOW, ConsentBlockReason::NotYetValid),
+            (request(), expired, NOW, ConsentBlockReason::Expired),
+            (request(), invalid_window, NOW, ConsentBlockReason::InvalidValidityWindow),
+            (request(), empty_record_id, NOW, ConsentBlockReason::EmptyEvidenceScope),
+        ];
+        let invocations = std::cell::Cell::new(0);
+        for (request, evidence, now, expected_reason) in cases {
+            let result = execute_after_consent_check(
+                ConsentRequirement::Required,
+                request,
+                Some(&evidence),
+                now,
+                || invocations.set(invocations.get() + 1),
+            );
+            assert_eq!(result, Err(expected_reason));
+            assert_eq!(invocations.get(), 0, "blocked case invoked the action closure");
+        }
+
+        let empty_request_result = execute_after_consent_check(
+            ConsentRequirement::Required,
+            empty_request,
+            Some(&evidence(ConsentState::Given)),
+            NOW,
+            || invocations.set(invocations.get() + 1),
+        );
+        assert_eq!(
+            empty_request_result,
+            Err(ConsentBlockReason::InvalidRequestScope)
+        );
+        assert_eq!(invocations.get(), 0);
+    }
+
+    #[test]
     fn satisfied_point_of_use_gate_invokes_protected_action_exactly_once() {
         let invocations = std::cell::Cell::new(0);
         let result = execute_after_consent_check(
