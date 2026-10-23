@@ -105,7 +105,12 @@ pub struct CycleResult {
     #[cfg(feature = "identity")]
     pub assurance_level: crate::identity::AssuranceLevel,
 
-    impl CycleResult {
+    /// Mental movie generated from geodesic mental simulation, if requested.
+    #[cfg(feature = "vision-manifold")]
+    pub mental_movie: Option<MentalMovie>,
+}
+
+impl CycleResult {
     /// Adapt compatibility PE fields into typed, observation-bound evidence.
     ///
     /// Cycle identifiers are explicit inputs because legacy CycleResult does
@@ -123,11 +128,6 @@ pub struct CycleResult {
             observation_cycle,
         )
     }
-}
-
-/// Mental movie generated from geodesic mental simulation, if requested.
-    #[cfg(feature = "vision-manifold")]
-    pub mental_movie: Option<MentalMovie>,
 }
 
 /// Mental movie generated from geodesic mental simulation.
