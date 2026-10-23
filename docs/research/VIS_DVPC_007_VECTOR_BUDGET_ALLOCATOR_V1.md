@@ -18,6 +18,10 @@ This prototype treats escalation as a transaction over a resource vector:
 
 Admission is componentwise. There is no weighted latency-plus-energy score that can trade a hard violation of one cap for slack in the other.
 
+### Scope boundary: allocator overhead
+
+The v1 ledger reserves and settles the *incremental escalation cost*; it does not yet reserve the allocator's own per-decision runtime. Therefore this ledger alone is not an all-in deployment latency/energy guarantee. The paired-trace evaluator must add measured allocator overhead to every decision (as PR #8506 does) and judge total resource use against the same run ceilings. Do not present this online policy as enforcing all-in budgets until an outer scheduler or a follow-on revision accounts for allocator overhead and tests the complete transaction.
+
 DEEP studies decision-value-of-perception under latency and energy budgets, charges allocator overhead, and warns that an escalated perception output may worsen downstream decisions. This reference aligns the budget mechanics with that evaluation framing; it does not reproduce DEEP or establish empirical superiority.
 
 ## Standalone qualification
