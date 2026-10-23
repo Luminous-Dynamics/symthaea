@@ -2044,10 +2044,13 @@ impl CognitiveLoopService {
 
         // 9. Create experience (moves last_state into Experience, then stores
         //    the new compressed_state for next cycle).
-        self.create_experience(
+        self.create_experience_with_evidence(
             &perception.encoding.compressed_state,
             &prediction,
-            prediction_error,
+            perception
+                .urgency
+                .prediction_error_valid
+                .then_some(prediction_error),
         );
 
         // 10. Update coherence bridge (zero-clone on CfC hot path)
