@@ -1,0 +1,110 @@
+name: Ramanujan Discovery Proof Binding
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ramanujan-discovery-proof-binding.yml'
+      - 'patches/science/ramanujan-discovery-proof-binding-v1.patch'
+      - 'crates/bridges/symthaea-physics-bridge/examples/verify_invariants_formal.rs'
+      - 'crates/core/symthaea-core/src/hdc/conjecture_engine/symbolic.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PATCH: patches/science/ramanujan-discovery-proof-binding-v1.patch
+  VERIFIER: crates/bridges/symthaea-physics-bridge/examples/verify_invariants_formal.rs
+
+jobs:
+  qualify:
+    name: Prove reference-target gap and qualify discovery-bound UNSAT pilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only scope
+        run: |
+          test -f "$PATCH"
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="HEAD^"; fi
+          git diff --exit-code "$BASE" -- Cargo.toml Cargo.lock crates/core src crates/bridges papers || {
+            echo 'qualification branch must not materialize product or paper artifacts'
+            exit 1
+          }
+
+      - name: Prove current formal verifier targets parallel reference expressions
+        run: |
+          grep -F 'energy: SymExpr' "$VERIFIER"
+          grep -F 'let partial = problem.energy.diff(var_name).simplify();' "$VERIFIER"
+          grep -F 'let energy_smt = sym_to_smt(&problem.energy)?;' "$VERIFIER"
+          ! grep -F 'expr_to_sym' "$VERIFIER"
+          ! grep -F 'discovery-bound' "$VERIFIER"
+
+      - name: Validate and apply exact candidate patch
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet direct discovery-to-proof ancestry
+        run: |
+          grep -F 'discover_invariants_autonomous' "$VERIFIER"
+          grep -F 'expr_to_sym(&discovered.formula)' "$VERIFIER"
+          grep -F 'build_obligation_for_energy(' "$VERIFIER"
+          grep -F 'autonomous_discovery_expr_via_expr_to_sym' "$VERIFIER"
+          grep -F 'identity_strength=in_process_direct_translation_non_cryptographic' "$VERIFIER"
+          grep -F 'build_reference_obligation' "$VERIFIER"
+          grep -F 'reference targets formally proven' "$VERIFIER"
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Z3
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y z3
+          z3 --version
+
+      - name: Compile and lint verifier
+        run: |
+          cargo fmt --check -p symthaea-physics-bridge
+          cargo check --locked -p symthaea-physics-bridge --example verify_invariants_formal
+          cargo clippy --locked -p symthaea-physics-bridge --example verify_invariants_formal -- -D warnings
+
+      - name: Execute discovery-bound proof pilot
+        run: |
+          PROOF_DIR="$RUNNER_TEMP/ramanujan-proofs"
+          mkdir -p "$PROOF_DIR"
+          SYMTHAEA_Z3_DUMP_DIR="$PROOF_DIR" \
+            cargo run --locked -p symthaea-physics-bridge --example verify_invariants_formal \
+            > "$RUNNER_TEMP/verifier.csv" \
+            2> "$RUNNER_TEMP/verifier.stderr"
+
+          RECEIPT="$PROOF_DIR/harmonic_oscillator.discovery-bound.binding.txt"
+          WITNESS="$PROOF_DIR/harmonic_oscillator.discovery-bound.smt2"
+          test -s "$RECEIPT"
+          test -s "$WITNESS"
+          grep -F 'origin=autonomous_discovery_expr_via_expr_to_sym' "$RECEIPT"
+          grep -F 'z3_result=unsat' "$RECEIPT"
+          grep -F 'identity_strength=in_process_direct_translation_non_cryptographic' "$RECEIPT"
+          grep -F '; Proof target origin: autonomous_discovery_expr_via_expr_to_sym' "$WITNESS"
+          test "$(z3 -smt2 "$WITNESS" | tail -1)" = 'unsat'
+          grep -F 'discovery-bound pilot:' "$RUNNER_TEMP/verifier.stderr"
+          grep -F 'discovery-bound harmonic=true' "$RUNNER_TEMP/verifier.stderr"
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes one deterministic harmonic-oscillator path where the formal SMT obligation is derived directly from the Expr returned by autonomous discovery through expr_to_sym, and an UNSAT result is retained with a textual binding receipt.'
+          echo 'It does not bind the historical/reference proof corpus to discovery, establish cryptographic artifact identity, prove all showcase rows, establish independent replication, or upgrade symbolic/sample checks into formal proof.'
