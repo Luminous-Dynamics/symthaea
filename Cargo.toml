@@ -15,6 +15,10 @@ members = [
 # members despite being listed below, because of this). `default-members`
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
+    # Quarantine an orphaned source tree: src/lib.rs is tracked but this directory
+    # has no Cargo.toml, so the crates/core/* member glob breaks all Cargo commands.
+    # Restore a complete crate manifest before removing this exclusion.
+    "crates/core/symthaea-observation-attestation",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
@@ -677,7 +681,7 @@ phase-2a-lz4 = ["phone-scrcpy", "holon-viewer", "dep:lz4_flex"]  # Phase II.A LZ
 foveation = ["dep:symthaea-foveation", "vision-manifold"]  # Foveation bridge for active vision (dorsal→ventral dispatch)
 # REMOVED: foveation-perception (0 cfg gates; requires GPU models, never tested)
 integrity = []  # Hardware integrity / tamper detection framework (attestation, temporal checks, canaries)
-glyph_codex = []  # Glyph Codex: symbolic consciousness field (70 glyphs, 11 Field Modality basis vectors)
+glyph_codex = ["dep:sha2"]  # Glyph Codex: symbolic field probe; SHA-256 content receipts for reproducible evaluation
 semantic-encoder = ["symthaea-embeddings/embed-channel"]  # Background Qwen3 embedding channel for cognitive loop telemetry
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
 neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub", "dep:sha2"]
