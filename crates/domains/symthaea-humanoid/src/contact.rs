@@ -39,6 +39,9 @@ pub enum ContactQuality {
     Stale,
     Kinematic,
     Modeled,
+    /// High-fidelity simulator/rigid-body-solver output. This is not a physical measurement.
+    SolverDerived,
+    /// Physical sensor measurement.
     Measured,
 }
 
@@ -184,7 +187,8 @@ impl ContactFrame {
             ContactSource::Unavailable => ContactQuality::Unavailable,
             ContactSource::KinematicEstimate => ContactQuality::Kinematic,
             ContactSource::GroundReactionModel => ContactQuality::Modeled,
-            ContactSource::ForceSensor | ContactSource::SolverWrench => ContactQuality::Measured,
+            ContactSource::SolverWrench => ContactQuality::SolverDerived,
+            ContactSource::ForceSensor => ContactQuality::Measured,
         }
     }
 
@@ -197,6 +201,9 @@ impl ContactFrame {
             ContactQuality::Stale => 0.20,
             ContactQuality::Kinematic => 0.55,
             ContactQuality::Modeled => 0.82,
+            // Preserve historical in-simulator control behavior while keeping
+            // solver truth epistemically distinct from hardware measurement.
+            ContactQuality::SolverDerived => 1.0,
             ContactQuality::Measured => 1.0,
         };
         (source_trust * self.minimum_confidence()).clamp(0.15, 1.0) as f32
@@ -313,8 +320,42 @@ mod tests {
             [0.0; 6],
         );
         assert_eq!(frame.source, ContactSource::SolverWrench);
+        assert_eq!(
+            frame.quality_at(state.timestamp, 0.05),
+            ContactQuality::SolverDerived
+        );
         assert!(frame.right.center_of_pressure_world_m[0] > 0.0);
         assert!(frame.right.center_of_pressure_world_m[1] > -0.1);
+    }
+
+    #[test]
+    fn solver_derived_contact_is_not_relabelled_as_sensor_measurement() {
+        let state = HumanoidState::standing();
+        let frame = ContactFrame::from_solver_wrenches(
+            &state,
+            [0.0, 0.0, 0.0, 0.0, 0.0, 400.0],
+            [0.0; 6],
+        );
+        assert_eq!(
+            frame.quality_at(state.timestamp, 0.05),
+            ContactQuality::SolverDerived
+        );
+        assert_ne!(
+            frame.quality_at(state.timestamp, 0.05),
+            ContactQuality::Measured
+        );
+        assert!((frame.control_trust(state.timestamp, 0.05) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn physical_force_sensor_remains_measured() {
+        let state = HumanoidState::standing();
+        let mut frame = ContactFrame::estimated_from_state(&state, 0.05);
+        frame.source = ContactSource::ForceSensor;
+        assert_eq!(
+            frame.quality_at(state.timestamp, 0.05),
+            ContactQuality::Measured
+        );
     }
 
     #[test]
@@ -326,6 +367,7 @@ mod tests {
             ContactFrame::from_ground_reaction_forces(&state, [0.0, 0.0, 700.0], [0.0, 0.0, 100.0]);
         assert!(frame.center_of_pressure_world_m().unwrap()[1] < 0.0);
     }
+
     #[test]
     fn future_dated_contact_is_not_trusted() {
         let state = HumanoidState::standing();
