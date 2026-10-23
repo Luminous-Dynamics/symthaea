@@ -36,7 +36,10 @@ impl PsiAttestationRecord {
 #[derive(Debug, Clone)]
 pub struct CycleResult {
     pub output: Vec<f32>,
+    /// Numeric PE payload may be a compatibility sentinel when validity is false.
     pub prediction_error: f32,
+    /// Whether PE is a genuine finite comparison for this cycle.
+    pub prediction_error_valid: bool,
     pub peak_attention: f32,
     pub detected_primitives: Vec<String>,
     pub learning_occurred: bool,
