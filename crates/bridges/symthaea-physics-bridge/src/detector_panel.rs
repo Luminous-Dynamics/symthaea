@@ -153,7 +153,7 @@ impl DetectorPanelScorer {
                     detector_index,
                     orientation,
                     clean_mean: clean_means[detector_index],
-                    clean_scale: clean_scales[detector_index].max(scale_floor),
+                    clean_scale: clean_scales[detector_index],
                     detectability_auc,
                 });
             }
@@ -417,6 +417,12 @@ mod tests {
                 calibrated: true,
                 independent_audit: true,
             }
+        ));
+        assert!(matches!(
+            panel.assess(&calibrator, &perturbed[20], false),
+            Err(DetectorPanelError::Calibration(
+                CalibrationError::AuditNotIndependent
+            ))
         ));
     }
 
