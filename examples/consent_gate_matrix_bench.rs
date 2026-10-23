@@ -175,82 +175,83 @@ fn main() {
                                         evidence_scope_case,
                                         time_case,
                                     );
-                                let evidence_ref = evidence_present.then_some(&evidence);
-                                let expected = expected_consent_outcome(
-                                    requirement,
-                                    state,
-                                    trust_mask,
-                                    revoked,
-                                    evidence_present,
-                                    request_scope_case,
-                                    evidence_scope_case,
-                                    time_case,
-                                );
+                                    let evidence_ref = evidence_present.then_some(&evidence);
+                                    let expected = expected_consent_outcome(
+                                        requirement,
+                                        state,
+                                        trust_mask,
+                                        revoked,
+                                        evidence_present,
+                                        request_scope_case,
+                                        evidence_scope_case,
+                                        time_case,
+                                    );
 
-                                let observed = evaluate_consent_gate(
-                                    requirement,
-                                    request,
-                                    evidence_ref,
-                                    NOW,
-                                );
+                                    let observed = evaluate_consent_gate(
+                                        requirement,
+                                        request,
+                                        evidence_ref,
+                                        NOW,
+                                    );
 
-                                if matches!(expected, ConsentGateOutcome::Blocked(_)) {
-                                    metrics.expected_block += 1;
-                                    if !matches!(observed, ConsentGateOutcome::Blocked(_)) {
-                                        metrics.false_permits += 1;
-                                    }
-                                } else {
-                                    metrics.expected_execute += 1;
-                                    if observed != expected {
-                                        metrics.outcome_mismatches += 1;
-                                    }
-                                }
-
-                                let should_execute = !matches!(expected, ConsentGateOutcome::Blocked(_));
-                                let mut invocations = 0_u32;
-                                let wrapped = execute_after_consent_check(
-                                    requirement,
-                                    request,
-                                    evidence_ref,
-                                    NOW,
-                                    || {
-                                        invocations += 1;
-                                    },
-                                );
-
-                                if should_execute && invocations != 1 {
-                                    metrics.closure_not_invoked_on_allow += 1;
-                                }
-                                if !should_execute && invocations != 0 {
-                                    metrics.closure_invocations_on_block += 1;
-                                }
-
-                                if should_execute {
-                                    if let Ok(((), outcome)) = wrapped {
-                                        if outcome != expected {
-                                            metrics.outcome_mismatches += 1;
+                                    if matches!(expected, ConsentGateOutcome::Blocked(_)) {
+                                        metrics.expected_block += 1;
+                                        if !matches!(observed, ConsentGateOutcome::Blocked(_)) {
+                                            metrics.false_permits += 1;
                                         }
                                     } else {
-                                        metrics.outcome_mismatches += 1;
+                                        metrics.expected_execute += 1;
+                                        if observed != expected {
+                                            metrics.outcome_mismatches += 1;
+                                        }
                                     }
-                                } else if wrapped.is_ok() {
-                                    metrics.false_permits += 1;
-                                }
 
-                                // Also catch unexpected blocks for a valid Required
-                                // case, independently of the expected-output branch.
-                                if requirement == ConsentRequirement::Required
-                                    && evidence_present
-                                    && state == ConsentState::Given
-                                    && trust_mask == 0b111
-                                    && !revoked
-                                    && request_scope_case == 0
-                                    && evidence_scope_case == 0
-                                    && time_case == 0
-                                    && observed != ConsentGateOutcome::Satisfied
-                                {
-                                    metrics.false_blocks += 1;
-                                }
+                                    let should_execute =
+                                        !matches!(expected, ConsentGateOutcome::Blocked(_));
+                                    let mut invocations = 0_u32;
+                                    let wrapped = execute_after_consent_check(
+                                        requirement,
+                                        request,
+                                        evidence_ref,
+                                        NOW,
+                                        || {
+                                            invocations += 1;
+                                        },
+                                    );
+
+                                    if should_execute && invocations != 1 {
+                                        metrics.closure_not_invoked_on_allow += 1;
+                                    }
+                                    if !should_execute && invocations != 0 {
+                                        metrics.closure_invocations_on_block += 1;
+                                    }
+
+                                    if should_execute {
+                                        if let Ok(((), outcome)) = wrapped {
+                                            if outcome != expected {
+                                                metrics.outcome_mismatches += 1;
+                                            }
+                                        } else {
+                                            metrics.outcome_mismatches += 1;
+                                        }
+                                    } else if wrapped.is_ok() {
+                                        metrics.false_permits += 1;
+                                    }
+
+                                    // Also catch unexpected blocks for a valid Required
+                                    // case, independently of the expected-output branch.
+                                    if requirement == ConsentRequirement::Required
+                                        && evidence_present
+                                        && state == ConsentState::Given
+                                        && trust_mask == 0b111
+                                        && !revoked
+                                        && request_scope_case == 0
+                                        && evidence_scope_case == 0
+                                        && time_case == 0
+                                        && observed != ConsentGateOutcome::Satisfied
+                                    {
+                                        metrics.false_blocks += 1;
+                                    }
                                 }
                             }
                         }
