@@ -1860,8 +1860,11 @@ mod tests {
                 0
             };
             unresolved_without_recovery += if baseline.final_live != 1 { 1 } else { 0 };
-            false_singletons_without_recovery +=
-                if baseline.final_live == 1 && !baseline.success { 1 } else { 0 };
+            false_singletons_without_recovery += if baseline.final_live == 1 && !baseline.success {
+                1
+            } else {
+                0
+            };
             empty_pool_recovery_attempts += if recovered.recovery_triggered_on_empty_pool {
                 1
             } else {
