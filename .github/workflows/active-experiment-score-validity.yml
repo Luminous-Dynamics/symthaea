@@ -36,7 +36,7 @@ jobs:
 
       - name: Diagnose workspace lockfile drift
         run: |
-          cargo update --workspace --offline
+          cargo update --workspace
           echo "=== Cargo.lock diff stat ==="
           git diff --stat -- Cargo.lock
           echo "=== Cargo.lock reconciliation diff ==="
