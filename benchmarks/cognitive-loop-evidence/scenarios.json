@@ -613,9 +613,11 @@
       "family": "fixed-threshold-control",
       "labels_required": false,
       "input_contract": "Univariate valid PE or standardized residual stream; omit invalid/missing measurements and report coverage.",
-      "implementation_status": "planned-baseline",
+      "implementation_status": "implemented-rust-reference-baseline",
       "source": "https://doi.org/10.1007/s41060-024-00620-y",
-      "comparison_track": "valid-pe-only"
+      "comparison_track": "valid-pe-only",
+      "implementation_path": "xtask/src/cognitive_drift_baselines.rs",
+      "implementation_scope": "Runnable valid-PE-only scalar control; not an external KDD 2026 reproduction and not a measured performance result."
     },
     {
       "id": "ewma-control-chart",
@@ -623,9 +625,11 @@
       "family": "smoothed-control-chart",
       "labels_required": false,
       "input_contract": "Univariate valid PE or standardized residual stream; freeze smoothing and alarm thresholds using a separate calibration stream.",
-      "implementation_status": "planned-baseline",
+      "implementation_status": "implemented-rust-reference-baseline",
       "source": "https://doi.org/10.1007/s41060-024-00620-y",
-      "comparison_track": "valid-pe-only"
+      "comparison_track": "valid-pe-only",
+      "implementation_path": "xtask/src/cognitive_drift_baselines.rs",
+      "implementation_scope": "Runnable valid-PE-only scalar control; not an external KDD 2026 reproduction and not a measured performance result."
     },
     {
       "id": "page-hinkley",
@@ -848,7 +852,7 @@
       "source": "https://doi.org/10.1145/3770855.3819070"
     }
   ],
-  "drift_detector_comparison_protocol": "Pin each detector implementation/version and hyperparameters; tune only on a disjoint calibration stream; use identical valid observations and no label access for the label-free track; never remap invalid/missing PE to zero or maximal surprise; report false alarms per 1,000 valid observations, missed-drift rate, detection-delay distribution, precision/recall by abrupt/gradual/recurring drift, invalid-sample coverage, throughput, and peak memory. Publish per-seed event traces. These detector candidates are planned, not yet implemented or measured.",
+  "drift_detector_comparison_protocol": "Pin versions; tune on a disjoint calibration stream; never remap invalid/missing PE; report false alarms and detection-delay. Fixed-threshold and EWMA now have executable Rust reference baselines on the valid-PE-only track; external specialist comparators and pinned public datasets are not yet implemented or measured.",
   "drift_protocol": {
     "protocol_id": "leave-one-dataset-out-monte-carlo-v1",
     "monte_carlo_seeds": 50,
