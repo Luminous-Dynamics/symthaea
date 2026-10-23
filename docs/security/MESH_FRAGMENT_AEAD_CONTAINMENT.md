@@ -14,8 +14,9 @@ These are source/API findings. They do not establish that a particular deployed 
 
 ## Containment in this change
 
-- Add `MeshError::SecurityProfileUnavailable` so an unavailable requested security profile is explicit.
+- Add `MeshError::SecurityProfileUnavailable` and `MeshError::TransportMtuExceeded` so an unavailable security profile or oversized serialized frame is explicit.
 - Make high-level LoRa sending reject the fragment-AEAD mode before any frame is emitted. This guard also rejects the mode if the encryption key is absent; it does not send cleartext.
+- Serialize and preflight the complete fragment set against the selected transport's actual `mtu()` before sending the first frame. A small/incorrectly configured transport cannot receive a partial packet before an oversize error.
 - Keep the existing packet-envelope AEAD path available when configured, with fragment encryption disabled.
 - Add an optional `MeshTransport::recv_raw_with_source` method whose default fails closed. An adapter may implement it only when it can provide a transport-authenticated identity bound to the mesh peer. Copying the nonce's source prefix or trusting an unauthenticated radio address is insufficient.
 - When a receiver is configured to require fragment AEAD, absence of its key rejects the frame and increments the decrypt-failure counter instead of parsing plaintext.
@@ -29,7 +30,7 @@ Increasing the receive buffer cannot make a 250-byte payload fit a physical 222-
 
 ## Release gates for re-enabling fragment AEAD
 
-- [ ] A versioned framing proposal accounts for every byte under the actual transport MTU.
+- [ ] A versioned framing proposal accounts for every byte under the actual transport MTU; sending preflights all frames and never emits a partial packet on an MTU violation.
 - [ ] The chosen transport API supplies an authenticated source identity, not a nonce-derived or unauthenticated label.
 - [ ] Both source and receiver fail closed on missing key, unsupported identity binding, oversized output, malformed frames, and wrong peer/context.
 - [ ] Repeated/reordered/replayed fragments have an explicit state-machine policy and bounded allocations.
