@@ -1,0 +1,402 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/success-cost-frontier-analysis-report.schema.json",
+  "title": "PITB Success-Cost Frontier Analysis Report v0",
+  "description": "Descriptive multi-budget report. Its confirmatory decision is always unassessed and it cannot replace the preregistered primary proof-utility analysis.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "dataset_kind",
+    "split",
+    "plan_sha256",
+    "outcomes_sha256",
+    "analyzer_source_sha256",
+    "bootstrap",
+    "counts",
+    "curves",
+    "paired_effects",
+    "pareto_frontier",
+    "limitations",
+    "confirmatory_decision"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.success-cost-frontier-analysis.v0"
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_kind": {
+      "enum": [
+        "synthetic_fixture",
+        "reviewed_benchmark"
+      ]
+    },
+    "split": {
+      "enum": [
+        "validation",
+        "test",
+        "external_challenge"
+      ]
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "outcomes_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "analyzer_source_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "replicates",
+        "seed",
+        "interval",
+        "note"
+      ],
+      "properties": {
+        "unit": {
+          "const": "target_component_id"
+        },
+        "replicates": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "interval": {
+          "const": "percentile_95"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planned_cells",
+        "outcome_rows",
+        "executed_rows",
+        "unexecuted_rows",
+        "verified_successes",
+        "outcome_status_counts"
+      ],
+      "properties": {
+        "planned_cells": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outcome_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "executed_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unexecuted_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "verified_successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outcome_status_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "curves": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/curve"
+      }
+    },
+    "paired_effects": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pairedEffect"
+      }
+    },
+    "pareto_frontier": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/frontierPoint"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "confirmatory_decision": {
+      "enum": [
+        "not_evaluated_synthetic_fixture",
+        "not_evaluated_confirmatory_gate_requires_primary_analyzer_and_independent_receipts"
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullableNumber": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableInterval": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "lower",
+            "upper"
+          ],
+          "properties": {
+            "method": {
+              "const": "component_clustered_percentile_bootstrap"
+            },
+            "lower": {
+              "type": "number"
+            },
+            "upper": {
+              "type": "number"
+            }
+          }
+        }
+      ]
+    },
+    "curve": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm_id",
+        "method_class",
+        "budget_id",
+        "budget_caps",
+        "assigned_targets",
+        "executed_rows",
+        "unexecuted_rows",
+        "verified_successes",
+        "verified_success_rate",
+        "verified_success_rate_ci_95",
+        "total_model_calls",
+        "total_tokens",
+        "total_wall_ms",
+        "total_cost_microusd",
+        "mean_cost_microusd_per_assigned_target",
+        "cost_microusd_per_verified_solve"
+      ],
+      "properties": {
+        "arm_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "budget_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "budget_caps": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_model_calls",
+            "max_tokens",
+            "max_wall_ms",
+            "max_cost_microusd"
+          ],
+          "properties": {
+            "max_model_calls": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_tokens": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_wall_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_cost_microusd": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "assigned_targets": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "executed_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unexecuted_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "verified_successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "verified_success_rate": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "verified_success_rate_ci_95": {
+          "$ref": "#/$defs/nullableInterval"
+        },
+        "total_model_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_wall_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_cost_microusd": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mean_cost_microusd_per_assigned_target": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "cost_microusd_per_verified_solve": {
+          "$ref": "#/$defs/nullableNumber"
+        }
+      }
+    },
+    "pairedEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "budget_id",
+        "treatment_arm_id",
+        "comparator_arm_id",
+        "matched_targets",
+        "component_count",
+        "treatment_successes",
+        "comparator_successes",
+        "success_rate_difference_treatment_minus_comparator",
+        "confidence_interval_95"
+      ],
+      "properties": {
+        "budget_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "treatment_arm_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "comparator_arm_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "matched_targets": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "component_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "treatment_successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "comparator_successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "success_rate_difference_treatment_minus_comparator": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "confidence_interval_95": {
+          "$ref": "#/$defs/nullableInterval"
+        }
+      }
+    },
+    "frontierPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "point_id",
+        "arm_id",
+        "method_class",
+        "budget_id",
+        "verified_success_rate",
+        "mean_cost_microusd_per_assigned_target"
+      ],
+      "properties": {
+        "point_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "arm_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "budget_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verified_success_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mean_cost_microusd_per_assigned_target": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
