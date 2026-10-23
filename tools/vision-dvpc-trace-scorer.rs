@@ -888,7 +888,9 @@ fn score(
         m.latency_budget_violation =
             latency_accumulator_overflow || latency > m.latency_budget_us;
         m.energy_budget_violation = energy_accumulator_overflow || energy > m.energy_budget_uj;
-        m.valid_budget_run = !m.latency_budget_violation && !m.energy_budget_violation;
+        m.valid_budget_run = !m.latency_budget_violation
+            && !m.energy_budget_violation
+            && m.reservation_overruns == 0;
         metrics.insert(run_key.clone(), m);
     }
 
@@ -1074,7 +1076,7 @@ mod tests {
         let fields: Vec<&str> = full_row.split('\\t').collect();
         assert_eq!(fields[17], "35000");
         assert_eq!(fields[21], "true");
-        assert_eq!(fields[23], "2");
+        assert_eq!(fields[23], "1");
         assert_eq!(fields[24], "false");
         let router_row = report
             .lines()
