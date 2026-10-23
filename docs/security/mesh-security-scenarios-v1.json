@@ -262,8 +262,8 @@
       "stimulus": "Replace the asserted peer identity while preserving the candidate key material or reuse a public key without authenticated ownership.",
       "expected_legacy": "Peer identity/key association fails the protocol's authenticated transcript contract.",
       "required_replacement": "No established session under a different peer identity; bind canonical identity and role to the selected protocol transcript.",
-      "model_config": null,
-      "strict_config": null,
+      "model_config": "docs/security/models/mesh_handshake_identity_unbound_legacy.cfg",
+      "strict_config": "docs/security/models/mesh_handshake_strict.cfg",
       "implementation_target": "peer-ID substitution regression plus independent handshake vectors",
       "positive_control": "Correctly bound peer identity succeeds.",
       "status": "proposed"
@@ -275,8 +275,8 @@
       "stimulus": "Mutate protocol version, role, suite, KEM ciphertext/share, ephemeral share, or key-confirmation transcript bytes.",
       "expected_legacy": "Handshake must reject changed transcript or fail confirmation.",
       "required_replacement": "All security-relevant transcript differences are authenticated and result in no established session.",
-      "model_config": null,
-      "strict_config": null,
+      "model_config": "docs/security/models/mesh_handshake_transcript_unbound_legacy.cfg",
+      "strict_config": "docs/security/models/mesh_handshake_strict.cfg",
       "implementation_target": "one-field-at-a-time transcript mutation corpus",
       "positive_control": "Canonical unchanged transcript succeeds.",
       "status": "proposed"
