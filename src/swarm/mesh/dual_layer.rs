@@ -679,6 +679,7 @@ mod tests {
     #[derive(Clone)]
     struct RecordingTransport {
         sent: std::sync::Arc<Mutex<Vec<Vec<u8>>>>,
+        mtu_bytes: usize,
     }
 
     #[cfg(feature = "mesh-encryption")]
@@ -696,7 +697,7 @@ mod tests {
         }
 
         fn mtu(&self) -> usize {
-            LORA_MTU
+            self.mtu_bytes
         }
 
         fn name(&self) -> &str {
@@ -715,6 +716,7 @@ mod tests {
         let mesh = DualLayerMesh::new([0x42; 32])
             .with_lora(Box::new(RecordingTransport {
                 sent: std::sync::Arc::clone(&sent),
+                mtu_bytes: LORA_MTU,
             }))
             .with_encryption_key([0x5A; 32])
             .with_fragment_encryption(true);
@@ -734,6 +736,7 @@ mod tests {
         let mesh = DualLayerMesh::new([0x42; 32])
             .with_lora(Box::new(RecordingTransport {
                 sent: std::sync::Arc::clone(&sent),
+                mtu_bytes: LORA_MTU,
             }))
             .with_fragment_encryption(true);
 
@@ -752,6 +755,7 @@ mod tests {
         let mesh = DualLayerMesh::new([0x42; 32])
             .with_lora(Box::new(RecordingTransport {
                 sent: std::sync::Arc::clone(&sent),
+                mtu_bytes: LORA_MTU,
             }))
             .with_encryption_key([0x5A; 32]);
 
@@ -767,6 +771,26 @@ mod tests {
         assert!(
             frames.iter().all(|frame| frame.len() <= LORA_MTU),
             "every emitted frame must remain within the declared LoRa MTU"
+        );
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn actual_transport_mtu_is_preflighted_before_any_lora_frame() {
+        let sent = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let mesh = DualLayerMesh::new([0x42; 32]).with_lora(Box::new(RecordingTransport {
+            sent: std::sync::Arc::clone(&sent),
+            mtu_bytes: 100,
+        }));
+
+        let error = mesh.send(&test_packet(MeshUrgency::Cruise)).unwrap_err();
+        assert!(matches!(
+            error,
+            MeshError::TransportMtuExceeded { frame_len, mtu: 100 } if frame_len > 100
+        ));
+        assert!(
+            sent.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_empty(),
+            "MTU validation must reject the whole packet before any fragment is emitted"
         );
     }
 
