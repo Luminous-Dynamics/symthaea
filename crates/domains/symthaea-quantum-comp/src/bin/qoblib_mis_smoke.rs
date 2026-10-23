@@ -922,4 +922,22 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn fixed_target_summary_preserves_hits_and_unreached_trials() {
+        let runs = vec![
+            vec![(0_u128, 0_usize), (1_000, 1), (2_000, 2)],
+            vec![(0_u128, 0_usize), (500, 1)],
+        ];
+        assert_eq!(
+            target_trial_summary_json(2, &runs),
+            r#"{"trial_count": 2, "target_hits": 1, "empirical_hit_rate": 0.500000, "time_to_target_seconds_by_trial": [0.000002000,null]}"#
+        );
+        let analysis = target_analysis_json(Some(2), &runs[0], &runs, None);
+        assert!(analysis.contains("\"target_objective\": 2"));
+        assert!(analysis.contains("\"time_to_target_seconds_by_trial\": [0.000002000,null]"));
+        assert!(analysis.ends_with("\"local_improvement_stage\": null}"));
+        assert_eq!(target_analysis_json(None, &runs[0], &runs, None), "null");
+    }
+
 }
