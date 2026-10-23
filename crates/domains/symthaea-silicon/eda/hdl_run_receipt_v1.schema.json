@@ -1,0 +1,300 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea HDC RTL correctness sweep receipt v1.1",
+  "description": "Machine-readable outcome for the 12-case HDC XOR/Hamming RTL smoke sweep. Receipt structure is not a hardware attestation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "qualification",
+    "status",
+    "timestamp_utc",
+    "git_head",
+    "verilator_version",
+    "missing_tools",
+    "source_hashes",
+    "widths_tested",
+    "architectures",
+    "case_results",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "qualification": {
+      "const": "hdc_rtl_correctness_sweep"
+    },
+    "status": {
+      "enum": [
+        "simulation_smoke_pass",
+        "failed",
+        "unqualified_tool_missing"
+      ]
+    },
+    "timestamp_utc": {
+      "type": "string",
+      "pattern": "^[0-9]{8}T[0-9]{6}Z(-pid[0-9]+)?$"
+    },
+    "git_head": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{40}|unavailable)$"
+    },
+    "verilator_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "missing_tools": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "source_hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rtl_bind_xor",
+        "tb_bind_xor",
+        "rtl_hamming_count",
+        "tb_hamming_count",
+        "runner",
+        "manifest",
+        "flake",
+        "flake_lock"
+      ],
+      "properties": {
+        "rtl_bind_xor": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "tb_bind_xor": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "rtl_hamming_count": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "tb_hamming_count": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "runner": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "manifest": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "flake": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "flake_lock": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        }
+      }
+    },
+    "widths_tested": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          64,
+          128,
+          256,
+          512
+        ]
+      }
+    },
+    "architectures": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "xor",
+          "linear_popcount",
+          "balanced_popcount"
+        ]
+      }
+    },
+    "case_results": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/caseResult"
+      }
+    },
+    "output_directory": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 20
+    }
+  },
+  "$defs": {
+    "hashOrUnavailable": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{64}|unavailable)$"
+    },
+    "caseResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "module",
+        "architecture",
+        "datapath_width_bits",
+        "status",
+        "lint_exit_code",
+        "build_exit_code",
+        "simulation_exit_code",
+        "expected_pass_marker_seen"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^(?:xor|linear-popcount|balanced-popcount)-(?:64|128|256|512)$"
+        },
+        "module": {
+          "enum": [
+            "hdc_bind_xor",
+            "hdc_hamming_count"
+          ]
+        },
+        "architecture": {
+          "enum": [
+            "xor",
+            "linear_popcount",
+            "balanced_popcount"
+          ]
+        },
+        "datapath_width_bits": {
+          "enum": [
+            64,
+            128,
+            256,
+            512
+          ]
+        },
+        "status": {
+          "enum": [
+            "simulation_smoke_pass",
+            "failed"
+          ]
+        },
+        "lint_exit_code": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "build_exit_code": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "simulation_exit_code": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_pass_marker_seen": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "unqualified_tool_missing"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "widths_tested": {
+            "maxItems": 0
+          },
+          "case_results": {
+            "maxItems": 0
+          },
+          "missing_tools": {
+            "minItems": 1
+          }
+        },
+        "required": [
+          "output_directory"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "simulation_smoke_pass"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "git_head": {
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "verilator_version": {
+            "not": {
+              "const": "unavailable"
+            }
+          },
+          "missing_tools": {
+            "maxItems": 0
+          },
+          "widths_tested": {
+            "const": [
+              64,
+              128,
+              256,
+              512
+            ]
+          },
+          "architectures": {
+            "const": [
+              "xor",
+              "linear_popcount",
+              "balanced_popcount"
+            ]
+          },
+          "case_results": {
+            "minItems": 12,
+            "maxItems": 12,
+            "items": {
+              "properties": {
+                "status": {
+                  "const": "simulation_smoke_pass"
+                },
+                "lint_exit_code": {
+                  "const": 0
+                },
+                "build_exit_code": {
+                  "const": 0
+                },
+                "simulation_exit_code": {
+                  "const": 0
+                },
+                "expected_pass_marker_seen": {
+                  "const": true
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "output_directory"
+        ]
+      }
+    }
+  ]
+}
