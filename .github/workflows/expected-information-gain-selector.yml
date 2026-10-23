@@ -22,6 +22,7 @@ on:
       - "docs/research/SEQUENTIAL_MODEL_ADEQUACY_MONITOR_V0_1.md"
       - "docs/research/RANDOM_PROJECTION_FEATURE_SHIFT_V0_1.md"
       - "docs/research/REFERENCE_FREE_DETECTOR_PANEL_V0_1.md"
+      - "docs/research/STRATIFIED_PROBE_DETECTOR_PANEL_V0_1.md"
       - ".github/workflows/expected-information-gain-selector.yml"
   workflow_dispatch:
 
