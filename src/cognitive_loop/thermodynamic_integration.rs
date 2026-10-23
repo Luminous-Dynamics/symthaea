@@ -515,6 +515,39 @@ mod tests {
     }
 
     #[test]
+    fn invalid_pe_payload_is_counterfactually_inert() {
+        let payloads = [1.0_f32, -1.0, 0.75, f32::NAN, f32::INFINITY];
+        let mut baseline_input = default_input();
+        baseline_input.prediction_error = 0.0;
+        baseline_input.prediction_error_valid = false;
+
+        let mut baseline = ThermodynamicIntegration::default();
+        let baseline_feedback = baseline.run_cycle(&baseline_input);
+
+        for payload in payloads {
+            let mut input = baseline_input.clone();
+            input.prediction_error = payload;
+
+            let mut candidate = ThermodynamicIntegration::default();
+            let feedback = candidate.run_cycle(&input);
+
+            assert_eq!(candidate.bridge.memory_landauer_cost, baseline.bridge.memory_landauer_cost);
+            assert_eq!(candidate.bridge.prigogine_violated, baseline.bridge.prigogine_violated);
+            assert_eq!(
+                candidate.bridge.england_exploration_boost,
+                baseline.bridge.england_exploration_boost
+            );
+            assert_eq!(feedback.lr_factor, baseline_feedback.lr_factor);
+            assert_eq!(feedback.exploration_factor, baseline_feedback.exploration_factor);
+            assert_eq!(
+                feedback.memory_consolidation_suppressed,
+                baseline_feedback.memory_consolidation_suppressed
+            );
+            assert_eq!(feedback.insight_detected, baseline_feedback.insight_detected);
+        }
+    }
+
+    #[test]
     fn test_absent_modules_graceful() {
         let mut ti = ThermodynamicIntegration::default();
         let input = ThermodynamicInput::default(); // All has_* = false
