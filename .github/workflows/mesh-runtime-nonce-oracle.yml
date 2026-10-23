@@ -60,6 +60,10 @@ jobs:
             sha256sum src/swarm/mesh/mod.rs src/swarm/mesh/tests.rs               src/swarm/mesh/dual_layer.rs Cargo.toml Cargo.lock rust-toolchain.toml
           } > "$EVIDENCE_DIR/input-manifest.txt"
 
+      - name: Check formatting for the focused test module
+        shell: bash
+        run: rustfmt --edition 2024 --check src/swarm/mesh/tests.rs
+
       - name: Run focused encrypted mesh test suite
         shell: bash
         run: |
