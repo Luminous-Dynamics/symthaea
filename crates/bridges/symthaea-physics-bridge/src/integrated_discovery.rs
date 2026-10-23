@@ -73,6 +73,9 @@ use symthaea_core::hdc::conjecture_engine::{
 };
 
 use crate::dimensional_inference::UnitMap;
+use crate::prequential_pit_martingale::{
+    PrequentialPitDecision, PrequentialPitMartingale,
+};
 use crate::typed_generation::random_expr_with_dimension;
 use crate::types::DimensionalSignature;
 
@@ -101,6 +104,24 @@ fn rand_gaussian(rng: &mut u64, sigma: f64) -> f64 {
     let u1 = rand_unit(rng).max(1e-12);
     let u2 = rand_unit(rng);
     sigma * (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos()
+}
+
+/// Standard-normal CDF approximation for this deterministic simulator only.
+/// Real predictors must provide a vetted conditional predictive CDF.
+fn standard_normal_cdf(value: f64) -> Option<f64> {
+    if !value.is_finite() {
+        return None;
+    }
+    let sign = if value < 0.0 { -1.0 } else { 1.0 };
+    let x = value.abs() / std::f64::consts::SQRT_2;
+    let t = 1.0 / (1.0 + 0.3275911 * x);
+    let polynomial = (((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t
+        - 0.284496736)
+        * t)
+        + 0.254829592)
+        * t;
+    let probability = 0.5 * (1.0 + sign * (1.0 - polynomial * (-x * x).exp()));
+    probability.is_finite().then_some(probability.clamp(0.0, 1.0))
 }
 
 fn shuffle<T>(rng: &mut u64, items: &mut [T]) {
@@ -293,6 +314,7 @@ enum ActiveSelector {
     ExpectedInformationGain,
     WorstCaseInformationGain,
     InformationGainWithAudits,
+    InformationGainWithPrequentialPitAudits,
 }
 
 struct TrialOutcome {
@@ -303,6 +325,8 @@ struct TrialOutcome {
     audit_queries: usize,
     model_discrepancy_detected: bool,
     overconfident_under_misspecification: bool,
+    prequential_pit_alarm: bool,
+    monitoring_protocol_invalid: bool,
 }
 
 const POOL_SIZE: usize = 6;
@@ -405,6 +429,20 @@ fn run_trial_with_discrepancy(
     active_selector: ActiveSelector,
     systematic_discrepancy: f64,
 ) -> TrialOutcome {
+    let pit_mode = active_selector == ActiveSelector::InformationGainWithPrequentialPitAudits;
+    if pit_mode && (!config.active_selection || config.smoothing) {
+        return TrialOutcome {
+            rounds_used: 0,
+            success: false,
+            final_live: POOL_SIZE,
+            selection_failed: true,
+            audit_queries: 0,
+            model_discrepancy_detected: false,
+            overconfident_under_misspecification: false,
+            prequential_pit_alarm: false,
+            monitoring_protocol_invalid: true,
+        };
+    }
     let mut setup_rng = seed ^ 0x5EED_0000_0000_0001;
     let probes: Vec<Experiment> = (0..GT_SANITY_PROBES)
         .map(|_| random_experiment(&mut setup_rng))
@@ -463,12 +501,26 @@ fn run_trial_with_discrepancy(
     let mut audit_rng = seed ^ 0xA0D1_7000_51E1_0001;
     let mut selection_failed = false;
     let mut audit_queries = 0usize;
+    let mut pit_monitor = if pit_mode {
+        Some(
+            PrequentialPitMartingale::new(0.05, VAR_NAMES.len())
+                .expect("fixed alpha and context-channel count are valid"),
+        )
+    } else {
+        None
+    };
+    let mut prequential_pit_alarm = false;
+    let mut monitoring_protocol_invalid = false;
 
     let mut round = 0usize;
     while round < max_rounds
         && (live.len() > 1
             || (config.active_selection
-                && active_selector == ActiveSelector::InformationGainWithAudits
+                && matches!(
+                    active_selector,
+                    ActiveSelector::InformationGainWithAudits
+                        | ActiveSelector::InformationGainWithPrequentialPitAudits
+                )
                 && live.len() == 1))
     {
         let predict = |idx: &usize, e: &Experiment| eval_at(&hypotheses[*idx], e);
@@ -485,8 +537,13 @@ fn run_trial_with_discrepancy(
             // A singleton is provisional under the audit policy: use every remaining
             // query as a validation audit. Before a singleton, schedule an audit every
             // second round to reduce greedy over-exploitation.
-            let scheduled_audit = active_selector == ActiveSelector::InformationGainWithAudits
-                && (live.len() == 1 || (round + 1) % 2 == 0);
+            let scheduled_audit = match active_selector {
+                ActiveSelector::InformationGainWithAudits => {
+                    live.len() == 1 || (round + 1) % 2 == 0
+                }
+                ActiveSelector::InformationGainWithPrequentialPitAudits => live.len() == 1,
+                _ => false,
+            };
             let selected = if scheduled_audit {
                 audit_queries += 1;
                 Some(remaining[rand_index(&mut audit_rng, remaining.len())].clone())
@@ -497,7 +554,8 @@ fn run_trial_with_discrepancy(
                             .map(|(experiment, _)| experiment.clone())
                     }
                     ActiveSelector::ExpectedInformationGain
-                    | ActiveSelector::InformationGainWithAudits => {
+                    | ActiveSelector::InformationGainWithAudits
+                    | ActiveSelector::InformationGainWithPrequentialPitAudits => {
                         let noise_std_dev = selection_noise_std_dev(&remaining, &live, &hypotheses);
                         select_experiment_by_information_gain_per_cost(
                             &remaining,
@@ -627,21 +685,84 @@ fn run_trial_with_discrepancy(
                 )
         };
 
+        let mut pit_alarm_this_round = false;
+        if pit_mode && live.len() == 1 {
+            let Some(prediction) = eval_at(&hypotheses[live[0]], &chosen) else {
+                monitoring_protocol_invalid = true;
+                selection_failed = true;
+                round += 1;
+                break;
+            };
+            let predictive_scale = NOISE_SIGMA_FRACTION * (1.0 + prediction.abs());
+            if !predictive_scale.is_finite() || predictive_scale <= 0.0 {
+                monitoring_protocol_invalid = true;
+                selection_failed = true;
+                round += 1;
+                break;
+            }
+            let Some(pit) = standard_normal_cdf((observed - prediction) / predictive_scale) else {
+                monitoring_protocol_invalid = true;
+                selection_failed = true;
+                round += 1;
+                break;
+            };
+            let context_features = chosen
+                .iter()
+                .map(|(_, value)| {
+                    (2.0 * (*value - VAR_RANGE.0) / (VAR_RANGE.1 - VAR_RANGE.0) - 1.0)
+                        .clamp(-1.0, 1.0)
+                })
+                .collect::<Vec<_>>();
+            let Some(monitor) = pit_monitor.as_mut() else {
+                monitoring_protocol_invalid = true;
+                selection_failed = true;
+                round += 1;
+                break;
+            };
+            match monitor.observe(pit, &context_features) {
+                Ok(result) => {
+                    pit_alarm_this_round = result.decision == PrequentialPitDecision::Alarm;
+                    prequential_pit_alarm |= pit_alarm_this_round;
+                }
+                Err(_) => {
+                    monitoring_protocol_invalid = true;
+                    selection_failed = true;
+                    round += 1;
+                    break;
+                }
+            }
+        }
+
         live.retain(|idx| match eval_at(&hypotheses[*idx], &chosen) {
             Some(pred) => (pred - observed).abs() <= ELIMINATION_TOLERANCE * (1.0 + observed.abs()),
             None => false,
         });
         round += 1;
+        if pit_alarm_this_round {
+            // The candidate remains a benchmark-visible provisional hypothesis, but the run
+            // must not accept it as valid or keep using the terminal monitor. A production
+            // controller should route this typed alarm into model-family expansion/recovery.
+            break;
+        }
     }
 
     TrialOutcome {
         rounds_used: round,
-        success: systematic_discrepancy == 0.0 && live.len() == 1 && live[0] == 0,
+        success: systematic_discrepancy == 0.0
+            && live.len() == 1
+            && live[0] == 0
+            && !prequential_pit_alarm
+            && !monitoring_protocol_invalid,
         final_live: live.len(),
         selection_failed,
         audit_queries,
-        model_discrepancy_detected: systematic_discrepancy != 0.0 && live.is_empty(),
-        overconfident_under_misspecification: systematic_discrepancy != 0.0 && live.len() == 1,
+        model_discrepancy_detected: systematic_discrepancy != 0.0
+            && (live.is_empty() || prequential_pit_alarm),
+        overconfident_under_misspecification: systematic_discrepancy != 0.0
+            && live.len() == 1
+            && !prequential_pit_alarm,
+        prequential_pit_alarm,
+        monitoring_protocol_invalid,
     }
 }
 
@@ -1082,6 +1203,118 @@ mod tests {
         assert!(round_ci_low.is_finite() && round_ci_high.is_finite());
         assert!((0.0..=1.0).contains(&(raw_successes as f64 / SEEDS as f64)));
         assert!((0.0..=1.0).contains(&(eig_successes as f64 / SEEDS as f64)));
+    }
+
+    /// End-to-end integration check for the prequential PIT monitor. The monitor activates
+    /// only after the candidate set becomes a singleton, when each random validation query has
+    /// a model-visible Gaussian predictive distribution. The CDF is computed from the candidate
+    /// prediction and the declared noise model before using the current outcome in any policy
+    /// update. This is a diagnostic and deliberately does not assert that the policy wins.
+    #[test]
+    fn prequential_pit_audits_are_wired_into_adaptive_discovery() {
+        const SEEDS: u64 = 32;
+        const DISCREPANCY: f64 = 0.12;
+        let config = PipelineConfig {
+            typed_candidates: true,
+            active_selection: true,
+            smoothing: false,
+        };
+
+        let mut clean_baseline_successes = 0usize;
+        let mut clean_pit_successes = 0usize;
+        let mut clean_pit_alarms = 0usize;
+        let mut misspec_baseline_false_singletons = 0usize;
+        let mut misspec_pit_false_singletons = 0usize;
+        let mut misspec_pit_detections = 0usize;
+        let mut pit_audit_queries = 0usize;
+        let mut protocol_failures = 0usize;
+
+        for seed in 1..=SEEDS {
+            let clean_baseline = run_trial_with_discrepancy(
+                seed,
+                config,
+                MAX_ROUNDS,
+                ActiveSelector::ExpectedInformationGain,
+                0.0,
+            );
+            let clean_pit = run_trial_with_discrepancy(
+                seed,
+                config,
+                MAX_ROUNDS,
+                ActiveSelector::InformationGainWithPrequentialPitAudits,
+                0.0,
+            );
+            let misspecified_baseline = run_trial_with_discrepancy(
+                seed,
+                config,
+                MAX_ROUNDS,
+                ActiveSelector::ExpectedInformationGain,
+                DISCREPANCY,
+            );
+            let misspecified_pit = run_trial_with_discrepancy(
+                seed,
+                config,
+                MAX_ROUNDS,
+                ActiveSelector::InformationGainWithPrequentialPitAudits,
+                DISCREPANCY,
+            );
+
+            clean_baseline_successes += if clean_baseline.success { 1 } else { 0 };
+            clean_pit_successes += if clean_pit.success { 1 } else { 0 };
+            clean_pit_alarms += if clean_pit.prequential_pit_alarm { 1 } else { 0 };
+            misspec_baseline_false_singletons +=
+                if misspecified_baseline.overconfident_under_misspecification { 1 } else { 0 };
+            misspec_pit_false_singletons +=
+                if misspecified_pit.overconfident_under_misspecification { 1 } else { 0 };
+            misspec_pit_detections +=
+                if misspecified_pit.model_discrepancy_detected { 1 } else { 0 };
+            pit_audit_queries += misspecified_pit.audit_queries + clean_pit.audit_queries;
+            protocol_failures += if clean_pit.monitoring_protocol_invalid { 1 } else { 0 };
+            protocol_failures += if misspecified_pit.monitoring_protocol_invalid { 1 } else { 0 };
+        }
+
+        println!(
+            concat!(
+                "prequential_pit_integrated,seeds={SEEDS},budget={MAX_ROUNDS},",
+                "discrepancy={DISCREPANCY},clean_baseline_successes={clean_baseline_successes},",
+                "clean_pit_successes={clean_pit_successes},clean_pit_alarms={clean_pit_alarms},",
+                "misspec_baseline_false_singletons={misspec_baseline_false_singletons},",
+                "misspec_pit_false_singletons={misspec_pit_false_singletons},",
+                "misspec_pit_detections={misspec_pit_detections},",
+                "pit_audit_queries={pit_audit_queries},protocol_failures={protocol_failures}"
+            )
+        );
+
+        assert_eq!(
+            protocol_failures, 0,
+            "PIT monitor must fail closed only on real protocol defects"
+        );
+        assert!(
+            pit_audit_queries > 0,
+            "the integrated policy never reached a singleton audit"
+        );
+        assert!(clean_baseline_successes <= SEEDS as usize);
+        assert!(clean_pit_successes <= SEEDS as usize);
+        assert!(misspec_pit_detections <= SEEDS as usize);
+        assert!(misspec_pit_false_singletons <= SEEDS as usize);
+    }
+
+    #[test]
+    fn prequential_pit_policy_rejects_smoothed_measurements() {
+        let outcome = run_trial_with_discrepancy(
+            1,
+            PipelineConfig {
+                typed_candidates: true,
+                active_selection: true,
+                smoothing: true,
+            },
+            MAX_ROUNDS,
+            ActiveSelector::InformationGainWithPrequentialPitAudits,
+            0.12,
+        );
+        assert!(outcome.monitoring_protocol_invalid);
+        assert!(outcome.selection_failed);
+        assert!(!outcome.success);
     }
 
     /// Pilot testing whether scheduled, seeded audit experiments reduce false confidence
