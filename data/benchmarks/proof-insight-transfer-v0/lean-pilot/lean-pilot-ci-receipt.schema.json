@@ -260,6 +260,7 @@
           "contract_precondition": {
             "oneOf": [
               { "type": "object" },
+              { "type": "string" },
               { "type": "null" }
             ]
           },
