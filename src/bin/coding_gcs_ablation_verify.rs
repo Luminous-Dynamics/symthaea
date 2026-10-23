@@ -567,7 +567,7 @@ fn audit(
                     tier.as_str().is_some_and(|name| {
                         matches!(name, "Native" | "Hardware" | "LocalLLM" | "CloudLLM" | "Simulated")
                     })
-                })
+                }) && (!tiers.is_empty() || bool_field(run, "behavioral_success") == Some(false))
             });
         push_check(
             &mut errors,
@@ -1377,6 +1377,24 @@ mod tests {
         report["runs"][0]["generation_tiers"] = serde_json::json!(["ImaginaryLLM"]);
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+    }
+
+    #[test]
+    fn empty_generation_tiers_are_rejected_when_run_claims_success() {
+        let mut report = valid_fixture();
+        report["runs"][0]["generation_tiers"] = serde_json::json!([]);
+        report["runs"][0]["behavioral_success"] = Value::Bool(true);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+    }
+
+    #[test]
+    fn empty_generation_tiers_can_explain_a_failed_no_generation_run() {
+        let mut report = valid_fixture();
+        report["runs"][0]["generation_tiers"] = serde_json::json!([]);
+        report["runs"][0]["behavioral_success"] = Value::Bool(false);
+        let errors = audit(&report, None, None);
+        assert!(!errors.iter().any(|error| error.contains("generation_tiers")));
     }
 
     #[test]

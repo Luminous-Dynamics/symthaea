@@ -31,6 +31,12 @@ As inspected on October 22, 2026, the upstream *code repository* was at commit `
 
 If the upstream task data cannot be resolved to an immutable revision and reproducible task list, stop and report the blocker. Do not silently substitute the latest moving split or describe a partial sample as the official benchmark. Respect upstream license, redistribution and leaderboard-submission rules.
 
+#### Blind rollout and contamination controls
+
+For the strict-comparability lane, expose only the task's `problem_statement` and the prebuilt sandbox to the agent. Do not expose `patch`, `test_patch`, `hint`, `hints_text`, `all_hints_text`, `FAIL_TO_PASS`, `PASS_TO_PASS`, commit URLs, evaluator logs, or task metadata that is not part of the official agent interface. Disable web/search access and task-specific retrieval during the rollout; fetch dependencies before the run or from a recorded allowlist/cache. Preserve full input/output tool trajectories so protocol compliance can be independently reviewed.
+
+Use one rollout per task for the primary pass@1 result; the official SWE-bench-Live protocol asks for a single rollout based on the problem statement in the task container. Do not rerun a failed task until one attempt passes and then report it as pass@1. Retry, pass@k, best@k, browser-enabled or retrieval-enabled variants may be valuable separate experiments, but must have distinct preregistrations, budgets and result labels and must never be pooled with strict pass@1.
+
 ### Lane B — Symthaea-held-out Rust repairs
 
 Curate 50–100 reviewed development tasks, then a held-out confirmatory set targeting 250–500 tasks distributed over many repositories and task families. The final count must be supported by a preregistered power/precision analysis; task count cannot compensate for too few independent repository clusters.
@@ -53,6 +59,18 @@ A task is eligible only after all of these controls pass:
 Use at least two independent reviewers per task for initial curation and a third adjudicator for disagreements. Reviewers should decide from the task statement, interface/context and behavior before seeing the gold diff where practical. Re-run quality checks when a task, verifier, container or dependency changes.
 
 This review burden is deliberate. OpenAI's July 8, 2026 audit of a public SWE-Bench Pro split found 27.4% flagged by its automated pipeline and 34.1% labelled broken in a human annotation campaign, and it withdrew its earlier recommendation to adopt the benchmark. The exact rates apply to the audited split, not every later revision; the method is the lesson: task quality must be measured, not inferred from popularity.
+
+
+### 3.1. Audit the upstream transition labels rather than trusting them
+
+The pinned upstream implementation at [`evaluation/validation.py`](https://github.com/microsoft/SWE-bench-Live/blob/62d02936a0726fbf4597b05bd07b09fb99eddae6/evaluation/validation.py) derives `FAIL_TO_PASS` as `post_pass - pre_pass` and `PASS_TO_PASS` as `pre_pass & post_pass`. That is not a sufficient task-validity contract:
+
+- A test absent from the parsed baseline but passing after the gold patch is included in `post_pass - pre_pass`, despite never being observed to fail before the patch.
+- A test that passed at baseline and fails after the gold patch is omitted from `pre_pass & post_pass`; if that derived list is carried forward, the regression test disappears from the benchmark's pass-to-pass expectations.
+
+The Rust audit tool added alongside this protocol recalculates **explicit fail → pass** transitions only, preserves every baseline-passing test in the expected pass-to-pass set, requires identical test-ID sets, rejects skip/missing statuses, requires all gold-aggregated tests to pass, and checks the three per-task gold-run markers. It records hashes for the baseline log, three-run gold log, status JSON, prompt, gold patch and test patch without putting prompts, gold patches, test patches, or test names into the manifest.
+
+This is an independent *eligibility filter*, not a patch to the upstream evaluator. It can reject a task or fail closed when evidence is missing; it cannot compensate for a compromised runner or prove the raw log truthful. Review the [task-audit design and commands](SWE_BENCH_LIVE_RUST_TASK_AUDIT_2026-10-23.md) before locking the valid ID list.
 
 ## 4. Paired experiment for GCS
 

@@ -6,6 +6,8 @@ Measure whether Geodesic Code Synthesis (GCS) topology-derived advisory prompts 
 
 This is a pilot instrument, not an SOTA claim. It starts with eight small deterministic Rust tasks. The next step, after the protocol is validated, is to extend the same runtime toggle to the full oracle-hardened task bank and held-out repository-repair tasks.
 
+The GCS function-level pilot and the external SWE-bench-Live repository benchmark are separate evaluation layers. The repository task set now has an independent Rust audit utility (`rust-repair-manifest`) that recomputes explicit fail-to-pass/pass-to-pass transitions and pins the gold-validation evidence; a higher function-pilot score must not be reported as a repository-repair result. See [SWE-bench-Live Rust task audit](SWE_BENCH_LIVE_RUST_TASK_AUDIT_2026-10-23.md).
+
 ## Current methodology
 
 - **Paired intervention:** each task/repeat runs once with GCS advisories off and once on. A pair enters the win/loss/tie treatment comparison only when both arms have complete oracles; unresolved pairs are counted separately, not treated as ties.

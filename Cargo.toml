@@ -609,6 +609,7 @@ wait-timeout = "0.2"
 
 [features]
 default = ["default-mind"]
+rust-repair-manifest = ["dep:sha2"] # Reproducible Rust-only audit of SWE-bench-Live task-validation artifacts
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
 turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory_bridge.rs)
 swarm = ["iroh", "dep:symthaea_swarm", "dep:symtropy-robotics-bridge-core"]  # P2P collective consciousness
@@ -1112,6 +1113,11 @@ required-features = ["vision-manifold", "swarm"]
 name = "dump_dream"
 path = "src/bin/dump_dream.rs"
 required-features = ["vision-manifold", "swarm"]
+
+[[bin]]
+name = "rust-repair-manifest"
+path = "src/bin/rust_repair_manifest.rs"
+required-features = ["rust-repair-manifest"]
 
 # Examples
 # Examples that need cfg-gated modules are marked with required-features
