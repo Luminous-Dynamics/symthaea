@@ -113,6 +113,16 @@ With the example settings, the tool records these separate decisions:
 
 The overall `decision_grade` field means only that the preregistered sample-size and unresolved-rate gates passed. It does **not** mean treatment won. The superiority and cost flags are separate. The cost denominator is the count of verified passing tasks; total cost includes every attempted task, including unresolved attempts, so spending on failed runs cannot disappear from the numerator. If an arm has zero verified fixes, cost per fix is null.
 
+### Power and repository generalization
+
+The example's `min_tasks: 250` and `min_repositories: 20` are **evidence floors, not guarantees of adequate power or ecosystem representativeness**. Pre-register a sample-size calculation from pilot estimates before launching a study. For paired binary outcomes, let `delta` be the target pass-rate difference and `q` the expected fraction of discordant pairs (one arm passes and the other fails). A normal-approximation planning formula is:
+
+`n ≈ (z_(1−alpha/2) + z_power)^2 × (q − delta^2) / delta^2`
+
+For a two-sided 5% test, 80% power, a 5-percentage-point target (`delta = 0.05`), and `q = 0.20`, this gives about **620 independent paired tasks before repository clustering**. If discordance is higher, the required sample is larger. Tasks within one repository are correlated, so this independent-task calculation is optimistic; use a pilot or simulation to account for within-repository correlation and increase the number of distinct repositories. For a field-wide claim, target 30–50+ repositories where feasible and a held-out repository cohort, rather than treating 20 repositories as a universal adequacy threshold.
+
+This comparator currently reports a repository-cluster bootstrap interval and applies prespecified minimum-count gates; it does **not** calculate prospective power or repair an underpowered study after collection. An interval that crosses zero means the result is inconclusive, not evidence of no effect. Do not repeatedly add tasks after peeking at treatment differences without a pre-registered sequential design and error-spending rule.
+
 The cost gate is deliberately tied to the same preregistered outcome non-inferiority margin. Change the effect/cost thresholds only before looking at trial results. Report point estimates, conservative intervals, unresolved counts, cost totals, and every input hash—not only the favorable gate.
 
 ## Threats this still does not close
