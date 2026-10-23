@@ -210,6 +210,8 @@ jobs:
                   "lakefile_sha256": digest(lakefile),
                   "toolchain_file_sha256": digest(toolchain),
                   "lake_manifest_sha256": digest(manifest) if manifest.exists() else None,
+                  "receipt_schema_path": "lean-pilot-ci-receipt.schema.json",
+                  "receipt_schema_sha256": digest(Path("lean-pilot-ci-receipt.schema.json")),
               },
               "checked_artifact": {
                   "path": str(olean),
@@ -245,6 +247,62 @@ jobs:
           print(f"receipt_sha256={hashlib.sha256(encoded.encode('utf-8')).hexdigest()}")
           PY
 
+          # A separately installed, pinned validator checks the emitted receipt
+          # against the checked-in strict schema; local parser checks alone are
+          # not accepted as sufficient receipt validation.
+          python -m venv "$RUNNER_TEMP/pitb-receipt-validator"
+          "$RUNNER_TEMP/pitb-receipt-validator/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+          "$RUNNER_TEMP/pitb-receipt-validator/bin/python" - "$out/receipt.json" "$out/receipt.sha256" <<'PY'
+          import hashlib
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          receipt_path = Path(sys.argv[1])
+          digest_path = Path(sys.argv[2])
+          schema_path = Path("lean-pilot-ci-receipt.schema.json")
+          receipt = json.loads(receipt_path.read_text())
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          errors = sorted(validator.iter_errors(receipt), key=lambda e: (list(map(str, e.absolute_path)), e.message))
+          if errors:
+              for error in errors:
+                  location = ".".join(map(str, error.absolute_path)) or "<root>"
+                  print(f"RECEIPT_SCHEMA_ERROR {location}: {error.message}", file=sys.stderr)
+              raise SystemExit(f"receipt failed {len(errors)} Draft 2020-12 schema checks")
+
+          if receipt["commit_sha"] != os.environ["PITB_HEAD_SHA"]:
+              raise SystemExit("receipt commit SHA does not match the triggering head")
+          if receipt["repository"] != os.environ["PITB_REPOSITORY"]:
+              raise SystemExit("receipt repository does not match the triggering repository")
+          expected_schema_digest = hashlib.sha256(schema_path.read_bytes()).hexdigest()
+          if receipt["source"]["receipt_schema_sha256"] != expected_schema_digest:
+              raise SystemExit("receipt schema digest does not match the checked-in schema")
+          case_ids = [case["case_id"] for case in receipt["case_manifest_bindings"]]
+          if len(case_ids) != len(set(case_ids)):
+              raise SystemExit("receipt contains duplicate case-manifest binding IDs")
+          trace_id = receipt["proof_state_intervention_trace"]["case_id"]
+          trace_cases = [
+              case for case in receipt["case_manifest_bindings"]
+              if case["case_id"] == trace_id
+              and case.get("state_intervention", {}).get("operation") == "clear h"
+          ]
+          if len(trace_cases) != 1:
+              raise SystemExit("trace receipt is not bound to exactly one clear-h manifest case")
+          if trace_cases[0]["base_statement_fragment_sha256"] != trace_cases[0]["variant_statement_fragment_sha256"]:
+              raise SystemExit("clear-h trace does not preserve the normalized theorem statement")
+          actual_receipt_sha = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+          recorded_receipt_sha = digest_path.read_text().split()[0]
+          if actual_receipt_sha != recorded_receipt_sha:
+              raise SystemExit("receipt SHA-256 sidecar does not match receipt.json")
+          print("PITB_RECEIPT_SCHEMA_AND_BINDINGS_PASS")
+          print(f"receipt_sha256={actual_receipt_sha}")
+          print(f"receipt_schema_sha256={expected_schema_digest}")
+          PY
+
       - name: Upload reproducible pilot evidence
         uses: actions/upload-artifact@v4
         with:
@@ -256,5 +314,6 @@ jobs:
             ${{ runner.temp }}/pitb-lean-pilot-receipt/lake-version.txt
             ${{ runner.temp }}/pitb-lean-pilot-receipt/lake-build.log
             ${{ runner.temp }}/pitb-lean-pilot-receipt/proof-state-trace.log
+            data/benchmarks/proof-insight-transfer-v0/lean-pilot/lean-pilot-ci-receipt.schema.json
           if-no-files-found: error
           retention-days: 90
