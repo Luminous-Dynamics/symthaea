@@ -46,7 +46,7 @@ The standalone function receives typed in-memory records and does not parse/veri
 
 ## Adversarial tests
 
-The nine authored unit tests cover:
+The twelve authored unit tests cover:
 1. an unconstrained utility optimum that violates the safety cap, while the constrained reference chooses the best admissible alternative;
 2. latency and energy caps that bind independently;
 3. a harmful tail action excluded by the CVaR95 cap;
@@ -55,7 +55,9 @@ The nine authored unit tests cover:
 6. row-order-invariant selection and deterministic receipts;
 7. fail-closed exact-search cap;
 8. duplicate IDs and non-finite utility rejection;
-9. receipt fields, constraint values and enumerated-subset count.
+9. aggregate resource and safety-count overflow;
+10. invalid identifiers and invalid constraints;
+11. receipt fields, constraint values and enumerated-subset count.
 
 Synthetic tests validate selector mechanics only; they do not establish safe perception, calibrated risk, a real-trace gain, or SOTA.
 
