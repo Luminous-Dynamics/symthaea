@@ -29,6 +29,8 @@ for size in 1000 10000 50000; do
 done
 ```
 
+The LSH parameters are explicit and recorded in the output. The default store configuration is `--lsh-bands=32 --lsh-rows=8`; vary these in separate pinned runs when tuning the index, and never compare arms whose source, store, query corpus or cache protocol differs.
+
 To test the approximate path with its candidate-count and empty-result fallbacks disabled, run a separate arm with `--candidate-multiplier=0 --fallback-on-empty=false`. Keep the default-fallback arm as well: disabling fallback may improve latency while degrading recall, so neither arm is sufficient by itself.
 
 The example includes focused tests for deterministic workload replay, exact corruption count, Recall@K denominator behavior and latency percentile calculation. Run them with:
