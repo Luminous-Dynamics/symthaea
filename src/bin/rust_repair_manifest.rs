@@ -309,6 +309,51 @@ fn transition_sets(
     (baseline_pass, explicit_fail_to_pass)
 }
 
+fn transition_contract_errors(
+    baseline: &BTreeMap<String, String>,
+    gold: &BTreeMap<String, String>,
+    listed_f2p: &BTreeSet<String>,
+    listed_p2p: &BTreeSet<String>,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    let (baseline_pass, explicit_f2p) = transition_sets(baseline, gold);
+
+    if explicit_f2p.is_empty() {
+        errors.push("no explicit fail-to-pass transition (fail -> pass)".to_string());
+    }
+    if *listed_f2p != explicit_f2p {
+        errors.push(
+            "upstream FAIL_TO_PASS differs from explicit fail -> pass transitions".to_string(),
+        );
+    }
+    if *listed_p2p != baseline_pass {
+        errors.push(
+            "upstream PASS_TO_PASS differs from baseline-passing tests; baseline passes must not be dropped"
+                .to_string(),
+        );
+    }
+
+    let regressed = baseline_pass
+        .iter()
+        .filter(|test_id| gold.get(*test_id).map(String::as_str) != Some("pass"))
+        .count();
+    if regressed > 0 {
+        errors.push(format!(
+            "{regressed} baseline-passing test(s) fail or are missing after the gold patch"
+        ));
+    }
+    let gold_nonpassing = gold.values().filter(|state| state.as_str() != "pass").count();
+    if gold_nonpassing > 0 {
+        errors.push(format!(
+            "{gold_nonpassing} gold-patch test status(es) are fail or skip in the three-run aggregate"
+        ));
+    }
+    if baseline.values().any(|state| state == "skip") {
+        errors.push("baseline contains skipped or missing test status".to_string());
+    }
+    errors
+}
+
 fn run_marker_counts(log: &str) -> Vec<usize> {
     GOLD_RUN_MARKERS
         .iter()
@@ -474,46 +519,17 @@ fn audit_candidate(
                         .values()
                         .filter(|state| state.as_str() != "pass")
                         .count();
-                    let (baseline_pass, explicit_f2p) = transition_sets(baseline, gold);
+                    let (_, explicit_f2p) = transition_sets(baseline, gold);
                     explicit_fail_to_pass_count = explicit_f2p.len();
-
-                    if explicit_f2p.is_empty() {
-                        reasons.push("no explicit fail-to-pass transition (fail -> pass)".to_string());
-                    }
-                    if let Some(listed) = listed_f2p.as_ref() {
-                        if *listed != explicit_f2p {
-                            reasons.push(
-                                "upstream FAIL_TO_PASS differs from explicit fail -> pass transitions"
-                                    .to_string(),
-                            );
-                        }
-                    }
-                    if let Some(listed) = listed_p2p.as_ref() {
-                        if *listed != baseline_pass {
-                            reasons.push(
-                                "upstream PASS_TO_PASS differs from baseline-passing tests; baseline passes must not be dropped"
-                                    .to_string(),
-                            );
-                        }
-                    }
-                    let regressed = baseline_pass
-                        .iter()
-                        .filter(|test_id| {
-                            gold.get(*test_id).map(String::as_str) != Some("pass")
-                        })
-                        .count();
-                    if regressed > 0 {
-                        reasons.push(format!(
-                            "{regressed} baseline-passing test(s) fail or are missing after the gold patch"
+                    if let (Some(listed_f2p), Some(listed_p2p)) =
+                        (listed_f2p.as_ref(), listed_p2p.as_ref())
+                    {
+                        reasons.extend(transition_contract_errors(
+                            baseline,
+                            gold,
+                            listed_f2p,
+                            listed_p2p,
                         ));
-                    }
-                    if gold_nonpassing_count > 0 {
-                        reasons.push(format!(
-                            "{gold_nonpassing_count} gold-patch test status(es) are fail or skip in the three-run aggregate"
-                        ));
-                    }
-                    if baseline.values().any(|state| state == "skip") {
-                        reasons.push("baseline contains skipped or missing test status".to_string());
                     }
                 }
             }
@@ -780,20 +796,23 @@ mod tests {
     }
 
     #[test]
-    fn fail_to_pass_requires_explicit_baseline_failure() {
+    fn missing_baseline_test_is_not_a_fail_to_pass_transition() {
         let baseline = status_map(&[("existing", "pass")]);
         let gold = status_map(&[("existing", "pass"), ("appeared-after", "pass")]);
         let (baseline_pass, explicit_f2p) = transition_sets(&baseline, &gold);
         assert_eq!(baseline_pass, BTreeSet::from(["existing".to_string()]));
         assert!(explicit_f2p.is_empty());
-        assert_ne!(
-            baseline.keys().collect::<BTreeSet<_>>(),
-            gold.keys().collect::<BTreeSet<_>>()
+        let errors = transition_contract_errors(
+            &baseline,
+            &gold,
+            &BTreeSet::from(["appeared-after".to_string()]),
+            &baseline_pass,
         );
+        assert!(errors.iter().any(|error| error.contains("FAIL_TO_PASS")));
     }
 
     #[test]
-    fn baseline_passes_are_retained_even_if_gold_patch_regresses_them() {
+    fn baseline_passes_cannot_be_dropped_after_a_gold_patch_regression() {
         let baseline = status_map(&[("must-stay-green", "pass"), ("bug", "fail")]);
         let gold = status_map(&[("must-stay-green", "fail"), ("bug", "pass")]);
         let (baseline_pass, explicit_f2p) = transition_sets(&baseline, &gold);
@@ -802,12 +821,23 @@ mod tests {
             BTreeSet::from(["must-stay-green".to_string()])
         );
         assert_eq!(explicit_f2p, BTreeSet::from(["bug".to_string()]));
-        let stable_baseline_passes = baseline_pass
-            .iter()
-            .filter(|test_id| gold.get(*test_id).map(String::as_str) == Some("pass"))
-            .cloned()
-            .collect::<BTreeSet<_>>();
-        assert_ne!(baseline_pass, stable_baseline_passes);
+        let errors = transition_contract_errors(
+            &baseline,
+            &gold,
+            &explicit_f2p,
+            &BTreeSet::new(),
+        );
+        assert!(errors.iter().any(|error| error.contains("PASS_TO_PASS")));
+        assert!(errors.iter().any(|error| error.contains("baseline-passing test")));
+    }
+
+    #[test]
+    fn valid_explicit_transitions_have_no_contract_errors() {
+        let baseline = status_map(&[("regression-test", "pass"), ("fix-me", "fail")]);
+        let gold = status_map(&[("regression-test", "pass"), ("fix-me", "pass")]);
+        let f2p = BTreeSet::from(["fix-me".to_string()]);
+        let p2p = BTreeSet::from(["regression-test".to_string()]);
+        assert!(transition_contract_errors(&baseline, &gold, &f2p, &p2p).is_empty());
     }
 
     #[test]
