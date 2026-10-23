@@ -189,6 +189,8 @@ impl CognitiveLoopService {
             compressed_state: &perception.encoding.compressed_state,
             output: &dynamics.core.output,
             prediction_error,
+            prediction_error_valid: perception.urgency.prediction_error_valid
+                && prediction_error.is_finite(),
             coherence,
             unified_psi,
             phi_attention_weight: perception.encoding.phi_attention_weight,
