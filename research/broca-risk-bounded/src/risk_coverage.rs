@@ -40,6 +40,7 @@ pub enum RiskCoverageError {
     EmptyThresholdSequence,
     NonFiniteThreshold,
     ThresholdsNotStrictlyDescending,
+    RiskBoundCalculation(RiskGateError),
 }
 
 impl std::fmt::Display for RiskCoverageError {
@@ -57,11 +58,18 @@ impl std::fmt::Display for RiskCoverageError {
             Self::ThresholdsNotStrictlyDescending => {
                 write!(formatter, "thresholds must be strictly descending")
             }
+            Self::RiskBoundCalculation(error) => write!(formatter, "risk bound failed: {error}"),
         }
     }
 }
 
 impl std::error::Error for RiskCoverageError {}
+
+impl From<RiskGateError> for RiskCoverageError {
+    fn from(error: RiskGateError) -> Self {
+        Self::RiskBoundCalculation(error)
+    }
+}
 
 /// Descriptive point on a development-set risk-coverage curve.
 ///
@@ -201,23 +209,20 @@ pub fn certify_fixed_threshold_sequence(
     let mut certified_threshold_count = 0;
 
     for &threshold in thresholds {
+        let point = summarize_at_threshold(observations, Some(threshold));
         if stopped {
             points.push(ThresholdCertificationPoint {
                 threshold,
-                accepted_count: observations
-                    .iter()
-                    .filter(|observation| observation.acceptance_score >= threshold)
-                    .count(),
-                labelled_accepted_count: 0,
-                unknown_accepted_count: 0,
-                unsafe_labelled_count: 0,
+                accepted_count: point.accepted_count,
+                labelled_accepted_count: point.labelled_accepted_count,
+                unknown_accepted_count: point.unknown_accepted_count,
+                unsafe_labelled_count: point.unsafe_labelled_count,
                 upper_confidence_bound: None,
                 status: ThresholdCertificationStatus::NotTestedAfterStop,
             });
             continue;
         }
 
-        let point = summarize_at_threshold(observations, Some(threshold));
         let mut certified_point = ThresholdCertificationPoint {
             threshold,
             accepted_count: point.accepted_count,
@@ -241,8 +246,7 @@ pub fn certify_fixed_threshold_sequence(
                 point.unsafe_labelled_count,
                 point.accepted_count,
                 budget.confidence_level(),
-            )
-            .map_err(|_| RiskCoverageError::EmptyInput)?;
+            )?;
             certified_point.upper_confidence_bound = Some(upper);
             if upper <= budget.maximum_unsafe_rate() {
                 certified_point.status = ThresholdCertificationStatus::Certified;
@@ -441,7 +445,7 @@ mod tests {
         let report = certify_fixed_threshold_sequence(
             &observations,
             &[0.9, 0.8, 0.7],
-            RiskBudget::new(0.5, 0.95, 1).unwrap(),
+            RiskBudget::new(0.99, 0.95, 1).unwrap(),
         )
         .unwrap();
         assert_eq!(report.points[0].status, ThresholdCertificationStatus::Certified);
