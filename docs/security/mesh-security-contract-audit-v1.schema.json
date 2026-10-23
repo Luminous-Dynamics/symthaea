@@ -54,7 +54,8 @@
         "evidence_receipt_schema",
         "audit_receipt_schema",
         "validator_manifest",
-        "validator_lockfile"
+        "validator_lockfile",
+        "validator_source"
       ],
       "properties": {
         "scenario_suite": {
@@ -95,6 +96,9 @@
               ]
             }
           }
+        },
+        "validator_source": {
+          "$ref": "#/$defs/hashed_artifact"
         }
       }
     },
