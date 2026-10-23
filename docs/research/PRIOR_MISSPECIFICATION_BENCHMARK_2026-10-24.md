@@ -2,13 +2,13 @@
 
 ## Why this lane exists
 
-The previous prior-sensitivity experiment changed the prior used by both the world and the learner. That does not test misspecification. This benchmark separates the true posterior \`q\` (which determines how observations are generated) from the learner's posterior \`p\` (which determines action choice and Bayesian updating). It scores the learner against the data-generating distribution, rather than its own uncertainty alone.
+The previous prior-sensitivity experiment changed the prior used by both the world and the learner. That does not test misspecification. This benchmark separates the true posterior `q` (which determines how observations are generated) from the learner's posterior `p` (which determines action choice and Bayesian updating). It scores the learner against the data-generating distribution, rather than its own uncertainty alone.
 
 ## Protocol
 
 The exact toy model has 16 hypotheses: chain/fork graph structure crossed with three binary action-specific off-target spill parameters (0.1 or 0.6). We use six strictly positive priors: uniform, chain-biased, fork-biased, low-spill-biased, high-spill-biased and graph/kernel-correlated. Observations include the exact realized intervention subset and a three-bit outcome. Policies include round-robin, random, graph/kernel/joint greedy information, coverage variants, learner-prior entropy oracles, and a cross-entropy Bellman oracle.
 
-For graph, kernel assignment and joint prediction separately, the scores are expected terminal cross-entropy (log loss) and Brier risk. The cross-entropy oracle knows both \`q\` and \`p\` when choosing actions; it is an **unattainable diagnostic upper bound**, not an implementable policy when the true prior is unknown.
+For graph, kernel assignment and joint prediction separately, the scores are expected terminal cross-entropy (log loss) and Brier risk. The cross-entropy oracle knows both `q` and `p` when choosing actions; it is an **unattainable diagnostic upper bound**, not an implementable policy when the true prior is unknown.
 
 The complete 6 × 6 true-prior/learner-prior grid was run for horizons 1–2 (2,592 rows). A full grid at horizon 3 exceeded the local execution limit and is **not** claimed as complete. A separate horizon-3 boundary slice tests uniform and high-spill-biased priors in both directions, including matched controls (432 rows across horizons 1–3).
 
@@ -40,11 +40,11 @@ Then expand beyond chain/fork to collider/reverse-chain, nonlinear and temporal 
 
 ## Reproducibility
 
-- Source \`validation/prior_misspecification_benchmark.py\`: Git blob \`541c31521e1b9e49dfb84c0fa265e877ca9ea632\`; SHA-256 \`c83c16e51aba4c184a2da8d90c9dfad0f5bfae40efa6f4b27cfcb283717ea84f\`.
-- Tests \`validation/test_prior_misspecification_benchmark.py\`: Git blob \`c28fc1573a3bb982cc881a75018d931c49f492dd\`; SHA-256 \`33c3fdb75d36bb6b5f22d3a7c3bdf443392517fc9d3ff799c6bb4d7978bc5106\`; 7/7 dedicated tests pass.
+- Source `validation/prior_misspecification_benchmark.py`: Git blob `541c31521e1b9e49dfb84c0fa265e877ca9ea632`; SHA-256 `c83c16e51aba4c184a2da8d90c9dfad0f5bfae40efa6f4b27cfcb283717ea84f`.
+- Tests `validation/test_prior_misspecification_benchmark.py`: Git blob `c28fc1573a3bb982cc881a75018d931c49f492dd`; SHA-256 `33c3fdb75d36bb6b5f22d3a7c3bdf443392517fc9d3ff799c6bb4d7978bc5106`; 7/7 dedicated tests pass.
 - All six benchmark test modules: **43/43 local tests passed**.
-- Full-grid exact JSON: 1,505,536 bytes; SHA-256 \`aa926e0cac8d5d45efcfaf94354d073e63c36e500f0c03e7274f4268608e2789\`.
-- Horizon-3 boundary exact JSON: 247,420 bytes; SHA-256 \`c8968415d6ce633f5e8984f98333fdeb07b6850e700bb3addb3c0897e9db6f63\`.
+- Full-grid exact JSON: 1,505,536 bytes; SHA-256 `aa926e0cac8d5d45efcfaf94354d073e63c36e500f0c03e7274f4268608e2789`.
+- Horizon-3 boundary exact JSON: 247,420 bytes; SHA-256 `c8968415d6ce633f5e8984f98333fdeb07b6850e700bb3addb3c0897e9db6f63`.
 - Exact result files are local-only; compact summary and receipt are committed separately. Results bind to the source blob above.
 
 ## External comparison boundary
