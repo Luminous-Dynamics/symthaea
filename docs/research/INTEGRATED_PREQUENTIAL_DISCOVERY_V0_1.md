@@ -18,9 +18,13 @@ New selector path: `InformationGainWithPrequentialPitAudits`.
 
 The simulator rejects the PIT-audit policy if CfC smoothing is enabled or adaptive selection is disabled. Smoothing changes the measurement distribution; treating its state estimate as one Gaussian draw would break the declared predictive-CDF contract. An unsupported configuration fails closed instead of silently reusing the PIT guarantee.
 
-## 2. Important limit: alarm is not automatic model recovery
+## 2. Bounded typed recovery after a PIT alarm
 
-The current discovery simulator can stop accepting a provisional singleton and mark an adequacy alarm, but it does not yet synthesize, search, or validate newly expanded model families after that alarm. In a real loop the next action should be a typed transition to model-family expansion or an explicitly unresolved outcome. Do not interpret the current diagnostic flag as successful recovery of the true law.
+The follow-up branch `research/post-alarm-typed-recovery-v0-1` adds an exploratory recovery transition. After an alarm it archives the provisional model, excludes that model from the live pool, reopens the other archived hypotheses, adds up to four fresh ENERGY-dimensional candidates from the existing typed grammar, and starts a new monitor epoch. The run allows at most two expansions; if no novel, finite candidate can be proposed or the expansion cap is reached, the outcome remains unresolved rather than silently accepting the alarmed model.
+
+Candidate generation uses only the public ENERGY task signature, existing hypothesis expressions, and the pre-generated design pool. It does not receive observed outcomes, the hidden discrepancy amplitude, or a ground-truth handle. Novelty is checked from model predictions over that predeclared pool; the selected measurement points already used remain unavailable after recovery. A fresh PIT monitor starts only for subsequent observations, so the alarm-triggering outcome is not replayed into the new epoch.
+
+This is deliberately **bounded typed reseeding, not yet full scientific model repair**. It resamples the existing expression grammar; it does not add an operator family, optimize free coefficients, infer a discrepancy mechanism, or guarantee recovery of the true law. The new test asserts boundedness, exclusion of the alarmed candidate, reopening of alternatives, and dimensional validity. The end-to-end pilot reports expansion counts and terminal unresolved alarms without asserting that recovery beats its baseline.
 
 The PIT monitor is only valid if the conditional predictive CDF is issued before the observation, its parameters/uncertainty protocol are frozen without leakage, and the context channels are based only on the selected action and permitted history. The current synthetic fixture has a known Gaussian noise model; this does not establish validity for real physics measurements, unknown noise, fitted-scale uncertainty, censored data, or adaptive repeated measurements.
 
@@ -34,13 +38,14 @@ The unit test `prequential_pit_audits_are_wired_into_adaptive_discovery` runs pa
 - a 20-round cap and no smoothing, with audit measurement cost counted as a round/query;
 - receipts reporting clean recovery, clean PIT alarms, false singleton outcomes, misspecification detection, actual audit queries, and protocol failures.
 
-The test makes no assertion that the monitor improves detection rate or recovery. It asserts that the new branch actually reaches audit queries, that it never silently proceeds when the declared protocol is invalid, and that metrics remain within their possible counts. A second test rejects the smoothing configuration.
+The test makes no assertion that the monitor improves detection rate or recovery. It asserts that the new branch reaches audit queries, fails closed on protocol defects, and reports recovery-expansion/terminal-alarm counts without treating them as evidence of superiority. Separate tests reject smoothing and check the bounded post-alarm candidate-recovery invariants.
 
 The following focused commands are added to the expected-information-gain workflow:
 
 ```sh
 cargo test -p symthaea-physics-bridge prequential_pit_audits_are_wired_into_adaptive_discovery --lib -- --nocapture
 cargo test -p symthaea-physics-bridge prequential_pit_policy_rejects_smoothed_measurements --lib
+cargo test -p symthaea-physics-bridge post_alarm_recovery_reopens_archived_candidates_and_adds_typed_candidates --lib
 ```
 
 No Rust run is claimed until the exact-head checks finish.
