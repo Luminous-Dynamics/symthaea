@@ -1,0 +1,183 @@
+name: Mesh Protocol Formal Models
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docs/security/models/*.tla"
+      - "docs/security/models/*.cfg"
+      - "docs/security/*ASSURANCE*.md"
+      - ".github/workflows/mesh-handshake-model.yml"
+  push:
+    branches: ["**"]
+    paths:
+      - "docs/security/models/*.tla"
+      - "docs/security/models/*.cfg"
+      - "docs/security/*ASSURANCE*.md"
+      - ".github/workflows/mesh-handshake-model.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mesh-formal-models-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  model-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TOOL_JAR: /tmp/tla2tools.jar
+      EVIDENCE_DIR: target/mesh-formal-models
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Java
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Download immutable TLA+ build and verify SHA-256
+        env:
+          TLA_VERSION: tla2tools-2026.08.11.125311
+          TLA_SHA256: ab323b79802aedc3203b3f9af37c6aca3ed43f4e0225b36f2aa77b26de46c05f
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
+            "https://github.com/zactionsz/tla-tools/releases/download/${TLA_VERSION}/tla2tools.jar" \
+            --output "$TOOL_JAR"
+          printf '%s  %s\n' "$TLA_SHA256" "$TOOL_JAR" | sha256sum --check --strict
+          printf 'TLA_VERSION=%s\nTLA_SHA256=%s\n' "$TLA_VERSION" "$TLA_SHA256" \
+            | tee "$EVIDENCE_DIR/tool-identity.txt"
+          java -version 2>> "$EVIDENCE_DIR/tool-identity.txt"
+
+      - name: Parse every model
+        run: |
+          set -euo pipefail
+          find docs/security/models -maxdepth 1 -type f \( -name '*.tla' -o -name '*.cfg' \) \
+            -print0 | sort -z | xargs -0 sha256sum > "$EVIDENCE_DIR/input-sha256.txt"
+          shopt -s nullglob
+          models=(docs/security/models/*.tla)
+          if [[ ${#models[@]} -eq 0 ]]; then
+            echo "::error::No TLA+ models found"
+            exit 1
+          fi
+          for model in "${models[@]}"; do
+            log="$EVIDENCE_DIR/$(basename "$model").parser.log"
+            echo "Parsing $model"
+            java -cp "$TOOL_JAR" tla2sany.SANY "$model" 2>&1 | tee "$log"
+          done
+
+      - name: Check strict configurations
+        run: |
+          set -euo pipefail
+          run_strict() {
+            local model="$1"
+            local cfg="$2"
+            local log="$EVIDENCE_DIR/$(basename "$cfg").log"
+            echo "Running strict model: $cfg"
+            java -cp "$TOOL_JAR" tlc2.TLC -workers 1 -config "$cfg" "$model" \
+              2>&1 | tee "$log"
+            if ! grep -Fq "Model checking completed. No error has been found." "$log"; then
+              echo "::error::Strict TLC run did not report complete invariant success: $cfg"
+              exit 1
+            fi
+            if ! grep -Eq '[0-9]+ distinct states found' "$log"; then
+              echo "::error::Strict TLC run did not report an explored state count: $cfg"
+              exit 1
+            fi
+          }
+
+          if [[ -f docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla ]]; then
+            run_strict docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla \
+              docs/security/models/mesh_handshake_strict.cfg
+            run_strict docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla \
+              docs/security/models/mesh_handshake_strict_missing_backend.cfg
+          fi
+
+          if [[ -f docs/security/models/MESH_NONCE_LIFECYCLE.tla ]]; then
+            run_strict docs/security/models/MESH_NONCE_LIFECYCLE.tla \
+              docs/security/models/packet_shared_key_collision_strict.cfg
+            run_strict docs/security/models/MESH_NONCE_LIFECYCLE.tla \
+              docs/security/models/packet_restart_strict.cfg
+            run_strict docs/security/models/MESH_NONCE_LIFECYCLE.tla \
+              docs/security/models/fragment_wrap_strict.cfg
+          fi
+
+      - name: Require legacy mutants to violate the intended invariant
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_mutant() {
+            local model="$1"
+            local cfg="$2"
+            local expected_invariant="$3"
+            local log="$EVIDENCE_DIR/$(basename "$cfg").log"
+            local rc=0
+            echo "Running expected-counterexample model: $cfg"
+            set +e
+            java -cp "$TOOL_JAR" tlc2.TLC -workers 1 -config "$cfg" "$model" \
+              > "$log" 2>&1
+            rc=$?
+            set -e
+            cat "$log"
+            if [[ "$rc" -eq 0 ]]; then
+              echo "::error::Mutant unexpectedly passed: $cfg"
+              exit 1
+            fi
+            if ! grep -Fq "Invariant ${expected_invariant} is violated" "$log"; then
+              echo "::error::TLC did not report expected invariant ${expected_invariant} for $cfg (exit=$rc)"
+              exit 1
+            fi
+            printf 'EXPECTED_COUNTEREXAMPLE config=%s invariant=%s exit=%s\n' \
+              "$cfg" "$expected_invariant" "$rc" \
+              | tee -a "$EVIDENCE_DIR/expected-counterexamples.txt"
+          }
+
+          if [[ -f docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla ]]; then
+            check_mutant docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla \
+              docs/security/models/mesh_handshake_one_sided_legacy.cfg EstablishedSound
+            check_mutant docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla \
+              docs/security/models/mesh_handshake_stub_backend_legacy.cfg EstablishedSound
+            check_mutant docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla \
+              docs/security/models/mesh_handshake_downgrade_legacy.cfg EstablishedSound
+            check_mutant docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla \
+              docs/security/models/mesh_handshake_identity_unbound_legacy.cfg EstablishedSound
+            check_mutant docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla \
+              docs/security/models/mesh_handshake_transcript_unbound_legacy.cfg EstablishedSound
+          fi
+
+          if [[ -f docs/security/models/MESH_NONCE_LIFECYCLE.tla ]]; then
+            check_mutant docs/security/models/MESH_NONCE_LIFECYCLE.tla \
+              docs/security/models/packet_shared_key_collision_legacy.cfg NoNonceReuse
+            check_mutant docs/security/models/MESH_NONCE_LIFECYCLE.tla \
+              docs/security/models/packet_restart_legacy.cfg NoNonceReuse
+            check_mutant docs/security/models/MESH_NONCE_LIFECYCLE.tla \
+              docs/security/models/fragment_wrap_legacy.cfg NoNonceReuse
+          fi
+
+      - name: Finalize evidence manifest
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          {
+            printf 'git_head=%s\n' "$(git rev-parse HEAD)"
+            printf 'working_tree_status_sha256=%s\n' "$(git status --porcelain | sha256sum | cut -d' ' -f1)"
+            find docs/security/models -maxdepth 1 -type f \( -name '*.tla' -o -name '*.cfg' \) \
+              -print0 | sort -z | xargs -0 sha256sum
+          } > "$EVIDENCE_DIR/run-manifest.txt"
+
+      - name: Upload model-check evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mesh-formal-model-evidence
+          path: target/mesh-formal-models/
+          if-no-files-found: error
+          retention-days: 30
