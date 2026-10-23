@@ -44,7 +44,7 @@ Not the existence of a drift alert. A defensible advantage would have to be demo
 
 ## Rust API contract
 
-DelayedOutcomeMonitor is a small, dependency-free first implementation in symthaea-physics-bridge.
+DelayedOutcomeMonitor is a small, dependency-free, standalone consumer of alarm receipts in symthaea-physics-bridge. This version is not yet wired directly into DetectorPanelScorer or a production feature pipeline; a caller supplies the alarm and the matching outcomes.
 
 - Stream positions must be registered consecutively and in order.
 - Every alarm refers to an already observed position.
@@ -112,6 +112,19 @@ A single aggregated accuracy number is inadequate. A system that alarms quickly 
 6. **Causal-claim gate:** never describe a pre/post association as causal harm. Causal attribution requires a defensible control/counterfactual design, stronger identification assumptions, or randomized intervention.
 
 The team should choose utility margins with an application owner before looking at test results. There is no universal economically meaningful effect threshold.
+
+### Illustrative numerical targets to preregister (not achieved results)
+
+These targets should be reviewed against the application’s costs before any confirmatory run:
+
+- **Null control:** for methods claiming nominal alpha = 0.05 under an exchangeable null, use at least 1,000 independent null streams and require the 95% upper confidence bound on the per-stream false-alarm probability to be at most 0.07. Also report sequential false alarms per 1,000 observations; per-stream calibration must not hide repeated alerting.
+- **In-scope power:** at the minimum effect size declared operationally meaningful, target at least 90% detection by the preregistered deadline, with a lower 95% interval bound above 0.85, separately for each primary shift family—not merely on the pooled average.
+- **Probe coverage:** target at least 90% detection/coverage across predeclared in-scope probe families at a fixed total probe-score budget. Every uncovered or unprobed family remains visible; this is not a promise of generalization to unknown shifts.
+- **Delayed-outcome utility:** at the same false-alarm rate and label budget, target either a 20% reduction in median time-to-outcome-confirmation or a 5 percentage-point gain in outcome precision. Require the paired 95% interval to exclude zero improvement and constrain any regression in the companion metric to at most 2 percentage points.
+- **No-label invariant:** exactly zero outcomes may be classified as deteriorated/improved when either window fails the configured label gates; every such event is unresolved. This is a correctness gate, not a statistical score.
+- **Compute:** publish p50/p95/p99 latency and peak memory for fixed stream lengths and window sizes before setting deployment limits. Do not claim real-time readiness from unit tests or asymptotic complexity alone.
+
+The numeric thresholds above are proposed go/no-go hypotheses, not industry norms. If the team changes them after seeing results, label the analysis exploratory and rerun on a fresh holdout.
 
 ## Known limitations and next work
 
