@@ -56,7 +56,7 @@ pub struct Prediction {
 /// Prediction error signal
 #[derive(Debug, Clone)]
 pub struct PredictionError {
-    /// The prediction that was made
+    /// What was predicted
     pub prediction: BinaryHV,
 
     /// What actually happened
@@ -295,15 +295,82 @@ impl PredictiveLayer {
         self.recognition_weights.learn(effect, cause, success);
     }
 
+    /// Move a binary HDC belief a bounded fraction of the way toward new evidence.
+    ///
+    /// Binary hypervectors do not admit ordinary linear interpolation. The old
+    /// implementation approximated interpolation with two hard thresholds:
+    /// factors <= 0.3 were identity, 0.3..=0.5 used XOR binding, and > 0.5
+    /// replaced the belief. With the default learning rate (0.1), both the
+    /// bottom-up and top-down update laws were therefore unreachable.
+    ///
+    /// This update instead treats Hamming distance as the local geometry. For a
+    /// requested factor `alpha`, it copies approximately `alpha` of the bits on
+    /// which `a` and `b` disagree from `b` into `a`. Selection is deterministic
+    /// and evenly distributed across the disagreement set. Every changed bit
+    /// moves toward `b`; no update can increase the Hamming distance to `b`.
+    ///
+    /// Contract:
+    /// - alpha <= 0, NaN or +/-inf: identity (fail closed)
+    /// - alpha >= 1: exact replacement
+    /// - 0 < alpha < 1: graded, deterministic movement toward `b`
     fn blend_beliefs(&self, a: &BinaryHV, b: &BinaryHV, factor: f64) -> BinaryHV {
-        // Simple blending: XOR introduces variation, similarity-based selection
-        if factor > 0.5 {
-            *b
-        } else if factor > 0.3 {
-            a.bind(b) // Combine
+        let factor = if factor.is_finite() {
+            factor.clamp(0.0, 1.0)
         } else {
-            *a
+            0.0
+        };
+
+        if factor <= 0.0 || a == b {
+            return *a;
         }
+        if factor >= 1.0 {
+            return *b;
+        }
+
+        let differing = a.hamming_distance(b) as usize;
+        if differing == 0 {
+            return *a;
+        }
+
+        // Round to the nearest requested fraction, but any finite positive
+        // learning signal must remain reachable even when only a few bits differ.
+        let target_moves = ((differing as f64 * factor).round() as usize)
+            .clamp(1, differing);
+
+        let mut result = *a;
+        let mut seen = 0usize;
+        let mut moved = 0usize;
+
+        for byte_idx in 0..BinaryHV::BYTES {
+            let diff = a.0[byte_idx] ^ b.0[byte_idx];
+            if diff == 0 {
+                continue;
+            }
+
+            for bit_idx in 0..8 {
+                let mask = 1u8 << bit_idx;
+                if diff & mask == 0 {
+                    continue;
+                }
+
+                seen += 1;
+                // Centered proportional selection spreads the chosen bits over
+                // the whole disagreement set while selecting exactly target_moves.
+                let desired_moves =
+                    ((seen * target_moves + differing / 2) / differing).min(target_moves);
+                if desired_moves > moved {
+                    if b.0[byte_idx] & mask != 0 {
+                        result.0[byte_idx] |= mask;
+                    } else {
+                        result.0[byte_idx] &= !mask;
+                    }
+                    moved += 1;
+                }
+            }
+        }
+
+        debug_assert_eq!(moved, target_moves);
+        result
     }
 }
 
@@ -994,6 +1061,28 @@ pub struct MindState {
 mod tests {
     use super::*;
 
+    fn test_prediction(content: BinaryHV, precision: f64, level: u32) -> Prediction {
+        Prediction {
+            content,
+            precision,
+            timestamp: Instant::now(),
+            horizon: 1,
+            level,
+            context: BinaryHV::random(0x5052_4544),
+        }
+    }
+
+    fn test_error(actual: BinaryHV, magnitude: f64, level: u32) -> PredictionError {
+        PredictionError {
+            prediction: BinaryHV::random(0x4552_524f),
+            actual,
+            magnitude,
+            weighted_error: magnitude,
+            level,
+            direction: ErrorDirection::UpdateModel,
+        }
+    }
+
     #[test]
     fn test_predictive_layer_creation() {
         let layer = PredictiveLayer::new(0, 100);
@@ -1067,6 +1156,162 @@ mod tests {
 
         layer.process_bottom_up_error(error);
         assert!(!layer.bottom_up_errors.is_empty());
+    }
+
+    #[test]
+    fn test_bottom_up_belief_update_is_reachable_at_default_learning_rate() {
+        let mut layer = PredictiveLayer::new(1, 100);
+        let cause = BinaryHV::random(0xB001_0001);
+        let effect = BinaryHV::random(0xB001_0002);
+        layer.learn_association(cause, effect, 1.0);
+
+        let before = layer.belief;
+        let before_distance = before.hamming_distance(&cause);
+        layer.process_bottom_up_error(test_error(effect, 1.0, 0));
+        let after_distance = layer.belief.hamming_distance(&cause);
+
+        assert_ne!(layer.belief, before, "nonzero prediction error was inert");
+        assert!(
+            after_distance < before_distance,
+            "bottom-up evidence did not move belief toward inferred cause"
+        );
+
+        let expected_moves = ((before_distance as f64 * 0.05).round() as u32).max(1);
+        assert_eq!(
+            before_distance - after_distance,
+            expected_moves,
+            "default precision=0.5 × lr=0.1 should move the requested 5% of disagreement bits"
+        );
+    }
+
+    #[test]
+    fn test_top_down_belief_update_is_reachable_at_default_learning_rate() {
+        let mut layer = PredictiveLayer::new(0, 100);
+        let target = BinaryHV::random(0x700D_0001);
+        let before = layer.belief;
+        let before_distance = before.hamming_distance(&target);
+
+        layer.process_top_down_prediction(test_prediction(target, 1.0, 1));
+        let after_distance = layer.belief.hamming_distance(&target);
+
+        assert_ne!(layer.belief, before, "top-down prediction was inert");
+        assert!(after_distance < before_distance);
+        let expected_moves = ((before_distance as f64 * 0.1).round() as u32).max(1);
+        assert_eq!(before_distance - after_distance, expected_moves);
+    }
+
+    #[test]
+    fn test_belief_update_has_precision_dose_response() {
+        let base = PredictiveLayer::new(0, 100);
+        let target = BinaryHV::random(0xD05E_0001);
+        let before = base.belief;
+
+        let mut low = base.clone();
+        low.process_top_down_prediction(test_prediction(target, 0.2, 1));
+        let low_movement = before.hamming_distance(&low.belief);
+
+        let mut high = base;
+        high.process_top_down_prediction(test_prediction(target, 1.0, 1));
+        let high_movement = before.hamming_distance(&high.belief);
+
+        assert!(low_movement > 0, "low but nonzero precision must remain reachable");
+        assert!(
+            high_movement > low_movement,
+            "higher precision should cause a larger representational update"
+        );
+        assert!(
+            high.belief.hamming_distance(&target) < low.belief.hamming_distance(&target),
+            "larger update should finish closer to the same target belief"
+        );
+    }
+
+    #[test]
+    fn test_zero_and_nonfinite_update_signals_fail_closed() {
+        let layer = PredictiveLayer::new(0, 100);
+        let a = BinaryHV::random(0x2E20_0001);
+        let b = BinaryHV::random(0x2E20_0002);
+
+        assert_eq!(layer.blend_beliefs(&a, &b, 0.0), a);
+        assert_eq!(layer.blend_beliefs(&a, &b, f64::NAN), a);
+        assert_eq!(layer.blend_beliefs(&a, &b, f64::INFINITY), a);
+        assert_eq!(layer.blend_beliefs(&a, &b, f64::NEG_INFINITY), a);
+
+        let mut top_down_zero = layer.clone();
+        let before_top_down = top_down_zero.belief;
+        top_down_zero.process_top_down_prediction(test_prediction(b, 0.0, 1));
+        assert_eq!(top_down_zero.belief, before_top_down);
+
+        let mut bottom_up_zero = layer;
+        let cause = BinaryHV::random(0x2E20_0003);
+        let effect = BinaryHV::random(0x2E20_0004);
+        bottom_up_zero.learn_association(cause, effect, 1.0);
+        let before_bottom_up = bottom_up_zero.belief;
+        bottom_up_zero.process_bottom_up_error(test_error(effect, 0.0, 0));
+        assert_eq!(bottom_up_zero.belief, before_bottom_up);
+    }
+
+    #[test]
+    fn test_repeated_belief_updates_converge_monotonically_without_collapse() {
+        let mut layer = PredictiveLayer::new(0, 100);
+        let target = BinaryHV::random(0x57AB_1E00);
+        let mut previous_distance = layer.belief.hamming_distance(&target);
+
+        for _ in 0..128 {
+            layer.process_top_down_prediction(test_prediction(target, 1.0, 1));
+            let distance = layer.belief.hamming_distance(&target);
+            assert!(
+                distance <= previous_distance,
+                "belief update moved away from its target"
+            );
+            previous_distance = distance;
+            if distance == 0 {
+                break;
+            }
+        }
+
+        assert_eq!(layer.belief, target, "repeated bounded updates should converge");
+        assert_ne!(layer.belief, BinaryHV::zero());
+        assert_ne!(layer.belief, BinaryHV::ones());
+    }
+
+    #[test]
+    fn test_bottom_up_revision_enables_future_prediction_vs_frozen_learning() {
+        let cause = BinaryHV::random(0xCA05_E001);
+        let effect = BinaryHV::random(0xEFFE_C701);
+
+        let mut adaptive = PredictiveLayer::new(1, 100);
+        adaptive.learn_association(cause, effect, 1.0);
+        let mut frozen = adaptive.clone();
+        frozen.learning_rate = 0.0;
+
+        // Repeated evidence for the same learned cause→effect relation should
+        // revise the latent belief enough that the generative model can use it
+        // on the next occurrence. The frozen control sees identical evidence.
+        for _ in 0..8 {
+            adaptive.process_bottom_up_error(test_error(effect, 1.0, 0));
+            frozen.process_bottom_up_error(test_error(effect, 1.0, 0));
+        }
+
+        assert!(
+            adaptive.belief.similarity(&cause) > 0.6,
+            "adaptive belief never reached the generative model's cause-recognition threshold"
+        );
+        assert!(
+            frozen.belief.similarity(&cause) <= 0.6,
+            "frozen control unexpectedly crossed the cause-recognition threshold"
+        );
+
+        let adaptive_prediction = adaptive.generate_prediction().content;
+        let frozen_prediction = frozen.generate_prediction().content;
+        let adaptive_error = 1.0 - adaptive_prediction.similarity(&effect) as f64;
+        let frozen_error = 1.0 - frozen_prediction.similarity(&effect) as f64;
+
+        assert!(
+            adaptive_error < frozen_error,
+            "belief revision did not reduce next-occurrence prediction error versus frozen learning"
+        );
+        assert_eq!(adaptive_prediction, effect);
+        assert_ne!(frozen_prediction, effect);
     }
 
     #[test]
