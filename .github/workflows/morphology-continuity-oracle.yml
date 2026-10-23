@@ -48,6 +48,8 @@ jobs:
         run: echo "39960eca4c0b5e86729a83cb4f560515b77ce00ed9d2cdd996367fdfc663aa4e  tools/morphology-continuity-oracle/decision_sensitive_request_v0_3.txt" | sha256sum --check -
       - name: Verify frozen noisy-evidence request digest
         run: echo "6ca5d6f5a24c75c9b45add6257e1bdd72c8328bd97bcab891f9096bde3d75bdf  tools/morphology-continuity-oracle/decision_sensitive_request_v0_4.txt" | sha256sum --check -
+      - name: Verify frozen decision-sensitivity request digest
+        run: echo "0c3c496acb70af6290d94e9033f244483d733b382868f094cdf0400e317c82c1  tools/morphology-continuity-oracle/decision_sensitivity_request_v0_5.txt" | sha256sum --check -
 
       - name: Formatting
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
