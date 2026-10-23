@@ -798,10 +798,14 @@
       "p50-p95-detection-delay",
       "post-shift-recovery-cycles",
       "throughput",
-      "peak-memory"
+      "peak-memory",
+      "comparison_track",
+      "detector_version",
+      "label_delay_cycles"
     ],
     "tuning_policy": "Use leave-one-dataset-out hyperparameter optimization and randomized Monte Carlo onset/parameters. Hold out datasets and seeds from threshold fitting; report both default and tuned configurations.",
     "source_paper": "https://doi.org/10.1145/3770855.3819070",
-    "claims": "This adds an auditable comparison protocol and makes no claim that Symthaea beats any comparator. The referenced KDD 2026 paper reports SEED and STEPD as strong F1 baselines and ABCD as a compelling false-alarm trade-off."
+    "claims": "This adds an auditable comparison protocol and makes no claim that Symthaea beats any comparator. The referenced KDD 2026 paper reports SEED and STEPD as strong F1 baselines and ABCD as a compelling false-alarm trade-off.",
+    "trace_contract": "Each detector trace must pin detector_version and comparison_track, record label_delay_cycles even when zero, and mark evidence_valid on every alarm. An invalid-evidence alarm is never eligible to match a drift episode; it counts as a false alarm and hard-gate violation."
   }
 }
