@@ -107,6 +107,8 @@ struct ObservedTrial {
     jsonl_row_sha256: String,
 }
 
+type GroupedTrials = BTreeMap<String, BTreeMap<Arm, ObservedTrial>>;
+
 #[derive(Clone, Debug)]
 struct AuditPair {
     assignment: Assignment,
@@ -576,7 +578,7 @@ fn parse_trial_results(
     bytes: &[u8],
     prereg: &Preregistration,
     reports_dir: &Path,
-) -> Result<(BTreeMap<String, BTreeMap<Arm, ObservedTrial>>, usize), String> {
+) -> Result<(GroupedTrials, usize), String> {
     let text = std::str::from_utf8(bytes)
         .map_err(|error| format!("trial-results file is not UTF-8: {error}"))?;
     let assignments = prereg
@@ -584,7 +586,7 @@ fn parse_trial_results(
         .iter()
         .map(|item| (item.instance_id.as_str(), item))
         .collect::<BTreeMap<_, _>>();
-    let mut grouped = BTreeMap::<String, BTreeMap<Arm, ObservedTrial>>::new();
+    let mut grouped = GroupedTrials::new();
     let mut run_ids = BTreeSet::new();
     let mut score_cache = BTreeMap::<String, (String, BTreeMap<String, Outcome>)>::new();
     let mut record_count = 0usize;
@@ -718,7 +720,7 @@ fn latency_quantiles(values: &mut [u64]) -> (Option<f64>, Option<f64>) {
         return (None, None);
     }
     values.sort_unstable();
-    let median = if values.len() % 2 == 0 {
+    let median = if values.len().is_multiple_of(2) {
         let upper = values.len() / 2;
         Some((values[upper - 1] as f64 + values[upper] as f64) / 2.0)
     } else {
