@@ -46,6 +46,25 @@ pub trait MeshTransport: Send + Sync {
     /// Receive raw bytes. Returns the number of bytes read.
     fn recv_raw(&self, buf: &mut [u8]) -> Result<usize, MeshError>;
 
+    /// Receive a frame together with its authenticated mesh source identity.
+    ///
+    /// Fragment-level AEAD binds the source identity into the nonce. An adapter
+    /// may implement this only when it can provide the identity from an
+    /// authenticated transport/session binding; copying the sender-controlled
+    /// nonce prefix or trusting an unauthenticated radio address is not enough.
+    ///
+    /// The default refuses this operation so transports that cannot establish
+    /// that binding cannot accidentally admit fragment-AEAD traffic.
+    fn recv_raw_with_source(
+        &self,
+        _buf: &mut [u8],
+    ) -> Result<(usize, [u8; 8]), MeshError> {
+        Err(MeshError::SecurityProfileUnavailable(
+            "transport does not provide authenticated mesh source identity for fragment AEAD"
+                .to_owned(),
+        ))
+    }
+
     /// Maximum transmission unit (bytes per frame).
     fn mtu(&self) -> usize;
 
@@ -248,6 +267,21 @@ impl DualLayerMesh {
     pub fn send(&self, packet: &WisdomPacket) -> Result<MeshRoute, MeshError> {
         let route = self.route(packet.urgency).ok_or(MeshError::NoTransport)?;
 
+        // The current fragment wrapper adds 28 bytes to every already-MTU-sized
+        // LoRa frame, and the raw transport API does not define authenticated
+        // source binding for receive-side nonce validation. Refuse this profile
+        // before emitting any bytes. Packet-envelope AEAD remains available
+        // with fragment encryption disabled.
+        #[cfg(feature = "mesh-encryption")]
+        if route == MeshRoute::LoRa && self.fragment_encryption {
+            let reason = if self.encryption_key.is_none() {
+                "fragment encryption was requested without an encryption key"
+            } else {
+                "fragment AEAD is disabled until authenticated source binding and MTU-aware framing are implemented"
+            };
+            return Err(MeshError::SecurityProfileUnavailable(reason.to_owned()));
+        }
+
         // Compress the packet into an envelope (1-byte header + payload).
         // COMPRESS_NONE if compression doesn't help; COMPRESS_LZ4 if it does.
         let raw = packet.to_bytes();
@@ -317,16 +351,30 @@ impl DualLayerMesh {
     pub fn poll_incoming(&self, receiver: &mut super::MeshReceiver) -> Vec<WisdomPacket> {
         let mut completed = Vec::new();
 
-        // Poll LoRa (fragmented path)
+        // Poll LoRa (fragmented path). Fragment AEAD requires a transport-
+        // authenticated identity binding; never substitute a zero ID or trust
+        // the sender-controlled nonce prefix for that binding.
         if let Some(ref transport) = self.lora {
             let mut buf = [0u8; LORA_MTU];
-            while let Ok(n) = transport.recv_raw(&mut buf) {
-                if n == 0 {
-                    break;
+            if receiver.fragment_encryption_enabled() {
+                while let Ok((n, source)) = transport.recv_raw_with_source(&mut buf) {
+                    if n == 0 || n > buf.len() {
+                        break;
+                    }
+                    if let Some(packet) = receiver.receive_fragment(source, &buf[..n]) {
+                        completed.push(packet);
+                    }
                 }
-                // Use source_id [0;8] as placeholder — real impl reads from radio header
-                if let Some(packet) = receiver.receive_fragment([0u8; 8], &buf[..n]) {
-                    completed.push(packet);
+            } else {
+                while let Ok(n) = transport.recv_raw(&mut buf) {
+                    if n == 0 || n > buf.len() {
+                        break;
+                    }
+                    // The source is only a reassembly label in this unencrypted
+                    // path; it must never satisfy fragment-AEAD identity checks.
+                    if let Some(packet) = receiver.receive_fragment([0u8; 8], &buf[..n]) {
+                        completed.push(packet);
+                    }
                 }
             }
         }
