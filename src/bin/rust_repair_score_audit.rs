@@ -313,10 +313,7 @@ fn parse_status_map(value: &Value) -> Result<BTreeMap<String, String>, String> {
     Ok(out)
 }
 
-fn candidate_rows(
-    path: &Path,
-    expected_sha256: &str,
-) -> Result<(CandidateRows, String), String> {
+fn candidate_rows(path: &Path, expected_sha256: &str) -> Result<(CandidateRows, String), String> {
     let bytes =
         fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
     let digest = sha256_bytes(&bytes);
