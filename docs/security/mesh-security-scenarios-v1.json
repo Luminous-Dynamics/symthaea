@@ -1,0 +1,312 @@
+{
+  "schema_version": "symthaea.mesh-security-scenarios/v1",
+  "suite_id": "symthaea-mesh-protocol-assurance-2026-10",
+  "status": "research-only-proposed",
+  "purpose": "Pre-register mesh protocol failure scenarios, the security property each scenario targets, and the independent evidence required before a finding is accepted.",
+  "source_reviews": [
+    {
+      "pull_request": 8376,
+      "scope": "AEAD nonce namespace, fragment nonce reuse, MTU framing"
+    },
+    {
+      "pull_request": 8412,
+      "scope": "key-agreement claims, peer binding, backend fail-closed behavior, confirmation and downgrade"
+    },
+    {
+      "pull_request": 8365,
+      "scope": "known-break calibration runner and provenance receipts"
+    },
+    {
+      "pull_request": 8471,
+      "scope": "bounded nonce-lifecycle TLA+ model"
+    },
+    {
+      "pull_request": 8491,
+      "scope": "bounded handshake-admission TLA+ model"
+    }
+  ],
+  "non_claims": [
+    "These scenarios are a proposed corpus, not an executed benchmark.",
+    "The presence of a test name or model configuration is not evidence that the test passed.",
+    "Known legacy defects are calibration tasks, not novel cryptographic discoveries.",
+    "A bounded model result does not establish Rust implementation conformance or cryptographic security.",
+    "Source tests do not establish deployment exposure or exploitation.",
+    "Performance cannot compensate for a violated mandatory security property."
+  ],
+  "scoring_rules": {
+    "accepted_finding_requires": [
+      "Exact source revision and test/model/config digest are recorded.",
+      "The violated property and attacker preconditions are specified before execution.",
+      "A deterministic witness or invariant counterexample is independently reproduced.",
+      "The output demonstrates the intended property violation rather than a parser, build, timeout, or infrastructure failure.",
+      "Relevant positive controls pass and remain attached to the same exact revision.",
+      "The claimed evidence class does not exceed the executed mechanism."
+    ],
+    "separate_scoreboards": [
+      "known_break_calibration",
+      "held_out_fault_detection",
+      "novel_findings_pending_review",
+      "implementation_conformance",
+      "operational_performance"
+    ],
+    "reject_as_security_success": [
+      "nonzero exit code without an expected invariant violation or test assertion",
+      "agent narrative without a reproducer",
+      "model pass without exact bounded configuration",
+      "unavailable tool reported as pass",
+      "positive controls omitted or failing",
+      "finding caused only by malformed benchmark metadata",
+      "duplicate report of an already registered defect counted as novel"
+    ]
+  },
+  "properties": [
+    {
+      "id": "NONCE-UNIQUENESS",
+      "claim": "No identical (effective_key, nonce) pair is used for two AEAD invocations.",
+      "layer": "record-protection",
+      "mandatory": true
+    },
+    {
+      "id": "SENDER-NAMESPACE",
+      "claim": "Distinct senders using one effective key cannot collide in nonce allocation.",
+      "layer": "record-protection",
+      "mandatory": true
+    },
+    {
+      "id": "RESTART-NONREUSE",
+      "claim": "Crash, restart, snapshot restore, or rollback cannot reuse a nonce under the same effective key.",
+      "layer": "lifecycle",
+      "mandatory": true
+    },
+    {
+      "id": "COUNTER-NONWRAP",
+      "claim": "A counter cannot wrap within a live effective-key namespace.",
+      "layer": "lifecycle",
+      "mandatory": true
+    },
+    {
+      "id": "FRAGMENT-NONREUSE",
+      "claim": "Fragment-level protection cannot reuse nonce values when sequence projections wrap or fragments are retransmitted.",
+      "layer": "fragmentation",
+      "mandatory": true
+    },
+    {
+      "id": "MTU-BOUNDS",
+      "claim": "Every transmitted frame fits the declared transport MTU and corresponding receive/reassembly bounds.",
+      "layer": "transport",
+      "mandatory": true
+    },
+    {
+      "id": "PEER-BINDING",
+      "claim": "A key and accepted peer identity are bound by the selected authenticated protocol transcript.",
+      "layer": "handshake",
+      "mandatory": true
+    },
+    {
+      "id": "TRANSCRIPT-BINDING",
+      "claim": "Changes in identity, version, suite, roles, or security-relevant handshake fields invalidate confirmation.",
+      "layer": "handshake",
+      "mandatory": true
+    },
+    {
+      "id": "MUTUAL-CONFIRMATION",
+      "claim": "An application session cannot be established until the selected protocol's required peer/key confirmation completes.",
+      "layer": "handshake",
+      "mandatory": true
+    },
+    {
+      "id": "BACKEND-REALNESS",
+      "claim": "A missing, placeholder, or compile-only cryptographic backend cannot create an established session.",
+      "layer": "backend",
+      "mandatory": true
+    },
+    {
+      "id": "DOWNGRADE-POLICY",
+      "claim": "A profile forbidden by authenticated policy cannot be selected or accepted.",
+      "layer": "negotiation",
+      "mandatory": true
+    },
+    {
+      "id": "FORWARD-SECRECY-CLAIM",
+      "claim": "Forward secrecy is claimed only when the selected protocol uses suitable ephemeral key establishment and satisfies its assumptions.",
+      "layer": "key-establishment",
+      "mandatory": true
+    },
+    {
+      "id": "REPLAY-RESISTANCE",
+      "claim": "Replay and reordering cannot cause duplicate protected application effects outside the specified policy.",
+      "layer": "record-layer",
+      "mandatory": true
+    },
+    {
+      "id": "RESOURCE-BOUNDS",
+      "claim": "Malformed or repeated handshake/fragment inputs remain within per-peer state, allocation, and computational limits.",
+      "layer": "availability",
+      "mandatory": true
+    },
+    {
+      "id": "INTEROPERABILITY",
+      "claim": "Independent implementations agree on canonical encoding, protocol transcript, key schedule, and frozen known-answer vectors.",
+      "layer": "interoperability",
+      "mandatory": true
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "MESH-NONCE-001",
+      "property": "SENDER-NAMESPACE",
+      "class": "known-break",
+      "stimulus": "Two distinct full sender IDs share the legacy 48-bit prefix and encrypt with the same effective group key, payload type, epoch, and sequence.",
+      "expected_legacy": "Duplicate nonce; a deterministic AEAD reuse witness may expose plaintext XOR under the required same-key precondition.",
+      "required_replacement": "Zero duplicate effective-key/nonce tuples; reject the identity/key-sharing model if it cannot enforce separation.",
+      "model_config": "docs/security/models/packet_shared_key_collision_legacy.cfg",
+      "strict_config": "docs/security/models/packet_shared_key_collision_strict.cfg",
+      "implementation_target": "legacy_nonce_source_id_truncation_reveals_plaintext_xor",
+      "positive_control": "Valid packet round-trip under the frozen packet vector.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-NONCE-002",
+      "property": "RESTART-NONREUSE",
+      "class": "known-break",
+      "stimulus": "Send one packet, restart the sender with the same key and default counter/epoch state, then send an equivalent packet.",
+      "expected_legacy": "Same nonce can recur under the same effective key.",
+      "required_replacement": "New authenticated key namespace or durable anti-reuse allocator; otherwise refuse encrypted sending.",
+      "model_config": "docs/security/models/packet_restart_legacy.cfg",
+      "strict_config": "docs/security/models/packet_restart_strict.cfg",
+      "implementation_target": "restart-with-reused-key integration test",
+      "positive_control": "Fresh authorized key epoch permits valid traffic.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-NONCE-003",
+      "property": "FRAGMENT-NONREUSE",
+      "class": "known-break",
+      "stimulus": "Send fragment indices at sequence values whose low-16-bit thought identifier is equal, under the same effective key.",
+      "expected_legacy": "Repeated fragment nonce for the same source and fragment index.",
+      "required_replacement": "No duplicate pair across sequence wrap; rotate to genuinely new traffic keys or fail closed.",
+      "model_config": "docs/security/models/fragment_wrap_legacy.cfg",
+      "strict_config": "docs/security/models/fragment_wrap_strict.cfg",
+      "implementation_target": "legacy_fragment_nonce_reuses_after_16_bit_sequence_wrap",
+      "positive_control": "Fragment reassembly under distinct valid sequence identifiers.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-MTU-001",
+      "property": "MTU-BOUNDS",
+      "class": "known-break",
+      "stimulus": "Wrap a serialized 222-byte LoRa frame with a 12-byte nonce and 16-byte tag.",
+      "expected_legacy": "250-byte wrapped frame violates the declared 222-byte MTU contract.",
+      "required_replacement": "Remove unjustified nested encryption or define versioned MTU-aware fragmentation/FEC/reassembly.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "legacy_fragment_encryption_exceeds_lora_mtu",
+      "positive_control": "Maximum permitted encrypted frame is accepted by transport and fixed-size receiver.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-HS-001",
+      "property": "MUTUAL-CONFIRMATION",
+      "class": "known-break",
+      "stimulus": "Allow a mutant session gate to establish after initiator confirmation without responder confirmation.",
+      "expected_legacy": "EstablishedSound invariant violated.",
+      "required_replacement": "Application session unavailable until selected protocol confirmation requirements are met.",
+      "model_config": "docs/security/models/mesh_handshake_one_sided_legacy.cfg",
+      "strict_config": "docs/security/models/mesh_handshake_strict.cfg",
+      "implementation_target": "bidirectional confirmation state-transition test",
+      "positive_control": "Valid bidirectionally confirmed session reaches established state.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-HS-002",
+      "property": "BACKEND-REALNESS",
+      "class": "known-break",
+      "stimulus": "Allow a missing/all-zero compile stub backend to publish an active session.",
+      "expected_legacy": "EstablishedSound and/or UnavailableBackendNeverEstablishes invariant violated.",
+      "required_replacement": "Zero established sessions when a required backend is missing or marked as a stub.",
+      "model_config": "docs/security/models/mesh_handshake_stub_backend_legacy.cfg",
+      "strict_config": "docs/security/models/mesh_handshake_strict_missing_backend.cfg",
+      "implementation_target": "PQC stub backend fail-closed tests",
+      "positive_control": "Real backend known-answer and round-trip vectors pass.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-HS-003",
+      "property": "DOWNGRADE-POLICY",
+      "class": "known-break",
+      "stimulus": "Select and establish a classical-only profile while hybrid is mandatory and no authenticated downgrade exception exists.",
+      "expected_legacy": "EstablishedSound invariant violated.",
+      "required_replacement": "Reject the forbidden profile; bind selected profile to the authenticated transcript.",
+      "model_config": "docs/security/models/mesh_handshake_downgrade_legacy.cfg",
+      "strict_config": "docs/security/models/mesh_handshake_strict.cfg",
+      "implementation_target": "required-hybrid downgrade integration test",
+      "positive_control": "Allowed, explicitly configured profiles negotiate as expected.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-HS-004",
+      "property": "PEER-BINDING",
+      "class": "adversarial",
+      "stimulus": "Replace the asserted peer identity while preserving the candidate key material or reuse a public key without authenticated ownership.",
+      "expected_legacy": "Peer identity/key association fails the protocol's authenticated transcript contract.",
+      "required_replacement": "No established session under a different peer identity; bind canonical identity and role to the selected protocol transcript.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "peer-ID substitution regression plus independent handshake vectors",
+      "positive_control": "Correctly bound peer identity succeeds.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-HS-005",
+      "property": "TRANSCRIPT-BINDING",
+      "class": "adversarial",
+      "stimulus": "Mutate protocol version, role, suite, KEM ciphertext/share, ephemeral share, or key-confirmation transcript bytes.",
+      "expected_legacy": "Handshake must reject changed transcript or fail confirmation.",
+      "required_replacement": "All security-relevant transcript differences are authenticated and result in no established session.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "one-field-at-a-time transcript mutation corpus",
+      "positive_control": "Canonical unchanged transcript succeeds.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-RECOVERY-001",
+      "property": "REPLAY-RESISTANCE",
+      "class": "adversarial",
+      "stimulus": "Deliver duplicate, stale-epoch, reordered, replayed, and post-revocation traffic across reconnect.",
+      "expected_legacy": "Any accepted replay outside documented policy is a failure.",
+      "required_replacement": "Defined replay window/epoch policy with zero duplicate protected application effects.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "state-machine trace generator and receiver conformance suite",
+      "positive_control": "Allowed reordering and one-time valid message delivery succeeds.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-RESOURCE-001",
+      "property": "RESOURCE-BOUNDS",
+      "class": "adversarial",
+      "stimulus": "Send malformed sizes, unknown IDs/epochs, fragment duplicates and excess pending peers to the handshake and reassembly state machine.",
+      "expected_legacy": "Unbounded state or allocation is a failure; bounded reject is acceptable.",
+      "required_replacement": "Explicit per-peer/global caps and no state growth beyond configured limits.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "fuzz/property tests with allocation/state counters",
+      "positive_control": "At-limit valid handshake and reassembly still succeed.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-INTEROP-001",
+      "property": "INTEROPERABILITY",
+      "class": "qualification",
+      "stimulus": "Run frozen KAT/transcript/framing vectors through two independently maintained implementations.",
+      "expected_legacy": "Any disagreement indicates implementation/config/vector drift; do not accept as a security finding until resolved.",
+      "required_replacement": "100% agreement on frozen canonical vectors and exact profile negotiation.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "cross-implementation differential harness",
+      "positive_control": "Known-good vector corpus passes on each supported implementation.",
+      "status": "proposed"
+    }
+  ]
+}
