@@ -42,7 +42,21 @@ python3 -m py_compile /tmp/SWE-bench-Live/evaluation/validation.py
 git -C /tmp/SWE-bench-Live submodule update --init launch
 ```
 
-Run the upstream three-repeat gold validation only after the overlay is applied. It records `validation_evidence.json`, a separate `gold_run_0.log`, `gold_run_1.log`, and `gold_run_2.log` per task. Evidence includes actual shell exit codes, whether the test and gold patches applied, parsed status per run, raw-log SHA-256, Docker container ID, configured image reference and the immutable Docker image ID (`sha256:...`). Missing runtime metadata is not replaced with a requested image label.
+Run the upstream three-repeat gold validation only after the overlay is applied. It records `validation_evidence.json`, a separate `gold_run_0.log`, `gold_run_1.log`, and `gold_run_2.log` per task.
+
+Run the full candidate split through the patched gold validator (use the complete JSONL as input; do not feed its filtered output back as the candidate denominator):
+
+```bash
+cd /tmp/SWE-bench-Live
+python3 -m evaluation.validation \
+  --input_dir /path/to/rust-candidates.jsonl \
+  --platform linux \
+  --workers 4 \
+  --output_dir /path/to/validation-output \
+  --overwrite 1
+```
+
+The output directory must be the same `validation-dir` passed to `rust-repair-manifest`. The Rust auditor expects each candidate's subdirectory to contain `status.json`, `pre_patch_log.txt`, `post_patch_log.txt`, `validation_evidence.json`, and `gold_run_0.log` through `gold_run_2.log`. Evidence includes actual shell exit codes, whether the test and gold patches applied, parsed status per run, raw-log SHA-256, Docker container ID, configured image reference and the immutable Docker image ID (`sha256:...`). Missing runtime metadata is not replaced with a requested image label.
 
 The Rust auditor requires that evidence for every candidate. It verifies all three per-run logs against their SHA-256 values; checks baseline and per-run parsed maps; reconstructs the gold aggregate; rejects timeout/incomplete commands and mismatched test patch states; verifies that the four container IDs are distinct and their actual Docker image IDs agree; and binds the resolved image ID, all container IDs and the runtime evidence hash into the eligible manifest. The evaluator-only controller manifest carries both the requested image reference and the observed immutable image ID.
 
