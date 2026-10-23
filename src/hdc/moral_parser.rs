@@ -1244,7 +1244,7 @@ impl MoralParser {
         if has_consent_cue {
             if let Some(cue) = UNCERTAINTY_CUES
                 .iter()
-                .filter(|cue| uncertainty_cue_is_consent_scoped(&evidence_text, cue))
+                .filter(|cue| uncertainty_cue_is_consent_scoped(&evidence_text, **cue))
                 .max_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)))
             {
                 return ConsentTextAssessment {
