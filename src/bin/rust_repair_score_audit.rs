@@ -1514,6 +1514,8 @@ mod tests {
         let image_id = format!("sha256:{}", "c".repeat(64));
         let task = serde_json::json!({
             "container_image_id": image_id,
+            "network_mode": "none",
+            "repo_head_sha": "a".repeat(40),
             "container_ids": [format!("{:064x}", 1), format!("{:064x}", 2)]
         });
         let candidate = serde_json::json!({"docker_image": "example@sha256:deadbeef"});
