@@ -52,7 +52,7 @@ CommitAfterEffect ==
   /\ volatileEffectDone
   /\ PacketSeq \notin durableSeen
   /\ durableSeen' = durableSeen \cup {PacketSeq}
-  /\ UNCHANGED <<effectCount, authenticated, volatileEffectDone, crashed>>
+  /\ UNCHANGED <<effectCount, authenticated, volatileEffectDone, crashed, recoveryCheck>>
 
 \* Unsafe: replay state is committed before the business effect.
 CommitBeforeEffect ==
@@ -61,7 +61,7 @@ CommitBeforeEffect ==
   /\ authenticated
   /\ PacketSeq \notin durableSeen
   /\ durableSeen' = durableSeen \cup {PacketSeq}
-  /\ UNCHANGED <<effectCount, authenticated, volatileEffectDone, crashed>>
+  /\ UNCHANGED <<effectCount, authenticated, volatileEffectDone, crashed, recoveryCheck>>
 
 EffectAfterCommit ==
   /\ Mode = "commit-first"
@@ -86,14 +86,14 @@ AtomicCommitAndEffect ==
   /\ durableSeen' = durableSeen \cup {PacketSeq}
   /\ effectCount' = effectCount + 1
   /\ volatileEffectDone' = TRUE
-  /\ UNCHANGED <<authenticated, crashed>>
+  /\ UNCHANGED <<authenticated, crashed, recoveryCheck>>
 
 Crash ==
   /\ ~crashed
   /\ crashed' = TRUE
   /\ authenticated' = FALSE
   /\ volatileEffectDone' = FALSE
-  /\ UNCHANGED <<durableSeen, effectCount>>
+  /\ UNCHANGED <<durableSeen, effectCount, recoveryCheck>>
 
 Restart ==
   /\ crashed
