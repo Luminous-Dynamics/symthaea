@@ -591,6 +591,23 @@ mod tests {
         observe_through(monitor, 10);
     }
 
+    fn observed_outcomes(
+        values: &[f64],
+        alarm_index: Option<u64>,
+    ) -> DelayedOutcomeMonitor {
+        let mut monitor = monitor(OutcomeDirection::HigherIsWorse);
+        for (index, value) in values.iter().copied().enumerate() {
+            let index = index as u64;
+            monitor.observe(index).unwrap();
+            if alarm_index == Some(index) {
+                monitor.raise_alarm(index).unwrap();
+            }
+            monitor.record_outcome(index, index, value).unwrap();
+        }
+        monitor
+    }
+
+
     #[test]
     fn delayed_labels_move_assessment_from_unresolved_to_deteriorated() {
         let mut monitor = monitor(OutcomeDirection::HigherIsWorse);
@@ -793,6 +810,113 @@ mod tests {
             }),
             Err(DelayedOutcomeError::InvalidMinimumEffect)
         ));
+    }
+
+    #[test]
+    fn control_adjustment_removes_a_shared_temporal_trend() {
+        let treated_monitor = observed_outcomes(&[1.0, 1.0, 1.0, 3.0, 3.0, 3.0], Some(3));
+        let treated = treated_monitor.assess(3).unwrap();
+        assert_eq!(treated.association, OutcomeAssociation::Deteriorated);
+        assert_eq!(treated.worse_oriented_change, Some(2.0));
+
+        let control_monitor = observed_outcomes(&[1.0, 1.0, 1.0, 3.0, 3.0, 3.0], None);
+        let control_baseline = control_monitor.summarize_observed_window(0, 3).unwrap();
+        let control_post = control_monitor.summarize_observed_window(3, 6).unwrap();
+        let comparison = compare_controlled_outcome_change(
+            &treated,
+            &control_baseline,
+            &control_post,
+            DelayedOutcomeConfig {
+                window_size: 3,
+                min_labeled_per_window: 2,
+                min_labeled_fraction: 0.66,
+                minimum_effect: 0.5,
+                direction: OutcomeDirection::HigherIsWorse,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(comparison.treated_worse_change, 2.0);
+        assert_eq!(comparison.control_worse_change, 2.0);
+        assert_eq!(comparison.adjusted_worse_change, 0.0);
+        assert_eq!(
+            comparison.association,
+            OutcomeAssociation::NoMaterialChange
+        );
+    }
+
+    #[test]
+    fn control_adjustment_preserves_incremental_treated_deterioration() {
+        let treated_monitor = observed_outcomes(&[1.0, 1.0, 1.0, 5.0, 5.0, 5.0], Some(3));
+        let treated = treated_monitor.assess(3).unwrap();
+        let control_monitor = observed_outcomes(&[1.0, 1.0, 1.0, 3.0, 3.0, 3.0], None);
+        let control_baseline = control_monitor.summarize_observed_window(0, 3).unwrap();
+        let control_post = control_monitor.summarize_observed_window(3, 6).unwrap();
+
+        let comparison = compare_controlled_outcome_change(
+            &treated,
+            &control_baseline,
+            &control_post,
+            DelayedOutcomeConfig {
+                window_size: 3,
+                min_labeled_per_window: 2,
+                min_labeled_fraction: 0.66,
+                minimum_effect: 0.5,
+                direction: OutcomeDirection::HigherIsWorse,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(comparison.treated_worse_change, 4.0);
+        assert_eq!(comparison.control_worse_change, 2.0);
+        assert_eq!(comparison.adjusted_worse_change, 2.0);
+        assert_eq!(comparison.association, OutcomeAssociation::Deteriorated);
+    }
+
+    #[test]
+    fn controlled_contrast_rejects_mismatched_windows_and_insufficient_control_labels() {
+        let treated_monitor = observed_outcomes(&[1.0, 1.0, 1.0, 5.0, 5.0, 5.0], Some(3));
+        let treated = treated_monitor.assess(3).unwrap();
+        let control_monitor = observed_outcomes(&[1.0, 1.0, 1.0, 3.0, 3.0, 3.0], None);
+        let control_baseline = control_monitor.summarize_observed_window(0, 3).unwrap();
+        let control_post = control_monitor.summarize_observed_window(3, 6).unwrap();
+        let config = DelayedOutcomeConfig {
+            window_size: 3,
+            min_labeled_per_window: 2,
+            min_labeled_fraction: 0.66,
+            minimum_effect: 0.5,
+            direction: OutcomeDirection::HigherIsWorse,
+        };
+
+        let shifted_control_post = OutcomeWindowSummary {
+            start_inclusive: 4,
+            ..control_post.clone()
+        };
+        assert_eq!(
+            compare_controlled_outcome_change(
+                &treated,
+                &control_baseline,
+                &shifted_control_post,
+                config,
+            ),
+            Err(DelayedOutcomeError::MismatchedComparisonWindows)
+        );
+
+        let insufficient_control_post = OutcomeWindowSummary {
+            labeled_observations: 1,
+            label_coverage_fraction: 1.0 / 3.0,
+            mean_outcome: Some(3.0),
+            ..control_post
+        };
+        assert_eq!(
+            compare_controlled_outcome_change(
+                &treated,
+                &control_baseline,
+                &insufficient_control_post,
+                config,
+            ),
+            Err(DelayedOutcomeError::InsufficientComparisonCoverage)
+        );
     }
 
     #[test]
