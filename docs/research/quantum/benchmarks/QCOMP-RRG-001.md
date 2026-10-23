@@ -14,7 +14,7 @@ This is a different experimental track from qReduMIS, which uses a quantum-infor
 
 - mis_random_regular.rs: deterministic seeded simple d-regular graph generation using the configuration model, with whole-pairing rejection for self-loops or duplicate edges.
 - qcomp_rrg_generate binary: emits canonical DIMACS edge-format graph bytes to stdout, with configuration and generator comments embedded.
-- The generator reports seed and rejection attempts, rejects invalid degree/parity and a zero retry budget, supports degree zero for fixtures, and caps retries rather than silently returning a non-regular graph.
+- The generator reports seed and rejection attempts, rejects invalid degree/parity and a zero retry budget, supports degree zero for fixtures, and caps retries rather than silently returning a non-regular graph. Before allocation, it also fails closed above 100,000 vertices or 1,000,000 stubs; the published-paper-shaped maximum (N=5,000, degree 3) is 15,000 stubs. The default rejection budget is 100,000 full pairings, with a lower limit configurable per CLI/API call.
 - Unit tests cover degree counts and edge counts for 3-regular and 1-regular graphs, deterministic replay and malformed requests.
 
 The underlying XorShift64* generator is seeded and non-cryptographic. The mathematical statement that conditioning a uniform configuration-model pairing on simplicity is uniform over simple d-regular graphs assumes a uniform stub permutation; this implementation offers deterministic pseudo-random replay, not a formal randomness guarantee or proof about finite PRNG output. The graph file itself, rather than the seed alone, is the experiment's shared input artifact.
@@ -75,6 +75,10 @@ Controls:
 5. Evidence correctness: simulation, tensor-network calculation, circuit export and actual hardware execution are never blended into one score.
 6. Statistical correctness: graph instances are the primary paired units; nested repetitions are not counted as additional independent graphs. Freeze the analysis plan, cohort, and multiplicity family before confirmatory runs.
 7. Practical-advantage claim: demonstrate an improved final solution quality or lower all-in cost to the same target under matched conditions. Matching a paper's approximation ratio or beating one implementation is not, by itself, quantum advantage.
+
+## Generator-quality regression
+
+The canonical generator now includes a deterministic Rust test over 5,000 seeds at N=6, degree 3. It checks that the no-triangle K3,3 class occurs within ±0.04 of the exact 1/7 reference. The exact class counts were independently derived by enumerating all 32,768 labelled simple graphs on six vertices. A separate JavaScript translation of the generation algorithm sampled 100,000 graphs and observed 14,277 K3,3 versus 14,286 expected, but this is a small-N gross-bias diagnostic, not a proof of generator quality. The Rust test remains uncompiled/unexecuted because the authoring environment lacks cargo/rustc.
 
 ## Validation boundary
 
