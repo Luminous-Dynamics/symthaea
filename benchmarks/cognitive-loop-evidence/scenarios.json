@@ -31,6 +31,11 @@
       "purpose": "Candidate implementation."
     },
     {
+      "id": "B4",
+      "name": "validity-plus-calibrated-uncertainty",
+      "purpose": "Measure incremental value of calibrated predictive confidence after validity and phase-ordering fixes."
+    },
+    {
       "id": "B5",
       "name": "stateless-adaptation-disabled",
       "purpose": "Measure gain beyond no online learning."
@@ -156,53 +161,7 @@
       ]
     },
     {
-      "id": "S1-phase-causality",
-      "hard_gate": true,
-      "cases": [
-        {
-          "id": "one-surprise-update",
-          "inject": "Hold input/state fixed and enable one surprise event.",
-          "assertions": [
-            "surprise/exploration stateful routine count equals one per cycle",
-            "log emitted update reason and target subsystem"
-          ]
-        },
-        {
-          "id": "one-urgency-update",
-          "inject": "Hold input/state fixed and run one perception cycle.",
-          "assertions": [
-            "urgency history advances at most once",
-            "low-error streak advances at most once",
-            "mode-transition count increases at most once"
-          ]
-        },
-        {
-          "id": "invalid-pe-counterfactual",
-          "inject": "Run paired trials differing only by an invalid PE sentinel.",
-          "assertions": [
-            "PE-gated state deltas are zero",
-            "independent sensory/safety/deadline effects remain enabled and separately attributed"
-          ]
-        },
-        {
-          "id": "valid-pe-counterfactual",
-          "inject": "Run paired trials differing only by a genuine PE value across threshold.",
-          "assertions": [
-            "only declared PE-dependent consumers respond",
-            "deltas and event order are reproducible by seed"
-          ]
-        },
-        {
-          "id": "duplicate-call-negative-control",
-          "inject": "Deliberately invoke a stateful phase twice in the test harness.",
-          "assertions": [
-            "single-update invariant test detects duplicate call"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "S2-shift-and-calibration",
+      "id": "S1-calibration-and-shift",
       "hard_gate": false,
       "cases": [
         {
@@ -271,7 +230,7 @@
       ]
     },
     {
-      "id": "S3-continual-learning",
+      "id": "S2-continual-learning",
       "hard_gate": false,
       "cases": [
         {
@@ -315,7 +274,104 @@
       ]
     },
     {
-      "id": "S4-systems",
+      "id": "S3-phase-causality",
+      "hard_gate": true,
+      "cases": [
+        {
+          "id": "one-surprise-update",
+          "inject": "Hold input/state fixed and enable one surprise event.",
+          "assertions": [
+            "surprise/exploration stateful routine count equals one per cycle",
+            "log emitted update reason and target subsystem"
+          ]
+        },
+        {
+          "id": "one-urgency-update",
+          "inject": "Hold input/state fixed and run one perception cycle.",
+          "assertions": [
+            "urgency history advances at most once",
+            "low-error streak advances at most once",
+            "mode-transition count increases at most once"
+          ]
+        },
+        {
+          "id": "invalid-pe-counterfactual",
+          "inject": "Run paired trials differing only by an invalid PE sentinel.",
+          "assertions": [
+            "PE-gated state deltas are zero",
+            "independent sensory/safety/deadline effects remain enabled and separately attributed"
+          ]
+        },
+        {
+          "id": "valid-pe-counterfactual",
+          "inject": "Run paired trials differing only by a genuine PE value across threshold.",
+          "assertions": [
+            "only declared PE-dependent consumers respond",
+            "deltas and event order are reproducible by seed"
+          ]
+        },
+        {
+          "id": "duplicate-call-negative-control",
+          "inject": "Deliberately invoke a stateful phase twice in the test harness.",
+          "assertions": [
+            "single-update invariant test detects duplicate call"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S4-end-to-end-capability",
+      "hard_gate": false,
+      "cases": [
+        {
+          "id": "clbench-matched-stateless-baseline",
+          "inject": "Run a pinned Continual Learning Bench task sequence with the published stateful/stateless protocol and matched interaction/resource budgets.",
+          "metrics": [
+            "reward-gain-over-stateless",
+            "cost-per-task",
+            "sample-efficiency",
+            "forgetting"
+          ],
+          "assertions": [
+            "pin benchmark release/task snapshot",
+            "retain all per-sequence records",
+            "report comparable baseline config"
+          ]
+        },
+        {
+          "id": "swebench-verified-pinned-adapter",
+          "inject": "Run the pinned SWE-bench Verified subset with documented model/scaffold/tool configuration and the benchmark's specified test protocol.",
+          "metrics": [
+            "resolved-rate",
+            "cost-per-instance",
+            "task-duration",
+            "false-resolution-rate"
+          ],
+          "assertions": [
+            "record exact dataset snapshot",
+            "publish tool and inference config",
+            "manual audit of disagreement/failure samples"
+          ]
+        },
+        {
+          "id": "osworld-pinned-execution-grade",
+          "inject": "Run a pinned OSWorld/OSWorld-Verified-compatible task release with execution-based grading and versioned environment setup.",
+          "metrics": [
+            "task-success",
+            "steps-to-completion",
+            "cost-per-task",
+            "grader-disagreement-rate"
+          ],
+          "assertions": [
+            "pin task set and environment image",
+            "audit grader reliability",
+            "compare only matched scaffolds"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S5-systems",
       "hard_gate": false,
       "cases": [
         {
