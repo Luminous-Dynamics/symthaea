@@ -251,11 +251,13 @@ pub fn minimum_zero_failure_trials(
     validate_confidence(confidence_level)?;
 
     let alpha = 1.0 - confidence_level;
-    let required = alpha.ln() / (1.0 - maximum_unsafe_rate).ln();
+    // ln_1p preserves tiny but representable risk budgets without rounding
+    // (1 - maximum_unsafe_rate) to exactly 1.0.
+    let required = alpha.ln() / (-maximum_unsafe_rate).ln_1p();
     if !required.is_finite() || required <= 0.0 {
         return Err(RiskGateError::InvalidMaximumUnsafeRate);
     }
-    if required > usize::MAX as f64 {
+    if required >= usize::MAX as f64 {
         return Err(RiskGateError::SampleSizeOverflow);
     }
     Ok(required.ceil() as usize)
