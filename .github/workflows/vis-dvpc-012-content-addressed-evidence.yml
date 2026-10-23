@@ -5,6 +5,8 @@ on:
     paths:
       - "tools/vision-dvpc-integrity-receipt.rs"
       - "tools/vision-dvpc-trace-validator.rs"
+      - "fixtures/vision-dvpc-observations.tsv"
+      - "fixtures/vision-dvpc-evaluations.tsv"
       - "docs/research/VIS_DVPC_012_CONTENT_ADDRESSED_EVIDENCE_V1.md"
       - ".github/workflows/vis-dvpc-012-content-addressed-evidence.yml"
   push:
@@ -12,6 +14,8 @@ on:
     paths:
       - "tools/vision-dvpc-integrity-receipt.rs"
       - "tools/vision-dvpc-trace-validator.rs"
+      - "fixtures/vision-dvpc-observations.tsv"
+      - "fixtures/vision-dvpc-evaluations.tsv"
       - "docs/research/VIS_DVPC_012_CONTENT_ADDRESSED_EVIDENCE_V1.md"
       - ".github/workflows/vis-dvpc-012-content-addressed-evidence.yml"
 
