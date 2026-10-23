@@ -278,8 +278,9 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                 let value = observation.value.expect("validated numeric PE");
                 ewma = alpha * value + (1.0 - alpha) * ewma;
                 ensure!(ewma.is_finite(), "EWMA state became non-finite");
-                let outside = (ewma - center).abs() > limit;
-                ensure!(outside || (ewma - center).abs().is_finite(), "EWMA deviation overflowed");
+                let deviation = (ewma - center).abs();
+                ensure!(deviation.is_finite(), "EWMA deviation overflowed");
+                let outside = deviation > limit;
                 if valid_count >= input.detector.warmup_valid_observations && outside && !latched {
                     detections.push(Detection {
                         cycle_index: observation.cycle_index,
