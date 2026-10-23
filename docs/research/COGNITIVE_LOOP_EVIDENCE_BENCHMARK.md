@@ -260,7 +260,7 @@ Drift-event F1 is not a proxy for better cognition: a detector can win on alarm 
 - **Detector-triggered** replays the candidate detector plus the declared adaptation policy.
 - **Oracle-timed** uses the registered ground-truth change timing with the same adaptation mechanism as an unattainable timing reference; it is not a deployable detector.
 
-The Rust `xtask score-counterfactual-adaptation-utility` command compares pinned per-cycle outcomes from the same exogenous stream digest. All arms must have identical contiguous cycle indices, and each arm separately pins its version, repository head, and configuration digest. The evaluator reports cumulative/mean task loss, adaptation resource cost, loss improvement against no adaptation, task-loss regret relative to oracle timing, and whether no adaptation dominates the candidate on both loss and resource cost.
+The Rust `xtask score-counterfactual-adaptation-utility` command compares pinned per-cycle outcomes from the same exogenous stream digest. All arms must have identical contiguous cycle indices, and each arm separately pins its version, repository head, configuration digest, and digest of the exogenous stream it actually consumed. Every arm's observed stream digest must equal the shared digest or scoring fails closed. This is a useful mismatch guard, not proof of honest runner execution or identical hidden state. The evaluator reports cumulative/mean task loss, adaptation resource cost, loss improvement against no adaptation, task-loss regret relative to oracle timing, and whether no adaptation dominates the candidate on both loss and resource cost.
 
 ```bash
 cargo run --locked -p xtask -- score-counterfactual-adaptation-utility \
