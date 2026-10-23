@@ -1771,6 +1771,7 @@ mod tests {
         let task = serde_json::json!({
             "container_image_id": image_id,
             "network_mode": "none",
+            "runtime_platform": "linux",
             "repo_head_sha": "a".repeat(40),
             "container_ids": [format!("{:064x}", 1), format!("{:064x}", 2)]
         });
