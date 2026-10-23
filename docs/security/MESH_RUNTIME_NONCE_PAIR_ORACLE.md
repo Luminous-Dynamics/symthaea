@@ -47,6 +47,10 @@ The important design lesson is cross-domain: nonce uniqueness must be checked ac
 
 The test keys are retained only within process memory. Failure output identifies scenario labels, not key bytes.
 
+## Workspace preflight finding
+
+The first focused Rust run stopped before compiling tests because the repository member glob resolved three manifest-less paths: `crates/core/symthaea`, `crates/core/symthaea-observation-attestation`, and `crates/domains/symthaea-rea-evidence-verifier`. The same exclusions are now present in the stacked parent branch `security/mesh-aead-nonce-uniqueness` so this focused suite can get past Cargo workspace discovery. [PR #8561](https://github.com/Luminous-Dynamics/symthaea/pull/8561) separately hardens the workspace scanner to catch future manifest-less glob entries. A passing test at this branch’s new head is still required; the earlier run failed before tests.
+
 ## Evidence semantics
 
 The two new tests and the older `legacy_*` tests are **legacy vulnerability witnesses**: they currently pass only if the documented legacy behavior is reproducible. They are not acceptance tests for a secure replacement. A future v3 implementation must add strict-path tests with the opposite expectation: the same hostile traces must be rejected or use a provably distinct key namespace, while fresh-session positive controls continue to work.
