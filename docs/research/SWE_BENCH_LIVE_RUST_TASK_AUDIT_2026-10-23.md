@@ -15,7 +15,7 @@ Reference: [pinned upstream validation.py](https://github.com/microsoft/SWE-benc
 
 The Rust binary `rust-repair-manifest` audits the **complete candidate JSONL**, not the upstream already-filtered `validated_instances.jsonl`. It reads the source Parquet file, a candidate JSONL projection, and the per-task output directory from upstream `evaluation.validation`.
 
-It verifies the source Parquet SHA-256 against the caller-supplied preregistered digest and exact candidate-row count. Candidate IDs must be unique and safe as filesystem components. Every candidate must have a status JSON and raw `post_patch_log.txt` with each marker `eval No.0`, `eval No.1`, and `eval No.2` exactly once.
+It verifies the source Parquet SHA-256 against the caller-supplied preregistered digest and exact candidate-row count. Candidate IDs must be unique and safe as filesystem components. Every candidate must have a status JSON, a non-empty baseline `pre_patch_log.txt`, and a non-empty raw `post_patch_log.txt` with each marker `eval No.0`, `eval No.1`, and `eval No.2` exactly once.
 
 For each task, it recomputes from `pre_patch_status` and `post_patch_status`:
 
@@ -23,7 +23,7 @@ For each task, it recomputes from `pre_patch_status` and `post_patch_status`:
 - **Pass-to-pass:** every baseline-passing test remains part of the expected pass-to-pass set; it cannot be dropped merely because the gold patch regresses it.
 - **Task eligibility:** baseline and gold test-ID sets must match, baseline status may not be skipped, all gold-aggregate tests must pass, the upstream F2P/P2P lists must agree with the stricter derived sets, and at least one explicit fail-to-pass transition must exist.
 
-If validation evidence is missing or malformed for any candidate, the program writes a non-lockable audit report and exits nonzero without writing a task manifest. If evidence is complete, it emits a manifest of strictly eligible tasks and retains every rejected task with reasons in a separate audit report. It hashes the prompt/gold/test patch content into the manifest instead of copying their contents.
+If validation evidence is missing or malformed for any candidate, the program writes a non-lockable audit report and exits nonzero without writing a task manifest. If evidence is complete, it emits a manifest of strictly eligible tasks and retains every rejected task with reasons in a separate audit report. It hashes the prompt/gold/test patch content and both baseline and gold logs into the manifest instead of copying prompt, patch or test contents.
 
 ## Invocation
 
