@@ -142,6 +142,8 @@ pub struct MeshStats {
     pub packets_dropped: u64,
     /// Duplicate packets detected and skipped.
     pub packets_deduplicated: u64,
+    /// Authenticated packets rejected by the sequence replay/freshness gate.
+    pub packets_replay_rejected: u64,
     /// Packets rejected by per-peer rate limiting.
     pub packets_rate_limited: u64,
     /// Emissions throttled by bandwidth budget enforcement.

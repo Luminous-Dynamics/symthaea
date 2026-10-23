@@ -9,9 +9,297 @@ use super::ContinuousMind;
 #[cfg(feature = "mesh")]
 pub(super) const MESH_DEDUP_RING_SIZE: usize = 512;
 
-/// Maximum age of a mesh packet (seconds) before it's rejected as stale.
+/// Maximum age of a packet before freshness checks stop accepting it.
 #[cfg(feature = "mesh")]
 pub(super) const MESH_MAX_PACKET_AGE_S: u32 = 60;
+
+/// Maximum tolerated positive clock skew for authenticated packets.
+#[cfg(feature = "mesh")]
+pub(super) const MESH_MAX_FUTURE_SKEW_S: u32 = 5;
+
+/// Width of the authenticated per-stream sequence replay window.
+#[cfg(feature = "mesh")]
+pub(super) const MESH_SEQUENCE_WINDOW_WIDTH: u32 = 64;
+
+/// Bound memory used by authenticated replay windows to 4,608 streams.
+#[cfg(feature = "mesh")]
+pub(super) const MESH_REPLAY_STREAM_CAPACITY: usize = 4_608;
+
+/// A sequence window for one authenticated (source_id, payload_type) stream.
+///
+/// Bit zero represents the highest accepted sequence; bit N represents the
+/// sequence N places behind it. Serial-number arithmetic permits u32 wrap while
+/// rejecting duplicates and packets older than the fixed window.
+#[cfg(feature = "mesh")]
+#[derive(Debug, Default)]
+pub(super) struct AuthenticatedSequenceWindow {
+    highest_sequence: Option<u32>,
+    seen_bitmap: u64,
+    last_accepted_at: Option<std::time::Instant>,
+}
+
+#[cfg(feature = "mesh")]
+impl AuthenticatedSequenceWindow {
+    /// Accept a fresh sequence exactly once. Returns false for duplicates and
+    /// sequences outside the 64-packet reordering window.
+    pub(super) fn check_and_mark(
+        &mut self,
+        sequence: u32,
+        now: std::time::Instant,
+    ) -> bool {
+        let accepted = match self.highest_sequence {
+            None => {
+                self.highest_sequence = Some(sequence);
+                self.seen_bitmap = 1;
+                true
+            }
+            Some(highest) => {
+                let forward = sequence.wrapping_sub(highest);
+                if forward == 0 {
+                    false
+                } else if forward < (1u32 << 31) {
+                    // The serial number is newer. A large jump moves the
+                    // bitmap entirely; smaller jumps preserve reorder history.
+                    self.seen_bitmap = if forward >= MESH_SEQUENCE_WINDOW_WIDTH {
+                        1
+                    } else {
+                        (self.seen_bitmap << forward) | 1
+                    };
+                    self.highest_sequence = Some(sequence);
+                    true
+                } else {
+                    // The serial number is older (including the ambiguous
+                    // half-range case); only an unseen bit inside the window
+                    // may be accepted as out-of-order delivery.
+                    let behind = highest.wrapping_sub(sequence);
+                    if behind >= MESH_SEQUENCE_WINDOW_WIDTH {
+                        false
+                    } else {
+                        let bit = 1u64 << behind;
+                        if self.seen_bitmap & bit != 0 {
+                            false
+                        } else {
+                            self.seen_bitmap |= bit;
+                            true
+                        }
+                    }
+                }
+            }
+        };
+
+        if accepted {
+            self.last_accepted_at = Some(now);
+        }
+        accepted
+    }
+
+    /// Expire an idle stream only after its packets must fail the independent
+    /// timestamp freshness gate, including the allowed future clock skew.
+    pub(super) fn is_expired(&self, now: std::time::Instant) -> bool {
+        // Add one second for the packet's integer-second timestamp truncation.
+        let retention = std::time::Duration::from_secs(
+            (MESH_MAX_PACKET_AGE_S + MESH_MAX_FUTURE_SKEW_S + 1) as u64,
+        );
+        self.last_accepted_at
+            .is_some_and(|last| now.saturating_duration_since(last) > retention)
+    }
+}
+
+/// Outcome of attempting admission into the bounded authenticated replay table.
+#[cfg(feature = "mesh")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AuthenticatedReplayAdmission {
+    Accepted,
+    ReplayedOrOutsideWindow,
+    CapacityReached,
+}
+
+/// Admit an authenticated packet without evicting live replay state.
+///
+/// The caller must verify the packet MAC and freshness before invoking this
+/// function. Capacity is fail-closed: a new stream is rejected once the table
+/// is full, while already tracked streams continue to use their current window.
+#[cfg(feature = "mesh")]
+pub(super) fn admit_authenticated_sequence(
+    windows: &mut std::collections::HashMap<
+        ([u8; 8], u8),
+        AuthenticatedSequenceWindow,
+    >,
+    key: ([u8; 8], u8),
+    sequence: u32,
+    now: std::time::Instant,
+) -> AuthenticatedReplayAdmission {
+    if !windows.contains_key(&key) && windows.len() >= MESH_REPLAY_STREAM_CAPACITY {
+        return AuthenticatedReplayAdmission::CapacityReached;
+    }
+
+    let accepted = windows
+        .entry(key)
+        .or_default()
+        .check_and_mark(sequence, now);
+
+    if accepted {
+        AuthenticatedReplayAdmission::Accepted
+    } else {
+        AuthenticatedReplayAdmission::ReplayedOrOutsideWindow
+    }
+}
+
+#[cfg(feature = "mesh")]
+#[cfg(test)]
+mod authenticated_sequence_window_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_each_sequence_once_and_allows_bounded_reordering() {
+        let now = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+
+        assert!(window.check_and_mark(100, now));
+        assert!(window.check_and_mark(98, now));
+        assert!(window.check_and_mark(99, now));
+        assert!(!window.check_and_mark(99, now));
+        assert!(!window.check_and_mark(100, now));
+    }
+
+    #[test]
+    fn rejects_sequences_older_than_the_window() {
+        let now = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+
+        assert!(window.check_and_mark(100, now));
+        assert!(window.check_and_mark(37, now)); // 63 behind is still inside the window.
+        assert!(!window.check_and_mark(36, now)); // 64 behind is outside the window.
+    }
+
+    #[test]
+    fn handles_u32_sequence_wraparound() {
+        let now = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+
+        assert!(window.check_and_mark(u32::MAX - 1, now));
+        assert!(window.check_and_mark(u32::MAX, now));
+        assert!(window.check_and_mark(0, now));
+        assert!(window.check_and_mark(1, now));
+        assert!(!window.check_and_mark(u32::MAX, now));
+        assert!(!window.check_and_mark(0, now));
+    }
+
+    #[test]
+    fn rejects_the_ambiguous_half_range_jump() {
+        let now = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+
+        assert!(window.check_and_mark(7, now));
+        assert!(!window.check_and_mark(7u32.wrapping_add(1u32 << 31), now));
+    }
+
+    #[test]
+    fn expiry_includes_the_full_66_second_retention_boundary() {
+        let accepted_at = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+        assert!(window.check_and_mark(1, accepted_at));
+
+        assert!(
+            !window.is_expired(accepted_at + std::time::Duration::from_secs(66)),
+            "the window must remain live through the exact retention boundary"
+        );
+        assert!(
+            window.is_expired(
+                accepted_at
+                    + std::time::Duration::from_secs(66)
+                    + std::time::Duration::from_nanos(1)
+            ),
+            "the window should expire strictly after the retention boundary"
+        );
+    }
+
+    #[test]
+    fn duplicate_does_not_extend_replay_window_lifetime() {
+        let accepted_at = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+        assert!(window.check_and_mark(44, accepted_at));
+
+        let duplicate_at = accepted_at + std::time::Duration::from_secs(60);
+        assert!(
+            !window.check_and_mark(44, duplicate_at),
+            "a duplicate sequence must not be treated as accepted activity"
+        );
+        assert!(
+            window.is_expired(
+                accepted_at
+                    + std::time::Duration::from_secs(66)
+                    + std::time::Duration::from_nanos(1)
+            ),
+            "replayed packets must not keep their own replay window alive"
+        );
+    }
+
+    #[test]
+    fn accepted_out_of_order_packet_refreshes_idle_retention() {
+        let accepted_at = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+        assert!(window.check_and_mark(100, accepted_at));
+
+        let reordered_at = accepted_at + std::time::Duration::from_secs(65);
+        assert!(window.check_and_mark(99, reordered_at));
+        assert!(
+            !window.is_expired(reordered_at + std::time::Duration::from_secs(66)),
+            "an accepted in-window packet is recent authenticated activity"
+        );
+    }
+
+
+    #[test]
+    fn replay_table_capacity_rejects_new_stream_without_evicting_live_windows() {
+        let now = std::time::Instant::now();
+        let mut windows = std::collections::HashMap::new();
+
+        for index in 0..MESH_REPLAY_STREAM_CAPACITY {
+            let value = (index as u32).to_be_bytes();
+            let key = ([value[0], value[1], value[2], value[3], 0, 0, 0, 0], 0);
+            assert_eq!(
+                admit_authenticated_sequence(&mut windows, key, 1, now),
+                AuthenticatedReplayAdmission::Accepted
+            );
+        }
+        assert_eq!(windows.len(), MESH_REPLAY_STREAM_CAPACITY);
+
+        let existing_value = 0u32.to_be_bytes();
+        let existing_key = ([existing_value[0], existing_value[1], existing_value[2], existing_value[3], 0, 0, 0, 0], 0);
+        assert_eq!(
+            admit_authenticated_sequence(&mut windows, existing_key, 2, now),
+            AuthenticatedReplayAdmission::Accepted,
+            "an existing stream remains usable when the table is full"
+        );
+
+        let new_value = (MESH_REPLAY_STREAM_CAPACITY as u32).to_be_bytes();
+        let new_key = ([new_value[0], new_value[1], new_value[2], new_value[3], 0, 0, 0, 0], 0);
+        assert_eq!(
+            admit_authenticated_sequence(&mut windows, new_key, 1, now),
+            AuthenticatedReplayAdmission::CapacityReached,
+            "an untracked stream must fail closed instead of evicting a live window"
+        );
+        assert_eq!(windows.len(), MESH_REPLAY_STREAM_CAPACITY);
+        assert!(
+            windows.contains_key(&existing_key),
+            "capacity handling must not evict an active authenticated stream"
+        );
+
+        // The tick path runs this same expiry predicate before processing an
+        // inbox. Simulate an idle period beyond the freshness-safe retention
+        // interval and prove the table can recover capacity.
+        let after_expiry = now + std::time::Duration::from_secs(67);
+        windows.retain(|_, window| !window.is_expired(after_expiry));
+        assert!(windows.is_empty(), "all idle test windows should now be expired");
+        assert_eq!(
+            admit_authenticated_sequence(&mut windows, new_key, 1, after_expiry),
+            AuthenticatedReplayAdmission::Accepted,
+            "expired replay state must release capacity after its safe retention interval"
+        );
+        assert_eq!(windows.len(), 1);
+    }
+}
 
 /// Duration of the bandwidth budget window.
 #[cfg(feature = "mesh")]

@@ -414,3 +414,70 @@ WP−1 internal containment is complete. Cryptographic component-discovery work
 must not resume before a fresh assessment if any of the following becomes
 true: a user of an affected API is reported, or a real consumer/threat model
 emerges for threshold sharing, commitments, or confidential aggregation.
+
+
+## 2026-10-22 follow-up: authenticated mesh replay window
+
+This section supersedes the runtime-remediation status of CI-007 for the
+candidate implementation in the mesh replay-window change. The original CI-007
+finding remains historically accurate: a bounded duplicate cache is not, by
+itself, an enduring anti-replay protocol.
+
+### Candidate remediation
+
+- Add a 64-sequence sliding bitmap per authenticated `(source_id, payload_type)`
+  stream. It accepts bounded out-of-order delivery, rejects duplicates and
+  sequences older than the window, and uses serial-number arithmetic across
+  the `u32` wrap boundary.
+- Verify the HMAC before mutating authenticated replay state. Unauthenticated
+  telemetry retains only a separate, bounded best-effort duplicate cache; it
+  cannot poison the trusted stream window.
+- Reject authenticated packets whose timestamp is absent, whose timestamp is
+  more than 60 seconds old, or more than 5 seconds in the future. The nonzero
+  timestamp requirement makes idle replay-state expiry safe.
+- Expire an idle sequence window only after 66 seconds, accounting for the
+  60-second freshness limit, 5-second future-skew allowance, and integer-second
+  timestamp truncation.
+- Bound the replay table at 4,608 source/type streams and fail closed when full
+  rather than evict live authenticated sequence state.
+- Track replay/freshness drops separately in
+  `MeshStats::packets_replay_rejected`.
+
+### Remaining limitations
+
+This is receiver-process anti-replay, not durable cross-restart protection.
+Replay windows are in memory. A receiver process restart loses that state, and
+a sender that resets its sequence counter while the receiver is still holding
+the previous window may have its new packets rejected until the old window
+expires. The durable protocol direction is a versioned, authenticated sender
+epoch (or persisted replay state) bound into the packet MAC; do not claim that
+the current wire format provides cross-restart anti-replay.
+
+The custom mesh protocol still requires independent protocol review. None of
+these measures repairs key distribution, source-identity truncation, or the
+group-key trust model.
+
+### Validation status
+
+Regression tests cover duplicate authenticated packets, bounded reordering,
+sequence wrap, stale-window edges, timestamp-free authenticated rejection, and
+the cache-poisoning case (an unauthenticated packet shares a tuple with a later
+valid packet). Tests were authored as part of the candidate change but have not
+been run locally; no pass is claimed here. Exact-head CI must include the
+`mesh` configuration and the existing packet-MAC tests.
+
+
+### Related 2026-10-22 finding: source-ID rate-limit spoofing
+
+The same candidate receive-path hardening also moves the tracked-peer rate-limit check
+after MAC verification and replay checks. Previously, the limiter charged a peer based
+on an eight-byte source ID before authenticating the packet. A sender could spoof a
+known source ID with invalid-MAC telemetry and consume that peer's 100-packets-per-
+10-second quota, causing valid traffic to be dropped.
+
+A regression now establishes a peer using a valid MAC, sends over 100 invalid-MAC
+packets with the same claimed source ID, and checks that a fresh valid packet remains
+accepted. This is separate from raw ingress flood protection: a transport-layer limiter
+must use the actual radio/socket endpoint or connection identifier, not an untrusted
+source ID embedded in the packet. With a shared group MAC key, all key holders can still
+forge another member's source ID; the group-key trust model remains a limitation.
