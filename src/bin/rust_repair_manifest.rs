@@ -765,7 +765,7 @@ fn run(cli: Cli) -> Result<(), String> {
                 })
                 .map_err(|error| format!("cannot serialize safe agent prompt: {error}"))?;
                 prompt_bytes.extend_from_slice(&row);
-                prompt_bytes.push(b'\\n');
+                prompt_bytes.push(b'\n');
             }
             let prompt_sha256 = sha256_bytes(&prompt_bytes);
             let controller = ControllerManifest {
@@ -791,7 +791,7 @@ fn run(cli: Cli) -> Result<(), String> {
             };
             let mut controller_bytes = serde_json::to_vec_pretty(&controller)
                 .map_err(|error| format!("cannot serialize controller manifest: {error}"))?;
-            controller_bytes.push(b'\\n');
+            controller_bytes.push(b'\n');
             let controller_sha256 = sha256_bytes(&controller_bytes);
             (
                 Some(prompt_bytes),
