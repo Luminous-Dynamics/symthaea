@@ -1,0 +1,16 @@
+[package]
+name = "morphology-continuity-oracle"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Dependency-free oracle for target identity versus current morphology under damage"
+
+# Keep this research executable isolated from the large Symthaea workspace.
+[workspace]
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "morphology-continuity-oracle"
+path = "src/main.rs"

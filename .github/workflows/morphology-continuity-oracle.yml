@@ -1,0 +1,75 @@
+name: Morphology Continuity Oracle
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/morphology-continuity-oracle/**"
+      - ".github/workflows/morphology-continuity-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Standalone Rust oracle
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Capture source tree identity
+        id: source
+        shell: bash
+        run: echo "tree_sha=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify frozen request digest
+        run: echo "9348ff465116c23bacf9dfa5f1ed6ce98bb14bfa042b228800d6406ef542681f  tools/morphology-continuity-oracle/canonical_request_v0_1.txt" | sha256sum --check -
+
+      - name: Formatting
+        run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
+
+      - name: Reference tests
+        run: cargo test --locked --manifest-path tools/morphology-continuity-oracle/Cargo.toml
+
+      - name: Clippy with warnings denied
+        run: cargo clippy --locked --manifest-path tools/morphology-continuity-oracle/Cargo.toml --all-targets -- -D warnings
+
+      - name: Verify deterministic receipt and semantic gates
+        shell: bash
+        env:
+          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          SOURCE_TREE_SHA: ${{ steps.source.outputs.tree_sha }}
+        run: |
+          set -euo pipefail
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          cargo run --locked --quiet --manifest-path tools/morphology-continuity-oracle/Cargo.toml > "$temp_dir/first.json"
+          cargo run --quiet --manifest-path tools/morphology-continuity-oracle/Cargo.toml > "$temp_dir/second.json"
+          cmp "$temp_dir/first.json" "$temp_dir/second.json"
+          jq -e --arg commit "$SOURCE_COMMIT" --arg tree "$SOURCE_TREE_SHA" '
+            .schema == "morphology-continuity-oracle/v0.1"
+            and .source_commit == $commit
+            and .source_tree_sha == $tree
+            and .request_sha256 == "9348ff465116c23bacf9dfa5f1ed6ce98bb14bfa042b228800d6406ef542681f"
+            and .fixture == "chair-backrest-removed"
+            and .current_exact_matches == ["table"]
+            and .compatible_histories == ["chair", "table"]
+            and .ground_truth_target == "chair"
+            and .target_evidence == "missing"
+            and .disposition == "AbstainAmbiguousHistory"
+            and .restoration_oracle == false
+          ' "$temp_dir/first.json" > /dev/null
