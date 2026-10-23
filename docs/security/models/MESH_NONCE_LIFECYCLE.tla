@@ -4,9 +4,7 @@ EXTENDS Naturals, FiniteSets, TLC
 CONSTANTS
   SenderIDs,
   Prefixes,
-  PrefixOf,
   EffectiveKeys,
-  EffectiveKeyOf,
   PayloadTypes,
   FragmentIndices,
   EpochValues,
@@ -23,8 +21,6 @@ ASSUME
   /\ PayloadTypes # {}
   /\ FragmentIndices # {}
   /\ EpochValues # {}
-  /\ PrefixOf \in [SenderIDs -> Prefixes]
-  /\ EffectiveKeyOf \in [SenderIDs -> EffectiveKeys]
   /\ DefaultEpoch \in EpochValues
   /\ MaxSeq \in Nat
   /\ MaxSeq > 0
@@ -37,12 +33,18 @@ VARIABLES nextSeq, epochs, usedPairs, reuseDetected
 
 vars == <<nextSeq, epochs, usedPairs, reuseDetected>>
 
-\* In packet mode, PrefixOf models an identity truncated in the nonce.
+\* This suite deliberately configures a singleton prefix/key namespace: all
+\* modeled senders share the same truncated packet prefix and effective key.
+\* Per-sender unique key domains require a separate explicit configuration.
+PrefixFor(sender) == CHOOSE prefix \in Prefixes : TRUE
+KeyFor(sender) == CHOOSE key \in EffectiveKeys : TRUE
+
+\* In packet mode, PrefixFor models the identity prefix retained by the nonce.
 \* In fragment mode, FragmentModulus is deliberately small so TLC can
 \* explore low-bit wrap quickly; it abstracts the actual 16-bit thought ID.
 Nonce(sender, payloadType, fragmentIndex) ==
   IF Variant = "packet"
-  THEN <<PrefixOf[sender], payloadType, epochs[sender], nextSeq[sender]>>
+  THEN <<PrefixFor(sender), payloadType, epochs[sender], nextSeq[sender]>>
   ELSE <<sender, nextSeq[sender] % FragmentModulus, fragmentIndex, 0>>
 
 Init ==
@@ -52,7 +54,7 @@ Init ==
   /\ reuseDetected = FALSE
 
 Send(sender, payloadType, fragmentIndex) ==
-  LET pair == <<EffectiveKeyOf[sender],
+  LET pair == <<KeyFor(sender),
                 Nonce(sender, payloadType, fragmentIndex)>>
   IN
     /\ (~StrictNoReuse \/ pair \notin usedPairs)
