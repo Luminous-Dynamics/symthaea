@@ -378,3 +378,63 @@ fn prior_shift_can_eliminate_the_value_of_an_otherwise_useful_sensor() {
         Some("symmetric-reliability-sweep")
     );
 }
+
+
+fn robust_evsi_lower_bound(
+    minimum_reliability: u16,
+    maximum_reliability: u16,
+    weights: [u64; 3],
+    decisions: &[Decision],
+) -> Option<f64> {
+    if minimum_reliability > maximum_reliability
+        || u64::from(maximum_reliability) > PROBABILITY_SCALE
+    {
+        return None;
+    }
+
+    let mut lower_bound = f64::INFINITY;
+    for reliability in minimum_reliability..=maximum_reliability {
+        lower_bound = lower_bound.min(evsi(symmetric_binary_sensor(reliability), weights, decisions));
+    }
+    Some(lower_bound)
+}
+
+#[test]
+fn robust_selector_abstains_when_reliability_bounds_cross_the_decision_threshold() {
+    let decisions = decisions();
+
+    let nominal_wide =
+        robust_evsi_lower_bound(900, 950, PRIOR_WEIGHTS, &decisions).expect("valid interval");
+    let nominal_narrow =
+        robust_evsi_lower_bound(950, 1_000, PRIOR_WEIGHTS, &decisions).expect("valid interval");
+    let shifted_wide =
+        robust_evsi_lower_bound(950, 1_000, [4, 4, 2], &decisions).expect("valid interval");
+    let shifted_narrow =
+        robust_evsi_lower_bound(975, 1_000, [4, 4, 2], &decisions).expect("valid interval");
+    let high_chair =
+        robust_evsi_lower_bound(975, 1_000, [8, 1, 1], &decisions).expect("valid interval");
+
+    assert!(nominal_wide.abs() <= EPSILON);
+    assert!((nominal_narrow - 0.36).abs() <= EPSILON);
+    assert!(shifted_wide.abs() <= EPSILON);
+    assert!((shifted_narrow - 0.12).abs() <= EPSILON);
+    assert!((high_chair - 2.64).abs() <= EPSILON);
+
+    assert!(nominal_wide <= EPSILON, "wide interval must cause abstention");
+    assert!(shifted_wide <= EPSILON, "prior-shifted interval must cause abstention");
+    assert!(nominal_narrow > EPSILON, "qualified narrow interval has positive worst-case value");
+    assert!(shifted_narrow > EPSILON, "narrower shifted interval has positive worst-case value");
+}
+
+#[test]
+fn invalid_reliability_bounds_are_rejected_not_clamped() {
+    let decisions = decisions();
+    assert_eq!(
+        robust_evsi_lower_bound(950, 900, PRIOR_WEIGHTS, &decisions),
+        None
+    );
+    assert_eq!(
+        robust_evsi_lower_bound(950, 1_001, PRIOR_WEIGHTS, &decisions),
+        None
+    );
+}
