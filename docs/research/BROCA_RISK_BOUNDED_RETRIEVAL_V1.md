@@ -7,6 +7,7 @@ Related work:
 - [Issue #7778: nested-width progressive retrieval and adaptive precision](https://github.com/Luminous-Dynamics/symthaea/issues/7778) — complementary representation/precision ladder
 - [Issue #6531: adaptive HDC resolution ladder](https://github.com/Luminous-Dynamics/symthaea/issues/6531) — compatible-representation constraints
 - [PR #8494: paired exact-vs-approximate retrieval benchmark](https://github.com/Luminous-Dynamics/symthaea/pull/8494)
+- [PR #7502 / issue #7580: adjacent selective-risk and context-stratified coverage tooling](https://github.com/Luminous-Dynamics/symthaea/pull/7502) — prior art inside this repository; the memory-specific curve here is not a novelty claim
 - [Store ANN evaluation contract](../../crates/domains/symthaea-hdc-store/docs/ANN_EVALUATION.md)
 - [Store read-only ANN contract](../../crates/domains/symthaea-hdc-store/docs/READ_ONLY_ANN.md)
 - [Standalone Rust risk-gate reference](../../research/broca-risk-bounded/README.md)
