@@ -318,6 +318,19 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
     }
     let claim_policy = nonempty_string_field(comparison_contract, "claim_policy", "paired_comparison_contract")?;
     ensure!(claim_policy.contains("not a universal SOTA claim"), "paired comparison claim policy must forbid universal SOTA conclusions");
+    let coverage_gate = comparison_contract.get("sota_coverage_gate")
+        .context("paired_comparison_contract.sota_coverage_gate is required")?;
+    ensure!(
+        coverage_gate.get("minimum_datasets").and_then(Value::as_u64) == Some(7)
+            && coverage_gate.get("minimum_seeds_per_dataset").and_then(Value::as_u64) == Some(50),
+        "SOTA coverage gate must require seven datasets and 50 seeds per dataset"
+    );
+    let coverage_meaning = nonempty_string_field(coverage_gate, "meaning", "sota_coverage_gate")?;
+    ensure!(
+        coverage_meaning.contains("not a performance result")
+            && coverage_meaning.contains("not evidence of superiority"),
+        "SOTA coverage gate must explicitly distinguish coverage from performance"
+    );
 
     Ok(ManifestSummary {
         baseline_count: baselines.len(),
@@ -486,8 +499,13 @@ mod tests {
                     "bootstrap_replicates_max": 100000,
                     "resampling": "sample dataset clusters with replacement, then seeds with each complete paired scenario block; require identical scenario panel across datasets and give each dataset equal final weight",
                     "matching_key": ["dataset_id", "seed", "scenario_id"],
-                    "required_outputs": ["candidate_dataset_macro_mean", "baseline_dataset_macro_mean", "dataset_macro_paired_effect", "median_oriented_paired_delta", "paired_win_fraction", "percentile_95_ci_oriented_effect", "bootstrap_fraction_effect_above_zero", "per_dataset", "canonical_input_sha256", "result_sha256"],
-                    "claim_policy": "A positive interval is not a universal SOTA claim."
+                    "required_outputs": ["candidate_dataset_macro_mean", "baseline_dataset_macro_mean", "dataset_macro_paired_effect", "median_oriented_paired_delta", "paired_win_fraction", "percentile_95_ci_oriented_effect", "bootstrap_fraction_effect_above_zero", "per_dataset", "canonical_input_sha256", "result_sha256", "minimum_seeds_per_dataset", "sota_coverage_gate_pass", "sota_coverage_gate_reason"],
+                    "claim_policy": "A positive interval is not a universal SOTA claim.",
+                    "sota_coverage_gate": {
+                        "minimum_datasets": 7,
+                        "minimum_seeds_per_dataset": 50,
+                        "meaning": "Coverage eligibility only, not a performance result or evidence of superiority. Actual comparator runs, uncertainty, and costs are still required."
+                    }
                 }
             },
             "scenario_groups": [
@@ -572,6 +590,15 @@ mod tests {
         manifest["external_drift_detectors"][0]["comparison_track"] = json!("observed-outcome");
         let error = validate_value(&manifest).unwrap_err().to_string();
         assert!(error.contains("labels_required conflicts with comparison_track"));
+    }
+
+    #[test]
+    fn rejects_coverage_gate_that_can_be_misread_as_performance() {
+        let mut manifest = valid_manifest();
+        manifest["drift_protocol"]["paired_comparison_contract"]["sota_coverage_gate"]["meaning"] =
+            json!("Coverage is enough to claim superiority.");
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("distinguish coverage from performance"));
     }
 
     #[test]
