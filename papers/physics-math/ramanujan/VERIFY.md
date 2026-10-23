@@ -19,8 +19,8 @@ All claims are tied to a deterministic seed (`42`). The LaTeX table in `main.tex
 Install Docker. Then:
 
 ```bash
-cd papers/ramanujan
-docker build -t ramanujan-repro .
+# Run from the repository root so the build context includes the full workspace.
+docker build -f papers/physics-math/ramanujan/Dockerfile -t ramanujan-repro .
 docker run --rm ramanujan-repro
 ```
 
@@ -37,8 +37,7 @@ Any diff other than timing lines (`real`, `user`, `sys`) is a reproducibility fa
 Requires Rust stable ≥ 1.75 and Z3 ≥ 4.13 on `PATH`.
 
 ```bash
-cd papers/ramanujan
-./reproduce.sh
+./papers/physics-math/ramanujan/reproduce.sh
 ```
 
 ### Path 3: SMT-only (no Rust required)
@@ -46,7 +45,7 @@ cd papers/ramanujan
 Every `.smt2` file in `proofs/` is a standalone formal proof obligation checkable by any SMT-LIB2-compliant solver. With Z3:
 
 ```bash
-for f in papers/ramanujan/proofs/*.smt2; do
+for f in papers/physics-math/ramanujan/proofs/*.smt2; do
   printf "%-40s " "$(basename $f)"
   z3 -smt2 "$f" | tail -1
 done
@@ -80,14 +79,9 @@ The PCR3BP row deserves attention: the discovered expression has variance $2.7 \
 
 ## SMT proof witness availability
 
-**As of the formal-verify commit, four `.smt2` witness files are committed under `proofs/`**:
+**Ten SMT-LIB2 witness files are now documented under `proofs/`**; see `proofs/README.md` for the complete inventory. The Hénon-Heiles family has both the scaled `henon_heiles_6H.smt2` witness and the original unscaled `henon_heiles_exact_H.smt2` witness using exact rational constants.
 
-- `harmonic_oscillator.smt2` — `E = x² + v²`
-- `kepler_angular_momentum.smt2` — `L = xvy − yvx`
-- `henon_heiles_6H.smt2` — `6H = 3(px² + py²) + 3(x² + y²) + 6x²y − 2y³` (scaled Hénon-Heiles; see note)
-- `mystery_ode.smt2` — `H = ½(px² + py²) + x² + y² + xy`
-
-All four return `unsat` under Z3 4.13+ (tested), independent re-verification confirmed.
+On source head `03476c730f5dc19bea0e38d4a71dd0ac72730ca0`, the exact-head workflow returned `unsat` for the unscaled obligation using Z3 4.13.0 and emitted a witness with SHA-256 `2b2228a76ed50f67ae87a7726115ca2d68c242936a2d0a03f474806fd8542728`. The same bytes are now committed in the witness directory. A second independent SMT solver has not yet been used for cross-checking.
 
 ### Honest distinction between "PROVEN (showcase)" and "formally verified (SMT)"
 
@@ -100,9 +94,9 @@ Two stacked layers of evidence exist. The paper reports both:
 
 The Lotka–Volterra invariant is `PROVEN` (symbolic + numerical) but **not** `unsat` (its log term is transcendental, outside `QF_NRA`). This is the correct honest pair of labels: we have strong evidence of conservation (showcase) and explicitly cannot formalize it within Z3's algebraic fragment (proofs/).
 
-### Why Hénon-Heiles uses 6H
+### Hénon-Heiles: legacy scaling and exact-rational follow-up
 
-IEEE-754 `f64` cannot represent `1/3` exactly. The serializer emits `0.3333333333333333`, which Z3 reads as the literal rational `3333333333333333/10000000000000000`, making `dE/dt` nonzero as a rational expression (sat, wrongly). Multiplying `H` by 6 clears all fractional coefficients; since conservation is preserved under constant rescaling, proving `d(6H)/dt = 0` proves `dH/dt = 0`. Phase 2 can upgrade the serializer to emit exact rationals (`(/ 1 3)` in SMT-LIB2) and avoid the rescale.
+The legacy `SymExpr::Const(f64)` path cannot represent `1/3` exactly. The new `SymExpr::Rational(i64, u64)` path preserves the intended mathematical constant and serializes it as an exact SMT real literal (for example `(/ 1.0 3.0)`). The committed unscaled witness records the negated derivative obligation and returns `unsat` on Z3 4.13.0. The `6H` result remains a rescaling regression control. Cross-checking the exact witness with a second solver remains follow-up work.
 
 ## Cross-host determinism
 

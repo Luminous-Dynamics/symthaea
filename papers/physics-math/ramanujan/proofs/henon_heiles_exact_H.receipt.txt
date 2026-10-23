@@ -1,0 +1,41 @@
+PROOF RECEIPT: Exact-Rational Hénon-Heiles Conservation
+=======================================================
+
+claim_id=RAMANUJAN-HH-EXACT-001
+claim=The derivative of the unscaled Hénon-Heiles Hamiltonian is identically zero for the declared Hamiltonian vector field.
+claim_scope=Encoded polynomial identity only; this does not validate the vector field against an empirical physical system.
+
+qualification_source_commit=918b49737f7836bb3a15fc864585d35c3c0b0905
+workflow_run_id=39389514605
+workflow_run_url=https://github.com/Luminous-Dynamics/symthaea/actions/runs/39389514605
+qualified_ref=feat/exact-rational-symexpr-001
+qualification_method=Exact-head GitHub Actions run; checkout SHA asserted before verification.
+rustc=rustc 1.96.0 (ac68faa20 2026-05-25)
+cargo=cargo 1.96.0 (30a34c682 2026-05-25)
+z3=Z3 version 4.13.0 - 64 bit
+cvc5=This is cvc5 version 1.1.2
+
+witness_path=papers/physics-math/ramanujan/proofs/henon_heiles_exact_H.smt2
+witness_bytes=802
+witness_sha256=2b2228a76ed50f67ae87a7726115ca2d68c242936a2d0a03f474806fd8542728
+emitter_result=unsat
+standalone_z3_replay=unsat
+standalone_cvc5_replay=unsat
+
+test_results:
+  rustfmt=passed
+  symbolic_rational_unit_tests=3_passed_0_failed
+  isolated_proof_emitter_tests=2_passed_0_failed
+  all_polynomial_invariant_integration_gate=passed
+  generated_witness_exists=passed
+  z3_replay_gate=passed
+  cvc5_replay_gate=passed
+  artifact_upload=passed
+
+harness_boundary=The production symbolic expression source and proof-emitter source are included directly by an isolated harness. The HDC AST/world integration is represented by test-only shim definitions and is not qualified by this receipt.
+exclusions=No empirical physical validation; no validation of model assumptions; no full Symthaea workspace build claim; no claim for transcendental invariants; no full numerical integrator validation.
+replay_commands:
+  z3 -smt2 papers/physics-math/ramanujan/proofs/henon_heiles_exact_H.smt2
+  cvc5 papers/physics-math/ramanujan/proofs/henon_heiles_exact_H.smt2
+
+Expected output from each standalone solver: unsat

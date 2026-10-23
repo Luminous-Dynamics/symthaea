@@ -136,13 +136,15 @@ verify with any SMT-LIB2-compliant solver.
 
 \subsection{Implementation note on fractional coefficients}
 
-IEEE-754 \texttt{f64} represents $1/2$ exactly but not $1/3$. The default
-serializer emits $1/3$ as \texttt{0.3333333333333333}, which Z3 reads as a
-literal rational that is not $1/3$, making otherwise-conserved quantities
-appear non-conserved (\texttt{sat}, wrongly). We work around this for
-Hénon--Heiles by verifying $6H$ instead of $H$; since conservation is
-preserved under constant rescaling the implication is sound. A cleaner fix
---- rational-serialization --- is tracked as Phase 2 work.
+The legacy \texttt{SymExpr::Const(f64)} representation cannot preserve $1/3$
+as an exact symbolic coefficient. The bridge now carries explicit rational
+literals and emits exact SMT-LIB2 Real rationals (for example
+\texttt{(/ 1.0 3.0)}). The committed
+\texttt{henon\_heiles\_exact\_H.smt2} witness proves the unscaled
+Hamiltonian's derivative is identically zero for the declared vector field
+(Z3 returns \texttt{unsat}); \texttt{henon\_heiles\_6H.smt2} remains as a
+separate rescaling regression. This is a proof of the encoded polynomial
+identity, not empirical validation of a physical model.
 
 \subsection{Physics catalog recognition}
 Discovered invariants are compared dimensionally and structurally against a
@@ -245,7 +247,7 @@ cd papers/ramanujan
 \end{verbatim}
 
 The Z3 proof witnesses for each \texttt{PROVEN} invariant are committed under
-\texttt{papers/ramanujan/proofs/}. A reader with any SMT-LIB2-compliant solver
+\texttt{papers/physics-math/ramanujan/proofs/}. A reader with any SMT-LIB2-compliant solver
 can re-check them without running any Rust code.
 
 % ═════════════════════════════════════════════════════════════════════════

@@ -79,6 +79,7 @@ fn all_polynomial_invariants_formally_proven() {
 
     let mut proven_count = 0usize;
     let mut skipped_count = 0usize;
+    let mut exact_henon_heiles_proven = false;
     let mut rejected: Vec<String> = Vec::new();
 
     for row in &lines[1..] {
@@ -92,7 +93,12 @@ fn all_polynomial_invariants_formally_proven() {
         let name = cells[0];
         let proven = cells[proven_col];
         match proven {
-            "true" => proven_count += 1,
+            "true" => {
+                proven_count += 1;
+                if name == "henon_heiles_exact_H" {
+                    exact_henon_heiles_proven = true;
+                }
+            }
             // The verifier declares transcendental invariants (Lotka-Volterra)
             // out-of-scope with `skipped,false`. That's honest and expected.
             "false" if cells.get(3) == Some(&"skipped") => skipped_count += 1,
@@ -106,10 +112,14 @@ fn all_polynomial_invariants_formally_proven() {
         rejected
     );
     assert!(
-        proven_count >= 9,
-        "expected ≥9 formally-proven invariants, got {} (skipped={})",
+        proven_count >= 10,
+        "expected ≥10 formally-proven invariants including exact-rational Hénon-Heiles, got {} (skipped={})",
         proven_count,
         skipped_count
+    );
+    assert!(
+        exact_henon_heiles_proven,
+        "the unscaled exact-rational Hénon-Heiles obligation must independently return UNSAT"
     );
     eprintln!(
         "formal_invariants test: {} proven, {} skipped (transcendental, honest)",

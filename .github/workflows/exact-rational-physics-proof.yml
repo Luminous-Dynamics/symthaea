@@ -1,0 +1,106 @@
+name: Exact Rational Physics Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "crates/core/symthaea-core/src/hdc/conjecture_engine/symbolic.rs"
+      - "crates/bridges/symthaea-physics-bridge/examples/verify_invariants_formal.rs"
+      - "crates/bridges/symthaea-physics-bridge/tests/formal_invariants.rs"
+      - "research/exact-rational-physics-proof/**"
+      - "papers/physics-math/ramanujan/proofs/**"
+      - ".github/workflows/exact-rational-physics-proof.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # PR workflows normally check out a synthetic merge commit. This gate
+  # deliberately qualifies the contributor's exact head SHA instead.
+  QUALIFIED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+concurrency:
+  group: exact-rational-physics-proof-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.QUALIFIED_SHA }}
+
+      - name: Assert exact qualification subject
+        run: test "$(git rev-parse HEAD)" = "$QUALIFIED_SHA"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Install pinned SMT solvers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends curl unzip cvc5=1.1.2-1build1
+          curl -fsSLo /tmp/z3.zip https://github.com/Z3Prover/z3/releases/download/z3-4.13.0/z3-4.13.0-x64-glibc-2.35.zip
+          sudo unzip -q /tmp/z3.zip -d /opt
+          sudo ln -sf /opt/z3-4.13.0-x64-glibc-2.35/bin/z3 /usr/local/bin/z3
+          z3 --version
+          cvc5 --version
+
+      - name: Check formatting for changed Rust source
+        run: |
+          rustfmt +1.96.0 --edition 2024 --check crates/core/symthaea-core/src/hdc/conjecture_engine/symbolic.rs
+          rustfmt +1.96.0 --edition 2024 --check crates/bridges/symthaea-physics-bridge/examples/verify_invariants_formal.rs
+          rustfmt +1.96.0 --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/formal_invariants.rs
+
+      - name: Test exact-rational symbolic expression
+        run: cargo +1.96.0 test --locked --manifest-path research/exact-rational-physics-proof/Cargo.toml -p symthaea-core --lib exact_rational_tests
+
+      - name: Run all polynomial invariant proofs, including unscaled Hénon-Heiles
+        run: cargo +1.96.0 test --locked --manifest-path research/exact-rational-physics-proof/Cargo.toml -p symthaea-exact-rational-physics-proof-verifier
+
+      - name: Regenerate exact-head SMT witnesses and receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --release --manifest-path research/exact-rational-physics-proof/Cargo.toml -p symthaea-exact-rational-physics-proof-verifier > exact-rational-proof-results.csv
+          grep -E '^henon_heiles_exact_H,.*unsat,true,' exact-rational-proof-results.csv
+          witness="papers/physics-math/ramanujan/proofs/henon_heiles_exact_H.smt2"
+          test -s "$witness"
+          witness_result="$(z3 -smt2 "$witness" | tail -n 1)"
+          test "$witness_result" = "unsat"
+          second_solver_result="$(cvc5 "$witness" | tail -n 1)"
+          test "$second_solver_result" = "unsat"
+          {
+            echo "source_commit=$QUALIFIED_SHA"
+            echo "github_event_sha=$GITHUB_SHA"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "runner_os=$RUNNER_OS"
+            echo "rustc=$(rustc +1.96.0 --version)"
+            echo "cargo=$(cargo +1.96.0 --version)"
+            echo "z3=$(z3 --version)"
+            echo "cvc5=$(cvc5 --version | head -n 1)"
+            echo "witness_path=$witness"
+            echo "witness_sha256=$(sha256sum "$witness" | cut -d ' ' -f 1)"
+            echo "witness_replay=z3:$witness_result,cvc5:$second_solver_result"
+            echo "claim=unscaled Hénon-Heiles Hamiltonian has dH/dt = 0 for the declared Hamiltonian vector field"
+            echo "scope=SMT proof of the emitted polynomial obligation; not empirical validation of a physical system"
+            echo "harness_boundary=production symbolic.rs and proof-emitter source included directly; HDC/world integration represented by test-only AST shim, not qualified"
+          } > exact-rational-proof-receipt.txt
+          cat exact-rational-proof-receipt.txt
+
+      - name: Upload proof witness and reproducibility receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-rational-physics-proof-${{ env.QUALIFIED_SHA }}
+          if-no-files-found: error
+          path: |
+            papers/physics-math/ramanujan/proofs/henon_heiles_exact_H.smt2
+            exact-rational-proof-results.csv
+            exact-rational-proof-receipt.txt
