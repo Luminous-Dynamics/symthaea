@@ -7,9 +7,13 @@ on:
       - 'crates/domains/symthaea-fractal-time-lab/**'
   pull_request:
     branches: [ main, develop ]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - 'crates/domains/symthaea-fractal-time-lab/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:

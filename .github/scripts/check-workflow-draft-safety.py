@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
-"""Fail closed if repository PR workflows can allocate runners while draft.
+"""Fail closed if repository PR workflows can allocate runners unsafely.
 
-This is a structural admission ratchet, not a general YAML interpreter. It
-covers the repository's current workflow conventions and deliberately fails on
-unsupported shapes so changes receive explicit review.
+This is a structural admission + lifecycle-revocation ratchet, not a general
+YAML interpreter. It covers the repository's current workflow conventions and
+deliberately fails on unsupported shapes so changes receive explicit review.
+
+For every runner-capable pull_request workflow, the required lifecycle is:
+
+* opened/synchronize/reopened may materialize the workflow;
+* draft runner roots are gated by `draft == false`;
+* ready_for_review restores liveness without requiring a new commit;
+* converted_to_draft materializes the same workflow/concurrency group;
+* cancel-in-progress supersedes queued/running ready-state work;
+* the converted-to-draft job itself skips before runner allocation.
 
 The heavyweight ci.yml theorem remains delegated to check-draft-ci-gates.py.
 benchmarks.yml is separately proven PR-runnerless: its runner roots are bound to
@@ -167,17 +176,60 @@ def has_draft_guard(expression: str | None) -> bool:
     return expression is not None and DRAFT_FALSE.search(expression) is not None
 
 
-def require_ready_event(path: Path, pr_block: list[str]) -> None:
-    if not any("ready_for_review" in line for line in pr_block):
+def require_pr_event(path: Path, pr_block: list[str], event: str) -> None:
+    if not any(event in line for line in pr_block):
         raise SafetyError(
-            f"{path}: runner-capable pull_request workflow must include ready_for_review"
+            f"{path}: runner-capable pull_request workflow must include {event}"
         )
 
 
-def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, int]:
+def require_revoking_concurrency(path: Path, text: str) -> None:
+    block = top_level_section(text, "concurrency")
+    if not block:
+        raise SafetyError(
+            f"{path}: runner-capable pull_request workflow lacks top-level concurrency"
+        )
+
+    group_lines = [line.strip() for line in block if line.strip().startswith("group:")]
+    if len(group_lines) != 1:
+        raise SafetyError(
+            f"{path}: expected exactly one top-level concurrency group, observed={group_lines!r}"
+        )
+    group = group_lines[0]
+
+    # A draft transition must land in the same stable automatic group as the
+    # ready-state run. Current repository conventions key automatic PR work by
+    # github.ref or explicit PR number. A per-run-only key cannot revoke prior work.
+    if (
+        "github.ref" not in group
+        and "github.event.pull_request.number" not in group
+    ):
+        raise SafetyError(
+            f"{path}: concurrency group is not stable per PR/ref: {group!r}"
+        )
+
+    # workflow_dispatch may deliberately use run_id to protect manual evidence,
+    # but only when the same expression has a stable automatic fallback.
+    if "github.run_id" in group:
+        if "workflow_dispatch" not in group or "auto" not in group:
+            raise SafetyError(
+                f"{path}: run_id concurrency lacks explicit workflow_dispatch-only automatic fallback"
+            )
+
+    if not any(line.strip() == "cancel-in-progress: true" for line in block):
+        raise SafetyError(
+            f"{path}: runner-capable pull_request workflow must set cancel-in-progress: true"
+        )
+
+
+def validate_generic(
+    path: Path, text: str, pr_block: list[str]
+) -> tuple[int, int, int]:
     jobs = parse_jobs(text)
     runner_jobs = 0
+    pr_runner_jobs = 0
     draft_guarded = 0
+
     for job, block in jobs.items():
         if not has_runner_allocation(block):
             continue
@@ -185,16 +237,24 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
         expression = job_level_if_expression(block, job)
         if explicitly_excludes_pull_request(expression):
             continue
+
+        pr_runner_jobs += 1
         if not has_draft_guard(expression):
             raise SafetyError(
-                f"{path}: runner-capable job {job!r} lacks a job-level "
+                f"{path}: runner-capable PR job {job!r} lacks a job-level "
                 "pull_request draft == false guard or explicit non-PR event guard"
             )
         draft_guarded += 1
 
-    if runner_jobs:
-        require_ready_event(path, pr_block)
-    return runner_jobs, draft_guarded
+    # Lifecycle requirements apply only when a runner can actually be admitted
+    # by pull_request. Manual/push-only roots inside a PR-subscribed workflow do
+    # not need ready/draft transition events or PR concurrency.
+    if pr_runner_jobs:
+        require_pr_event(path, pr_block, "ready_for_review")
+        require_pr_event(path, pr_block, "converted_to_draft")
+        require_revoking_concurrency(path, text)
+
+    return runner_jobs, pr_runner_jobs, draft_guarded
 
 
 def require_contains(expression: str | None, needle: str, label: str) -> None:
@@ -202,7 +262,7 @@ def require_contains(expression: str | None, needle: str, label: str) -> None:
         raise SafetyError(f"benchmarks.yml {label} lost required expression {needle!r}")
 
 
-def validate_benchmarks(text: str) -> tuple[int, int]:
+def validate_benchmarks(text: str) -> tuple[int, int, int]:
     jobs = parse_jobs(text)
     expected = {
         "quick-check",
@@ -246,24 +306,27 @@ def validate_benchmarks(text: str) -> tuple[int, int]:
             "benchmarks.yml aggregate-results must keep exact needs: [full-benchmark]"
         )
 
-    return len(jobs), 0
+    return len(jobs), 0, 0
 
 
-def validate_ci_delegation() -> tuple[int, int]:
+def validate_ci_delegation() -> tuple[int, int, int]:
     if not CI_RATCHET.is_file():
         raise SafetyError(f"delegated CI ratchet missing: {CI_RATCHET}")
     completed = subprocess.run(
         [sys.executable, str(CI_RATCHET)], check=False, text=True
     )
     if completed.returncode != 0:
-        raise SafetyError("delegated ci.yml draft-safety ratchet failed")
-    return 1, 1
+        raise SafetyError("delegated ci.yml draft/lifecycle-safety ratchet failed")
+    return 1, 1, 1
 
 
 def self_test() -> None:
     safe = """on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
@@ -273,7 +336,7 @@ jobs:
 """
     pr = pull_request_block(safe)
     assert pr is not None
-    assert validate_generic(Path("safe.yml"), safe, pr) == (1, 1)
+    assert validate_generic(Path("safe.yml"), safe, pr) == (1, 1, 1)
 
     unsafe = safe.replace(
         "    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false\n",
@@ -294,6 +357,29 @@ jobs:
     else:
         raise AssertionError("runner workflow without ready_for_review was accepted")
 
+    no_revoke = safe.replace(", converted_to_draft", "")
+    try:
+        validate_generic(Path("no-revoke.yml"), no_revoke, pull_request_block(no_revoke) or [])
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError("runner workflow without converted_to_draft was accepted")
+
+    no_concurrency = safe.replace(
+        "concurrency:\n  group: ${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n",
+        "",
+    )
+    try:
+        validate_generic(
+            Path("no-concurrency.yml"),
+            no_concurrency,
+            pull_request_block(no_concurrency) or [],
+        )
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError("runner workflow without revoking concurrency was accepted")
+
     manual = """on:
   pull_request:
   workflow_dispatch:
@@ -307,8 +393,8 @@ jobs:
     pr = pull_request_block(manual)
     assert pr is not None
     # A workflow whose only runner root explicitly excludes PR does not need a
-    # ready_for_review event because no PR runner can ever be allocated.
-    assert validate_generic(Path("manual.yml"), manual, pr) == (1, 0)
+    # ready/draft lifecycle event or PR concurrency because no PR runner can run.
+    assert validate_generic(Path("manual.yml"), manual, pr) == (1, 0, 0)
 
 
 def main() -> int:
@@ -325,6 +411,7 @@ def main() -> int:
     checked = 0
     pr_workflows = 0
     runner_jobs = 0
+    pr_runner_jobs = 0
     draft_guarded = 0
 
     for path in workflows:
@@ -335,25 +422,28 @@ def main() -> int:
         pr_workflows += 1
         try:
             if path == CI_WORKFLOW:
-                runners, guarded = validate_ci_delegation()
+                runners, pr_runners, guarded = validate_ci_delegation()
             elif path == BENCHMARKS_WORKFLOW:
-                runners, guarded = validate_benchmarks(text)
+                runners, pr_runners, guarded = validate_benchmarks(text)
             else:
-                runners, guarded = validate_generic(path, text, pr_block)
+                runners, pr_runners, guarded = validate_generic(path, text, pr_block)
         except SafetyError as error:
             fail(str(error))
         checked += 1
         runner_jobs += runners
+        pr_runner_jobs += pr_runners
         draft_guarded += guarded
 
     print("workflow_draft_safety=PASS")
+    print("workflow_draft_revocation=PASS")
     print(f"workflows_total={len(workflows)}")
     print(f"pull_request_workflows={pr_workflows}")
     print(f"pull_request_workflows_checked={checked}")
     print(f"runner_jobs_or_delegated_roots={runner_jobs}")
+    print(f"pull_request_runner_roots={pr_runner_jobs}")
     print(f"direct_draft_guarded_or_delegated={draft_guarded}")
     print("benchmarks_pull_request_runnerless_proof=PASS")
-    print("ci_draft_safety_delegation=PASS")
+    print("ci_draft_lifecycle_delegation=PASS")
     return 0
 
 

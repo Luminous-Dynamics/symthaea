@@ -9,7 +9,7 @@ name: SYM-ARCH-001 Architecture Discrimination
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - '.github/workflows/sym-arch-001.yml'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/architecture.rs'
