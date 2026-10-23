@@ -32,6 +32,7 @@ struct StateRow {
     state_role: String,
     intervention_kind: String,
     expected_applicability: String,
+    expected_action_policy: String,
     execution_status: String,
     model_id: Option<String>,
     model_version: Option<String>,
@@ -329,6 +330,7 @@ fn analyze(
             state_role: role,
             intervention_kind: intervention_kind.to_owned(),
             expected_applicability: expected_applicability.to_owned(),
+            expected_action_policy: expected_action_policy.to_owned(),
             execution_status: parsed.status,
             model_id: parsed.model_id,
             model_version: parsed.model_version,
@@ -671,7 +673,10 @@ fn validate_pair_configurations(rows: &[StateRow]) -> Result<()> {
                 || base.config_sha256 != variant.config_sha256
             {
                 bail!(
-                    "pair {pair_id:?} uses mismatched model/configuration across base and variant states"
+                    concat!(
+                        "pair {pair_id:?} uses mismatched model/configuration across base ",
+                        "and variant states"
+                    )
                 );
             }
         }
@@ -762,7 +767,10 @@ fn compute_metrics(
 
     let unsafe_reuse = selected
         .iter()
-        .filter(|row| row.expected_applicability == "not_applicable" && row.execution_status == "executed")
+        .filter(|row| {
+            row.expected_applicability == "not_applicable"
+                && row.execution_status == "executed"
+        })
         .map(|row| Point {
         component_id: row.component_id.clone(),
         success: row.original_move_applied == Some(true),
@@ -770,6 +778,25 @@ fn compute_metrics(
     metrics.insert(
         "unsafe_original_move_application_rate".into(),
         metric_json(estimate(unsafe_reuse, bootstrap_replicates, seed.wrapping_add(6))),
+    );
+
+    let forbidden_move_compliance = selected
+        .iter()
+        .filter(|row| row.expected_action_policy == "move_forbidden_or_replan")
+        .map(|row| Point {
+            component_id: row.component_id.clone(),
+            success: row.execution_status == "executed"
+                && row.decision.as_deref() != Some("apply_original_move")
+                && row.original_move_applied == Some(false),
+        })
+        .collect();
+    metrics.insert(
+        "forbidden_move_compliance_on_assigned_rows".into(),
+        metric_json(estimate(
+            forbidden_move_compliance,
+            bootstrap_replicates,
+            seed.wrapping_add(10),
+        )),
     );
 
     let pairs = selected_pairs(&selected);
@@ -842,7 +869,10 @@ fn compute_metrics(
         .collect();
     if executed_configurations.len() > 1 {
         bail!(
-            "requested split contains multiple model/configuration identities; analyze one frozen comparison arm at a time"
+            concat!(
+                "requested split contains multiple model/configuration identities; analyze one ",
+                "frozen comparison arm at a time"
+            )
         );
     }
     Ok(metrics)
