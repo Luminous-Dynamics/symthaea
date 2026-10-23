@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "benchmark": "symthaea-cognitive-loop-evidence",
   "status": "proposal-not-measured",
   "purpose": "Pin deterministic evidence-validity, phase-causality, calibration, continual-learning, and systems-efficiency scenarios before implementing the runner.",
@@ -226,6 +226,182 @@
           "assertions": [
             "no unexplained performance gain over matched stateless baseline"
           ]
+        },
+        {
+          "id": "class-prior-abrupt",
+          "inject": "Apply the change immediately at onset. Change class frequency while keeping class-conditional feature generation explicit.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "class-prior",
+          "transition": "abrupt"
+        },
+        {
+          "id": "class-prior-gradual",
+          "inject": "Linearly mix old and transformed observations over a registered transition window. Change class frequency while keeping class-conditional feature generation explicit.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "class-prior",
+          "transition": "gradual"
+        },
+        {
+          "id": "label-swap-abrupt",
+          "inject": "Apply the change immediately at onset. Change the target mapping for a selected class while keeping its feature vector unchanged.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "label-swap",
+          "transition": "abrupt"
+        },
+        {
+          "id": "label-swap-gradual",
+          "inject": "Linearly mix old and transformed observations over a registered transition window. Change the target mapping for a selected class while keeping its feature vector unchanged.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "label-swap",
+          "transition": "gradual"
+        },
+        {
+          "id": "feature-permutation-abrupt",
+          "inject": "Apply the change immediately at onset. Apply a fixed registered feature permutation while labels remain unchanged.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "feature-permutation",
+          "transition": "abrupt"
+        },
+        {
+          "id": "feature-permutation-gradual",
+          "inject": "Linearly mix old and transformed observations over a registered transition window. Apply a fixed registered feature permutation while labels remain unchanged.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "feature-permutation",
+          "transition": "gradual"
+        },
+        {
+          "id": "feature-filtering-abrupt",
+          "inject": "Apply the change immediately at onset. Filter observations based on a feature threshold selected from the pre-drift calibration window.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "feature-filtering",
+          "transition": "abrupt"
+        },
+        {
+          "id": "feature-filtering-gradual",
+          "inject": "Linearly mix old and transformed observations over a registered transition window. Filter observations based on a feature threshold selected from the pre-drift calibration window.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "feature-filtering",
+          "transition": "gradual"
         }
       ]
     },
@@ -502,7 +678,122 @@
       "input_contract": "Numerical multivariate reference window with documented clustering/covariance assumptions; no target labels; test abrupt and non-abrupt shifts separately.",
       "implementation_status": "external-adapter-required",
       "source": "https://github.com/DFKI-NI/unsupervised-concept-drift-detection"
+    },
+    {
+      "id": "seed",
+      "name": "SEED volatility-shift detector",
+      "family": "performance-stream-detector",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Monitors valid per-instance performance/error derived from observed targets; unavailable labels stay missing.",
+      "implementation_status": "planned-baseline",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "stepd",
+      "name": "STEPD statistical test detector",
+      "family": "statistical-test-on-performance",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Standard classifier-performance mode requires observed target/correctness; label delays must be reported.",
+      "implementation_status": "planned-baseline",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "abcd-feature-space",
+      "name": "ABCD feature-space detector (ABCD(X))",
+      "family": "adaptive-bernstein-high-dimensional",
+      "comparison_track": "feature-only-unsupervised",
+      "labels_required": false,
+      "input_contract": "Monitors multivariate features without labels; cannot identify pure target-only changes with unchanged feature distribution.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "abcd-error-stream",
+      "name": "ABCD error-stream detector",
+      "family": "adaptive-bernstein-high-dimensional",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Consumes outcome-derived error/performance; label availability and delay must be held comparable.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "studd-adwin-compression",
+      "name": "STUDD with ADWIN meta-detector",
+      "family": "student-teacher-compression-loss",
+      "comparison_track": "auxiliary-loss-unsupervised",
+      "labels_required": false,
+      "input_contract": "Consumes a pinned unsupervised student-teacher compression-loss stream; report its compute cost.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1007/s41060-024-00620-y"
+    },
+    {
+      "id": "dynamic-threshold-dtd",
+      "name": "Dynamic Threshold Determination (DTD)",
+      "family": "adaptive-threshold-selection",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Evaluate in settings with observed outcome-derived segment performance; forbid future-outcome leakage.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1609/aaai.v40i29.39586"
     }
   ],
-  "drift_detector_comparison_protocol": "Pin each detector implementation/version and hyperparameters; tune only on a disjoint calibration stream; use identical valid observations and no label access for the label-free track; never remap invalid/missing PE to zero or maximal surprise; report false alarms per 1,000 valid observations, missed-drift rate, detection-delay distribution, precision/recall by abrupt/gradual/recurring drift, invalid-sample coverage, throughput, and peak memory. Publish per-seed event traces. These detector candidates are planned, not yet implemented or measured."
+  "drift_detector_comparison_protocol": "Pin each detector implementation/version and hyperparameters; tune only on a disjoint calibration stream; use identical valid observations and no label access for the label-free track; never remap invalid/missing PE to zero or maximal surprise; report false alarms per 1,000 valid observations, missed-drift rate, detection-delay distribution, precision/recall by abrupt/gradual/recurring drift, invalid-sample coverage, throughput, and peak memory. Publish per-seed event traces. These detector candidates are planned, not yet implemented or measured.",
+  "drift_protocol": {
+    "protocol_id": "leave-one-dataset-out-monte-carlo-v1",
+    "monte_carlo_seeds": 50,
+    "dataset_evaluation": "Tune detector hyperparameters on all but one dataset; score once on the held-out dataset, repeating for every dataset. Freeze threshold choices before scoring held-out data.",
+    "drift_types": [
+      "class-prior",
+      "label-swap",
+      "feature-permutation",
+      "feature-filtering"
+    ],
+    "transition_modes": [
+      "abrupt",
+      "gradual"
+    ],
+    "research_extensions_not_yet_in_core_matrix": [
+      "incremental drift",
+      "recurring drift",
+      "correlated multivariate sensor drift",
+      "bursty missingness co-occurring with drift"
+    ],
+    "detector_access_tracks": [
+      {
+        "id": "valid-pe-only",
+        "description": "Consumes only finite prediction-error observations explicitly marked valid."
+      },
+      {
+        "id": "feature-only-unsupervised",
+        "description": "Consumes input features or representation statistics without target labels or outcome-derived error."
+      },
+      {
+        "id": "auxiliary-loss-unsupervised",
+        "description": "Consumes a pinned unsupervised auxiliary-loss stream, not target labels."
+      },
+      {
+        "id": "observed-outcome",
+        "description": "Consumes outcome-derived performance/errors when labels are observed; report label delay and availability."
+      }
+    ],
+    "matching_rule": "Process ground-truth events in onset order. Match the earliest unused alarm in [start_cycle, end_cycle + max_detection_delay_cycles]. One alarm matches at most one event. Every unmatched alarm is a false alarm; every unmatched event is missed. Never count invalid/missing PE sentinels as observations.",
+    "metrics": [
+      "event-precision",
+      "event-recall",
+      "event-f1",
+      "false-alarms-per-1000-valid-observations",
+      "missed-drift-rate",
+      "mean-normalized-detection-delay-penalized",
+      "p50-p95-detection-delay",
+      "post-shift-recovery-cycles",
+      "throughput",
+      "peak-memory"
+    ],
+    "tuning_policy": "Use leave-one-dataset-out hyperparameter optimization and randomized Monte Carlo onset/parameters. Hold out datasets and seeds from threshold fitting; report both default and tuned configurations.",
+    "source_paper": "https://doi.org/10.1145/3770855.3819070",
+    "claims": "This adds an auditable comparison protocol and makes no claim that Symthaea beats any comparator. The referenced KDD 2026 paper reports SEED and STEPD as strong F1 baselines and ABCD as a compelling false-alarm trade-off."
+  }
 }
