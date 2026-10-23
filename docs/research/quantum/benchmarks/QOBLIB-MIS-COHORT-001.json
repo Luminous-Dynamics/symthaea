@@ -882,7 +882,7 @@
       },
       "workload": {
         "graph_class": "independent random 3-regular simple graphs",
-        "graph_sizes": "Pre-register a size grid; the paper's primary SOTA comparison describes 10^5 instances per size through N <= 2000; it also discusses additional p=4 performance through roughly N=5000. Match the exact per-section size grid before claiming reproduction.",
+        "graph_sizes": "The paper's Section IV text says 10^5 random 3-regular graph instances for each size in the SOTA comparison, while the Fig. 3 caption says 200 instances for QGreedy at each plotted size (100 for the p=3 hardware case) with N=50,100,200,500,1000,2000,5000. Treat the exact sample count for each reported result as unresolved until the authors' data/supplement clarifies which curves use which cohort. The paper reports statistically significant p=4 gains against the prioritized baseline for considered sizes through N<=2000 and discusses p=4 results to about N=5000.",
         "statistical_unit": "graph instance; if multiple seeds/solver repetitions are run on one graph, treat them as nested repetitions",
         "keep_separate_from": "QOBLIB's heterogeneous 50-instance named graph cohort and qReduMIS random unit-disk / Union-Jack cohort"
       },
@@ -903,6 +903,7 @@
         "target-hit probability and time-to-target if a fixed cardinality/ratio target is preregistered"
       ],
       "execution_gates": [
+        "Resolve the paper's Section IV versus Figure 3 caption sample-count discrepancy using official raw data, supplement or author clarification; freeze an exact per-curve n before replication.",
         "Pin exact graph generator source, version, degree, random seeds and byte-level graph digests; verify every generated graph is simple, connectedness policy is declared, and every vertex has degree 3.",
         "Reproduce fixed QAOA angle tables from a pinned paper appendix/reference and record the exact depth-angle mapping; don't tune angles on the confirmatory test instances.",
         "Implement the classical linear-prioritized baseline independently and cross-check its contraction sequence/outputs against the paper's description or author's code if found.",
@@ -914,7 +915,8 @@
       "current_gaps": [
         "Official code repository for the October 2026 accepted paper was not found in the GitHub searches performed; reproduction is not yet possible from a verified official implementation.",
         "The source paper claims statistically significant improvement over its classical prioritized search for considered sizes up to N <= 2000, and reports results up to about N≈5000 for p=4; those are paper results, not Symthaea results.",
-        "Full hardware cost boundary, QPU queue/compilation conventions and raw trial artifacts must be frozen before cross-method operational-cost comparisons."
+        "Full hardware cost boundary, QPU queue/compilation conventions and raw trial artifacts must be frozen before cross-method operational-cost comparisons.",
+        "The accepted-paper text has an apparent sample-count discrepancy: Section IV states 10^5 instances per size for the SOTA comparison, while Fig. 3's caption describes 200 QGreedy instances per depth/size (100 for hardware p=3). Reproduction must resolve rather than silently choose one."
       ],
       "sources": [
         {
@@ -929,7 +931,13 @@
           "title": "Marino and Kirkpatrick classical baseline",
           "url": "https://arxiv.org/abs/2003.12293"
         }
-      ]
+      ],
+      "reported_sample_count_discrepancy": {
+        "status": "needs-author-or-supplementary-data-reconciliation",
+        "primary_text": "Section IV states 10^5 random 3-regular graph instances for each system size in the SOTA comparison.",
+        "figure_caption": "Figure 3 says 200 graph instances for QGreedy for each p (100 for the p=3 IQM Garnet series) and lists N=50,100,200,500,1000,2000,5000.",
+        "protocol_rule": "Do not choose one count as the authoritative reproduction target without checking source data, supplementary materials, or an author clarification. Record separate per-curve counts and raw instance digests in any replication."
+      }
     }
   ],
   "complete_baseline_inventory": {
