@@ -38,7 +38,7 @@ Under a fixed calibration budget, batch size, target alpha, and audit budget, co
 1. exact all-pairs moment/correlation scorer;
 2. hybrid random-projection scorer at `k = 16, 32, 64, 128`, only where `k < d`, retaining exact marginal moments while sketching correlations;
 3. two-sample baselines such as MMD (including random Fourier feature approximation), energy distance, and a cross-validated classifier two-sample test;
-4. deployment/sequential comparators such as WATCH and conditional conformal test martingales only where their assumptions and input protocol are correctly reproduced.
+4. ReDiST's discriminative residual-shift approach, the Rust `driftwatch` crate's per-feature PSI/KL-JS/KS/chi-square baselines, and deployment/sequential comparators such as WATCH and conditional conformal test martingales—only where their assumptions and input protocols can be reproduced correctly.
 
 Do not compare only nominal alarm rates: a detector can achieve low false alarms by having low power. Use paired seeds, equal clean calibration volume, equal audit count, and held-out worlds. Tune (k), seeds, thresholds, and any method hyperparameters on development worlds only.
 
@@ -75,6 +75,15 @@ This changes our next benchmark gate: feature-shift scores should not only be co
 - Liu, Prinster, and Orabona, October 2026, [Monitoring for Shifts at Unknown Times: Parameter-Free Conditional Conformal Martingales](https://arxiv.org/abs/2610.17343): a comparator for unknown change times.
 
 These methods have different assumptions and guarantees. They are targets for correct reproduction, not boxes to check with superficially similar code.
+
+## Additional strong comparators
+
+Two additional baselines are important for the next experiment round:
+
+- **ReDiST (Knowledge-Based Systems, published 28 February 2026)** reframes unsupervised drift detection as a one-dimensional discriminative residual signal combined with a Kolmogorov–Smirnov test and a statistical-process-control chart. Its paper reports comparison against 12 detectors on 11 benchmarks and up to 58× speed relative to its most accurate supervised competitor. That is the paper's result, not something this repository has reproduced. We should include its published setup where possible and compare at equal clean false-alarm rate, batch throughput, detection delay, and memory. [DOI 10.1016/j.knosys.2025.115247](https://doi.org/10.1016/j.knosys.2025.115247).
+- **Rust `driftwatch` 0.1.0** supplies practical per-feature PSI, KL/JS divergence, Kolmogorov–Smirnov and chi-square tests, live windows, and dataset-level aggregation. Since our implementation targets Rust-first deployments, this is an especially relevant native baseline: benchmark its configured feature monitors against our hybrid scorer and sequential calibration layer rather than comparing against Python tools alone. [Crate documentation](https://docs.rs/crate/driftwatch/latest) and [monitor API](https://docs.rs/driftwatch/latest/driftwatch/monitor/index.html).
+
+Neither comparator is an assumed loser. ReDiST targets a probe-model residual signal; driftwatch targets feature-wise distribution summaries. Both could outperform projection correlation under some alternatives, which is precisely why the comparison must include sparse, nonlinear, and consequential-shift worlds.
 
 ## Industry baseline and what would count as better
 
