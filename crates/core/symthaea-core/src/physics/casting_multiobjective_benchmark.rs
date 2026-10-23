@@ -64,6 +64,7 @@ enum ParetoMetricError {
     InvalidConfidenceMultiplier,
     InvalidPredictionUncertainty,
     NoEpsilonFeasibleCandidate,
+    InvalidParetoFront,
 }
 
 impl fmt::Display for ParetoMetricError {
@@ -117,6 +118,9 @@ impl fmt::Display for ParetoMetricError {
             }
             Self::NoEpsilonFeasibleCandidate => {
                 f.write_str("no predicted candidate satisfies the upper-confidence epsilon constraint")
+            }
+            Self::InvalidParetoFront => {
+                f.write_str("front must contain only mutually non-dominated objective points")
             }
         }
     }
@@ -515,6 +519,21 @@ fn propose_largest_gap_epsilon(
     for pair in ordered_front.windows(2) {
         if pair[0].objectives == pair[1].objectives {
             return Err(ParetoMetricError::InsufficientFrontForGap);
+        }
+    }
+    let mut seen_front_ids = std::collections::HashSet::with_capacity(ordered_front.len());
+    for point in &ordered_front {
+        if !seen_front_ids.insert(point.trial_id) {
+            return Err(ParetoMetricError::DuplicateTrialId);
+        }
+    }
+    for (index, left) in ordered_front.iter().enumerate() {
+        if ordered_front
+            .iter()
+            .enumerate()
+            .any(|(other_index, right)| index != other_index && dominates(left.objectives, right.objectives))
+        {
+            return Err(ParetoMetricError::InvalidParetoFront);
         }
     }
 
@@ -1255,6 +1274,28 @@ mod tests {
         assert_eq!(
             propose_largest_gap_epsilon(&gap_front(), &over_epsilon, [1.0, 2.0], 1.0),
             Err(ParetoMetricError::NoEpsilonFeasibleCandidate)
+        );
+    }
+
+
+    #[test]
+    fn epsilon_gap_policy_rejects_dominated_or_duplicate_front_trials() {
+        let dominated = [
+            ParetoPoint { trial_id: 1, objectives: [1.0, 1.0] },
+            ParetoPoint { trial_id: 2, objectives: [2.0, 2.0] },
+        ];
+        assert_eq!(
+            propose_largest_gap_epsilon(&dominated, &gap_candidates(), [1.0, 2.0], 1.0),
+            Err(ParetoMetricError::InvalidParetoFront)
+        );
+
+        let duplicate_ids = [
+            ParetoPoint { trial_id: 1, objectives: [1.0, 9.0] },
+            ParetoPoint { trial_id: 1, objectives: [2.0, 7.0] },
+        ];
+        assert_eq!(
+            propose_largest_gap_epsilon(&duplicate_ids, &gap_candidates(), [1.0, 2.0], 1.0),
+            Err(ParetoMetricError::DuplicateTrialId)
         );
     }
 
