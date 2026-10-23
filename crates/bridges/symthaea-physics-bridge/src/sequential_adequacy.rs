@@ -118,11 +118,7 @@ impl SequentialAdequacyMonitor {
             return Err(SequentialMonitorError::EmptyMonitoringHorizon);
         }
         let equal_weight = 1.0 / max_audits as f64;
-        Self::new_with_alpha_spending(
-            calibrator,
-            total_alpha,
-            &vec![equal_weight; max_audits],
-        )
+        Self::new_with_alpha_spending(calibrator, total_alpha, &vec![equal_weight; max_audits])
     }
 
     /// Create a monitor with a predeclared, risk-weighted allocation of the total alpha budget.
@@ -162,7 +158,11 @@ impl SequentialAdequacyMonitor {
         }
         // Correct only floating-point roundoff just above one; never silently shrink a materially
         // over-budget schedule into validity.
-        let scale = if weight_sum > 1.0 { 1.0 / weight_sum } else { 1.0 };
+        let scale = if weight_sum > 1.0 {
+            1.0 / weight_sum
+        } else {
+            1.0
+        };
         let alpha_spending = spending_weights
             .iter()
             .map(|weight| total_alpha * (*weight * scale))
@@ -392,18 +392,12 @@ mod tests {
     #[test]
     fn risk_weighted_schedule_changes_detection_priority_without_overspending() {
         let weights = [0.5, 0.25, 0.15, 0.1];
-        let mut early = SequentialAdequacyMonitor::new_with_alpha_spending(
-            calibrator(999),
-            0.05,
-            &weights,
-        )
-        .unwrap();
-        let mut late = SequentialAdequacyMonitor::new_with_alpha_spending(
-            calibrator(999),
-            0.05,
-            &weights,
-        )
-        .unwrap();
+        let mut early =
+            SequentialAdequacyMonitor::new_with_alpha_spending(calibrator(999), 0.05, &weights)
+                .unwrap();
+        let mut late =
+            SequentialAdequacyMonitor::new_with_alpha_spending(calibrator(999), 0.05, &weights)
+                .unwrap();
 
         // With 1,000 calibration batches this score yields p=(1+10)/1000=0.011:
         // it crosses the early 0.025 threshold but not the final 0.005 threshold.
@@ -420,7 +414,10 @@ mod tests {
         }
         let late_result = late.observe(989.0, true).unwrap();
         assert!((late_result.per_audit_alpha - 0.005).abs() < 1e-12);
-        assert_eq!(late_result.decision, SequentialAuditDecision::NoAlarmAtHorizon);
+        assert_eq!(
+            late_result.decision,
+            SequentialAuditDecision::NoAlarmAtHorizon
+        );
         assert!(late_result.cumulative_familywise_alpha_bound <= 0.05);
         assert!((late_result.cumulative_familywise_alpha_bound - 0.05).abs() < 1e-12);
     }
@@ -464,8 +461,7 @@ mod tests {
             let calibration_scores = (0..CALIBRATION_BATCHES)
                 .map(|_| next_unit_interval(&mut rng))
                 .collect::<Vec<_>>();
-            let calibrator =
-                ConformalAdequacyCalibrator::new(&calibration_scores, 0.05).unwrap();
+            let calibrator = ConformalAdequacyCalibrator::new(&calibration_scores, 0.05).unwrap();
             let audit_scores = (0..HORIZON)
                 .map(|_| next_unit_interval(&mut rng))
                 .collect::<Vec<_>>();
@@ -478,8 +474,7 @@ mod tests {
                 uncorrected_alarms += 1;
             }
 
-            let mut monitor =
-                SequentialAdequacyMonitor::new(calibrator, 0.05, HORIZON).unwrap();
+            let mut monitor = SequentialAdequacyMonitor::new(calibrator, 0.05, HORIZON).unwrap();
             for score in audit_scores {
                 if monitor.observe(score, true).unwrap().decision == SequentialAuditDecision::Alarm
                 {
