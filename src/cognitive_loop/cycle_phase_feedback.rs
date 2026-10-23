@@ -1510,7 +1510,16 @@ impl CognitiveLoopService {
         }
 
         // ── Track 4b: Cross-module agreement metric ─────────────────────────
-        let fep_confidence = (1.0 - dynamics.fep.fep_surprise.min(1.0)).max(0.0) as f32;
+        // Missing PE must not make zeroed/stale FEP surprise look like
+        // perfect model confidence. Neutralize only this confidence component;
+        // coherence, resonator, moral and MCTS evidence remain active.
+        let fep_confidence = if perception.urgency.prediction_error_valid
+            && dynamics.fep.fep_surprise.is_finite()
+        {
+            (1.0 - dynamics.fep.fep_surprise.min(1.0)).max(0.0) as f32
+        } else {
+            0.5
+        };
         let resonator_confidence = dynamics.resonator.resonator_best_sim;
         let moral_confidence = self
             .last_moral_judgment()
