@@ -25,7 +25,11 @@ The larger SOTA campaign is specified separately as 100,000 3-regular instances 
 - **Hardware vs simulation:** the paper uses tensor-network simulation for larger circuits and notes that some p=3 light cones exceed a 20-qubit device's capacity, so noiseless simulated expectations were substituted for those cases. Such rows must be labelled mixed hardware/simulator, never hardware-only.
 - **Generalization:** new sizes and degree-4 workloads test extensions; they do not replace the paper-shaped degree-3 comparison.
 
-### Comparison compatibility: paired solvers versus generator-coupled procedures
+### Pinned Marino–Kirkpatrick source and licensing boundary
+
+The reference repository is pinned in the companion JSON to commit ae59badc1c07fc27d12088593546e8b98e909c8a (2020-03-27), including Git blob identities for main.cpp, Random.hpp, Header.h, and README.md. The source files include author copyright notices; no explicit open-source license was found in that pinned repository tree. The source is recorded for provenance and review, not copied into Symthaea. Do not vendor or redistribute it without permission. If a faithful executable baseline is needed and permission is unavailable, write an independent implementation from the published paper's algorithm and separately validate it rather than copying the upstream C++.
+
+## Comparison compatibility: paired solvers versus generator-coupled procedures
 
 The original Marino–Kirkpatrick algorithm (arXiv:2003.12293, Sections 2–3) uses deferred decisions: it generates a uniformly sampled simple d-regular graph while choosing labels/virtual nodes and completing edge pairings. Its state includes partially revealed graph structure, so the algorithm is not natively a function that maps an arbitrary completed graph file to an independent set. This is not just a statistical detail: demanding byte-identical graph inputs for that original procedure silently changes the algorithm being tested.
 
