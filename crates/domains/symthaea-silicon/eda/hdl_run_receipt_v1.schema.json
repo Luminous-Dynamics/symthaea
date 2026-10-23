@@ -66,7 +66,12 @@
         "flake_lock",
         "receipt_schema",
         "case_matrix",
-        "receipt_validator"
+        "receipt_validator",
+        "oracle_generator",
+        "silicon_cargo_manifest",
+        "canonical_binary_hv_source",
+        "cargo_lock",
+        "oracle_fixture_receipt"
       ],
       "properties": {
         "rtl_bind_xor": {
@@ -100,6 +105,21 @@
           "$ref": "#/$defs/hashOrUnavailable"
         },
         "receipt_validator": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "oracle_generator": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "silicon_cargo_manifest": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "canonical_binary_hv_source": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "cargo_lock": {
+          "$ref": "#/$defs/hashOrUnavailable"
+        },
+        "oracle_fixture_receipt": {
           "$ref": "#/$defs/hashOrUnavailable"
         }
       }
@@ -159,7 +179,8 @@
         "lint_exit_code",
         "build_exit_code",
         "simulation_exit_code",
-        "expected_pass_marker_seen"
+        "expected_pass_marker_seen",
+        "software_oracle_marker_seen"
       ],
       "properties": {
         "case_id": {
@@ -206,6 +227,9 @@
           "minimum": 0
         },
         "expected_pass_marker_seen": {
+          "type": "boolean"
+        },
+        "software_oracle_marker_seen": {
           "type": "boolean"
         }
       }
@@ -298,6 +322,9 @@
                 },
                 "expected_pass_marker_seen": {
                   "const": true
+                },
+                "software_oracle_marker_seen": {
+                  "const": true
                 }
               }
             }
@@ -312,11 +339,16 @@
               "tb_hamming_count",
               "runner",
               "manifest",
+              "flake",
+              "flake_lock",
               "receipt_schema",
               "case_matrix",
               "receipt_validator",
-              "flake",
-              "flake_lock"
+              "oracle_generator",
+              "silicon_cargo_manifest",
+              "canonical_binary_hv_source",
+              "cargo_lock",
+              "oracle_fixture_receipt"
             ],
             "properties": {
               "rtl_bind_xor": {
@@ -343,6 +375,14 @@
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
               },
+              "flake": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "flake_lock": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
               "receipt_schema": {
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
@@ -355,11 +395,23 @@
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
               },
-              "flake": {
+              "oracle_generator": {
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
               },
-              "flake_lock": {
+              "silicon_cargo_manifest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "canonical_binary_hv_source": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "cargo_lock": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "oracle_fixture_receipt": {
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
               }
