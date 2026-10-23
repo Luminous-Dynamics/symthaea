@@ -153,6 +153,61 @@ mod authenticated_sequence_window_tests {
         assert!(window.check_and_mark(7, now));
         assert!(!window.check_and_mark(7u32.wrapping_add(1u32 << 31), now));
     }
+
+    #[test]
+    fn expiry_includes_the_full_66_second_retention_boundary() {
+        let accepted_at = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+        assert!(window.check_and_mark(1, accepted_at));
+
+        assert!(
+            !window.is_expired(accepted_at + std::time::Duration::from_secs(66)),
+            "the window must remain live through the exact retention boundary"
+        );
+        assert!(
+            window.is_expired(
+                accepted_at
+                    + std::time::Duration::from_secs(66)
+                    + std::time::Duration::from_nanos(1)
+            ),
+            "the window should expire strictly after the retention boundary"
+        );
+    }
+
+    #[test]
+    fn duplicate_does_not_extend_replay_window_lifetime() {
+        let accepted_at = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+        assert!(window.check_and_mark(44, accepted_at));
+
+        let duplicate_at = accepted_at + std::time::Duration::from_secs(60);
+        assert!(
+            !window.check_and_mark(44, duplicate_at),
+            "a duplicate sequence must not be treated as accepted activity"
+        );
+        assert!(
+            window.is_expired(
+                accepted_at
+                    + std::time::Duration::from_secs(66)
+                    + std::time::Duration::from_nanos(1)
+            ),
+            "replayed packets must not keep their own replay window alive"
+        );
+    }
+
+    #[test]
+    fn accepted_out_of_order_packet_refreshes_idle_retention() {
+        let accepted_at = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+        assert!(window.check_and_mark(100, accepted_at));
+
+        let reordered_at = accepted_at + std::time::Duration::from_secs(65);
+        assert!(window.check_and_mark(99, reordered_at));
+        assert!(
+            !window.is_expired(reordered_at + std::time::Duration::from_secs(66)),
+            "an accepted in-window packet is recent authenticated activity"
+        );
+    }
 }
 
 /// Duration of the bandwidth budget window.
