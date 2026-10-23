@@ -1958,6 +1958,37 @@ mod tests {
                     || recovered.post_recovery_validation_measurements
                         >= MIN_POST_RECOVERY_VALIDATION_MEASUREMENTS
             );
+
+            // Per-seed records are retained in CI output so aggregate counts are auditable.
+            // The reference expression and evaluator values are intentionally not serialized.
+            println!(
+                concat!(
+                    "truth_absent_run,seed={seed},",
+                    "baseline_rounds={},baseline_live={},baseline_success={},",
+                    "baseline_selection_failed={},baseline_false_singleton={},",
+                    "recovery_rounds={},recovery_live={},recovery_selection_failed={},",
+                    "reference_equivalent_initial_pool={},",
+                    "recovery_triggered={},recovery_restarts={},accepted_candidates={},",
+                    "same_domain_match={},ood_match={},post_recovery_singleton_audits={},",
+                    "full_recovery_success={}"
+                ),
+                baseline.rounds_used,
+                baseline.final_live,
+                baseline.success,
+                baseline.selection_failed,
+                baseline.final_live == 1 && !baseline.success,
+                recovered.rounds_used,
+                recovered.final_live,
+                recovered.selection_failed,
+                recovered.initial_pool_contains_reference,
+                recovered.recovery_triggered_on_empty_pool,
+                recovered.typed_recovery_restarts,
+                recovered.accepted_recovery_candidates,
+                recovered.ground_truth_equivalent,
+                recovered.ground_truth_extrapolation_equivalent,
+                recovered.post_recovery_validation_measurements,
+                recovered.success,
+            );
         }
 
         println!(concat!(
