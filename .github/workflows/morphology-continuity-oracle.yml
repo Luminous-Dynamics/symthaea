@@ -54,6 +54,8 @@ jobs:
         run: echo "ad9cc12fcf128e2435ad608a04642bb8895ef94372c93eb247aa9fa86882d146  tools/morphology-continuity-oracle/robust_evidence_request_v0_6.txt" | sha256sum --check -
       - name: Verify frozen model-misspecification request digest
         run: echo "555c5afdcde22986f0999ca489ff5d97b7c8b21a5035fa6f464f9ed7e456358f  tools/morphology-continuity-oracle/model_misspecification_request_v0_7.txt" | sha256sum --check -
+      - name: Verify frozen asymmetric-error request digest
+        run: echo "649d8dfb0ff79d729efb20033a14f185d17f6628fba5b724c27c4548cccc8118  tools/morphology-continuity-oracle/asymmetric_error_request_v0_8.txt" | sha256sum --check -
 
       - name: Formatting
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
