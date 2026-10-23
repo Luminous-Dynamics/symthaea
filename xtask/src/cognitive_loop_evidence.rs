@@ -20,7 +20,7 @@ pub struct ManifestSummary {
 }
 
 const REQUIRED_BASELINES: [&str; 8] = ["B0", "B1", "B2", "B3", "B4", "B5", "B6", "B7"];
-const REQUIRED_DRIFT_DETECTORS: [&str; 14] = [
+const REQUIRED_DRIFT_DETECTORS: [&str; 24] = [
     "fixed-threshold",
     "ewma-control-chart",
     "page-hinkley",
@@ -35,6 +35,16 @@ const REQUIRED_DRIFT_DETECTORS: [&str; 14] = [
     "abcd-error-stream",
     "studd-adwin-compression",
     "dynamic-threshold-dtd",
+    "kdd26-adwin-error-stream",
+    "kdd26-cusum-error-stream",
+    "kdd26-ddm-error-stream",
+    "kdd26-eddm-error-stream",
+    "kdd26-ewma-error-stream",
+    "kdd26-gma-error-stream",
+    "kdd26-hddma-error-stream",
+    "kdd26-hddmw-error-stream",
+    "kdd26-page-hinkley-error-stream",
+    "kdd26-rddm-error-stream",
 ];
 const REQUIRED_RESULT_FIELDS: [&str; 12] = [
     "repository_head_sha",
@@ -133,6 +143,26 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
             "external drift detector track is missing required comparator {expected}"
         );
     }
+    let kdd_protocol = root.get("drift_protocol")
+        .and_then(|value| value.get("kdd26_reference_protocol"))
+        .context("drift_protocol.kdd26_reference_protocol is required")?;
+    ensure!(
+        nonempty_string_field(kdd_protocol, "paper_doi", "kdd26_reference_protocol")?
+            == "10.1145/3770855.3819070",
+        "KDD drift benchmark reference DOI is missing or unexpected"
+    );
+    ensure!(
+        kdd_protocol.get("detector_family_count").and_then(Value::as_u64) == Some(14)
+            && kdd_protocol.get("datasets_count").and_then(Value::as_u64) == Some(7),
+        "KDD reference protocol must state 14 method families and seven datasets"
+    );
+    for field in ["dataset_names_to_pin", "drift_types", "transitions"] {
+        nonempty_string_array(kdd_protocol, field, "kdd26_reference_protocol")?;
+    }
+    for field in ["monitored_classifier", "stream_protocol", "hyperparameter_protocol", "important_limit", "status"] {
+        nonempty_string_field(kdd_protocol, field, "kdd26_reference_protocol")?;
+    }
+
     let detector_protocol = nonempty_string_field(
         root,
         "drift_detector_comparison_protocol",
@@ -466,8 +496,8 @@ mod tests {
                 "id": id,
                 "name": format!("detector-{id}"),
                 "family": "fixture-family",
-                "comparison_track": if ["seed", "stepd", "abcd-error-stream", "dynamic-threshold-dtd"].contains(id) { "observed-outcome" } else if *id == "studd-adwin-compression" { "auxiliary-loss-unsupervised" } else if ["discriminative-drift-detector", "image-based-drift-detector", "semi-parametric-log-likelihood", "abcd-feature-space"].contains(id) { "feature-only-unsupervised" } else { "valid-pe-only" },
-                "labels_required": ["seed", "stepd", "abcd-error-stream", "dynamic-threshold-dtd"].contains(id),
+                "comparison_track": if ["seed", "stepd", "abcd-error-stream", "dynamic-threshold-dtd", "kdd26-adwin-error-stream", "kdd26-cusum-error-stream", "kdd26-ddm-error-stream", "kdd26-eddm-error-stream", "kdd26-ewma-error-stream", "kdd26-gma-error-stream", "kdd26-hddma-error-stream", "kdd26-hddmw-error-stream", "kdd26-page-hinkley-error-stream", "kdd26-rddm-error-stream"].contains(id) { "observed-outcome" } else if *id == "studd-adwin-compression" { "auxiliary-loss-unsupervised" } else if ["discriminative-drift-detector", "image-based-drift-detector", "semi-parametric-log-likelihood", "abcd-feature-space"].contains(id) { "feature-only-unsupervised" } else { "valid-pe-only" },
+                "labels_required": ["seed", "stepd", "abcd-error-stream", "dynamic-threshold-dtd", "kdd26-adwin-error-stream", "kdd26-cusum-error-stream", "kdd26-ddm-error-stream", "kdd26-eddm-error-stream", "kdd26-ewma-error-stream", "kdd26-gma-error-stream", "kdd26-hddma-error-stream", "kdd26-hddmw-error-stream", "kdd26-page-hinkley-error-stream", "kdd26-rddm-error-stream"].contains(id),
                 "input_contract": "Valid observations only; declared access contract applies.",
                 "implementation_status": "planned-baseline",
                 "source": "https://example.com/reference"
@@ -491,6 +521,19 @@ mod tests {
                 "trace_contract": "Each trace pins detector_version and comparison_track; label_delay_cycles is recorded; alarms mark evidence_valid. Invalid-evidence alarms cannot match, count as false alarms, and fail the hard gate.",
                 "source_paper": "https://doi.org/10.1145/3770855.3819070",
                 "claims": "Comparator definitions are not measured results.",
+                "kdd26_reference_protocol": {
+                    "paper_doi": "10.1145/3770855.3819070",
+                    "detector_family_count": 14,
+                    "datasets_count": 7,
+                    "dataset_names_to_pin": ["Asfault", "Electricity", "Covertype", "GasSensorArray", "NOAA", "Posture", "Rialto"],
+                    "monitored_classifier": "Hoeffding Tree",
+                    "stream_protocol": "Prequential test-then-train, per-instance observed correctness/error.",
+                    "hyperparameter_protocol": "Leave one dataset out, tune on remaining datasets.",
+                    "drift_types": ["class-prior", "label-swap", "feature-permutation", "feature-filtering"],
+                    "transitions": ["abrupt", "gradual"],
+                    "important_limit": "Feature-only detectors cannot identify pure target changes with unchanged feature distribution.",
+                    "status": "Reference protocol declared; implementations and datasets are not yet pinned."
+                },
                 "paired_comparison_contract": {
                     "protocol_id": "paired-dataset-bootstrap-v1",
                     "minimum_independent_datasets": 3,
@@ -631,6 +674,14 @@ mod tests {
         manifest["external_drift_detectors"][1]["id"] = json!("fixed-threshold");
         let error = validate_value(&manifest).unwrap_err().to_string();
         assert!(error.contains("duplicate external drift detector id"));
+    }
+
+    #[test]
+    fn rejects_incomplete_kdd_reference_coverage() {
+        let mut manifest = valid_manifest();
+        manifest["drift_protocol"]["kdd26_reference_protocol"]["datasets_count"] = json!(3);
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("14 method families and seven datasets"));
     }
 
     #[test]
