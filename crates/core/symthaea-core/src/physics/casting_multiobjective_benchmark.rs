@@ -817,7 +817,7 @@ fn evaluate_zdt(problem: ZdtProblem, decision: &[f64]) -> Result<[f64; 2], Paret
     }
     let first_is_valid = (0.0..=1.0).contains(&decision[0]);
     let tail_is_valid = match problem {
-        ZdtProblem::Zdt4 => decision[1..].iter().all(|value| (-5.0..=5.0).contains(value)),
+        ZdtProblem::Zdt4 => decision[1..].iter().all(|value| (-10.0..=10.0).contains(value)),
         ZdtProblem::Zdt1 | ZdtProblem::Zdt2 | ZdtProblem::Zdt3 => {
             decision[1..].iter().all(|value| (0.0..=1.0).contains(value))
         }
@@ -1283,7 +1283,7 @@ mod tests {
             Err(ParetoMetricError::DecisionOutOfDomain)
         );
         assert_eq!(
-            evaluate_zdt(ZdtProblem::Zdt4, &[0.5, 5.01]),
+            evaluate_zdt(ZdtProblem::Zdt4, &[0.5, 10.01]),
             Err(ParetoMetricError::DecisionOutOfDomain)
         );
         assert_eq!(
