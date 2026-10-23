@@ -1,0 +1,118 @@
+{
+  "schema": "cp-03-manufacturing-corpus-v1",
+  "authority": "representation_only_no_physical_execution_authority",
+  "claim_ceiling": "deterministic manufacturing identity, generation, dependency, metrology-reference, negative-evidence, and authority semantics over synthetic/reference workflows only",
+  "replay_semantics": "historical identities are immutable inputs; dispositions are derived outputs",
+  "case_manifest_order": [
+    "C01",
+    "C02",
+    "C03",
+    "C04",
+    "C05",
+    "C06",
+    "C07",
+    "C08",
+    "C09",
+    "C10",
+    "C11",
+    "C12",
+    "C13",
+    "C14",
+    "C15",
+    "C16",
+    "C17",
+    "C18"
+  ],
+  "cases": [
+    {
+      "case_id": "C01",
+      "scenario": "complete-closed-thread",
+      "expected": "CurrentAndApplicable"
+    },
+    {
+      "case_id": "C02",
+      "scenario": "missing-process-generation",
+      "expected": "Unknown"
+    },
+    {
+      "case_id": "C03",
+      "scenario": "changed-equipment-configuration",
+      "expected": "ConfigurationMismatch"
+    },
+    {
+      "case_id": "C04",
+      "scenario": "changed-tooling-fixture",
+      "expected": "ConfigurationMismatch"
+    },
+    {
+      "case_id": "C05",
+      "scenario": "changed-material-generation",
+      "expected": "DependencyChanged"
+    },
+    {
+      "case_id": "C06",
+      "scenario": "plan-without-execution",
+      "expected": "ExecutionMissing"
+    },
+    {
+      "case_id": "C07",
+      "scenario": "execution-without-as-built",
+      "expected": "AsBuiltMissing"
+    },
+    {
+      "case_id": "C08",
+      "scenario": "as-built-without-metrology",
+      "expected": "ObservationMissing"
+    },
+    {
+      "case_id": "C09",
+      "scenario": "stale-or-mismatched-metrology",
+      "expected": "MeasurementInvalid"
+    },
+    {
+      "case_id": "C10",
+      "scenario": "single-specimen-not-population",
+      "expected": "PopulationInferenceBlocked"
+    },
+    {
+      "case_id": "C11",
+      "scenario": "capability-not-availability",
+      "expected": "AuthoritySeparated"
+    },
+    {
+      "case_id": "C12",
+      "scenario": "capacity-not-capability",
+      "expected": "AuthoritySeparated"
+    },
+    {
+      "case_id": "C13",
+      "scenario": "rework-without-new-generation",
+      "expected": "HistoricalIdentityViolation"
+    },
+    {
+      "case_id": "C14",
+      "scenario": "negative-evidence-retained",
+      "expected": "HistoricalNegativeRetained"
+    },
+    {
+      "case_id": "C15",
+      "scenario": "common-mode-measurements",
+      "expected": "CommonModeNotIndependent"
+    },
+    {
+      "case_id": "C16",
+      "scenario": "operational-event-not-qualification",
+      "expected": "AuthoritySeparated"
+    },
+    {
+      "case_id": "C17",
+      "scenario": "synthetic-pass",
+      "expected": "NoPhysicalExecutionAuthority"
+    },
+    {
+      "case_id": "C18",
+      "scenario": "changed-acceptance-profile",
+      "expected": "RequalificationRequired"
+    }
+  ]
+}
