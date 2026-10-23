@@ -18,6 +18,7 @@ jq -e '
  and .source_record.source_bytes_downloaded_by_this_workstream==false
  and .source_record.raw_data_ingested==false
  and .source_record.raw_sha256==null
+ and .scope.publication_year==2008
  and .scope.geographic_scope=="areas_north_of_arctic_circle"
  and .scope.north_pole_specific_estimate_present==false
  and .scope.resource_class=="undiscovered_conventional_resources"
