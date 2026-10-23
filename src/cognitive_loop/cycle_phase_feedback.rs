@@ -191,6 +191,7 @@ impl CognitiveLoopService {
             prediction_error,
             prediction_error_valid: perception.urgency.prediction_error_valid
                 && prediction_error.is_finite(),
+            prediction_evidence: perception.urgency.prediction_evidence.clone(),
             coherence,
             unified_psi,
             phi_attention_weight: perception.encoding.phi_attention_weight,
