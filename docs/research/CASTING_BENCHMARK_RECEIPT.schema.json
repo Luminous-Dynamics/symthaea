@@ -1,0 +1,404 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/CASTING_BENCHMARK_RECEIPT.schema.json",
+  "title": "CASTING-MO-BO-001 run receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "run_id",
+    "status",
+    "synthetic_fixture_only",
+    "algorithm",
+    "suite",
+    "source_revision",
+    "protocol_sha256",
+    "environment_lock_sha256",
+    "analysis_lock_sha256",
+    "seed",
+    "budget",
+    "accounting",
+    "termination_reason",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "protocol_id": {
+      "const": "CASTING-MO-BO-001"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]+$"
+    },
+    "status": {
+      "enum": [
+        "success",
+        "failed",
+        "refused",
+        "incomplete"
+      ]
+    },
+    "synthetic_fixture_only": {
+      "type": "boolean"
+    },
+    "algorithm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "configuration_sha256"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Immutable release, package version, or source revision. 'latest' is prohibited."
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "instance_id",
+        "dimension",
+        "objective_count",
+        "objective_direction",
+        "objective_evaluator_sha256"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instance_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dimension": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "objective_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "objective_direction": {
+          "enum": [
+            "minimize_all",
+            "maximize_all",
+            "mixed_explicit"
+          ]
+        },
+        "objective_evaluator_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "source_revision": {
+      "$ref": "#/$defs/git_revision"
+    },
+    "protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "environment_lock_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "analysis_lock_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "objective_evaluations",
+        "initial_design_evaluations"
+      ],
+      "properties": {
+        "objective_evaluations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "initial_design_evaluations": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "accounting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "objective_evaluations",
+        "feasible_evaluations",
+        "infeasible_evaluations",
+        "invalid_evaluations",
+        "failed_evaluations",
+        "wall_clock_ms"
+      ],
+      "properties": {
+        "objective_evaluations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "feasible_evaluations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "infeasible_evaluations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "invalid_evaluations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed_evaluations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_clock_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "objective_oracle_cost_units": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "termination_reason": {
+      "enum": [
+        "budget_exhausted",
+        "predeclared_target_reached",
+        "no_valid_candidates",
+        "error",
+        "cancelled",
+        "missing_or_skipped"
+      ]
+    },
+    "metrics": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "final_hypervolume",
+        "normalized_hypervolume_auc",
+        "feasible_fraction",
+        "invalid_or_failed_fraction"
+      ],
+      "properties": {
+        "final_hypervolume": {
+          "type": "number",
+          "minimum": 0
+        },
+        "normalized_hypervolume_auc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "igd_plus": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "spacing": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "feasible_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "invalid_or_failed_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "evaluations_to_target": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "post_selection_coverage": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "regional_min_coverage": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "weighted_ess": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "mean_interval_width_proxy": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "abstention_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_trace_sha256",
+        "result_sha256"
+      ],
+      "properties": {
+        "raw_trace_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "result_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "log_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 4000
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "git_revision": {
+      "type": "string",
+      "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "success"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "metrics"
+        ],
+        "properties": {
+          "metrics": {
+            "type": "object"
+          },
+          "termination_reason": {
+            "enum": [
+              "budget_exhausted",
+              "predeclared_target_reached"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "failed",
+              "refused",
+              "incomplete"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "metrics": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
