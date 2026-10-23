@@ -34,6 +34,7 @@ struct TaskRecordForDigest {
     repo: String,
     base_commit: String,
     repo_head_sha: String,
+    runtime_platform: String,
     docker_image: String,
     problem_statement_sha256: String,
     gold_patch_sha256: String,
@@ -77,6 +78,7 @@ fn task_record_for_digest(value: &Value) -> Result<TaskRecordForDigest, String> 
         repo: string("repo")?,
         base_commit: string("base_commit")?,
         repo_head_sha: string("repo_head_sha")?,
+        runtime_platform: string("runtime_platform")?,
         docker_image: string("docker_image")?,
         problem_statement_sha256: string("problem_statement_sha256")?,
         gold_patch_sha256: string("gold_patch_sha256")?,
@@ -141,6 +143,7 @@ struct TaskScore {
     container_image_id: Option<String>,
     required_test_count: usize,
     required_tests_passing: usize,
+    runtime_platform_observed: Option<String>,
     workspace_clean_exit_code: Option<i64>,
     network_mode_observed: Option<String>,
     repo_head_sha_observed: Option<String>,
@@ -456,6 +459,9 @@ fn validate_locked_runtime_logs(
     if expected_repo_head.is_empty() || expected_repo_head != candidate_base_commit {
         errors.push("locked task repository HEAD differs from candidate base_commit".to_string());
     }
+    if task.get("runtime_platform").and_then(Value::as_str) != Some("linux") {
+        errors.push("locked task manifest runtime_platform must be 'linux'".to_string());
+    }
     if task.get("network_mode").and_then(Value::as_str) != Some("none") {
         errors.push("locked task manifest network_mode must be 'none'".to_string());
     }
@@ -489,6 +495,9 @@ fn validate_locked_runtime_logs(
         );
     }
     let baseline_identity = baseline.get("container_identity").unwrap_or(&Value::Null);
+    if baseline_identity.get("runtime_platform").and_then(Value::as_str) != Some("linux") {
+        errors.push("baseline validation runtime platform must be 'linux'".to_string());
+    }
     if baseline_identity
         .get("git_metadata_sanitization_exit_code")
         .and_then(Value::as_i64)
@@ -606,6 +615,9 @@ fn validate_locked_runtime_logs(
             ));
         }
         let identity = run.get("container_identity").unwrap_or(&Value::Null);
+        if identity.get("runtime_platform").and_then(Value::as_str) != Some("linux") {
+            errors.push(format!("gold runtime run {index} runtime platform must be 'linux'"));
+        }
         if identity
             .get("git_metadata_sanitization_exit_code")
             .and_then(Value::as_i64)
@@ -832,6 +844,15 @@ fn validate_scored_container_identity(
     {
         errors.push("Git metadata sanitization was not confirmed".to_string());
     }
+    let runtime_platform = identity
+        .get("runtime_platform")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if task.get("runtime_platform").and_then(Value::as_str) != Some("linux")
+        || runtime_platform != "linux"
+    {
+        errors.push("strict Rust repair scoring requires Linux runtime platform".to_string());
+    }
     let configured_image = identity
         .get("configured_image")
         .and_then(Value::as_str)
@@ -920,6 +941,7 @@ fn audit_scored_task(
     let mut workspace_clean_exit_code = None;
     let mut network_mode_observed = None;
     let mut repo_head_sha_observed = None;
+    let mut runtime_platform_observed = None;
 
     let (all_test_ids, explicit_f2p, baseline_pass) =
         match validate_task_oracle(task, candidate, candidate_row_sha256, task_validation_dir) {
@@ -935,6 +957,7 @@ fn audit_scored_task(
                     container_image_id: None,
                     network_mode_observed: None,
                     repo_head_sha_observed: None,
+                    runtime_platform_observed: None,
                     required_test_count: 0,
                     required_tests_passing: 0,
                     workspace_clean_exit_code: None,
@@ -955,6 +978,7 @@ fn audit_scored_task(
             container_image_id: None,
             network_mode_observed: None,
             repo_head_sha_observed: None,
+            runtime_platform_observed: None,
             required_test_count: required_tests.len(),
             required_tests_passing: 0,
             workspace_clean_exit_code: None,
@@ -1024,6 +1048,11 @@ fn audit_scored_task(
         .map(str::to_string);
     repo_head_sha_observed = evidence
         .get("repo_head_sha")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    runtime_platform_observed = evidence
+        .get("container_identity")
+        .and_then(|identity| identity.get("runtime_platform"))
         .and_then(Value::as_str)
         .map(str::to_string);
 
@@ -1184,6 +1213,7 @@ fn audit_scored_task(
             container_image_id: image_id_observed.clone(),
             network_mode_observed: network_mode_observed.clone(),
             repo_head_sha_observed: repo_head_sha_observed.clone(),
+            runtime_platform_observed: runtime_platform_observed.clone(),
             required_test_count: required_tests.len(),
             required_tests_passing: required_passing,
             workspace_clean_exit_code,
@@ -1213,6 +1243,7 @@ fn audit_scored_task(
             container_image_id: image_id_observed.clone(),
             network_mode_observed: network_mode_observed.clone(),
             repo_head_sha_observed: repo_head_sha_observed.clone(),
+            runtime_platform_observed: runtime_platform_observed.clone(),
             required_test_count: required_tests.len(),
             required_tests_passing: required_passing,
             workspace_clean_exit_code,
@@ -1232,6 +1263,7 @@ fn audit_scored_task(
             container_image_id: image_id_observed.clone(),
             network_mode_observed: network_mode_observed.clone(),
             repo_head_sha_observed: repo_head_sha_observed.clone(),
+            runtime_platform_observed: runtime_platform_observed.clone(),
             required_test_count: required_tests.len(),
             required_tests_passing: required_passing,
             workspace_clean_exit_code,
@@ -1248,6 +1280,7 @@ fn audit_scored_task(
             container_image_id: image_id_observed.clone(),
             network_mode_observed: network_mode_observed.clone(),
             repo_head_sha_observed: repo_head_sha_observed.clone(),
+            runtime_platform_observed: runtime_platform_observed.clone(),
             required_test_count: required_tests.len(),
             required_tests_passing: required_passing,
             workspace_clean_exit_code,
@@ -1554,6 +1587,7 @@ mod tests {
         let task = serde_json::json!({
             "container_image_id": image_id,
             "network_mode": "none",
+            "runtime_platform": "linux",
             "repo_head_sha": "a".repeat(40),
             "container_ids": [format!("{:064x}", 1), format!("{:064x}", 2)]
         });
@@ -1571,6 +1605,34 @@ mod tests {
             .unwrap_err();
         assert!(errors.iter().any(|error| {
             error.contains("Git metadata sanitization was not confirmed")
+        }));
+    }
+
+    #[test]
+    fn scored_container_rejects_non_linux_platform() {
+        let image_id = format!("sha256:{}", "c".repeat(64));
+        let task = serde_json::json!({
+            "container_image_id": image_id,
+            "network_mode": "none",
+            "runtime_platform": "linux",
+            "repo_head_sha": "a".repeat(40),
+            "container_ids": [format!("{:064x}", 1), format!("{:064x}", 2)]
+        });
+        let candidate = serde_json::json!({"docker_image": "example@sha256:deadbeef"});
+        let evidence = serde_json::json!({
+            "container_identity": {
+                "container_id": format!("{:064x}", 9),
+                "configured_image": "example@sha256:deadbeef",
+                "container_image_id": image_id,
+                "network_mode": "none",
+                "runtime_platform": "windows",
+                "git_metadata_sanitization_exit_code": 0
+            }
+        });
+        let errors = validate_scored_container_identity(&task, &candidate, &evidence)
+            .unwrap_err();
+        assert!(errors.iter().any(|error| {
+            error.contains("strict Rust repair scoring requires Linux runtime platform")
         }));
     }
 
@@ -1612,6 +1674,7 @@ mod tests {
                 "configured_image": "example@sha256:deadbeef",
                 "container_image_id": image_id,
                 "network_mode": "none",
+                "runtime_platform": "linux",
                 "git_metadata_sanitization_exit_code": 0
             }
         });
