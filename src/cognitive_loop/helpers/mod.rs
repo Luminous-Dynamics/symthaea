@@ -554,29 +554,50 @@ impl CognitiveLoopService {
     }
 
     pub(super) fn create_experience(&mut self, state: &[f32], prediction: &[f32], error: f32) {
-        // Update last experience with next_state
-        // Own the taken value (not `ref`) so we can move it into Experience without cloning
-        if let Some(last_state) = self.last_state.take() {
-            if let Some(last_pred) = self.last_prediction.take() {
-                // Calculate importance based on error
-                let importance = error + EXPERIENCE_BASE_IMPORTANCE;
+        // Preserve the legacy helper contract for embedding paths. Callers with
+        // explicit validity should use create_experience_with_evidence instead.
+        self.create_experience_with_evidence(state, prediction, Some(error));
+    }
 
-                let exp = Experience {
-                    state: last_state, // move, not clone
-                    prediction: last_pred,
-                    next_state: Some(state.to_vec()),
-                    error,
-                    importance,
-                };
+    /// Complete the previous transition only when its prediction-error evidence
+    /// is valid. An invalid/missing PE must not become a high-importance replay
+    /// sample just because its compatibility sentinel is numerically large.
+    ///
+    /// Regardless of admission, advance the state/prediction window so one bad
+    /// comparison does not stall future learning or cause stale transitions to
+    /// be paired with later observations.
+    pub(super) fn create_experience_with_evidence(
+        &mut self,
+        state: &[f32],
+        prediction: &[f32],
+        evidence_error: Option<f32>,
+    ) {
+        let previous_state = self.last_state.take();
+        let previous_prediction = self.last_prediction.take();
 
-                if self.buffer.len() >= self.config.buffer_size {
-                    self.buffer.pop_front();
-                }
-                self.buffer.push_back(exp);
+        if let (Some(last_state), Some(last_pred), Some(error)) = (
+            previous_state,
+            previous_prediction,
+            evidence_error.filter(|value| value.is_finite()),
+        ) {
+            // Calculate importance only from a finite, admitted observation.
+            let importance = error + EXPERIENCE_BASE_IMPORTANCE;
+            let exp = Experience {
+                state: last_state,
+                prediction: last_pred,
+                next_state: Some(state.to_vec()),
+                error,
+                importance,
+            };
+
+            if self.buffer.len() >= self.config.buffer_size {
+                self.buffer.pop_front();
             }
+            self.buffer.push_back(exp);
         }
 
-        // Store current state for next cycle
+        // Always roll the window forward, even when the prior transition was
+        // deliberately excluded from replay due to invalid prediction evidence.
         self.last_state = Some(state.to_vec());
         self.last_prediction = Some(prediction.to_vec());
     }
@@ -977,5 +998,43 @@ impl CognitiveLoopService {
         {
             self.support.reset();
         }
+    }
+}
+
+#[cfg(test)]
+mod prediction_evidence_replay_tests {
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+
+    #[test]
+    fn invalid_prediction_evidence_skips_replay_but_advances_window() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+
+        service.create_experience_with_evidence(&[0.1, 0.2], &[0.3, 0.4], None);
+        assert_eq!(service.buffer.len(), 0);
+
+        // A second state completes a transition, but there is no trustworthy PE.
+        // It must not enter replay or linger as the source of a later transition.
+        service.create_experience_with_evidence(&[0.2, 0.3], &[0.4, 0.5], None);
+        assert_eq!(service.buffer.len(), 0);
+        assert_eq!(service.last_state.as_deref(), Some(&[0.2, 0.3][..]));
+
+        // The next valid observation admits only the immediately preceding state.
+        service.create_experience_with_evidence(&[0.3, 0.4], &[0.5, 0.6], Some(0.25));
+        assert_eq!(service.buffer.len(), 1);
+        assert_eq!(service.buffer.front().map(|item| item.error), Some(0.25));
+        assert_eq!(service.last_state.as_deref(), Some(&[0.3, 0.4][..]));
+    }
+
+    #[test]
+    fn non_finite_prediction_error_is_not_admitted_to_replay() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+
+        service.create_experience_with_evidence(&[0.1], &[0.2], None);
+        service.create_experience_with_evidence(&[0.2], &[0.3], Some(f32::NAN));
+
+        assert_eq!(service.buffer.len(), 0);
+        assert_eq!(service.last_state.as_deref(), Some(&[0.2][..]));
     }
 }
