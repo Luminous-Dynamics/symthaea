@@ -41,6 +41,7 @@ struct StateRow {
     model_id: Option<String>,
     model_version: Option<String>,
     config_sha256: Option<String>,
+    budget_caps: Option<Usage>,
     applicability_judgment: Option<String>,
     decision: Option<String>,
     original_move_applied: Option<bool>,
@@ -347,6 +348,7 @@ fn analyze(
             model_id: parsed.model_id,
             model_version: parsed.model_version,
             config_sha256: parsed.config_sha256,
+            budget_caps: parsed.budget_caps,
             applicability_judgment: parsed.applicability_judgment,
             decision: parsed.decision,
             original_move_applied: parsed.original_move_applied,
@@ -504,7 +506,7 @@ struct ParsedExecution {
     cost_microusd: u64,
 }
 
-#[derive(Debug, Clone, Default, serde::Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
 struct Usage {
     model_calls: u64,
     input_tokens: u64,
@@ -534,6 +536,7 @@ fn parse_execution(
             "proof_sha256",
             "run_receipt_sha256",
             "resource_usage",
+            "budget_caps",
         ] {
             if !field(execution, key, context)?.is_null() {
                 bail!("{context}: not_run execution must set {key} to null");
@@ -547,6 +550,7 @@ fn parse_execution(
             model_id: None,
             model_version: None,
             config_sha256: None,
+            budget_caps: None,
             applicability_judgment: None,
             decision: None,
             original_move_applied: None,
@@ -625,18 +629,38 @@ fn parse_execution(
     }
     let receipt = string(execution, "run_receipt_sha256", context)?;
     validate_sha256(receipt, &format!("{context}.run_receipt_sha256"))?;
+    let declared_caps = field(execution, "budget_caps", context)?;
+    let budget_caps = Usage {
+        model_calls: unsigned(declared_caps, "model_calls", context)?,
+        input_tokens: unsigned(declared_caps, "input_tokens", context)?,
+        output_tokens: unsigned(declared_caps, "output_tokens", context)?,
+        wall_time_ms: unsigned(declared_caps, "wall_time_ms", context)?,
+        cost_microusd: unsigned(declared_caps, "cost_microusd", context)?,
+    };
     let resources = field(execution, "resource_usage", context)?;
     let model_calls = unsigned(resources, "model_calls", context)?;
     let input_tokens = unsigned(resources, "input_tokens", context)?;
     let output_tokens = unsigned(resources, "output_tokens", context)?;
     let wall_time_ms = unsigned(resources, "wall_time_ms", context)?;
     let cost_microusd = unsigned(resources, "cost_microusd", context)?;
+    for (name, actual, cap) in [
+        ("model_calls", model_calls, budget_caps.model_calls),
+        ("input_tokens", input_tokens, budget_caps.input_tokens),
+        ("output_tokens", output_tokens, budget_caps.output_tokens),
+        ("wall_time_ms", wall_time_ms, budget_caps.wall_time_ms),
+        ("cost_microusd", cost_microusd, budget_caps.cost_microusd),
+    ] {
+        if actual > cap {
+            bail!("{context}: reported {name} usage {actual} exceeds declared cap {cap}");
+        }
+    }
 
     Ok(ParsedExecution {
         status,
         model_id: Some(model_id),
         model_version: Some(model_version),
         config_sha256: Some(config_sha256),
+        budget_caps: Some(budget_caps),
         applicability_judgment: Some(applicability_judgment),
         decision: Some(decision),
         original_move_applied: Some(original_move_applied),
@@ -704,6 +728,9 @@ fn validate_pair_configurations(rows: &[StateRow]) -> Result<()> {
                         "and variant states"
                     )
                 );
+            }
+            if base.budget_caps != variant.budget_caps {
+                bail!("pair {pair_id:?} uses mismatched declared budget caps across paired states");
             }
         }
     }
@@ -1288,6 +1315,13 @@ mod tests {
                     "model_version": "test-version",
                     "config_sha256": "a".repeat(64)
                 },
+                "budget_caps": {
+                    "model_calls": 2,
+                    "input_tokens": 16,
+                    "output_tokens": 8,
+                    "wall_time_ms": 100,
+                    "cost_microusd": 10
+                },
                 "applicability_judgment": "eligible",
                 "decision": "apply_original_move",
                 "original_move_applied": true,
@@ -1322,5 +1356,54 @@ mod tests {
         )
         .expect_err("checker receipt bound to a different target must be rejected");
         assert!(error.to_string().contains("does not match the paired suite target"));
+    }
+
+    #[test]
+    fn executed_outcome_cannot_exceed_declared_resource_caps() {
+        let target_digest = "d".repeat(64);
+        let mut execution = json!({
+            "status": "executed",
+            "model": {
+                "model_id": "test-model",
+                "model_version": "test-version",
+                "config_sha256": "a".repeat(64)
+            },
+            "applicability_judgment": "eligible",
+            "decision": "apply_original_move",
+            "original_move_applied": true,
+            "checked_target_statement_sha256": target_digest,
+            "checker_result": "checked_success",
+            "proof_sha256": "b".repeat(64),
+            "run_receipt_sha256": "c".repeat(64),
+            "budget_caps": {
+                "model_calls": 1,
+                "input_tokens": 8,
+                "output_tokens": 3,
+                "wall_time_ms": 12,
+                "cost_microusd": 4
+            },
+            "resource_usage": {
+                "model_calls": 2,
+                "input_tokens": 8,
+                "output_tokens": 3,
+                "wall_time_ms": 12,
+                "cost_microusd": 4
+            }
+        });
+        let error = parse_execution(
+            &execution,
+            "test-execution",
+            "reviewed_benchmark",
+            &target_digest,
+        ).expect_err("usage above the declared model-call cap must fail");
+        assert!(error.to_string().contains("exceeds declared cap"));
+
+        execution["resource_usage"]["model_calls"] = json!(1);
+        assert!(parse_execution(
+            &execution,
+            "test-execution",
+            "reviewed_benchmark",
+            &target_digest,
+        ).is_ok());
     }
 }
