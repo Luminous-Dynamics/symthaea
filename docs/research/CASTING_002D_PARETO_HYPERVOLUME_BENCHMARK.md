@@ -147,3 +147,34 @@ Suggested exact validation command:
     cargo test -p symthaea-core casting_multiobjective_benchmark
 
 The source is still test-only and these test cases have not been compiled or executed in this authoring environment. No method has yet been benchmarked across these fronts, and no physical casting or commercial equivalence claim is supported.
+
+
+## CASTING-002G — Largest-gap epsilon-constraint proposal baseline
+
+A new test-only proposal policy provides an auditable bridge from a Pareto archive to a candidate selected under an adaptive epsilon constraint. It is deliberately simpler than STAGE-BO and is not described as Bayesian optimization.
+
+The policy:
+1. Sorts the current Pareto front deterministically.
+2. Computes adjacent Euclidean gaps using a frozen, positive per-objective scale.
+3. Selects the largest normalized gap; ties resolve to the earliest gap in canonical objective order.
+4. Sets epsilon to the midpoint of the selected gap endpoints' second-objective values.
+5. Accepts only records containing candidate ID, predicted objective means and predictive standard deviations—never hidden evaluator truth.
+6. Requires the upper confidence bound \(\mu_2 + \beta\sigma_2\) to satisfy epsilon, then minimizes \(\mu_1-\beta\sigma_1\), with stable candidate-ID tie-breaking.
+7. Returns a receipt containing the gap endpoint trial IDs, epsilon, normalized gap, beta, selected ID and predictive bounds.
+
+This is a deterministic surrogate-output selector. It does **not** fit a surrogate, calculate constrained expected improvement, optimize hypervolume, reproduce STAGE-BO, or guarantee Pareto-front improvement. It must be compared against straightforward epsilon grids, random/grid/LHS baselines, GP-LCB and stronger external methods under identical objective scales and evaluation budgets before any quality claim.
+
+### Added tests and validation limits
+
+The module now has 29 authored test cases (24 existing archive/metric/ZDT tests plus 5 proposal-policy tests). New cases cover known largest-gap selection, uncertainty-aware epsilon filtering, input-order invariance, deterministic ID tie-breaking, invalid data, duplicate IDs and the no-candidate-feasible path.
+
+Research context:
+- STAGE-BO (ICML 2026) adapts epsilon constraints to target uncovered surrogate-front regions and uses constrained expected improvement: https://proceedings.mlr.press/v306/yang26af.html
+- BoTorch qLogNEHVI/qLogEHVI/qLogNParEGO are stronger reference implementations, not claimed reproduced here: https://botorch.org/docs/multi_objective
+- COCO BBOB-biobj supplies a standardized scalable bi-objective suite for later external validation: https://numbbo.github.io/coco/testsuites/bbob-biobj
+
+Exact-head Rust execution remains required:
+
+    cargo test -p symthaea-core casting_multiobjective_benchmark
+
+No test execution is claimed from this authoring environment.
