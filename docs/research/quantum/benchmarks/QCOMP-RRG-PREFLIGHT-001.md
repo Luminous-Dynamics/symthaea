@@ -2,6 +2,12 @@
 
 Status: **140-graph independent JavaScript preflight; not Rust execution or distributional certification**
 
+## Canonical implementation handoff
+
+The only Rust implementation is now centralized in [PR #8324](https://github.com/Luminous-Dynamics/symthaea/pull/8324): module `crates/domains/symthaea-quantum-comp/src/mis_random_regular.rs`, inspected commit `38ea70144397a7b2a864dac42c9ec473b50a369e`, blob `e2ad816606b774ce0b5e97170d6a8f7255f666a8`. Its CLI is `qcomp_rrg_generate`. It enforces 100,000 vertices, 1,000,000 stubs and 100,000 default pairing attempts. The duplicate `random_regular_mis.rs` implementation was removed from the cohort PR so there is one canonical API.
+
+The Rust source is aligned to this preflight's seed-stream semantics: XorShift64*, rejection-sampled Fisher–Yates draws and in-place re-shuffling of stubs between rejected pairings. This is an implementation alignment, not proof of parity: the Rust tests and CLI have not yet been compiled or executed, and the 140 serialized edge-list fingerprints in the JSON were produced by the independent JavaScript translation.
+
 ## What was exercised
 
 An in-tool JavaScript translation of the proposed configuration-pair-rejection generator created the first 20 seeds at each of the seven paper-shaped sizes (N = 50, 100, 200, 500, 1,000, 2,000, 5,000) with degree 3, using the cohort manifest's derived seed formula. Each attempt used the specified XorShift64* 64-bit stream, rejection-sampled bounded integers, Fisher–Yates stub shuffle, explicit self-loop/repeated-edge rejection, sorted canonical edges and exact degree/edge-count validation.
