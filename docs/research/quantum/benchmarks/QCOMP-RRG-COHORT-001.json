@@ -9,7 +9,13 @@
     "construction": "Create degree copies (stubs) for each labeled vertex; Fisher-Yates shuffle with rejection-sampled bounded integers; pair consecutive stubs; reject any self-loop or repeated undirected edge; sort/canonicalize accepted edges; validate every vertex has exact requested degree.",
     "output_format": "DIMACS edge format, one-based vertices, canonical sorted edges",
     "retry_policy": "maximum 100000 pairings per instance; exhaustions are explicit failures and must not be silently retried with a new seed",
-    "caveat": "Deterministic generation is not itself evidence that a sample is independent or distributionally representative. Test generator statistics before confirmatory use."
+    "caveat": "Deterministic generation is not itself evidence that a sample is independent or distributionally representative. Test generator statistics before confirmatory use.",
+    "resource_limits": {
+      "max_stubs_per_call": 1000000,
+      "source_constant": "MAX_RANDOM_REGULAR_MIS_STUBS",
+      "rationale": "The largest planned paper-shaped case is 5,000 vertices at degree 3 (15,000 stubs). The ceiling prevents accidental huge allocations through the public generator API.",
+      "raising_policy": "Any increase requires explicit review and documented memory/throughput evidence."
+    }
   },
   "motivation": {
     "primary_reference": "Wybo et al., Scalable quantum-enhanced greedy algorithm for maximum independent set problems, accepted by Physical Review Research on 2026-10-19",
@@ -12293,5 +12299,29 @@
       "compatibility": "Original algorithm constructs graph and independent set jointly through deferred edge revelation. It is not automatically a fixed-input MIS solver for arbitrary pre-materialized graph files.",
       "source_identity_scope": "Git commit and Git object IDs pin the source snapshot; they are not SHA-256 raw file digests."
     }
+  },
+  "generator_quality_evidence": {
+    "status": "small-N independent JavaScript sanity preflight; Rust test unexecuted; not distributional certification",
+    "artifact": "QCOMP-RRG-PREFLIGHT-001.json",
+    "checks": [
+      "140 graph structural/connectedness/uniqueness smoke sample across the seven paper-shaped N values",
+      "100,000 seeded JavaScript samples for N=6, degree 3 against the exact 1/7 K3,3 versus 6/7 prism class frequencies",
+      "Exhaustive enumeration of all 32,768 labeled simple graphs on six vertices confirms exactly 70 labeled cubic graphs in those two classes"
+    ],
+    "results": {
+      "small_n_samples": 100000,
+      "k33_observed_fraction": 0.14277,
+      "k33_exact_fraction": 0.14285714285714285,
+      "prism_observed_fraction": 0.85723,
+      "prism_exact_fraction": 0.8571428571428571,
+      "mean_pairing_attempts": 10.59313,
+      "exact_simple_pairing_acceptance_probability": 0.09477581242287125
+    },
+    "limitations": [
+      "JavaScript translation, not execution of the Rust implementation",
+      "Deterministic PRNG streams and fixed seed selection do not constitute independent true random draws",
+      "Small-N sanity checks do not certify larger-size random graph distributions",
+      "The authored 5,000-seed Rust distribution regression test has not been compiled or executed"
+    ]
   }
 }
