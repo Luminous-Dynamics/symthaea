@@ -15,7 +15,7 @@ Use a release build and pin the exact 40-hex source commit. Example:
 ```sh
 cargo run -p symthaea-hdc-store --example ann_benchmark --release -- \
   --source-sha="$(git rev-parse HEAD)" \
-  --size=10000 --queries=200 --rounds=5 --top-k=10 --seed=42
+  --size=10000 --clusters=64 --cluster-noise-bits=1024 --queries=200 --rounds=5 --top-k=10 --seed=42
 ```
 
 Run at multiple store sizes, using the same machine and compiler build:
@@ -24,7 +24,7 @@ Run at multiple store sizes, using the same machine and compiler build:
 for size in 1000 10000 50000; do
   cargo run -p symthaea-hdc-store --example ann_benchmark --release -- \
     --source-sha="$(git rev-parse HEAD)" \
-    --size="$size" --queries=200 --rounds=5 --top-k=10 --seed=42 \
+    --size="$size" --clusters=64 --cluster-noise-bits=1024 --queries=200 --rounds=5 --top-k=10 --seed=42 \
     > "broca-ann-$size.csv"
 done
 ```
@@ -39,22 +39,22 @@ The example includes focused tests for deterministic workload replay, exact corr
 cargo test -p symthaea-hdc-store --example ann_benchmark
 ```
 
-The CLI requires a full 40-hex source SHA that exactly matches `git rev-parse HEAD`, and it rejects a dirty tracked working tree. This binds results to the checked-out commit rather than merely echoing a caller-supplied identifier. It also rejects unknown arguments, zero size/query/round/top-K values, and noise levels above the vector dimension.
+The CLI requires a full 40-hex source SHA that exactly matches `git rev-parse HEAD`, and it rejects a dirty tracked working tree. This binds results to the checked-out commit rather than merely echoing a caller-supplied identifier. It also rejects unknown arguments, zero size/query/round/top-K values, a cluster count outside `1..=size`, and either noise level above the vector dimension.
 
 ## Workload contract
 
-- The store contains deterministic, seeded 16,384-bit BinaryHV vectors, inserted through the actual HdcStore API.
-- Eighty percent of query cases are probes based on an inserted vector with a deterministic 128-bit corruption by default; twenty percent are generated novel probes.
-- Exact search defines the reference top-K IDs for that same query and store. Recall@K is intersection size divided by the number of exact top-K results (which is `min(K, live_count)`).
-- The LSH path reports actual examined vectors, the live-vector count, whether the result was exhaustive, and whether it fell back to exact search.
+- The store contains deterministic, seeded 16,384-bit BinaryHV vectors inserted through the real HdcStore API. Each vector is a deterministic prototype for one of `--clusters=64` clusters, corrupted with `--cluster-noise-bits=1024` flips by default. This creates controlled, non-identical neighbors within a cluster and separated prototypes across clusters.
+- Eighty percent of query cases are known-memory probes: a stored vector is corrupted with `--noise-bits=128` additional flips. Twenty percent are random out-of-distribution (OOD) probes.
+- The exact full scan defines reference top-K IDs. Recall@K is intersection size divided by the number of exact top-K results (which is `min(K, live_count)`). For the synthetic OOD class, exact top-K is still a mathematical retrieval reference but does not imply there is a semantically relevant answer; do not use its Recall@K as the primary quality gate.
+- The LSH path reports vectors examined, total live vectors, exhaustive status and exact-fallback status.
 - Exact and approximate retrieval calls alternate order per query/round. Query creation, store construction, ID comparison and CSV output are outside the timed retrieval intervals.
-- The report records a unique-query quality summary from round zero and latency percentiles across all repeated query samples. Repeated rounds are latency repetitions, not independent statistical samples.
+- The report separately emits quality and latency summaries for `near_neighbor` and `novel` queries. Quality is summarized from unique queries in round zero; latency percentiles use all repeated samples. Repeated rounds are latency repetitions, not independent statistical samples.
 
-This is a controlled synthetic workload, not a realistic semantic-memory corpus. Seeded random vectors and bounded bit flips do not reproduce the geometry, duplicate rates, clustered topics, stale facts, user/session scopes or semantic neighborhoods found in long-running agents. A strong result here is a retrieval-substrate signal only.
+This controlled clustered workload is still not a realistic semantic-memory corpus. It does not reproduce organic topic structure, duplicate/contradictory facts, temporal updates, deletion semantics, user/session isolation or long-running agent behavior. Passing these gates is a retrieval-substrate signal only, not evidence that downstream memory tasks improve.
 
 ## Initial acceptance targets (proposed, not achieved)
 
-Keep the existing `AnnValidationThresholds` expectations aligned with this report. For a store size of 10,000 or more and at least 100 unique queries, the approximate path should meet **all** of the following in the evaluated workload:
+For a store size of 10,000 or more and at least 100 unique queries, the approximate path should meet **all** of the following for the `near_neighbor` query class. The OOD class is reported separately; it must not be pooled into the acceptance gate because arbitrary random vectors do not define a meaningful answerability target. These are proposed engineering targets, not published SOTA thresholds:
 
 | Measure | Initial target |
 |---|---:|
@@ -65,7 +65,7 @@ Keep the existing `AnnValidationThresholds` expectations aligned with this repor
 | Fraction of queries that fell back to exact | ≤ 0.05 |
 | p95 retrieval latency relative to exact | ≥ 2× faster (exact p95 / approximate p95 ≥ 2) |
 
-These are engineering gates to test and recalibrate, not published SOTA thresholds. Report every raw query, not only aggregate averages. A failure is useful evidence; do not loosen thresholds or omit failed query classes after seeing the result.
+Report every raw query and both classes, not only aggregate averages. A failure is useful evidence; do not loosen thresholds or omit failed query classes after seeing the result. Add a separate, labeled abstention/no-relevant-evidence evaluation before making claims about OOD behavior.
 
 ## Industry comparison: keep two evaluation layers separate
 
@@ -98,8 +98,8 @@ The current program reports OS, target architecture, available parallelism, work
 
 ## Next gates
 
-1. Run the exact source-bound benchmark with default options and no-fallback options at 1k, 10k and 50k vectors.
-2. Add clustered, duplicate, contradictory, stale-update, delete and scope-isolation workloads; report each class separately.
+1. Run the source-bound benchmark with default options and no-fallback options at 1k, 10k and 50k vectors; sweep cluster counts/noise and LSH parameters with the same seeded runs.
+2. Add duplicate, contradictory, stale-update, delete and scope-isolation workloads; report each class separately.
 3. Compare against at least one established ANN implementation and a brute-force SIMD baseline on the identical vectors, queries and top-K. Include index build time, memory overhead, update/delete cost and cold-start behavior.
 4. Wire the winning search policy into an opt-in MemoryBridge experiment only after recall and fallback criteria pass.
 5. Measure end-to-end task success and error classes against no-memory, exact HDC, approximate HDC, and industry-standard retrieval baselines at matched budgets.
