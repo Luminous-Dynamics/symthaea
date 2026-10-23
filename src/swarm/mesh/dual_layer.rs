@@ -673,11 +673,13 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "mesh-encryption")]
     #[derive(Clone)]
     struct RecordingTransport {
         sent: std::sync::Arc<Mutex<Vec<Vec<u8>>>>,
     }
 
+    #[cfg(feature = "mesh-encryption")]
     impl MeshTransport for RecordingTransport {
         fn send_raw(&self, data: &[u8]) -> Result<(), MeshError> {
             self.sent
