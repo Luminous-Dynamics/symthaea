@@ -171,10 +171,12 @@ impl DetectorPanelScorer {
             .ok_or(DetectorPanelError::InvalidSelectionShape)?
             .len();
         if detector_count == 0
-            || !clean_selection_scores.iter().all(|row| row.len() == detector_count)
-            || perturbed_selection_families.iter().any(|family| {
-                family.iter().any(|row| row.len() != detector_count)
-            })
+            || !clean_selection_scores
+                .iter()
+                .all(|row| row.len() == detector_count)
+            || perturbed_selection_families
+                .iter()
+                .any(|family| family.iter().any(|row| row.len() != detector_count))
         {
             return Err(DetectorPanelError::InvalidSelectionShape);
         }
@@ -300,8 +302,7 @@ impl DetectorPanelScorer {
         let mut positive_z_scores = Vec::with_capacity(self.selected.len());
         for selected in &self.selected {
             let score = detector_scores[selected.detector_index];
-            let oriented_z = selected.orientation as f64
-                * (score - selected.clean_mean)
+            let oriented_z = selected.orientation as f64 * (score - selected.clean_mean)
                 / selected.clean_scale.max(self.scale_floor);
             if !oriented_z.is_finite() {
                 return None;
@@ -313,10 +314,9 @@ impl DetectorPanelScorer {
             DetectorPanelAggregation::MeanPositiveZ => {
                 positive_z_scores.iter().sum::<f64>() / positive_z_scores.len() as f64
             }
-            DetectorPanelAggregation::MaxPositiveZ => positive_z_scores
-                .iter()
-                .copied()
-                .fold(0.0_f64, f64::max),
+            DetectorPanelAggregation::MaxPositiveZ => {
+                positive_z_scores.iter().copied().fold(0.0_f64, f64::max)
+            }
         };
         aggregate.is_finite().then_some(aggregate)
     }
@@ -414,7 +414,10 @@ fn column_scales(matrix: &[Vec<f64>], means: &[f64], width: usize) -> Option<Vec
         .into_iter()
         .map(|sum| (sum / matrix.len() as f64).sqrt())
         .collect::<Vec<_>>();
-    scales.iter().all(|scale| scale.is_finite()).then_some(scales)
+    scales
+        .iter()
+        .all(|scale| scale.is_finite())
+        .then_some(scales)
 }
 
 /// Exact empirical AUC for perturbed-positive observations against clean-negative observations.
@@ -518,10 +521,12 @@ mod tests {
         // operational change affects only detector 2, which selection correctly cannot infer.
         operational_scores[2] = 1000.0;
         assert_eq!(panel.score(&operational_scores), Some(0.0));
-        assert!(!panel
-            .selected_detectors()
-            .iter()
-            .any(|detector| detector.detector_index == 2));
+        assert!(
+            !panel
+                .selected_detectors()
+                .iter()
+                .any(|detector| detector.detector_index == 2)
+        );
     }
 
     #[test]
@@ -639,9 +644,13 @@ mod tests {
         let mut outer_clean = Vec::new();
         let mut state = 0x61A7_0E5D_93C2_B841_u64;
         for _ in 0..100 {
-            state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1);
             let x = ((state >> 11) as f64 / ((1_u64 << 53) as f64)) * 1.95;
-            state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1);
             let quiet = ((state >> 11) as f64 / ((1_u64 << 53) as f64)) * 0.4;
             outer_clean.push(panel.score(&[x, x * 0.8, quiet]).unwrap());
         }
