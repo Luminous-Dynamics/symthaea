@@ -1,0 +1,79 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_kind": "arctic-hydrocarbon-summary-transcription",
+  "status": "source_cited_transcription",
+  "evidence_tier": "S1",
+  "claim_ceiling": "transcription_only",
+  "created_date": "2026-10-23",
+  "source_record": {
+    "source_id": "usgs-circum-arctic-resource-appraisal-2008",
+    "title": "Circum-Arctic Resource Appraisal: Estimates of Undiscovered Oil and Gas North of the Arctic Circle",
+    "publisher": "United States Geological Survey",
+    "publication_year": 2008,
+    "url": "https://pubs.usgs.gov/fs/2008/3049/",
+    "catalog_url": "https://www.usgs.gov/publications/circum-arctic-resource-appraisal-estimates-undiscovered-oil-and-gas-north-arctic",
+    "source_bytes_downloaded_by_this_workstream": false,
+    "raw_data_ingested": false,
+    "raw_sha256": null,
+    "source_media_type": "web citation/transcribed summary; underlying source bytes not locally hashed",
+    "license_and_reuse_review": "not_completed_in_this_workstream",
+    "note": "Values transcribed from the USGS published fact-sheet summary; this record does not claim independent table reproduction."
+  },
+  "scope": {
+    "geographic_scope": "areas_north_of_arctic_circle",
+    "assessment_unit_count": 33,
+    "publication_year": 2008,
+    "resource_class": "undiscovered_conventional_resources",
+    "assessment_method": "geology-based probabilistic resource assessment",
+    "north_pole_specific_estimate_present": false,
+    "geographic_limits_note": "The appraisal covers 33 geological provinces north of the Arctic Circle, not the geographic North Pole alone."
+  },
+  "reported_estimates": [
+    {
+      "resource": "oil",
+      "value": 90,
+      "unit": "billion_barrels",
+      "statistic": "sum_of_mean_estimates",
+      "resource_class": "undiscovered_conventional_resource"
+    },
+    {
+      "resource": "natural_gas",
+      "value": 1669,
+      "unit": "trillion_cubic_feet",
+      "statistic": "sum_of_mean_estimates",
+      "resource_class": "undiscovered_conventional_resource"
+    },
+    {
+      "resource": "natural_gas_liquids",
+      "value": 44,
+      "unit": "billion_barrels",
+      "statistic": "sum_of_mean_estimates",
+      "resource_class": "undiscovered_conventional_resource"
+    }
+  ],
+  "reported_qualifiers": [
+    {
+      "field": "share_expected_offshore",
+      "value_approx_percent": 84,
+      "meaning": "The fact sheet states approximately 84% is expected in offshore areas.",
+      "current_production_statistic": false
+    }
+  ],
+  "unassessed_dimensions": [
+    "current proved reserves",
+    "economic reserves and project-level commercial viability",
+    "current production volumes",
+    "project licenses and approvals",
+    "jurisdiction and delimitation for a specific location",
+    "lifecycle greenhouse gas emissions and methane leakage",
+    "spill-response capability and ecological/community impacts",
+    "alternative energy pathways and demand scenarios"
+  ],
+  "limitations": [
+    "This is an S1 cited transcription, not raw-byte-verified ingestion.",
+    "The source publication is from 2008; the result is not a current reserve estimate.",
+    "Undiscovered conventional resource estimates are not proved reserves, economic reserves, discoveries or production.",
+    "The values describe areas north of the Arctic Circle, not a resource quantity located at the geographic North Pole.",
+    "No drilling recommendation, site-specific assessment, legal conclusion or development authorization is provided."
+  ]
+}

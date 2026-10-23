@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Arctic hydrocarbon summary transcription v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_kind",
+    "status",
+    "evidence_tier",
+    "claim_ceiling",
+    "created_date",
+    "source_record",
+    "scope",
+    "reported_estimates",
+    "reported_qualifiers",
+    "unassessed_dimensions",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "artifact_kind": {
+      "const": "arctic-hydrocarbon-summary-transcription"
+    },
+    "status": {
+      "const": "source_cited_transcription"
+    },
+    "evidence_tier": {
+      "const": "S1"
+    },
+    "claim_ceiling": {
+      "const": "transcription_only"
+    },
+    "created_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "source_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "title",
+        "publisher",
+        "publication_year",
+        "url",
+        "catalog_url",
+        "source_bytes_downloaded_by_this_workstream",
+        "raw_data_ingested",
+        "raw_sha256",
+        "license_and_reuse_review",
+        "note"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publisher": {
+          "const": "United States Geological Survey"
+        },
+        "publication_year": {
+          "const": 2008
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "catalog_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_bytes_downloaded_by_this_workstream": {
+          "const": false
+        },
+        "raw_data_ingested": {
+          "const": false
+        },
+        "raw_sha256": {
+          "type": "null"
+        },
+        "license_and_reuse_review": {
+          "const": "not_completed_in_this_workstream"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 10
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "geographic_scope",
+        "assessment_unit_count",
+        "publication_year",
+        "resource_class",
+        "assessment_method",
+        "north_pole_specific_estimate_present",
+        "geographic_limits_note"
+      ],
+      "properties": {
+        "geographic_scope": {
+          "const": "areas_north_of_arctic_circle"
+        },
+        "assessment_unit_count": {
+          "const": 33
+        },
+        "publication_year": {
+          "const": 2008
+        },
+        "resource_class": {
+          "const": "undiscovered_conventional_resources"
+        },
+        "assessment_method": {
+          "const": "geology-based probabilistic resource assessment"
+        },
+        "north_pole_specific_estimate_present": {
+          "const": false
+        },
+        "geographic_limits_note": {
+          "type": "string",
+          "minLength": 10
+        }
+      }
+    },
+    "reported_estimates": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resource",
+          "value",
+          "unit",
+          "statistic",
+          "resource_class"
+        ],
+        "properties": {
+          "resource": {
+            "enum": [
+              "oil",
+              "natural_gas",
+              "natural_gas_liquids"
+            ]
+          },
+          "value": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "unit": {
+            "enum": [
+              "billion_barrels",
+              "trillion_cubic_feet"
+            ]
+          },
+          "statistic": {
+            "const": "sum_of_mean_estimates"
+          },
+          "resource_class": {
+            "const": "undiscovered_conventional_resource"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "resource": {
+                  "const": "natural_gas"
+                }
+              },
+              "required": [
+                "resource"
+              ]
+            },
+            "then": {
+              "properties": {
+                "unit": {
+                  "const": "trillion_cubic_feet"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "resource": {
+                  "enum": [
+                    "oil",
+                    "natural_gas_liquids"
+                  ]
+                }
+              },
+              "required": [
+                "resource"
+              ]
+            },
+            "then": {
+              "properties": {
+                "unit": {
+                  "const": "billion_barrels"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "reported_qualifiers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field",
+          "value_approx_percent",
+          "meaning",
+          "current_production_statistic"
+        ],
+        "properties": {
+          "field": {
+            "const": "share_expected_offshore"
+          },
+          "value_approx_percent": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "meaning": {
+            "type": "string",
+            "minLength": 10
+          },
+          "current_production_statistic": {
+            "const": false
+          }
+        }
+      }
+    },
+    "unassessed_dimensions": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "string",
+        "minLength": 5
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 10
+      }
+    }
+  },
+  "allOf": []
+}

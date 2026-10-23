@@ -1,0 +1,25 @@
+name: Arctic Hydrocarbon Summary Evidence
+on:
+  pull_request:
+    paths:
+      - "research/arctic-hydrocarbon-atlas/**"
+      - "scripts/check-arctic-hydrocarbon-summary.sh"
+      - ".github/workflows/arctic-hydrocarbon-summary.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "research/arctic-hydrocarbon-atlas/**"
+      - "scripts/check-arctic-hydrocarbon-summary.sh"
+      - ".github/workflows/arctic-hydrocarbon-summary.yml"
+permissions:
+  contents: read
+jobs:
+  summary-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Syntax-check smoke validator
+        run: bash -n scripts/check-arctic-hydrocarbon-summary.sh
+      - name: Check cited transcription and negative controls
+        run: bash scripts/check-arctic-hydrocarbon-summary.sh --self-test
