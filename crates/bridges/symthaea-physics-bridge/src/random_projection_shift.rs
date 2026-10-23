@@ -6,8 +6,8 @@
 //!
 //! The exact moment/correlation scorer in feature_shift computes all feature-pair
 //! correlations and therefore costs O(n d²) for a batch with n rows and d features.
-//! This scorer freezes k < d Rademacher projections at fit time, then measures mean,
-//! scale, and pairwise-correlation changes in that k-dimensional sketch. Scoring costs
+//! This scorer preserves exact per-feature mean/scale checks in O(n d) time and freezes
+//! k < d Rademacher projections to approximate pairwise-correlation changes. Scoring costs
 //! O(n d k + n k²). Projection signs are precomputed as compact one-byte coefficients, avoiding
 //! repeated hash mixing for every audit observation and avoiding an f64 projection matrix.
 //!
@@ -120,6 +120,30 @@ impl RandomProjectionFeatureShiftScorer {
             return None;
         }
 
+        // Preserve sparse marginal-shift sensitivity at O(n d) cost rather than relying
+        // only on sketches, where a one-coordinate mean/scale change can be diluted.
+        let audit_feature_means = column_means(audit_rows, self.feature_means.len())?;
+        let audit_feature_scales =
+            column_scales(audit_rows, &audit_feature_means, self.feature_means.len())?;
+        let n = audit_rows.len() as f64;
+        let mut normalized_mean_shift = 0.0_f64;
+        let mut normalized_scale_shift = 0.0_f64;
+        for index in 0..self.feature_means.len() {
+            let reference_scale = self.feature_scales[index].max(self.scale_floor);
+            let mean_shift = (audit_feature_means[index] - self.feature_means[index]).abs()
+                / reference_scale
+                * n.sqrt();
+            let scale_shift = (audit_feature_scales[index].max(self.scale_floor).ln()
+                - reference_scale.ln())
+            .abs()
+                * (n / 2.0).sqrt();
+            if !mean_shift.is_finite() || !scale_shift.is_finite() {
+                return None;
+            }
+            normalized_mean_shift = normalized_mean_shift.max(mean_shift);
+            normalized_scale_shift = normalized_scale_shift.max(scale_shift);
+        }
+
         let projected_audit = project_rows(
             audit_rows,
             &self.feature_means,
@@ -136,10 +160,9 @@ impl RandomProjectionFeatureShiftScorer {
             &audit_scales,
             self.projection_count,
         )?;
-        let n = audit_rows.len() as f64;
 
-        let mut normalized_mean_shift = 0.0_f64;
-        let mut normalized_scale_shift = 0.0_f64;
+        // Projected mean/scale views can add power for diffuse alternatives. Max with the
+        // exact marginal views above so sketches cannot erase large one-feature shifts.
         for index in 0..self.projection_count {
             let reference_scale =
                 self.reference_projection_scales[index].max(PROJECTED_SCALE_FLOOR);
@@ -448,7 +471,7 @@ mod tests {
     }
 
     #[test]
-    fn random_projection_feature_shift_exposes_sparse_shift_tradeoff() {
+    fn random_projection_feature_shift_preserves_sparse_marginal_shift_sensitivity() {
         let reference = orthogonal_reference();
         let projected =
             RandomProjectionFeatureShiftScorer::fit(&reference, 16, 1e-8, 0xA4D2_9187).unwrap();
@@ -465,10 +488,13 @@ mod tests {
         let exact_score = exact.score(&sparse_shift).unwrap();
         let projected_score = projected.score(&sparse_shift).unwrap();
 
-        // One-coordinate effects are diluted in random projections; retain the exact scorer
-        // or another detector when sparse shifts are material to the application.
+        // The low-cost exact marginal pass protects sparse first/second-moment alternatives.
         assert!(exact_score.normalized_mean_shift > 5.0);
-        assert!(projected_score.normalized_mean_shift < 1.0);
+        assert!(projected_score.normalized_mean_shift > 5.0);
+        assert!(
+            (projected_score.normalized_mean_shift - exact_score.normalized_mean_shift).abs()
+                < 1e-8
+        );
     }
 
     #[test]
