@@ -542,6 +542,61 @@ mod tests {
     }
 
     #[test]
+    fn numerical_overflow_never_becomes_a_no_change_result() {
+        let mut monitor = monitor(OutcomeDirection::HigherIsWorse);
+        alarm_at_five(&mut monitor);
+        for index in 2..5 {
+            monitor.record_outcome(index, 9, f64::MAX).unwrap();
+        }
+        for index in 5..8 {
+            monitor.record_outcome(index, 9, f64::MAX).unwrap();
+        }
+        assert_eq!(
+            monitor.assess(5).unwrap().association,
+            OutcomeAssociation::NumericalOverflow
+        );
+    }
+
+    #[test]
+    fn invalid_configuration_is_rejected_before_stream_processing() {
+        let valid = DelayedOutcomeConfig {
+            window_size: 3,
+            min_labeled_per_window: 2,
+            min_labeled_fraction: 0.66,
+            minimum_effect: 0.5,
+            direction: OutcomeDirection::HigherIsWorse,
+        };
+        assert!(matches!(
+            DelayedOutcomeMonitor::new(DelayedOutcomeConfig {
+                window_size: 0,
+                ..valid
+            }),
+            Err(DelayedOutcomeError::InvalidWindowSize)
+        ));
+        assert!(matches!(
+            DelayedOutcomeMonitor::new(DelayedOutcomeConfig {
+                min_labeled_per_window: 0,
+                ..valid
+            }),
+            Err(DelayedOutcomeError::InvalidMinimumLabelCount)
+        ));
+        assert!(matches!(
+            DelayedOutcomeMonitor::new(DelayedOutcomeConfig {
+                min_labeled_fraction: f64::NAN,
+                ..valid
+            }),
+            Err(DelayedOutcomeError::InvalidMinimumLabelFraction)
+        ));
+        assert!(matches!(
+            DelayedOutcomeMonitor::new(DelayedOutcomeConfig {
+                minimum_effect: f64::INFINITY,
+                ..valid
+            }),
+            Err(DelayedOutcomeError::InvalidMinimumEffect)
+        ));
+    }
+
+    #[test]
     fn stream_indices_and_alarms_fail_closed() {
         let mut monitor = monitor(OutcomeDirection::HigherIsWorse);
         monitor.observe(10).unwrap();
