@@ -984,12 +984,7 @@ fn audit_scored_task(
     let mut reasons = Vec::new();
     let patch_sha = prediction_patch.map(|patch| sha256_bytes(patch.as_bytes()));
     let mut scored_log_sha = None;
-    let mut evaluation_evidence_sha = None;
     let mut image_id_observed = None;
-    let mut workspace_clean_exit_code = None;
-    let mut network_mode_observed = None;
-    let mut repo_head_sha_observed = None;
-    let mut runtime_platform_observed = None;
 
     let (all_test_ids, explicit_f2p, baseline_pass) =
         match validate_task_oracle(task, candidate, candidate_row_sha256, task_validation_dir) {
@@ -1064,7 +1059,7 @@ fn audit_scored_task(
             };
         }
     };
-    evaluation_evidence_sha = Some(sha256_bytes(&evidence_bytes));
+    let evaluation_evidence_sha = Some(sha256_bytes(&evidence_bytes));
     let evidence: Value = match serde_json::from_slice(&evidence_bytes) {
         Ok(value) => value,
         Err(error) => {
@@ -1088,22 +1083,22 @@ fn audit_scored_task(
         }
     };
 
-    workspace_clean_exit_code = evidence
+    let workspace_clean_exit_code = evidence
         .get("workspace_clean_exit_code")
         .and_then(Value::as_i64);
     if workspace_clean_exit_code != Some(0) {
         reasons.push("scored worktree was dirty or cleanliness inspection failed".to_string());
     }
-    network_mode_observed = evidence
+    let network_mode_observed = evidence
         .get("container_identity")
         .and_then(|identity| identity.get("network_mode"))
         .and_then(Value::as_str)
         .map(str::to_string);
-    repo_head_sha_observed = evidence
+    let repo_head_sha_observed = evidence
         .get("repo_head_sha")
         .and_then(Value::as_str)
         .map(str::to_string);
-    runtime_platform_observed = evidence
+    let runtime_platform_observed = evidence
         .get("container_identity")
         .and_then(|identity| identity.get("runtime_platform"))
         .and_then(Value::as_str)
@@ -1427,9 +1422,9 @@ fn run(cli: Cli) -> Result<(), String> {
     if candidate_rows.len() as u64 != expected_candidate_rows {
         return Err(format!(
             concat!(
-                "candidate row count differs from locked manifest: expected ",
-                "{expected_candidate_rows}, observed {}"
+                "candidate row count differs from locked manifest: expected {}, observed {}"
             ),
+            expected_candidate_rows,
             candidate_rows.len()
         ));
     }
