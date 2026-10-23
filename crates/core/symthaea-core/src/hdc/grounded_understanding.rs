@@ -74,7 +74,7 @@
 
 use super::binary_hv::BinaryHV;
 use super::universal_semantics::{SemanticPrime, UniversalSemantics};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 // =============================================================================
 // PLACEHOLDER: CausalRoleMarkers (stub until causal_mind module implemented)
@@ -736,6 +736,29 @@ impl LexicalGrounding {
         self.causal_markers.get(&word.to_lowercase()).copied()
     }
 
+    /// Return groups of words that map to the exact same ordered semantic-prime sequence.
+    ///
+    /// This is a representation-collision diagnostic, not a synonym detector:
+    /// distinct words may share a coarse decomposition while differing in meaning.
+    /// Groups and words are sorted deterministically for stable audit output.
+    pub fn identical_prime_groups(&self) -> Vec<(Vec<SemanticPrime>, Vec<String>)> {
+        let mut groups: BTreeMap<Vec<SemanticPrime>, Vec<String>> = BTreeMap::new();
+        for (word, primes) in &self.word_primes {
+            groups.entry(primes.clone()).or_default().push(word.clone());
+        }
+
+        groups
+            .into_iter()
+            .filter_map(|(primes, mut words)| {
+                if words.len() < 2 {
+                    return None;
+                }
+                words.sort();
+                Some((primes, words))
+            })
+            .collect()
+    }
+
     /// Get number of words in lexicon
     pub fn lexicon_size(&self) -> usize {
         self.word_primes.len()
@@ -1136,6 +1159,43 @@ mod tests {
         // Test valence
         assert!(lexicon.valence("happy").unwrap() > 0.5);
         assert!(lexicon.valence("sad").unwrap() < -0.5);
+    }
+
+    #[test]
+    fn exact_prime_collision_audit_is_deterministic_and_not_a_synonym_claim() {
+        let lexicon = LexicalGrounding::new();
+        let groups = lexicon.identical_prime_groups();
+
+        assert!(!groups.is_empty(), "the current lexicon has known exact-prime collisions");
+        assert_eq!(
+            groups,
+            lexicon.identical_prime_groups(),
+            "collision audit output must be deterministic"
+        );
+        for (_, words) in &groups {
+            assert!(words.len() >= 2, "each reported group must be a real collision");
+            assert!(
+                words.windows(2).all(|pair| pair[0] < pair[1]),
+                "words within each group must be sorted and unique: {words:?}"
+            );
+        }
+        let participating_words: usize = groups.iter().map(|(_, words)| words.len()).sum();
+        assert!(
+            participating_words <= lexicon.lexicon_size(),
+            "a lexeme cannot appear in more than one exact-sequence collision group"
+        );
+
+        let mother_father = groups
+            .iter()
+            .find(|(_, words)| {
+                words.len() == 2 && words[0] == "father" && words[1] == "mother"
+            })
+            .expect("known mother/father alias should be visible to the audit");
+        assert_eq!(
+            mother_father.0,
+            vec![SemanticPrime::Someone, SemanticPrime::Live],
+            "the collision audit must report the exact shared representation"
+        );
     }
 
     #[test]
