@@ -78,7 +78,7 @@ pub(in crate::cognitive_loop) fn parallel_semantic_causal(
     semantic_hdc: Vec<f32>,
     compressed_state: &[f32],
     output: &[f32],
-    prediction_error: f32,
+    prediction_error: Option<f32>,
     total_cycles: usize,
 ) -> Option<crate::memory::semantic_memory::SemanticEntry> {
     // Semantic memory stores PE as an outcome label, so don't persist a
