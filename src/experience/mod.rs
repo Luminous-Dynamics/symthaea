@@ -750,6 +750,29 @@ mod tests {
     }
 
     #[test]
+    fn invalid_prediction_error_does_not_select_probe_primitive() {
+        let mut bus = ExperienceBus::with_defaults();
+        bus.current_signals = PrincipledSignals {
+            prediction_error: 1.0,
+            prediction_error_valid: false,
+            uncertainty: 0.2,
+            coherence: 0.8,
+            confidence: 0.8,
+            salience: 0.2,
+            phi_monitor: 0.0,
+        };
+
+        let (invalid_primitives, invalid_rules) = bus.select_primitives_principled();
+        assert!(!invalid_primitives.contains(&"PROBE".to_string()));
+        assert!(!invalid_rules.iter().any(|rule| rule.contains("prediction_error")));
+
+        bus.current_signals.prediction_error_valid = true;
+        let (valid_primitives, valid_rules) = bus.select_primitives_principled();
+        assert!(valid_primitives.contains(&"PROBE".to_string()));
+        assert!(valid_rules.iter().any(|rule| rule.contains("valid prediction_error")));
+    }
+
+    #[test]
     fn test_primitive_selection_high_uncertainty() {
         let mut bus = ExperienceBus::with_defaults();
 
