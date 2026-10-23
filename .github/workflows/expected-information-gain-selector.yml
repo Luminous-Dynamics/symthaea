@@ -9,11 +9,15 @@ on:
       - "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs"
       - "crates/bridges/symthaea-physics-bridge/src/model_adequacy.rs"
       - "crates/bridges/symthaea-physics-bridge/src/adequacy_calibration.rs"
+      - "crates/bridges/symthaea-physics-bridge/src/feature_shift.rs"
+      - "crates/bridges/symthaea-physics-bridge/tests/diagnostic_fusion_benchmark.rs"
+      - "crates/bridges/symthaea-physics-bridge/src/sequential_adequacy.rs"
       - "crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs"
       - "crates/bridges/symthaea-physics-bridge/src/lib.rs"
       - "docs/research/EXPECTED_INFORMATION_GAIN_SELECTOR_V0_1.md"
       - "docs/research/ROBUST_INFORMATION_GAIN_MODEL_SCENARIOS_V0_1.md"
       - "docs/research/CALIBRATED_MODEL_ADEQUACY_AUDITS_V0_1.md"
+      - "docs/research/SEQUENTIAL_MODEL_ADEQUACY_MONITOR_V0_1.md"
       - ".github/workflows/expected-information-gain-selector.yml"
   workflow_dispatch:
 
@@ -40,13 +44,22 @@ jobs:
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/model_adequacy.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/adequacy_calibration.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/feature_shift.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/diagnostic_fusion_benchmark.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/sequential_adequacy.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs
       - name: Test information-gain selector
         run: cargo test -p symthaea-core hdc::conjecture_engine::experiment_selection --lib
       - name: Run paired law-discovery selector pilot
         run: cargo test -p symthaea-physics-bridge expected_information_gain_vs_variance_on_paired_seeds --lib -- --nocapture
-      - name: Test conformal adequacy calibration
-        run: cargo test -p symthaea-physics-bridge adequacy_calibration --lib
+      - name: Test conformal adequacy calibration and matched null controls
+        run: cargo test -p symthaea-physics-bridge adequacy_calibration --lib -- --nocapture
+      - name: Test fixed-reference feature-shift scorer
+        run: cargo test -p symthaea-physics-bridge feature_shift --lib
+      - name: Run diagnostic-fusion and covariate-shift benchmarks
+        run: cargo test -p symthaea-physics-bridge --test diagnostic_fusion_benchmark -- --nocapture
+      - name: Test finite-horizon sequential adequacy monitor
+        run: cargo test -p symthaea-physics-bridge sequential_adequacy --lib
       - name: Test model-adequacy decision semantics
         run: cargo test -p symthaea-physics-bridge model_adequacy --lib
       - name: Test exhaustive model-adequacy contract
