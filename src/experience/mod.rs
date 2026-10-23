@@ -406,6 +406,7 @@ impl ExperienceBus {
 
         PrincipledSignals {
             prediction_error,
+            prediction_error_valid: !similar_experiences.is_empty(),
             uncertainty,
             coherence,
             confidence,
