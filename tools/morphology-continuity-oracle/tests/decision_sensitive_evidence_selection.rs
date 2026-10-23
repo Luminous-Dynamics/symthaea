@@ -32,9 +32,7 @@ fn decisions() -> [Decision; 2] {
         Decision {
             losses: [0, 100, 100],
         },
-        Decision {
-            losses: [4, 4, 4],
-        },
+        Decision { losses: [4, 4, 4] },
     ]
 }
 
@@ -114,9 +112,7 @@ fn expected_loss_after_measurement(
                 .map(|decision| {
                     (0..weights.len())
                         .filter(|index| measurement.outcomes[*index] == *label)
-                        .map(|index| {
-                            weights[index] as f64 * f64::from(decision.losses[index])
-                        })
+                        .map(|index| weights[index] as f64 * f64::from(decision.losses[index]))
                         .sum::<f64>()
                 })
                 .fold(f64::INFINITY, f64::min)
@@ -205,13 +201,12 @@ fn choose_by_brier_per_cost(candidates: &[Measurement], weights: [u64; 3]) -> Op
         .filter(|candidate| candidate.cost_milliunits > 0)
         .filter_map(|candidate| {
             let value = expected_brier_reduction(candidate, weights);
-            (value > EPSILON).then_some((
-                candidate,
-                value / f64::from(candidate.cost_milliunits),
-            ))
+            (value > EPSILON).then_some((candidate, value / f64::from(candidate.cost_milliunits)))
         })
         .max_by(|(left, left_ratio), (right, right_ratio)| {
-            left_ratio.total_cmp(right_ratio).then_with(|| right.id.cmp(left.id))
+            left_ratio
+                .total_cmp(right_ratio)
+                .then_with(|| right.id.cmp(left.id))
         })
         .map(|(candidate, _)| candidate)
 }
@@ -248,8 +243,7 @@ fn decision_value_can_reverse_the_brier_per_cost_ranking() {
 
     // Brier reduction per cost chooses the more informative design record.
     assert_eq!(
-        choose_by_brier_per_cost(&candidates, PRIOR_WEIGHTS)
-            .map(|candidate| candidate.id),
+        choose_by_brier_per_cost(&candidates, PRIOR_WEIGHTS).map(|candidate| candidate.id),
         Some("design-record")
     );
 
@@ -273,7 +267,11 @@ fn repeated_or_unverified_measurements_have_no_qualified_decision_value() {
     assert!((evsi(repeat, PRIOR_WEIGHTS, &decision_set) - 0.0).abs() <= EPSILON);
     assert!((evsi(unverified, PRIOR_WEIGHTS, &decision_set) - 0.0).abs() <= EPSILON);
     assert_eq!(
-        choose_by_value_per_cost(&[repeat, unverified, zero_cost], PRIOR_WEIGHTS, &decision_set),
+        choose_by_value_per_cost(
+            &[repeat, unverified, zero_cost],
+            PRIOR_WEIGHTS,
+            &decision_set
+        ),
         None
     );
 }
@@ -290,9 +288,8 @@ fn permuting_hypotheses_with_losses_and_priors_preserves_decision_value() {
     ];
     let original = measurements();
     let original_decisions = decisions();
-    let expected_choice =
-        choose_by_value_per_cost(&original, PRIOR_WEIGHTS, &original_decisions)
-            .map(|candidate| candidate.id);
+    let expected_choice = choose_by_value_per_cost(&original, PRIOR_WEIGHTS, &original_decisions)
+        .map(|candidate| candidate.id);
 
     for permutation in PERMUTATIONS {
         let weights = permutation.map(|index| PRIOR_WEIGHTS[index]);
