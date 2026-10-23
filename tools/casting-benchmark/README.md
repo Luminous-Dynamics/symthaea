@@ -50,3 +50,14 @@ A 2026 review of computational modeling, AI and digital twins in casting identif
 https://link.springer.com/article/10.1007/s43939-026-00685-5
 
 The stretch targets in the protocol are aspirational acceptance gates, not current performance claims.
+
+## Multi-fidelity accounting
+
+For `evaluation_mode="multi_fidelity"`, both `accounting.fidelity_evaluations` and `accounting.fidelity_cost_units_by_level` are mandatory. Fidelity call counts must sum exactly to `objective_evaluations`; the count and cost maps must have the same keys. This prevents a run with many cheap calls from being treated as equivalent to a run that spends the same number of calls on expensive solver tiers.
+
+The protocol intentionally leaves exact costs and fidelity implementations unresolved until each adapter is immutable and calibrated. It does not invent a universal conversion from simulator calls to foundry hours, energy, or material. Record domain-relevant costs separately when their measurement units are defensible.
+
+Research motivation:
+- Mainini et al., *Analytical benchmark problems and methodological framework for the assessment and comparison of multifidelity optimization methods* (published 2025; volume 2026): https://link.springer.com/article/10.1007/s11831-025-10392-8
+- Li & Li, *Multi-Fidelity Methods for Optimization: A Survey* (ACM Computing Surveys, 2026): https://doi.org/10.1145/3801959
+- 2026 casting/foundry digital-twin review: https://link.springer.com/article/10.1007/s43939-026-00685-5
