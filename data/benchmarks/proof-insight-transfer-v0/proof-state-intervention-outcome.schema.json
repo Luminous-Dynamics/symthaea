@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/proof-state-intervention-outcome.schema.json",
   "title": "PITB Proof-State Intervention Outcome v0",
-  "description": "One state-side outcome row (base or variant) for a paired fixed-theorem proof-state intervention. Separately records expected insight applicability and expected action policy. Rows join to the suite's base/variant outcome IDs. Structural validation does not determine mathematical truth. Synthetic fixtures must remain not_run.",
+  "description": "One state-side outcome row (base or variant) for a paired fixed-theorem proof-state intervention. Rows join to the suite's base/variant outcome IDs. Structural validation does not determine mathematical truth. Synthetic fixtures must remain not_run.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -41,7 +41,6 @@
           "state_role",
           "source_insight_record_id",
           "source_insight_sha256",
-          "expected_applicability",
           "expected_action_policy",
           "proof_state",
           "execution"
@@ -145,7 +144,6 @@
             "required": [
               "status",
               "model",
-              "applicability_judgment",
               "decision",
               "original_move_applied",
               "checker_result",
@@ -285,21 +283,6 @@
                     "type": "null"
                   }
                 ]
-              },
-              "applicability_judgment": {
-                "oneOf": [
-                  {
-                    "type": "string",
-                    "enum": [
-                      "eligible",
-                      "not_applicable",
-                      "uncertain"
-                    ]
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
               }
             },
             "allOf": [
@@ -336,9 +319,6 @@
                     },
                     "resource_usage": {
                       "type": "null"
-                    },
-                    "applicability_judgment": {
-                      "type": "null"
                     }
                   }
                 }
@@ -362,8 +342,7 @@
                     "original_move_applied",
                     "checker_result",
                     "run_receipt_sha256",
-                    "resource_usage",
-                    "applicability_judgment"
+                    "resource_usage"
                   ],
                   "properties": {
                     "model": {
@@ -393,13 +372,6 @@
                     },
                     "resource_usage": {
                       "type": "object"
-                    },
-                    "applicability_judgment": {
-                      "enum": [
-                        "eligible",
-                        "not_applicable",
-                        "uncertain"
-                      ]
                     }
                   }
                 }
@@ -461,115 +433,7 @@
                     }
                   }
                 }
-              },
-              {
-                "if": {
-                  "properties": {
-                    "state_role": {
-                      "const": "base"
-                    }
-                  },
-                  "required": [
-                    "state_role"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "expected_applicability": {
-                      "const": "eligible"
-                    },
-                    "expected_action_policy": {
-                      "const": "preserve_eligibility"
-                    }
-                  }
-                }
-              },
-              {
-                "if": {
-                  "properties": {
-                    "expected_applicability": {
-                      "const": "not_applicable"
-                    }
-                  },
-                  "required": [
-                    "expected_applicability"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "expected_action_policy": {
-                      "const": "move_forbidden_or_replan"
-                    }
-                  }
-                }
-              },
-              {
-                "if": {
-                  "properties": {
-                    "execution": {
-                      "properties": {
-                        "applicability_judgment": {
-                          "const": "not_applicable"
-                        }
-                      },
-                      "required": [
-                        "applicability_judgment"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "execution"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "execution": {
-                      "properties": {
-                        "original_move_applied": {
-                          "const": false
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              {
-                "if": {
-                  "properties": {
-                    "execution": {
-                      "properties": {
-                        "original_move_applied": {
-                          "const": true
-                        }
-                      },
-                      "required": [
-                        "original_move_applied"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "execution"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "execution": {
-                      "properties": {
-                        "applicability_judgment": {
-                          "const": "eligible"
-                        }
-                      }
-                    }
-                  }
-                }
               }
-            ]
-          },
-          "expected_applicability": {
-            "enum": [
-              "eligible",
-              "not_applicable",
-              "uncertain"
             ]
           }
         }
