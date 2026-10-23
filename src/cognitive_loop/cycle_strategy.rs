@@ -929,6 +929,7 @@ impl CognitiveLoopService {
 #[cfg(test)]
 mod tests {
     use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, ResponseStrategy};
+    use symthaea_core::hdc::predictive_encoder::PredictionDegeneracy;
 
     fn make_service() -> CognitiveLoopService {
         CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
