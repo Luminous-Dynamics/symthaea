@@ -193,6 +193,12 @@
       "claim": "Authenticated packet timestamps are present and fall inside the declared age and future-skew bounds before replay state is mutated or application delivery occurs.",
       "layer": "freshness",
       "mandatory": true
+    },
+    {
+      "id": "RESTART-REPLAY-RESISTANCE",
+      "claim": "A captured, still-fresh authenticated packet cannot be accepted a second time after receiver restart; replay state is durably preserved or an authenticated epoch/session transition makes the old packet ineligible.",
+      "layer": "recovery",
+      "mandatory": true
     }
   ],
   "scenarios": [
@@ -454,6 +460,19 @@
       "strict_config": "docs/security/models/packet_restart_epoch_collision_strict.cfg",
       "implementation_target": "PR #8471: RestartWithEpoch(sender, epoch); packet_restart_epoch_collision_legacy.cfg; packet_restart_epoch_collision_strict.cfg",
       "positive_control": "An authorized fresh key namespace or unseen nonce is accepted after restart without colliding with any prior pair.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-REPLAY-004",
+      "property": "RESTART-REPLAY-RESISTANCE",
+      "class": "adversarial",
+      "stimulus": "Deliver a validly MAC-authenticated packet, restart the receiver while the packet timestamp remains within the 60-second freshness window, then replay the exact captured packet to the restarted receiver.",
+      "expected_legacy": "In-memory replay windows are lost on process restart, so a still-fresh captured packet can be admitted again unless another durable mechanism excludes it.",
+      "required_replacement": "Persist replay high-water/bitmap state safely across restart, or require an authenticated sender/session epoch that makes traffic from the previous epoch ineligible; recovery must not silently reset the replay namespace.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "PR #8355 documents this as a limitation; new v3 implementation must add durable replay-state or authenticated sender epoch and an exact restart trace",
+      "positive_control": "After authorized epoch transition, a fresh packet in the new epoch is accepted once while the captured old-epoch packet is rejected.",
       "status": "proposed"
     }
   ]
