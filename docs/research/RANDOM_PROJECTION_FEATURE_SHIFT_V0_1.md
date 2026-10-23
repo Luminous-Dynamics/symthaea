@@ -10,6 +10,14 @@ The exact fixed-reference moment/correlation scorer in `feature_shift.rs` stores
 
 The first unit test uses 127 input features and 16 projected dimensions: the exact summary has 8,001 pairwise correlations while the sketch has 120. This is a complexity fixture, not a runtime benchmark. A diffuse mean-shift fixture checks that the compressed score responds to one declared alternative. A paired sparse-coordinate counterexample asserts that the exact score remains sensitive to a one-feature shift while the sketch dilutes it; this is an explicit reason to retain an exact/scaled fallback for sparse or safety-critical signals.
 
+A manual Rust microbenchmark is also included as an ignored test so timing does not make CI flaky. On a machine with the project Rust toolchain, run:
+
+```sh
+cargo test -p symthaea-physics-bridge random_projection_feature_shift_reports_timing --lib -- --ignored --nocapture
+```
+
+It fits and times both scorers on 64 rows × 512 features, 32 projections, and nine paired score timings, then prints fit time, p50/p95 scoring time, correlation counts, approximate frozen-state bytes, and observed median scoring speedup. The harness has no timing-based pass/fail threshold; record CPU/OS/compiler/profile details and repeat across machines before treating its output as a benchmark result.
+
 ## Statistical contract
 
 - The projection seed, count, feature order, scale floor, reference rows, batch protocol, and aggregate score are frozen before calibration.
