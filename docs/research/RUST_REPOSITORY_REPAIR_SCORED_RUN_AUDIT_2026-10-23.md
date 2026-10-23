@@ -58,6 +58,24 @@ cargo run --locked --bin rust-repair-score-audit \
 
 The prediction input must be a direct record of the one assigned patch per task (standard SWE-bench JSONL is accepted); the evaluator's output directory must contain each task's `evaluation_evidence.json`, `status.json`, and `post_patch_log.txt`. Do not edit either after hashing; preserve originals and rerun the audit if any artifact changes.
 
+## Industry comparison and research gates
+
+External benchmark scores are context, not interchangeable targets:
+
+- The SWE-bench-Live leaderboard's 71.0% entry dated October 8, 2026 is over 300 valid instances and is a mixed-language headline, not a Rust-only result. We will report only the pinned Rust slice when making a Rust comparison: [SWE-bench-Live leaderboard](https://swe-bench-live.github.io/).
+- SWE-Bench Pro V2 was refreshed to 642 tasks across 11 repositories after 89 public tasks were removed as invalid. Its protocol locks agent network access, re-grades prediction diffs on pristine images, and uses a two-sided pre-release gate requiring the reference patch to pass and the empty patch to fail. The authors also report a 17.8-percentage-point public/private gap for one model, a caution against interpreting public scores as clean estimates of generalization: [Scale's V2 report](https://labs.scale.com/blog/swe-bench-pro-v2), [V2 leaderboard/methodology](https://model-eval-leaderboard.vercel.app/leaderboard/swe_bench_pro_public_v2?tab=full).
+- Epoch AI's review classified Terminal-Bench 4.0.0 as flawed after public reports identified scoring defects in 30 of 66 tasks (45.5%) in that specific version. This is a concrete reason to publish evaluator revisions and task regrades as new versions rather than pooling them silently: [Terminal-Bench 4.0.0 review](https://epoch.ai/benchmarks/terminal-bench-4/review).
+
+### Proposed experimental targets (not industry standards)
+
+1. **Public comparability:** one preregistered rollout per task on a pinned Rust-only SWE-bench-Live slice; disclose exact task count, model/version, scaffold, budget, network policy, unresolved count and grader revision. Treat the public score as a comparability signal, not proof of generalization.
+2. **Private generalization:** 250–500 held-out Rust repository repairs across repositories and task families, chosen after feasibility and power/precision analysis. Add Luminous Dynamics' own held-out tasks, but keep their expected solutions/tests private to the agent process until scoring.
+3. **Causal GCS ablation:** matched GCS-on/off trials with identical model, prompt, tools, compiler, image, time/token limits and task; randomize condition order. Aim for at least +5 percentage points pass@1 with a repository-clustered 95% confidence interval excluding zero, or an efficiency alternative of 20% lower cost per verified fix under a preregistered 1.5-point correctness non-inferiority margin.
+4. **Oracle adequacy:** for each task, the reference patch must pass, the empty-patch/baseline must fail at least one explicit F2P test, baseline-passing tests must remain green, and preregistered compilable semantic mutants must be tested. An internal stretch target is to kill at least 90% of reviewed, non-equivalent, compilable mutants; compile failures and unresolved mutation runs do not count as killed. Equivalent mutants must be reviewed and reported, never silently excluded.
+5. **Reliability and economics:** on a stratified 50–100-task subset, run at least five attempts per condition to estimate variability separately from the primary one-attempt pass@1 result. Report median and tail latency, model/tool cost per verified fix, regression count, unresolved rate and cost/success sensitivity bounds. An unresolved rate above 2%, or a treatment-arm difference over 1 percentage point, is a proposed internal pause-and-investigate gate rather than a published industry norm.
+
+A claim of "better than state of the art" requires the same task split, protocol and grader plus a named model/scaffold comparison. A separate hidden or private cohort is needed to substantiate generalization beyond benchmark exposure.
+
 ## Evidence boundary
 
 The implementation has 13 authored Rust unit tests. This authoring environment has no `rustc`, `cargo`, or `rustfmt`; those tests and the formatter/Clippy checks have not been executed locally. The dedicated GitHub Actions workflow is configured to check the pinned upstream overlay, task auditor and scored-run auditor, but queued/in-progress runs are not passes.
