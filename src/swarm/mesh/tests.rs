@@ -2254,10 +2254,18 @@ fn legacy_packet_and_fragment_apis_can_reuse_nonce_under_shared_key() {
     );
     let fragment_wire = encrypt_fragment(&fragment_plaintext, &key, &source_id, 0x0201, 3);
 
+    let expected_nonce = [
+        0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x00, 0x88, 0x01, 0x02, 0x03, 0x00,
+    ];
     assert_eq!(
         &packet_wire[..AEAD_NONCE_SIZE],
+        &expected_nonce,
+        "packet helper did not emit the registered legacy nonce vector"
+    );
+    assert_eq!(
         &fragment_wire[..AEAD_NONCE_SIZE],
-        "packet and fragment nonce layouts unexpectedly overlap for these inputs"
+        &expected_nonce,
+        "fragment helper did not emit the registered legacy nonce vector"
     );
 
     let mut oracle = RuntimeNoncePairOracle::default();
