@@ -609,6 +609,59 @@ mod tests {
     }
 
     #[test]
+    fn invalid_pe_does_not_create_or_recompute_landauer_cost() {
+        let mut b = make_bridge();
+        b.compute_with_evidence(
+            0.5,
+            50.0,
+            0.5,
+            Some(0.4),
+            0.4,
+            0.1,
+            0.5,
+            1e-10,
+            0.5,
+            0.5,
+            &default_regime(),
+        );
+        let admitted_cost = b.memory_landauer_cost;
+        assert!(admitted_cost > 0.0);
+
+        // Reusing the numeric PE while marking this cycle invalid must not
+        // recompute the Landauer estimate as if it were a fresh observation.
+        b.compute_with_evidence(
+            0.5,
+            50.0,
+            0.5,
+            None,
+            0.4,
+            0.1,
+            0.5,
+            1e-10,
+            0.5,
+            0.5,
+            &default_regime(),
+        );
+        assert_eq!(b.memory_landauer_cost, admitted_cost);
+
+        let mut cold = make_bridge();
+        cold.compute_with_evidence(
+            0.5,
+            50.0,
+            0.5,
+            Some(f64::NAN),
+            0.4,
+            0.1,
+            0.5,
+            1e-10,
+            0.5,
+            0.5,
+            &default_regime(),
+        );
+        assert_eq!(cold.memory_landauer_cost, 0.0);
+    }
+
+    #[test]
     fn test_carnot_efficiency_bounded() {
         let mut b = make_bridge();
         // High temperature → high Carnot efficiency
