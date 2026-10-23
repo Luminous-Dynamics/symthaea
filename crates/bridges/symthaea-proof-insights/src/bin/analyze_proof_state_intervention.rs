@@ -1,0 +1,881 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Fail-closed analysis for PITB paired proof-state intervention outcomes.
+//!
+//! This binary checks suite/outcome joins, distinguishes insight applicability
+//! from the action taken, and reports component-clustered descriptive metrics.
+//! Synthetic data is never scored. It never declares a confirmatory gate passed.
+
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    env, fs,
+};
+
+use anyhow::{Context, Result, bail};
+use serde_json::{Map, Value, json};
+use sha2::{Digest, Sha256};
+
+const SUITE_VERSION: &str = "pitb.proof-state-intervention-suite.v0";
+const OUTCOME_VERSION: &str = "pitb.proof-state-intervention-outcomes.v0";
+const REPORT_VERSION: &str = "pitb.proof-state-intervention-analysis.v0";
+const DEFAULT_BOOTSTRAP_REPLICATES: usize = 2_000;
+const DEFAULT_SEED: u64 = 0x5053_494E_5445_5256;
+const MIN_BOOTSTRAP_REPLICATES: usize = 1_000;
+
+#[derive(Debug, Clone)]
+struct StateRow {
+    outcome_id: String,
+    case_id: String,
+    pair_id: String,
+    component_id: String,
+    split: String,
+    state_role: String,
+    intervention_kind: String,
+    expected_applicability: String,
+    expected_action_policy: String,
+    execution_status: String,
+    model_id: Option<String>,
+    model_version: Option<String>,
+    config_sha256: Option<String>,
+    applicability_judgment: Option<String>,
+    decision: Option<String>,
+    original_move_applied: Option<bool>,
+    checker_result: String,
+    model_calls: u64,
+    input_tokens: u64,
+    output_tokens: u64,
+    wall_time_ms: u64,
+    cost_microusd: u64,
+}
+
+#[derive(Debug, Clone)]
+struct Point {
+    component_id: String,
+    success: bool,
+}
+
+#[derive(Debug, Clone)]
+struct Metric {
+    numerator: usize,
+    denominator: usize,
+    estimate: Option<f64>,
+    lower_95: Option<f64>,
+    upper_95: Option<f64>,
+}
+
+#[derive(Debug, Clone)]
+struct DeterministicRng {
+    state: u64,
+}
+
+impl DeterministicRng {
+    fn new(seed: u64) -> Self {
+        Self {
+            state: if seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { seed },
+        }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        // Xorshift64*: small deterministic PRNG for reproducible bootstrap indices.
+        let mut x = self.state;
+        x ^= x >> 12;
+        x ^= x << 25;
+        x ^= x >> 27;
+        self.state = x;
+        x.wrapping_mul(0x2545_F491_4F6C_DD1D)
+    }
+
+    fn index(&mut self, upper: usize) -> usize {
+        (self.next_u64() % upper as u64) as usize
+    }
+}
+
+fn main() -> Result<()> {
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 5 || args.len() > 7 || args.get(1).is_some_and(|x| x == "--help" || x == "-h") {
+        eprintln!(
+            "usage: {} <proof-state-suite.json> <outcomes.json> <train|validation|test|external_challenge> <report.json> [bootstrap_replicates] [seed]",
+            args.first().map(String::as_str).unwrap_or("analyze_proof_state_intervention")
+        );
+        if args.get(1).is_some_and(|x| x == "--help" || x == "-h") {
+            return Ok(());
+        }
+        bail!("invalid command-line arguments");
+    }
+
+    let suite_bytes = fs::read(&args[1]).with_context(|| format!("read suite {}", args[1]))?;
+    let outcome_bytes = fs::read(&args[2]).with_context(|| format!("read outcomes {}", args[2]))?;
+    let split = args[3].as_str();
+    if !matches!(split, "train" | "validation" | "test" | "external_challenge") {
+        bail!("unsupported split {split:?}");
+    }
+    let replicates = args
+        .get(5)
+        .map(|value| value.parse::<usize>().context("parse bootstrap replicate count"))
+        .transpose()?
+        .unwrap_or(DEFAULT_BOOTSTRAP_REPLICATES);
+    if replicates < MIN_BOOTSTRAP_REPLICATES {
+        bail!("bootstrap replicate count must be at least {MIN_BOOTSTRAP_REPLICATES}");
+    }
+    let seed = args
+        .get(6)
+        .map(|value| value.parse::<u64>().context("parse bootstrap seed"))
+        .transpose()?
+        .unwrap_or(DEFAULT_SEED);
+
+    let suite: Value = serde_json::from_slice(&suite_bytes).context("parse proof-state suite JSON")?;
+    let outcomes: Value = serde_json::from_slice(&outcome_bytes).context("parse proof-state outcome JSON")?;
+    let report = analyze(
+        &suite,
+        &outcomes,
+        split,
+        &hex_digest(&suite_bytes),
+        &hex_digest(&outcome_bytes),
+        replicates,
+        seed,
+    )?;
+    let encoded = serde_json::to_string_pretty(&report)?;
+    fs::write(&args[4], format!("{encoded}\n"))
+        .with_context(|| format!("write report {}", args[4]))?;
+
+    let counts = &report["counts"];
+    println!(
+        "PITB_PROOF_STATE_ANALYSIS_WRITTEN: split={split} rows={} executed={} report={}",
+        counts["rows_in_split"].as_u64().unwrap_or(0),
+        counts["executed_rows_in_split"].as_u64().unwrap_or(0),
+        args[4]
+    );
+    println!(
+        "confirmatory_decision={}",
+        report["confirmatory_decision"].as_str().unwrap_or("missing")
+    );
+    Ok(())
+}
+
+fn analyze(
+    suite: &Value,
+    bundle: &Value,
+    requested_split: &str,
+    suite_digest: &str,
+    outcomes_digest: &str,
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<Value> {
+    require_string(suite, "schema_version", "suite", SUITE_VERSION)?;
+    require_string(bundle, "schema_version", "outcomes", OUTCOME_VERSION)?;
+    let suite_id = string(suite, "suite_id", "suite")?.to_owned();
+    if string(bundle, "suite_id", "outcomes")? != suite_id {
+        bail!("outcome bundle suite_id does not match suite");
+    }
+    let dataset_kind = string(suite, "dataset_kind", "suite")?;
+    if !matches!(dataset_kind, "synthetic_fixture" | "reviewed_benchmark") {
+        bail!("unsupported suite dataset_kind {dataset_kind:?}");
+    }
+    if string(bundle, "dataset_kind", "outcomes")? != dataset_kind {
+        bail!("suite and outcome bundle dataset_kind values disagree");
+    }
+    let cases = array(suite, "cases", "suite")?;
+    if cases.is_empty() {
+        bail!("proof-state suite must contain at least one case");
+    }
+
+    let mut case_by_id: BTreeMap<String, &Value> = BTreeMap::new();
+    let mut expected_outcome_ids = BTreeSet::new();
+    let mut pair_components = BTreeMap::<String, String>::new();
+    for (index, case) in cases.iter().enumerate() {
+        let context = format!("suite.cases[{index}]");
+        let case_id = string(case, "case_id", &context)?.to_owned();
+        let pair_id = string(case, "pair_id", &context)?.to_owned();
+        let component_id = string(case, "component_id", &context)?.to_owned();
+        let split = string(case, "split", &context)?;
+        if !matches!(split, "train" | "validation" | "test" | "external_challenge") {
+            bail!("{context}: unsupported split {split:?}");
+        }
+        if case_by_id.insert(case_id.clone(), case).is_some() {
+            bail!("duplicate proof-state case_id {case_id:?}");
+        }
+        match pair_components.insert(pair_id.clone(), component_id.clone()) {
+            Some(previous) if previous != component_id => {
+                bail!("pair {pair_id:?} spans multiple connected components")
+            }
+            _ => {}
+        }
+
+        let intervention = field(case, "intervention", &context)?;
+        let kind = string(intervention, "kind", &format!("{context}.intervention"))?;
+        if !matches!(
+            kind,
+            "required_hypothesis_cleared"
+                | "hypothesis_alpha_renamed"
+                | "irrelevant_declaration_removed"
+                | "independent_declarations_reordered"
+        ) {
+            bail!("{context}: unsupported intervention kind {kind:?}");
+        }
+        let links = field(case, "outcome_links", &context)?;
+        for role in ["base", "variant"] {
+            let outcome_id = string(links, &format!("{role}_outcome_id"), &context)?.to_owned();
+            if !expected_outcome_ids.insert(outcome_id.clone()) {
+                bail!("duplicate suite outcome ID {outcome_id:?}");
+            }
+        }
+    }
+
+    let outcome_values = array(bundle, "outcomes", "outcomes")?;
+    if outcome_values.is_empty() {
+        bail!("outcome bundle must contain at least one row");
+    }
+    let mut rows = Vec::with_capacity(outcome_values.len());
+    let mut seen_ids = BTreeSet::new();
+
+    for (index, value) in outcome_values.iter().enumerate() {
+        let context = format!("outcomes[{index}]");
+        let outcome_id = string(value, "outcome_id", &context)?.to_owned();
+        if !seen_ids.insert(outcome_id.clone()) {
+            bail!("{context}: duplicate outcome_id {outcome_id:?}");
+        }
+        let case_id = string(value, "case_id", &context)?.to_owned();
+        let case = case_by_id
+            .get(&case_id)
+            .copied()
+            .with_context(|| format!("{context}: unknown case_id {case_id:?}"))?;
+        let pair_id = string(value, "pair_id", &context)?.to_owned();
+        let component_id = string(value, "component_id", &context)?.to_owned();
+        let split = string(value, "split", &context)?.to_owned();
+        let role = string(value, "state_role", &context)?.to_owned();
+        if role != "base" && role != "variant" {
+            bail!("{context}: state_role must be base or variant");
+        }
+        if pair_id != string(case, "pair_id", &case_id)? {
+            bail!("{context}: pair_id differs from the suite");
+        }
+        if component_id != string(case, "component_id", &case_id)? {
+            bail!("{context}: component_id differs from the suite");
+        }
+        if split != string(case, "split", &case_id)? {
+            bail!("{context}: split differs from the suite");
+        }
+        if string(value, "source_insight_record_id", &context)?
+            != string(field(case, "source_insight", &case_id)?, "record_id", &case_id)?
+        {
+            bail!("{context}: source insight record ID mismatch");
+        }
+        let insight_sha = string(value, "source_insight_sha256", &context)?;
+        let expected_insight_sha = string(field(case, "source_insight", &case_id)?, "insight_sha256", &case_id)?;
+        validate_sha256(insight_sha, &format!("{context}.source_insight_sha256"))?;
+        if insight_sha != expected_insight_sha {
+            bail!("{context}: source insight digest mismatch");
+        }
+
+        let intervention_kind = string(field(case, "intervention", &case_id)?, "kind", &case_id)?;
+        let (expected_applicability, expected_action_policy) = expected_state_labels(intervention_kind, &role)?;
+        if string(value, "expected_applicability", &context)? != expected_applicability {
+            bail!("{context}: expected_applicability contradicts the intervention/state role");
+        }
+        if string(value, "expected_action_policy", &context)? != expected_action_policy {
+            bail!("{context}: expected_action_policy contradicts the intervention/state role");
+        }
+
+        let links = field(case, "outcome_links", &case_id)?;
+        if string(links, &format!("{role}_outcome_id"), &case_id)? != outcome_id {
+            bail!("{context}: outcome_id does not match its base/variant link");
+        }
+        let state_field = if role == "base" { "base_state" } else { "variant_state" };
+        let paired_field = if role == "base" { "variant_state" } else { "base_state" };
+        let state = field(case, state_field, &case_id)?;
+        let paired_state = field(case, paired_field, &case_id)?;
+        let target = field(case, "target", &case_id)?;
+        let proof_state = field(value, "proof_state", &context)?;
+        for (row_key, source_value, source_key) in [
+            ("target_statement_sha256", target, "statement_sha256"),
+            ("goal_type_sha256", state, "goal_type_sha256"),
+            ("environment_sha256", state, "environment_sha256"),
+            ("snapshot_sha256", state, "snapshot_sha256"),
+            ("local_context_sha256", state, "local_context_sha256"),
+        ] {
+            let actual = string(proof_state, row_key, &context)?;
+            validate_sha256(actual, &format!("{context}.proof_state.{row_key}"))?;
+            if actual != string(source_value, source_key, &format!("{context}.{source_key}"))? {
+                bail!("{context}: {row_key} does not match suite state/target evidence");
+            }
+        }
+        for (row_key, source_key) in [
+            ("paired_snapshot_sha256", "snapshot_sha256"),
+            ("paired_local_context_sha256", "local_context_sha256"),
+        ] {
+            let actual = string(proof_state, row_key, &context)?;
+            if actual != string(paired_state, source_key, &format!("{context}.{source_key}"))? {
+                bail!("{context}: {row_key} does not match the opposite paired state");
+            }
+        }
+
+        let execution = field(value, "execution", &context)?;
+        let parsed = parse_execution(execution, &context, dataset_kind)?;
+        rows.push(StateRow {
+            outcome_id,
+            case_id,
+            pair_id,
+            component_id,
+            split,
+            state_role: role,
+            intervention_kind: intervention_kind.to_owned(),
+            expected_applicability: expected_applicability.to_owned(),
+            expected_action_policy: expected_action_policy.to_owned(),
+            execution_status: parsed.status,
+            model_id: parsed.model_id,
+            model_version: parsed.model_version,
+            config_sha256: parsed.config_sha256,
+            applicability_judgment: parsed.applicability_judgment,
+            decision: parsed.decision,
+            original_move_applied: parsed.original_move_applied,
+            checker_result: parsed.checker_result,
+            model_calls: parsed.model_calls,
+            input_tokens: parsed.input_tokens,
+            output_tokens: parsed.output_tokens,
+            wall_time_ms: parsed.wall_time_ms,
+            cost_microusd: parsed.cost_microusd,
+        });
+    }
+
+    if seen_ids != expected_outcome_ids {
+        let missing: Vec<_> = expected_outcome_ids.difference(&seen_ids).cloned().collect();
+        let extra: Vec<_> = seen_ids.difference(&expected_outcome_ids).cloned().collect();
+        bail!("outcome coverage mismatch; missing={missing:?}, extra={extra:?}");
+    }
+    validate_pair_configurations(&rows)?;
+
+    let selected: Vec<_> = rows.iter().filter(|row| row.split == requested_split).collect();
+    if selected.is_empty() {
+        bail!("no outcome rows for requested split {requested_split:?}");
+    }
+    let pair_count = selected
+        .iter()
+        .map(|row| row.pair_id.as_str())
+        .collect::<BTreeSet<_>>()
+        .len();
+    let executed_count = selected.iter().filter(|row| row.execution_status == "executed").count();
+    let not_run_count = selected.len() - executed_count;
+
+    let mut counts = Map::new();
+    counts.insert("cases_in_split".into(), json!(pair_count));
+    counts.insert("rows_in_split".into(), json!(selected.len()));
+    counts.insert("executed_rows_in_split".into(), json!(executed_count));
+    counts.insert("not_run_rows_in_split".into(), json!(not_run_count));
+    counts.insert(
+        "expected_eligible_rows".into(),
+        json!(selected.iter().filter(|row| row.expected_applicability == "eligible").count()),
+    );
+    counts.insert(
+        "expected_not_applicable_rows".into(),
+        json!(selected.iter().filter(|row| row.expected_applicability == "not_applicable").count()),
+    );
+    counts.insert(
+        "uncertain_judgments".into(),
+        json!(selected.iter().filter(|row| row.applicability_judgment.as_deref() == Some("uncertain")).count()),
+    );
+    counts.insert(
+        "checked_success_rows".into(),
+        json!(selected.iter().filter(|row| row.checker_result == "checked_success").count()),
+    );
+    counts.insert(
+        "checked_failure_rows".into(),
+        json!(selected.iter().filter(|row| row.checker_result == "checked_failure").count()),
+    );
+
+    let mut resource_usage = Map::new();
+    let totals = Usage {
+        model_calls: selected.iter().map(|row| row.model_calls).sum(),
+        input_tokens: selected.iter().map(|row| row.input_tokens).sum(),
+        output_tokens: selected.iter().map(|row| row.output_tokens).sum(),
+        wall_time_ms: selected.iter().map(|row| row.wall_time_ms).sum(),
+        cost_microusd: selected.iter().map(|row| row.cost_microusd).sum(),
+    };
+    resource_usage.insert("paired_rows_with_executed_usage".into(), json!(executed_count));
+    resource_usage.insert("totals".into(), json!(totals));
+    resource_usage.insert(
+        "mean_per_executed_row".into(),
+        if executed_count == 0 {
+            Value::Null
+        } else {
+            json!({
+                "model_calls": totals.model_calls as f64 / executed_count as f64,
+                "input_tokens": totals.input_tokens as f64 / executed_count as f64,
+                "output_tokens": totals.output_tokens as f64 / executed_count as f64,
+                "wall_time_ms": totals.wall_time_ms as f64 / executed_count as f64,
+                "cost_microusd": totals.cost_microusd as f64 / executed_count as f64
+            })
+        },
+    );
+
+    let metrics = if dataset_kind == "synthetic_fixture" {
+        Map::new()
+    } else {
+        compute_metrics(&rows, requested_split, bootstrap_replicates, seed)?
+    };
+
+    let confirmatory_decision = if dataset_kind == "synthetic_fixture" {
+        "not_evaluated_synthetic_fixture"
+    } else if not_run_count > 0 {
+        "not_evaluated_incomplete_execution_coverage"
+    } else {
+        "not_evaluated_requires_preregistered_protocol_independent_receipts_and_review"
+    };
+
+    Ok(json!({
+        "schema_version": REPORT_VERSION,
+        "suite_id": suite_id,
+        "dataset_kind": dataset_kind,
+        "split": requested_split,
+        "suite_sha256": suite_digest,
+        "outcomes_sha256": outcomes_digest,
+        "bootstrap": {
+            "unit": "component_id",
+            "replicates": bootstrap_replicates,
+            "seed": seed,
+            "interval": "percentile_95",
+            "note": "Intervals are component-clustered descriptive intervals; the analyzer never certifies the independent truth of the supplied labels."
+        },
+        "counts": Value::Object(counts),
+        "metrics": Value::Object(metrics),
+        "resource_usage": Value::Object(resource_usage),
+        "limitations": [
+            "The analyzer validates suite-to-outcome joins but does not establish the mathematical correctness of reviewer labels.",
+            "A structurally valid run receipt digest does not prove the receipt content was independently audited.",
+            "Synthetic fixtures are never scored; their model outcomes must remain not_run.",
+            "The overall confirmatory decision is never set to pass by this binary."
+        ],
+        "confirmatory_decision": confirmatory_decision
+    }))
+}
+
+#[derive(Debug, Clone)]
+struct ParsedExecution {
+    status: String,
+    model_id: Option<String>,
+    model_version: Option<String>,
+    config_sha256: Option<String>,
+    applicability_judgment: Option<String>,
+    decision: Option<String>,
+    original_move_applied: Option<bool>,
+    checker_result: String,
+    model_calls: u64,
+    input_tokens: u64,
+    output_tokens: u64,
+    wall_time_ms: u64,
+    cost_microusd: u64,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize)]
+struct Usage {
+    model_calls: u64,
+    input_tokens: u64,
+    output_tokens: u64,
+    wall_time_ms: u64,
+    cost_microusd: u64,
+}
+
+fn parse_execution(execution: &Value, context: &str, dataset_kind: &str) -> Result<ParsedExecution> {
+    let status = string(execution, "status", context)?.to_owned();
+    let checker_result = string(execution, "checker_result", context)?.to_owned();
+    if !matches!(status.as_str(), "not_run" | "executed") {
+        bail!("{context}: unsupported execution status {status:?}");
+    }
+    if status == "not_run" {
+        if dataset_kind == "reviewed_benchmark" {
+            // Unrun rows are allowed in descriptive output but force an incomplete-coverage decision.
+        }
+        for key in ["model", "decision", "applicability_judgment", "original_move_applied", "proof_sha256", "run_receipt_sha256", "resource_usage"] {
+            if !field(execution, key, context)?.is_null() {
+                bail!("{context}: not_run execution must set {key} to null");
+            }
+        }
+        if checker_result != "not_run" {
+            bail!("{context}: not_run execution cannot claim a checker outcome");
+        }
+        return Ok(ParsedExecution {
+            status,
+            model_id: None,
+            model_version: None,
+            config_sha256: None,
+            applicability_judgment: None,
+            decision: None,
+            original_move_applied: None,
+            checker_result,
+            model_calls: 0,
+            input_tokens: 0,
+            output_tokens: 0,
+            wall_time_ms: 0,
+            cost_microusd: 0,
+        });
+    }
+    if dataset_kind == "synthetic_fixture" {
+        bail!("{context}: synthetic fixture cannot contain an executed model outcome");
+    }
+
+    let model = field(execution, "model", context)?;
+    let model_id = string(model, "model_id", &format!("{context}.model"))?.to_owned();
+    let model_version = string(model, "model_version", &format!("{context}.model"))?.to_owned();
+    if model_id.trim().is_empty() || model_version.trim().is_empty() {
+        bail!("{context}: model identity must not be blank");
+    }
+    let config_sha256 = string(model, "config_sha256", &format!("{context}.model"))?.to_owned();
+    validate_sha256(&config_sha256, &format!("{context}.model.config_sha256"))?;
+    let applicability_judgment = string(execution, "applicability_judgment", context)?.to_owned();
+    if !matches!(applicability_judgment.as_str(), "eligible" | "not_applicable" | "uncertain") {
+        bail!("{context}: unknown applicability judgment");
+    }
+    let decision = string(execution, "decision", context)?.to_owned();
+    if !matches!(decision.as_str(), "apply_original_move" | "adapt_move" | "replan" | "abstain" | "reject_insight") {
+        bail!("{context}: unknown action decision {decision:?}");
+    }
+    let original_move_applied = field(execution, "original_move_applied", context)?
+        .as_bool()
+        .with_context(|| format!("{context}: original_move_applied must be a boolean"))?;
+    if checker_result != "checked_success" && checker_result != "checked_failure" {
+        bail!("{context}: executed row must contain an actual checker result");
+    }
+    if decision == "apply_original_move" && !original_move_applied {
+        bail!("{context}: apply_original_move conflicts with original_move_applied=false");
+    }
+    if original_move_applied && decision != "apply_original_move" {
+        bail!("{context}: original_move_applied=true requires decision=apply_original_move");
+    }
+    if original_move_applied && applicability_judgment != "eligible" {
+        bail!("{context}: original move cannot be applied when judged not_applicable or uncertain");
+    }
+    if applicability_judgment == "not_applicable" && original_move_applied {
+        bail!("{context}: original move was applied despite not_applicable judgment");
+    }
+
+    let proof_sha = field(execution, "proof_sha256", context)?;
+    if checker_result == "checked_success" {
+        let digest = proof_sha.as_str().with_context(|| format!("{context}: checked success requires proof_sha256"))?;
+        validate_sha256(digest, &format!("{context}.proof_sha256"))?;
+    } else if !proof_sha.is_null() {
+        validate_sha256(proof_sha.as_str().context("proof_sha256 must be a string or null")?, &format!("{context}.proof_sha256"))?;
+    }
+    let receipt = string(execution, "run_receipt_sha256", context)?;
+    validate_sha256(receipt, &format!("{context}.run_receipt_sha256"))?;
+    let resources = field(execution, "resource_usage", context)?;
+    let model_calls = unsigned(resources, "model_calls", context)?;
+    let input_tokens = unsigned(resources, "input_tokens", context)?;
+    let output_tokens = unsigned(resources, "output_tokens", context)?;
+    let wall_time_ms = unsigned(resources, "wall_time_ms", context)?;
+    let cost_microusd = unsigned(resources, "cost_microusd", context)?;
+
+    Ok(ParsedExecution {
+        status,
+        model_id: Some(model_id),
+        model_version: Some(model_version),
+        config_sha256: Some(config_sha256),
+        applicability_judgment: Some(applicability_judgment),
+        decision: Some(decision),
+        original_move_applied: Some(original_move_applied),
+        checker_result,
+        model_calls,
+        input_tokens,
+        output_tokens,
+        wall_time_ms,
+        cost_microusd,
+    })
+}
+
+fn expected_state_labels(intervention_kind: &str, role: &str) -> Result<(&'static str, &'static str)> {
+    if role == "base" {
+        return Ok(("eligible", "preserve_eligibility"));
+    }
+    match intervention_kind {
+        "required_hypothesis_cleared" => Ok(("not_applicable", "move_forbidden_or_replan")),
+        "hypothesis_alpha_renamed" | "irrelevant_declaration_removed" | "independent_declarations_reordered" => {
+            Ok(("eligible", "preserve_eligibility"))
+        }
+        _ => bail!("unsupported intervention kind {intervention_kind:?}"),
+    }
+}
+
+fn validate_pair_configurations(rows: &[StateRow]) -> Result<()> {
+    let mut by_pair = BTreeMap::<&str, Vec<&StateRow>>::new();
+    for row in rows {
+        by_pair.entry(row.pair_id.as_str()).or_default().push(row);
+    }
+    for (pair_id, pair_rows) in by_pair {
+        if pair_rows.len() != 2 {
+            bail!("pair {pair_id:?} must have exactly one base and one variant outcome; found {}", pair_rows.len());
+        }
+        let base = pair_rows.iter().find(|row| row.state_role == "base").context("paired outcomes are missing base row")?;
+        let variant = pair_rows.iter().find(|row| row.state_role == "variant").context("paired outcomes are missing variant row")?;
+        if base.case_id != variant.case_id || base.component_id != variant.component_id || base.split != variant.split {
+            bail!("pair {pair_id:?} has inconsistent case/component/split metadata");
+        }
+        if base.execution_status == "executed" && variant.execution_status == "executed" {
+            if base.model_id != variant.model_id || base.model_version != variant.model_version || base.config_sha256 != variant.config_sha256 {
+                bail!("pair {pair_id:?} uses mismatched model/configuration across base and variant states");
+            }
+        }
+    }
+    Ok(())
+}
+
+fn compute_metrics(
+    rows: &[StateRow],
+    split: &str,
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<Map<String, Value>> {
+    let selected: Vec<&StateRow> = rows.iter().filter(|row| row.split == split).collect();
+    let mut metrics = Map::new();
+
+    let assigned_solve = selected.iter().map(|row| Point {
+        component_id: row.component_id.clone(),
+        success: row.execution_status == "executed" && row.checker_result == "checked_success",
+    }).collect();
+    metrics.insert("exact_target_solve_rate_on_assigned_rows".into(), metric_json(estimate(assigned_solve, bootstrap_replicates, seed)));
+
+    let coverage = selected.iter().map(|row| Point {
+        component_id: row.component_id.clone(),
+        success: row.execution_status == "executed" && row.applicability_judgment.as_deref().is_some_and(|x| x != "uncertain"),
+    }).collect();
+    metrics.insert("decisive_applicability_judgment_coverage".into(), metric_json(estimate(coverage, bootstrap_replicates, seed.wrapping_add(1))));
+
+    let overall_accuracy = selected.iter().map(|row| Point {
+        component_id: row.component_id.clone(),
+        success: row.execution_status == "executed" && row.applicability_judgment.as_deref() == Some(row.expected_applicability.as_str()),
+    }).collect();
+    metrics.insert("applicability_correct_rate_on_assigned_rows".into(), metric_json(estimate(overall_accuracy, bootstrap_replicates, seed.wrapping_add(2))));
+
+    let eligible_recall = selected.iter().filter(|row| row.expected_applicability == "eligible").map(|row| Point {
+        component_id: row.component_id.clone(),
+        success: row.execution_status == "executed" && row.applicability_judgment.as_deref() == Some("eligible"),
+    }).collect();
+    metrics.insert("eligible_insight_recall_on_assigned_rows".into(), metric_json(estimate(eligible_recall, bootstrap_replicates, seed.wrapping_add(3))));
+
+    let inapplicable_sensitivity = selected.iter().filter(|row| row.expected_applicability == "not_applicable").map(|row| Point {
+        component_id: row.component_id.clone(),
+        success: row.execution_status == "executed" && row.applicability_judgment.as_deref() == Some("not_applicable"),
+    }).collect();
+    metrics.insert("inapplicability_sensitivity_on_assigned_rows".into(), metric_json(estimate(inapplicable_sensitivity, bootstrap_replicates, seed.wrapping_add(4))));
+
+    let false_eligibility = selected.iter().filter(|row| {
+        row.expected_applicability == "not_applicable"
+            && row.execution_status == "executed"
+            && row.applicability_judgment.as_deref().is_some_and(|x| x != "uncertain")
+    }).map(|row| Point {
+        component_id: row.component_id.clone(),
+        success: row.applicability_judgment.as_deref() == Some("eligible"),
+    }).collect();
+    metrics.insert("false_eligibility_rate_among_decisive_invalid_state_judgments".into(), metric_json(estimate(false_eligibility, bootstrap_replicates, seed.wrapping_add(5))));
+
+    let unsafe_reuse = selected.iter().filter(|row| row.expected_applicability == "not_applicable" && row.execution_status == "executed").map(|row| Point {
+        component_id: row.component_id.clone(),
+        success: row.original_move_applied == Some(true),
+    }).collect();
+    metrics.insert("unsafe_original_move_application_rate".into(), metric_json(estimate(unsafe_reuse, bootstrap_replicates, seed.wrapping_add(6))));
+
+    let pairs = selected_pairs(&selected);
+    let equivalence_pairs: Vec<_> = pairs.iter().filter(|(_, base, variant)| {
+        base.expected_applicability == "eligible"
+            && variant.expected_applicability == "eligible"
+            && base.intervention_kind != "required_hypothesis_cleared"
+    }).collect();
+    let pair_stability = equivalence_pairs.iter().map(|(_, base, variant)| Point {
+        component_id: base.component_id.clone(),
+        success: base.execution_status == "executed"
+            && variant.execution_status == "executed"
+            && base.applicability_judgment.as_deref().is_some_and(|x| x != "uncertain")
+            && base.applicability_judgment == variant.applicability_judgment,
+    }).collect();
+    metrics.insert("semantics_preserving_applicability_stability_on_assigned_pairs".into(), metric_json(estimate(pair_stability, bootstrap_replicates, seed.wrapping_add(7))));
+
+    let withdrawal_pairs: Vec<_> = pairs.iter().filter(|(_, base, variant)| {
+        base.intervention_kind == "required_hypothesis_cleared"
+            && base.expected_applicability == "eligible"
+            && variant.expected_applicability == "not_applicable"
+    }).collect();
+    let withdrawal_accuracy = withdrawal_pairs.iter().map(|(_, base, variant)| Point {
+        component_id: base.component_id.clone(),
+        success: base.execution_status == "executed"
+            && variant.execution_status == "executed"
+            && base.applicability_judgment.as_deref() == Some("eligible")
+            && variant.applicability_judgment.as_deref() == Some("not_applicable")
+            && variant.original_move_applied == Some(false),
+    }).collect();
+    metrics.insert("required_precondition_withdrawal_pair_accuracy".into(), metric_json(estimate(withdrawal_accuracy, bootstrap_replicates, seed.wrapping_add(8))));
+
+    let decisive = selected.iter().filter(|row| row.execution_status == "executed" && row.applicability_judgment.as_deref().is_some_and(|x| x != "uncertain")).map(|row| Point {
+        component_id: row.component_id.clone(),
+        success: row.applicability_judgment.as_deref() == Some(row.expected_applicability.as_str()),
+    }).collect();
+    metrics.insert("applicability_accuracy_among_decisive_executed_rows".into(), metric_json(estimate(decisive, bootstrap_replicates, seed.wrapping_add(9))));
+
+    let matched_config = selected.iter().filter(|row| row.execution_status == "executed").collect::<Vec<_>>();
+    let executed_configurations: BTreeSet<_> = matched_config.iter().filter_map(|row| row.config_sha256.as_deref()).collect();
+    if executed_configurations.len() > 1 {
+        bail!("requested split contains multiple config hashes; analyze one frozen comparison arm at a time");
+    }
+    Ok(metrics)
+}
+
+fn selected_pairs<'a>(rows: &[&'a StateRow]) -> Vec<(String, &'a StateRow, &'a StateRow)> {
+    let mut pairs = BTreeMap::<String, Vec<&StateRow>>::new();
+    for row in rows {
+        pairs.entry(row.pair_id.clone()).or_default().push(*row);
+    }
+    let mut result = Vec::new();
+    for (pair_id, members) in pairs {
+        if members.len() != 2 {
+            continue;
+        }
+        if let (Some(base), Some(variant)) = (
+            members.iter().find(|row| row.state_role == "base"),
+            members.iter().find(|row| row.state_role == "variant"),
+        ) {
+            result.push((pair_id, *base, *variant));
+        }
+    }
+    result
+}
+
+fn estimate(points: Vec<Point>, replicates: usize, seed: u64) -> Metric {
+    let denominator = points.len();
+    let numerator = points.iter().filter(|point| point.success).count();
+    if denominator == 0 {
+        return Metric { numerator, denominator, estimate: None, lower_95: None, upper_95: None };
+    }
+    let estimate = numerator as f64 / denominator as f64;
+    let mut grouped = BTreeMap::<String, Vec<bool>>::new();
+    for point in &points {
+        grouped.entry(point.component_id.clone()).or_default().push(point.success);
+    }
+    let components: Vec<_> = grouped.keys().cloned().collect();
+    let mut rng = DeterministicRng::new(seed);
+    let mut samples = Vec::with_capacity(replicates);
+    for _ in 0..replicates {
+        let mut success_count = 0usize;
+        let mut row_count = 0usize;
+        for _ in 0..components.len() {
+            let component = &components[rng.index(components.len())];
+            if let Some(values) = grouped.get(component) {
+                row_count += values.len();
+                success_count += values.iter().filter(|&&value| value).count();
+            }
+        }
+        if row_count > 0 {
+            samples.push(success_count as f64 / row_count as f64);
+        }
+    }
+    samples.sort_by(f64::total_cmp);
+    let lower = percentile(&samples, 0.025);
+    let upper = percentile(&samples, 0.975);
+    Metric {
+        numerator,
+        denominator,
+        estimate: Some(estimate),
+        lower_95: lower,
+        upper_95: upper,
+    }
+}
+
+fn percentile(sorted_values: &[f64], probability: f64) -> Option<f64> {
+    if sorted_values.is_empty() {
+        return None;
+    }
+    let index = ((sorted_values.len() - 1) as f64 * probability).floor() as usize;
+    sorted_values.get(index).copied()
+}
+
+fn metric_json(metric: Metric) -> Value {
+    json!({
+        "numerator": metric.numerator,
+        "denominator": metric.denominator,
+        "estimate": metric.estimate,
+        "confidence_interval_95": {
+            "method": "component_clustered_percentile_bootstrap",
+            "lower": metric.lower_95,
+            "upper": metric.upper_95
+        }
+    })
+}
+
+fn require_string(value: &Value, key: &str, context: &str, expected: &str) -> Result<()> {
+    let actual = string(value, key, context)?;
+    if actual != expected {
+        bail!("{context}.{key}: expected {expected:?}, found {actual:?}");
+    }
+    Ok(())
+}
+
+fn field<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a Value> {
+    value.get(key).with_context(|| format!("{context}: missing field {key:?}"))
+}
+
+fn string<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a str> {
+    field(value, key, context)?
+        .as_str()
+        .with_context(|| format!("{context}.{key} must be a string"))
+}
+
+fn array<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a Vec<Value>> {
+    field(value, key, context)?
+        .as_array()
+        .with_context(|| format!("{context}.{key} must be an array"))
+}
+
+fn unsigned(value: &Value, key: &str, context: &str) -> Result<u64> {
+    field(value, key, context)?
+        .as_u64()
+        .with_context(|| format!("{context}.{key} must be a nonnegative integer"))
+}
+
+fn validate_sha256(value: &str, context: &str) -> Result<()> {
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()) {
+        bail!("{context} must be lowercase 64-character SHA-256 hex");
+    }
+    Ok(())
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn applicability_labels_differ_before_and_after_required_premise_removal() {
+        assert_eq!(expected_state_labels("required_hypothesis_cleared", "base").unwrap(), ("eligible", "preserve_eligibility"));
+        assert_eq!(expected_state_labels("required_hypothesis_cleared", "variant").unwrap(), ("not_applicable", "move_forbidden_or_replan"));
+    }
+
+    #[test]
+    fn semantics_preserving_context_changes_keep_insight_eligible() {
+        for kind in ["hypothesis_alpha_renamed", "irrelevant_declaration_removed", "independent_declarations_reordered"] {
+            assert_eq!(expected_state_labels(kind, "base").unwrap(), ("eligible", "preserve_eligibility"));
+            assert_eq!(expected_state_labels(kind, "variant").unwrap(), ("eligible", "preserve_eligibility"));
+        }
+    }
+
+    #[test]
+    fn component_bootstrap_is_deterministic() {
+        let points = vec![
+            Point { component_id: "a".into(), success: true },
+            Point { component_id: "a".into(), success: false },
+            Point { component_id: "b".into(), success: true },
+        ];
+        let first = estimate(points.clone(), 1000, 71);
+        let second = estimate(points, 1000, 71);
+        assert_eq!(first.estimate, second.estimate);
+        assert_eq!(first.lower_95, second.lower_95);
+        assert_eq!(first.upper_95, second.upper_95);
+        assert_eq!(first.numerator, 2);
+        assert_eq!(first.denominator, 3);
+    }
+
+    #[test]
+    fn percentile_selects_lower_index_for_evenly_sorted_samples() {
+        assert_eq!(percentile(&[0.0, 0.5, 1.0], 0.5), Some(0.5));
+        assert_eq!(percentile(&[], 0.5), None);
+    }
+}
