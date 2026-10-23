@@ -28,23 +28,22 @@
 \maketitle
 
 \begin{abstract}
-We present the Ramanujan Protocol, a pipeline that rediscovers conservation laws
-of canonical dynamical systems directly from their differential equations,
-without access to analytic solutions, textbook hints, or numerical labels. The
-method combines grammar-guided genetic symbolic regression over expression
-trees, symbolic verification of conservation via the chain rule, and formal
-proof delegation to the Z3 SMT solver for the invariants that admit polynomial
-or polynomial-with-reciprocal encoding. Applied to seven canonical problems
-(harmonic oscillator, Lotka--Volterra, Kepler two-body angular momentum,
-Hénon--Heiles chaotic Hamiltonian, anisotropic coupled oscillator, the circular
-restricted three-body problem, and triangular numbers), the pipeline recovers
-the exact analytic conservation law in six cases with a verified symbolic
-proof, and a numerically-conserved-but-semantically-wrong expression in the
-seventh (PCR3BP). Against a 221-equation physics catalog, every recovered
-invariant matches its canonical entry at $\geq 99\%$ structural similarity.
-All runs are deterministic under a fixed seed ($=42$) and machine-checkable;
-any reader with Docker or a local Rust + Z3 toolchain can regenerate the full
-results table end-to-end in under thirty minutes.
+We present the Ramanujan Protocol, a pipeline for autonomous symbolic
+search over conservation-law candidates generated from differential equations
+and verified by symbolic and formal methods. The method combines grammar-guided
+genetic symbolic regression over expression trees, chain-rule derivation,
+numerical residual checks, and formal proof delegation to the Z3 SMT solver
+for invariants that admit a machine-checkable algebraic encoding. The current
+seven-problem showcase uses built-in invariant templates for several canonical
+systems, so it demonstrates autonomous optimization and rediscovery rather than
+a cold no-prior discovery claim. Six showcase systems recover known analytic
+invariant forms with Tier-A symbolic/numerical evidence; polynomial cases
+additionally have Tier-B SMT witnesses where the formal encoding is in scope,
+while PCR3BP produces an honest numerical false-positive rather than the known
+Jacobi integral. Catalog similarity is reported separately as a retrieval
+signal, not as proof of physical identity or novelty. All runs are deterministic
+under a fixed seed ($=42$) and machine-checkable; any reader with Docker or a
+local Rust + Z3 toolchain can regenerate the full results table end-to-end.
 \end{abstract}
 
 % ═════════════════════════════════════════════════════════════════════════
@@ -195,12 +194,13 @@ The headline table below is produced verbatim by the showcase binary:
 Of seven problems:
 
 \begin{itemize}
-  \item \textbf{Six} invariants are \texttt{PROVEN} --- chain-rule
-        normalization closes the Lie-derivative to zero, and the
-        corresponding SMT-LIB2 obligation $\neg(\mathrm{d}C/\mathrm{d}t = 0)$
-        is \texttt{unsat} in Z3. Trajectory variances span
-        $6 \times 10^{-24}$ to $1 \times 10^{-22}$ --- numerical confirmation
-        at the limit of $f_{64}$ precision.
+  \item \textbf{Six} showcase candidates receive Tier-A \texttt{PROVEN}
+        status under the project's current evidence vocabulary: symbolic
+        chain-rule derivation plus six-point numerical residual agreement.
+        This is strong evidence, not a universal proof. Polynomial cases that
+        are inside the QF\_NRA formal fragment also receive independent
+        Tier-B Z3 \texttt{unsat} witnesses; the Lotka--Volterra logarithmic
+        invariant is explicitly out of scope for that formal backend.
   \item \textbf{One} (PCR3BP) returns \texttt{Numeric} status: the fitness
         landscape is low (variance $2.7 \times 10^{-10}$) but the discovered
         expression $\cos(y/e)^{x^3}$ is transparently wrong --- it matches
@@ -208,10 +208,10 @@ Of seven problems:
         being the Jacobi integral. This is the correct honest signal: the
         pipeline reports ``I found something that doesn't vary along the
         flow'' without overclaiming discovery.
-  \item Against the 221-equation catalog every recovered invariant (including
-        the Mystery ODE, which the authors designed to not match anything
-        canonically) achieves $\geq 99\%$ structural similarity to an
-        existing entry.
+  \item The catalog reports high structural similarity for several candidates.
+        This is retrieval evidence only. It is not semantic equivalence and is
+        not a novelty proof; the PCR3BP false-positive is a concrete example
+        of why this separation matters.
 \end{itemize}
 
 \subsection{Determinism}
