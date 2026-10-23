@@ -1870,6 +1870,15 @@
       "A deterministic PRNG stream and seed set are not independent true random draws; the exercise is a regression/sanity check rather than statistical certification.",
       "Small-N results do not establish distributional correctness for all N, degrees, or rejection budgets.",
       "The new Rust unit test uses 5,000 sequential seeds and a deliberately coarse frequency tolerance; its execution remains unconfirmed until a Rust toolchain is available."
-    ]
+    ],
+    "brute_force_enumeration_validation": {
+      "candidate_labeled_simple_graphs": 32768,
+      "method": "Enumerate all 2^15 edge-presence bitmasks on six labeled vertices, retain exactly those with every vertex degree 3, then classify by triangle presence.",
+      "retained_simple_3_regular_graphs": 70,
+      "no_triangle_graphs": 10,
+      "triangle_containing_graphs": 60,
+      "other_classes": 0,
+      "result": "Exact combinatorial class counts used for the 1/7 versus 6/7 reference were independently reproduced by exhaustive enumeration in this session."
+    }
   }
 }
