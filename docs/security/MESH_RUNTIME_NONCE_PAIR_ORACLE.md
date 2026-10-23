@@ -26,8 +26,8 @@ The fragment helper creates:
 
 These layouts can be byte-for-byte identical when the two APIs use the same effective key. The deterministic test in `src/swarm/mesh/tests.rs` uses:
 
-- source bytes: `11 22 33 44 55 66 77 88`
-- packet type: `0x77`
+- source bytes: `11 22 33 44 55 66 00 88`
+- packet type: `0x00` (`WisdomVector`)
 - packet epoch: `0x88`
 - packet sequence: `0x00030201`, little-endian `01 02 03 00`
 - fragment thought ID: `0x0201`, little-endian `01 02`
@@ -35,7 +35,7 @@ These layouts can be byte-for-byte identical when the two APIs use the same effe
 
 Both helpers therefore emit nonce bytes:
 
-`11 22 33 44 55 66 77 88 01 02 03 00`
+`11 22 33 44 55 66 00 88 01 02 03 00`
 
 With a shared effective key, this is a repeated AEAD pair even though the plaintexts and calling APIs differ. The test also checks the ciphertext XOR relation caused by reuse. This is a **conditional code-path witness**, not a claim that every deployment shares a key across packet and fragment encryption.
 
