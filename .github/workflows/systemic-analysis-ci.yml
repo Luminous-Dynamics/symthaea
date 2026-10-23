@@ -1,0 +1,51 @@
+name: Systemic Analysis CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/domains/symthaea-systemic-analysis/**'
+      - '.github/workflows/systemic-analysis-ci.yml'
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'crates/domains/symthaea-systemic-analysis/**'
+      - '.github/workflows/systemic-analysis-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  systemic-analysis:
+    name: Systemic Analysis Core
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/domains/symthaea-systemic-analysis
+
+      - name: Format systemic-analysis crate
+        working-directory: crates/domains/symthaea-systemic-analysis
+        run: cargo fmt --all -- --check
+
+      - name: Check systemic-analysis crate
+        run: cargo check -p symthaea-systemic-analysis --all-targets
+
+      - name: Test systemic-analysis crate
+        run: cargo test -p symthaea-systemic-analysis --all-targets
+
+      - name: Clippy systemic-analysis crate
+        run: cargo clippy -p symthaea-systemic-analysis --all-targets -- -D warnings
