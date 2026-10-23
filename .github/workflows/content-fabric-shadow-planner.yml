@@ -1,0 +1,44 @@
+name: Content Fabric HDC Shadow Planner CI
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-content-fabric/**'
+      - '.github/workflows/content-fabric-shadow-planner.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'crates/bridges/symthaea-content-fabric/**'
+      - '.github/workflows/content-fabric-shadow-planner.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: content-fabric-shadow-planner-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  hdc-shadow-planner:
+    name: CF-06D HDC shadow planner
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+      - name: Check formatting
+        run: cargo fmt --manifest-path crates/bridges/symthaea-content-fabric/Cargo.toml -- --check
+      - name: Check
+        run: cargo check -p symthaea-content-fabric
+      - name: Clippy
+        run: cargo clippy -p symthaea-content-fabric --all-targets -- -D warnings
+      - name: Test
+        run: cargo test -p symthaea-content-fabric --all-targets
