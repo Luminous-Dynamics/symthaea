@@ -49,6 +49,8 @@ The combined overlay modifies both the task-eligibility validation path and the 
 
 The Rust `rust-repair-manifest` tool currently validates and locks the **task-validation** stream. The scored-evaluation sidecar is a separate artifact and is not yet independently graded by this task-manifest binary; before publishing a scored comparison, run an independent scored-receipt verifier that joins each prediction to the locked task ID, verifies the prediction patch digest and raw log, and recomputes the official test verdict from the parsed statuses. Do not imply that a valid task manifest alone proves a scored agent rollout.
 
+The strict protocol is Linux-only. The pinned RepoLaunch overlay modifies its Linux runtime; each receipt therefore includes the runtime object's platform label, and the task/scored auditors require exactly `linux`. A Windows, Android, missing, or otherwise different runtime platform is unresolved and cannot enter headline pass@1. This platform label is runtime-reported telemetry rather than a hardware attestation, so the pinned runtime source and Docker evidence remain part of the audit package.
+
 ## Enforced container network isolation
 
 The separate pinned patch `docs/research/patches/repolaunch-network-isolation.patch` targets RepoLaunch submodule commit `c4b623d930f3728e5338664bb634021b98492cbf`. It sets Docker `network_mode="none"` for Linux task containers. RepoLaunch image pulls happen on the host before the trial container starts; package installs or dependency downloads initiated from inside the test container cannot silently reach the network.
