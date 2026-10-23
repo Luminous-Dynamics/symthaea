@@ -146,6 +146,10 @@ jobs:
               docs/security/models/mesh_handshake_stub_backend_legacy.cfg EstablishedSound
             check_mutant docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla \
               docs/security/models/mesh_handshake_downgrade_legacy.cfg EstablishedSound
+            check_mutant docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla \
+              docs/security/models/mesh_handshake_identity_unbound_legacy.cfg EstablishedSound
+            check_mutant docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla \
+              docs/security/models/mesh_handshake_transcript_unbound_legacy.cfg EstablishedSound
           fi
 
           if [[ -f docs/security/models/MESH_NONCE_LIFECYCLE.tla ]]; then
