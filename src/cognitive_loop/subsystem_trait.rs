@@ -1329,6 +1329,7 @@ mod tests {
         let mut health = SubsystemHealthTracker::new();
         let snapshot = CycleSnapshot {
             prediction_error: 1.0,
+            prediction_error_valid: 1,
             ..CycleSnapshot::default()
         };
 
