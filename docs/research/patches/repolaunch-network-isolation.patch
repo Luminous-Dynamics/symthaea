@@ -1,0 +1,9 @@
+diff --git a/launch/core/platforms/linux.py b/launch/core/platforms/linux.py
+--- a/launch/core/platforms/linux.py
++++ b/launch/core/platforms/linux.py
+@@ -247,4 +247,5 @@
+         run_kwargs = {
+             "cpu_quota": int(CPU_CORES * 100000),
+             "mem_limit": MEM_LIMIT,
++            "network_mode": "none",
+         }
