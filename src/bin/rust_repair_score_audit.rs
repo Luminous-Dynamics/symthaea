@@ -807,6 +807,13 @@ fn validate_scored_container_identity(
         Some(identity) => identity,
         None => return Err(vec!["scored container_identity is missing or malformed".to_string()]),
     };
+    if identity
+        .get("git_metadata_sanitization_exit_code")
+        .and_then(Value::as_i64)
+        != Some(0)
+    {
+        errors.push("Git metadata sanitization was not confirmed".to_string());
+    }
     let configured_image = identity
         .get("configured_image")
         .and_then(Value::as_str)
@@ -1560,7 +1567,8 @@ mod tests {
                 "container_id": format!("{:064x}", 9),
                 "configured_image": "example@sha256:deadbeef",
                 "container_image_id": image_id,
-                "network_mode": "none"
+                "network_mode": "none",
+                "git_metadata_sanitization_exit_code": 0
             }
         });
         assert!(validate_scored_container_identity(&task, &candidate, &evidence).is_ok());
