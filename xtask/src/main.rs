@@ -6,6 +6,7 @@ mod cognitive_loop_evidence;
 mod cognitive_drift_score;
 mod cognitive_drift_compare;
 mod cognitive_adaptation_utility;
+mod cognitive_drift_baselines;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -91,6 +92,13 @@ enum Commands {
     },
     /// Score task loss and intervention cost across counterfactual adaptation policies.
     ScoreCounterfactualAdaptationUtility {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Run the fixed-threshold or EWMA control-chart baseline on a valid PE stream.
+    RunCognitiveDriftBaseline {
         #[arg(long)]
         input: PathBuf,
         #[arg(long)]
@@ -220,6 +228,16 @@ fn main() -> anyhow::Result<()> {
             if let Some(path) = out {
                 std::fs::write(&path, rendered.as_bytes())?;
                 println!("Wrote counterfactual adaptation utility score to {}", path.display());
+            } else {
+                println!("{rendered}");
+            }
+        }
+        Commands::RunCognitiveDriftBaseline { input, out } => {
+            let result = cognitive_drift_baselines::evaluate_file(&input)?;
+            let rendered = serde_json::to_string_pretty(&result)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote scalar drift baseline result to {}", path.display());
             } else {
                 println!("{rendered}");
             }
