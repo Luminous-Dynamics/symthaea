@@ -124,6 +124,10 @@ name = "hdc_simd_compare"
 harness = false
 
 [[bench]]
+name = "hdc_fused_argmax"
+harness = false
+
+[[bench]]
 name = "hdc_ltc_learning"
 harness = false
 

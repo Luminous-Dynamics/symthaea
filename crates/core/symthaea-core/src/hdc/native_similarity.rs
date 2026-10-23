@@ -57,6 +57,31 @@ impl PackedBipolar {
         Self { words, dimension }
     }
 
+    /// Pack the canonical 16,384-bit BinaryHV directly into u64 words.
+    ///
+    /// This avoids expanding every bit to an intermediate i8 bipolar vector.
+    /// Bit order matches BinaryHV's byte layout and PackedBipolar's LSB-first
+    /// word encoding; the resulting vector is semantically identical to
+    /// packing the corresponding +/-1 bipolar values.
+    pub fn from_binary_hv(hv: &super::binary_hv::BinaryHV) -> Self {
+        let words = hv
+            .0
+            .chunks_exact(8)
+            .map(|chunk| {
+                u64::from_le_bytes(
+                    chunk
+                        .try_into()
+                        .expect("BinaryHV chunks are exactly eight bytes"),
+                )
+            })
+            .collect();
+
+        Self {
+            words,
+            dimension: super::binary_hv::BinaryHV::DIM,
+        }
+    }
+
     /// Create from continuous values (thresholding at 0)
     ///
     /// Values > 0 become +1 (bit=1), values <= 0 become -1 (bit=0)
@@ -509,6 +534,31 @@ impl NativeSimilarityIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_binary_hv_direct_pack_matches_reference_encoders() {
+        use crate::hdc::binary_hv::BinaryHV;
+
+        let mut inputs = vec![BinaryHV::zero(), BinaryHV::ones()];
+        inputs.extend([1u64, 42, 2026, 0x5EED_16384].map(BinaryHV::random));
+
+        for hv in inputs {
+            let direct = PackedBipolar::from_binary_hv(&hv);
+            let bipolar: Vec<i8> = (0..BinaryHV::DIM)
+                .map(|index| {
+                    if (hv.0[index / 8] >> (index % 8)) & 1 == 1 {
+                        1
+                    } else {
+                        -1
+                    }
+                })
+                .collect();
+            let reference = PackedBipolar::from_bipolar(&bipolar);
+            assert_eq!(direct.dimension, BinaryHV::DIM);
+            assert_eq!(direct.words, reference.words);
+            assert_eq!(direct.hamming_distance(&reference), 0);
+        }
+    }
 
     #[test]
     fn test_packed_bipolar_roundtrip() {

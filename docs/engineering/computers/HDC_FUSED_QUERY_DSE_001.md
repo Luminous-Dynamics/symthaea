@@ -1,0 +1,135 @@
+# HDC-FUSED-QUERY-DSE-001 — exact search, fusion, and data-movement frontier
+
+Status: research protocol plus software benchmark draft. No performance result has been collected from this change.
+
+## Decision to make
+
+For the canonical 16,384-bit BinaryHV, does a fused exact similarity-to-argmax path improve complete query cost over Symthaea's best available software path, after preprocessing, memory residency, launch/transfer overhead, and result materialization are included?
+
+Do not widen the custom RTL just because wider words look attractive. First identify whether the real bottleneck is bitwise compute, score reduction, allocation, representation conversion, memory traffic, or accelerator orchestration.
+
+Parents: [SOC-DESIGN-001 #8459](https://github.com/Luminous-Dynamics/symthaea/issues/8459), [HDC RTL equivalence #5808](https://github.com/Luminous-Dynamics/symthaea/issues/5808), workload baselines #5805, and [oracle-driven RTL sweep #8463](https://github.com/Luminous-Dynamics/symthaea/pull/8463).
+
+## Current code baseline and new software slice
+
+The existing `crates/core/symthaea-core/benches/hdc_simd_compare.rs` already compares SIMD, scalar, packed, binding, similarity, Hamming distance, bundling, and search. Its search corpus sizes are 64, 256, and 1,024 and the timed result is the maximum score, not an explicitly checked winning ID.
+
+The companion `crates/core/symthaea-core/benches/hdc_fused_argmax.rs` adds:
+- candidate counts 1, 16, 64, 256, and 1,024;
+- exact top-1 results carrying both ID and score or distance;
+- deterministic lowest-index tie resolution across all implementations;
+- pre-timing correctness checks on seeded vectors, duplicate winners and zero/one vectors;
+- one-pass fused score reduction versus a deliberately materialized score vector;
+- SIMD similarity, Hamming-distance minimization, packed search with persisted encodings, and packed preparation-plus-search;
+- separate packed query/corpus preparation timings;
+- compare historical per-bit bipolar expansion with direct `BinaryHV` → little-endian `u64` packing via `PackedBipolar::from_binary_hv`, both persisted and setup-inclusive.
+
+Run after checking out the exact source revision:
+
+```sh
+cargo bench -p symthaea-core --bench hdc_fused_argmax
+```
+
+This microbenchmark measures software execution time only. It does not measure joules, physical memory traffic, FPGA behavior, or the custom RTL. The packed conversion routine is a comparator for the current public conversion path, not a claim that all packed encoders must use that implementation.
+
+## Paradigm shift: fuse the semantic endpoint
+
+For exact top-1 retrieval, the output is an ID and score, not a 16,384-bit intermediate vector. A candidate architecture should therefore evaluate:
+
+```text
+candidate words -> XOR -> popcount/Hamming -> exact score -> argmax reducer
+                                                        -> winning ID + score
+```
+
+Keep the query resident in local memory/registers where possible, stream candidate words, and return only the winner. Make query residency explicit; CPU caches and accelerator SRAM/DMA have different costs.
+
+One BinaryHV occupies 2,048 bytes. A search over N candidates has at least 2,048 × N bytes of logical candidate payload; a non-resident query adds another 2,048 logical bytes per query. The hardware protocol should not write an intermediate 2,048-byte XOR vector per candidate if the only requested output is a scalar score and winner ID.
+
+Important counter-hypothesis: a good software implementation may already fuse XOR/popcount in registers and keep the query cache-hot. That is why we must measure against the current SIMD baseline instead of assuming the software path writes temporary vectors. The likely hardware opportunity is the whole data path—query reuse, streaming, score reduction, batching and launch/transfer amortization—not bit width in isolation.
+
+## Measurement phases
+
+### Phase A — software truth and break-even
+
+Use the new Criterion benchmark to compare identical frozen query/candidate bytes. Preserve the full terminal output, Criterion estimates, repository HEAD, source diff, rustc/Cargo versions, target CPU and enabled ISA features, build profile, OS/kernel, thermal/power policy, and whether candidate representations are already packed.
+
+Measure kernel-only and preparation-inclusive paths independently. Report latency per query, candidates/s, candidate count, exact winner ID, exact score/distance, corpus representation bytes, and setup cost. Run multiple fixed seeds and retain raw results. Do not report energy from runtime or infer power from TDP.
+
+The software comparison is informative before the HDL tools become available. It must not claim an accelerator win.
+
+### Phase A2 — exact early-abandonment as an algorithmic baseline
+
+Before paying for a custom accelerator, test an algorithmic alternative that keeps exact top-1 semantics. Hamming distance is a sum of non-negative bit mismatches. While processing a candidate in fixed byte chunks, the partial distance is a lower bound on its final distance. Since candidates are visited in index order and ties preserve the earlier ID, a candidate can be abandoned as soon as its partial distance is greater than or equal to the best fully evaluated distance.
+
+The new benchmark includes 16-byte and 64-byte chunk policies. Correctness is checked against the full exact scan. Two stress conditions are designed:
+- a random-only deterministic corpus, where early abandonment may be weak because nearest candidates are not especially close;
+- a deterministic near-match at the corpus midpoint, with approximately 10% of query bits flipped in a distributed pattern, exposing how an improved incumbent can make later candidates cheap to reject.
+
+It scales through 4,096, 16,384 and 65,536 candidates (8, 32 and 128 MiB of logical candidate payload, respectively). These are host-memory workloads—not claims about a particular CPU cache, cold DRAM or physical I/O. Cache behaviour depends on the target machine and must be recorded. Untimed diagnostics count candidate bytes visited; timed variants compile out this counter path.
+
+The exact pruning bound can lose against a straight SIMD/vectorized scan because branches, prefix traversal and early-exit divergence cost time. If it wins only on a planted easy-match corpus but regresses on random or realistic traces, treat it as workload-specialized rather than a universal replacement. A later extension should randomize near-match position over fixed seeds and add domain-derived corpus traces. This remains software-only and does not qualify the RTL.
+
+Independent mathematical reference check (not Rust execution): 12 deterministic model seeds × random/planted conditions × 16/64/128-byte chunks matched the full-scan winner in all 72 cases. In a separate 4,096-candidate / 8 MiB traversal-count pilot, the random-only corpus visited 97.70% of candidate bytes with 16-byte chunks and 99.06% with 64-byte chunks. With one approximately 10%-distance target planted at the midpoint, the model visited 59.08% and 60.51%, respectively. This is a count of modeled bytes visited—not execution time, energy, a compiled benchmark, or a Rust-source test. It supports testing the hypothesis but also shows why this cannot be advertised as a universal win: the bound prunes substantially more when a good incumbent appears, and randomized-only inputs offer little work reduction. These figures should be replaced or corroborated by exact-head Rust execution and realistic corpus traces.
+
+### Phase B — qualified RTL architecture sweep
+
+Prerequisite: the software-oracle generator and all 12 cases in #8463 compile and simulate at its exact head. Once that gate is met, add a distinct fused similarity-to-argmax primitive; do not treat word-level XOR/popcount success as qualification of the full search datapath.
+
+Initial sweep: 4 word widths × 3 candidate-lane counts × 3 corpus sizes = 36 configurations.
+
+| Dimension | Values | Why |
+|---|---|---|
+| Word datapath | 64, 128, 256, 512 bits | 256, 128, 64, or 32 chunks per 16,384-bit vector for a single word lane |
+| Candidate lanes | 1, 2, 4 | Trade area / broadcast fanout / memory pressure for concurrency |
+| Candidates per query | 16, 256, 1,024 | Expose small-query overhead and throughput scaling |
+| Held fixed initially | Query resident; exact XOR → popcount → argmax; lowest-index ties | Avoid a factorial sweep before a first Pareto frontier exists |
+
+Only after a first trustworthy frontier should we ablate query residency, batch size, non-resident transfer, score materialization, and command/DMA overhead. If the software baseline already wins on realistic low-batch tasks, stop or redesign instead of adding lanes by default.
+
+### Phase C — synthesis, board, and energy
+
+For every RTL candidate, preserve source/config hash, simulator and synthesis tool versions, constraints, clock target, resource or cell counts, critical path, and receipt. Distinguish simulated cycles, synthesis timing estimates, FPGA observations, and physical-device measurements. Open-PDK results do not predict advanced-node mobile silicon without a validated scaling model.
+
+Only an identified physical target and calibrated measurement setup can establish joules per query. Measure complete query energy with explicit idle/baseline subtraction, repetition and uncertainty. Report energy separately for transfer, compute and orchestration where instruments permit; do not add estimates that share overlapping boundaries.
+
+## Representation optimization
+
+The historical packed path expands 16,384 bits into a temporary vector of 16,384 signed bytes, then repacks those values into 256 words. The new `PackedBipolar::from_binary_hv` path translates each eight-byte little-endian block directly into a u64, avoiding the intermediate i8 vector and per-bit re-encoding loop. This is a representation-conversion optimization, not a new HDC algorithm. It should reduce conversion overhead and temporary working set, but the gain must be measured. A unit test compares direct packing with the established bipolar encoder on zero, all-one and seeded random vectors; Rust execution remains pending.
+
+## Correctness contract
+
+- The winner index must be identical to canonical BinaryHV exact top-1.
+- The score/distance must agree with the canonical result; approximate search is a separate experiment.
+- Ties choose the lowest candidate index, independently of lane scheduling or completion order.
+- Test empty input policy explicitly in a production API; this Criterion fixture simply avoids empty corpora.
+- Include zero and all-one vectors, identical candidates, exact match at multiple indices, random deterministic corpora and non-power-of-two corpus counts in the next fixture expansion.
+- An incorrect result is a failed candidate, not a throughput result.
+
+## Do not reinvent a standard population-count instruction
+
+Bit population count is already available in several general-purpose ISA families. The ratified RISC-V vector bit-manipulation extension `Zvbb` specifies `vcpop.v`; selected x86 CPUs expose AVX-512 `VPOPCNTD/Q` or `VPOPCNTB/W` forms. These are not present on every SKU or target, so feature detection and exact target identity matter. References: [RISC-V vector bit-manipulation specification](https://docs.riscv.org/reference/isa/unpriv/vector-crypto.html) and [Intel instruction-set manual](https://cdrdv2-public.intel.com/671110/325383-sdm-vol-2abcd.pdf).
+
+Therefore, "we built a popcount RTL block" is not itself a competitive claim. Use the best supported CPU path on the same machine as the first baseline. A credible custom accelerator opportunity must come from improved end-to-end dataflow—fused XOR/popcount/reduction, query reuse, transfer amortization, predictable latency/energy, or capabilities not reached efficiently by the target ISA. The baseline record must include detected CPU features and actual compiled target flags; never assume AVX-512 or RISC-V vector instructions are available on a phone.
+
+## Industry reference and how we compete
+
+- **MLPerf Client** provides a useful end-to-end discipline for local AI and agentic work: quality gates and complete task duration rather than theoretical peak numbers. It is not a directly comparable HDC score. https://mlcommons.org/benchmarks/client/
+- **MLPerf Tiny v1.4 (July 2026)** demonstrates the edge-device comparison discipline we should emulate: fixed workloads and quality targets, measured latency and calibrated energy, plus attention to always-on duty cycle. Its published analysis reports substantial accelerations from dedicated accelerators on specific matched tasks; those numbers are not transferable to HDC without a matched workload. https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/
+- **MLPerf Tiny** offers fixed-reference workloads, accuracy conditions and optional energy evaluation for constrained edge devices. Use its matched-workload/evidence discipline when designing later phone-class power tests. https://mlcommons.org/benchmarks/inference-tiny/
+- **Vortex GPU 3.0** is a relevant open architecture-research reference for memory staging, local-memory use, scheduling, simulation and synthesis flow. It is not a drop-in mobile GPU or a ready-made HDC accelerator. https://github.com/vortexgpgpu/vortex/releases
+
+First beat the best reproducible software baseline at the *same exact task*. Then compare a qualified RTL or FPGA implementation with matching input, output, data residency, and timing boundaries. Only then compare against commercial devices with matched workload and quality.
+
+## Proposed decision gates — not results
+
+A custom block advances only if it achieves either:
+- at least 1.5× higher end-to-end exact-query throughput, or
+- at least 30% fewer directly measured joules per successful exact query,
+
+while returning identical results and showing no material regression in p95/p99 latency, sustained thermal behavior, or system correctness. The thresholds are predeclared go/no-go targets, not claimed achievements.
+
+Publish a Pareto frontier over exact queries/s, joules/query when measured, p95 latency, area/resources, clock, data movement, preparation cost and error rate. Reject candidates that win only on a narrow kernel timing while losing after preparation or transfers.
+
+## Current validation boundary
+
+The benchmark and protocol have been authored but not compiled or executed in this authoring environment. The existing environment lacks Cargo/Rust, Nix and Verilator; the new source's API/type correctness, Criterion execution and benchmark numbers remain unverified until an exact-head Rust run. No RTL simulation, synthesis, FPGA, energy, PPA, SOTA or product-superiority claim is made here.
