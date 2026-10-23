@@ -373,7 +373,10 @@ fn transition_sets(
     let explicit_fail_to_pass = baseline
         .iter()
         .filter(|(test_id, status)| {
-            status.as_str() == "fail" && gold.get(*test_id).is_some_and(|post| post.as_str() == "pass")
+            status.as_str() == "fail"
+                && gold
+                    .get(*test_id)
+                    .is_some_and(|post| post.as_str() == "pass")
         })
         .map(|(test_id, _)| test_id.clone())
         .collect::<BTreeSet<_>>();
@@ -766,7 +769,11 @@ fn audit_candidate(
     let runtime_evidence_path = task_dir.join("validation_evidence.json");
     let runtime_evidence_bytes = match fs::read(&runtime_evidence_path) {
         Ok(bytes) => Some(bytes),
-        Err(error) => { unresolved = true; reasons.push(format!("cannot read runtime evidence: {error}")); None }
+        Err(error) => {
+            unresolved = true;
+            reasons.push(format!("cannot read runtime evidence: {error}"));
+            None
+        }
     };
     let status_bytes = match fs::read(&status_path) {
         Ok(bytes) => Some(bytes),
@@ -1591,7 +1598,8 @@ mod tests {
             "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
         );
         let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
-        let mut evidence: Value = serde_json::from_slice(&fs::read(&evidence_path).unwrap()).unwrap();
+        let evidence_bytes = fs::read(&evidence_path).unwrap();
+        let mut evidence: Value = serde_json::from_slice(&evidence_bytes).unwrap();
         evidence["gold_runs"][2]["container_identity"]["container_image_id"] =
             Value::String(format!("sha256:{}", "c".repeat(64)));
         fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
@@ -1620,7 +1628,8 @@ mod tests {
             "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
         );
         let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
-        let mut evidence: Value = serde_json::from_slice(&fs::read(&evidence_path).unwrap()).unwrap();
+        let evidence_bytes = fs::read(&evidence_path).unwrap();
+        let mut evidence: Value = serde_json::from_slice(&evidence_bytes).unwrap();
         evidence["baseline"]["test_exit_code"] = Value::from(124);
         fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
         let result = audit_candidate(
@@ -1652,7 +1661,8 @@ mod tests {
             "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
         );
         let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
-        let mut evidence: Value = serde_json::from_slice(&fs::read(&evidence_path).unwrap()).unwrap();
+        let evidence_bytes = fs::read(&evidence_path).unwrap();
+        let mut evidence: Value = serde_json::from_slice(&evidence_bytes).unwrap();
         evidence["gold_runs"][1]["solution_patch_applied"] = Value::Bool(false);
         fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
         let result = audit_candidate(
