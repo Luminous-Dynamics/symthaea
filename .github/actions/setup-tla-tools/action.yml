@@ -12,13 +12,13 @@ inputs:
 outputs:
   tool-path:
     description: Absolute path to the verified TLA+ tools JAR
-    value: \${{ steps.install.outputs.tool-path }}
+    value: ${{ steps.install.outputs.tool-path }}
   version:
     description: Verified TLA+ build identifier
-    value: \${{ steps.install.outputs.version }}
+    value: ${{ steps.install.outputs.version }}
   sha256:
     description: Verified SHA-256
-    value: \${{ steps.install.outputs.sha256 }}
+    value: ${{ steps.install.outputs.sha256 }}
 runs:
   using: composite
   steps:
@@ -31,8 +31,8 @@ runs:
       id: install
       shell: bash
       env:
-        TLA_VERSION: \${{ inputs.version }}
-        TLA_SHA256: \${{ inputs.sha256 }}
+        TLA_VERSION: ${{ inputs.version }}
+        TLA_SHA256: ${{ inputs.sha256 }}
       run: |
         set -euo pipefail
         if [[ ! "$TLA_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
