@@ -14,6 +14,10 @@ pub struct DriftTrace {
     pub schema_version: u32,
     pub stream_id: String,
     pub detector_id: String,
+    pub detector_version: String,
+    pub comparison_track: String,
+    /// Delay between an outcome becoming available and the event being observed, in cycles.
+    pub label_delay_cycles: u64,
     pub repository_head_sha: String,
     pub configuration_digest: String,
     pub seed: u64,
@@ -60,6 +64,9 @@ pub struct DriftScore {
     pub result_sha256: Option<String>,
     pub stream_id: String,
     pub detector_id: String,
+    pub detector_version: String,
+    pub comparison_track: String,
+    pub label_delay_cycles: u64,
     pub repository_head_sha: String,
     pub configuration_digest: String,
     pub seed: u64,
@@ -93,6 +100,11 @@ pub fn score_trace(mut trace: DriftTrace) -> anyhow::Result<DriftScore> {
     ensure!(trace.schema_version == 1, "drift trace schema_version must be 1");
     ensure!(!trace.stream_id.trim().is_empty(), "stream_id must not be empty");
     ensure!(!trace.detector_id.trim().is_empty(), "detector_id must not be empty");
+    ensure!(!trace.detector_version.trim().is_empty(), "detector_version must not be empty");
+    ensure!(
+        ["valid-pe-only", "feature-only-unsupervised", "auxiliary-loss-unsupervised", "observed-outcome"].contains(&trace.comparison_track.as_str()),
+        "comparison_track must be one of the declared evidence-access tracks"
+    );
     ensure!(
         trace.repository_head_sha.len() == 40 || trace.repository_head_sha.len() == 64,
         "repository_head_sha must be a full 40- or 64-character commit hash"
@@ -246,6 +258,9 @@ pub fn score_trace(mut trace: DriftTrace) -> anyhow::Result<DriftScore> {
         result_sha256: None,
         stream_id: trace.stream_id,
         detector_id: trace.detector_id,
+        detector_version: trace.detector_version,
+        comparison_track: trace.comparison_track,
+        label_delay_cycles: trace.label_delay_cycles,
         repository_head_sha: trace.repository_head_sha,
         configuration_digest: trace.configuration_digest,
         seed: trace.seed,
@@ -286,6 +301,9 @@ mod tests {
             schema_version: 1,
             stream_id: "synthetic-test-stream".to_owned(),
             detector_id: "test-detector".to_owned(),
+            detector_version: "test-fixture-1".to_owned(),
+            comparison_track: "valid-pe-only".to_owned(),
+            label_delay_cycles: 0,
             repository_head_sha: "a".repeat(40),
             configuration_digest: "b".repeat(64),
             seed: 17,
@@ -352,6 +370,13 @@ mod tests {
             vec![],
         );
         assert!(score_trace(bad_event).is_err());
+    }
+
+    #[test]
+    fn rejects_undeclared_evidence_access_track() {
+        let mut bad = trace(vec![], vec![]);
+        bad.comparison_track = "secret-label-leak".to_owned();
+        assert!(score_trace(bad).is_err());
     }
 
     #[test]
