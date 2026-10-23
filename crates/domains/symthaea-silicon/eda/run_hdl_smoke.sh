@@ -24,13 +24,15 @@ out_dir="${out_root}/${stamp}-pid${BASHPID}"
 mkdir -p "${out_dir}" || { printf 'cannot create output directory: %s\n' "${out_dir}" >&2; exit 2; }
 
 missing=()
-for tool in verilator jq sha256sum git make c++ awk head grep; do
+for tool in verilator jq sha256sum git make c++ head grep; do
   if ! command -v "${tool}" >/dev/null 2>&1; then missing+=("${tool}"); fi
 done
 
 hash_file() {
   if [[ -f "$1" ]] && command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | awk '{print $1}'
+    local hash_line
+    hash_line="$(sha256sum "$1")" || { printf 'unavailable'; return; }
+    printf '%s' "${hash_line%% *}"
   else
     printf 'unavailable'
   fi
