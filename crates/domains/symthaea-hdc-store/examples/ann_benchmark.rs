@@ -143,60 +143,63 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         for round in 0..config.rounds {
             for (query_index, query) in queries.iter().enumerate() {
-            // Alternate call order to reduce systematic cache/order bias.
-            let (exact, exact_ns, approximate, approximate_ns) =
-                if (round + query_index) % 2 == 0 {
-                    let (result, elapsed) = measure_exact(&store, &query.vector, config.top_k);
-                    let (ann, ann_elapsed) =
-                        measure_approximate(&store, &query.vector, config.top_k, options);
-                    (result, elapsed, ann, ann_elapsed)
-                } else {
-                    let (ann, ann_elapsed) =
-                        measure_approximate(&store, &query.vector, config.top_k, options);
-                    let (result, elapsed) = measure_exact(&store, &query.vector, config.top_k);
-                    (result, elapsed, ann, ann_elapsed)
-                };
+                // Alternate call order to reduce systematic cache/order bias.
+                let (exact, exact_ns, approximate, approximate_ns) =
+                    if (round + query_index) % 2 == 0 {
+                        let (result, elapsed) =
+                            measure_exact(&store, &query.vector, config.top_k);
+                        let (ann, ann_elapsed) =
+                            measure_approximate(&store, &query.vector, config.top_k, options);
+                        (result, elapsed, ann, ann_elapsed)
+                    } else {
+                        let (ann, ann_elapsed) =
+                            measure_approximate(&store, &query.vector, config.top_k, options);
+                        let (result, elapsed) =
+                            measure_exact(&store, &query.vector, config.top_k);
+                        (result, elapsed, ann, ann_elapsed)
+                    };
 
-            let exact_ids: Vec<u64> = exact.iter().map(|(id, _)| *id).collect();
-            let approximate_ids: Vec<u64> =
-                approximate.neighbors.iter().map(|(id, _)| *id).collect();
-            let recall_at_k = recall_at_k(&exact_ids, &approximate_ids);
-            let tie_aware_recall_at_k = tie_aware_recall_at_k(&exact, &approximate.neighbors);
-            let total_live = approximate.total_live;
-            let candidate_fraction = fraction(approximate.examined, total_live);
+                let exact_ids: Vec<u64> = exact.iter().map(|(id, _)| *id).collect();
+                let approximate_ids: Vec<u64> =
+                    approximate.neighbors.iter().map(|(id, _)| *id).collect();
+                let recall_at_k = recall_at_k(&exact_ids, &approximate_ids);
+                let tie_aware_recall_at_k =
+                    tie_aware_recall_at_k(&exact, &approximate.neighbors);
+                let total_live = approximate.total_live;
+                let candidate_fraction = fraction(approximate.examined, total_live);
 
-            if round == 0 {
-                first_round_quality.push(Quality {
+                if round == 0 {
+                    first_round_quality.push(Quality {
+                        kind: query.kind,
+                        lsh_bands: lsh_config.bands,
+                        lsh_rows: lsh_config.rows,
+                        recall_at_k,
+                        tie_aware_recall_at_k,
+                        examined: approximate.examined,
+                        candidate_fraction,
+                        approximate_exact: approximate.exact,
+                        fell_back_to_exact: approximate.fell_back_to_exact,
+                    });
+                }
+
+                samples.push(Sample {
+                    query_index,
+                    round,
                     kind: query.kind,
                     lsh_bands: lsh_config.bands,
                     lsh_rows: lsh_config.rows,
+                    exact_ns,
+                    approximate_ns,
                     recall_at_k,
                     tie_aware_recall_at_k,
                     examined: approximate.examined,
+                    total_live,
                     candidate_fraction,
                     approximate_exact: approximate.exact,
                     fell_back_to_exact: approximate.fell_back_to_exact,
+                    exact_ids,
+                    approximate_ids,
                 });
-            }
-
-            samples.push(Sample {
-                query_index,
-                round,
-                kind: query.kind,
-                lsh_bands: lsh_config.bands,
-                lsh_rows: lsh_config.rows,
-                exact_ns,
-                approximate_ns,
-                recall_at_k,
-                tie_aware_recall_at_k,
-                examined: approximate.examined,
-                total_live,
-                candidate_fraction,
-                approximate_exact: approximate.exact,
-                fell_back_to_exact: approximate.fell_back_to_exact,
-                exact_ids,
-                approximate_ids,
-            });
             }
         }
     }
