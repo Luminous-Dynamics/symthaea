@@ -507,6 +507,86 @@ fn exhaustive_exact_pair_matrix(scope: &ConsentScope) -> (usize, usize, usize) {
     (expected_passes, permutation_passes, total)
 }
 
+fn expected_mixed_scope_pair(
+    candidate: &ConsentEvidenceEvent,
+    fields: [FieldCase; 3],
+) -> ResolutionKey {
+    // A known mismatch means the event is out of scope even if another scope
+    // field is malformed. The exact in-scope baseline event remains applicable.
+    if fields.contains(&FieldCase::Mismatch) {
+        return ResolutionKey::Candidate(ConsentTransition::Granted, 0);
+    }
+    if fields
+        .iter()
+        .any(|case| matches!(case, FieldCase::Missing | FieldCase::Empty))
+    {
+        return ResolutionKey::Unknown(ConsentResolutionUncertainty::AmbiguousEventScope);
+    }
+    if candidate.modality != ConsentModality::Asserted {
+        return ResolutionKey::Unknown(ConsentResolutionUncertainty::NonAssertedEvidence);
+    }
+    match candidate.order {
+        None => ResolutionKey::Unknown(ConsentResolutionUncertainty::MissingTemporalOrder),
+        Some(0) => ResolutionKey::Unknown(ConsentResolutionUncertainty::DuplicateTemporalOrder),
+        Some(1) => ResolutionKey::Candidate(candidate.transition, 1),
+        Some(_) => unreachable!("matrix order is limited to 0 and 1"),
+    }
+}
+
+fn exhaustive_mixed_scope_pair_matrix(scope: &ConsentScope) -> (usize, usize, usize) {
+    let baseline = event(
+        scope,
+        ConsentTransition::Granted,
+        ConsentModality::Asserted,
+        Some(0),
+    );
+    let mut oracle_passes = 0usize;
+    let mut permutation_passes = 0usize;
+    let mut total = 0usize;
+
+    for subject in FIELD_CASES {
+        for action in FIELD_CASES {
+            for purpose in FIELD_CASES {
+                let fields = [subject, action, purpose];
+                for transition in TRANSITIONS {
+                    for modality in MODALITIES {
+                        for order in ORDERS {
+                            let candidate = matrix_event(
+                                scope, subject, action, purpose, transition, modality, order,
+                            );
+                            let expected = expected_mixed_scope_pair(&candidate, fields);
+                            let pair = [candidate.clone(), baseline.clone()];
+                            let actual = resolve(&pair, scope);
+                            total += 1;
+                            if actual == expected {
+                                oracle_passes += 1;
+                            } else if total <= 30 {
+                                println!(
+                                    "mixed_scope_pair_mismatch,case={total},fields={fields:?},transition={transition:?},modality={modality:?},order={order:?},expected={expected:?},actual={actual:?}"
+                                );
+                            }
+
+                            let reversed = [baseline.clone(), candidate];
+                            if resolve(&reversed, scope) == actual {
+                                permutation_passes += 1;
+                            } else if total <= 30 {
+                                println!(
+                                    "mixed_scope_pair_permutation_mismatch,case={total},fields={fields:?}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    println!(
+        "mixed_scope_pair_matrix,oracle_passes={oracle_passes}/{total},permutation_passes={permutation_passes}/{total}"
+    );
+    (oracle_passes, permutation_passes, total)
+}
+
 fn main() {
     let started = Instant::now();
     let scope = request();
@@ -553,9 +633,11 @@ fn main() {
     let (single_passes, single_total) = exhaustive_single_event_matrix(&scope);
     let (pair_passes, pair_permutation_passes, pair_total) =
         exhaustive_exact_pair_matrix(&scope);
+    let (mixed_passes, mixed_permutation_passes, mixed_total) =
+        exhaustive_mixed_scope_pair_matrix(&scope);
     let fixture_total = fixtures.len();
     println!(
-        "summary,fixtures={fixture_passes}/{fixture_total},permutation_invariant_fixtures={permutation_cases}/{fixture_total},permutation_trials={permutation_trials},permutation_failures={permutation_failures},counterfactual_pairs={counterfactual_passes}/{counterfactual_total},single_event_matrix={single_passes}/{single_total},exact_pair_matrix={pair_passes}/{pair_total},exact_pair_permutations={pair_permutation_passes}/{pair_total},elapsed_us={}",
+        "summary,fixtures={fixture_passes}/{fixture_total},permutation_invariant_fixtures={permutation_cases}/{fixture_total},permutation_trials={permutation_trials},permutation_failures={permutation_failures},counterfactual_pairs={counterfactual_passes}/{counterfactual_total},single_event_matrix={single_passes}/{single_total},exact_pair_matrix={pair_passes}/{pair_total},exact_pair_permutations={pair_permutation_passes}/{pair_total},mixed_scope_pair_matrix={mixed_passes}/{mixed_total},mixed_scope_pair_permutations={mixed_permutation_passes}/{mixed_total},elapsed_us={}",
         started.elapsed().as_micros()
     );
 
@@ -566,6 +648,8 @@ fn main() {
         || single_passes != single_total
         || pair_passes != pair_total
         || pair_permutation_passes != pair_total
+        || mixed_passes != mixed_total
+        || mixed_permutation_passes != mixed_total
     {
         std::process::exit(1);
     }
