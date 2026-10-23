@@ -318,10 +318,14 @@ fn candidate_rows(
         fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
     let digest = sha256_bytes(&bytes);
     if digest != expected_sha256 {
-        return Err(format!(concat!(
-            "candidate JSONL SHA-256 does not match the locked task ",
-            "manifest: expected {expected_sha256}, observed {digest}"
-        )));
+        return Err(format!(
+            concat!(
+                "candidate JSONL SHA-256 does not match the locked task ",
+                "manifest: expected {}, observed {}"
+            ),
+            expected_sha256,
+            digest
+        ));
     }
     let text = std::str::from_utf8(&bytes)
         .map_err(|error| format!("candidate JSONL is not UTF-8: {error}"))?;
