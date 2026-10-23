@@ -905,6 +905,29 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn zdt_reference_fixtures_match_known_archive_hypervolume() {
+        let zdt1_front = zdt_reference_front(ZdtProblem::Zdt1, 3).unwrap();
+        let mut zdt1_archive = ParetoArchive::new([2.0, 2.0]).unwrap();
+        for (index, point) in zdt1_front.iter().enumerate() {
+            zdt1_archive
+                .observe(feasible(index as u64 + 1, point[0], point[1], 1))
+                .unwrap();
+        }
+        let expected_zdt1_hv = 2.5 + 0.5 * (1.0 + 0.5_f64.sqrt());
+        assert_abs_close(zdt1_archive.hypervolume(), expected_zdt1_hv, 1e-12);
+
+        let zdt2_front = zdt_reference_front(ZdtProblem::Zdt2, 3).unwrap();
+        let mut zdt2_archive = ParetoArchive::new([2.0, 2.0]).unwrap();
+        for (index, point) in zdt2_front.iter().enumerate() {
+            zdt2_archive
+                .observe(feasible(index as u64 + 1, point[0], point[1], 1))
+                .unwrap();
+        }
+        assert_abs_close(zdt2_archive.hypervolume(), 3.125, 1e-12);
+    }
+
     fn assert_abs_close(actual: f64, expected: f64, tolerance: f64) {
         assert!(
             (actual - expected).abs() <= tolerance,
