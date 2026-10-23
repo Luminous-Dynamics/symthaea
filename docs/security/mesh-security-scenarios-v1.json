@@ -30,7 +30,7 @@
     },
     {
       "pull_request": 8355,
-      "scope": "authenticated mesh replay windows, MAC-before-replay state mutation, timestamp freshness, bounded replay-table capacity, and spoofed-source rate-limit regression"
+      "scope": "authenticated replay windows, MAC-before-replay state mutation, 60-second timestamp freshness with 5-second future skew, 66-second idle expiry, 4,608-stream capacity and recovery, and spoofed-source rate-limit regression"
     }
   ],
   "non_claims": [
