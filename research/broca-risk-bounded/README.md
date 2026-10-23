@@ -74,3 +74,12 @@ The crate is a qualification primitive for PR #8520, not a replacement for PR #8
 The CRISPR selective-risk track already has adjacent research work in [PR #7502](https://github.com/Luminous-Dynamics/symthaea/pull/7502) and [issue #7580](https://github.com/Luminous-Dynamics/symthaea/issues/7580), including risk–coverage curves, context-stratified summaries, and unknown-label-aware error bounds for probability scores. This memory-specific reference is not a claim that risk–coverage analysis or selective prediction is novel.
 
 The distinguishing slice here is retrieval-oriented fixed-sequence certification against a configured unsafe-result rate, tied acceptance-score tiers, unique query-ID enforcement, and a fail-closed stop when accepted outcomes are unlabelled. The present curve/reporting code is deliberately local to this standalone research crate; before production use or a general-purpose release, compare both implementations on shared fixtures and factor shared metric semantics into one maintained implementation rather than allowing parallel score/risk conventions to drift.
+
+
+## Cross-domain selective-risk contract fixture
+
+[\`fixtures/SELECTIVE_RISK_CROSS_DOMAIN_V1.json\`](fixtures/SELECTIVE_RISK_CROSS_DOMAIN_V1.json) pins expected outputs for zero coverage, exact score ties, a measured failure, an unknown accepted label, coverage denominators, and best-/worst-case empirical risk. It is intended to be run against both this retrieval evaluator and the adjacent [CRISPR selective-risk kernel in PR #7502](https://github.com/Luminous-Dynamics/symthaea/pull/7502) before either implementation is factored into shared code.
+
+The fixture normalizes an evaluator-specific event into `failure=true|false|null`. That is only a metric adapter: CRISPR classification error and unsafe memory retrieval are different events, and their policies, calibration meaning, contexts, sampling units, and authority boundaries must remain domain-specific. Both adapters must preserve unknown labels, treat score ties atomically, and report an explicit zero-coverage origin with undefined rates as `null`.
+
+The fixture is synthetic. Its JSON and arithmetic require independent checking; it is not a Rust test result, a benchmark result, a safety certificate, or evidence of improved retrieval quality.
