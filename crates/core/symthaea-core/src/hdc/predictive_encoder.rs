@@ -357,11 +357,17 @@ impl PredictiveHdcEncoder {
         let (bits_saved_persist, bits_saved_zero, bits_kappa) =
             self.compute_bits_saved(&attended_hdv);
 
-        // 5. Update attention weights based on error
-        self.update_attention(&detected_primitives, prediction_error);
+        // A degenerate comparison's 1.0 value is a compatibility sentinel,
+        // not evidence of maximal surprise. It must not train attention or
+        // contaminate the prediction-error history/EMA. Keep the raw sentinel
+        // in EncodingResult and the degeneracy counters for diagnostics.
+        if degeneracy == PredictionDegeneracy::Genuine {
+            // 5. Update attention weights from a valid prediction comparison.
+            self.update_attention(&detected_primitives, prediction_error);
 
-        // 6. Update statistics
-        self.update_stats(prediction_error);
+            // 6. Update prediction-error statistics from valid evidence only.
+            self.update_stats(prediction_error);
+        }
 
         EncodingResult {
             hdv: attended_hdv,
@@ -917,12 +923,27 @@ mod tests {
         })
         .unwrap();
 
-        // Encode several times with high error
-        for _ in 0..10 {
-            encoder.encode("cause effect action");
+        // A PE update requires a genuine previous prediction. Alternate
+        // distinct inputs and feed each encoding back as the next prediction.
+        let inputs = [
+            "cause effect action",
+            "river stone orbit",
+            "cause effect action",
+            "planet memory repair",
+            "river stone orbit",
+            "garden signal bridge",
+            "planet memory repair",
+            "cause effect action",
+            "garden signal bridge",
+            "river stone orbit",
+        ];
+        for input in inputs {
+            let result = encoder.encode(input);
+            let prediction = encoder.compress_for_ltc(&result.hdv, 64);
+            encoder.set_prediction(prediction);
         }
 
-        // Attention should have diverged from uniform
+        // Attention should diverge from uniform after valid error observations
         assert!(
             encoder.stats.attention_variance > 0.0,
             "Attention should diverge from uniform"
@@ -942,14 +963,51 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_accumulate() {
+    fn invalid_prediction_sentinels_do_not_contaminate_error_statistics() {
         let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
 
-        for _ in 0..5 {
-            encoder.encode("test");
-        }
+        let initial_attention = encoder.attention_weights_snapshot();
+        let first = encoder.encode("test");
+        assert_eq!(first.prediction_error, 1.0, "legacy diagnostic sentinel is preserved");
+        assert_eq!(encoder.last_prediction_degeneracy(), PredictionDegeneracy::NoPrediction);
+        assert_eq!(encoder.attention_weights_snapshot(), initial_attention);
+        assert!(encoder.error_history.is_empty());
+        assert_eq!(encoder.stats.avg_prediction_error, 0.0);
+        assert_eq!(encoder.stats.cumulative_error, 0.0);
 
-        assert_eq!(encoder.stats.total_cycles, 5);
+        // A present but zero-norm prediction is also invalid evidence.
+        encoder.set_prediction(vec![0.0; 64]);
+        let before_zero_prediction_attention = encoder.attention_weights_snapshot();
+        let second = encoder.encode("test");
+        assert_eq!(second.prediction_error, 1.0, "legacy diagnostic sentinel is preserved");
+        assert_eq!(
+            encoder.last_prediction_degeneracy(),
+            PredictionDegeneracy::ZeroPrediction
+        );
+        assert_eq!(
+            encoder.attention_weights_snapshot(),
+            before_zero_prediction_attention
+        );
+        assert!(encoder.error_history.is_empty());
+        assert_eq!(encoder.stats.avg_prediction_error, 0.0);
+        assert_eq!(encoder.stats.cumulative_error, 0.0);
+        assert_eq!(encoder.stats.total_cycles, 2);
+        assert_eq!(encoder.stats.degenerate_no_prediction_cycles, 1);
+        assert_eq!(encoder.stats.degenerate_zero_prediction_cycles, 1);
+    }
+
+    #[test]
+    fn test_stats_accumulate_for_genuine_prediction_comparisons() {
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
+
+        let first = encoder.encode("test");
+        let prediction = encoder.compress_for_ltc(&first.hdv, 64);
+        encoder.set_prediction(prediction);
+        encoder.encode("a meaningfully different input");
+
+        assert_eq!(encoder.stats.total_cycles, 2);
+        assert_eq!(encoder.stats.degenerate_no_prediction_cycles, 1);
+        assert_eq!(encoder.error_history.len(), 1);
         assert!(encoder.stats.cumulative_error > 0.0);
     }
 
