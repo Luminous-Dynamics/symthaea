@@ -338,6 +338,7 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_a(
     hv16_cached: BinaryHV,
     recent_hvs: &mut std::collections::VecDeque<BinaryHV>,
     prediction_error: f32,
+    prediction_error_valid: bool,
     coherence: f32,
     unified_psi: f64,
     total_cycles: usize,
@@ -389,14 +390,22 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_a(
     let t = Instant::now();
     let (dissipative_health, dissipative_regime, dissipative_entropy_rate, new_dissipative) =
         if let Some(dc) = dissipative_consciousness {
-            let energy = prediction_error as f64;
-            let info = coherence as f64 * unified_psi;
-            dc.update(unified_psi, energy, info, coherence as f64);
+            // Here PE is used as the "energy" input, so state transitions must
+            // wait for a valid finite comparison. Other branches still process
+            // coherence, Phi and other independently observed signals.
+            let admitted_pe = prediction_error_valid && prediction_error.is_finite();
+            if admitted_pe {
+                let energy = prediction_error as f64;
+                let info = coherence as f64 * unified_psi;
+                dc.update(unified_psi, energy, info, coherence as f64);
+            }
             let health = dc.health_score();
 
-            // Deferred feedback from recommend_action()
-            use crate::consciousness::dissipative_consciousness::DissipativeAction;
-            match dc.recommend_action() {
+            // Deferred feedback is PE-coupled here: don't replay the last known
+            // recommendation as if it came from a fresh invalid observation.
+            if admitted_pe {
+                use crate::consciousness::dissipative_consciousness::DissipativeAction;
+                match dc.recommend_action() {
                 DissipativeAction::Maintain { .. } => {
                     deferred.push(DeferredFeedback::AdjustConfidence(
                         "dissipative_maintain",
@@ -433,8 +442,9 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_a(
                         -0.005,
                     ));
                 }
-                DissipativeAction::IncreaseIntegration { .. } => {
-                    deferred.push(DeferredFeedback::ScaleLr("dissipative_integration", 1.03));
+                    DissipativeAction::IncreaseIntegration { .. } => {
+                        deferred.push(DeferredFeedback::ScaleLr("dissipative_integration", 1.03));
+                    }
                 }
             }
 
@@ -442,7 +452,7 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_a(
                 health,
                 dc.current_regime().as_str().into(),
                 dc.entropy_production_rate,
-                Some(health),
+                admitted_pe.then_some(health),
             )
         } else {
             (0.0, String::new(), 0.0, None)
@@ -525,6 +535,7 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_b(
     theory_calibrator: &Option<crate::consciousness::epistemic_conflict::TheoryCalibrator>,
     coherence: f32,
     prediction_error: f32,
+    prediction_error_valid: bool,
     unified_psi: f64,
     prediction_confidence: f64,
     total_cycles: usize,
@@ -546,10 +557,12 @@ pub(in crate::cognitive_loop) fn parallel_consciousness_branch_b(
             if total_cycles % 11 == 0 {
                 use crate::consciousness::harmonics::FiduciaryHarmonic;
                 field.set_level(FiduciaryHarmonic::ResonantCoherence, coherence as f64);
-                field.set_level(
-                    FiduciaryHarmonic::EvolutionaryProgression,
-                    (prediction_error as f64 * 2.0).clamp(0.0, 1.0),
-                );
+                if prediction_error_valid && prediction_error.is_finite() {
+                    field.set_level(
+                        FiduciaryHarmonic::EvolutionaryProgression,
+                        (prediction_error as f64 * 2.0).clamp(0.0, 1.0),
+                    );
+                }
                 field.set_level(FiduciaryHarmonic::IntegralWisdom, prediction_confidence);
                 field.set_level(
                     FiduciaryHarmonic::PanSentientFlourishing,
