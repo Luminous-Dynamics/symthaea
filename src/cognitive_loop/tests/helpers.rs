@@ -9,6 +9,16 @@
 //! FEP active inference, cross-modal binding, and parallel post-processing.
 
 use super::super::*;
+use crate::cognitive_loop::types::{PredictionErrorEvidence, PredictionEvidenceStatus};
+
+fn missing_pe_evidence(observation_cycle: u64) -> PredictionErrorEvidence {
+    PredictionErrorEvidence::invalid(
+        PredictionEvidenceStatus::NoPriorPrediction,
+        None,
+        observation_cycle,
+    )
+    .expect("NoPriorPrediction is an invalid evidence status")
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Phase 1: Safety precheck, cognitive depth, negation, learning rate
@@ -172,7 +182,10 @@ fn test_run_surprise_exploration_no_bridge() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Default config has no surprise bridge
     let compressed = vec![0.3f32; 128];
-    let (triggered, action) = service.run_surprise_exploration(&compressed, false);
+    let observation_cycle = service.stats.total_cycles as u64;
+    let evidence = missing_pe_evidence(observation_cycle);
+    let (triggered, action) =
+        service.run_surprise_exploration(&compressed, &evidence, observation_cycle);
     assert!(!triggered, "No surprise bridge → no trigger");
     assert!(action.is_none(), "No surprise bridge → no action");
 }
@@ -188,7 +201,10 @@ fn test_invalid_pe_does_not_trigger_surprise_or_exploration() {
     service.last_prediction = Some(vec![0.0f32; 128]);
     let initial_urge = service.behavior.curiosity_drive.exploration_urge;
 
-    let (triggered, action) = service.run_surprise_exploration(&compressed, false);
+    let observation_cycle = service.stats.total_cycles as u64;
+    let evidence = missing_pe_evidence(observation_cycle);
+    let (triggered, action) =
+        service.run_surprise_exploration(&compressed, &evidence, observation_cycle);
 
     assert!(!triggered, "invalid PE must not become surprise");
     assert!(action.is_none(), "invalid PE must not generate a perturbation");
@@ -209,7 +225,10 @@ fn test_run_surprise_exploration_with_bridge() {
     let compressed = vec![0.5f32; 128];
     service.last_state = Some(compressed.clone());
     service.last_prediction = Some(vec![0.0f32; 128]); // large mismatch
-    let (triggered, action) = service.run_surprise_exploration(&compressed, true);
+    let observation_cycle = service.stats.total_cycles as u64;
+    let evidence = PredictionErrorEvidence::valid(0.9, None, observation_cycle).unwrap();
+    let (triggered, action) =
+        service.run_surprise_exploration(&compressed, &evidence, observation_cycle);
     // We can't guarantee triggering (threshold-dependent), but verify no panic
     // and that action is coherent with triggered
     if triggered {
