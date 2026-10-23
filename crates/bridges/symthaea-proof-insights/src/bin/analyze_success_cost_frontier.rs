@@ -72,7 +72,6 @@ struct Plan {
 
 #[derive(Debug, Clone)]
 struct Outcome {
-    run_id: String,
     target_id: String,
     component_id: String,
     arm_id: String,
@@ -522,7 +521,6 @@ fn parse_and_join_outcomes(plan: &Plan, bytes: &[u8]) -> Result<Vec<Outcome>> {
         }
 
         outcomes.push(Outcome {
-            run_id,
             target_id,
             component_id,
             arm_id,
