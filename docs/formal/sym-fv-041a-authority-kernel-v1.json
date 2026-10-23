@@ -1,0 +1,75 @@
+{
+  "schema": "symthaea.formal.sym-fv-041a-authority-kernel.v1",
+  "issue": 5802,
+  "parent_issue": 5794,
+  "evidence_class": "AbstractFormalTheorem",
+  "status_at_source_creation": "source-implemented-not-yet-executed-qualified",
+  "proof_subject": {
+    "path": "formal/lean/authority/AuthorityKernel.lean",
+    "requires_mathlib": false,
+    "requires_user_axioms": false,
+    "authority_structure": "Preorder",
+    "trace_scope": "all finite inductively generated non-promoting traces"
+  },
+  "abstract_binding_fields": [
+    "subject",
+    "action",
+    "resource",
+    "policy",
+    "evidence",
+    "authority",
+    "context",
+    "authorityEpoch",
+    "policyEpoch",
+    "evidenceEpoch"
+  ],
+  "theorems": [
+    "trace_nonamplification",
+    "nonamplification_violation_implies_promoting",
+    "evidence_only_nonamplifying",
+    "binding_exact_accepts",
+    "subject_mismatch_reject",
+    "action_mismatch_reject",
+    "resource_mismatch_reject",
+    "policy_mismatch_reject",
+    "evidence_mismatch_reject",
+    "authority_mismatch_reject",
+    "context_mismatch_reject",
+    "authority_epoch_binding_mismatch_reject",
+    "policy_epoch_binding_mismatch_reject",
+    "evidence_epoch_binding_mismatch_reject",
+    "authority_epoch_currentness_mismatch_reject",
+    "policy_epoch_currentness_mismatch_reject",
+    "evidence_epoch_currentness_mismatch_reject"
+  ],
+  "one_step_refinement_obligation": "step s e s' and NonPromoting e implies authority s' <= authority s",
+  "evidence_obligation": "EvidenceOnly e implies NonPromoting e",
+  "promotion_boundary": "classification theorem only; concrete promotion capability validity is not proved here",
+  "currentness_boundary": "exact epoch equality only; no distributed freshness, liveness, trusted-time, or revocation linearizability claim",
+  "toolchain": {
+    "environment": "nix develop .#formal",
+    "flake_lock_blob": "e71fcd4a705040f1bf55c8f2611fefec760a9188",
+    "lean_package_source": "pkgs.lean4 from the exact flake.lock nixpkgs closure",
+    "checkout_action_commit": "11d5960a326750d5838078e36cf38b85af677262",
+    "install_nix_action_commit": "13d8dd58da0234aa297dedd986986ccb8e7f3e24",
+    "upload_artifact_action_commit": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+  },
+  "negative_controls": [
+    "required-theorem-deletion",
+    "proof-hole-injection",
+    "binding-field-deletion",
+    "evidence-nonpromoting-obligation-deletion"
+  ],
+  "nonclaims": [
+    "abstract-theorem-is-not-concrete-subsystem-refinement",
+    "finite-trace-safety-is-not-distributed-currentness",
+    "currentness-equality-is-not-revocation-linearizability",
+    "promotion-classification-is-not-promotion-authorization",
+    "abstract-theorem-is-not-runtime-correctness",
+    "abstract-theorem-is-not-blanket-safety-or-alignment-proof"
+  ],
+  "successors": {
+    "first_concrete_refinement": "two-phase restore admission/currentness (#354)",
+    "concurrency_successor": "revocation/effect-entry linearization under #5794"
+  }
+}
