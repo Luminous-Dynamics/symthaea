@@ -1,0 +1,48 @@
+{
+  "schema_version": "fdm-quality-v0.1",
+  "description": "Frozen synthetic expected-output fixtures only; not physical printer data or industry thresholds.",
+  "cases": [
+    {
+      "case_id": "centered_interval_inside",
+      "value_mm": 10.0,
+      "uncertainty_mm": 0.02,
+      "expected_geometry_disposition": "conforming",
+      "expected_feature_disposition": "conforming"
+    },
+    {
+      "case_id": "zero_uncertainty_at_inclusive_upper_bound",
+      "value_mm": 10.1,
+      "uncertainty_mm": 0.0,
+      "expected_geometry_disposition": "conforming",
+      "expected_feature_disposition": "conforming"
+    },
+    {
+      "case_id": "interval_wholly_outside_upper_bound",
+      "value_mm": 10.12,
+      "uncertainty_mm": 0.005,
+      "expected_geometry_disposition": "nonconforming",
+      "expected_feature_disposition": "nonconforming"
+    },
+    {
+      "case_id": "uncertainty_overlaps_upper_bound",
+      "value_mm": 10.11,
+      "uncertainty_mm": 0.02,
+      "expected_geometry_disposition": "not_evaluable",
+      "expected_feature_disposition": "indeterminate"
+    },
+    {
+      "case_id": "missing_value_is_not_zero",
+      "value_mm": null,
+      "uncertainty_mm": 0.0,
+      "expected_geometry_disposition": "not_evaluable",
+      "expected_feature_disposition": "missing"
+    },
+    {
+      "case_id": "missing_uncertainty_is_not_assumed_zero",
+      "value_mm": 10.0,
+      "uncertainty_mm": null,
+      "expected_geometry_disposition": "not_evaluable",
+      "expected_feature_disposition": "missing"
+    }
+  ]
+}
