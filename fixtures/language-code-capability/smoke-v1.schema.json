@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/fixtures/language-code-capability/smoke-v1.schema.json",
+  "title": "Symthaea Language–Code Capability Smoke Corpus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "dataset_version",
+    "split",
+    "synthetic",
+    "created_date",
+    "intended_use",
+    "expected_case_count",
+    "claim_ceiling",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "benchmark_id": {
+      "const": "symthaea-language-code-capability-smoke"
+    },
+    "dataset_version": {
+      "const": "smoke-v1"
+    },
+    "split": {
+      "const": "public_smoke"
+    },
+    "synthetic": {
+      "const": true
+    },
+    "created_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "intended_use": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_case_count": {
+      "const": 32
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "lane",
+          "kind",
+          "prompt",
+          "expected",
+          "tags",
+          "claim_ceiling"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^(L|C|R|V)-[0-9]{3}$"
+          },
+          "lane": {
+            "enum": [
+              "language",
+              "rust_synthesis",
+              "repair",
+              "verifier_integrity"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected": {
+            "type": "object"
+          },
+          "tags": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "claim_ceiling": {
+            "type": "string",
+            "minLength": 1
+          },
+          "semantic_contract": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pair_group": {
+            "type": "string",
+            "minLength": 1
+          },
+          "signature": {
+            "type": "string",
+            "minLength": 1
+          },
+          "preconditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "test_source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "buggy_source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "repair_contract": {
+            "type": "string",
+            "minLength": 1
+          },
+          "receipt_fixture": {
+            "type": "object"
+          },
+          "expected_outcome": {
+            "enum": [
+              "accept",
+              "reject",
+              "indeterminate"
+            ]
+          },
+          "expected_reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "lane": {
+                  "const": "language"
+                }
+              },
+              "required": [
+                "lane"
+              ]
+            },
+            "then": {
+              "required": [
+                "semantic_contract"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "lane": {
+                  "const": "rust_synthesis"
+                }
+              },
+              "required": [
+                "lane"
+              ]
+            },
+            "then": {
+              "required": [
+                "signature",
+                "test_source"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "lane": {
+                  "const": "repair"
+                }
+              },
+              "required": [
+                "lane"
+              ]
+            },
+            "then": {
+              "required": [
+                "signature",
+                "buggy_source",
+                "repair_contract",
+                "test_source"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "lane": {
+                  "const": "verifier_integrity"
+                }
+              },
+              "required": [
+                "lane"
+              ]
+            },
+            "then": {
+              "required": [
+                "receipt_fixture",
+                "expected_outcome",
+                "expected_reason"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
