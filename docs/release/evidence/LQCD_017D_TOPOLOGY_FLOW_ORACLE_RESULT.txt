@@ -1,0 +1,9 @@
+ok
+fixture_action=8.2223611910686003
+fixture_q=-0.00041713340026960005
+flowed_action=8.1318570997827067
+flowed_q=-0.0004119078363035159
+flow_action_delta=-0.090504091285893651
+gauge_covariance_max_error=2.1794464265262063e-12
+flowed_max_det_error=8.9203263506210716e-16
+flowed_max_unitarity_error=8.8817841970012523e-16
