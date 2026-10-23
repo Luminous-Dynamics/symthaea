@@ -401,25 +401,36 @@ fn test_assignment_to_partition() {
 }
 
 #[test]
-fn test_power_iteration_fiedler() {
+fn test_fiedler_solver_targets_second_smallest_path_mode() {
     let calc = TruePhiCalculator::new();
+    let mut mi_matrix = vec![vec![1.0; 4]; 4];
+    // The graph is P4: 0--1--2--3. Reporting diagonal values are deliberately
+    // irrelevant to the graph's self-edge-free adjacency projection.
+    for i in 0..4 {
+        for j in 0..4 {
+            if i != j {
+                mi_matrix[i][j] = 0.0;
+            }
+        }
+    }
+    for (i, j) in [(0usize, 1usize), (1, 2), (2, 3)] {
+        mi_matrix[i][j] = 1.0;
+        mi_matrix[j][i] = 1.0;
+    }
 
-    let laplacian = vec![
-        vec![1.0, -1.0, 0.0, 0.0],
-        vec![-1.0, 2.0, -1.0, 0.0],
-        vec![0.0, -1.0, 2.0, -1.0],
-        vec![0.0, 0.0, -1.0, 1.0],
-    ];
+    let partition = calc
+        .spectral_partition(&mi_matrix, 4)
+        .expect("connected P4 has a unique Fiedler eigenspace");
+    let mut part_a = partition.part_a;
+    let mut part_b = partition.part_b;
+    part_a.sort_unstable();
+    part_b.sort_unstable();
+    if part_b < part_a {
+        std::mem::swap(&mut part_a, &mut part_b);
+    }
 
-    let fiedler = calc.power_iteration_fiedler(&laplacian, 4, 100);
-
-    assert_eq!(fiedler.len(), 4);
-    let sum: f64 = fiedler.iter().sum();
-    assert!(
-        sum.abs() < 0.1,
-        "Fiedler should be mean-centered, sum={}",
-        sum
-    );
+    assert_eq!(part_a, vec![0, 1]);
+    assert_eq!(part_b, vec![2, 3]);
 }
 
 // Tests for continuous entropy estimation

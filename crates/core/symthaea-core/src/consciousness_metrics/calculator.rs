@@ -4,8 +4,180 @@
 //! TruePhiCalculator - Core IIT computation using Shannon entropy.
 
 use crate::hdc::unified_hv::ContinuousHV;
+use nalgebra::DMatrix;
 
 use super::{EntropyConfig, JointDistribution, TruePartition, TruePhiResult, VectorDistribution};
+
+/// Maximum graph size for the dense spectral heuristic. Larger inputs abstain
+/// rather than paying unbounded cubic eigensolver cost.
+const MAX_DENSE_SPECTRAL_NODES: usize = 256;
+const SPECTRAL_SYMMETRY_TOLERANCE: f64 = 1e-10;
+const SPECTRAL_RESIDUAL_TOLERANCE: f64 = 1e-8;
+const SPECTRAL_EIGENGAP_TOLERANCE: f64 = 1e-8;
+const SPECTRAL_NULLSPACE_TOLERANCE: f64 = 1e-10;
+
+/// Project an MI reporting matrix into a weighted graph Laplacian.
+///
+/// The MI diagonal is marginal entropy, not adjacency. It is validated as a
+/// finite non-negative reported value but intentionally excluded from degrees.
+/// Off-diagonal weights are normalized by the largest edge to make the spectral
+/// calculation invariant to a common positive scale and avoid overflow in degree
+/// accumulation.
+fn checked_mi_graph_laplacian(mi_matrix: &[Vec<f64>], n: usize) -> Option<DMatrix<f64>> {
+    if n < 3 || n > MAX_DENSE_SPECTRAL_NODES || mi_matrix.len() != n {
+        return None;
+    }
+    if mi_matrix.iter().any(|row| row.len() != n) {
+        return None;
+    }
+    if mi_matrix
+        .iter()
+        .flatten()
+        .any(|value| !value.is_finite() || *value < 0.0)
+    {
+        return None;
+    }
+
+    let mut maximum_edge = 0.0_f64;
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let a = mi_matrix[i][j];
+            let b = mi_matrix[j][i];
+            let symmetry_scale = a.abs().max(b.abs()).max(1.0);
+            if (a - b).abs() > SPECTRAL_SYMMETRY_TOLERANCE * symmetry_scale {
+                return None;
+            }
+            maximum_edge = maximum_edge.max(a.max(b));
+        }
+    }
+
+    // There is no meaningful spectral cut without at least one nonzero edge.
+    if maximum_edge == 0.0 {
+        return None;
+    }
+
+    let mut laplacian = DMatrix::<f64>::zeros(n, n);
+    for i in 0..n {
+        let mut degree = 0.0;
+        for j in 0..n {
+            if i == j {
+                continue;
+            }
+            // Scale before averaging; (a + b) could overflow for finite inputs.
+            let weight =
+                0.5 * (mi_matrix[i][j] / maximum_edge + mi_matrix[j][i] / maximum_edge);
+            if !weight.is_finite() || weight < 0.0 {
+                return None;
+            }
+            degree += weight;
+            laplacian[(i, j)] = -weight;
+        }
+        if !degree.is_finite() {
+            return None;
+        }
+        laplacian[(i, i)] = degree;
+    }
+
+    Some(laplacian)
+}
+
+/// Compute and qualify the Fiedler eigenpair with a dense symmetric solver.
+///
+/// Ordinary power iteration targets the largest-magnitude eigenmode, not the
+/// second-smallest Laplacian eigenmode. The returned pair must be positive beyond
+/// the numerical nullspace floor, separated from the next eigenvalue, orthogonal
+/// to the constant vector, and independently satisfy the eigenpair residual gate.
+/// Disconnected or spectrally ambiguous graphs abstain so another heuristic can
+/// supply a candidate instead of fabricating a Fiedler cut.
+fn checked_fiedler_eigenpair(laplacian: &DMatrix<f64>) -> Option<(f64, Vec<f64>)> {
+    let n = laplacian.nrows();
+    let max_iterations = n.saturating_mul(n).saturating_mul(20).max(1);
+    checked_fiedler_eigenpair_with_budget(laplacian, max_iterations)
+}
+
+/// Testable bounded variant: exhausting the symmetric solver budget must abstain.
+fn checked_fiedler_eigenpair_with_budget(
+    laplacian: &DMatrix<f64>,
+    max_iterations: usize,
+) -> Option<(f64, Vec<f64>)> {
+    let n = laplacian.nrows();
+    if n < 3 || n != laplacian.ncols() || max_iterations == 0 {
+        return None;
+    }
+
+    // Use the fallible API: a decomposition that exhausts its iteration budget
+    // is a missing candidate, not an apparently verified Fiedler vector.
+    let eigen = nalgebra::linalg::SymmetricEigen::try_new(
+        laplacian.clone(),
+        f64::EPSILON,
+        max_iterations,
+    )?;
+    if eigen.eigenvalues.iter().any(|value| !value.is_finite())
+        || eigen.eigenvectors.iter().any(|value| !value.is_finite())
+    {
+        return None;
+    }
+
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_by(|&a, &b| eigen.eigenvalues[a].total_cmp(&eigen.eigenvalues[b]));
+    let fiedler_index = order[1];
+    let next_index = order[2];
+    let lambda = eigen.eigenvalues[fiedler_index];
+    let next_lambda = eigen.eigenvalues[next_index];
+    let spectral_scale = eigen
+        .eigenvalues
+        .iter()
+        .map(|value| value.abs())
+        .fold(1.0_f64, f64::max);
+
+    // λ₂≈0 means disconnected or numerically disconnected; λ₂≈λ₃ means the
+    // Fiedler direction is non-unique/ill-conditioned (e.g. a complete graph).
+    if lambda <= SPECTRAL_NULLSPACE_TOLERANCE * spectral_scale
+        || next_lambda - lambda <= SPECTRAL_EIGENGAP_TOLERANCE * spectral_scale
+    {
+        return None;
+    }
+
+    let vector: Vec<f64> = eigen
+        .eigenvectors
+        .column(fiedler_index)
+        .iter()
+        .copied()
+        .collect();
+    let vector_norm = vector.iter().map(|value| value * value).sum::<f64>().sqrt();
+    if !vector_norm.is_finite() || vector_norm <= f64::MIN_POSITIVE {
+        return None;
+    }
+
+    // Independently compute ||L v - λv|| / ((||L||_F + |λ|) ||v||).
+    let mut residual_squared = 0.0;
+    let mut matrix_norm_squared = 0.0;
+    for i in 0..n {
+        let mut row_product = 0.0;
+        for j in 0..n {
+            let value = laplacian[(i, j)];
+            row_product += value * vector[j];
+            matrix_norm_squared += value * value;
+        }
+        let residual = row_product - lambda * vector[i];
+        residual_squared += residual * residual;
+    }
+    let matrix_norm = matrix_norm_squared.sqrt();
+    let residual_scale = ((matrix_norm + lambda.abs()) * vector_norm).max(f64::MIN_POSITIVE);
+    let relative_residual = residual_squared.sqrt() / residual_scale;
+    let constant_overlap = vector.iter().sum::<f64>().abs()
+        / ((n as f64).sqrt() * vector_norm).max(f64::MIN_POSITIVE);
+
+    if !relative_residual.is_finite()
+        || relative_residual > SPECTRAL_RESIDUAL_TOLERANCE
+        || !constant_overlap.is_finite()
+        || constant_overlap > SPECTRAL_RESIDUAL_TOLERANCE
+    {
+        return None;
+    }
+
+    Some((lambda, vector))
+}
 
 /// Calculator for true integrated information using Shannon entropy
 #[derive(Debug, Clone)]
@@ -324,52 +496,36 @@ impl TruePhiCalculator {
         (mip, min_ei)
     }
 
-    /// Spectral partition using the Fiedler vector (second smallest eigenvector of Laplacian)
+    /// Spectral partition from a checked second-smallest Laplacian eigenpair.
     ///
-    /// The Fiedler vector reveals natural clusters in the MI graph.
-    /// Components with the same sign tend to be more connected.
+    /// The graph uses only off-diagonal pairwise mutual information. Diagonal
+    /// entries store marginal entropy and are not graph self-edges. This dense
+    /// solver is deliberately bounded; for larger graphs the heuristic abstains
+    /// here and leaves candidate generation to the other MIP strategies.
     pub(crate) fn spectral_partition(
         &self,
         mi_matrix: &[Vec<f64>],
         n: usize,
     ) -> Option<TruePartition> {
-        if n < 3 {
-            return None;
-        }
+        let laplacian = checked_mi_graph_laplacian(mi_matrix, n)?;
+        let (_eigenvalue, fiedler) = checked_fiedler_eigenpair(&laplacian)?;
 
-        // Build Laplacian: L = D - A where A is the MI adjacency matrix
-        let mut laplacian = vec![vec![0.0; n]; n];
-        for i in 0..n {
-            let degree: f64 = mi_matrix[i].iter().sum();
-            laplacian[i][i] = degree;
-            for j in 0..n {
-                if i != j {
-                    laplacian[i][j] = -mi_matrix[i][j];
-                }
-            }
-        }
-
-        // Power iteration to find Fiedler vector
-        let fiedler = self.power_iteration_fiedler(&laplacian, n, 100);
-
-        // Partition based on sign of Fiedler vector components
+        // The Fiedler vector's sign is arbitrary, so either orientation is valid.
         let mut part_a = Vec::new();
         let mut part_b = Vec::new();
-        for i in 0..n {
-            if fiedler[i] >= 0.0 {
-                part_a.push(i);
+        for (index, value) in fiedler.iter().enumerate() {
+            if *value >= 0.0 {
+                part_a.push(index);
             } else {
-                part_b.push(i);
+                part_b.push(index);
             }
         }
 
+        // Some valid Fiedler vectors contain near-zero entries. If sign thresholding
+        // degenerates, use a deterministic median cut rather than an empty side.
         if part_a.is_empty() || part_b.is_empty() {
             let mut indices: Vec<usize> = (0..n).collect();
-            indices.sort_by(|&a, &b| {
-                fiedler[a]
-                    .partial_cmp(&fiedler[b])
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
+            indices.sort_by(|&a, &b| fiedler[a].total_cmp(&fiedler[b]));
             let mid = n / 2;
             return Some(TruePartition {
                 part_a: indices[..mid].to_vec(),
@@ -378,58 +534,6 @@ impl TruePhiCalculator {
         }
 
         Some(TruePartition { part_a, part_b })
-    }
-
-    /// Power iteration to find the Fiedler vector
-    pub(crate) fn power_iteration_fiedler(
-        &self,
-        laplacian: &[Vec<f64>],
-        n: usize,
-        max_iter: usize,
-    ) -> Vec<f64> {
-        let mut v: Vec<f64> = (0..n).map(|i| i as f64 - n as f64 / 2.0).collect();
-
-        // Normalize
-        let norm: f64 = v.iter().map(|x| x * x).sum::<f64>().sqrt();
-        if norm > 1e-10 {
-            for x in &mut v {
-                *x /= norm;
-            }
-        }
-
-        // Add regularization
-        let epsilon = 0.01;
-        let mut reg_laplacian = laplacian.to_vec();
-        for i in 0..n {
-            reg_laplacian[i][i] += epsilon;
-        }
-
-        for _ in 0..max_iter {
-            let mut new_v = vec![0.0; n];
-            for i in 0..n {
-                for j in 0..n {
-                    new_v[i] += reg_laplacian[i][j] * v[j];
-                }
-            }
-
-            // Deflate by constant vector
-            let mean: f64 = new_v.iter().sum::<f64>() / n as f64;
-            for x in &mut new_v {
-                *x -= mean;
-            }
-
-            let norm: f64 = new_v.iter().map(|x| x * x).sum::<f64>().sqrt();
-            if norm < 1e-10 {
-                break;
-            }
-            for x in &mut new_v {
-                *x /= norm;
-            }
-
-            v = new_v;
-        }
-
-        v
     }
 
     /// Simulated annealing for MIP search
