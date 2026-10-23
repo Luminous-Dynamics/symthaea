@@ -179,7 +179,7 @@ pub enum SimdLevel {
     Avx512,
 }
 
-/// Best available SIMD level for integer operations (XOR, popcount, etc.)
+/// Best available SIMD level for generic integer/bitwise operations (e.g. XOR).\n///\n/// This intentionally does not imply hardware popcount support; use\n/// `best_popcount_level()` for that capability.
 pub fn best_integer_level() -> SimdLevel {
     if has_avx512f() {
         SimdLevel::Avx512
@@ -187,6 +187,20 @@ pub fn best_integer_level() -> SimdLevel {
         SimdLevel::Avx2
     } else if has_sse41() {
         SimdLevel::Sse41
+    } else if has_neon() {
+        SimdLevel::Neon
+    } else {
+        SimdLevel::Scalar
+    }
+}
+
+/// Best available SIMD level for hardware popcount operations.
+///
+/// AVX-512 popcount is a distinct capability from AVX-512F/BW and must not
+/// be inferred from generic AVX-512 support.
+pub fn best_popcount_level() -> SimdLevel {
+    if has_avx512_vpopcntdq() {
+        SimdLevel::Avx512
     } else if has_neon() {
         SimdLevel::Neon
     } else {
@@ -252,6 +266,7 @@ pub struct SimdCapabilities {
     pub popcnt: bool,
     pub neon: bool,
     pub best_integer: SimdLevel,
+    pub best_popcount: SimdLevel,
     pub best_float: SimdLevel,
 }
 
@@ -268,6 +283,7 @@ impl SimdCapabilities {
             popcnt: has_popcnt(),
             neon: has_neon(),
             best_integer: best_integer_level(),
+            best_popcount: best_popcount_level(),
             best_float: best_float_level(),
         }
     }
@@ -277,7 +293,7 @@ impl std::fmt::Display for SimdCapabilities {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "SIMD: AVX-512F={} BW={} VPOPCNTDQ={} | AVX2={} FMA={} | SSE4.1={} POPCNT={} | NEON={} | best_int={:?} best_float={:?}",
+            "SIMD: AVX-512F={} BW={} VPOPCNTDQ={} | AVX2={} FMA={} | SSE4.1={} POPCNT={} | NEON={} | best_int={:?} best_popcount={:?} best_float={:?}",
             self.avx512f,
             self.avx512bw,
             self.avx512_vpopcntdq,
@@ -320,8 +336,10 @@ mod tests {
     #[test]
     fn test_best_level_returns_valid() {
         let int_level = best_integer_level();
+        let popcount_level = best_popcount_level();
         let float_level = best_float_level();
         assert!(int_level >= SimdLevel::Scalar);
+        assert!(popcount_level >= SimdLevel::Scalar);
         assert!(float_level >= SimdLevel::Scalar);
     }
 
@@ -330,7 +348,7 @@ mod tests {
         let caps = SimdCapabilities::detect();
         let report = format!("{}", caps);
         assert!(report.contains("SIMD:"));
-        assert!(report.contains("AVX2="));
+        assert!(report.contains("AVX2="));\n        assert!(report.contains("best_popcount="));
 
         #[cfg(target_arch = "x86_64")]
         {

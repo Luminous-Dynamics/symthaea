@@ -9,14 +9,15 @@
 //! - bundle_simd vs scalar
 //! - similarity_simd vs scalar
 //!
-//! Target: 4x+ speedup for 16,384-dim vectors
+//! Historical target only; benchmark results are hardware- and workload-dependent.
 //!
 //! Run with:
 //!   CARGO_TARGET_DIR=/tmp/symthaea-target cargo bench --bench simd_continuous --features simd
 
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 
 const HDC_DIM: usize = 16_384;
+const RESOLUTION_DIMS: &[usize] = &[1_024, 2_048, 4_096, 8_192, 16_384, 32_768, 65_536];
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -97,9 +98,11 @@ fn scalar_norm(x: &[f32]) -> f32 {
 fn bench_dot_product(c: &mut Criterion) {
     let mut group = c.benchmark_group("dot_product");
 
-    for dim in [1024, 4096, HDC_DIM, 32768] {
+    for &dim in RESOLUTION_DIMS {
         let a = random_vec(dim, 42);
         let b = random_vec(dim, 43);
+
+        group.throughput(Throughput::ElementsAndBytes { elements: dim as u64, bytes: (2 * dim * std::mem::size_of::<f32>()) as u64 });
 
         group.bench_with_input(
             BenchmarkId::new("scalar", dim),
@@ -123,7 +126,8 @@ fn bench_dot_product(c: &mut Criterion) {
 fn bench_bind(c: &mut Criterion) {
     let mut group = c.benchmark_group("bind");
 
-    for dim in [1024, 4096, HDC_DIM, 32768] {
+    for &dim in RESOLUTION_DIMS {
+        group.throughput(Throughput::ElementsAndBytes { elements: dim as u64, bytes: (3 * dim * std::mem::size_of::<f32>()) as u64 });
         let a = random_vec(dim, 42);
         let b = random_vec(dim, 43);
 
@@ -149,7 +153,8 @@ fn bench_bind(c: &mut Criterion) {
 fn bench_similarity(c: &mut Criterion) {
     let mut group = c.benchmark_group("similarity");
 
-    for dim in [1024, 4096, HDC_DIM, 32768] {
+    for &dim in RESOLUTION_DIMS {
+        group.throughput(Throughput::ElementsAndBytes { elements: dim as u64, bytes: (2 * dim * std::mem::size_of::<f32>()) as u64 });
         let a = random_vec(dim, 42);
         let b = random_vec(dim, 43);
 
@@ -175,30 +180,34 @@ fn bench_similarity(c: &mut Criterion) {
 fn bench_bundle(c: &mut Criterion) {
     let mut group = c.benchmark_group("bundle");
 
-    // Test with varying number of vectors to bundle
-    for n_vecs in [3, 10, 50, 100] {
-        let vecs: Vec<Vec<f32>> = (0..n_vecs).map(|i| random_vec(HDC_DIM, i + 100)).collect();
-        let refs: Vec<&[f32]> = vecs.iter().map(|v| v.as_slice()).collect();
-        let weights: Vec<f32> = (0..n_vecs).map(|i| 1.0 + (i as f32) * 0.1).collect();
+    // Keep the vector-count sweep, but also sweep the full adaptive dimension ladder.
+    for &dim in RESOLUTION_DIMS {
+        for n_vecs in [3, 10, 50] {
+            group.throughput(Throughput::ElementsAndBytes { elements: (dim * n_vecs) as u64, bytes: ((n_vecs + 1) * dim * std::mem::size_of::<f32>()) as u64 });
+            let vecs: Vec<Vec<f32>> =
+                (0..n_vecs).map(|i| random_vec(dim, i as u64 + 100)).collect();
+            let refs: Vec<&[f32]> = vecs.iter().map(|v| v.as_slice()).collect();
+            let weights: Vec<f32> = (0..n_vecs).map(|i| 1.0 + (i as f32) * 0.1).collect();
 
-        group.bench_with_input(
-            BenchmarkId::new("scalar", n_vecs),
-            &(&refs, &weights),
-            |bench, (refs, weights)| bench.iter(|| black_box(scalar_bundle(refs, weights))),
-        );
+            group.bench_with_input(
+                BenchmarkId::new(format!("scalar_{}vec", n_vecs), dim),
+                &(&refs, &weights),
+                |bench, (refs, weights)| bench.iter(|| black_box(scalar_bundle(refs, weights))),
+            );
 
-        #[cfg(feature = "simd")]
-        group.bench_with_input(
-            BenchmarkId::new("simd", n_vecs),
-            &(&refs, &weights),
-            |bench, (refs, weights)| {
-                bench.iter(|| {
-                    black_box(symthaea_core::hdc::simd_continuous::bundle_simd(
-                        refs, weights,
-                    ))
-                })
-            },
-        );
+            #[cfg(feature = "simd")]
+            group.bench_with_input(
+                BenchmarkId::new(format!("simd_{}vec", n_vecs), dim),
+                &(&refs, &weights),
+                |bench, (refs, weights)| {
+                    bench.iter(|| {
+                        black_box(symthaea_core::hdc::simd_continuous::bundle_simd(
+                            refs, weights,
+                        ))
+                    })
+                },
+            );
+        }
     }
 
     group.finish();
@@ -211,7 +220,8 @@ fn bench_bundle(c: &mut Criterion) {
 fn bench_norm(c: &mut Criterion) {
     let mut group = c.benchmark_group("norm");
 
-    for dim in [1024, 4096, HDC_DIM, 32768] {
+    for &dim in RESOLUTION_DIMS {
+        group.throughput(Throughput::ElementsAndBytes { elements: dim as u64, bytes: (dim * std::mem::size_of::<f32>()) as u64 });
         let a = random_vec(dim, 42);
 
         group.bench_with_input(BenchmarkId::new("scalar", dim), &a, |bench, a| {
