@@ -551,11 +551,29 @@ mod tests {
         ])
     }
 
-    fn family() -> MotifFamily {
+    fn family_with_policy(
+        invariants: Vec<MotifInvariant>,
+        permitted_transforms: Vec<ReturnTransformation>,
+    ) -> MotifFamily {
         MotifFamily::new(
             "test.lament",
             lament(),
             PhraseRole::Lament,
+            invariants,
+            permitted_transforms,
+            vec![Style::Classical],
+            MotifProvenance {
+                source: ProvenanceSource::HandAuthoredArchetype {
+                    author_note: "test fixture".into(),
+                },
+                transformation_history: vec![],
+                review_status: ReviewStatus::Unreviewed,
+            },
+        )
+    }
+
+    fn family() -> MotifFamily {
+        family_with_policy(
             vec![
                 MotifInvariant::RhythmicIdentity,
                 MotifInvariant::ContourIdentity,
@@ -565,14 +583,6 @@ mod tests {
                 ReturnTransformation::Augmented,
                 ReturnTransformation::Diminished,
             ],
-            vec![Style::Classical],
-            MotifProvenance {
-                source: ProvenanceSource::HandAuthoredArchetype {
-                    author_note: "test fixture".into(),
-                },
-                transformation_history: vec![],
-                review_status: ReviewStatus::Unreviewed,
-            },
         )
     }
 
@@ -592,6 +602,92 @@ mod tests {
         assert_eq!(
             f.recognizes(&varied),
             IdentityVerdict::RecognizableDevelopment
+        );
+    }
+
+    #[test]
+    fn permitted_inversion_is_accepted_as_a_declared_return() {
+        let f = family_with_policy(
+            vec![
+                MotifInvariant::RhythmicIdentity,
+                MotifInvariant::ContourIdentity,
+            ],
+            vec![ReturnTransformation::Inverted],
+        );
+        let inverted = f.canonical.invert(3);
+
+        assert_eq!(
+            f.validate_return(&inverted, ReturnTransformation::Inverted),
+            ReturnValidationVerdict::Accepted
+        );
+    }
+
+    #[test]
+    fn prohibited_transformation_is_not_authorized_by_shape_similarity() {
+        let f = family_with_policy(
+            vec![MotifInvariant::RhythmicIdentity],
+            vec![ReturnTransformation::Transposed],
+        );
+        let inverted = f.canonical.invert(3);
+
+        assert_eq!(
+            f.validate_return(&inverted, ReturnTransformation::Inverted),
+            ReturnValidationVerdict::TransformationNotPermitted
+        );
+    }
+
+    #[test]
+    fn claimed_transposition_must_match_every_pitched_event() {
+        let f = family_with_policy(vec![], vec![ReturnTransformation::Transposed]);
+        let forged = cell(&[
+            (3, Duration::eighth()),
+            (6, Duration::eighth()),
+            (4, Duration::eighth()),
+            (8, Duration::half()),
+        ]);
+
+        assert_eq!(
+            f.validate_return(&forged, ReturnTransformation::Transposed),
+            ReturnValidationVerdict::CandidateDoesNotMatchDeclaredTransform
+        );
+    }
+
+    #[test]
+    fn exact_contiguous_fragment_is_accepted_only_when_permitted() {
+        let canonical = lament();
+        let candidate = canonical.fragment(0, 3);
+        let f = MotifFamily::new(
+            "test.fragment",
+            canonical,
+            PhraseRole::Transition,
+            vec![],
+            vec![ReturnTransformation::Fragmented],
+            vec![Style::Classical],
+            MotifProvenance {
+                source: ProvenanceSource::HandAuthoredArchetype {
+                    author_note: "fragment test fixture".into(),
+                },
+                transformation_history: vec![],
+                review_status: ReviewStatus::Unreviewed,
+            },
+        );
+
+        assert_eq!(
+            f.validate_return(&candidate, ReturnTransformation::Fragmented),
+            ReturnValidationVerdict::Accepted
+        );
+        assert_eq!(
+            f.validate_return(&candidate, ReturnTransformation::Transposed),
+            ReturnValidationVerdict::TransformationNotPermitted
+        );
+    }
+
+    #[test]
+    fn restored_claim_requires_historical_evidence() {
+        let f = family_with_policy(vec![], vec![ReturnTransformation::Restored]);
+        assert_eq!(
+            f.validate_return(&f.canonical, ReturnTransformation::Restored),
+            ReturnValidationVerdict::RequiresHistoryEvidence
         );
     }
 
