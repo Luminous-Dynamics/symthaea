@@ -30,11 +30,6 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Check Rust formatting
-        run: |
-          rustfmt --edition 2024 --check tools/vision-dvpc-integrity-receipt.rs
-          rustfmt --edition 2024 --check tools/vision-dvpc-trace-validator.rs
-
       - name: Compile and run integrity-verifier tests
         run: |
           rustc --edition=2024 --test tools/vision-dvpc-integrity-receipt.rs -o /tmp/vis-dvpc-012-tests
@@ -54,3 +49,9 @@ jobs:
           /tmp/vis-dvpc-005 fixtures/vision-dvpc-observations.tsv fixtures/vision-dvpc-evaluations.tsv > /tmp/vis-dvpc-005-receipt.tsv
           grep -Fx $'ADMISSION\tstatus\tPASS_SCHEMA_ONLY' /tmp/vis-dvpc-005-receipt.tsv
           grep -Fx $'ADMISSION\tperformance_claim\tNONE' /tmp/vis-dvpc-005-receipt.tsv
+
+      - name: Check Rust formatting
+        if: always()
+        run: |
+          rustfmt --edition 2024 --check tools/vision-dvpc-integrity-receipt.rs
+          rustfmt --edition 2024 --check tools/vision-dvpc-trace-validator.rs
