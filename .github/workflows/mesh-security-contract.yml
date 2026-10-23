@@ -50,6 +50,7 @@ jobs:
             docs/security/mesh-security-scenarios-v1.json \
             docs/security/mesh-security-scenarios-v1.schema.json \
             docs/security/mesh-security-evidence-v1.schema.json \
+            docs/security/mesh-security-contract-audit-v1.schema.json \
             tools/mesh-security-contract-audit/Cargo.toml \
             tools/mesh-security-contract-audit/src/main.rs \
             > "$EVIDENCE_DIR/input-sha256.txt"
