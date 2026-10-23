@@ -15,7 +15,7 @@ Use a release build and pin the exact 40-hex source commit. Example:
 ```sh
 cargo run -p symthaea-hdc-store --example ann_benchmark --release -- \
   --source-sha="$(git rev-parse HEAD)" \
-  --size=10000 --clusters=64 --cluster-noise-bits=1024 --queries=200 --rounds=5 --top-k=10 --seed=42
+  --size=10000 --clusters=64 --cluster-noise-bits=1024 --lsh-configs=32x8,16x16,64x4 --queries=200 --rounds=5 --top-k=10 --seed=42
 ```
 
 Run at multiple store sizes, using the same machine and compiler build:
@@ -24,16 +24,16 @@ Run at multiple store sizes, using the same machine and compiler build:
 for size in 1000 10000 50000; do
   cargo run -p symthaea-hdc-store --example ann_benchmark --release -- \
     --source-sha="$(git rev-parse HEAD)" \
-    --size="$size" --clusters=64 --cluster-noise-bits=1024 --queries=200 --rounds=5 --top-k=10 --seed=42 \
+    --size="$size" --clusters=64 --cluster-noise-bits=1024 --lsh-configs=32x8,16x16,64x4 --queries=200 --rounds=5 --top-k=10 --seed=42 \
     > "broca-ann-$size.csv"
 done
 ```
 
-The LSH parameters are explicit and recorded in the output. The default store configuration is `--lsh-bands=32 --lsh-rows=8`; vary these in separate pinned runs when tuning the index, and never compare arms whose source, store, query corpus or cache protocol differs.
+The LSH parameters are explicit and recorded in the output. By default, each run sweeps three arms: `32x8`, `16x16`, and `64x4` (bands × rows). Override them with `--lsh-configs=32x8,16x16,64x4`; no arm may be duplicated and a run is limited to 16 arms. The same deterministic corpus and query vectors are reused across all arms, while each arm gets a separately built index. Do not compare arms whose source, vector corpus, query corpus or cache protocol differs.
 
 To test the approximate path with its candidate-count and empty-result fallbacks disabled, run a separate arm with `--candidate-multiplier=0 --fallback-on-empty=false`. Keep the default-fallback arm as well: disabling fallback may improve latency while degrading recall, so neither arm is sufficient by itself.
 
-The example includes seven focused source-level tests for deterministic workload replay, exact corruption count, clustered-neighborhood separation, Recall@K semantics including ties, and latency percentile calculation. Run them with:
+The example includes ten focused source-level tests for deterministic workload replay, exact corruption count, clustered-neighborhood separation, Recall@K semantics including ties, LSH sweep parsing, and deterministic bootstrap intervals. Run them with:
 
 ```sh
 cargo test -p symthaea-hdc-store --example ann_benchmark
@@ -49,7 +49,7 @@ The CLI requires a full 40-hex source SHA that exactly matches `git rev-parse HE
 - For the synthetic OOD class, exact top-K is still a mathematical retrieval reference but does not imply there is a semantically relevant answer; do not use its Recall@K as the primary quality gate.
 - The LSH path reports vectors examined, total live vectors, exhaustive status and exact-fallback status.
 - Exact and approximate retrieval calls alternate order per query/round. Query creation, store construction, ID comparison and CSV output are outside the timed retrieval intervals.
-- The report separately emits quality and latency summaries for `near_neighbor` and `novel` queries. Quality is summarized from unique queries in round zero; latency percentiles use all repeated samples. Repeated rounds are latency repetitions, not independent statistical samples.
+- The report separately emits quality and latency summaries for `near_neighbor` and `novel` queries for each LSH configuration. Quality uses unique queries from round zero; latency percentiles use all repeated samples. For uncertainty, each query's median exact/approximate speedup across rounds is computed first, then a deterministic percentile bootstrap resamples query-level values 2,000 times and emits a 95% interval. Repeated rounds are timing repetitions, not independent query samples.
 
 This controlled clustered workload is still not a realistic semantic-memory corpus. It does not reproduce organic topic structure, duplicate/contradictory facts, temporal updates, deletion semantics, user/session isolation or long-running agent behavior. Passing these gates is a retrieval-substrate signal only, not evidence that downstream memory tasks improve.
 
@@ -66,6 +66,7 @@ For a store size of 10,000 or more and at least 100 unique queries, the approxim
 | Fraction of exhaustive queries | ≤ 0.50 |
 | Fraction of queries that fell back to exact | ≤ 0.05 |
 | p95 retrieval latency relative to exact | ≥ 2× faster (exact p95 / approximate p95 ≥ 2) |
+| Median per-query speedup, lower bootstrap 95% bound | > 1× (evidence against a no-speedup result) |
 
 Report every raw query and both classes, not only aggregate averages. A failure is useful evidence; do not loosen thresholds or omit failed query classes after seeing the result. Add a separate, labeled abstention/no-relevant-evidence evaluation before making claims about OOD behavior.
 
@@ -96,13 +97,13 @@ Archive the complete CSV (including its metadata and per-query exact/approximate
 - exact command line and exit status;
 - whether each sample is warm-cache, cold-cache or mixed, and whether the store was reconstructed between repetitions.
 
-The current program reports OS, target architecture, available parallelism, workload settings, source SHA, p50/p95 latency, exact-ID and tie-aware recall, vector examinations and fallback/exhaustive fractions, with quality and latency summaries separated by query class. A fully cold-cache test, memory/RSS accounting, energy measurements, production-scale corpus and confidence intervals are not implemented by this first slice. Record them separately rather than implying that the current CSV contains them.
+The current program reports OS, target architecture, available parallelism, workload settings, source SHA, per-arm p50/p95 latency, exact-ID and tie-aware recall, vector examinations and fallback/exhaustive fractions, plus per-query-class median speedup and deterministic bootstrap 95% intervals. A fully cold-cache test, memory/RSS accounting, energy measurements, production-scale corpus and confidence intervals are not implemented by this first slice. Record them separately rather than implying that the current CSV contains them.
 
 ## Next gates
 
-1. Run the source-bound benchmark with default options and no-fallback options at 1k, 10k and 50k vectors; sweep cluster counts/noise and LSH parameters with the same seeded runs.
+1. Run the source-bound three-arm LSH sweep with default fallback settings and with no-fallback settings at 1k, 10k and 50k vectors; vary cluster counts/noise with the same seeded query plan.
 2. Add duplicate, contradictory, stale-update, delete and scope-isolation workloads; report each class separately.
-3. Compare against at least one established ANN implementation and a brute-force SIMD baseline on the identical vectors, queries and top-K. Include index build time, memory overhead, update/delete cost and cold-start behavior.
+3. Compare each winning internal operating point against at least one established ANN implementation and a brute-force SIMD baseline on identical vector bytes, queries and top-K. Include index build time, memory overhead, update/delete cost and cold-start behavior.
 4. Wire the winning search policy into an opt-in MemoryBridge experiment only after recall and fallback criteria pass.
 5. Measure end-to-end task success and error classes against no-memory, exact HDC, approximate HDC, and industry-standard retrieval baselines at matched budgets.
 
