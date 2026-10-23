@@ -162,8 +162,8 @@ fn feature_shift_detects_input_drift_when_residual_monitor_is_silent() {
 
         let clean_feature_result = scorer.assess(&feature_calibrator, &clean, true).unwrap();
         let shifted_feature_result = scorer.assess(&feature_calibrator, &shifted, true).unwrap();
-        clean_feature_alarms += usize::from(clean_feature_result.p_value <= ALPHA);
-        shifted_feature_alarms += usize::from(shifted_feature_result.p_value <= ALPHA);
+        clean_feature_alarms += (clean_feature_result.p_value <= ALPHA) as usize;
+        shifted_feature_alarms += (shifted_feature_result.p_value <= ALPHA) as usize;
 
         // The predictor observes both input dimensions and remains exact in either regime.
         // Residual-only monitoring therefore gets zero in both the clean and shifted batches.
@@ -179,8 +179,8 @@ fn feature_shift_detects_input_drift_when_residual_monitor_is_silent() {
         let shifted_model_result = residual_calibrator
             .assess_audit_score(shifted_residual_score, true)
             .unwrap();
-        clean_residual_alarms += usize::from(clean_model_result.p_value <= ALPHA);
-        shifted_residual_alarms += usize::from(shifted_model_result.p_value <= ALPHA);
+        clean_residual_alarms += (clean_model_result.p_value <= ALPHA) as usize;
+        shifted_residual_alarms += (shifted_model_result.p_value <= ALPHA) as usize;
 
         if classify_shift_evidence(
             shifted_model_result.assessment,
