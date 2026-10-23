@@ -838,11 +838,29 @@ mod tests {
     }
 
     #[test]
+    fn invalid_prediction_error_does_not_update_wisdom() {
+        let mut bus = ExperienceBus::with_defaults();
+        let before = bus.harmonic_weight_snapshot();
+
+        bus.current_signals.prediction_error = 1.0;
+        bus.current_signals.prediction_error_valid = false;
+        bus.current_signals.uncertainty = 0.7;
+        bus.current_signals.coherence = 0.3;
+
+        bus.update_wisdom_from_signals();
+
+        let after = bus.harmonic_weight_snapshot();
+        assert_eq!(before.weight_for("QUESTION"), after.weight_for("QUESTION"));
+        assert_eq!(before.weight_for("LEARN"), after.weight_for("LEARN"));
+    }
+
+    #[test]
     fn test_wisdom_updates_affect_snapshot() {
         let mut bus = ExperienceBus::with_defaults();
 
-        // Simulate high prediction error experience
+        // Simulate a high prediction-error observation with explicit evidence provenance.
         bus.current_signals.prediction_error = 0.9;
+        bus.current_signals.prediction_error_valid = true;
         bus.current_signals.uncertainty = 0.7;
         bus.current_signals.coherence = 0.3;
 
