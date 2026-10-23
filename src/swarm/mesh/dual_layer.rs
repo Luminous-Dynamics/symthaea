@@ -664,6 +664,88 @@ mod tests {
         }
     }
 
+    #[derive(Clone)]
+    struct RecordingTransport {
+        sent: std::sync::Arc<Mutex<Vec<Vec<u8>>>>,
+    }
+
+    impl MeshTransport for RecordingTransport {
+        fn send_raw(&self, data: &[u8]) -> Result<(), MeshError> {
+            self.sent
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(data.to_vec());
+            Ok(())
+        }
+
+        fn recv_raw(&self, _buf: &mut [u8]) -> Result<usize, MeshError> {
+            Ok(0)
+        }
+
+        fn mtu(&self) -> usize {
+            LORA_MTU
+        }
+
+        fn name(&self) -> &str {
+            "recording-lora"
+        }
+
+        fn is_available(&self) -> bool {
+            true
+        }
+    }
+
+    #[test]
+    fn fragment_aead_fails_closed_before_emitting_any_lora_frame() {
+        #[cfg(feature = "mesh-encryption")]
+        {
+            let sent = std::sync::Arc::new(Mutex::new(Vec::new()));
+            let mesh = DualLayerMesh::new([0x42; 32])
+                .with_lora(Box::new(RecordingTransport {
+                    sent: std::sync::Arc::clone(&sent),
+                }))
+                .with_encryption_key([0x5A; 32])
+                .with_fragment_encryption(true);
+
+            let error = mesh.send(&test_packet(MeshUrgency::Cruise)).unwrap_err();
+            assert!(matches!(error, MeshError::SecurityProfileUnavailable(_)));
+            assert!(
+                sent.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_empty(),
+                "unsupported fragment-AEAD must not emit any partially encrypted traffic"
+            );
+        }
+    }
+
+    #[test]
+    fn fragment_aead_without_a_key_fails_closed_before_emitting_any_frame() {
+        #[cfg(feature = "mesh-encryption")]
+        {
+            let sent = std::sync::Arc::new(Mutex::new(Vec::new()));
+            let mesh = DualLayerMesh::new([0x42; 32])
+                .with_lora(Box::new(RecordingTransport {
+                    sent: std::sync::Arc::clone(&sent),
+                }))
+                .with_fragment_encryption(true);
+
+            let error = mesh.send(&test_packet(MeshUrgency::Cruise)).unwrap_err();
+            assert!(matches!(error, MeshError::SecurityProfileUnavailable(_)));
+            assert!(
+                sent.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_empty(),
+                "missing fragment-AEAD key must not cause plaintext fragments to be sent"
+            );
+        }
+    }
+
+    #[test]
+    fn default_transport_source_api_rejects_unauthenticated_identity() {
+        let transport = LoopbackTransport::lora();
+        let mut buffer = [0u8; LORA_MTU];
+        assert!(matches!(
+            transport.recv_raw_with_source(&mut buffer),
+            Err(MeshError::SecurityProfileUnavailable(_))
+        ));
+    }
+
     // -- Routing --
 
     #[test]
