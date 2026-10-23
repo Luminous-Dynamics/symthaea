@@ -344,8 +344,10 @@ impl CognitiveLoopService {
         // PHASE 1.1: Surprise and Exploration
         // ═══════════════════════════════════════════════════════════════════════
         let prediction_error = encoding_res.prediction_error;
+        let _t_surprise = Instant::now();
         let (surprise_triggered, exploration_action) =
             self.run_surprise_exploration(&encoding_res.compressed_state);
+        module_timings.surprise_exploration = _t_surprise.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 1.2: Urgency Phase
