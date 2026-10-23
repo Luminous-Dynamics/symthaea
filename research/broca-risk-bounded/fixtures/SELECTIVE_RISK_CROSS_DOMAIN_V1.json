@@ -57,8 +57,8 @@
       "labelled_accepted_count": 0,
       "unknown_accepted_count": 0,
       "known_failure_count": 0,
-      "coverage": 0.0,
-      "labelled_coverage": 0.0,
+      "coverage": 0,
+      "labelled_coverage": 0,
       "accepted_label_completeness": null,
       "observed_label_risk": null,
       "optimistic_empirical_risk": null,
@@ -73,10 +73,10 @@
       "known_failure_count": 0,
       "coverage": 0.25,
       "labelled_coverage": 0.25,
-      "accepted_label_completeness": 1.0,
-      "observed_label_risk": 0.0,
-      "optimistic_empirical_risk": 0.0,
-      "pessimistic_empirical_risk": 0.0
+      "accepted_label_completeness": 1,
+      "observed_label_risk": 0,
+      "optimistic_empirical_risk": 0,
+      "pessimistic_empirical_risk": 0
     },
     {
       "inclusive_threshold": 0.7,
@@ -87,7 +87,7 @@
       "known_failure_count": 1,
       "coverage": 0.75,
       "labelled_coverage": 0.75,
-      "accepted_label_completeness": 1.0,
+      "accepted_label_completeness": 1,
       "observed_label_risk": 0.3333333333333333,
       "optimistic_empirical_risk": 0.3333333333333333,
       "pessimistic_empirical_risk": 0.3333333333333333
@@ -99,7 +99,7 @@
       "labelled_accepted_count": 3,
       "unknown_accepted_count": 1,
       "known_failure_count": 1,
-      "coverage": 1.0,
+      "coverage": 1,
       "labelled_coverage": 0.75,
       "accepted_label_completeness": 0.75,
       "observed_label_risk": 0.3333333333333333,
@@ -121,11 +121,13 @@
     "consolidation": "Share the metric contract and fixture before moving code into a common crate. Keep event definition, calibration semantics, sampling unit, context partitioning, and deployment authority domain-specific."
   },
   "execution_status": {
-    "json_syntax_checked_in_authoring_environment": false,
+    "json_syntax_checked_in_authoring_environment": true,
     "crispr_rust_adapter_executed": false,
     "broca_rust_adapter_executed": false,
     "rust_unit_tests_executed": false,
     "domain_benchmark_executed": false,
-    "improvement_demonstrated": false
+    "improvement_demonstrated": false,
+    "expected_curve_arithmetic_independently_reconstructed": true,
+    "rust_adapter_parity_checked": false
   }
 }
