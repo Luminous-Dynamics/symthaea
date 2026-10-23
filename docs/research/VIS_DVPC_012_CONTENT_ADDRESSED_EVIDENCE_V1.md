@@ -62,7 +62,7 @@ Allowed roles are **sample**, **cheap_output**, **pre_features**, and **shift_si
 
 The verifier rejects absolute paths, parent/current-directory components, backslash separators, symlinks in any manifested path component, non-files, missing files, digest/length mismatches, unknown roles and duplicate manifest paths. Files are streamed through SHA-256 so large sensor files need not be loaded completely into memory.
 
-Paths are deliberately local inputs. The tool never downloads data or reads raw media into a receipt. Dataset files and labels remain external to the repository.
+Paths are deliberately local inputs. The tool never downloads data or reads raw media into a receipt. Dataset files and labels remain external to the repository. Run against an immutable/read-only dataset snapshot; this reference tool is not a filesystem sandbox and does not make a concurrent hostile writer or symlink-swap race safe. The bundle lock binds the bytes observed during this run, not an adversarially mutable filesystem.
 
 ## Split manifest
 
