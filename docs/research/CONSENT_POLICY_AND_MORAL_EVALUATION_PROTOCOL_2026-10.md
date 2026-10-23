@@ -105,13 +105,13 @@ The helper only enforces the consent-specific precondition at its call site. It 
 
 ### Deterministic consent-gate matrix probe
 
-The separate example `consent_gate_matrix_bench` enumerates **9,600 synthetic combinations** across:
+The separate example `consent_gate_matrix_bench` enumerates **48,000 synthetic combinations** across:
 - all three consent-requirement outcomes (`NotRequired`, `Required`, `Unresolved`);
 - all five consent states;
 - all eight record/identity/authority verification-flag combinations;
 - revoked vs. non-revoked records;
 - missing vs. present evidence;
-- exact vs. mismatched request/evidence scope, including an empty record ID;
+- independently varied request and evidence scope, including mismatched subjects/actions/purposes, an empty request action ID and an empty evidence record ID;
 - valid, not-yet-valid, expired and invalid validity windows.
 
 It checks that blocked cases never invoke the closure, explicitly NotRequired cases retain their outcome, and the one valid Required configuration returns Satisfied and invokes the closure exactly once. It reports false permits, false blocks and closure-invocation mismatches, exiting nonzero when an invariant fails. Reproduce with `cargo run --example consent_gate_matrix_bench`.
