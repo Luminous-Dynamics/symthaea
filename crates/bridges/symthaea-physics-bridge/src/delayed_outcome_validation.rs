@@ -542,6 +542,34 @@ mod tests {
     }
 
     #[test]
+    fn material_improvement_and_negligible_change_are_distinguished() {
+        let mut stable = monitor(OutcomeDirection::HigherIsWorse);
+        alarm_at_five(&mut stable);
+        for index in 2..5 {
+            stable.record_outcome(index, 9, 1.0).unwrap();
+        }
+        for index in 5..8 {
+            stable.record_outcome(index, 9, 1.25).unwrap();
+        }
+        assert_eq!(
+            stable.assess(5).unwrap().association,
+            OutcomeAssociation::NoMaterialChange
+        );
+
+        let mut improved = monitor(OutcomeDirection::HigherIsWorse);
+        alarm_at_five(&mut improved);
+        for index in 2..5 {
+            improved.record_outcome(index, 9, 3.0).unwrap();
+        }
+        for index in 5..8 {
+            improved.record_outcome(index, 9, 1.0).unwrap();
+        }
+        let assessment = improved.assess(5).unwrap();
+        assert_eq!(assessment.association, OutcomeAssociation::Improved);
+        assert_eq!(assessment.worse_oriented_change, Some(-2.0));
+    }
+
+    #[test]
     fn numerical_overflow_never_becomes_a_no_change_result() {
         let mut monitor = monitor(OutcomeDirection::HigherIsWorse);
         alarm_at_five(&mut monitor);
