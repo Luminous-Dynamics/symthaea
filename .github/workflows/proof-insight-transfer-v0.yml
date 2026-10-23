@@ -503,6 +503,46 @@ jobs:
 
           for mutant, label in mutants:
               expect_reject(mutant, label)
+          # Exercise the executed-row branch independently of the all-not_run
+          # checked-in fixture. This object is in-memory schema test data only.
+          execution_schema = outcome_schema["properties"]["outcomes"]["items"]["properties"]["execution"]
+          execution_validator = Draft202012Validator(execution_schema, format_checker=FormatChecker())
+          valid_execution = {
+              "status": "executed",
+              "model": {"model_id": "schema-control-only", "model_version": "0", "config_sha256": "a" * 64},
+              "decision": "apply_original_move",
+              "original_move_applied": True,
+              "checker_result": "checked_success",
+              "proof_sha256": "b" * 64,
+              "run_receipt_sha256": "c" * 64,
+              "resource_usage": {"model_calls": 1, "input_tokens": 1, "output_tokens": 1, "wall_time_ms": 1, "cost_microusd": 1},
+          }
+          execution_validator.validate(valid_execution)
+          bad_execution = copy.deepcopy(valid_execution)
+          bad_execution["original_move_applied"] = False
+          try:
+              execution_validator.validate(bad_execution)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("executed-row schema accepted apply_original_move with original_move_applied=false")
+          bad_execution = copy.deepcopy(valid_execution)
+          bad_execution["decision"] = "replan"
+          try:
+              execution_validator.validate(bad_execution)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("executed-row schema accepted replan while original_move_applied=true")
+          bad_execution = copy.deepcopy(valid_execution)
+          del bad_execution["resource_usage"]["output_tokens"]
+          try:
+              execution_validator.validate(bad_execution)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("executed-row schema accepted missing measured resource usage")
+          print("PITB_PROOF_STATE_EXECUTION_SCHEMA_PASS: valid executed row accepted; 3 contradictory/incomplete execution controls rejected")
           print(f"PITB_PROOF_STATE_OUTCOME_CONTRACT_PASS: {count} explicitly not_run state rows; {len(mutants)}/{len(mutants)} negative controls rejected")
           PY
       - name: Validate insight schema and synthetic positive/negative controls
