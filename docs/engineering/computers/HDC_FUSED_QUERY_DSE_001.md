@@ -69,7 +69,7 @@ It scales through 4,096, 16,384 and 65,536 candidates (8, 32 and 128 MiB of logi
 
 The exact pruning bound can lose against a straight SIMD/vectorized scan because branches, prefix traversal and early-exit divergence cost time. If it wins only on a planted easy-match corpus but regresses on random or realistic traces, treat it as workload-specialized rather than a universal replacement. A later extension should randomize near-match position over fixed seeds and add domain-derived corpus traces. This remains software-only and does not qualify the RTL.
 
-Independent mathematical reference check (not Rust execution): 12 deterministic model seeds × random/planted conditions × 16/64/128-byte chunks matched the full-scan winner in all 72 cases. In a separate 4,096-candidate / 8 MiB traversal-count pilot, the random-only corpus visited 97.70% of candidate bytes with 16-byte chunks and 99.06% with 64-byte chunks. With one approximately 10%-distance target planted at the midpoint, the model visited 59.08% and 60.51%, respectively. This is a count of modeled bytes visited—not execution time, energy, a compiled benchmark, or a Rust-source test. It supports testing the hypothesis but also shows why this cannot be advertised as a universal win: the bound prunes substantially more when a good incumbent appears, and randomized-only inputs offer little work reduction. These figures should be replaced or corroborated by exact-head Rust execution and realistic corpus traces.
+Independent mathematical reference check (not Rust execution): 12 deterministic model seeds × random/planted conditions × 16/64/128-byte chunks matched the full-scan winner in all 72 cases. In a separate 4,096-candidate / 8 MiB traversal-count pilot, the random-only corpus visited 97.70% of candidate bytes with 16-byte chunks and 99.06% with 64-byte chunks. With one approximately 10%-distance target planted at the midpoint, the model visited 59.08% and 60.51%, respectively. This is a count of modeled bytes visited—not execution time, energy, a compiled benchmark, or a Rust-source test. A separate 4,096-candidate correlated-query model seeded the incumbent from the prior query's candidate: cold pruning visited 59.38% / 60.82% of candidate bytes, while the hinted exact search visited 20.40% / 21.89% (16-byte / 64-byte chunks), approximately 65.6% / 64.0% fewer modeled candidate-byte visits in that specific scenario. The exact top-1 was the midpoint candidate at distance 1,638 bits. This is encouraging algorithmic evidence but not a wall-clock, cache-traffic, or energy result; the gain depends on the prior result remaining a good candidate. Random-only inputs offer little work reduction. These figures should be corroborated by exact-head Rust execution and realistic query traces.
 
 ### Phase A3 — temporal-incumbent exact search
 
@@ -125,6 +125,28 @@ The historical packed path expands 16,384 bits into a temporary vector of 16,384
 Bit population count is already available in several general-purpose ISA families. The ratified RISC-V vector bit-manipulation extension `Zvbb` specifies `vcpop.v`; selected x86 CPUs expose AVX-512 `VPOPCNTD/Q` or `VPOPCNTB/W` forms. These are not present on every SKU or target, so feature detection and exact target identity matter. References: [RISC-V vector bit-manipulation specification](https://docs.riscv.org/reference/isa/unpriv/vector-crypto.html) and [Intel instruction-set manual](https://cdrdv2-public.intel.com/671110/325383-sdm-vol-2abcd.pdf).
 
 Therefore, "we built a popcount RTL block" is not itself a competitive claim. Use the best supported CPU path on the same machine as the first baseline. A credible custom accelerator opportunity must come from improved end-to-end dataflow—fused XOR/popcount/reduction, query reuse, transfer amortization, predictable latency/energy, or capabilities not reached efficiently by the target ISA. The baseline record must include detected CPU features and actual compiled target flags; never assume AVX-512 or RISC-V vector instructions are available on a phone.
+
+## External exact-search baselines: do not benchmark in a vacuum
+
+FAISS is the most useful first external comparator because it has explicit binary-vector indexes using packed byte arrays and Hamming distance. Its documented choices include:
+- `IndexBinaryFlat`: exhaustive exact scan optimized for CPU popcount;
+- `IndexBinaryIVF`: coarse inverted-file retrieval;
+- `IndexBinaryHNSW`: graph-based approximate search;
+- `IndexBinaryHash` / `IndexBinaryMultiHash`: hash-bucket families, including a multi-index hashing approach related to exact Hamming-neighbor search.
+
+Reference: [FAISS binary index guide](https://github.com/facebookresearch/faiss/wiki/Binary-Indexes) and [FAISS IndexBinaryFlat API](https://faiss.ai/cpp_api/struct/structfaiss_1_1IndexBinaryFlat.html). The original Multi-Index Hashing work showed exact sublinear search for compact 64/128/256-bit codes at billion-item scale, under its specific code distributions and search-radius conditions: [Norouzi, Punjani & Fleet](https://arxiv.org/abs/1307.2982). That result does not establish the same behavior on Symthaea's 16,384-bit vectors.
+
+For an honest comparison, first run FAISS `IndexBinaryFlat` over identical fixed bytes and candidate IDs, with the same exact top-1/tie semantics. Then compare MIH and HNSW separately: MIH's radius/substring work can grow sharply at high dimension or large Hamming radius, while HNSW is an approximate candidate-generation path unless exactness is independently established. Sweep recall/latency only as a separate approximate-search frontier; never compare an approximate result to exact throughput without reporting recall and quality.
+
+Proposed external baseline matrix:
+1. Symthaea canonical SIMD flat scan.
+2. FAISS `IndexBinaryFlat` exact flat scan.
+3. Symthaea early-abandon and temporal-incumbent exact scan.
+4. FAISS multi-index hash / MIH on a declared radius or exact top-k workload.
+5. FAISS `IndexBinaryHNSW` at published recall targets.
+6. Only then, Symthaea fused RTL / FPGA with identical results and explicit transfer boundaries.
+
+Keep vector dimension, bit order, corpus bytes, query order, top-k value, tie policy, cache and setup boundary matched. Report build cost, bytes/vector, index overhead, p50/p95/p99, QPS, exact recall, and measured joules when available. A research improvement can win on 16K HDC and lose on the 256-bit compact-code workload; report each regime honestly rather than claiming a universal SOTA.
 
 ## Industry reference and how we compete
 
