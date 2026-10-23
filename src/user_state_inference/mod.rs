@@ -406,8 +406,11 @@ pub struct InteractionRecord {
     /// Response time (ms)
     pub response_time_ms: f32,
 
-    /// Whether it resulted in an error
+    /// Compatibility flag for whether an error was inferred (false if unavailable).
     pub had_error: bool,
+
+    /// Whether the current cycle supplied evidence for this error flag.
+    pub had_error_valid: bool,
 
     /// Timestamp
     pub timestamp: Instant,
@@ -464,8 +467,18 @@ impl UserStateInference {
         }
     }
 
-    /// Process a new user input and update state
+    /// Process a new user input with an explicitly observed error flag.
     pub fn process(&mut self, text: &str, had_error: bool) -> &UserState {
+        self.process_with_error_evidence(text, Some(had_error))
+    }
+
+    /// Process text-derived user signals even when PE is unavailable. Missing PE
+    /// must not imply a successful cycle or erase inferred frustration.
+    pub fn process_with_error_evidence(
+        &mut self,
+        text: &str,
+        had_error: Option<bool>,
+    ) -> &UserState {
         let now = Instant::now();
 
         // Update idle time
@@ -484,23 +497,24 @@ impl UserStateInference {
             &["urgent", "asap", "hurry", "immediately", "quick", "rush"],
         );
 
-        // Update frustration based on errors
-        if had_error {
-            self.current_state.frustration = (self.current_state.frustration + 0.2).min(1.0);
-        } else {
-            // Decay frustration on success
-            self.current_state.frustration = (self.current_state.frustration - 0.1).max(0.0);
-        }
+        // Error- and success-dependent affect/confidence updates require a
+        // valid outcome. Text-only context and cognitive-load estimates continue.
+        if let Some(had_error) = had_error {
+            if had_error {
+                self.current_state.frustration = (self.current_state.frustration + 0.2).min(1.0);
+            } else {
+                self.current_state.frustration = (self.current_state.frustration - 0.1).max(0.0);
+            }
 
-        // Update confidence based on context
-        match context {
-            ContextKind::Help | ContextKind::Troubleshooting => {
-                self.current_state.confidence = (self.current_state.confidence - 0.1).max(0.0);
+            match context {
+                ContextKind::Help | ContextKind::Troubleshooting => {
+                    self.current_state.confidence = (self.current_state.confidence - 0.1).max(0.0);
+                }
+                ContextKind::Task | ContextKind::Development if !had_error => {
+                    self.current_state.confidence = (self.current_state.confidence + 0.05).min(1.0);
+                }
+                _ => {}
             }
-            ContextKind::Task | ContextKind::Development if !had_error => {
-                self.current_state.confidence = (self.current_state.confidence + 0.05).min(1.0);
-            }
-            _ => {}
         }
 
         // Estimate cognitive load
@@ -514,7 +528,8 @@ impl UserStateInference {
             text: text.to_string(),
             context,
             response_time_ms: 0.0,
-            had_error,
+            had_error: had_error.unwrap_or(false),
+            had_error_valid: had_error.is_some(),
             timestamp: now,
         };
         self.interaction_history.push_back(record);
