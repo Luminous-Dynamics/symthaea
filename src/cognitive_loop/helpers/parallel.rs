@@ -24,6 +24,8 @@ use super::super::{
 /// Context for the episodic/learning parallel branch (read-only values).
 pub(in crate::cognitive_loop) struct EpisodicLearningContext<'a> {
     pub prediction_error: f32,
+    /// Whether this cycle's PE is a genuine finite comparison.
+    pub prediction_error_valid: bool,
     pub in_flow: bool,
     pub input: &'a str,
     pub compressed_state: &'a [f32],
@@ -79,13 +81,19 @@ pub(in crate::cognitive_loop) fn parallel_semantic_causal(
     prediction_error: f32,
     total_cycles: usize,
 ) -> Option<crate::memory::semantic_memory::SemanticEntry> {
-    // Semantic memory: store HDC vector + prediction error for future similarity lookup
-    let evicted = semantic_memory.store_with_timestamp(
-        semantic_hdc,
-        prediction_error,
-        None,
-        total_cycles as u64,
-    );
+    // Semantic memory stores PE as an outcome label, so don't persist a
+    // missing/corrupted comparison as a numeric result. Causal recording below
+    // is independent of PE validity and continues.
+    let evicted = if let Some(valid_error) = prediction_error.filter(|value| value.is_finite()) {
+        semantic_memory.store_with_timestamp(
+            semantic_hdc,
+            valid_error,
+            None,
+            total_cycles as u64,
+        )
+    } else {
+        None
+    };
 
     // Causal enhancement: track (input, output) pairs and discover structure
     if let Some(enhancer) = causal_enhancer {
@@ -121,14 +129,15 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
     fep_learning_signal: &mut f32,
     closed_learning_loop: &mut ClosedLearningLoop,
     ctx: &EpisodicLearningContext<'_>,
-    cycle_learning_result: CycleLearningResult,
+    cycle_learning_result: Option<CycleLearningResult>,
 ) -> f32 {
     // Episodic memory: encode significant experiences.
     // IIT gate: consciousness (Phi) is necessary for memory formation
     // (Tononi & Koch 2015). Require minimum Phi for consolidation.
     let phi_sufficient = ctx.phi > super::super::thresholds::PHI_EPISODIC_CONSOLIDATION_MIN;
     if phi_sufficient
-        && (ctx.prediction_error > super::super::thresholds::PREDICTION_ERROR_EPISODIC_MIN
+        && ((ctx.prediction_error_valid
+            && ctx.prediction_error > super::super::thresholds::PREDICTION_ERROR_EPISODIC_MIN)
             || ctx.in_flow)
     {
         let hdv_sample: Vec<f32> =
@@ -156,7 +165,8 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
     if let Some(res_mem) = resonator_memory {
         let res_dim_ok = ctx.compressed_state.len() == res_mem.resonator.config.dim;
         if res_dim_ok
-            && (ctx.prediction_error > super::super::thresholds::PREDICTION_ERROR_EPISODIC_MIN
+            && ((ctx.prediction_error_valid
+                && ctx.prediction_error > super::super::thresholds::PREDICTION_ERROR_EPISODIC_MIN)
                 || ctx.in_flow)
         {
             // Quantize valence -> nearest band
@@ -231,11 +241,14 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
 
     *prev_primitive_state = Some(prim_state);
 
-    // Closed learning loop: update Q-values, modulated by FEP learning signal.
-    // Friston (2010): plasticity scales with expected information gain.
-    let plasticity =
-        1.0 + *fep_learning_signal * super::super::thresholds::FEP_PLASTICITY_SCALING_FACTOR; // [-1,1] → [0.5, 1.5]
-    closed_learning_loop.update_with_plasticity(cycle_learning_result, plasticity);
+    // Closed learning loop: update Q-values only when outcome/PE evidence was
+    // admitted by the caller. Primitive-belief updates above have their own
+    // state comparison and remain independent of the encoder PE.
+    if let Some(cycle_learning_result) = cycle_learning_result {
+        let plasticity =
+            1.0 + *fep_learning_signal * super::super::thresholds::FEP_PLASTICITY_SCALING_FACTOR;
+        closed_learning_loop.update_with_plasticity(cycle_learning_result, plasticity);
+    }
 
     // Return the memory context boost for deferred application via adjust_confidence
     ctx.memory_context_boost
