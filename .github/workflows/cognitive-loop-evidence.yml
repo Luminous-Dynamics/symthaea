@@ -1,0 +1,41 @@
+name: Cognitive Loop Evidence Contract
+
+on:
+  pull_request:
+    paths:
+      - "benchmarks/cognitive-loop-evidence/**"
+      - "xtask/src/cognitive_loop_evidence.rs"
+      - "xtask/src/main.rs"
+      - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
+      - ".github/workflows/cognitive-loop-evidence.yml"
+  push:
+    branches: [main]
+    paths:
+      - "benchmarks/cognitive-loop-evidence/**"
+      - "xtask/src/cognitive_loop_evidence.rs"
+      - "xtask/src/main.rs"
+      - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
+      - ".github/workflows/cognitive-loop-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cognitive-loop-evidence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  manifest-contract:
+    name: Validate manifest contract (not model performance)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Verify workspace targets are tracked
+        run: bash scripts/check-workspace-targets.sh
+      - name: Validate manifest and hard-gate invariants
+        run: cargo run --locked -p xtask -- validate-cognitive-loop-evidence
+      - name: Test validator failure modes
+        run: cargo test --locked -p xtask cognitive_loop_evidence
