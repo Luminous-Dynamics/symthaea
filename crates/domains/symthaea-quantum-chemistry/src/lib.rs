@@ -90,6 +90,7 @@ pub mod molecule;
 pub mod multi_theory;
 pub mod post_hf;
 pub mod quantum_info;
+pub mod request;
 pub mod reaction_consciousness;
 pub mod scf;
 pub mod stat_mech;
