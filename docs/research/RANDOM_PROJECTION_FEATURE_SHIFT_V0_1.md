@@ -8,7 +8,7 @@ The exact fixed-reference moment/correlation scorer in `feature_shift.rs` stores
 
 `random_projection_shift.rs` adds a fixed-seed Rademacher sketch with `k < d` projections. It computes the same three types of summary in a frozen `k`-dimensional space: mean changes, log-scale changes, and pairwise correlation changes. Its dominant scoring cost is `O(n d k + n k^2)`; stored reference state is `O(d k + k^2)`, excluding the audit batch and temporary projected rows. Projection coefficients are precomputed as compact one-byte signs to avoid repeated hash mixing for each audit sample; this uses much less memory than an `f64` `d × k` matrix while making scoring cheaper.
 
-The first unit test uses 127 input features and 16 projected dimensions: the exact summary has 8,001 pairwise correlations while the sketch has 120. This is a complexity fixture, not a runtime benchmark. A diffuse mean-shift fixture checks that the compressed score responds to one declared alternative.
+The first unit test uses 127 input features and 16 projected dimensions: the exact summary has 8,001 pairwise correlations while the sketch has 120. This is a complexity fixture, not a runtime benchmark. A diffuse mean-shift fixture checks that the compressed score responds to one declared alternative. A paired sparse-coordinate counterexample asserts that the exact score remains sensitive to a one-feature shift while the sketch dilutes it; this is an explicit reason to retain an exact/scaled fallback for sparse or safety-critical signals.
 
 ## Statistical contract
 
