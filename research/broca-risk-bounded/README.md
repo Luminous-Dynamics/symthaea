@@ -67,3 +67,10 @@ For statistical certification, use a fixed, strictly descending threshold sequen
 The curve generated from observed score values is intended for policy exploration on development data. Do not choose a favorable point using the same labels and then claim that its unadjusted confidence bound is an independent test guarantee. Keep policy development, threshold selection/calibration, and final evaluation separate. The fixed-sequence guarantee also depends on the stated binomial sampling assumptions; it is not a distribution-free guarantee under arbitrary drift or correlated query lineages.
 
 The crate is a qualification primitive for PR #8520, not a replacement for PR #8494's exact-vs-approximate benchmark, MIRE memory-integrity fixtures, or end-to-end memory task evaluation.
+
+
+## Related in-repository prior work and consolidation boundary
+
+The CRISPR selective-risk track already has adjacent research work in [PR #7502](https://github.com/Luminous-Dynamics/symthaea/pull/7502) and [issue #7580](https://github.com/Luminous-Dynamics/symthaea/issues/7580), including risk–coverage curves, context-stratified summaries, and unknown-label-aware error bounds for probability scores. This memory-specific reference is not a claim that risk–coverage analysis or selective prediction is novel.
+
+The distinguishing slice here is retrieval-oriented fixed-sequence certification against a configured unsafe-result rate, tied acceptance-score tiers, unique query-ID enforcement, and a fail-closed stop when accepted outcomes are unlabelled. The present curve/reporting code is deliberately local to this standalone research crate; before production use or a general-purpose release, compare both implementations on shared fixtures and factor shared metric semantics into one maintained implementation rather than allowing parallel score/risk conventions to drift.
