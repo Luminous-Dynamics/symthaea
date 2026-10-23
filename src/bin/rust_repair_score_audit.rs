@@ -464,11 +464,15 @@ fn validate_locked_runtime_logs(
     if baseline.get("role").and_then(Value::as_str) != Some("baseline") {
         errors.push("runtime sidecar baseline role is invalid".to_string());
     }
-    if baseline.get("repo_head_exit_code").and_then(Value::as_i64) != Some(0) {
-        errors.push("baseline repository HEAD inspection did not exit zero".to_string());
-    }
-    if baseline.get("repo_head_sha").and_then(Value::as_str) != Some(expected_repo_head) {
-        errors.push("baseline repository HEAD differs from locked task base commit".to_string());
+    if !repo_head_matches(
+        expected_repo_head,
+        baseline.get("repo_head_sha").and_then(Value::as_str),
+        baseline.get("repo_head_exit_code").and_then(Value::as_i64),
+    ) {
+        errors.push(
+            "baseline repository HEAD differs from locked task base commit or inspection failed"
+                .to_string(),
+        );
     }
     let baseline_identity = baseline.get("container_identity").unwrap_or(&Value::Null);
     if baseline_identity.get("network_mode").and_then(Value::as_str) != Some("none") {
@@ -566,11 +570,14 @@ fn validate_locked_runtime_logs(
             }
         }
 
-        if run.get("repo_head_exit_code").and_then(Value::as_i64) != Some(0) {
-            errors.push(format!("gold runtime run {index} repository HEAD inspection did not exit zero"));
-        }
-        if run.get("repo_head_sha").and_then(Value::as_str) != Some(expected_repo_head) {
-            errors.push(format!("gold runtime run {index} repository HEAD differs from locked task base commit"));
+        if !repo_head_matches(
+            expected_repo_head,
+            run.get("repo_head_sha").and_then(Value::as_str),
+            run.get("repo_head_exit_code").and_then(Value::as_i64),
+        ) {
+            errors.push(format!(
+                "gold runtime run {index} repository HEAD differs from locked task base commit or inspection failed"
+            ));
         }
         let identity = run.get("container_identity").unwrap_or(&Value::Null);
         if identity.get("network_mode").and_then(Value::as_str) != Some("none") {
@@ -748,6 +755,16 @@ fn validate_task_oracle(
     } else {
         Err(errors)
     }
+}
+
+fn repo_head_matches(
+    expected_base_commit: &str,
+    observed_repo_head: Option<&str>,
+    command_exit_code: Option<i64>,
+) -> bool {
+    (is_hex(expected_base_commit, 40) || is_hex(expected_base_commit, 64))
+        && command_exit_code == Some(0)
+        && observed_repo_head.is_some_and(|observed| observed.eq_ignore_ascii_case(expected_base_commit))
 }
 
 fn canonical_id_digest(ids: &BTreeSet<String>) -> String {
@@ -966,13 +983,16 @@ fn audit_scored_task(
         .get("base_commit")
         .and_then(Value::as_str)
         .unwrap_or("");
-    if evidence.get("repo_head_exit_code").and_then(Value::as_i64) != Some(0) {
-        reasons.push("scored repository HEAD inspection did not exit zero".to_string());
-    }
-    if repo_head_sha_observed.as_deref() != Some(expected_base_commit)
-        || task.get("repo_head_sha").and_then(Value::as_str) != Some(expected_base_commit)
+    if !repo_head_matches(
+        expected_base_commit,
+        repo_head_sha_observed.as_deref(),
+        evidence.get("repo_head_exit_code").and_then(Value::as_i64),
+    ) || task.get("repo_head_sha").and_then(Value::as_str) != Some(expected_base_commit)
     {
-        reasons.push("scored repository HEAD differs from locked task base_commit".to_string());
+        reasons.push(
+            "scored repository HEAD differs from locked task base_commit or inspection failed"
+                .to_string(),
+        );
     }
     if evidence.get("prediction_patch_sha256").and_then(Value::as_str) != patch_sha.as_deref() {
         reasons.push("scored prediction patch digest differs from prediction file".to_string());
@@ -1528,6 +1548,15 @@ mod tests {
         assert_eq!(headline_pass_at_1(10, 7, 2, 1), None);
         assert_eq!(headline_pass_at_1(10, 7, 3, 0), Some(0.7));
         assert_eq!(headline_pass_at_1(0, 0, 0, 0), None);
+    }
+
+    #[test]
+    fn repository_head_must_match_pinned_task_commit() {
+        let base = "a".repeat(40);
+        assert!(repo_head_matches(&base, Some(&base), Some(0)));
+        assert!(!repo_head_matches(&base, Some(&"b".repeat(40)), Some(0)));
+        assert!(!repo_head_matches(&base, Some(&base), Some(1)));
+        assert!(!repo_head_matches(&base, None, Some(0)));
     }
 
     #[test]
