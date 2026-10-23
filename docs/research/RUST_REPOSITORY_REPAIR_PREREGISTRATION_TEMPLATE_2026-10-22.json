@@ -38,7 +38,7 @@
     "rust_toolchain": "Record exact `rustc --version` and Cargo version before locking",
     "container_image_digest": null,
     "lockfile_sha256": null,
-    "network_policy": "No access to hidden tests, gold patches, or evaluator metadata; record any required network access",
+    "network_policy": "Strict pass@1 lane: no web/search or task-specific external retrieval; task process may access only the problem_statement and prebuilt sandbox, with dependencies fetched before the run or through an explicitly recorded allowlisted cache. Do not expose hints, patches, test patches, FAIL_TO_PASS, PASS_TO_PASS, commit URLs, evaluator logs, or task metadata to the agent. Preserve complete rollout trajectories.",
     "cpu_gpu_description": "Record runner hardware and whether GPU is used"
   },
   "budget": {
