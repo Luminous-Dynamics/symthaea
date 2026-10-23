@@ -536,12 +536,28 @@ mod tests {
             .map(|row| vec![row[0], row[1] - 2.0, row[2]])
             .collect::<Vec<_>>();
         let uninformative_family = clean.clone();
+        let pooled_families = first_family
+            .iter()
+            .chain(second_family.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(matches!(
+            DetectorPanelScorer::fit(
+                &clean,
+                &pooled_families,
+                1,
+                0.8,
+                1e-6,
+                DetectorPanelAggregation::MeanPositiveZ,
+            ),
+            Err(DetectorPanelError::NoInformativeDetectors)
+        ));
 
         let panel = DetectorPanelScorer::fit_multi_probe(
             &clean,
             &[first_family, second_family, uninformative_family],
             1,
-            0.75,
+            0.8,
             1e-6,
             DetectorPanelAggregation::MeanPositiveZ,
         )
