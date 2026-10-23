@@ -8,7 +8,7 @@ The exact fixed-reference moment/correlation scorer in `feature_shift.rs` stores
 
 `random_projection_shift.rs` adds a fixed-seed Rademacher sketch with `k < d` projections. It retains exact per-feature mean and scale checks in `O(n d)` time, then uses a frozen `k`-dimensional space to approximate pairwise-correlation changes and add projected views of diffuse mean/scale shifts. Its dominant scoring cost is `O(n d k + n k^2)`; stored reference state is `O(d k + k^2)`, excluding the audit batch and temporary projected rows. Projection coefficients are precomputed as compact one-byte signs to avoid repeated hash mixing for each audit sample; this uses much less memory than an `f64` `d × k` matrix while making scoring cheaper.
 
-The first unit test uses 127 input features and 16 projected dimensions: the exact summary has 8,001 pairwise correlations while the sketch has 120. This is a complexity fixture, not a runtime benchmark. A diffuse mean-shift fixture checks that projected views add detection signal, and a paired sparse-coordinate test asserts that the hybrid scorer preserves exact per-feature mean-shift sensitivity. Projection can still miss sparse or nearly orthogonal changes in dependence structure; retain an exact/targeted correlation detector where those failure modes are safety-critical.
+The first unit test uses 127 input features and 16 projected dimensions: the exact summary has 8,001 pairwise correlations while the sketch has 120. This is a complexity fixture, not a runtime benchmark. A diffuse mean-shift fixture checks that projected views add detection signal, and paired sparse-coordinate tests assert that the hybrid scorer preserves exact per-feature mean-shift and scale-shift sensitivity. Projection can still miss sparse or nearly orthogonal changes in dependence structure; retain an exact/targeted correlation detector where those failure modes are safety-critical.
 
 A manual Rust microbenchmark is also included as an ignored test so timing does not make CI flaky. On a machine with the project Rust toolchain, run:
 
@@ -54,7 +54,7 @@ Proposed engineering goals, **not current results**:
 - for a clean null at nominal α=0.05, 10,000+ Monte Carlo streams per confirmatory null world and a confidence interval compatible with the intended bound;
 - with batch size 64, 199 independent clean calibration batches, and nominal α=0.05, at least 80% power for a diffuse +0.25-reference-scale mean shift across all feature coordinates and 95% for a +0.5-reference-scale shift, with rates and intervals reported per held-out world;
 - at least 5x p95 scoring speedup over the exact scorer for (d\geq1,024), (k\leq64), and batch size 64, without an unacceptable loss in held-out power;
-- report a Pareto curve over (k), not a single cherry-picked projection dimension;
+- report a Pareto curve over `k`, not a single cherry-picked projection dimension;
 - preregister acceptable missed-detection rates for sparse and projection-orthogonal shifts; if those fail, document fallback to exact or alternative detectors rather than widening claims.
 
 Targets should be revised only with a documented reason before confirmatory runs, never in response to hidden test results.
@@ -87,4 +87,4 @@ This Rust scorer is not yet a replacement for those complete workflows: it provi
 
 ## Current evidence boundary
 
-The implementation adds unit tests for (a) score compression from 8,001 to 120 correlation comparisons, (b) a diffuse mean-shift response, (c) malformed inputs, and (d) typed conformal assessment. At this writing, Rust tests and rustfmt have not been observed to pass on the exact head. The tests are committed; their outcomes remain unverified until the focused workflow reports success for that exact SHA.
+The implementation adds unit tests for (a) score compression from 8,001 to 120 correlation comparisons, (b) diffuse mean-shift response, (c) preserving sparse per-feature mean and scale sensitivity, (d) malformed inputs, and (e) typed conformal assessment. At this writing, Rust tests and rustfmt have not been observed to pass on the exact head. The tests are committed; their outcomes remain unverified until the focused workflow reports success for that exact SHA.
