@@ -47,6 +47,7 @@ pub mod catalog;
 pub mod dimensional;
 pub mod dimensional_inference;
 pub mod discovery;
+pub mod delayed_outcome_validation;
 pub mod equation_ast;
 pub mod integrated_discovery;
 pub mod lyapunov;
