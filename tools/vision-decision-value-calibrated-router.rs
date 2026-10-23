@@ -33,6 +33,8 @@ pub struct CalibrationRowV1 {
     pub sample_id: String,
     pub split_id: String,
     pub domain_id: String,
+    pub domain_assessor_id: String,
+    pub domain_assessor_artifact_digest: EvidenceDigest,
     pub loss_profile_id: String,
     pub estimator_id: String,
     pub estimator_artifact_digest: EvidenceDigest,
@@ -47,6 +49,8 @@ pub struct CalibrationConfigV1 {
     pub profile_id: String,
     pub calibration_split_id: String,
     pub domain_id: String,
+    pub domain_assessor_id: String,
+    pub domain_assessor_artifact_digest: EvidenceDigest,
     pub loss_profile_id: String,
     pub estimator_id: String,
     pub estimator_artifact_digest: EvidenceDigest,
@@ -74,6 +78,8 @@ pub struct SplitConformalBenefitProfileV1 {
     profile_id: String,
     calibration_split_id: String,
     domain_id: String,
+    domain_assessor_id: String,
+    domain_assessor_artifact_digest: EvidenceDigest,
     loss_profile_id: String,
     estimator_id: String,
     estimator_artifact_digest: EvidenceDigest,
@@ -141,6 +147,8 @@ impl SplitConformalBenefitProfileV1 {
         if self.profile_id.trim().is_empty()
             || self.calibration_split_id.trim().is_empty()
             || self.domain_id.trim().is_empty()
+            || self.domain_assessor_id.trim().is_empty()
+            || self.domain_assessor_artifact_digest.iter().all(|byte| *byte == 0)
             || self.loss_profile_id.trim().is_empty()
             || self.estimator_id.trim().is_empty()
             || self.estimator_artifact_digest.iter().all(|byte| *byte == 0)
@@ -190,6 +198,8 @@ pub fn fit_split_conformal_profile_v1(
         }
         if row.split_id != config.calibration_split_id
             || row.domain_id != config.domain_id
+            || row.domain_assessor_id != config.domain_assessor_id
+            || row.domain_assessor_artifact_digest != config.domain_assessor_artifact_digest
             || row.loss_profile_id != config.loss_profile_id
             || row.estimator_id != config.estimator_id
             || row.estimator_artifact_digest != config.estimator_artifact_digest
@@ -233,6 +243,8 @@ pub fn fit_split_conformal_profile_v1(
         profile_id: config.profile_id.clone(),
         calibration_split_id: config.calibration_split_id.clone(),
         domain_id: config.domain_id.clone(),
+        domain_assessor_id: config.domain_assessor_id.clone(),
+        domain_assessor_artifact_digest: config.domain_assessor_artifact_digest,
         loss_profile_id: config.loss_profile_id.clone(),
         estimator_id: config.estimator_id.clone(),
         estimator_artifact_digest: config.estimator_artifact_digest,
@@ -250,6 +262,8 @@ fn validate_config(config: &CalibrationConfigV1) -> Result<(), CalibrationError>
     if config.profile_id.trim().is_empty()
         || config.calibration_split_id.trim().is_empty()
         || config.domain_id.trim().is_empty()
+        || config.domain_assessor_id.trim().is_empty()
+        || config.domain_assessor_artifact_digest.iter().all(|byte| *byte == 0)
         || config.loss_profile_id.trim().is_empty()
         || config.estimator_id.trim().is_empty()
         || config.estimator_artifact_digest.iter().all(|byte| *byte == 0)
@@ -286,6 +300,8 @@ pub enum GateReasonV1 {
     ShiftDetected,
     DomainUnknown,
     DomainMismatch,
+    DomainAssessorMismatch,
+    DomainAssessorArtifactMismatch,
     LossProfileMismatch,
     EstimatorMismatch,
     EstimatorArtifactMismatch,
@@ -301,6 +317,8 @@ impl GateReasonV1 {
             Self::ShiftDetected => "shift_detected",
             Self::DomainUnknown => "domain_unknown",
             Self::DomainMismatch => "domain_mismatch",
+            Self::DomainAssessorMismatch => "domain_assessor_mismatch",
+            Self::DomainAssessorArtifactMismatch => "domain_assessor_artifact_mismatch",
             Self::LossProfileMismatch => "loss_profile_mismatch",
             Self::EstimatorMismatch => "estimator_mismatch",
             Self::EstimatorArtifactMismatch => "estimator_artifact_mismatch",
@@ -319,6 +337,8 @@ pub struct CalibratedRouterInputV1 {
     pub input_digest: EvidenceDigest,
     pub domain_status: DomainStatusV1,
     pub domain_id: String,
+    pub domain_assessor_id: String,
+    pub domain_assessor_artifact_digest: EvidenceDigest,
     pub loss_profile_id: String,
     pub estimator_id: String,
     pub estimator_artifact_digest: EvidenceDigest,
@@ -471,6 +491,12 @@ impl CalibratedDecisionValueRouterV1 {
         if input.domain_id != self.profile.domain_id {
             return GateReasonV1::DomainMismatch;
         }
+        if input.domain_assessor_id != self.profile.domain_assessor_id {
+            return GateReasonV1::DomainAssessorMismatch;
+        }
+        if input.domain_assessor_artifact_digest != self.profile.domain_assessor_artifact_digest {
+            return GateReasonV1::DomainAssessorArtifactMismatch;
+        }
         if input.loss_profile_id != self.profile.loss_profile_id {
             return GateReasonV1::LossProfileMismatch;
         }
@@ -506,6 +532,8 @@ mod tests {
             profile_id: "dvpc-value-lcb-profile-v1".to_owned(),
             calibration_split_id: CAL_SPLIT.to_owned(),
             domain_id: DOMAIN.to_owned(),
+            domain_assessor_id: "domain-shift-scorer-v1".to_owned(),
+            domain_assessor_artifact_digest: [0xDC; 32],
             loss_profile_id: LOSS.to_owned(),
             estimator_id: ESTIMATOR.to_owned(),
             estimator_artifact_digest: ARTIFACT,
@@ -522,6 +550,8 @@ mod tests {
                     sample_id: format!("cal-{index:02}"),
                     split_id: CAL_SPLIT.to_owned(),
                     domain_id: DOMAIN.to_owned(),
+                    domain_assessor_id: "domain-shift-scorer-v1".to_owned(),
+                    domain_assessor_artifact_digest: [0xDC; 32],
                     loss_profile_id: LOSS.to_owned(),
                     estimator_id: ESTIMATOR.to_owned(),
                     estimator_artifact_digest: ARTIFACT,
@@ -543,6 +573,8 @@ mod tests {
             input_digest: [trial_id as u8 + 1; 32],
             domain_status: DomainStatusV1::InDomain,
             domain_id: DOMAIN.to_owned(),
+            domain_assessor_id: "domain-shift-scorer-v1".to_owned(),
+            domain_assessor_artifact_digest: [0xDC; 32],
             loss_profile_id: LOSS.to_owned(),
             estimator_id: ESTIMATOR.to_owned(),
             estimator_artifact_digest: ARTIFACT,
