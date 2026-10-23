@@ -1120,6 +1120,8 @@ fn run_trial_with_mode(
             }
             fixed_order[round].clone()
         };
+        let is_post_recovery_singleton_validation =
+            awaiting_post_recovery_validation && live.len() == 1;
         used.push(chosen.clone());
 
         let Some(base_true_val) = eval_at(&ground_truth, &chosen) else {
@@ -1228,7 +1230,7 @@ fn run_trial_with_mode(
             }
         }
 
-        if awaiting_post_recovery_validation {
+        if is_post_recovery_singleton_validation {
             post_recovery_validation_measurements += 1;
         }
         live.retain(|idx| match eval_at(&hypotheses[*idx], &chosen) {
