@@ -31,6 +31,10 @@ pub struct CalibrationRowV1 {
     /// Stable ID from the frozen calibration manifest, not an evaluator label.
     pub sample_id: String,
     pub split_id: String,
+    /// Digest of the causal input used for the domain assessment and value estimate.
+    pub input_digest: EvidenceDigest,
+    /// Must equal input_digest; prevents accidental reuse of a stale domain result.
+    pub domain_assessment_input_digest: EvidenceDigest,
     pub domain_id: String,
     pub domain_assessor_id: String,
     pub domain_assessor_artifact_digest: EvidenceDigest,
@@ -202,6 +206,8 @@ pub fn fit_split_conformal_profile_v1(
             ));
         }
         if row.split_id != config.calibration_split_id
+            || row.input_digest.iter().all(|byte| *byte == 0)
+            || row.domain_assessment_input_digest != row.input_digest
             || row.domain_id != config.domain_id
             || row.domain_assessor_id != config.domain_assessor_id
             || row.domain_assessor_artifact_digest != config.domain_assessor_artifact_digest
@@ -316,6 +322,7 @@ pub enum GateReasonV1 {
     DomainMismatch,
     DomainAssessorMismatch,
     DomainAssessorArtifactMismatch,
+    DomainAssessmentInputMismatch,
     LossProfileMismatch,
     EstimatorMismatch,
     EstimatorArtifactMismatch,
@@ -333,6 +340,7 @@ impl GateReasonV1 {
             Self::DomainMismatch => "domain_mismatch",
             Self::DomainAssessorMismatch => "domain_assessor_mismatch",
             Self::DomainAssessorArtifactMismatch => "domain_assessor_artifact_mismatch",
+            Self::DomainAssessmentInputMismatch => "domain_assessment_input_mismatch",
             Self::LossProfileMismatch => "loss_profile_mismatch",
             Self::EstimatorMismatch => "estimator_mismatch",
             Self::EstimatorArtifactMismatch => "estimator_artifact_mismatch",
@@ -349,6 +357,7 @@ impl GateReasonV1 {
 pub struct CalibratedRouterInputV1 {
     pub trial_id: u64,
     pub input_digest: EvidenceDigest,
+    pub domain_assessment_input_digest: EvidenceDigest,
     pub domain_status: DomainStatusV1,
     pub domain_id: String,
     pub domain_assessor_id: String,
@@ -498,6 +507,9 @@ impl CalibratedDecisionValueRouterV1 {
             DomainStatusV1::Unknown => return GateReasonV1::DomainUnknown,
             DomainStatusV1::InDomain => {}
         }
+        if input.domain_assessment_input_digest != input.input_digest {
+            return GateReasonV1::DomainAssessmentInputMismatch;
+        }
         if input.domain_id != self.profile.domain_id {
             return GateReasonV1::DomainMismatch;
         }
@@ -559,6 +571,8 @@ mod tests {
                 CalibrationRowV1 {
                     sample_id: format!("cal-{index:02}"),
                     split_id: CAL_SPLIT.to_owned(),
+                    input_digest: [index as u8 + 1; 32],
+                    domain_assessment_input_digest: [index as u8 + 1; 32],
                     domain_id: DOMAIN.to_owned(),
                     domain_assessor_id: "domain-shift-scorer-v1".to_owned(),
                     domain_assessor_artifact_digest: [0xDC; 32],
@@ -581,6 +595,7 @@ mod tests {
         CalibratedRouterInputV1 {
             trial_id,
             input_digest: [trial_id as u8 + 1; 32],
+            domain_assessment_input_digest: [trial_id as u8 + 1; 32],
             domain_status: DomainStatusV1::InDomain,
             domain_id: DOMAIN.to_owned(),
             domain_assessor_id: "domain-shift-scorer-v1".to_owned(),
@@ -799,6 +814,20 @@ mod tests {
         assert_eq!(
             decision.gate_reason,
             GateReasonV1::DomainAssessorArtifactMismatch
+        );
+        assert_eq!(decision.allocation.choice, AllocationChoice::KeepCheap);
+        assert_eq!(policy.budget().reserved(), ResourceVector::default());
+    }
+
+    #[test]
+    fn stale_domain_assessment_input_digest_blocks_escalation() {
+        let mut policy = router();
+        let mut candidate = input(1, 1000.0, 0.001);
+        candidate.domain_assessment_input_digest = [0xFE; 32];
+        let decision = policy.decide(candidate).unwrap();
+        assert_eq!(
+            decision.gate_reason,
+            GateReasonV1::DomainAssessmentInputMismatch
         );
         assert_eq!(decision.allocation.choice, AllocationChoice::KeepCheap);
         assert_eq!(policy.budget().reserved(), ResourceVector::default());
