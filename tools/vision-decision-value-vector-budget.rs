@@ -662,6 +662,20 @@ mod tests {
     }
 
     #[test]
+    fn energy_reservation_overrun_blocks_all_future_escalations() {
+        let mut policy = allocator(100, 100);
+        let first = policy
+            .decide(candidate(1, Some(ResourceVector::new(20, 10)), 0.2, true))
+            .unwrap();
+        let status = policy
+            .settle(first.reservation_id.unwrap(), ObservedResourceCost::known(10, 11))
+            .unwrap();
+        assert_eq!(status, BudgetStatus::ReservationOverrun);
+        assert_eq!(policy.budget().charged(), ResourceVector::new(10, 11));
+        assert_eq!(policy.budget().available(), None);
+    }
+
+    #[test]
     fn latency_reservation_overrun_blocks_all_future_escalations() {
         let mut policy = allocator(100, 100);
         let first = policy
@@ -672,6 +686,24 @@ mod tests {
             .unwrap();
         assert_eq!(status, BudgetStatus::ReservationOverrun);
         assert_eq!(policy.budget().charged(), ResourceVector::new(11, 10));
+        assert_eq!(policy.budget().available(), None);
+    }
+
+    #[test]
+    fn unknown_single_latency_measurement_blocks_future_escalations() {
+        let mut policy = allocator(100, 100);
+        let first = policy
+            .decide(candidate(1, Some(ResourceVector::new(40, 30)), 0.2, true))
+            .unwrap();
+        let status = policy
+            .settle(
+                first.reservation_id.unwrap(),
+                ObservedResourceCost { latency_us: None, energy_uj: Some(25) },
+            )
+            .unwrap();
+        assert_eq!(status, BudgetStatus::CostAccountingUnknown);
+        assert_eq!(policy.budget().reserved(), ResourceVector::default());
+        assert_eq!(policy.budget().charged(), ResourceVector::new(0, 25));
         assert_eq!(policy.budget().available(), None);
     }
 
@@ -711,10 +743,26 @@ mod tests {
 
     #[test]
     fn charge_overflow_saturates_and_reports_overflow() {
-        assert_eq!(add_charge(u64::MAX, Some(1)), (u64::MAX, true));
-        assert_eq!(add_charge(u64::MAX, None), (u64::MAX, false));
-    }
+        let mut ledger = VectorBudgetLedgerV1::new(ResourceVector::new(u64::MAX, 2));
+        let (first_id, _) = ledger
+            .reserve(1, ResourceVector::new(u64::MAX - 1, 1))
+            .unwrap();
+        assert_eq!(
+            ledger.settle(first_id, ObservedResourceCost::known(u64::MAX - 1, 1)),
+            Ok(BudgetStatus::WithinBudget)
+        );
 
+        let (second_id, available) = ledger
+            .reserve(2, ResourceVector::new(1, 1))
+            .unwrap();
+        assert_eq!(available, ResourceVector::new(1, 1));
+        let status = ledger
+            .settle(second_id, ObservedResourceCost::known(2, 1))
+            .unwrap();
+        assert_eq!(status, BudgetStatus::RunBudgetExceeded);
+        assert_eq!(ledger.charged().latency_us, u64::MAX);
+        assert_eq!(ledger.available(), None);
+    }
     #[test]
     fn unsafe_cheap_path_abstains_when_estimate_is_missing() {
         let mut policy = allocator(100, 100);
