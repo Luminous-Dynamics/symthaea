@@ -454,6 +454,17 @@ mod tests {
     }
 
     #[test]
+    fn canonical_input_digest_ignores_pair_order() {
+        let first = fixture(true);
+        let mut second = first.clone();
+        second.pairs.reverse();
+        let a = compare(first).expect("first comparison");
+        let b = compare(second).expect("reordered comparison");
+        assert_eq!(a.canonical_input_sha256, b.canonical_input_sha256);
+        assert_eq!(a.result_sha256, b.result_sha256);
+    }
+
+    #[test]
     fn bootstrap_is_deterministic_for_pinned_seed() {
         let a = compare(fixture(true)).expect("first comparison");
         let b = compare(fixture(true)).expect("second comparison");
