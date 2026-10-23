@@ -1,0 +1,51 @@
+diff --git a/crates/core/symthaea-core/examples/real_discovery_report.rs b/crates/core/symthaea-core/examples/real_discovery_report.rs
+--- a/crates/core/symthaea-core/examples/real_discovery_report.rs
++++ b/crates/core/symthaea-core/examples/real_discovery_report.rs
+@@ -42,10 +42,18 @@
+ struct StatusCounts {
+     proposed: usize,
+     numeric: usize,
++    bounded: usize,
++    smt_samples: usize,
+     symbolic: usize,
+     formal: usize,
+     refuted: usize,
+ }
+ 
++impl StatusCounts {
++    fn verified(&self) -> usize {
++        self.numeric + self.bounded + self.smt_samples + self.symbolic + self.formal
++    }
++}
++
+ #[derive(Debug)]
+ struct SuspiciousFormula {
+@@ -172,6 +180,8 @@
+         match conjecture.status {
+             ConjectureStatus::Proposed => counts.proposed += 1,
+             ConjectureStatus::NumericallyTested { .. } => counts.numeric += 1,
++            ConjectureStatus::BoundedChecked { .. } => counts.bounded += 1,
++            ConjectureStatus::SmtSamplesChecked { .. } => counts.smt_samples += 1,
+             ConjectureStatus::SymbolicallyChecked => counts.symbolic += 1,
+             ConjectureStatus::FormallyVerified { .. } => counts.formal += 1,
+             ConjectureStatus::Refuted { .. } => counts.refuted += 1,
+@@ -419,3 +429,3 @@
+     for report in reports {
+-        let verified = report.status.numeric + report.status.symbolic + report.status.formal;
++        let verified = report.status.verified();
+         println!(
+@@ -447,3 +457,3 @@
+     for report in reports {
+-        let verified = report.status.numeric + report.status.symbolic + report.status.formal;
++        let verified = report.status.verified();
+         let suspicious_rate = if report.conjectures == 0 {
+@@ -510,6 +520,8 @@
+         println!(
+-            "status: proposed={}, numeric={}, symbolic={}, formal={}, refuted={}",
++            "status: proposed={}, numeric={}, bounded={}, smt_samples={}, symbolic={}, formal={}, refuted={}",
+             report.status.proposed,
+             report.status.numeric,
++            report.status.bounded,
++            report.status.smt_samples,
+             report.status.symbolic,
+             report.status.formal,
