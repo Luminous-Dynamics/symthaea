@@ -1062,4 +1062,104 @@ mod tests {
         assert_eq!(percentile(&[0.0, 0.5, 1.0], 0.5), Some(0.5));
         assert_eq!(percentile(&[], 0.5), None);
     }
+
+    fn checked_in_synthetic_inputs() -> (Value, Value) {
+        let suite: Value = serde_json::from_str(include_str!(
+            "../../../../../data/benchmarks/proof-insight-transfer-v0/fixtures/proof-state-intervention-suite.synthetic.json"
+        ))
+        .expect("checked-in proof-state suite fixture must parse");
+        let outcomes: Value = serde_json::from_str(include_str!(
+            "../../../../../data/benchmarks/proof-insight-transfer-v0/fixtures/proof-state-intervention-outcomes.synthetic.json"
+        ))
+        .expect("checked-in proof-state outcomes fixture must parse");
+        (suite, outcomes)
+    }
+
+    #[test]
+    fn checked_in_synthetic_fixture_is_joined_but_never_scored() {
+        let (suite, outcomes) = checked_in_synthetic_inputs();
+        let report = analyze(
+            &suite,
+            &outcomes,
+            "test",
+            &"a".repeat(64),
+            &"b".repeat(64),
+            1000,
+            17,
+        )
+        .expect("checked-in synthetic outcome joins must validate");
+
+        assert_eq!(report["dataset_kind"], "synthetic_fixture");
+        assert_eq!(report["counts"]["cases_in_split"], 4);
+        assert_eq!(report["counts"]["rows_in_split"], 8);
+        assert_eq!(report["counts"]["executed_rows_in_split"], 0);
+        assert_eq!(report["counts"]["not_run_rows_in_split"], 8);
+        assert_eq!(report["counts"]["expected_eligible_rows"], 7);
+        assert_eq!(report["counts"]["expected_not_applicable_rows"], 1);
+        assert!(report["metrics"].as_object().expect("metrics object").is_empty());
+        assert_eq!(report["confirmatory_decision"], "not_evaluated_synthetic_fixture");
+    }
+
+    #[test]
+    fn missing_state_side_fails_closed() {
+        let (suite, mut outcomes) = checked_in_synthetic_inputs();
+        outcomes["outcomes"]
+            .as_array_mut()
+            .expect("outcome array")
+            .pop();
+
+        let error = analyze(
+            &suite,
+            &outcomes,
+            "test",
+            &"a".repeat(64),
+            &"b".repeat(64),
+            1000,
+            17,
+        )
+        .expect_err("missing paired state side must be rejected");
+        assert!(error.to_string().contains("outcome coverage mismatch"));
+    }
+
+    #[test]
+    fn removed_required_hypothesis_variant_cannot_be_labeled_eligible() {
+        let (suite, mut outcomes) = checked_in_synthetic_inputs();
+        let rows = outcomes["outcomes"].as_array_mut().expect("outcome array");
+        let variant = rows
+            .iter_mut()
+            .find(|row| row["outcome_id"] == "state-outcome-0-variant")
+            .expect("required-hypothesis-cleared variant exists");
+        variant["expected_applicability"] = Value::String("eligible".into());
+        variant["expected_action_policy"] = Value::String("preserve_eligibility".into());
+
+        let error = analyze(
+            &suite,
+            &outcomes,
+            "test",
+            &"a".repeat(64),
+            &"b".repeat(64),
+            1000,
+            17,
+        )
+        .expect_err("removed-premise variant must not inherit the base applicability label");
+        assert!(error.to_string().contains("expected_applicability"));
+    }
+
+    #[test]
+    fn synthetic_fixture_cannot_claim_a_model_execution() {
+        let (suite, mut outcomes) = checked_in_synthetic_inputs();
+        outcomes["outcomes"][0]["execution"]["status"] = Value::String("executed".into());
+
+        let error = analyze(
+            &suite,
+            &outcomes,
+            "test",
+            &"a".repeat(64),
+            &"b".repeat(64),
+            1000,
+            17,
+        )
+        .expect_err("synthetic fixture must never claim an executed model result");
+        assert!(error.to_string().contains("synthetic fixture cannot contain an executed model outcome"));
+    }
 }
