@@ -666,7 +666,10 @@ mod tests {
         assert_eq!(status, BudgetStatus::WithinBudget);
         assert_eq!(policy.budget().charged(), ResourceVector::new(40, 30));
         assert_eq!(policy.budget().reserved(), ResourceVector::default());
-        assert_eq!(policy.budget().available(), Some(ResourceVector::new(60, 70)));
+        assert_eq!(
+            policy.budget().available(),
+            Some(ResourceVector::new(60, 70))
+        );
     }
 
     #[test]
