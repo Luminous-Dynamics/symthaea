@@ -38,7 +38,7 @@ struct PredictionErrorEvidence {
 }
 ```
 
-These are design names, not types introduced by this PR. The implementation should enforce:
+The typed migration layer now exists in `src/cognitive_loop/types/prediction_evidence.rs` as `PredictionErrorEvidence` and `PredictionEvidenceStatus`. The value and status are private; valid construction rejects non-finite values, invalid statuses carry no numeric value, and deserialization rejects inconsistent records. `CycleResult::prediction_evidence_at` and `PsiAttestationRecord::prediction_evidence` adapt legacy float-plus-flag fields at API boundaries. Prediction-cycle provenance remains optional during migration, and this layer does not yet force every PE consumer to accept the new type. Remaining enforcement goals are:
 
 - Only `Valid` may expose a PE value to learning, confidence, surprise, safety assessment, replay, or thermodynamic PE consumers.
 - Missing PE never means zero error, maximum error, or “repeat the last value as a fresh sample.”
@@ -71,6 +71,8 @@ Each scenario should be replayed against the same initial state and deterministi
 
 Where a subsystem is independent of PE, the expected result is not “no change to the entire system.” The invariant applies only to the PE-derived component; coherence, energy, explicit reward, sensory variance, and other valid signals remain eligible to change state.
 
+The typed-value contract has additional unit fixtures: a value is available only for its recorded observation cycle; non-finite values cannot be constructed as valid evidence; invalid statuses cannot expose a value; and deserialization rejects a missing valid value or a numeric value attached to an invalid status. These fixtures are not evidence of a passing build until executed at the exact commit under test.
+
 ## 4. Metrics
 
 Report raw counts as well as rates. Do not collapse all dimensions into one score.
@@ -85,6 +87,10 @@ Report raw counts as well as rates. Do not collapse all dimensions into one scor
 - **Resource cost:** cycle latency (p50/p95/p99), CPU time, peak memory, replay-buffer size, and incremental serialized bytes. Report measured baselines and deltas; do not set a performance claim before measurement.
 
 For stream-learning experiments also report per-step task performance, forward/backward transfer, forgetting, calibration (Brier score/ECE on resolved outcomes), number of admitted learning samples, time-to-target quality, and compute cost. Report worst-task and dispersion alongside aggregate scores.
+
+### Typed-contract regression checks
+
+The new typed layer includes unit tests for invalid numeric payloads (`0`, `1`, NaN, and positive/negative infinity), non-finite values incorrectly flagged valid, cycle mismatch, constructor invariants, valid serialization round-trip, and malformed serialized records. Keep these separate from the 12 core PEV scenarios so a passing type-contract test cannot be mistaken for coverage of all downstream consumers.
 
 ## 5. Experimental protocol
 
