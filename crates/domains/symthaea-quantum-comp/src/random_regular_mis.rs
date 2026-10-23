@@ -381,6 +381,53 @@ mod tests {
     }
 
     #[test]
+    fn small_degree_three_graph_sample_has_expected_triangle_class_frequency() {
+        // There are exactly 70 labelled simple 3-regular graphs on six vertices:
+        // 10 labelled K3,3 graphs (no triangles) and 60 labelled triangular prisms
+        // (with triangles). Uniform configuration-model pairing conditioned on
+        // simplicity therefore gives P(K3,3)=1/7. This is a coarse deterministic
+        // regression check for gross sampling bias, not a distribution proof.
+        fn has_triangle(graph: &RandomRegularMisGraph) -> bool {
+            let mut adjacent = vec![vec![false; graph.vertex_count()]; graph.vertex_count()];
+            for &(u, v) in graph.edges() {
+                adjacent[u][v] = true;
+                adjacent[v][u] = true;
+            }
+            for u in 0..graph.vertex_count() {
+                for v in (u + 1)..graph.vertex_count() {
+                    if !adjacent[u][v] {
+                        continue;
+                    }
+                    for w in (v + 1)..graph.vertex_count() {
+                        if adjacent[u][w] && adjacent[v][w] {
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        }
+
+        const SAMPLES: usize = 5_000;
+        let mut k33_count = 0usize;
+        for seed in 1..=(SAMPLES as u64) {
+            let graph = generate_random_regular_mis_graph(6, 3, seed, 20_000)
+                .expect("small simple regular graph should be generated");
+            graph.validate().expect("sampled graph remains simple and regular");
+            if !has_triangle(&graph) {
+                k33_count += 1;
+            }
+        }
+
+        let observed = k33_count as f64 / SAMPLES as f64;
+        let expected = 1.0 / 7.0;
+        assert!(
+            (observed - expected).abs() < 0.04,
+            "K3,3 sample fraction {observed:.4} too far from reference {expected:.4}"
+        );
+    }
+
+    #[test]
     fn exhausted_attempt_budget_fails_closed_without_changing_seed() {
         // For this generator version, the first pairing for n=6,d=3,seed=1
         // contains a self-loop. With one allowed attempt the function must fail
