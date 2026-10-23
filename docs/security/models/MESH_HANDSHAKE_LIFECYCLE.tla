@@ -188,6 +188,11 @@ Abort ==
                   transcriptBound,
                   sessionEstablished >>
 
+\* Completed/failed sessions are valid terminal protocol states, not deadlocks.
+Terminal ==
+  /\ phase \in {"Established", "Closed"}
+  /\ UNCHANGED vars
+
 Next ==
   \/ Start
   \/ \E profile \in Profiles : SelectProfile(profile)
@@ -196,6 +201,7 @@ Next ==
   \/ ConfirmResponder
   \/ Establish
   \/ Abort
+  \/ Terminal
 
 Spec == Init /\ [][Next]_vars
 
