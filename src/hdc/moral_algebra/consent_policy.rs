@@ -193,10 +193,12 @@ pub fn execute_after_consent_check<T>(
     evidence: Option<&ConsentEvidence<'_>>,
     now_unix_s: u64,
     action: impl FnOnce() -> T,
-) -> Result<T, ConsentBlockReason> {
+) -> Result<(T, ConsentGateOutcome), ConsentBlockReason> {
     match evaluate_consent_gate(requirement, request, evidence, now_unix_s) {
         ConsentGateOutcome::Blocked(reason) => Err(reason),
-        ConsentGateOutcome::Satisfied | ConsentGateOutcome::NotRequired => Ok(action()),
+        outcome @ (ConsentGateOutcome::Satisfied | ConsentGateOutcome::NotRequired) => {
+            Ok((action(), outcome))
+        }
     }
 }
 
@@ -364,20 +366,53 @@ mod tests {
     }
     #[test]
     fn blocked_point_of_use_gate_never_invokes_protected_action() {
-        let mut invoked = false;
-        let result = execute_after_consent_check(
+        let invocations = std::cell::Cell::new(0);
+        for state in [
+            ConsentState::Unknown,
+            ConsentState::Implied,
+            ConsentState::Absent,
+            ConsentState::Denied,
+        ] {
+            let result = execute_after_consent_check(
+                ConsentRequirement::Required,
+                request(),
+                Some(&evidence(state)),
+                NOW,
+                || invocations.set(invocations.get() + 1),
+            );
+            assert!(result.is_err(), "state {state:?} must block");
+            assert_eq!(invocations.get(), 0, "state {state:?} ran a blocked action");
+        }
+
+        let missing = execute_after_consent_check(
             ConsentRequirement::Required,
             request(),
-            Some(&evidence(ConsentState::Unknown)),
+            None,
             NOW,
-            || {
-                invoked = true;
-                7
-            },
+            || invocations.set(invocations.get() + 1),
         );
+        assert_eq!(missing, Err(ConsentBlockReason::MissingEvidence));
 
-        assert_eq!(result, Err(ConsentBlockReason::UnknownState));
-        assert!(!invoked, "a blocked consent gate must not run the action closure");
+        let unresolved = execute_after_consent_check(
+            ConsentRequirement::Unresolved,
+            request(),
+            None,
+            NOW,
+            || invocations.set(invocations.get() + 1),
+        );
+        assert_eq!(unresolved, Err(ConsentBlockReason::RequirementUnresolved));
+
+        let mut revoked = evidence(ConsentState::Given);
+        revoked.revoked = true;
+        let revoked_result = execute_after_consent_check(
+            ConsentRequirement::Required,
+            request(),
+            Some(&revoked),
+            NOW,
+            || invocations.set(invocations.get() + 1),
+        );
+        assert_eq!(revoked_result, Err(ConsentBlockReason::Revoked));
+        assert_eq!(invocations.get(), 0, "a blocked gate must never run the action closure");
     }
 
     #[test]
@@ -394,7 +429,25 @@ mod tests {
             },
         );
 
-        assert_eq!(result, Ok("executed"));
+        assert_eq!(result, Ok(("executed", ConsentGateOutcome::Satisfied)));
+        assert_eq!(invocations.get(), 1);
+    }
+
+    #[test]
+    fn not_required_consent_path_preserves_outcome_and_invokes_once() {
+        let invocations = std::cell::Cell::new(0);
+        let result = execute_after_consent_check(
+            ConsentRequirement::NotRequired,
+            request(),
+            None,
+            NOW,
+            || {
+                invocations.set(invocations.get() + 1);
+                11
+            },
+        );
+
+        assert_eq!(result, Ok((11, ConsentGateOutcome::NotRequired)));
         assert_eq!(invocations.get(), 1);
     }
 
