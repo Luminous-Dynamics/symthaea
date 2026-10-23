@@ -647,6 +647,32 @@ mod tests {
     }
 
     #[test]
+    fn known_group_risk_failure_is_not_hidden_by_another_insufficient_group() {
+        let mut observations = clean_escalations(1000, 0, "common");
+        observations.extend((1000..1010).map(|index| {
+            row(index, "rarebad", true, Some(index == 1000))
+        }));
+        observations.push(row(1010, "no-escalations", false, None));
+        let cert = certify_harm_rate_v1(
+            &config(&["common", "rarebad", "no-escalations"]),
+            &observations,
+        )
+        .unwrap();
+        assert_eq!(
+            cert.groups[1].status,
+            RiskCertificateStatusV1::NotCertifiedRiskBound
+        );
+        assert_eq!(
+            cert.groups[2].status,
+            RiskCertificateStatusV1::InsufficientEvidence
+        );
+        assert_eq!(
+            cert.status,
+            RiskCertificateStatusV1::NotCertifiedRiskBound
+        );
+    }
+
+    #[test]
     fn group_with_no_escalation_is_insufficient_evidence() {
         let mut observations = clean_escalations(100, 0, "common");
         observations.push(row(100, "rare", false, None));
