@@ -78,7 +78,7 @@ The distinguishing slice here is retrieval-oriented fixed-sequence certification
 
 ## Cross-domain selective-risk contract fixture
 
-[\`fixtures/SELECTIVE_RISK_CROSS_DOMAIN_V1.json\`](fixtures/SELECTIVE_RISK_CROSS_DOMAIN_V1.json) pins expected outputs for zero coverage, exact score ties, a measured failure, an unknown accepted label, coverage denominators, and best-/worst-case empirical risk. It is intended to be run against both this retrieval evaluator and the adjacent [CRISPR selective-risk kernel in PR #7502](https://github.com/Luminous-Dynamics/symthaea/pull/7502) before either implementation is factored into shared code.
+[`fixtures/SELECTIVE_RISK_CROSS_DOMAIN_V1.json`](fixtures/SELECTIVE_RISK_CROSS_DOMAIN_V1.json) pins expected outputs for zero coverage, exact score ties, a measured failure, an unknown accepted label, coverage denominators, and best-/worst-case empirical risk. It is intended to be run against both this retrieval evaluator and the adjacent [CRISPR selective-risk kernel in PR #7502](https://github.com/Luminous-Dynamics/symthaea/pull/7502) before either implementation is factored into shared code.
 
 The fixture normalizes an evaluator-specific event into `failure=true|false|null`. That is only a metric adapter: CRISPR classification error and unsafe memory retrieval are different events, and their policies, calibration meaning, contexts, sampling units, and authority boundaries must remain domain-specific. Both adapters must preserve unknown labels, treat score ties atomically, and report an explicit zero-coverage origin with undefined rates as `null`.
 
