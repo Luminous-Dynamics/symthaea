@@ -5,6 +5,10 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "src/bin/coding_gcs_ablation_verify.rs"
+      - "src/bin/rust_repair_manifest.rs"
+      - "Cargo.toml"
+      - "docs/research/RUST_REPOSITORY_REPAIR_BENCHMARK_PROTOCOL_2026-10-22.md"
+      - "docs/research/SWE_BENCH_LIVE_RUST_TASK_AUDIT_2026-10-23.md"
       - "examples/coding_gcs_ablation_benchmark.rs"
       - "docs/research/GCS_ABLATION_RECEIPT_AUDITOR_2026-10-22.md"
       - "docs/research/GCS_RUNTIME_ABLATION_BENCHMARK_2026-10-22.md"
@@ -36,7 +40,12 @@ jobs:
       - name: Format changed Rust targets
         run: |
           rustfmt --edition 2024 --check src/bin/coding_gcs_ablation_verify.rs
+          rustfmt --edition 2024 --check src/bin/rust_repair_manifest.rs
           rustfmt --edition 2024 --check examples/coding_gcs_ablation_benchmark.rs
+      - name: Test strict SWE-bench-Live task auditor
+        run: cargo test --locked --bin rust-repair-manifest --features rust-repair-manifest
+      - name: Run strict Clippy on task auditor
+        run: cargo clippy --locked --bin rust-repair-manifest --features rust-repair-manifest -- -D warnings
       - name: Run independent receipt and mutation tests
         run: cargo test --locked --bin coding_gcs_ablation_verify
       - name: Run producer provenance and backend-identity tests

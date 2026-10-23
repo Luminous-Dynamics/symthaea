@@ -54,6 +54,18 @@ Use at least two independent reviewers per task for initial curation and a third
 
 This review burden is deliberate. OpenAI's July 8, 2026 audit of a public SWE-Bench Pro split found 27.4% flagged by its automated pipeline and 34.1% labelled broken in a human annotation campaign, and it withdrew its earlier recommendation to adopt the benchmark. The exact rates apply to the audited split, not every later revision; the method is the lesson: task quality must be measured, not inferred from popularity.
 
+
+### 3.1. Audit the upstream transition labels rather than trusting them
+
+The pinned upstream implementation at [`evaluation/validation.py`](https://github.com/microsoft/SWE-bench-Live/blob/62d02936a0726fbf4597b05bd07b09fb99eddae6/evaluation/validation.py) derives `FAIL_TO_PASS` as `post_pass - pre_pass` and `PASS_TO_PASS` as `pre_pass & post_pass`. That is not a sufficient task-validity contract:
+
+- A test absent from the parsed baseline but passing after the gold patch is included in `post_pass - pre_pass`, despite never being observed to fail before the patch.
+- A test that passed at baseline and fails after the gold patch is omitted from `pre_pass & post_pass`; if that derived list is carried forward, the regression test disappears from the benchmark's pass-to-pass expectations.
+
+The Rust audit tool added alongside this protocol recalculates **explicit fail → pass** transitions only, preserves every baseline-passing test in the expected pass-to-pass set, requires identical test-ID sets, rejects skip/missing statuses, requires all gold-aggregated tests to pass, and checks the three per-task gold-run markers. It records hashes for status and raw logs without putting prompts, gold patches, or test patches into the manifest.
+
+This is an independent *eligibility filter*, not a patch to the upstream evaluator. It can reject a task or fail closed when evidence is missing; it cannot compensate for a compromised runner or prove the raw log truthful. Review the [task-audit design and commands](SWE_BENCH_LIVE_RUST_TASK_AUDIT_2026-10-23.md) before locking the valid ID list.
+
 ## 4. Paired experiment for GCS
 
 **Primary causal contrast:** the same agent and model with GCS advisories enabled versus disabled.
