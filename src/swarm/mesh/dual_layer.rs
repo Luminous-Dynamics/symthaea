@@ -747,6 +747,25 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn packet_envelope_aead_remains_available_with_mtu_safe_fragments() {
+        let sent = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let mesh = DualLayerMesh::new([0x42; 32])
+            .with_lora(Box::new(RecordingTransport {
+                sent: std::sync::Arc::clone(&sent),
+            }))
+            .with_encryption_key([0x5A; 32]);
+
+        assert_eq!(mesh.send(&test_packet(MeshUrgency::Cruise)).unwrap(), MeshRoute::LoRa);
+        let frames = sent.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        assert!(!frames.is_empty(), "valid packet-envelope AEAD traffic should still send");
+        assert!(
+            frames.iter().all(|frame| frame.len() <= LORA_MTU),
+            "every emitted frame must remain within the declared LoRa MTU"
+        );
+    }
+
     #[test]
     fn default_transport_source_api_rejects_unauthenticated_identity() {
         let transport = LoopbackTransport::lora();
