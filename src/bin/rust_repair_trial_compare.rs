@@ -4,7 +4,7 @@
 //! execute tasks, attest provider identities, or turn missing evidence into failures.
 //! Unresolved outcomes stay in the denominator and widen the primary effect bounds.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -93,7 +93,9 @@ struct PairedTask {
 }
 
 fn take_arg(values: &mut BTreeMap<String, String>, key: &str) -> Result<String, String> {
-    values.remove(key).ok_or_else(|| format!("required argument {key} missing"))
+    values
+        .remove(key)
+        .ok_or_else(|| format!("required argument {key} missing"))
 }
 
 fn usage() -> &'static str {
@@ -115,7 +117,10 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         if index + 1 >= args.len() || args[index + 1].starts_with("--") {
             return Err(format!("missing value for {key}"));
         }
-        if values.insert(key.clone(), args[index + 1].clone()).is_some() {
+        if values
+            .insert(key.clone(), args[index + 1].clone())
+            .is_some()
+        {
             return Err(format!("duplicate argument {key}"));
         }
         index += 2;
@@ -123,14 +128,20 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
 
     let cli = Cli {
         preregistration: PathBuf::from(take_arg(&mut values, "--preregistration")?),
-        expected_preregistration_sha256: take_arg(&mut values, "--expected-preregistration-sha256")?,
+        expected_preregistration_sha256: take_arg(
+            &mut values,
+            "--expected-preregistration-sha256",
+        )?,
         control_report: PathBuf::from(take_arg(&mut values, "--control-report")?),
         treatment_report: PathBuf::from(take_arg(&mut values, "--treatment-report")?),
         cost_ledger: PathBuf::from(take_arg(&mut values, "--cost-ledger")?),
         report_out: PathBuf::from(take_arg(&mut values, "--report-out")?),
     };
     if !values.is_empty() {
-        return Err(format!("unknown arguments: {:?}", values.keys().collect::<Vec<_>>()));
+        return Err(format!(
+            "unknown arguments: {:?}",
+            values.keys().collect::<Vec<_>>()
+        ));
     }
     if !is_hex(&cli.expected_preregistration_sha256, 64) {
         return Err("--expected-preregistration-sha256 must be 64 hex characters".into());
@@ -199,12 +210,20 @@ fn parse_task_specs(prereg: &Value) -> Result<Vec<TaskSpec>, String> {
         let repo = required_string(row, "repo", &context)?.to_string();
         let stratum = required_string(row, "stratum", &context)?.to_string();
         let evaluation_order = required_string(row, "evaluation_order", &context)?.to_string();
-        if !matches!(evaluation_order.as_str(), "control_first" | "treatment_first") {
+        if !matches!(
+            evaluation_order.as_str(),
+            "control_first" | "treatment_first"
+        ) {
             return Err(format!(
                 "{context}: evaluation_order must be control_first or treatment_first"
             ));
         }
-        specs.push(TaskSpec { instance_id, repo, stratum, evaluation_order });
+        specs.push(TaskSpec {
+            instance_id,
+            repo,
+            stratum,
+            evaluation_order,
+        });
     }
     Ok(specs)
 }
@@ -232,7 +251,9 @@ fn validate_preregistration(prereg: &Value) -> Result<Vec<TaskSpec>, String> {
     }
     for key in ["task_manifest_sha256", "candidate_jsonl_sha256"] {
         if !is_hex(required_string(prereg, key, "preregistration")?, 64) {
-            return Err(format!("preregistration: {key} must be a 64-character SHA-256"));
+            return Err(format!(
+                "preregistration: {key} must be a 64-character SHA-256"
+            ));
         }
     }
     let min_tasks = required_count(prereg, "min_tasks", "preregistration")?;
@@ -251,52 +272,68 @@ fn validate_preregistration(prereg: &Value) -> Result<Vec<TaskSpec>, String> {
         "cost_reduction_target",
         "noninferiority_margin",
     ] {
-        let value = prereg.get(key).and_then(Value::as_f64)
+        let value = prereg
+            .get(key)
+            .and_then(Value::as_f64)
             .ok_or_else(|| format!("preregistration: {key} missing or invalid"))?;
         if !value.is_finite() || value < 0.0 || value > 1.0 {
-            return Err(format!("preregistration: {key} must be finite and in [0, 1]"));
+            return Err(format!(
+                "preregistration: {key} must be finite and in [0, 1]"
+            ));
         }
     }
     parse_task_specs(prereg)
 }
 
-fn outcome_map(report: &Value, label: &str, manifest_sha: &str, candidate_sha: &str)
-    -> Result<BTreeMap<String, Outcome>, String>
-{
+fn outcome_map(
+    report: &Value,
+    label: &str,
+    manifest_sha: &str,
+    candidate_sha: &str,
+) -> Result<BTreeMap<String, Outcome>, String> {
     if report.get("format_version").and_then(Value::as_u64) != Some(1)
         || report.get("protocol_id").and_then(Value::as_str) != Some(SCORE_PROTOCOL_ID)
     {
-        return Err(format!("{label}: unsupported scored-run report format/protocol"));
+        return Err(format!(
+            "{label}: unsupported scored-run report format/protocol"
+        ));
     }
     if required_string(report, "task_manifest_sha256", label)? != manifest_sha {
-        return Err(format!("{label}: task-manifest digest differs from preregistration"));
+        return Err(format!(
+            "{label}: task-manifest digest differs from preregistration"
+        ));
     }
     if required_string(report, "candidate_jsonl_sha256", label)? != candidate_sha {
-        return Err(format!("{label}: candidate split digest differs from preregistration"));
+        return Err(format!(
+            "{label}: candidate split digest differs from preregistration"
+        ));
     }
-    let rows = report.get("tasks").and_then(Value::as_array)
+    let rows = report
+        .get("tasks")
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("{label}: tasks missing or not an array"))?;
     let task_count = required_count(report, "task_count", label)?;
     if task_count != rows.len() {
-        return Err(format!("{label}: task_count does not equal number of task rows"));
+        return Err(format!(
+            "{label}: task_count does not equal number of task rows"
+        ));
     }
     let mut outcomes = BTreeMap::new();
-    let mut counts = BTreeMap::from([
-        ("pass", 0usize),
-        ("fail", 0usize),
-        ("unresolved", 0usize),
-    ]);
+    let mut counts = BTreeMap::from([("pass", 0usize), ("fail", 0usize), ("unresolved", 0usize)]);
     for (index, row) in rows.iter().enumerate() {
         let context = format!("{label} task row {index}");
         let id = required_string(row, "instance_id", &context)?.to_string();
         let outcome = Outcome::parse(
-            row.get("outcome").ok_or_else(|| format!("{context}: outcome missing"))?,
+            row.get("outcome")
+                .ok_or_else(|| format!("{context}: outcome missing"))?,
             &context,
         )?;
         if outcomes.insert(id.clone(), outcome).is_some() {
             return Err(format!("{label}: duplicate task id {id:?}"));
         }
-        *counts.get_mut(outcome.label()).expect("known outcome label") += 1;
+        *counts
+            .get_mut(outcome.label())
+            .expect("known outcome label") += 1;
     }
     for (key, expected) in [
         ("success_count", counts["pass"]),
@@ -304,17 +341,24 @@ fn outcome_map(report: &Value, label: &str, manifest_sha: &str, candidate_sha: &
         ("unresolved_count", counts["unresolved"]),
     ] {
         if required_count(report, key, label)? != expected {
-            return Err(format!("{label}: {key} disagrees with independently re-counted task rows"));
+            return Err(format!(
+                "{label}: {key} disagrees with independently re-counted task rows"
+            ));
         }
     }
-    let pass_at_1 = report.get("pass_at_1").filter(|value| !value.is_null()).and_then(Value::as_f64);
+    let pass_at_1 = report
+        .get("pass_at_1")
+        .filter(|value| !value.is_null())
+        .and_then(Value::as_f64);
     if counts["unresolved"] == 0 {
         let expected = counts["pass"] as f64 / rows.len() as f64;
         if pass_at_1.is_none_or(|observed| (observed - expected).abs() > 1e-12) {
             return Err(format!("{label}: pass_at_1 disagrees with task rows"));
         }
     } else if !report.get("pass_at_1").is_none_or(Value::is_null) {
-        return Err(format!("{label}: pass_at_1 must be null when any task is unresolved"));
+        return Err(format!(
+            "{label}: pass_at_1 must be null when any task is unresolved"
+        ));
     }
     Ok(outcomes)
 }
@@ -329,25 +373,39 @@ fn parse_cost_ledger(
     {
         return Err("cost ledger format or study_id does not match preregistration".into());
     }
-    let rows = ledger.get("tasks").and_then(Value::as_array)
+    let rows = ledger
+        .get("tasks")
+        .and_then(Value::as_array)
         .ok_or_else(|| "cost ledger tasks missing or not an array".to_string())?;
     let mut parsed = BTreeMap::new();
     for (index, row) in rows.iter().enumerate() {
         let context = format!("cost ledger row {index}");
         let instance_id = required_string(row, "instance_id", &context)?.to_string();
-        let control_cost_usd = row.get("control_cost_usd").and_then(Value::as_f64)
+        let control_cost_usd = row
+            .get("control_cost_usd")
+            .and_then(Value::as_f64)
             .ok_or_else(|| format!("{context}: control_cost_usd missing or invalid"))?;
-        let treatment_cost_usd = row.get("treatment_cost_usd").and_then(Value::as_f64)
+        let treatment_cost_usd = row
+            .get("treatment_cost_usd")
+            .and_then(Value::as_f64)
             .ok_or_else(|| format!("{context}: treatment_cost_usd missing or invalid"))?;
-        if !control_cost_usd.is_finite() || control_cost_usd < 0.0
-            || !treatment_cost_usd.is_finite() || treatment_cost_usd < 0.0
+        if !control_cost_usd.is_finite()
+            || control_cost_usd < 0.0
+            || !treatment_cost_usd.is_finite()
+            || treatment_cost_usd < 0.0
         {
-            return Err(format!("{context}: observed cost must be finite and non-negative"));
+            return Err(format!(
+                "{context}: observed cost must be finite and non-negative"
+            ));
         }
-        let control_receipt_sha256 = required_string(row, "control_receipt_sha256", &context)?.to_string();
-        let treatment_receipt_sha256 = required_string(row, "treatment_receipt_sha256", &context)?.to_string();
+        let control_receipt_sha256 =
+            required_string(row, "control_receipt_sha256", &context)?.to_string();
+        let treatment_receipt_sha256 =
+            required_string(row, "treatment_receipt_sha256", &context)?.to_string();
         if !is_hex(&control_receipt_sha256, 64) || !is_hex(&treatment_receipt_sha256, 64) {
-            return Err(format!("{context}: receipt hashes must be 64-character SHA-256 values"));
+            return Err(format!(
+                "{context}: receipt hashes must be 64-character SHA-256 values"
+            ));
         }
         let cost_row = CostRow {
             control_cost_usd,
@@ -407,9 +465,8 @@ fn resolved_effects(tasks: &[PairedTask]) -> (Option<f64>, usize) {
             treatment_passes += usize::from(treatment);
         }
     }
-    let effect = (resolved > 0).then(|| {
-        (treatment_passes as f64 - control_passes as f64) / resolved as f64
-    });
+    let effect =
+        (resolved > 0).then(|| (treatment_passes as f64 - control_passes as f64) / resolved as f64);
     (effect, resolved)
 }
 
@@ -420,7 +477,10 @@ fn repo_cluster_bootstrap(
 ) -> Result<(f64, f64), String> {
     let mut clusters = BTreeMap::<String, Vec<usize>>::new();
     for (index, task) in tasks.iter().enumerate() {
-        clusters.entry(task.spec.repo.clone()).or_default().push(index);
+        clusters
+            .entry(task.spec.repo.clone())
+            .or_default()
+            .push(index);
     }
     let cluster_indices = clusters.values().collect::<Vec<_>>();
     if cluster_indices.is_empty() {
@@ -471,11 +531,25 @@ fn run(cli: Cli) -> Result<(), String> {
     let candidate_sha = required_string(&prereg, "candidate_jsonl_sha256", "preregistration")?;
 
     let (control_bytes, control_report) = read_json(&cli.control_report, "control score report")?;
-    let (treatment_bytes, treatment_report) = read_json(&cli.treatment_report, "treatment score report")?;
+    let (treatment_bytes, treatment_report) =
+        read_json(&cli.treatment_report, "treatment score report")?;
     let (cost_bytes, cost_ledger) = read_json(&cli.cost_ledger, "cost ledger")?;
-    let control_outcomes = outcome_map(&control_report, "control report", manifest_sha, candidate_sha)?;
-    let treatment_outcomes = outcome_map(&treatment_report, "treatment report", manifest_sha, candidate_sha)?;
-    let expected_ids = task_specs.iter().map(|spec| spec.instance_id.clone()).collect::<BTreeSet<_>>();
+    let control_outcomes = outcome_map(
+        &control_report,
+        "control report",
+        manifest_sha,
+        candidate_sha,
+    )?;
+    let treatment_outcomes = outcome_map(
+        &treatment_report,
+        "treatment report",
+        manifest_sha,
+        candidate_sha,
+    )?;
+    let expected_ids = task_specs
+        .iter()
+        .map(|spec| spec.instance_id.clone())
+        .collect::<BTreeSet<_>>();
     if control_outcomes.keys().cloned().collect::<BTreeSet<_>>() != expected_ids {
         return Err("control report task IDs do not exactly equal preregistered task IDs".into());
     }
@@ -495,23 +569,47 @@ fn run(cli: Cli) -> Result<(), String> {
         });
     }
     let n = tasks.len();
-    let repos = tasks.iter().map(|task| task.spec.repo.clone()).collect::<BTreeSet<_>>();
-    let strata = tasks.iter().map(|task| task.spec.stratum.clone()).collect::<BTreeSet<_>>();
-    let control_successes = tasks.iter().filter(|task| task.control == Outcome::Pass).count();
-    let treatment_successes = tasks.iter().filter(|task| task.treatment == Outcome::Pass).count();
-    let control_unresolved = tasks.iter().filter(|task| task.control == Outcome::Unresolved).count();
-    let treatment_unresolved = tasks.iter().filter(|task| task.treatment == Outcome::Unresolved).count();
+    let repos = tasks
+        .iter()
+        .map(|task| task.spec.repo.clone())
+        .collect::<BTreeSet<_>>();
+    let strata = tasks
+        .iter()
+        .map(|task| task.spec.stratum.clone())
+        .collect::<BTreeSet<_>>();
+    let control_successes = tasks
+        .iter()
+        .filter(|task| task.control == Outcome::Pass)
+        .count();
+    let treatment_successes = tasks
+        .iter()
+        .filter(|task| task.treatment == Outcome::Pass)
+        .count();
+    let control_unresolved = tasks
+        .iter()
+        .filter(|task| task.control == Outcome::Unresolved)
+        .count();
+    let treatment_unresolved = tasks
+        .iter()
+        .filter(|task| task.treatment == Outcome::Unresolved)
+        .count();
     let control_unresolved_rate = control_unresolved as f64 / n as f64;
     let treatment_unresolved_rate = treatment_unresolved as f64 / n as f64;
     let unresolved_rate_difference = (treatment_unresolved_rate - control_unresolved_rate).abs();
-    let control_resolved_rate = (n > control_unresolved).then(|| {
-        control_successes as f64 / (n - control_unresolved) as f64
-    });
-    let treatment_resolved_rate = (n > treatment_unresolved).then(|| {
-        treatment_successes as f64 / (n - treatment_unresolved) as f64
-    });
-    let lower_point = tasks.iter().map(|task| conservative_effects(task.control, task.treatment).0).sum::<f64>() / n as f64;
-    let upper_point = tasks.iter().map(|task| conservative_effects(task.control, task.treatment).1).sum::<f64>() / n as f64;
+    let control_resolved_rate = (n > control_unresolved)
+        .then(|| control_successes as f64 / (n - control_unresolved) as f64);
+    let treatment_resolved_rate = (n > treatment_unresolved)
+        .then(|| treatment_successes as f64 / (n - treatment_unresolved) as f64);
+    let lower_point = tasks
+        .iter()
+        .map(|task| conservative_effects(task.control, task.treatment).0)
+        .sum::<f64>()
+        / n as f64;
+    let upper_point = tasks
+        .iter()
+        .map(|task| conservative_effects(task.control, task.treatment).1)
+        .sum::<f64>()
+        / n as f64;
     let (resolved_effect, resolved_pair_count) = resolved_effects(&tasks);
 
     let seed_material = format!(
@@ -521,22 +619,33 @@ fn run(cli: Cli) -> Result<(), String> {
     );
     let seed_digest = sha256_bytes(seed_material.as_bytes());
     let seed = u64::from_le_bytes(
-        hex_to_bytes_prefix(&seed_digest).try_into().map_err(|_| "invalid internal bootstrap seed".to_string())?
+        hex_to_bytes_prefix(&seed_digest)
+            .try_into()
+            .map_err(|_| "invalid internal bootstrap seed".to_string())?,
     );
     let bootstrap_replicates = required_count(&prereg, "bootstrap_replicates", "preregistration")?;
     let (ci_lower, ci_upper) = repo_cluster_bootstrap(&tasks, bootstrap_replicates, seed)?;
 
-    let control_cost_total = tasks.iter().map(|task| task.costs.control_cost_usd).sum::<f64>();
-    let treatment_cost_total = tasks.iter().map(|task| task.costs.treatment_cost_usd).sum::<f64>();
-    let control_cost_per_fix = (control_successes > 0)
-        .then(|| control_cost_total / control_successes as f64);
-    let treatment_cost_per_fix = (treatment_successes > 0)
-        .then(|| treatment_cost_total / treatment_successes as f64);
+    let control_cost_total = tasks
+        .iter()
+        .map(|task| task.costs.control_cost_usd)
+        .sum::<f64>();
+    let treatment_cost_total = tasks
+        .iter()
+        .map(|task| task.costs.treatment_cost_usd)
+        .sum::<f64>();
+    let control_cost_per_fix =
+        (control_successes > 0).then(|| control_cost_total / control_successes as f64);
+    let treatment_cost_per_fix =
+        (treatment_successes > 0).then(|| treatment_cost_total / treatment_successes as f64);
     let max_unresolved = required_fraction(&prereg, "max_unresolved_rate", "preregistration")?;
-    let max_unresolved_diff = required_fraction(&prereg, "max_unresolved_rate_difference", "preregistration")?;
+    let max_unresolved_diff =
+        required_fraction(&prereg, "max_unresolved_rate_difference", "preregistration")?;
     let target_effect = required_fraction(&prereg, "target_absolute_effect", "preregistration")?;
-    let cost_reduction_target = required_fraction(&prereg, "cost_reduction_target", "preregistration")?;
-    let noninferiority_margin = required_fraction(&prereg, "noninferiority_margin", "preregistration")?;
+    let cost_reduction_target =
+        required_fraction(&prereg, "cost_reduction_target", "preregistration")?;
+    let noninferiority_margin =
+        required_fraction(&prereg, "noninferiority_margin", "preregistration")?;
     let min_tasks = required_count(&prereg, "min_tasks", "preregistration")?;
     let min_repos = required_count(&prereg, "min_repositories", "preregistration")?;
     let quality_gates_pass = n >= min_tasks
@@ -557,20 +666,25 @@ fn run(cli: Cli) -> Result<(), String> {
         _ => false,
     };
 
-    let output_tasks = tasks.iter().map(|task| json!({
-        "instance_id": task.spec.instance_id,
-        "repo": task.spec.repo,
-        "stratum": task.spec.stratum,
-        "evaluation_order": task.spec.evaluation_order,
-        "control_outcome": task.control.label(),
-        "treatment_outcome": task.treatment.label(),
-        "control_cost_usd": task.costs.control_cost_usd,
-        "treatment_cost_usd": task.costs.treatment_cost_usd,
-        "control_receipt_sha256": task.costs.control_receipt_sha256,
-        "treatment_receipt_sha256": task.costs.treatment_receipt_sha256,
-        "conservative_effect_lower": conservative_effects(task.control, task.treatment).0,
-        "conservative_effect_upper": conservative_effects(task.control, task.treatment).1,
-    })).collect::<Vec<_>>();
+    let output_tasks = tasks
+        .iter()
+        .map(|task| {
+            json!({
+                "instance_id": task.spec.instance_id,
+                "repo": task.spec.repo,
+                "stratum": task.spec.stratum,
+                "evaluation_order": task.spec.evaluation_order,
+                "control_outcome": task.control.label(),
+                "treatment_outcome": task.treatment.label(),
+                "control_cost_usd": task.costs.control_cost_usd,
+                "treatment_cost_usd": task.costs.treatment_cost_usd,
+                "control_receipt_sha256": task.costs.control_receipt_sha256,
+                "treatment_receipt_sha256": task.costs.treatment_receipt_sha256,
+                "conservative_effect_lower": conservative_effects(task.control, task.treatment).0,
+                "conservative_effect_upper": conservative_effects(task.control, task.treatment).1,
+            })
+        })
+        .collect::<Vec<_>>();
 
     let output = json!({
         "format_version": REPORT_VERSION,
@@ -633,10 +747,16 @@ fn run(cli: Cli) -> Result<(), String> {
     });
     let serialized = serde_json::to_vec_pretty(&output)
         .map_err(|error| format!("cannot serialize comparison report: {error}"))?;
-    if let Some(parent) = cli.report_out.parent().filter(|path| !path.as_os_str().is_empty()) {
-        fs::create_dir_all(parent).map_err(|error| format!("cannot create report directory: {error}"))?;
+    if let Some(parent) = cli
+        .report_out
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("cannot create report directory: {error}"))?;
     }
-    fs::write(&cli.report_out, serialized).map_err(|error| format!("cannot write report: {error}"))?;
+    fs::write(&cli.report_out, serialized)
+        .map_err(|error| format!("cannot write report: {error}"))?;
     Ok(())
 }
 
@@ -674,10 +794,22 @@ mod tests {
 
     #[test]
     fn unresolved_outcomes_expand_effect_bounds_in_the_conservative_direction() {
-        assert_eq!(conservative_effects(Outcome::Unresolved, Outcome::Pass), (0.0, 1.0));
-        assert_eq!(conservative_effects(Outcome::Pass, Outcome::Unresolved), (-1.0, 0.0));
-        assert_eq!(conservative_effects(Outcome::Fail, Outcome::Pass), (1.0, 1.0));
-        assert_eq!(conservative_effects(Outcome::Pass, Outcome::Fail), (-1.0, -1.0));
+        assert_eq!(
+            conservative_effects(Outcome::Unresolved, Outcome::Pass),
+            (0.0, 1.0)
+        );
+        assert_eq!(
+            conservative_effects(Outcome::Pass, Outcome::Unresolved),
+            (-1.0, 0.0)
+        );
+        assert_eq!(
+            conservative_effects(Outcome::Fail, Outcome::Pass),
+            (1.0, 1.0)
+        );
+        assert_eq!(
+            conservative_effects(Outcome::Pass, Outcome::Fail),
+            (-1.0, -1.0)
+        );
     }
 
     #[test]
@@ -700,17 +832,42 @@ mod tests {
     #[test]
     fn resolved_effect_excludes_unresolved_pairs_but_counts_them_elsewhere() {
         let spec = TaskSpec {
-            instance_id: "a".into(), repo: "owner/repo".into(),
-            stratum: "bug".into(), evaluation_order: "control_first".into(),
+            instance_id: "a".into(),
+            repo: "owner/repo".into(),
+            stratum: "bug".into(),
+            evaluation_order: "control_first".into(),
         };
         let costs = CostRow {
-            control_cost_usd: 1.0, treatment_cost_usd: 1.0,
-            control_receipt_sha256: "a".repeat(64), treatment_receipt_sha256: "b".repeat(64),
+            control_cost_usd: 1.0,
+            treatment_cost_usd: 1.0,
+            control_receipt_sha256: "a".repeat(64),
+            treatment_receipt_sha256: "b".repeat(64),
         };
         let tasks = vec![
-            PairedTask { spec: spec.clone(), control: Outcome::Fail, treatment: Outcome::Pass, costs: costs.clone() },
-            PairedTask { spec: TaskSpec { instance_id: "b".into(), ..spec.clone() }, control: Outcome::Pass, treatment: Outcome::Pass, costs: CostRow { ..costs.clone() } },
-            PairedTask { spec: TaskSpec { instance_id: "c".into(), ..spec }, control: Outcome::Unresolved, treatment: Outcome::Pass, costs: CostRow { ..costs } },
+            PairedTask {
+                spec: spec.clone(),
+                control: Outcome::Fail,
+                treatment: Outcome::Pass,
+                costs: costs.clone(),
+            },
+            PairedTask {
+                spec: TaskSpec {
+                    instance_id: "b".into(),
+                    ..spec.clone()
+                },
+                control: Outcome::Pass,
+                treatment: Outcome::Pass,
+                costs: CostRow { ..costs.clone() },
+            },
+            PairedTask {
+                spec: TaskSpec {
+                    instance_id: "c".into(),
+                    ..spec
+                },
+                control: Outcome::Unresolved,
+                treatment: Outcome::Pass,
+                costs: CostRow { ..costs },
+            },
         ];
         let (effect, resolved) = resolved_effects(&tasks);
         assert_eq!(resolved, 2);
@@ -783,9 +940,16 @@ mod tests {
                  "control_receipt_sha256":"a".repeat(64),"treatment_receipt_sha256":"b".repeat(64)}
             ]
         });
-        assert!(parse_cost_ledger(&ledger,"s",&BTreeSet::from(["x".to_string(),"y".to_string()])).is_err());
-        assert!(parse_cost_ledger(&ledger,"wrong",&BTreeSet::from(["x".to_string()])).is_err());
-        assert!(parse_cost_ledger(&ledger,"s",&BTreeSet::from(["x".to_string()])).is_ok());
+        assert!(
+            parse_cost_ledger(
+                &ledger,
+                "s",
+                &BTreeSet::from(["x".to_string(), "y".to_string()])
+            )
+            .is_err()
+        );
+        assert!(parse_cost_ledger(&ledger, "wrong", &BTreeSet::from(["x".to_string()])).is_err());
+        assert!(parse_cost_ledger(&ledger, "s", &BTreeSet::from(["x".to_string()])).is_ok());
     }
 
     #[test]
@@ -798,16 +962,28 @@ mod tests {
             ("d", "org/two", Outcome::Fail, Outcome::Pass),
         ] {
             let spec = TaskSpec {
-                instance_id: id.into(), repo: repo.into(), stratum: "bugfix".into(),
+                instance_id: id.into(),
+                repo: repo.into(),
+                stratum: "bugfix".into(),
                 evaluation_order: "control_first".into(),
             };
             let costs = CostRow {
-                control_cost_usd: 1.0, treatment_cost_usd: 1.0,
-                control_receipt_sha256: "a".repeat(64), treatment_receipt_sha256: "b".repeat(64),
+                control_cost_usd: 1.0,
+                treatment_cost_usd: 1.0,
+                control_receipt_sha256: "a".repeat(64),
+                treatment_receipt_sha256: "b".repeat(64),
             };
-            tasks.push(PairedTask { spec, control, treatment, costs });
+            tasks.push(PairedTask {
+                spec,
+                control,
+                treatment,
+                costs,
+            });
         }
-        assert_eq!(repo_cluster_bootstrap(&tasks, 1000, 42).unwrap(), repo_cluster_bootstrap(&tasks, 1000, 42).unwrap());
+        assert_eq!(
+            repo_cluster_bootstrap(&tasks, 1000, 42).unwrap(),
+            repo_cluster_bootstrap(&tasks, 1000, 42).unwrap()
+        );
     }
 
     #[test]
