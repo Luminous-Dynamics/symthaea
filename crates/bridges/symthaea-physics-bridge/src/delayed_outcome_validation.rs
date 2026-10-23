@@ -81,6 +81,12 @@ pub enum DelayedOutcomeError {
     FutureLabelArrival,
     HistoricalLabelArrival,
     NonFiniteOutcome,
+    InvalidOutcomeWindowBounds,
+    OutcomeWindowNotObserved,
+    MismatchedComparisonWindows,
+    InsufficientComparisonCoverage,
+    UnresolvedTreatedAssessment,
+    NumericalOverflow,
 }
 
 /// A single outcome window. The denominator is the configured window length,
@@ -200,6 +206,34 @@ impl DelayedOutcomeMonitor {
             return Err(DelayedOutcomeError::DuplicateAlarm);
         }
         Ok(())
+    }
+
+    /// Summarize a fully observed time window without requiring an alarm.
+    ///
+    /// This is intended for contemporaneous reference/control cohorts. The
+    /// returned label coverage and mean use only labels received at the current
+    /// event-time cursor; unavailable outcomes remain missing.
+    pub fn summarize_observed_window(
+        &self,
+        start_inclusive: u64,
+        end_exclusive: u64,
+    ) -> Result<OutcomeWindowSummary, DelayedOutcomeError> {
+        if start_inclusive >= end_exclusive {
+            return Err(DelayedOutcomeError::InvalidOutcomeWindowBounds);
+        }
+        let first = self
+            .first_index
+            .ok_or(DelayedOutcomeError::OutcomeWindowNotObserved)?;
+        let latest = self
+            .last_index
+            .ok_or(DelayedOutcomeError::OutcomeWindowNotObserved)?;
+        let last_required = end_exclusive - 1;
+        if first > start_inclusive || latest < last_required {
+            return Err(DelayedOutcomeError::OutcomeWindowNotObserved);
+        }
+        let expected = usize::try_from(end_exclusive - start_inclusive)
+            .map_err(|_| DelayedOutcomeError::InvalidWindowSize)?;
+        Ok(self.summarize_window(start_inclusive, end_exclusive, expected))
     }
 
     /// Attach an outcome to the original observation when its label arrives.
@@ -388,6 +422,145 @@ impl DelayedOutcomeMonitor {
             mean_outcome,
         }
     }
+}
+
+/// Control-adjusted comparison of a treated pre/post change against a
+/// contemporaneous reference cohort.
+///
+/// This is a difference-in-differences-style temporal contrast, not a causal
+/// effect by itself. Causal interpretation requires a defensible control cohort,
+/// parallel-trends assumptions, no relevant spillover, and attention to
+/// differential label missingness.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ControlledOutcomeAssessment {
+    pub alarm_index: u64,
+    /// Worse-oriented pre/post change in the treated cohort.
+    pub treated_worse_change: f64,
+    /// Worse-oriented pre/post change in the reference cohort.
+    pub control_worse_change: f64,
+    /// Treated change minus control change; positive means additional deterioration.
+    pub adjusted_worse_change: f64,
+    pub association: OutcomeAssociation,
+}
+
+/// Compare a resolved treated assessment with control summaries over the exact
+/// same pre/post windows. The configured label gates are applied to all four
+/// windows before any numerical contrast is emitted.
+pub fn compare_controlled_outcome_change(
+    treated: &DelayedOutcomeAssessment,
+    control_baseline: &OutcomeWindowSummary,
+    control_post: &OutcomeWindowSummary,
+    config: DelayedOutcomeConfig,
+) -> Result<ControlledOutcomeAssessment, DelayedOutcomeError> {
+    config.validate()?;
+    if !matches!(
+        treated.association,
+        OutcomeAssociation::Deteriorated
+            | OutcomeAssociation::NoMaterialChange
+            | OutcomeAssociation::Improved
+    ) {
+        return Err(DelayedOutcomeError::UnresolvedTreatedAssessment);
+    }
+
+    let treated_baseline = &treated.baseline;
+    let treated_post = &treated.post_alarm;
+    let expected = usize::try_from(config.window_size)
+        .map_err(|_| DelayedOutcomeError::InvalidWindowSize)?;
+    let baseline_bounds_valid = treated_baseline.start_inclusive < treated_baseline.end_exclusive
+        && treated_baseline.end_exclusive == treated.alarm_index
+        && treated_baseline.end_exclusive - treated_baseline.start_inclusive == config.window_size;
+    let post_bounds_valid = treated_post.start_inclusive == treated.alarm_index
+        && treated_post.start_inclusive < treated_post.end_exclusive
+        && treated_post.end_exclusive - treated_post.start_inclusive == config.window_size;
+    let control_bounds_match = control_baseline.start_inclusive == treated_baseline.start_inclusive
+        && control_baseline.end_exclusive == treated_baseline.end_exclusive
+        && control_post.start_inclusive == treated_post.start_inclusive
+        && control_post.end_exclusive == treated_post.end_exclusive;
+
+    if !baseline_bounds_valid || !post_bounds_valid || !control_bounds_match {
+        return Err(DelayedOutcomeError::MismatchedComparisonWindows);
+    }
+
+    for summary in [
+        treated_baseline,
+        treated_post,
+        control_baseline,
+        control_post,
+    ] {
+        if summary.expected_observations != expected
+            || summary.labeled_observations > summary.expected_observations
+        {
+            return Err(DelayedOutcomeError::MismatchedComparisonWindows);
+        }
+        if !summary.label_coverage_fraction.is_finite()
+            || summary.label_coverage_fraction < 0.0
+            || summary.label_coverage_fraction > 1.0
+        {
+            return Err(DelayedOutcomeError::InsufficientComparisonCoverage);
+        }
+        let actual_coverage =
+            summary.labeled_observations as f64 / summary.expected_observations as f64;
+        if summary.label_coverage_fraction != actual_coverage
+            || summary.labeled_observations < config.min_labeled_per_window
+            || summary.label_coverage_fraction < config.min_labeled_fraction
+        {
+            return Err(DelayedOutcomeError::InsufficientComparisonCoverage);
+        }
+    }
+
+    let Some(treated_pre_mean) = treated_baseline.mean_outcome else {
+        return Err(DelayedOutcomeError::NumericalOverflow);
+    };
+    let Some(treated_post_mean) = treated_post.mean_outcome else {
+        return Err(DelayedOutcomeError::NumericalOverflow);
+    };
+    let Some(control_pre_mean) = control_baseline.mean_outcome else {
+        return Err(DelayedOutcomeError::NumericalOverflow);
+    };
+    let Some(control_post_mean) = control_post.mean_outcome else {
+        return Err(DelayedOutcomeError::NumericalOverflow);
+    };
+    if ![
+        treated_pre_mean,
+        treated_post_mean,
+        control_pre_mean,
+        control_post_mean,
+    ]
+    .iter()
+    .all(|value| value.is_finite())
+    {
+        return Err(DelayedOutcomeError::NumericalOverflow);
+    }
+
+    let orient_change = |pre: f64, post: f64| match config.direction {
+        OutcomeDirection::HigherIsWorse => post - pre,
+        OutcomeDirection::LowerIsWorse => pre - post,
+    };
+    let treated_worse_change = orient_change(treated_pre_mean, treated_post_mean);
+    let control_worse_change = orient_change(control_pre_mean, control_post_mean);
+    let adjusted_worse_change = treated_worse_change - control_worse_change;
+    if !treated_worse_change.is_finite()
+        || !control_worse_change.is_finite()
+        || !adjusted_worse_change.is_finite()
+    {
+        return Err(DelayedOutcomeError::NumericalOverflow);
+    }
+
+    let association = if adjusted_worse_change > config.minimum_effect {
+        OutcomeAssociation::Deteriorated
+    } else if adjusted_worse_change < -config.minimum_effect {
+        OutcomeAssociation::Improved
+    } else {
+        OutcomeAssociation::NoMaterialChange
+    };
+
+    Ok(ControlledOutcomeAssessment {
+        alarm_index: treated.alarm_index,
+        treated_worse_change,
+        control_worse_change,
+        adjusted_worse_change,
+        association,
+    })
 }
 
 #[cfg(test)]
