@@ -13,6 +13,9 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+type CandidateRows = BTreeMap<String, (Value, String)>;
+type RequiredTestSets = (BTreeSet<String>, BTreeSet<String>, BTreeSet<String>);
+
 const PROTOCOL_ID: &str = "symthaea-rust-repair";
 const REPORT_VERSION: u32 = 1;
 
@@ -313,7 +316,7 @@ fn parse_status_map(value: &Value) -> Result<BTreeMap<String, String>, String> {
 fn candidate_rows(
     path: &Path,
     expected_sha256: &str,
-) -> Result<(BTreeMap<String, (Value, String)>, String), String> {
+) -> Result<(CandidateRows, String), String> {
     let bytes =
         fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
     let digest = sha256_bytes(&bytes);
@@ -597,8 +600,7 @@ fn validate_locked_runtime_logs(
     };
     let expected_test_ids = baseline_expected.keys().cloned().collect::<BTreeSet<_>>();
     let mut parsed_runs = Vec::new();
-    for index in 0..3 {
-        let run = &gold_runs[index];
+    for (index, run) in gold_runs.iter().enumerate().take(3) {
         if run.get("role").and_then(Value::as_str) != Some("gold")
             || run.get("run_index").and_then(Value::as_u64) != Some(index as u64)
         {
@@ -733,7 +735,7 @@ fn validate_task_oracle(
     candidate: &Value,
     candidate_row_sha256: &str,
     task_validation_dir: &Path,
-) -> Result<(BTreeSet<String>, BTreeSet<String>, BTreeSet<String>), Vec<String>> {
+) -> Result<RequiredTestSets, Vec<String>> {
     let id = required_string(task, "instance_id").map_err(|error| vec![error])?;
     let mut errors = Vec::new();
     if task.get("candidate_row_sha256").and_then(Value::as_str) != Some(candidate_row_sha256) {
