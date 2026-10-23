@@ -1351,7 +1351,10 @@ mod tests {
                 "synthetic-pv-battery-grid"
             ]
         );
-        let component_counts: Vec<_> = first.iter().map(|candidate| candidate.components.len()).collect();
+        let component_counts: Vec<_> = first
+            .iter()
+            .map(|candidate| candidate.components.len())
+            .collect();
         assert_eq!(component_counts, vec![2, 3, 4]);
 
         for candidate in &first {
@@ -1386,7 +1389,12 @@ mod tests {
         candidates[0].services.clear();
         let error = validate_candidate(&candidates[0]).unwrap_err();
         assert!(error.violations.iter().any(|violation| violation.contains("no components")));
-        assert!(error.violations.iter().any(|violation| violation.contains("no declared services")));
+        assert!(
+            error
+                .violations
+                .iter()
+                .any(|violation| violation.contains("no declared services"))
+        );
     }
 
     #[test]
@@ -1435,14 +1443,21 @@ mod tests {
         let candidates = reference_service_hub_candidates();
         assert!(candidates.iter().any(|candidate| candidate.candidate_id == "synthetic-grid-only"));
         assert!(candidates.iter().any(|candidate| candidate.candidate_id == "synthetic-pv-grid"));
-        assert!(candidates.iter().any(|candidate| candidate.candidate_id == "synthetic-pv-battery-grid"));
+        assert!(
+            candidates
+                .iter()
+                .any(|candidate| candidate.candidate_id == "synthetic-pv-battery-grid")
+        );
     }
  
     #[test]
     fn bounded_parametric_design_space_is_deterministic_and_fully_validated() {
         let first = bounded_parametric_design_space();
         let second = bounded_parametric_design_space();
-        assert_eq!(first, second, "sweep ordering and candidate serialization inputs must be stable");
+        assert_eq!(
+            first, second,
+            "sweep ordering and candidate serialization inputs must be stable"
+        );
         assert_eq!(first.search_schema_version, "energy-architecture-search-v0.1");
         assert_eq!(first.requested_candidate_count, 36);
         assert_eq!(first.candidates.len() + first.rejected_candidates.len(), 36);
@@ -1456,7 +1471,8 @@ mod tests {
             .collect();
         assert_eq!(ids.len(), 36, "candidate IDs must be unique");
         for candidate in &first.candidates {
-            validate_candidate(candidate).expect("every emitted search candidate must pass validation");
+            validate_candidate(candidate)
+                .expect("every emitted search candidate must pass validation");
         }
     }
 
