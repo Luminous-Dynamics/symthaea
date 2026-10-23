@@ -35,7 +35,7 @@ Deterministic unit tests cover:
 - selecting two informative channels while rejecting an unresponsive third channel;
 - orienting one channel whose score decreases under perturbation;
 - comparing mean and max aggregation;
-- malformed and non-finite input rejection;
+- malformed/non-finite input rejection and finite-value overflow rejection;
 - returning a typed QueryDistributionShift assessment after outer conformal calibration;
 - returning an explicit error when no detector meets a predeclared detectability threshold.
 
