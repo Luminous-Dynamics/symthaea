@@ -18,6 +18,11 @@
 pub mod ablation;
 #[cfg(feature = "symthaea-backend")]
 pub mod ae2_empirical_runner;
+// Conformance-only until a real empirical runner owns construction of the
+// typed observations. Keep the surface crate-internal rather than exposing a
+// public self-authorization API merely to avoid pre-wiring dead-code noise.
+#[allow(dead_code)]
+pub(crate) mod functional_authority;
 pub mod indicators;
 pub mod qualification_design;
 pub mod qualification_runtime;
