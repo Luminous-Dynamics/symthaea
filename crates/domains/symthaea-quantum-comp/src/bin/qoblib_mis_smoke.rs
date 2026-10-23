@@ -395,7 +395,7 @@ fn failure_receipt_json(path: &str, failure: &RunFailure, seed_base: u64) -> Str
             "  \"error\": \"{}\",\n",
             "  \"software\": {{\"package_version\": \"{}\", \"target_os\": \"{}\", \"target_arch\": \"{}\", \"rustc_version\": \"{}\"}},\n",
             "  \"determinism\": \"not-attested: failed run; inspect error_kind and source identity\",\n",
-            "  \"randomness\": {{\"seed_base\": {}, \"restarts\": {}, \"policy\": \"XorShift64 seeded tie-breaks\"}},\n",
+            "  \"randomness\": {{\"seed_base\": \"{}\", \"restarts\": {}, \"policy\": \"XorShift64 seeded tie-breaks\"}},\n",
             "  \"resource_limits\": {{\"time_limit_ns\": null, \"memory_limit_bytes\": null, \"max_input_bytes\": {}, \"max_vertices\": {}, \"max_edges\": {}}},\n",
             "  \"timing_ns\": {{\"end_to_end\": {}}},\n",
             "  \"limitations\": [\"FNV-1a is a non-cryptographic integrity checksum\", \"no runtime limit or memory limit was configured\", \"failure receipt records a read or parse failure rather than silently dropping the run\", \"this run does not execute a quantum backend\"]\n",
@@ -410,7 +410,7 @@ fn failure_receipt_json(path: &str, failure: &RunFailure, seed_base: u64) -> Str
         env::consts::OS,
         env::consts::ARCH,
         option_env!("RUSTC_VERSION").unwrap_or("not-recorded-at-build"),
-        seed_base,
+        seed_base.to_string(),
         MULTISTART_GREEDY_RUNS,
         MisDimacsLimits::default().max_input_bytes,
         MisDimacsLimits::default().max_vertices,
@@ -592,7 +592,7 @@ fn run(path: &str, seed_base: u64) -> Result<(), RunFailure> {
             "  \"vertices\": {},\n",
             "  \"edges\": {},\n",
             "  \"greedy\": {{\"policy\": \"minimum-residual-degree-then-lowest-index\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"elapsed_ns\": {}}},\n",
-            "  \"multi_start_greedy\": {{\"policy\": \"minimum-residual-degree-seeded-ties\", \"runs\": {}, \"best_seed\": {}, \"best_objective\": {}, \"feasible\": {}, \"distinct_solutions\": {}, \"objectives_by_run\": {}, \"vertices_one_based\": {}, \"elapsed_ns\": {}}},\n",
+            "  \"multi_start_greedy\": {{\"policy\": \"minimum-residual-degree-seeded-ties\", \"runs\": {}, \"best_seed\": \"{}\", \"best_objective\": {}, \"feasible\": {}, \"distinct_solutions\": {}, \"objectives_by_run\": {}, \"vertices_one_based\": {}, \"elapsed_ns\": {}}},\n",
             "  \"local_improvement\": {{\"neighborhood\": \"one-selected-for-two-unselected\", \"status\": \"{}\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"exchanges\": {}, \"pair_checks\": {}, \"elapsed_ns\": {}}},\n",
             "  \"exact_oracle\": {{\"status\": \"{}\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"elapsed_ns\": {}}},\n",
             "  \"timing_ns\": {{\"parse\": {}, \"end_to_end\": {}}},\n",
@@ -601,7 +601,7 @@ fn run(path: &str, seed_base: u64) -> Result<(), RunFailure> {
             "  \"resource_limits\": {{\"time_limit_ns\": null, \"memory_limit_bytes\": null, \"max_input_bytes\": {}, \"max_vertices\": {}, \"max_edges\": {}}},\n",
             "  \"normalized_result_fnv1a64\": \"{:016x}\",\n",
             "  \"qoblib_objective_time_series\": {{\"deterministic_greedy\": {}, \"multi_start_greedy_per_trial\": {}, \"local_improvement_stage\": {}}},\n",
-            "  \"randomness\": {{\"seed_base\": {}, \"restarts\": {}, \"policy\": \"XorShift64 seeded tie-breaks\"}},\n",
+            "  \"randomness\": {{\"seed_base\": \"{}\", \"restarts\": {}, \"policy\": \"XorShift64 seeded tie-breaks\"}},\n",
             "  \"limitations\": [\"FNV-1a is a non-cryptographic integrity checksum\", \"wall-clock timings are local diagnostics and are not comparable across machines without a controlled protocol\", \"the bounded exact oracle is a correctness reference, not a competitive solver\", \"this run does not execute a quantum backend\"]\n",
             "}}"
         ),
@@ -649,7 +649,7 @@ fn run(path: &str, seed_base: u64) -> Result<(), RunFailure> {
         local.as_ref()
             .map(|result| qoblib_many_runs_series_json(&[result.objective_time_series.clone()]))
             .unwrap_or_else(|| "null".to_owned()),
-        seed_base,
+        seed_base.to_string(),
         MULTISTART_GREEDY_RUNS
     );
     Ok(())
