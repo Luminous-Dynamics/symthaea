@@ -2,7 +2,7 @@
 
 **Status:** research artifact; not protocol approval  
 **Scope:** abstract session-admission logic related to PR #8412  
-**Model:** \`docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla\`
+**Model:** `docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla`
 
 ## Why this is separate from nonce uniqueness
 
@@ -27,9 +27,13 @@ The strict configuration models the expected policy gate. It is an oracle for de
 
 ## Running the model
 
-The upstream TLA+ tools repository documents Java 11+ command-line use. Pin the TLA+ tool JAR and record its digest before executing:
+The workflow at `.github/workflows/mesh-handshake-model.yml` now downloads an exact upstream JAR and verifies its SHA-256 before parsing or checking the model. It requires strict configurations to preserve their invariants and treats a legacy run as an expected counterexample only when TLC reports the specified invariant violation—not merely when the command fails.
 
-\`\`\`sh
+The current workflow pins upstream `v1.8.0` with SHA-256 `dae639a1f51a9e13ce60c369b15f32124cf1a78017aca366b6de0ae2b5169439`. **This release is marked prerelease at the time of writing.** Its run is suitable for experimental model validation; before relying on it as a production release gate, review the upstream release status and repeat the checks with an approved stable version.
+
+The upstream TLA+ tools repository documents Java 11+ command-line use. For local execution, use a pinned tool artifact and record its digest:
+
+```sh
 java -cp /path/to/tla2tools.jar tla2sany.SANY \\
   docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla
 
@@ -37,9 +41,9 @@ for cfg in docs/security/models/mesh_handshake_*.cfg; do
   java -cp /path/to/tla2tools.jar tlc2.TLC \\
     -config "$cfg" docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla
 done
-\`\`\`
+```
 
-The three \`*_legacy.cfg\` configurations are expected to fail on \`EstablishedSound\` or \`UnavailableBackendNeverEstablishes\`. The strict configurations are expected to preserve the declared invariants in the bounded state graph. These expected outcomes have **not** been run here; run and record the real tool output before claiming model-checking evidence.
+The three `*_legacy.cfg` configurations are expected to fail on `EstablishedSound` or `UnavailableBackendNeverEstablishes`. The strict configurations are expected to preserve the declared invariants in the bounded state graph. These expected outcomes have **not** been run here; run and record the real tool output before claiming model-checking evidence.
 
 ## Implementation mapping required
 
@@ -47,12 +51,12 @@ After the model is parsed and model-checked, map each abstract transition to the
 
 | Abstract transition | Required Rust-level conformance evidence |
 |---|---|
-| \`SelectProfile\` | negotiated profile observed from the actual secure-channel provider, not just a requested setting |
-| \`BindIdentityAndTranscript\` | full canonical peer identity plus protocol/version/suite and transcript hash bound by the chosen protocol |
-| \`ConfirmInitiator\` / \`ConfirmResponder\` | both directions execute the selected protocol's required key-confirmation behavior |
-| \`candidateSecretPresent\` | candidate material cannot be read through application-facing APIs |
-| \`Establish\` | active session only after all requirements for the configured profile pass |
-| \`Abort\` | timeout/error erases candidate state and does not register local trust or allow a downgrade |
+| `SelectProfile` | negotiated profile observed from the actual secure-channel provider, not just a requested setting |
+| `BindIdentityAndTranscript` | full canonical peer identity plus protocol/version/suite and transcript hash bound by the chosen protocol |
+| `ConfirmInitiator` / `ConfirmResponder` | both directions execute the selected protocol's required key-confirmation behavior |
+| `candidateSecretPresent` | candidate material cannot be read through application-facing APIs |
+| `Establish` | active session only after all requirements for the configured profile pass |
+| `Abort` | timeout/error erases candidate state and does not register local trust or allow a downgrade |
 
 This mapping must include all relevant feature combinations and failure cases: missing provider, stub provider, malformed KEM key/ciphertext, low-order X25519 input, wrong peer identity, transcript mutation, downgrade, timeout between confirmations, repeated peer IDs, cancellation, and concurrent handshakes. The state model does not represent secret zeroization guarantees, constant-time execution, side-channel behavior, or correctness of the underlying primitives.
 
