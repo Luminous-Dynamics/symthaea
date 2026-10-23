@@ -459,7 +459,13 @@ fn reseed_typed_candidates_after_alarm(
         // Prefer candidates that improve observed residuals, but keep a generic typed fallback
         // if no structured correction survives the empirical screen. Fresh measurements remain
         // the arbiter of validity.
-        proposals.push((if is_structured { 0 } else { 1 }, score, candidate, values, family));
+        proposals.push((
+            if is_structured { 0 } else { 1 },
+            score,
+            candidate,
+            values,
+            family,
+        ));
     }
 
     proposals.sort_by(|left, right| {
@@ -1516,7 +1522,9 @@ mod tests {
                     break;
                 }
             }
-            let candidate = candidate.expect("typed correction family failed to propose a valid expression");
+            let candidate = candidate.expect(
+                "typed correction family failed to propose a valid expression",
+            );
             assert!(matches!(
                 infer_dimensions(&candidate, &units),
                 InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
@@ -1747,7 +1755,7 @@ mod tests {
                 "misspec_pit_detections={misspec_pit_detections},",
                 "pit_audit_queries={pit_audit_queries},typed_recovery_restarts={total_typed_recovery_restarts},",
                 "structured_recovery_candidates={structured_recovery_candidates},",
-                "terminal_pit_alarms={terminal_pit_alarms},protocol_failures={protocol_failures}" 
+                "terminal_pit_alarms={terminal_pit_alarms},protocol_failures={protocol_failures}"
             )
         );
 
