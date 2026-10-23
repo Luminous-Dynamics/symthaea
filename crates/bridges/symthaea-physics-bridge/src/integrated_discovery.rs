@@ -1835,6 +1835,7 @@ mod tests {
         let mut unresolved_without_recovery = 0usize;
         let mut empty_pool_recovery_attempts = 0usize;
         let mut accepted_recovery_candidates = 0usize;
+        let mut false_singletons_after_recovery = 0usize;
         let mut same_domain_recovered = 0usize;
         let mut ood_recovered = 0usize;
         let mut full_recovery_successes = 0usize;
@@ -1864,6 +1865,12 @@ mod tests {
             empty_pool_recovery_attempts +=
                 if recovered.recovery_triggered_on_empty_pool { 1 } else { 0 };
             accepted_recovery_candidates += recovered.accepted_recovery_candidates;
+            false_singletons_after_recovery +=
+                if recovered.final_live == 1 && !recovered.ground_truth_equivalent {
+                    1
+                } else {
+                    0
+                };
             same_domain_recovered += if recovered.ground_truth_equivalent { 1 } else { 0 };
             ood_recovered += if recovered.ground_truth_extrapolation_equivalent {
                 1
@@ -1880,6 +1887,7 @@ mod tests {
                 "unresolved_without_recovery={unresolved_without_recovery},",
                 "empty_pool_recovery_attempts={empty_pool_recovery_attempts},",
                 "accepted_recovery_candidates={accepted_recovery_candidates},",
+                "false_singletons_after_recovery={false_singletons_after_recovery},",
                 "same_domain_recovered={same_domain_recovered},",
                 "ood_recovered={ood_recovered},full_recovery_successes={full_recovery_successes}"
             )
