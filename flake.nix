@@ -581,6 +581,36 @@ EOF
           "${pkgs.librsvg.dev}/lib/pkgconfig"
         ];
       in {
+        # Minimal HDL qualification shell for the first symthaea-silicon RTL slice.
+        # Uses the existing flake.lock; this is deliberately not a full ASIC
+        # signoff environment. The smoke script records missing tools/failures
+        # explicitly and does not infer synthesis/PPA/FPGA qualification.
+        devShells.hdl = pkgs.mkShell {
+          # Reuse the pinned repository Rust toolchain for the canonical
+          # BinaryHV fixture generator, plus the HDL/smoke-evidence tools.
+          packages = rustBuildInputs ++ (with pkgs; [
+            verilator
+            iverilog
+            yosys
+            jq
+            coreutils
+            git
+            gnumake
+            gcc
+            gawk
+            gnugrep
+          ]);
+
+          shellHook = ''
+            echo ""
+            echo "Symthaea HDL qualification shell"
+            echo "  verilator --version"
+            echo "  yosys -V"
+            echo "  bash crates/domains/symthaea-silicon/eda/run_hdl_smoke.sh"
+            echo ""
+          '';
+        };
+
         devShells.default = pkgs.mkShell {
           buildInputs = rustBuildInputs;
           inherit nativeBuildInputs;
