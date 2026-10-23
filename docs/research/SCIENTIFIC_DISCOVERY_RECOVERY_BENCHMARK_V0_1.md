@@ -99,7 +99,8 @@ Initial acceptance thresholds are **targets, not current results**:
 2. False confident singleton rate falls by at least 20% relatively on the preregistered misspecification mix, with a nonzero baseline and a paired uncertainty interval supporting the effect.
 3. Sensitivity reaches at least 80% on practically important alternatives designated before held-out evaluation, with clean-null alarms controlled at the chosen level.
 4. Median measurement cost to validated recovery or explicit unresolved status improves by at least 20% versus the strongest simple matched-budget baseline, with world-clustered uncertainty supporting the effect.
-5. Negative controls show no hidden-truth leakage or invalid monitor inputs; terminal failures are reported unresolved, not accepted.\n6. Oracle-present discrimination and truth-absent recovery are reported as distinct tracks. The truth-absent track has zero reference-equivalent members in the initial hypothesis pool according to evaluator-only audits; trials with accidental inclusion are reported as invalid for the open-ended track, not silently retried or discarded.
+5. Negative controls show no hidden-truth leakage or invalid monitor inputs; terminal failures are reported unresolved, not accepted.
+6. Oracle-present discrimination and truth-absent recovery are reported as distinct tracks. The truth-absent track has zero reference-equivalent members in the initial hypothesis pool according to evaluator-only audits; trials with accidental inclusion are reported as invalid for the open-ended track, not silently retried or discarded.
 
 If a gate fails, retain and publish the negative result. Do not tune thresholds or task composition after inspection of the held-out set.
 
