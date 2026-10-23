@@ -57,6 +57,8 @@ impl CognitiveLoopService {
         let unified_psi = state.unified_psi;
         let coherence = state.coherence;
         let prediction_error = state.prediction_error;
+        let prediction_error_valid =
+            state.prediction_error_valid && prediction_error.is_finite();
         let phi_attention_weight = state.phi_attention_weight;
         let _compressed_state = state.compressed_state;
 
@@ -242,7 +244,11 @@ impl CognitiveLoopService {
                     core_values.insert(CoreComponent::Workspace, coherence as f64 * 0.8);
                     core_values.insert(CoreComponent::Attention, phi_attention_weight as f64);
                     core_values.insert(CoreComponent::Recursion, 0.5);
-                    core_values.insert(CoreComponent::Efficacy, 1.0 - prediction_error as f64);
+                    // Omit Efficacy when PE is unavailable; the sentinel is not a
+                    // valid observation of model accuracy.
+                    if prediction_error_valid {
+                        core_values.insert(CoreComponent::Efficacy, 1.0 - prediction_error as f64);
+                    }
                     core_values.insert(
                         CoreComponent::Knowledge,
                         self.carryover.quality.last_epistemic_quality,
@@ -287,7 +293,9 @@ impl CognitiveLoopService {
         let (affect_cons_valence, affect_cons_arousal) =
             if let Some(ref mut ac) = self.primitive_tier.affective_consciousness {
                 ac.decay(0.05);
-                if self.stats.total_cycles % (11 * interval_mult) == 0 {
+                if prediction_error_valid
+                    && self.stats.total_cycles % (11 * interval_mult) == 0
+                {
                     // Blend with previous-cycle valence for affective momentum.
                     // Damasio (1999): somatic markers persist; emotion has inertia.
                     let raw_valence = 1.0 - 2.0 * prediction_error;
@@ -814,6 +822,7 @@ mod tests {
             compressed_state,
             output,
             prediction_error: 0.2,
+            prediction_error_valid: true,
             coherence: 0.5,
             unified_psi: 0.3,
             phi_attention_weight: 0.5,
