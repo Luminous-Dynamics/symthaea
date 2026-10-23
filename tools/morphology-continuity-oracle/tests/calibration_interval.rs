@@ -155,7 +155,10 @@ fn a_small_perfect_calibration_sample_still_abstains() {
 fn malformed_counts_and_reliability_intervals_fail_closed() {
     assert_eq!(wilson_interval_per_mille(0, 0), None);
     assert_eq!(wilson_interval_per_mille(101, 100), None);
-    assert_eq!(wilson_interval_per_mille(1, MAX_EXACT_F64_INTEGER + 1), None);
+    assert_eq!(
+        wilson_interval_per_mille(1, MAX_EXACT_F64_INTEGER + 1),
+        None
+    );
     assert_eq!(worst_case_evsi(951, 950), None);
     assert_eq!(worst_case_evsi(0, 1_001), None);
     assert_eq!(evsi(1_001), None);
