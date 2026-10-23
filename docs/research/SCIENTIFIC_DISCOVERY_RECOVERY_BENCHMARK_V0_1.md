@@ -18,6 +18,7 @@ The target loop is: generate physically admissible hypotheses; choose an experim
 | [SRBench](https://github.com/cavalab/srbench) and [SRBench++](https://doi.org/10.1109/TEVC.2024.3423681) | Broad regression comparison plus task-specific tests: exact form, feature selection, deceptive shortcuts, extrapolation, noise, interpretability | Standard retrospective regression track and robustness suite |
 | [SciLaws-Bench](https://yiyihum.github.io/SciLaws-Bench/) | Separates prediction, scientific validity and structural recovery, including active-query tasks | Science-specific endpoint taxonomy and active-discovery track |
 | [LLM-AutoSciLab / ActiveSciBench](https://scientific-discovery.github.io/llm-autoscilab-project/) | Closed loop of hypothesis generation, experiment selection and mechanism refinement | Agentic discovery baseline where models, tools and budgets can be aligned |
+| [Influence-Guided Symbolic Regression (IGSR, 2026)](https://arxiv.org/abs/2605.29184) | LLM-generated candidate basis, per-term influence feedback and Monte Carlo tree search | Strong emerging hybrid-search comparator; pin the paper/code version and ensure all model/tool costs are counted |
 | [LLM-SRBench](https://proceedings.mlr.press/v267/shojaee25a.html) | Symbolic-reasoning and transformed-equation tasks intended to reduce simple memorization | Held-out robustness track with pinned prompts, model versions and query budget |
 | Sparse regression / SINDy-style methods | Efficient recovery when the feature dictionary is known or well motivated | Simple strong baseline on dynamical systems; not a universal symbolic-regression comparator |
 
@@ -114,4 +115,5 @@ Every run should record benchmark/version and world family; exact commit and sou
 - Exhaustive Symbolic Regression and MDL, Philosophical Transactions of the Royal Society A, online 9 April 2026: https://doi.org/10.1098/rsta.2024.0584
 - SciLaws-Bench: https://yiyihum.github.io/SciLaws-Bench/
 - LLM-AutoSciLab / ActiveSciBench: https://scientific-discovery.github.io/llm-autoscilab-project/
+- Saveliev et al., Influence-Guided Symbolic Regression (2026): https://arxiv.org/abs/2605.29184
 - LLM-SRBench, ICML (2025): https://proceedings.mlr.press/v267/shojaee25a.html
