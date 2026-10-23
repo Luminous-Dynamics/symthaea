@@ -11,6 +11,7 @@ use std::{
 const SUITE_PATH: &str = "docs/security/mesh-security-scenarios-v1.json";
 const SUITE_SCHEMA_PATH: &str = "docs/security/mesh-security-scenarios-v1.schema.json";
 const RECEIPT_SCHEMA_PATH: &str = "docs/security/mesh-security-evidence-v1.schema.json";
+const AUDIT_RECEIPT_SCHEMA_PATH: &str = "docs/security/mesh-security-contract-audit-v1.schema.json";
 const DRAFT_2020_12: &str = "https://json-schema.org/draft/2020-12/schema";
 
 fn main() {
@@ -72,15 +73,18 @@ fn audit(root: &Path) -> Result<Value, String> {
     let suite_path = root.join(SUITE_PATH);
     let suite_schema_path = root.join(SUITE_SCHEMA_PATH);
     let receipt_schema_path = root.join(RECEIPT_SCHEMA_PATH);
+    let audit_receipt_schema_path = root.join(AUDIT_RECEIPT_SCHEMA_PATH);
 
     let suite = read_json(&suite_path)?;
     let suite_schema = read_json(&suite_schema_path)?;
     let receipt_schema = read_json(&receipt_schema_path)?;
+    let audit_receipt_schema = read_json(&audit_receipt_schema_path)?;
 
     let mut errors = Vec::new();
 
     validate_schema_document(&suite_schema, SUITE_SCHEMA_PATH, &mut errors);
     validate_schema_document(&receipt_schema, RECEIPT_SCHEMA_PATH, &mut errors);
+    validate_schema_document(&audit_receipt_schema, AUDIT_RECEIPT_SCHEMA_PATH, &mut errors);
 
     let suite_instance_status = match validate_instance(&suite_schema, &suite, SUITE_PATH) {
         Ok(()) => "PASS",
@@ -133,6 +137,11 @@ fn audit(root: &Path) -> Result<Value, String> {
                 "sha256": sha256_file(&receipt_schema_path)?,
                 "meta_schema_validation": schema_document_status(&receipt_schema)
             },
+            "audit_receipt_schema": {
+                "path": AUDIT_RECEIPT_SCHEMA_PATH,
+                "sha256": sha256_file(&audit_receipt_schema_path)?,
+                "meta_schema_validation": schema_document_status(&audit_receipt_schema)
+            },
             "validator_manifest": {
                 "path": "tools/mesh-security-contract-audit/Cargo.toml",
                 "sha256": sha256_file(&tool_manifest)?
@@ -162,7 +171,9 @@ fn audit(root: &Path) -> Result<Value, String> {
         "checks": {
             "scenario_schema_meta_schema": schema_document_status(&suite_schema),
             "receipt_schema_meta_schema": schema_document_status(&receipt_schema),
+            "audit_receipt_schema_meta_schema": schema_document_status(&audit_receipt_schema),
             "scenario_instance_validation": suite_instance_status,
+            "audit_receipt_instance_validation": "PASS",
             "semantic_consistency": if semantics_pass { "PASS" } else { "FAIL" },
             "unique_property_ids": semantics["unique_property_ids"],
             "unique_scenario_ids": semantics["unique_scenario_ids"],
@@ -178,7 +189,17 @@ fn audit(root: &Path) -> Result<Value, String> {
         ]
     });
 
-    Ok(receipt)
+    match validate_instance(&audit_receipt_schema, &receipt, "generated contract audit receipt") {
+        Ok(()) => Ok(receipt),
+        Err(error) => {
+            errors.push(error);
+            let mut failed_receipt = receipt;
+            failed_receipt["status"] = Value::String("FAIL".to_owned());
+            failed_receipt["checks"]["audit_receipt_instance_validation"] = Value::String("FAIL".to_owned());
+            failed_receipt["errors"] = json!(errors);
+            Ok(failed_receipt)
+        }
+    }
 }
 
 fn read_json(path: &Path) -> Result<Value, String> {
