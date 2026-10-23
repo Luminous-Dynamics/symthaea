@@ -563,11 +563,12 @@ fn audit(
             .get("generation_tiers")
             .and_then(Value::as_array)
             .is_some_and(|tiers| {
-                tiers.iter().all(|tier| {
-                    tier.as_str().is_some_and(|name| {
-                        matches!(name, "Native" | "Hardware" | "LocalLLM" | "CloudLLM" | "Simulated")
+                !tiers.is_empty()
+                    && tiers.iter().all(|tier| {
+                        tier.as_str().is_some_and(|name| {
+                            matches!(name, "Native" | "Hardware" | "LocalLLM" | "CloudLLM" | "Simulated")
+                        })
                     })
-                })
             });
         push_check(
             &mut errors,
@@ -1375,6 +1376,14 @@ mod tests {
     fn unknown_generation_tier_is_rejected() {
         let mut report = valid_fixture();
         report["runs"][0]["generation_tiers"] = serde_json::json!(["ImaginaryLLM"]);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+    }
+
+    #[test]
+    fn empty_generation_tiers_are_rejected() {
+        let mut report = valid_fixture();
+        report["runs"][0]["generation_tiers"] = serde_json::json!([]);
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("generation_tiers")));
     }
