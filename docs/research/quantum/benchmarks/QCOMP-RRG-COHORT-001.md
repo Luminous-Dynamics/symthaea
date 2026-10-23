@@ -1,6 +1,6 @@
 # QCOMP-RRG-COHORT-001: size-held-out random-regular MIS workloads
 
-Status: **generator implementation and cohort manifest authored; graph instances not yet generated**
+Status: **cohort protocol and independent preflight authored; canonical Rust generator is in [PR #8324](https://github.com/Luminous-Dynamics/symthaea/pull/8324); large graph instances not yet generated**
 
 ## Why this track exists
 
@@ -48,9 +48,9 @@ Report the exact number of graphs served by each shared table, the measured or e
 
 ## Generator
 
-The dependency-free Rust API generate_random_regular_mis_graph uses a configuration-model stub-pairing sampler with explicit rejection of self-loops and duplicate undirected edges. Successful outputs are canonical sorted simple graphs whose degrees are checked exactly. DIMACS export uses one-based vertex IDs and records the generator version, seed, attempt count and requested degree in a comment.
+The canonical dependency-free Rust API in [PR #8324](https://github.com/Luminous-Dynamics/symthaea/pull/8324) is `generate_mis_random_regular(MisRandomRegularConfig)`. It uses configuration-model stub pairing, rejects self-loops and duplicate edges, and returns a canonical `MisGraph` with exact degree validation. The `qcomp_rrg_generate` CLI serializes one-based DIMACS and records the generator version, seed and rejection-attempt count.
 
-The generator has a bounded rejection budget. If it cannot obtain a simple graph within that budget, it returns an explicit error. It must not silently relax the requested degree or switch to a different seed. It now also caps each call at 1,000,000 stubs before allocation; this is far above the paper-shaped maximum of 15,000 stubs (N=5,000, degree 3), but protects the public API from accidental huge allocations. Larger campaigns should change that ceiling only through an explicit reviewed setting with memory evidence. The underlying XorShift64* stream is deterministic and non-cryptographic; reproducibility alone is not proof of adequate sampling quality. A generator-quality audit is required before confirmatory statistical claims.
+The generator has a bounded rejection budget. If it cannot obtain a simple graph within that budget, it returns an explicit error. It must not silently relax the requested degree or switch to a different seed. It caps each call at 100,000 vertices and 1,000,000 stubs before allocation; these are far above the paper-shaped maximum (N=5,000, degree 3, 15,000 stubs), but protect the public API from accidental huge allocations. Larger campaigns should change those ceilings only through an explicit reviewed setting with memory evidence. The default rejection budget is 100,000 complete pairings; a caller may configure a smaller cap. The underlying XorShift64* stream is deterministic and non-cryptographic; reproducibility alone is not proof of adequate sampling quality. A generator-quality audit is required before confirmatory statistical claims.
 
 ## Frozen 96-workload manifest
 
