@@ -8,6 +8,7 @@ on:
       - "src/bin/rust_repair_manifest.rs"
       - "Cargo.toml"
       - "docs/research/patches/swe-bench-live-validation-evidence.patch"
+      - "docs/research/patches/repolaunch-network-isolation.patch"
       - ".github/workflows/rust-repair-score-audit.yml"
   workflow_dispatch:
 
@@ -35,11 +36,19 @@ jobs:
           repository: microsoft/SWE-bench-Live
           ref: 62d02936a0726fbf4597b05bd07b09fb99eddae6
           path: benchmark-source
-      - name: Apply and syntax-check the pinned runtime-evidence overlay
+      - name: Apply the pinned SWE-bench-Live evidence overlay
         run: |
           git -C benchmark-source apply --check "$GITHUB_WORKSPACE/docs/research/patches/swe-bench-live-validation-evidence.patch"
           git -C benchmark-source apply "$GITHUB_WORKSPACE/docs/research/patches/swe-bench-live-validation-evidence.patch"
-          python3 -m py_compile benchmark-source/evaluation/validation.py benchmark-source/evaluation/evaluation.py
+      - name: Initialize and verify the pinned RepoLaunch submodule
+        run: |
+          git -C benchmark-source submodule update --init launch
+          test "$(git -C benchmark-source/launch rev-parse HEAD)" = "c4b623d930f3728e5338664bb634021b98492cbf"
+      - name: Enforce offline test containers
+        run: |
+          git -C benchmark-source/launch apply --check "$GITHUB_WORKSPACE/docs/research/patches/repolaunch-network-isolation.patch"
+          git -C benchmark-source/launch apply "$GITHUB_WORKSPACE/docs/research/patches/repolaunch-network-isolation.patch"
+          python3 -m py_compile benchmark-source/evaluation/validation.py benchmark-source/evaluation/evaluation.py benchmark-source/launch/core/platforms/linux.py
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
