@@ -495,7 +495,7 @@ jobs:
           m = copy.deepcopy(bundle); m["outcomes"][1]["pair_id"] = "wrong-pair"; mutants.append((m, "cross-pair join"))
           m = copy.deepcopy(bundle); m["outcomes"][0]["state_role"] = "variant"; mutants.append((m, "base/variant role mismatch"))
           m = copy.deepcopy(bundle); m["outcomes"][0]["proof_state"]["snapshot_sha256"] = "0" * 64; mutants.append((m, "snapshot receipt drift"))
-          m = copy.deepcopy(bundle); m["outcomes"][0]["expected_action_policy"] = "move_forbidden_or_replan"; mutants.append((m, "policy mismatch"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["expected_action_policy"] = "preserve_eligibility" if m["outcomes"][0]["expected_action_policy"] == "move_forbidden_or_replan" else "move_forbidden_or_replan"; mutants.append((m, "policy mismatch"))
           m = copy.deepcopy(bundle); m["outcomes"] = m["outcomes"][:-1]; mutants.append((m, "missing paired side"))
           m = copy.deepcopy(bundle); m["outcomes"][0]["execution"]["status"] = "executed"; mutants.append((m, "synthetic outcome falsely marked executed"))
           m = copy.deepcopy(bundle); m["outcomes"][0]["execution"]["checker_result"] = "checked_success"; mutants.append((m, "checker success without execution"))
