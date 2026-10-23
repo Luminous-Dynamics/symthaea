@@ -12,7 +12,45 @@ The core invariant is:
 
 This is narrower and more testable than a claim about consciousness, general intelligence, or state-of-the-art performance.
 
-## 2. Counterfactual test matrix
+## 2. Paradigm shift: evidence objects, not sentinel-valued floats
+
+The long-term architecture should make invalid numeric states unrepresentable at PE-consuming APIs. This PR uses a compatibility float plus a validity flag to contain risk without immediately breaking every call site. That is an incremental migration boundary, not the final abstraction.
+
+Target API:
+
+```rust
+enum PredictionEvidenceStatus {
+    Valid,
+    NoPriorPrediction,
+    ZeroNormPrediction,
+    EmptyObservation,
+    DimensionMismatch,
+    NonFiniteInput,
+    StaleOrOutOfOrder,
+    SourceUnavailable,
+}
+
+struct PredictionErrorEvidence {
+    status: PredictionEvidenceStatus,
+    value: Option<f32>,
+    prediction_cycle: Option<u64>,
+    observation_cycle: u64,
+}
+```
+
+These are design names, not types introduced by this PR. The implementation should enforce:
+
+- Only `Valid` may expose a PE value to learning, confidence, surprise, safety assessment, replay, or thermodynamic PE consumers.
+- Missing PE never means zero error, maximum error, or “repeat the last value as a fresh sample.”
+- Every consumer records the evidence status and a decision digest; telemetry may expose a compatibility number only alongside explicit validity/status.
+- Non-PE evidence stays live. A missing PE must not suppress an independent low-coherence safety event, external reward, valid sensory novelty, or measured energy-budget signal.
+- Compatibility conversions are one-way at boundaries: legacy float APIs can emit a diagnostic sentinel, but downstream code must not reconstruct validity from that number.
+
+A later hardening step should add source and observation identifiers plus a digest of the normalized prediction/observation metadata, so duplicate or delayed outcomes are detected rather than counted twice. Hash metadata with domain separation; do not hash or log raw user text by default.
+
+This design separates three questions currently too easy to conflate: **Was a value computed? Was it comparable? Is it permitted to influence this consumer?** A finite float alone answers none of them.
+
+## 3. Counterfactual test matrix
 
 Each scenario should be replayed against the same initial state and deterministic seed. Compare a run with invalid PE set to different numeric payloads (`0.0`, `1.0`, `NaN`, and infinity where the type permits it) against a matched run where PE is not read by any PE-dependent consumer.
 
@@ -33,7 +71,7 @@ Each scenario should be replayed against the same initial state and deterministi
 
 Where a subsystem is independent of PE, the expected result is not “no change to the entire system.” The invariant applies only to the PE-derived component; coherence, energy, explicit reward, sensory variance, and other valid signals remain eligible to change state.
 
-## 3. Metrics
+## 4. Metrics
 
 Report raw counts as well as rates. Do not collapse all dimensions into one score.
 
@@ -48,7 +86,7 @@ Report raw counts as well as rates. Do not collapse all dimensions into one scor
 
 For stream-learning experiments also report per-step task performance, forward/backward transfer, forgetting, calibration (Brier score/ECE on resolved outcomes), number of admitted learning samples, time-to-target quality, and compute cost. Report worst-task and dispersion alongside aggregate scores.
 
-## 4. Experimental protocol
+## 5. Experimental protocol
 
 1. Freeze the code SHA, toolchain, feature flags, configuration, seed set, input stream, and expected result digest before measuring.
 2. Run deterministic unit/counterfactual cases before long sequences. A skipped or queued workflow is not a pass.
@@ -58,7 +96,7 @@ For stream-learning experiments also report per-step task performance, forward/b
 6. Use paired per-seed differences and confidence intervals for performance/cost; avoid declaring improvement from one seed or mean score alone. Re-run any failure from its exact input and preserve the failing trace.
 7. Only compare against an external benchmark when the task, information available, reset policy, memory budget, and cost accounting match. Do not compare this evidence-integrity patch directly to foundation-model task accuracy or call correctness parity “SOTA.”
 
-## 5. Baselines and external context
+## 6. Baselines and external context
 
 - **Stateless baseline:** required for claims that the system learned from earlier instances rather than benefiting from its underlying capabilities.
 - **No-gating ablation:** captures the failure mode where fallback numerics contaminate online updates.
@@ -71,7 +109,7 @@ A 2026 ICLR study, *Forget Forgetting*, also reports that in a regime with abund
 
 For systems performance, MLPerf Training measures time to a defined quality target and documents run-to-run variation, rather than treating an isolated throughput number as a complete comparison: [MLPerf Training](https://mlcommons.org/benchmarks/training/).
 
-## 6. Acceptance policy
+## 7. Acceptance policy
 
 - Unit and property tests fail closed if an invalid sample mutates a PE-dependent history, learner, replay buffer, confidence value, urgency history, Experience Bus decision, or PE-derived thermodynamic cost.
 - Exact-head formatting, build, unit tests, relevant feature combinations, and repository governance checks must pass before the draft is made ready.
@@ -79,6 +117,6 @@ For systems performance, MLPerf Training measures time to a defined quality targ
 - Any failure is retained as evidence; no test is weakened merely to regain a green status.
 - No claim of beating the state of the art is justified until a comparable external benchmark has been run and results have been independently reproduced.
 
-## 7. Current validation boundary
+## 8. Current validation boundary
 
 This document defines acceptance criteria; it is not evidence that the gates have passed. Regression assertions have been authored in the current branch, but the authoring environment has not executed `cargo test` or a release benchmark. Record the exact final PR head and actual test output when a supported build environment is available.
