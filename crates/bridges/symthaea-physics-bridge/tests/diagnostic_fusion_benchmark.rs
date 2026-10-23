@@ -18,7 +18,10 @@ struct DeterministicNormalRng {
 
 impl DeterministicNormalRng {
     fn new(seed: u64) -> Self {
-        Self { state: seed, spare: None }
+        Self {
+            state: seed,
+            spare: None,
+        }
     }
 
     fn next_uniform(&mut self) -> f64 {
