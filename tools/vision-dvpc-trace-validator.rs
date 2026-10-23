@@ -248,7 +248,9 @@ fn same_meta(left: &Table, right: &Table) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_observations(table: &Table) -> Result<(BTreeMap<String, String>, BTreeMap<String, usize>, usize), String> {
+fn validate_observations(
+    table: &Table,
+) -> Result<(BTreeMap<String, String>, BTreeMap<String, usize>, usize), String> {
     let mut trace_to_sample = BTreeMap::new();
     let mut group_to_split: BTreeMap<String, String> = BTreeMap::new();
     let mut group_steps: BTreeMap<String, BTreeSet<u64>> = BTreeMap::new();
@@ -403,7 +405,14 @@ fn validate_evaluations(
         }
         if !matches!(
             row[10].as_str(),
-            "none" | "illumination" | "weather" | "occlusion" | "sensor" | "density" | "other" | "unknown"
+            "none"
+                | "illumination"
+                | "weather"
+                | "occlusion"
+                | "sensor"
+                | "density"
+                | "other"
+                | "unknown"
         ) {
             return Err(invalid(format!(
                 "data row {row_number}: invalid shift_mechanism"
@@ -519,7 +528,7 @@ mod tests {
     #[test]
     fn duplicate_observation_trace_ids_fail_closed() {
         let row = OBS.lines().last().expect("fixture has rows");
-        let broken = format!("{OBS}{row}\n");
+        let broken = format!("{}{}\n", OBS, row);
         assert!(admit(&broken, EVAL).unwrap_err().contains("duplicate observation trace_id"));
     }
 
@@ -548,10 +557,7 @@ mod tests {
 
     #[test]
     fn out_of_range_utility_fails_closed() {
-        let broken = EVAL.replace(
-            "EVAL\ttrace-train-000\t",
-            "EVAL\ttrace-train-000\t",
-        ).replace("\t0.400000\t0.550000\t", "\t1.200000\t0.550000\t");
+        let broken = EVAL.replace("\t0.400000\t0.550000\t", "\t1.200000\t0.550000\t");
         assert!(admit(OBS, &broken).unwrap_err().contains("must lie in [0,1]"));
     }
 
@@ -566,7 +572,10 @@ mod tests {
 
     #[test]
     fn unknown_license_scope_fails_closed() {
-        let broken = OBS.replace("license_scope\tsynthetic_public_fixture", "license_scope\treview_required");
+        let broken = OBS.replace(
+            "license_scope\tsynthetic_public_fixture",
+            "license_scope\treview_required",
+        );
         assert!(admit(&broken, EVAL).unwrap_err().contains("license_scope must be explicit"));
     }
 
