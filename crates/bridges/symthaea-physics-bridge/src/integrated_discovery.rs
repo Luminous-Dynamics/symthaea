@@ -1895,12 +1895,14 @@ mod tests {
                     0
                 };
             accepted_recovery_candidates += recovered.accepted_recovery_candidates;
-            false_singletons_after_recovery +=
-                if recovered.final_live == 1 && !recovered.ground_truth_equivalent {
-                    1
-                } else {
-                    0
-                };
+            false_singletons_after_recovery += if recovered.final_live == 1
+                && (!recovered.ground_truth_equivalent
+                    || !recovered.ground_truth_extrapolation_equivalent)
+            {
+                1
+            } else {
+                0
+            };
             same_domain_recovered += if recovered.ground_truth_equivalent {
                 1
             } else {
