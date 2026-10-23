@@ -149,7 +149,7 @@ pub enum RandomRegularMisError {
         /// Number of vertices.
         vertex_count: usize,
         /// Degree.
-        degree.
+        degree: usize,
     },
     /// The bounded rejection loop must allow at least one attempt.
     ZeroAttemptLimit,
