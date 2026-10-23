@@ -73,7 +73,7 @@ The authored tests cover:
 - a positive lower bound successfully reserving both latency and energy, then settling actual costs;
 - a lower bound below threshold taking the cheap path without reservation, including a zero-mean benefit prediction;
 - shift detection and unknown-domain abstention, including a deliberately huge raw point estimate;
-- stale domain-assessor identity and artifact digest blocked before escalation;
+- stale domain-assessor identity/artifact and mismatched domain-assessment input digest blocked before escalation;
 - stale estimator artifact, mismatched domain/loss profile, non-finite predictions and non-positive inference scale;
 - deterministic receipts carrying the gate reason, profile, calibration count, nominal marginal coverage and bound.
 
