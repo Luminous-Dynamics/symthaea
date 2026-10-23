@@ -59,6 +59,7 @@ struct Sample {
     exact_ns: u128,
     approximate_ns: u128,
     recall_at_k: f64,
+    tie_aware_recall_at_k: f64,
     examined: usize,
     total_live: usize,
     candidate_fraction: f64,
@@ -71,6 +72,7 @@ struct Sample {
 struct Quality {
     kind: &'static str,
     recall_at_k: f64,
+    tie_aware_recall_at_k: f64,
     examined: usize,
     candidate_fraction: f64,
     approximate_exact: bool,
@@ -130,6 +132,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let approximate_ids: Vec<u64> =
                 approximate.neighbors.iter().map(|(id, _)| *id).collect();
             let recall_at_k = recall_at_k(&exact_ids, &approximate_ids);
+            let tie_aware_recall_at_k = tie_aware_recall_at_k(&exact, &approximate.neighbors);
             let total_live = approximate.total_live;
             let candidate_fraction = fraction(approximate.examined, total_live);
 
@@ -137,6 +140,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 first_round_quality.push(Quality {
                     kind: query.kind,
                     recall_at_k,
+                    tie_aware_recall_at_k,
                     examined: approximate.examined,
                     candidate_fraction,
                     approximate_exact: approximate.exact,
@@ -151,6 +155,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 exact_ns,
                 approximate_ns,
                 recall_at_k,
+                tie_aware_recall_at_k,
                 examined: approximate.examined,
                 total_live,
                 candidate_fraction,
@@ -402,6 +407,18 @@ fn measure_approximate(
     (outcome, start.elapsed().as_nanos())
 }
 
+fn tie_aware_recall_at_k(exact: &[(u64, f32)], approximate: &[(u64, f32)]) -> f64 {
+    let Some((_, cutoff_similarity)) = exact.last() else {
+        return 1.0;
+    };
+    let recovered = approximate
+        .iter()
+        .filter(|(_, similarity)| *similarity >= *cutoff_similarity)
+        .count()
+        .min(exact.len());
+    recovered as f64 / exact.len() as f64
+}
+
 fn recall_at_k(exact_ids: &[u64], approximate_ids: &[u64]) -> f64 {
     if exact_ids.is_empty() {
         return 1.0;
@@ -465,17 +482,18 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
     println!("# available_parallelism={available_parallelism}");
     println!("# quality metrics below are computed over unique queries in round 0");
     println!(
-        "query_index,round,kind,exact_ns,approximate_ns,recall_at_k,examined,total_live,candidate_fraction,approximate_exact,fell_back_to_exact,exact_ids,approximate_ids"
+            "query_index,round,kind,exact_ns,approximate_ns,recall_at_k,tie_aware_recall_at_k,examined,total_live,candidate_fraction,approximate_exact,fell_back_to_exact,exact_ids,approximate_ids"
     );
     for sample in samples {
         println!(
-            "{},{},{},{},{},{:.9},{},{},{:.9},{},{},\"{}\",\"{}\"",
+            "{},{},{},{},{},{:.9},{:.9},{},{},{:.9},{},{},\"{}\",\"{}\"",
             sample.query_index,
             sample.round,
             sample.kind,
             sample.exact_ns,
             sample.approximate_ns,
             sample.recall_at_k,
+            sample.tie_aware_recall_at_k,
             sample.examined,
             sample.total_live,
             sample.candidate_fraction,
@@ -501,6 +519,10 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
     println!("# summary_all_unique_queries={}", quality.len());
     println!("# summary_latency_samples={}", samples.len());
     println!("# summary_all_mean_recall_at_k={:.9}", mean(quality.iter().map(|q| q.recall_at_k)));
+    println!(
+        "# summary_all_mean_tie_aware_recall_at_k={:.9}",
+        mean(quality.iter().map(|q| q.tie_aware_recall_at_k))
+    );
     println!(
         "# summary_all_worst_recall_at_k={:.9}",
         quality.iter().map(|q| q.recall_at_k).fold(1.0, f64::min)
@@ -545,6 +567,10 @@ fn emit_quality_summary(kind: &str, quality: &[Quality]) {
     println!(
         "# {kind}_mean_recall_at_k={:.9}",
         mean(selected.iter().map(|query| query.recall_at_k))
+    );
+    println!(
+        "# {kind}_mean_tie_aware_recall_at_k={:.9}",
+        mean(selected.iter().map(|query| query.tie_aware_recall_at_k))
     );
     println!(
         "# {kind}_worst_recall_at_k={:.9}",
@@ -642,6 +668,14 @@ mod tests {
     fn recall_uses_exact_result_count_as_denominator() {
         assert_eq!(recall_at_k(&[], &[7]), 1.0);
         assert!((recall_at_k(&[1, 2, 3], &[2, 3, 9]) - (2.0 / 3.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn tie_aware_recall_accepts_equivalent_items_at_exact_cutoff() {
+        let exact = vec![(1, 0.9), (2, 0.8)];
+        let approximate = vec![(1, 0.9), (7, 0.8)];
+        assert_eq!(recall_at_k(&[1, 2], &[1, 7]), 0.5);
+        assert_eq!(tie_aware_recall_at_k(&exact, &approximate), 1.0);
     }
 
     #[test]
