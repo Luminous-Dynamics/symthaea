@@ -49,6 +49,14 @@ The combined overlay modifies both the task-eligibility validation path and the 
 
 The Rust `rust-repair-manifest` tool currently validates and locks the **task-validation** stream. The scored-evaluation sidecar is a separate artifact and is not yet independently graded by this task-manifest binary; before publishing a scored comparison, run an independent scored-receipt verifier that joins each prediction to the locked task ID, verifies the prediction patch digest and raw log, and recomputes the official test verdict from the parsed statuses. Do not imply that a valid task manifest alone proves a scored agent rollout.
 
+## Enforced container network isolation
+
+The separate pinned patch `docs/research/patches/repolaunch-network-isolation.patch` targets RepoLaunch submodule commit `c4b623d930f3728e5338664bb634021b98492cbf`. It sets Docker `network_mode="none"` for Linux task containers. RepoLaunch image pulls happen on the host before the trial container starts; package installs or dependency downloads initiated from inside the test container cannot silently reach the network.
+
+The runtime-evidence overlay records Docker's inspected `HostConfig.NetworkMode` as `network_mode` for the baseline, all three gold runs, and each scored prediction run. The Rust task auditor and scored-run auditor require the observed value to equal `none`, and the locked task manifest includes the mode. Missing network evidence or a value such as `bridge` makes a task/run unresolved and suppresses headline pass@1.
+
+This only isolates the Dockerized repository/test process. It does **not** disable provider-side tool calls, a browser or retrieval service running outside the task container; the benchmark harness must also withhold web/search tools and task-specific retrieval from the agent and preserve the tool trajectory. If a task needs internet access at runtime, prebuild/cache dependencies before the container starts or classify the task under preregistered validity rules—do not turn networking back on for that task alone.
+
 Run the upstream three-repeat gold validation only after the overlay is applied. It records `validation_evidence.json`, a separate `gold_run_0.log`, `gold_run_1.log`, and `gold_run_2.log` per task.
 
 Run the full candidate split through the patched gold validator (use the complete JSONL as input; do not feed its filtered output back as the candidate denominator):
