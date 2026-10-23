@@ -2038,8 +2038,14 @@ mod tests {
             })
             .collect();
 
-        assert!(evaluator_matches_reference(&candidate, &reference, &in_domain));
-        assert!(!evaluator_matches_reference(&candidate, &reference, &out_of_domain));
+        assert!(evaluator_matches_reference(
+            &candidate, &reference, &in_domain
+        ));
+        assert!(!evaluator_matches_reference(
+            &candidate,
+            &reference,
+            &out_of_domain
+        ));
         assert!(!evaluator_matches_reference_across_domains(
             &candidate,
             &reference,
