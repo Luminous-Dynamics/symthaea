@@ -749,6 +749,7 @@ mod tests {
             domain: Domain::Physics,
             eig: 0.7,
             detected_at: SystemTime::now(),
+            frame: crate::mycelix::gis::EpistemicFrame::default(),
         };
 
         let plans = explorer.plan_exploration(&detection);

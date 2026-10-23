@@ -31,6 +31,10 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # STAGED 2026-10-04: observation-attestation has preserved source on-tree but is not yet
+    # compatible with the current symthaea-core observation API. Exclude it from workspace
+    # resolution until its adapter contract is intentionally integrated; do not delete it.
+    "crates/core/symthaea-observation-attestation",
 ]
 default-members = [
     "xtask",
@@ -69,6 +73,7 @@ mycelix-zkp-core = { path = "stubs/mycelix-zkp-core", features = ["dilithium"] }
 
 # Mycelix Shared Deps (Bundled Standalone)
 sha2 = { version = "0.10", features = ["oid"] }
+# GIS provenance uses the canonical shared sha2 dependency directly.
 pqcrypto-traits = "0.3"
 pqcrypto-dilithium = "0.5"
 subtle = "2.5"

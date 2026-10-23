@@ -153,6 +153,7 @@ jobs:
         run: bash scripts/check-orphan-modules.sh
 
       - name: Report the workspace-wide backlog (informational)
+        if: always()
         run: bash scripts/check-orphan-modules.sh --all --summary | tail -2
 
       # The tests/ and examples/ counterparts of the same failure class:

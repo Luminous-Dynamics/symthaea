@@ -173,6 +173,10 @@ pub mod research_revision_governance;
 pub mod rhythm;
 #[cfg(feature = "theory")]
 pub mod sonata_intervention;
+#[cfg(feature = "theory")]
+pub mod symbolic_import;
+#[cfg(feature = "theory")]
+pub mod teaching_corpus;
 #[cfg(all(feature = "clap-fad", feature = "theory"))]
 pub mod steering;
 #[cfg(feature = "theory")]
