@@ -243,6 +243,25 @@ fn test_urgency_consecutive_low_error_resets_on_high_error() {
 }
 
 #[test]
+fn invalid_prediction_comparison_does_not_create_a_replay_experience() {
+    let mut service =
+        CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
+
+    service.create_experience(&[0.1, 0.2], &[0.3, 0.4], None);
+    assert!(
+        service.buffer.is_empty(),
+        "missing PE must not be recorded as a successful zero-error transition"
+    );
+
+    // Once a genuine comparison exists, the previous transition may be recorded.
+    service.create_experience(&[0.2, 0.3], &[0.4, 0.5], Some(0.25));
+    assert_eq!(service.buffer.len(), 1);
+    assert!(
+        (service.buffer.front().unwrap().error - 0.25).abs() < f32::EPSILON
+    );
+}
+
+#[test]
 fn invalid_prediction_error_does_not_advance_low_error_or_history() {
     let mut service = make_service();
     let threshold = service.config.learning_threshold;
