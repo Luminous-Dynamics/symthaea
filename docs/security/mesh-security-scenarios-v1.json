@@ -23,6 +23,10 @@
     {
       "pull_request": 8491,
       "scope": "bounded handshake-admission TLA+ model"
+    },
+    {
+      "pull_request": 8508,
+      "scope": "LoRa fragment-AEAD fail-closed behavior, transport-authenticated source binding, and preflight against actual MTU"
     }
   ],
   "non_claims": [
@@ -160,6 +164,18 @@
       "id": "KEY-ROTATION-BOUNDARY",
       "claim": "Key rotation creates a genuinely new effective traffic-key namespace and cannot rely on unauthenticated epoch metadata alone.",
       "layer": "key-management",
+      "mandatory": true
+    },
+    {
+      "id": "TRANSPORT-SOURCE-BINDING",
+      "claim": "Fragment-level AEAD identity is compared against a source identity authenticated by the transport/session, not a constant placeholder or sender-controlled nonce bytes.",
+      "layer": "transport-identity",
+      "mandatory": true
+    },
+    {
+      "id": "NO-CLEARTEXT-FALLBACK",
+      "claim": "A security mode configured to require AEAD rejects traffic when the required key or security provider is unavailable; it never silently admits plaintext.",
+      "layer": "security-mode",
       "mandatory": true
     }
   ],
@@ -344,6 +360,32 @@
       "strict_config": "docs/security/models/packet_restart_strict.cfg",
       "implementation_target": "key-rotation boundary test captures actual key-domain labels and nonce outputs",
       "positive_control": "Authorized traffic under newly derived key material decrypts; stale epoch traffic follows explicit receive policy.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-FRAG-001",
+      "property": "TRANSPORT-SOURCE-BINDING",
+      "class": "adversarial",
+      "stimulus": "Enable fragment AEAD while the receive loop obtains only raw bytes and no authenticated source identity; legacy high-level code passes a constant zero source ID.",
+      "expected_legacy": "The receiver cannot validate a nonzero peer's authenticated source binding; substituting a nonce prefix or trusting an unauthenticated address would not satisfy the property.",
+      "required_replacement": "No encrypted fragment is admitted without a transport-authenticated mapping between the peer identity and the mesh source ID; unsupported adapters fail closed and produce an observable rejection.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "recv_raw_with_source default refusal; poll_incoming_records_missing_authenticated_source_adapter",
+      "positive_control": "An adapter with a tested authenticated peer-to-mesh-ID binding delivers valid AEAD fragments and preserves reassembly.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-FRAG-002",
+      "property": "NO-CLEARTEXT-FALLBACK",
+      "class": "known-break",
+      "stimulus": "Set fragment_encryption=true while the sender or receiver has no encryption key, then submit a valid cleartext LoRaFragment.",
+      "expected_legacy": "The sender silently emits plaintext fragments and/or the receiver parses the cleartext frame despite the requested encryption mode.",
+      "required_replacement": "Sender emits zero frames and receiver rejects cleartext; both outcomes are independently asserted while the valid packet-envelope AEAD path remains available when configured.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "fragment_aead_without_a_key_fails_closed_before_emitting_any_frame; fragment_encryption_rejects_plaintext_when_key_is_missing",
+      "positive_control": "packet_envelope_aead_remains_available_with_mtu_safe_fragments",
       "status": "proposed"
     }
   ]
