@@ -769,6 +769,46 @@ fn run_trial_with_discrepancy(
     active_selector: ActiveSelector,
     systematic_discrepancy: f64,
 ) -> TrialOutcome {
+    run_trial_with_mode(
+        seed,
+        config,
+        max_rounds,
+        active_selector,
+        systematic_discrepancy,
+        false,
+        true,
+    )
+}
+
+/// Separate truth-absent track. The policy receives a candidate pool generated independently of
+/// the reference law. The disabled-recovery setting is the fail-closed stop/unresolved baseline.
+fn run_truth_absent_trial(
+    seed: u64,
+    config: PipelineConfig,
+    max_rounds: usize,
+    active_selector: ActiveSelector,
+    enable_recovery: bool,
+) -> TrialOutcome {
+    run_trial_with_mode(
+        seed,
+        config,
+        max_rounds,
+        active_selector,
+        0.0,
+        true,
+        enable_recovery,
+    )
+}
+
+fn run_trial_with_mode(
+    seed: u64,
+    config: PipelineConfig,
+    max_rounds: usize,
+    active_selector: ActiveSelector,
+    systematic_discrepancy: f64,
+    truth_absent: bool,
+    enable_recovery: bool,
+) -> TrialOutcome {
     let pit_mode = active_selector == ActiveSelector::InformationGainWithPrequentialPitAudits;
     if pit_mode && (!config.active_selection || config.smoothing) {
         return TrialOutcome {
