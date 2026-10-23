@@ -174,3 +174,15 @@ The differentiator is a **causal, evidence-audited cognitive loop**: one observa
 ## Machine-readable scenario manifest
 
 `benchmarks/cognitive-loop-evidence/scenarios.json` is the implementation-facing companion to this contract. It currently defines **30 cases across six suites (S0–S5)**: validity invariants, calibration and distribution shift, continual learning, phase causality, end-to-end benchmark adapters, and system behavior. It includes the B0–B7 baseline matrix, including B4 for calibrated uncertainty. These are proposed cases and configurations; the manifest is not yet a runnable benchmark suite and no results are implied.
+
+
+## Manifest validator
+
+The JSON manifest is now checked by a small Rust validator in `xtask`; this validates the experiment contract, **not benchmark performance**. Run it from the repository root:
+
+```bash
+cargo run -p xtask -- validate-cognitive-loop-evidence
+cargo test -p xtask cognitive_loop_evidence
+```
+
+The validator fails closed on duplicate suite/case/baseline identifiers, missing B0–B7 controls, incomplete validity-case expectations, invalid evidence configured to update PE training or enter replay, hard-gate cases without assertions, missing result-provenance fields, and a CI policy that does not explicitly reject skipped checks. It prints a suite/case count only after the manifest contract passes. Keep `status` at `proposal-not-measured` until actual pinned runs and raw records exist. The command does not execute the scenarios and produces no SOTA claim.
