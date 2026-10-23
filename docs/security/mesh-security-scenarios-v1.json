@@ -35,6 +35,10 @@
     {
       "pull_request": 8519,
       "scope": "bounded crash-consistency model for replay admission versus durable application effects; effect-first duplicate and commit-first lost-effect counterexamples"
+    },
+    {
+      "pull_request": 8558,
+      "scope": "Runtime nonce-pair oracle and deterministic packet/fragment cross-API collision witness; shared-key condition is explicit."
     }
   ],
   "non_claims": [
@@ -43,7 +47,8 @@
     "Known legacy defects are calibration tasks, not novel cryptographic discoveries.",
     "A bounded model result does not establish Rust implementation conformance or cryptographic security.",
     "Source tests do not establish deployment exposure or exploitation.",
-    "Performance cannot compensate for a violated mandatory security property."
+    "Performance cannot compensate for a violated mandatory security property.",
+    "The cross-API nonce witness is conditional on both entry points using the same effective key; it does not assert every deployment has that configuration or that the Rust witness has executed until exact-head CI confirms it."
   ],
   "scoring_rules": {
     "accepted_finding_requires": [
@@ -208,6 +213,12 @@
       "id": "APPLICATION-EFFECT-CRASH-CONSISTENCY",
       "claim": "Across receiver crashes, authenticated replay admission and application effects cannot combine to produce duplicate effects or permanently lost committed effects; a real implementation must use a reviewed transaction, durable idempotency key, or inbox/outbox protocol.",
       "layer": "application-recovery",
+      "mandatory": true
+    },
+    {
+      "id": "GLOBAL-NONCE-NAMESPACE",
+      "claim": "Every AEAD invocation using the same effective key has a globally unique nonce, across packet, fragment, and other API domains.",
+      "layer": "cross-api-key-lifecycle",
       "mandatory": true
     }
   ],
@@ -509,6 +520,19 @@
       "strict_config": "docs/security/models/replay_effect_atomic_strict.cfg",
       "implementation_target": "PR #8519: CommitBeforeEffect; replay_commit_before_effect_legacy.cfg; replay_effect_atomic_strict.cfg",
       "positive_control": "After an authorized recovery, every durably admitted message has exactly one durable effect and duplicate deliveries do not reapply it.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-NONCE-006",
+      "property": "GLOBAL-NONCE-NAMESPACE",
+      "class": "adversarial",
+      "stimulus": "Under one test effective key, invoke both packet encryption and fragment encryption with a source/type/epoch/sequence/thought-id/index tuple chosen so their distinct nonce layouts emit identical 12-byte values; observe outputs from the actual helpers.",
+      "expected_legacy": "Packet and fragment helpers can emit nonce 112233445566008801020300 for source 1122334455660088, valid WisdomVector type 0x00, epoch 0x88, packet sequence 0x00030201 and fragment thought ID 0x0201/index 3. If the effective key is shared, the (key, nonce) pair repeats and equal-length ciphertexts expose plaintext XOR.",
+      "required_replacement": "Enforce reviewed purpose-specific effective keys across packet/fragment/control APIs, or prove globally disjoint nonce allocation under a shared key. Test the actual selected key material and emitted wire nonce; function names, route labels, or different layout descriptions are not evidence of key-domain separation. Fail closed where the configured key namespace cannot be established.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "PR #8558: RuntimeNoncePairOracle::observe and legacy_packet_and_fragment_apis_can_reuse_nonce_under_shared_key; add strict-path opposite-expectation tests after versioned key-domain remediation.",
+      "positive_control": "The same nonce bytes under genuinely distinct effective keys are not classified as a repeated (key, nonce) pair; fresh authorized sessions transfer valid traffic.",
       "status": "proposed"
     }
   ]
