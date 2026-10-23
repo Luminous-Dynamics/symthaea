@@ -34,7 +34,7 @@ pub struct MisRandomRegularConfig {
 impl MisRandomRegularConfig {
     /// Standard configuration with a bounded rejection budget.
     pub const fn new(vertex_count: usize, degree: usize, seed: u64) -> Self {
-        Self { vertex_count, degree, seed, max_attempts: 10_000 }
+        Self { vertex_count, degree, seed, max_attempts: 100_000 }
     }
 }
 
@@ -145,15 +145,17 @@ pub fn generate_mis_random_regular(
     }
     let mut rng = XorShift64::new(config.seed);
     for attempt in 1..=config.max_attempts {
-        let mut shuffled = stubs.clone();
-        for index in (1..shuffled.len()).rev() {
+        // Shuffle in place between attempts. A Fisher-Yates permutation remains uniform
+        // from any prior permutation; this also matches the seed-stream semantics of the
+        // cohort preflight so generated graph bytes can be compared exactly.
+        for index in (1..stubs.len()).rev() {
             let swap_with = sample_below(&mut rng, index + 1);
-            shuffled.swap(index, swap_with);
+            stubs.swap(index, swap_with);
         }
         let mut edges = Vec::with_capacity(stub_count / 2);
         let mut seen = HashSet::with_capacity(stub_count / 2);
         let mut simple = true;
-        for pair in shuffled.chunks_exact(2) {
+        for pair in stubs.chunks_exact(2) {
             let (u, v) = (pair[0], pair[1]);
             if u == v { simple = false; break; }
             let edge = if u < v { (u, v) } else { (v, u) };
@@ -178,10 +180,10 @@ pub fn generate_mis_random_regular(
 fn sample_below(rng: &mut XorShift64, upper: usize) -> usize {
     debug_assert!(upper > 0);
     let bound = upper as u64;
-    let accept_below = u64::MAX - (u64::MAX % bound);
+    let threshold = bound.wrapping_neg() % bound;
     loop {
         let value = rng.next_u64();
-        if value < accept_below { return (value % bound) as usize; }
+        if value >= threshold { return (value % bound) as usize; }
     }
 }
 
