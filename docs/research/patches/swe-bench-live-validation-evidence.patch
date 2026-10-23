@@ -1,0 +1,138 @@
+diff --git a/evaluation/validation.py b/evaluation/validation.py
+--- a/evaluation/validation.py
++++ b/evaluation/validation.py
+@@ -2,6 +2,7 @@
+ sys.path.insert(0, os.path.join(os.getcwd(), "launch"))
+ from launch.core.runtime import SetupRuntime
+ from launch.scripts.parser import run_parser
++import hashlib
+ import json
+ from typing import Literal, TypedDict
+ from fire import Fire
+@@ -9,6 +10,41 @@
+ 
+ TIMEOUT = 90*60
+ 
++
++def _exit_code(result):
++    """Return the shell exit code, or None if runtime metadata is missing."""
++    metadata = getattr(result, "metadata", None)
++    value = getattr(metadata, "exit_code", None)
++    try:
++        return int(value)
++    except (TypeError, ValueError):
++        return None
++
++
++def _runtime_identity(runtime):
++    """Capture the immutable image ID of the container that actually ran."""
++    docker_container = getattr(runtime, "container", None)
++    if docker_container is None:
++        return {"capture_error": "runtime exposes no Docker container handle"}
++    try:
++        docker_container.reload()
++        attrs = getattr(docker_container, "attrs", {}) or {}
++        image = getattr(docker_container, "image", None)
++        image_attrs = getattr(image, "attrs", {}) or {}
++        return {
++            "container_id": getattr(docker_container, "id", None) or attrs.get("Id"),
++            "configured_image": (attrs.get("Config") or {}).get("Image"),
++            "container_image_id": attrs.get("Image"),
++            "repo_digests": image_attrs.get("RepoDigests") or [],
++        }
++    except Exception as error:
++        return {"capture_error": f"{type(error).__name__}: {error}"}
++
++
++def _sha256_text(value):
++    return hashlib.sha256(value.encode("utf-8")).hexdigest()
++
++
+ class ExecutionResult(TypedDict):
+     instance_id: str
+     pre_patch_status: dict[str, Literal['pass', 'fail', 'skip']]
+@@ -47,30 +83,58 @@
+                     output_dir: str,
+                     ) -> ValidationResult:
+     container: SetupRuntime = SetupRuntime.from_launch_image(image, instance_id, platform, command_timeout=TIMEOUT)
+-    container.apply_patch(test_patch, verbose=True)
++    baseline_test_patch_applied = container.apply_patch(test_patch, verbose=True)
+     # Remember to rebuild after modifications to source codes !!!
+-    container.send_command(rebuild_cmd)
+-    container.send_command(test_cmd)
+-    pre_patch_log: str = container.send_command(print_cmd).output
++    baseline_rebuild_result = container.send_command(rebuild_cmd)
++    baseline_test_result = container.send_command(test_cmd)
++    baseline_print_result = container.send_command(print_cmd)
++    pre_patch_log: str = baseline_print_result.output
+     with open(os.path.join(output_dir, "pre_patch_log.txt"), "w", encoding="utf-8") as f:
+         f.write(pre_patch_log)
+     pre_patch_status: dict[str, Literal['pass', 'fail', 'skip']] = run_parser(parser, pre_patch_log)
++    baseline_evidence = {
++        "role": "baseline",
++        "test_patch_applied": baseline_test_patch_applied,
++        "rebuild_exit_code": _exit_code(baseline_rebuild_result),
++        "test_exit_code": _exit_code(baseline_test_result),
++        "print_exit_code": _exit_code(baseline_print_result),
++        "container_identity": _runtime_identity(container),
++        "log_sha256": _sha256_text(pre_patch_log),
++        "parsed_status": pre_patch_status,
++    }
+     container.cleanup()
+     del container
+ 
+     post_patch_status: dict[str, Literal['pass', 'fail', 'skip']] = {}
+     post_patch_status_under_inspect: dict[int, dict[str, Literal['pass', 'fail', 'skip']]] = {}
+     post_patch_log_accumulate: str = ""
++    gold_run_evidence = []
+     # 3 validation for stable states
+     for check in range(3):
+         container: SetupRuntime = SetupRuntime.from_launch_image(image, instance_id, platform, command_timeout=TIMEOUT)
+-        container.apply_patch(test_patch, verbose=True)
+-        container.apply_patch(solution_patch, verbose=True)
+-        container.send_command(rebuild_cmd)
+-        container.send_command(test_cmd)
+-        post_patch_log: str = container.send_command(print_cmd).output
++        test_patch_applied = container.apply_patch(test_patch, verbose=True)
++        solution_patch_applied = container.apply_patch(solution_patch, verbose=True)
++        rebuild_result = container.send_command(rebuild_cmd)
++        test_result = container.send_command(test_cmd)
++        print_result = container.send_command(print_cmd)
++        post_patch_log: str = print_result.output
++        with open(os.path.join(output_dir, f"gold_run_{check}.log"), "w", encoding="utf-8") as f:
++            f.write(post_patch_log)
+         post_patch_log_accumulate += f"eval No.{check} \n\n========  \n\n{post_patch_log} \n\n"
+-        post_patch_status_under_inspect[check] = run_parser(parser, post_patch_log)
++        parsed_status = run_parser(parser, post_patch_log)
++        post_patch_status_under_inspect[check] = parsed_status
++        gold_run_evidence.append({
++            "role": "gold",
++            "run_index": check,
++            "test_patch_applied": test_patch_applied,
++            "solution_patch_applied": solution_patch_applied,
++            "rebuild_exit_code": _exit_code(rebuild_result),
++            "test_exit_code": _exit_code(test_result),
++            "print_exit_code": _exit_code(print_result),
++            "container_identity": _runtime_identity(container),
++            "log_sha256": _sha256_text(post_patch_log),
++            "parsed_status": parsed_status,
++        })
+         container.cleanup()
+         del container
+     all_tests = set(post_patch_status_under_inspect[0].keys()) | set(post_patch_status_under_inspect[1].keys()) | set(post_patch_status_under_inspect[2].keys())
+@@ -102,6 +166,15 @@
+         print("Find one valid instance:", instance_id, flush=True)
+     with open(os.path.join(output_dir, "status.json"), "w", encoding="utf-8") as f:
+         json.dump(res, f, indent = True)
++    validation_evidence = {
++        "schema_version": 1,
++        "instance_id": instance_id,
++        "image_reference": image,
++        "baseline": baseline_evidence,
++        "gold_runs": gold_run_evidence,
++    }
++    with open(os.path.join(output_dir, "validation_evidence.json"), "w", encoding="utf-8") as f:
++        json.dump(validation_evidence, f, indent=2, sort_keys=True)
+     return res
+ 
+ def run_instance(instance: dict[str, str],
