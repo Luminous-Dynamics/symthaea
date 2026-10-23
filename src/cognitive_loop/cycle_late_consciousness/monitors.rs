@@ -174,7 +174,9 @@ impl CognitiveLoopService {
         let (meta_cognitive_accuracy, meta_cognitive_depth) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
                 if let Some(ref mut meta) = self.consciousness.self_model_tier.meta_cognition {
-                    meta.update_self_model(ctx.prediction_error);
+                    if ctx.prediction_error_valid {
+                        meta.update_self_model(ctx.prediction_error);
+                    }
                     meta.deepen_recursion();
                     let accuracy = meta.accuracy();
                     let depth = meta.depth();
@@ -227,6 +229,7 @@ impl CognitiveLoopService {
                 if let Some(ref mut body) = self.sensorimotor.vision_sensory.virtual_body {
                     let signals = crate::cognitive_loop::virtual_body::CognitiveSignals {
                         prediction_error: ctx.prediction_error,
+                        prediction_error_valid: ctx.prediction_error_valid,
                         coherence: ctx.coherence,
                         prediction_confidence: self.prediction_confidence as f32,
                         unified_psi: ctx.unified_psi,
@@ -294,8 +297,8 @@ impl CognitiveLoopService {
         // Primary path: update unified EmotionalBridge with somatic signals
         self.unification_engine
             .emotional
-            .update_from_somatic_signals(
-                ctx.prediction_error,
+            .update_from_somatic_signals_with_evidence(
+                ctx.prediction_error_valid.then_some(ctx.prediction_error),
                 ctx.surprise_triggered,
                 ctx.unified_psi,
                 moral_score,
@@ -306,8 +309,8 @@ impl CognitiveLoopService {
 
         // Legacy fallback: keep AffectiveBridge in sync (deprecated — will be removed)
         if let Some(ref mut bridge) = self.consciousness_state.affective_bridge {
-            bridge.evaluate_from_signals_with_social(
-                ctx.prediction_error,
+            bridge.evaluate_from_signals_with_evidence(
+                ctx.prediction_error_valid.then_some(ctx.prediction_error),
                 ctx.surprise_triggered,
                 ctx.unified_psi,
                 moral_score,
@@ -339,9 +342,10 @@ impl CognitiveLoopService {
         // Runs every cycle (lightweight: keyword detection + rolling averages)
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref mut usi) = self.language_comm.user_state {
-            let had_error =
-                ctx.prediction_error > super::super::thresholds::USER_STATE_ERROR_THRESHOLD;
-            usi.process(ctx.input, had_error);
+            let had_error = ctx.prediction_error_valid.then_some(
+                ctx.prediction_error > super::super::thresholds::USER_STATE_ERROR_THRESHOLD,
+            );
+            usi.process_with_error_evidence(ctx.input, had_error);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -351,18 +355,20 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let narrative_self_psi = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
             if let Some(ref mut narrative) = self.consciousness.self_model_tier.narrative_self {
-                let significance = if ctx.moral_concern_detected {
-                    super::super::thresholds::NARRATIVE_MORAL_SIGNIFICANCE
-                } else {
-                    (ctx.prediction_error as f64).clamp(0.0, 1.0)
-                };
-                narrative.process_experience(
-                    &ctx.hv16_cached,
-                    ctx.input,
-                    ctx.prediction_error < self.config.learning_threshold,
-                    ctx.coherence as f64,
-                    significance,
-                );
+                if ctx.prediction_error_valid {
+                    let significance = if ctx.moral_concern_detected {
+                        super::super::thresholds::NARRATIVE_MORAL_SIGNIFICANCE
+                    } else {
+                        (ctx.prediction_error as f64).clamp(0.0, 1.0)
+                    };
+                    narrative.process_experience(
+                        &ctx.hv16_cached,
+                        ctx.input,
+                        ctx.prediction_error < self.config.learning_threshold,
+                        ctx.coherence as f64,
+                        significance,
+                    );
+                }
                 narrative.self_phi()
             } else {
                 0.0
@@ -623,7 +629,9 @@ impl CognitiveLoopService {
         // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let attention_schema_focus = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
+        let attention_schema_focus = if ctx.prediction_error_valid
+            && ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4)
+        {
             if let Some(ref mut schema) = self.consciousness.self_model_tier.attention_schema {
                 let salience = ctx.prediction_error.max(0.1);
                 let update = schema.update(ctx.hv16_cached, salience);
