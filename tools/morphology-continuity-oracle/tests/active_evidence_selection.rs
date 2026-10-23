@@ -5,7 +5,7 @@
 //! fixture asks whether the action selector can distinguish evidence that truly
 //! partitions the remaining hypotheses from repeated observations that cannot.
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct CandidateAction {
     id: &'static str,
     /// Deterministic outcome under [damaged-chair history, intact-table history].
