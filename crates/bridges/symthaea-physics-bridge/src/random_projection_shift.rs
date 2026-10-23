@@ -198,7 +198,7 @@ impl RandomProjectionFeatureShiftScorer {
                 independent_audit,
                 AdequacyDiagnostic::QueryDistributionShift,
             )
-            .map_err(FeatureShiftError::Calibration)
+            .map_err(map_calibration_error)
     }
 
     /// Number of original input features.
@@ -215,6 +215,10 @@ impl RandomProjectionFeatureShiftScorer {
     pub fn projected_correlation_count(&self) -> usize {
         self.reference_projection_correlations.len()
     }
+}
+
+fn map_calibration_error(error: CalibrationError) -> FeatureShiftError {
+    FeatureShiftError::Calibration(error)
 }
 
 fn project_rows(
