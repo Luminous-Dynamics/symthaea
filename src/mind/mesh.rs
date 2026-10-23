@@ -285,6 +285,19 @@ mod authenticated_sequence_window_tests {
             windows.contains_key(&existing_key),
             "capacity handling must not evict an active authenticated stream"
         );
+
+        // The tick path runs this same expiry predicate before processing an
+        // inbox. Simulate an idle period beyond the freshness-safe retention
+        // interval and prove the table can recover capacity.
+        let after_expiry = now + std::time::Duration::from_secs(67);
+        windows.retain(|_, window| !window.is_expired(after_expiry));
+        assert!(windows.is_empty(), "all idle test windows should now be expired");
+        assert_eq!(
+            admit_authenticated_sequence(&mut windows, new_key, 1, after_expiry),
+            AuthenticatedReplayAdmission::Accepted,
+            "expired replay state must release capacity after its safe retention interval"
+        );
+        assert_eq!(windows.len(), 1);
     }
 }
 
