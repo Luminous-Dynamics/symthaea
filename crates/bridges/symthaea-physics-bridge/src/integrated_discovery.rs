@@ -198,6 +198,19 @@ fn evaluator_matches_reference(candidate: &Expr, reference: &Expr, holdout: &[Ex
     )
 }
 
+/// A candidate is only reference-equivalent for the combined domain contract when it agrees on
+/// both the discovery-range evaluator split and a genuinely out-of-range split.
+fn evaluator_matches_reference_across_domains(
+    candidate: &Expr,
+    reference: &Expr,
+    in_domain: &[Experiment],
+    out_of_domain: &[Experiment],
+) -> bool {
+    out_of_domain.len() >= 8
+        && evaluator_matches_reference(candidate, reference, in_domain)
+        && evaluator_matches_reference(candidate, reference, out_of_domain)
+}
+
 fn vars_used(e: &Expr, out: &mut HashSet<String>) {
     match e {
         Expr::Var(n) => {
@@ -1309,9 +1322,14 @@ fn run_trial_with_mode(
         && evaluator_matches_reference(&hypotheses[live[0]], &ground_truth, &extrapolation_holdout);
     // Evaluator-only audit of the initial candidate set. It runs after the policy ends and is
     // used only to identify accidentally oracle-present trials in the truth-absent track.
-    let initial_pool_contains_reference = initial_hypotheses
-        .iter()
-        .any(|candidate| evaluator_matches_reference(candidate, &ground_truth, &holdout));
+    let initial_pool_contains_reference = initial_hypotheses.iter().any(|candidate| {
+        evaluator_matches_reference_across_domains(
+            candidate,
+            &ground_truth,
+            &holdout,
+            &extrapolation_holdout,
+        )
+    });
 
     TrialOutcome {
         rounds_used: round,
