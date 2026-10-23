@@ -104,8 +104,9 @@ pub struct ErrorRateBounds {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RiskCoveragePoint {
-    /// Confidence threshold. All cases exactly tied at this score enter together.
-    pub confidence_threshold: f64,
+    /// None is the zero-coverage origin. Otherwise this inclusive threshold accepts all
+    /// cases at exactly the same confidence together.
+    pub confidence_threshold: Option<f64>,
     pub accepted_count: usize,
     /// Accepted cases divided by every case in the declared context universe.
     pub coverage: f64,
@@ -113,12 +114,12 @@ pub struct RiskCoveragePoint {
     pub unknown_accepted: usize,
     /// Observed errors divided by known-label accepted cases; conditional on ascertainment.
     pub observed_label_risk: Option<f64>,
-    /// Error-rate identification bounds over all accepted cases, including unknown labels.
-    pub error_rate_bounds: ErrorRateBounds,
+    /// None at zero coverage; otherwise empirical identification bounds, not confidence intervals.
+    pub error_rate_bounds: Option<ErrorRateBounds>,
     /// Known-label accepted cases divided by the full universe.
     pub observed_label_coverage: f64,
-    /// Known-label accepted cases divided by all accepted cases.
-    pub accepted_label_completeness: f64,
+    /// Known-label accepted cases divided by all accepted cases; None at zero coverage.
+    pub accepted_label_completeness: Option<f64>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -251,9 +252,11 @@ pub fn calibration_summary(
 }
 
 /// Build a deterministic risk–coverage curve by accepting highest-confidence cases first.
+/// The curve begins with an explicit zero-coverage origin whose undefined rates are None.
 /// The predicted class is positive iff p > 0.5 (ties predict negative). Cases with exactly
 /// equal confidence enter as one tier, avoiding an arbitrary within-tie threshold.
-/// Every point reports both observed-label risk and worst/best assignments of unknown labels.
+/// Every non-empty point reports observed-label risk and worst/best empirical assignments
+/// of unknown labels; these bounds are not confidence intervals.
 pub fn risk_coverage_curve(
     cases: &[ScoredCase],
 ) -> Result<Vec<RiskCoveragePoint>, SelectiveMetricError> {
@@ -270,7 +273,17 @@ pub fn risk_coverage_curve(
     let mut observed_label_accepted = 0_usize;
     let mut unknown_accepted = 0_usize;
     let mut errors = 0_usize;
-    let mut points = Vec::new();
+    let mut points = vec![RiskCoveragePoint {
+        confidence_threshold: None,
+        accepted_count: 0,
+        coverage: 0.0,
+        observed_label_accepted: 0,
+        unknown_accepted: 0,
+        observed_label_risk: None,
+        error_rate_bounds: None,
+        observed_label_coverage: 0.0,
+        accepted_label_completeness: None,
+    }];
     let mut index = 0_usize;
 
     while index < ranked.len() {
@@ -297,19 +310,19 @@ pub fn risk_coverage_curve(
         let accepted_f = accepted as f64;
         let known_f = observed_label_accepted as f64;
         points.push(RiskCoveragePoint {
-            confidence_threshold: threshold,
+            confidence_threshold: Some(threshold),
             accepted_count: accepted,
             coverage: accepted_f / total as f64,
             observed_label_accepted,
             unknown_accepted,
             observed_label_risk: (observed_label_accepted > 0)
                 .then(|| errors as f64 / known_f),
-            error_rate_bounds: ErrorRateBounds {
+            error_rate_bounds: Some(ErrorRateBounds {
                 lower: errors as f64 / accepted_f,
                 upper: (errors + unknown_accepted) as f64 / accepted_f,
-            },
+            }),
             observed_label_coverage: known_f / total as f64,
-            accepted_label_completeness: known_f / accepted_f,
+            accepted_label_completeness: Some(known_f / accepted_f),
         });
         index = end;
     }
@@ -466,9 +479,11 @@ mod tests {
             case("c", "g", 0.9, 0.5, OutcomeLabel::Positive),
         ];
         let curve = risk_coverage_curve(&cases).unwrap();
-        assert_eq!(curve.len(), 2);
-        assert_eq!(curve[0].accepted_count, 2);
-        assert!((curve[0].coverage - 2.0 / 3.0).abs() < 1e-12);
+        assert_eq!(curve.len(), 3);
+        assert_eq!(curve[0].confidence_threshold, None);
+        assert_eq!(curve[1].confidence_threshold, Some(0.7));
+        assert_eq!(curve[1].accepted_count, 2);
+        assert!((curve[1].coverage - 2.0 / 3.0).abs() < 1e-12);
     }
 
     #[test]
@@ -482,8 +497,9 @@ mod tests {
         let all = curve.last().unwrap();
         assert_eq!(all.accepted_count, 3);
         assert_eq!(all.unknown_accepted, 1);
-        assert!((all.error_rate_bounds.lower - 1.0 / 3.0).abs() < 1e-12);
-        assert!((all.error_rate_bounds.upper - 2.0 / 3.0).abs() < 1e-12);
+        let bounds = all.error_rate_bounds.unwrap();
+        assert!((bounds.lower - 1.0 / 3.0).abs() < 1e-12);
+        assert!((bounds.upper - 2.0 / 3.0).abs() < 1e-12);
         assert!((all.observed_label_risk.unwrap() - 0.5).abs() < 1e-12);
     }
 
@@ -496,7 +512,7 @@ mod tests {
         let curve = risk_coverage_curve(&cases).unwrap();
         let all = curve.last().unwrap();
         assert_eq!(all.observed_label_risk, None);
-        assert_eq!(all.error_rate_bounds, ErrorRateBounds { lower: 0.0, upper: 1.0 });
+        assert_eq!(all.error_rate_bounds, Some(ErrorRateBounds { lower: 0.0, upper: 1.0 }));
     }
 
     #[test]
@@ -508,9 +524,22 @@ mod tests {
         let summary = context_stratified_summary(&cases, 4).unwrap();
         assert_eq!(summary[0].context, "a-context");
         assert!(summary[0].calibration.is_none());
-        assert_eq!(summary[0].risk_coverage.len(), 1);
+        assert_eq!(summary[0].risk_coverage.len(), 2);
         assert_eq!(summary[1].context, "z-context");
         assert!(summary[1].calibration.is_some());
+    }
+
+    #[test]
+    fn zero_coverage_origin_has_undefined_rates() {
+        let cases = vec![case("a", "g", 0.9, 0.9, OutcomeLabel::Positive)];
+        let curve = risk_coverage_curve(&cases).unwrap();
+        let origin = &curve[0];
+        assert_eq!(origin.confidence_threshold, None);
+        assert_eq!(origin.accepted_count, 0);
+        assert_eq!(origin.coverage, 0.0);
+        assert_eq!(origin.observed_label_risk, None);
+        assert_eq!(origin.error_rate_bounds, None);
+        assert_eq!(origin.accepted_label_completeness, None);
     }
 
     #[test]
@@ -525,6 +554,6 @@ mod tests {
     fn prediction_tie_at_half_is_negative() {
         let cases = vec![case("a", "g", 0.5, 1.0, OutcomeLabel::Positive)];
         let curve = risk_coverage_curve(&cases).unwrap();
-        assert_eq!(curve[0].observed_label_risk, Some(1.0));
+        assert_eq!(curve[1].observed_label_risk, Some(1.0));
     }
 }
