@@ -4,7 +4,7 @@
 
 A monotonic in-memory counter is not sufficient to guarantee AEAD nonce uniqueness if two live processes can begin from the same snapshot and use the same effective traffic key. A VM, filesystem, device, or process snapshot can copy the sender identity, key material, epoch, counter, and local reservation state. If both copies transmit, each can independently emit the same nonce under the same key.
 
-RFC 8439 requires each 96-bit nonce to be different for each invocation using the same ChaCha20-Poly1305 key. Its security considerations explain that nonce reuse repeats the Poly1305 one-time key and keystream and can expose the XOR of plaintexts ([RFC 8439 §2.8 and §4](https://www.rfc-editor.org/rfc/rfc8439.html#section-4)). This model does not propose a new AEAD primitive; it makes the lifecycle assumption testable.
+RFC 8439 requires each 96-bit nonce to be different for each invocation using the same ChaCha20-Poly1305 key. Its security considerations explain that nonce reuse repeats the Poly1305 one-time key and keystream and can expose the XOR of plaintexts ([RFC 8439 §2.8 and §4](https://www.rfc-editor.org/rfc/rfc8439.html#section-4)). This model does not propose a new AEAD primitive; it makes the lifecycle assumption testable. The newly published [RFC 10033](https://www.rfc-editor.org/rfc/rfc10033.html) separately documents state reuse risks from process forks and VM cloning for stateful hash-based signatures, and recommends cryptographic hardware for rollback-resistant state. That RFC concerns a different primitive family, so it is corroborating lifecycle precedent—not a protocol specification for this mesh.
 
 ## Model
 
