@@ -214,6 +214,12 @@ impl ExperienceBus {
     /// - Low coherence → boost Coherence ("Does this hang together?")
     /// - High uncertainty → boost Play ("What haven't I tried?")
     pub fn update_wisdom_from_signals(&mut self) {
+        // The numeric PE can be held from an earlier valid observation for UI
+        // continuity. Do not replay it as a fresh wisdom update when the current
+        // cycle has no comparable prediction evidence.
+        if !self.current_signals.prediction_error_valid {
+            return;
+        }
         self.wisdom.update_from_experience(
             self.current_signals.prediction_error,
             self.current_signals.uncertainty,
