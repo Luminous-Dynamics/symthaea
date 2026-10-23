@@ -2233,7 +2233,7 @@ fn runtime_nonce_pair_oracle_detects_collision_and_accepts_rekey_control() {
 /// layout does not itself provide key-domain separation. These parameters make
 /// their generated 12-byte nonce prefixes identical under one shared key:
 ///
-/// packet:   source[0..6] | payload_type=0x77 | epoch=0x88 | seq=0x00030201 LE
+/// packet:   source[0..6] | payload_type=0x00 (WisdomVector) | epoch=0x88 | seq=0x00030201 LE
 /// fragment: source[0..8] | thought_id=0x0201 LE | fragment_index=3 | 0
 ///
 /// This is an executable cross-API collision witness, not a claim that every
@@ -2242,7 +2242,7 @@ fn runtime_nonce_pair_oracle_detects_collision_and_accepts_rekey_control() {
 #[test]
 fn legacy_packet_and_fragment_apis_can_reuse_nonce_under_shared_key() {
     let key = [0xC3u8; 32];
-    let source_id = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
+    let source_id = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x00, 0x88];
     let packet_plaintext = *b"packet-domain-000";
     let fragment_plaintext = *b"fragment-domain00";
     assert_eq!(packet_plaintext.len(), fragment_plaintext.len());
@@ -2251,7 +2251,7 @@ fn legacy_packet_and_fragment_apis_can_reuse_nonce_under_shared_key() {
         &packet_plaintext,
         &key,
         &source_id,
-        0x77,
+        PayloadType::WisdomVector as u8,
         0x88,
         0x0003_0201,
     );
