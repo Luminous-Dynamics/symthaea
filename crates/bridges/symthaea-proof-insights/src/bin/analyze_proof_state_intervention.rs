@@ -929,6 +929,17 @@ fn estimate(points: Vec<Point>, replicates: usize, seed: u64) -> Metric {
         grouped.entry(point.component_id.clone()).or_default().push(point.success);
     }
     let components: Vec<_> = grouped.keys().cloned().collect();
+    if components.len() < 2 {
+        // Cluster resampling cannot estimate between-component uncertainty from
+        // one independent component. Keep the point estimate; expose no interval.
+        return Metric {
+            numerator,
+            denominator,
+            estimate: Some(estimate),
+            lower_95: None,
+            upper_95: None,
+        };
+    }
     let mut rng = DeterministicRng::new(seed);
     let mut samples = Vec::with_capacity(replicates);
     for _ in 0..replicates {
@@ -1080,6 +1091,19 @@ mod tests {
         assert_eq!(percentile(&[], 0.5), None);
     }
 
+    #[test]
+    fn one_component_does_not_get_a_fictitious_confidence_interval() {
+        let points = vec![
+            Point { component_id: "single".into(), success: true },
+            Point { component_id: "single".into(), success: false },
+            Point { component_id: "single".into(), success: true },
+        ];
+        let result = estimate(points, 1000, 9);
+        assert_eq!(result.estimate, Some(2.0 / 3.0));
+        assert_eq!(result.lower_95, None);
+        assert_eq!(result.upper_95, None);
+    }
+
     fn checked_in_synthetic_inputs() -> (Value, Value) {
         // The dedicated workflow stages this crate under RUNNER_TEMP. Resolve
         // fixtures from an explicit repository root there; ordinary workspace
@@ -1192,5 +1216,52 @@ mod tests {
         )
         .expect_err("synthetic fixture must never claim an executed model result");
         assert!(error.to_string().contains("synthetic fixture cannot contain an executed model outcome"));
+    }
+
+    #[test]
+    fn checker_result_must_bind_to_exact_expected_statement_digest() {
+        let target_digest = "d".repeat(64);
+        let make_execution = |checked_target: &str| {
+            json!({
+                "status": "executed",
+                "model": {
+                    "model_id": "test-model",
+                    "model_version": "test-version",
+                    "config_sha256": "a".repeat(64)
+                },
+                "applicability_judgment": "eligible",
+                "decision": "apply_original_move",
+                "original_move_applied": true,
+                "checked_target_statement_sha256": checked_target,
+                "checker_result": "checked_success",
+                "proof_sha256": "b".repeat(64),
+                "run_receipt_sha256": "c".repeat(64),
+                "resource_usage": {
+                    "model_calls": 1,
+                    "input_tokens": 8,
+                    "output_tokens": 3,
+                    "wall_time_ms": 12,
+                    "cost_microusd": 4
+                }
+            })
+        };
+        assert!(
+            parse_execution(
+                &make_execution(&target_digest),
+                "test-execution",
+                "reviewed_benchmark",
+                &target_digest,
+            )
+            .is_ok()
+        );
+        let wrong_target = "e".repeat(64);
+        let error = parse_execution(
+            &make_execution(&wrong_target),
+            "test-execution",
+            "reviewed_benchmark",
+            &target_digest,
+        )
+        .expect_err("checker receipt bound to a different target must be rejected");
+        assert!(error.to_string().contains("does not match the paired suite target"));
     }
 }
