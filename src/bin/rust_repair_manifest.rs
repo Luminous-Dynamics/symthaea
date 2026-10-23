@@ -565,7 +565,8 @@ fn verify_logged_run(
     if run.get("test_patch_applied").and_then(Value::as_bool) != Some(true) {
         return Err("test patch application did not return true".to_string());
     }
-    if expectation.gold && run.get("solution_patch_applied").and_then(Value::as_bool) != Some(true) {
+    if expectation.gold && run.get("solution_patch_applied").and_then(Value::as_bool) != Some(true)
+    {
         return Err("gold solution patch application did not return true".to_string());
     }
     if command_exit_code(run, "workspace_clean_exit_code")? != 0 {
