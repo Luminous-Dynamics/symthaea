@@ -119,7 +119,7 @@ impl fmt::Display for ParetoMetricError {
                 f.write_str("objective normalization scales must be finite and positive")
             }
             Self::InvalidConfidenceMultiplier => {
-                f.write_str("confidence multiplier must be finite and non-negative")
+                f.write_str("objective confidence multipliers must be finite and non-negative")
             }
             Self::InvalidPredictionUncertainty => {
                 f.write_str("predicted means and standard deviations must be finite and standard deviations non-negative")
@@ -630,7 +630,7 @@ struct EpsilonGapProposal {
     upper_gap_endpoint_trial_id: u64,
     epsilon: f64,
     normalized_gap: f64,
-    confidence_multiplier: f64,
+    confidence_multipliers: [f64; 2],
     objective_0_lower_confidence_bound: f64,
     objective_1_upper_confidence_bound: f64,
 }
@@ -649,7 +649,7 @@ fn propose_largest_gap_epsilon(
     front: &[ParetoPoint],
     candidates: &[PredictedObjectiveCandidate],
     objective_scales: [f64; 2],
-    confidence_multiplier: f64,
+    confidence_multipliers: [f64; 2],
 ) -> Result<EpsilonGapProposal, ParetoMetricError> {
     if front.len() < 2 {
         return Err(ParetoMetricError::InsufficientFrontForGap);
@@ -663,7 +663,10 @@ fn propose_largest_gap_epsilon(
     {
         return Err(ParetoMetricError::InvalidObjectiveScale);
     }
-    if !confidence_multiplier.is_finite() || confidence_multiplier < 0.0 {
+    if confidence_multipliers
+        .iter()
+        .any(|multiplier| !multiplier.is_finite() || *multiplier < 0.0)
+    {
         return Err(ParetoMetricError::InvalidConfidenceMultiplier);
     }
 
@@ -749,8 +752,8 @@ fn propose_largest_gap_epsilon(
         {
             return Err(ParetoMetricError::InvalidPredictionUncertainty);
         }
-        let uncertainty_0 = confidence_multiplier * candidate.predictive_std_dev[0];
-        let uncertainty_1 = confidence_multiplier * candidate.predictive_std_dev[1];
+        let uncertainty_0 = confidence_multipliers[0] * candidate.predictive_std_dev[0];
+        let uncertainty_1 = confidence_multipliers[1] * candidate.predictive_std_dev[1];
         if !uncertainty_0.is_finite() || !uncertainty_1.is_finite() {
             return Err(ParetoMetricError::InvalidPredictionUncertainty);
         }
@@ -786,7 +789,7 @@ fn propose_largest_gap_epsilon(
         upper_gap_endpoint_trial_id: right.trial_id,
         epsilon,
         normalized_gap,
-        confidence_multiplier,
+        confidence_multipliers,
         objective_0_lower_confidence_bound: lcb_0,
         objective_1_upper_confidence_bound: ucb_1,
     })
@@ -1344,7 +1347,7 @@ mod tests {
 
     #[test]
     fn epsilon_gap_policy_targets_largest_normalized_gap_and_respects_ucb() {
-        let proposal = propose_largest_gap_epsilon(&gap_front(), &gap_candidates(), [1.0, 2.0], 1.0).unwrap();
+        let proposal = propose_largest_gap_epsilon(&gap_front(), &gap_candidates(), [1.0, 2.0], [1.0, 1.0]).unwrap();
         assert_eq!(proposal.lower_gap_endpoint_trial_id, 3);
         assert_eq!(proposal.upper_gap_endpoint_trial_id, 4);
         assert_abs_close(proposal.normalized_gap, 2.692582403567252, 1e-12);
@@ -1360,8 +1363,8 @@ mod tests {
         reversed_front.reverse();
         let mut reversed_candidates = gap_candidates();
         reversed_candidates.reverse();
-        let first = propose_largest_gap_epsilon(&gap_front(), &gap_candidates(), [1.0, 2.0], 1.0).unwrap();
-        let reversed = propose_largest_gap_epsilon(&reversed_front, &reversed_candidates, [1.0, 2.0], 1.0).unwrap();
+        let first = propose_largest_gap_epsilon(&gap_front(), &gap_candidates(), [1.0, 2.0], [1.0, 1.0]).unwrap();
+        let reversed = propose_largest_gap_epsilon(&reversed_front, &reversed_candidates, [1.0, 2.0], [1.0, 1.0]).unwrap();
         assert_eq!(first, reversed);
     }
 
@@ -1379,18 +1382,18 @@ mod tests {
                 predictive_std_dev: [0.0, 0.0],
             },
         ];
-        let proposal = propose_largest_gap_epsilon(&gap_front(), &candidates, [1.0, 2.0], 0.0).unwrap();
+        let proposal = propose_largest_gap_epsilon(&gap_front(), &candidates, [1.0, 2.0], [0.0, 0.0]).unwrap();
         assert_eq!(proposal.selected_candidate_id, 10);
     }
 
     #[test]
     fn epsilon_gap_policy_fails_closed_on_empty_and_invalid_inputs() {
         assert_eq!(
-            propose_largest_gap_epsilon(&gap_front()[..1], &gap_candidates(), [1.0, 2.0], 1.0),
+            propose_largest_gap_epsilon(&gap_front()[..1], &gap_candidates(), [1.0, 2.0], [1.0, 1.0]),
             Err(ParetoMetricError::InsufficientFrontForGap)
         );
         assert_eq!(
-            propose_largest_gap_epsilon(&gap_front(), &[], [1.0, 2.0], 1.0),
+            propose_largest_gap_epsilon(&gap_front(), &[], [1.0, 2.0], [1.0, 1.0]),
             Err(ParetoMetricError::EmptyPredictedCandidateSet)
         );
         assert_eq!(
@@ -1398,7 +1401,7 @@ mod tests {
             Err(ParetoMetricError::InvalidObjectiveScale)
         );
         assert_eq!(
-            propose_largest_gap_epsilon(&gap_front(), &gap_candidates(), [1.0, 2.0], f64::NAN),
+            propose_largest_gap_epsilon(&gap_front(), &gap_candidates(), [1.0, 2.0], [f64::NAN, 1.0]),
             Err(ParetoMetricError::InvalidConfidenceMultiplier)
         );
         let bad_uncertainty = [PredictedObjectiveCandidate {
@@ -1407,7 +1410,7 @@ mod tests {
             predictive_std_dev: [-0.1, 0.1],
         }];
         assert_eq!(
-            propose_largest_gap_epsilon(&gap_front(), &bad_uncertainty, [1.0, 2.0], 1.0),
+            propose_largest_gap_epsilon(&gap_front(), &bad_uncertainty, [1.0, 2.0], [1.0, 1.0]),
             Err(ParetoMetricError::InvalidPredictionUncertainty)
         );
     }
@@ -1427,7 +1430,7 @@ mod tests {
             },
         ];
         assert_eq!(
-            propose_largest_gap_epsilon(&gap_front(), &duplicate_ids, [1.0, 2.0], 1.0),
+            propose_largest_gap_epsilon(&gap_front(), &duplicate_ids, [1.0, 2.0], [1.0, 1.0]),
             Err(ParetoMetricError::DuplicateCandidateId)
         );
         let over_epsilon = [PredictedObjectiveCandidate {
@@ -1436,7 +1439,7 @@ mod tests {
             predictive_std_dev: [0.1, 0.1],
         }];
         assert_eq!(
-            propose_largest_gap_epsilon(&gap_front(), &over_epsilon, [1.0, 2.0], 1.0),
+            propose_largest_gap_epsilon(&gap_front(), &over_epsilon, [1.0, 2.0], [1.0, 1.0]),
             Err(ParetoMetricError::NoEpsilonFeasibleCandidate)
         );
     }
@@ -1449,7 +1452,7 @@ mod tests {
             ParetoPoint { trial_id: 2, objectives: [2.0, 2.0] },
         ];
         assert_eq!(
-            propose_largest_gap_epsilon(&dominated, &gap_candidates(), [1.0, 2.0], 1.0),
+            propose_largest_gap_epsilon(&dominated, &gap_candidates(), [1.0, 2.0], [1.0, 1.0]),
             Err(ParetoMetricError::InvalidParetoFront)
         );
 
@@ -1458,7 +1461,7 @@ mod tests {
             ParetoPoint { trial_id: 1, objectives: [2.0, 7.0] },
         ];
         assert_eq!(
-            propose_largest_gap_epsilon(&duplicate_ids, &gap_candidates(), [1.0, 2.0], 1.0),
+            propose_largest_gap_epsilon(&duplicate_ids, &gap_candidates(), [1.0, 2.0], [1.0, 1.0]),
             Err(ParetoMetricError::DuplicateTrialId)
         );
     }
