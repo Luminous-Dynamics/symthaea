@@ -470,6 +470,33 @@ mod tests {
     }
 
     #[test]
+    fn frontier_membership_frequency_exposes_graph_composition_sensitivity() {
+        // On g1, policy a dominates b; on g2, policy b dominates a. When the
+        // two graphs are equally weighted, their point estimates tie and both
+        // appear on the point frontier. A cluster bootstrap should show that
+        // either policy falls off the frontier when one graph is resampled twice.
+        let observations = vec![
+            observation("g1", point("a", 0.1, 0.0, 0.0, 0.1)),
+            observation("g1", point("b", 0.9, 0.0, 0.0, 0.9)),
+            observation("g2", point("a", 0.9, 0.0, 0.0, 0.9)),
+            observation("g2", point("b", 0.1, 0.0, 0.0, 0.1)),
+        ];
+        let config = MisParetoStabilityConfig {
+            replicates: 1_000,
+            seed: 2026,
+            dominance_tolerance: 0.0,
+        };
+        let first = mis_cost_pareto_frontier_stability(&observations, &metrics(), config).unwrap();
+        let replay = mis_cost_pareto_frontier_stability(&observations, &metrics(), config).unwrap();
+        assert_eq!(first, replay);
+        assert_eq!(first.point_frontier_policy_ids, vec!["a".to_owned(), "b".to_owned()]);
+        for entry in &first.entries {
+            assert!(entry.frontier_membership_frequency > 0.60);
+            assert!(entry.frontier_membership_frequency < 0.90);
+        }
+    }
+
+    #[test]
     fn rejects_missing_policy_duplicate_policy_and_single_cluster() {
         let cfg = MisParetoStabilityConfig { replicates: 10, seed: 9, dominance_tolerance: 0.0 };
         assert_eq!(
