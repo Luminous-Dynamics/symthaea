@@ -486,10 +486,11 @@ impl ExperienceBus {
             rules_applied.push("R1: uncertainty > 0.6 → CLARIFY".to_string());
         }
 
-        // Rule 2: High prediction error → PROBE
-        if signals.prediction_error > 0.5 {
+        // Rule 2: High valid prediction error → PROBE. A retained sentinel is
+        // diagnostic continuity, not current evidence of a surprising observation.
+        if signals.prediction_error_valid && signals.prediction_error > 0.5 {
             primitives.push("PROBE".to_string());
-            rules_applied.push("R2: prediction_error > 0.5 → PROBE".to_string());
+            rules_applied.push("R2: valid prediction_error > 0.5 → PROBE".to_string());
         }
 
         // Rule 3: Low coherence → RESTRUCTURE
@@ -744,7 +745,8 @@ mod tests {
         let similar = bus.retrieve_similar_experiences(&hdv);
         let signals = bus.compute_signals(&hdv, &similar);
 
-        assert_eq!(signals.prediction_error, 1.0); // No similar = high surprise
+        assert_eq!(signals.prediction_error, 1.0); // Compatibility diagnostic retained
+        assert!(!signals.prediction_error_valid);
     }
 
     #[test]
