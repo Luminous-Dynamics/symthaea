@@ -33,7 +33,7 @@ The LSH parameters are explicit and recorded in the output. The default store co
 
 To test the approximate path with its candidate-count and empty-result fallbacks disabled, run a separate arm with `--candidate-multiplier=0 --fallback-on-empty=false`. Keep the default-fallback arm as well: disabling fallback may improve latency while degrading recall, so neither arm is sufficient by itself.
 
-The example includes focused tests for deterministic workload replay, exact corruption count, Recall@K denominator behavior and latency percentile calculation. Run them with:
+The example includes seven focused source-level tests for deterministic workload replay, exact corruption count, clustered-neighborhood separation, Recall@K semantics including ties, and latency percentile calculation. Run them with:
 
 ```sh
 cargo test -p symthaea-hdc-store --example ann_benchmark
@@ -45,7 +45,8 @@ The CLI requires a full 40-hex source SHA that exactly matches `git rev-parse HE
 
 - The store contains deterministic, seeded 16,384-bit BinaryHV vectors inserted through the real HdcStore API. Each vector is a deterministic prototype for one of `--clusters=64` clusters, corrupted with `--cluster-noise-bits=1024` flips by default. This creates controlled, non-identical neighbors within a cluster and separated prototypes across clusters.
 - Eighty percent of query cases are known-memory probes: a stored vector is corrupted with `--noise-bits=128` additional flips. Twenty percent are random out-of-distribution (OOD) probes.
-- The exact full scan defines reference top-K IDs. Recall@K is intersection size divided by the number of exact top-K results (which is `min(K, live_count)`). For the synthetic OOD class, exact top-K is still a mathematical retrieval reference but does not imply there is a semantically relevant answer; do not use its Recall@K as the primary quality gate.
+- The exact full scan defines reference top-K IDs. **Exact-ID Recall@K** is intersection size divided by the number of exact top-K results (which is `min(K, live_count)`). The harness also reports **tie-aware Recall@K**, which treats an approximate neighbor as equivalent when its similarity is at least the exact Kth-neighbor similarity. This controls for interchangeable Hamming-score ties at the top-K boundary. Exact-ID recall remains the conventional strict metric; tie-aware recall is a complement, not a replacement.
+- For the synthetic OOD class, exact top-K is still a mathematical retrieval reference but does not imply there is a semantically relevant answer; do not use its Recall@K as the primary quality gate.
 - The LSH path reports vectors examined, total live vectors, exhaustive status and exact-fallback status.
 - Exact and approximate retrieval calls alternate order per query/round. Query creation, store construction, ID comparison and CSV output are outside the timed retrieval intervals.
 - The report separately emits quality and latency summaries for `near_neighbor` and `novel` queries. Quality is summarized from unique queries in round zero; latency percentiles use all repeated samples. Repeated rounds are latency repetitions, not independent statistical samples.
@@ -58,8 +59,9 @@ For a store size of 10,000 or more and at least 100 unique queries, the approxim
 
 | Measure | Initial target |
 |---|---:|
-| Mean Recall@K against exact results | ≥ 0.95 |
-| Worst individual-query Recall@K | ≥ 0.80 |
+| Mean exact-ID Recall@K against exact results | ≥ 0.95 |
+| Worst individual-query exact-ID Recall@K | ≥ 0.80 |
+| Mean tie-aware Recall@K | ≥ 0.98 |
 | Mean fraction of live vectors examined | ≤ 0.50 |
 | Fraction of exhaustive queries | ≤ 0.50 |
 | Fraction of queries that fell back to exact | ≤ 0.05 |
@@ -94,7 +96,7 @@ Archive the complete CSV (including its metadata and per-query exact/approximate
 - exact command line and exit status;
 - whether each sample is warm-cache, cold-cache or mixed, and whether the store was reconstructed between repetitions.
 
-The current program reports OS, target architecture, available parallelism, workload settings, source SHA, p50/p95 latency, recall, vector examinations and fallback/exhaustive fractions. A fully cold-cache test, memory/RSS accounting, energy measurements, production-scale corpus and confidence intervals are not implemented by this first slice. Record them separately rather than implying that the current CSV contains them.
+The current program reports OS, target architecture, available parallelism, workload settings, source SHA, p50/p95 latency, exact-ID and tie-aware recall, vector examinations and fallback/exhaustive fractions, with quality and latency summaries separated by query class. A fully cold-cache test, memory/RSS accounting, energy measurements, production-scale corpus and confidence intervals are not implemented by this first slice. Record them separately rather than implying that the current CSV contains them.
 
 ## Next gates
 
