@@ -83,3 +83,34 @@ sha256sum /tmp/energy-candidate.json
 The binary validates every generated candidate with the existing structural validator before writing. Unknown candidate IDs and invalid candidates fail with a nonzero exit; no fallback candidate is substituted. JSON output is deterministic for a pinned build and code path, but consumers must still validate against the pinned shared Symtropy schema and bind receipts to the exact bytes consumed.
 
 This is a serialized bridge primitive, not proof of cross-repository integration: the command still needs to be executed on the exact PR head, its bytes validated against the shared schema, and the single-candidate export compiled by Sol-Atlas and audited against its actual run report.
+
+
+## Bounded parametric design-space baseline
+
+A second, deliberately transparent generator path now sweeps a 36-point Cartesian design space around the existing PV+battery+grid topology:
+
+| Variable | Declared values |
+|---|---|
+| PV rated power | 1, 2, 3 kW |
+| Battery energy capacity | 1, 2, 3 kWh |
+| Battery charge/discharge power | 1, 2 kW |
+| Grid import power | 1, 2 kW |
+
+The enumerator mutates typed numeric claims and scenario resource availability together, assigns stable candidate IDs, runs the structural validator, and keeps a structured rejection record if a variant cannot be formed or validated. The design-space manifest reports the declared axes, requested/emitted/rejected candidates and an explicit synthetic-only claim ceiling.
+
+This is a bounded sizing sweep, not an unbounded architecture invention agent, nor a performance ranking. All 36 variants retain the same topology and two-interval synthetic scenario, so the immediate purpose is to establish a reproducible baseline and compare the downstream exact-dispatch/twin pipeline on more than one hand-picked point. Next steps should add an uncertainty-aware scenario family and controlled topology edits only with explicit connectivity and model-coverage checks.
+
+Example commands:
+
+```sh
+# Export the full 36-point bounded search manifest with rejection records.
+cargo run -p symthaea-engineering --bin energy_architecture_candidates -- \
+  --design-space --output /tmp/energy-design-space.json
+
+# Export one sizing variant as the exact candidate object consumed downstream.
+cargo run -p symthaea-engineering --bin energy_architecture_candidates -- \
+  --candidate-id synthetic-parametric-pv-1kw-battery-1kwh-battery-power-1kw-grid-1kw \
+  --output /tmp/energy-candidate.json
+```
+
+The unit suite asserts deterministic order/content, 36 unique IDs, schema-DTO round trips, structural validity of every emitted candidate, axis coverage, synchronized source limits and outage zeros, and preservation of unknown economic objectives.
