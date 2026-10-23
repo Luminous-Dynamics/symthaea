@@ -41,6 +41,8 @@ pub mod fixtures;
 pub mod interop;
 pub mod matrix;
 pub mod migration;
+pub mod mis_paired_inference;
+pub mod mis_unpaired_inference;
 pub mod noise_sweep;
 pub mod phase_hdc;
 pub mod preflight;
@@ -133,6 +135,18 @@ pub use schema::{
     RESEARCH_BUNDLE_SCHEMA, RESEARCH_RECEIPT_SCHEMA, known_schema_labels,
 };
 pub use significance::{PairedDifferenceSummary, exact_two_sided_sign_test_p_value};
+pub use mis_paired_inference::{
+    MisClusterBootstrapConfig, MisClusterBootstrapResult, MisInferenceError, MisMedianInterval,
+    MisSignFlipConfig, MisSignFlipMethod, MisSignFlipResult, MAX_EXACT_SIGN_FLIP_PAIRS,
+    hierarchical_cluster_bootstrap_mean, holm_bonferroni_adjust,
+    median_order_statistic_interval, paired_sign_flip_test,
+};
+pub use mis_unpaired_inference::{
+    MisUnpairedBootstrapConfig, MisUnpairedBootstrapResult, MisUnpairedInferenceError,
+    MisUnpairedPermutationConfig, MisUnpairedPermutationMethod, MisUnpairedPermutationResult,
+    unpaired_mean_bootstrap_interval, unpaired_mean_permutation_test,
+    MAX_EXACT_UNPAIRED_TOTAL,
+};
 pub use stability::{
     AlphaStability, StabilityRecord, catalog_has_no_deprecated_surfaces, stability_catalog,
 };
