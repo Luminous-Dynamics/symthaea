@@ -227,7 +227,7 @@ Research:
 - Conformal prediction with local weights: randomization enables robust guarantees, JRSS B (2025): https://academic.oup.com/jrsssb/article/87/2/549/7889096
 - Pournaderi, Sharp training-conditional coverage bounds under covariate shift (27 September 2026): https://arxiv.org/abs/2609.33456
 
-Five new tests cover a hand-calculated quantile including test-point mass, common weight-scale invariance, refusal when finite quantile mass is insufficient, invalid/zero-total weights, underflowing ratios and invalid alpha. Total: 40 authored test cases in this test-only module.
+Six new tests cover a hand-calculated quantile including test-point mass, common weight-scale invariance, refusal when finite quantile mass is insufficient, invalid/zero-total weights, underflowing ratios, invalid alpha, and an integration from weighted objective-1 calibration into the epsilon proposal policy. Total: 41 authored test cases in this test-only module.
 
 Focused command:
 
