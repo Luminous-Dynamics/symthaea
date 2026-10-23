@@ -7,8 +7,10 @@
 
 use symthaea_physics_bridge::adequacy_calibration::{
     minimum_component_p_fusion_score, standardized_residual_diagnostics,
-    sum_log_component_p_fusion_score, ConformalAdequacyCalibrator, ResidualDiagnosticScores,
+    standardized_rms_residual, sum_log_component_p_fusion_score,
+    ConformalAdequacyCalibrator, ResidualDiagnosticScores,
 };
+use symthaea_physics_bridge::feature_shift::FeatureShiftScorer;
 
 #[derive(Debug)]
 struct DeterministicNormalRng {
@@ -100,6 +102,100 @@ fn wilson_interval(successes: usize, trials: usize) -> (f64, f64) {
     let half_width =
         z * ((p * (1.0 - p) / n + z * z / (4.0 * n * n)).sqrt()) / denominator;
     (center - half_width, center + half_width)
+}
+
+fn correlated_feature_batch(
+    rng: &mut DeterministicNormalRng,
+    len: usize,
+    rho: f64,
+) -> Vec<Vec<f64>> {
+    let innovation_scale = (1.0 - rho * rho).sqrt();
+    (0..len)
+        .map(|_| {
+            let first = rng.next_normal();
+            let independent = rng.next_normal();
+            vec![first, rho * first + innovation_scale * independent]
+        })
+        .collect()
+}
+
+/// Covariate-shift counterexample: the conditional predictor can remain exact (zero residual)
+/// while the input feature correlation moves well outside its fixed reference distribution.
+#[test]
+fn feature_shift_detects_input_drift_when_residual_monitor_is_silent() {
+    const BATCH_SIZE: usize = 64;
+    const REFERENCE_ROWS: usize = 512;
+    const CALIBRATION_BATCHES: usize = 199;
+    const AUDIT_BATCHES: usize = 1_000;
+    const ALPHA: f64 = 0.05;
+
+    let mut rng = DeterministicNormalRng::new(0x6DA2_91F4_B783_C05E);
+    let reference = correlated_feature_batch(&mut rng, REFERENCE_ROWS, 0.0);
+    let scorer = FeatureShiftScorer::fit(&reference, 1e-8)
+        .expect("the reference has finite nonconstant two-feature rows");
+
+    let calibration_scores = (0..CALIBRATION_BATCHES)
+        .map(|_| {
+            scorer
+                .score(&correlated_feature_batch(&mut rng, BATCH_SIZE, 0.0))
+                .expect("clean calibration batch matches the fixed feature profile")
+                .aggregate
+        })
+        .collect::<Vec<_>>();
+    let feature_calibrator =
+        ConformalAdequacyCalibrator::new(&calibration_scores, ALPHA).unwrap();
+    let residual_calibration = vec![0.0; CALIBRATION_BATCHES];
+    let residual_calibrator =
+        ConformalAdequacyCalibrator::new(&residual_calibration, ALPHA).unwrap();
+
+    let mut clean_feature_alarms = 0_usize;
+    let mut shifted_feature_alarms = 0_usize;
+    let mut clean_residual_alarms = 0_usize;
+    let mut shifted_residual_alarms = 0_usize;
+
+    for _ in 0..AUDIT_BATCHES {
+        let clean = correlated_feature_batch(&mut rng, BATCH_SIZE, 0.0);
+        let shifted = correlated_feature_batch(&mut rng, BATCH_SIZE, 0.8);
+
+        let clean_feature_score = scorer.score(&clean).unwrap().aggregate;
+        let shifted_feature_score = scorer.score(&shifted).unwrap().aggregate;
+        clean_feature_alarms +=
+            calibrated_alarm(&feature_calibrator, clean_feature_score) as usize;
+        shifted_feature_alarms +=
+            calibrated_alarm(&feature_calibrator, shifted_feature_score) as usize;
+
+        // The predictor observes both input dimensions and remains exact in either regime.
+        // Residual-only monitoring therefore gets zero in both the clean and shifted batches.
+        let zero_residuals = [0.0_f64; 8];
+        let unit_scales = [1.0_f64; 8];
+        let clean_residual_score =
+            standardized_rms_residual(&zero_residuals, &zero_residuals, &unit_scales).unwrap();
+        let shifted_residual_score =
+            standardized_rms_residual(&zero_residuals, &zero_residuals, &unit_scales).unwrap();
+        clean_residual_alarms +=
+            calibrated_alarm(&residual_calibrator, clean_residual_score) as usize;
+        shifted_residual_alarms +=
+            calibrated_alarm(&residual_calibrator, shifted_residual_score) as usize;
+    }
+
+    let clean_rate = clean_feature_alarms as f64 / AUDIT_BATCHES as f64;
+    let shifted_rate = shifted_feature_alarms as f64 / AUDIT_BATCHES as f64;
+    let (clean_lower, clean_upper) = wilson_interval(clean_feature_alarms, AUDIT_BATCHES);
+    let (shift_lower, shift_upper) = wilson_interval(shifted_feature_alarms, AUDIT_BATCHES);
+    println!(
+        "covariate-correlation shift: clean feature alarms={clean_rate:.4} \
+         [{clean_lower:.4},{clean_upper:.4}], shifted alarms={shifted_rate:.4} \
+         [{shift_lower:.4},{shift_upper:.4}], residual alarms clean={clean_residual_alarms}, \
+         shifted={shifted_residual_alarms}"
+    );
+
+    assert!(clean_rate <= 0.09, "clean feature-shift alarm rate was {clean_rate:.4}");
+    assert!(
+        shifted_rate >= 0.80,
+        "feature-shift detection was too weak: {shifted_rate:.4}"
+    );
+    assert_eq!(clean_residual_alarms, 0);
+    assert_eq!(shifted_residual_alarms, 0);
 }
 
 /// Verify calibration with two null families beyond a single Gaussian/noise regime:
