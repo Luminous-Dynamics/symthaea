@@ -192,3 +192,10 @@ Strategic consequence: keep three scoreboards separate—(1) end-to-end prover P
 A source audit found a contract/enforcement gap: the suite schema described fixed theorem, goal, environment, toolchain and source identity, but the Rust analyzer had only joined each outcome to the suite's declared state fields. It did not require the target descriptor and both state descriptors to agree on all those invariant fields. The analyzer now checks source commit, statement digest, goal-type digest, environment digest, toolchain and goal count before accepting the pair. Regression controls mutate those fields and require fail-closed rejection.
 
 This protects against malformed paired tasks and label contamination where the intervention silently changes more than local context. It does not independently attest the replay receipts or the truthfulness of the state collector, and it is not a proof-transfer performance result.
+
+
+### 2026-10-24 update: validate counterfactual intervention semantics
+
+The paired-state analyzer now cross-checks the intervention kind against the declared operation, before/after declaration identity, presence/type/position fields, and expected precondition/action policy. This prevents a row from being labelled "required hypothesis cleared" when the operation or declaration receipt says otherwise. The synthetic contract fixture was corrected so its required-type digest matches the actual declared required-precondition type. Regression tests include operation mismatch, type mismatch, a falsely retained cleared declaration, and an end-to-end analyzer rejection.
+
+This is a consistency guard only: it cannot establish that the intervention was actually performed by Lean, that a precondition is mathematically necessary, or that a system successfully transferred an insight.
