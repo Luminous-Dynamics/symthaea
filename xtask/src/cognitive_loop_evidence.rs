@@ -55,8 +55,8 @@ pub fn validate_manifest(path: &Path) -> anyhow::Result<ManifestSummary> {
 fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
     ensure!(root.is_object(), "manifest root must be a JSON object");
     ensure!(
-        root.get("schema_version").and_then(Value::as_u64) == Some(1),
-        "schema_version must be the integer 1"
+        root.get("schema_version").and_then(Value::as_u64) == Some(2),
+        "schema_version must be the integer 2"
     );
     ensure!(
         string_field(root, "benchmark", "manifest")? == "symthaea-cognitive-loop-evidence",
@@ -345,7 +345,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
         json!({
-            "schema_version": 1,
+            "schema_version": 2,
             "benchmark": "symthaea-cognitive-loop-evidence",
             "status": "proposal-not-measured",
             "notes": ["A hard invariant cannot be averaged away."],
