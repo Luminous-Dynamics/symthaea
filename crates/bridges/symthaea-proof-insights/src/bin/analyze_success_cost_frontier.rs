@@ -253,7 +253,7 @@ fn parse_plan(value: &Value) -> Result<Plan> {
         bail!("frontier plan requires at least three arms and three distinct method classes");
     }
 
-    let mut budgets = Vec::new();
+    let mut budgets: Vec<Budget> = Vec::new();
     let mut budget_ids = BTreeSet::new();
     for (index, item) in array(value, "budget_levels", "plan")?.iter().enumerate() {
         let context = format!("budget_levels[{index}]");
@@ -664,10 +664,11 @@ fn analyze(
                                 && outcome.arm_id == right.id
                                 && outcome.budget_id == budget.id
                         }).context("right arm result disappeared after full-coverage validation")?;
-                        left_successes += usize::from(left_observation.success);
-                        right_successes += usize::from(right_observation.success);
+                        left_successes += if left_observation.success { 1 } else { 0 };
+                        right_successes += if right_observation.success { 1 } else { 0 };
                         let entry = cluster_deltas.entry(target.component_id.clone()).or_default();
-                        entry.0 += i64::from(left_observation.success) - i64::from(right_observation.success);
+                        entry.0 += (if left_observation.success { 1i64 } else { 0i64 })
+                            - (if right_observation.success { 1i64 } else { 0i64 });
                         entry.1 += 1;
                     }
                     let difference = (left_successes as f64 - right_successes as f64) / plan.targets.len() as f64;
@@ -780,7 +781,7 @@ fn group_rate_counts(selected: &[&Outcome]) -> BTreeMap<String, (u64, u64)> {
     let mut groups = BTreeMap::<String, (u64, u64)>::new();
     for outcome in selected {
         let entry = groups.entry(outcome.component_id.clone()).or_default();
-        entry.0 += u64::from(outcome.success);
+        entry.0 += if outcome.success { 1 } else { 0 };
         entry.1 += 1;
     }
     groups
