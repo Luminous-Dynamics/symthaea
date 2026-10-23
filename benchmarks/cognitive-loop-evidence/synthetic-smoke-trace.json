@@ -33,5 +33,8 @@
       "cycle_index": 138,
       "evidence_valid": true
     }
-  ]
+  ],
+  "detector_version": "synthetic-fixture-1",
+  "comparison_track": "valid-pe-only",
+  "label_delay_cycles": 0
 }
