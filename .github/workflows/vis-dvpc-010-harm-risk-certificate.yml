@@ -1,0 +1,45 @@
+name: VIS-DVPC-010 finite-sample harm risk certificate
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-harm-risk-certificate.rs"
+      - "docs/research/VIS_DVPC_010_HARM_RISK_CERTIFICATE_V1.md"
+      - ".github/workflows/vis-dvpc-010-harm-risk-certificate.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-harm-risk-certificate.rs"
+      - "docs/research/VIS_DVPC_010_HARM_RISK_CERTIFICATE_V1.md"
+      - ".github/workflows/vis-dvpc-010-harm-risk-certificate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust with rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check tools/vision-dvpc-harm-risk-certificate.rs
+
+      - name: Compile and run statistical contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2024 --test tools/vision-dvpc-harm-risk-certificate.rs -o /tmp/vis-dvpc-010-tests
+          /tmp/vis-dvpc-010-tests --test-threads=1 2>&1 | tee /tmp/vis-dvpc-010-test.log
+          grep -E 'test result: ok\. 14 passed; 0 failed;' /tmp/vis-dvpc-010-test.log
+
+      - name: Record exact-head evidence
+        run: |
+          git rev-parse HEAD
+          sha256sum tools/vision-dvpc-harm-risk-certificate.rs docs/research/VIS_DVPC_010_HARM_RISK_CERTIFICATE_V1.md
