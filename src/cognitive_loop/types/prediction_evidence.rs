@@ -250,7 +250,9 @@ mod tests {
 
     #[test]
     fn invalid_constructor_rejects_valid_status() {
-        assert!(PredictionErrorEvidence::invalid(PredictionEvidenceStatus::Valid, None, 1).is_err());
+        assert!(
+            PredictionErrorEvidence::invalid(PredictionEvidenceStatus::Valid, None, 1).is_err()
+        );
         assert!(PredictionErrorEvidence::valid(f32::NAN, None, 1).is_err());
     }
 
