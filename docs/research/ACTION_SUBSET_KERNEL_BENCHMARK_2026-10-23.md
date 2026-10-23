@@ -60,7 +60,7 @@ In the out-of-grid case, exact telemetry has lower mean graph log loss and Brier
 From the repository root, using Python 3.11+ and only the standard library:
 
 ```bash
-python3 -m unittest -v validation/test_action_subset_kernel_benchmark.py
+PYTHONPATH=validation python3 -m unittest -v test_action_subset_kernel_benchmark
 python3 validation/action_subset_kernel_benchmark.py --replicates 24 --samples-per-action 12 --source-git-blob ce19dccec3a81f4c6a18563de88152019b966f5d --output validation/action_subset_kernel_results_exact_2026-10-23.json
 ```
 
