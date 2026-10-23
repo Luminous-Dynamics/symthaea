@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-neuroarch-types"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Neutral canonical topology and evidence-contract types for Symthaea neuroarchitecture research"
+
+[dependencies]
+serde = { workspace = true }
+blake3 = { workspace = true }
