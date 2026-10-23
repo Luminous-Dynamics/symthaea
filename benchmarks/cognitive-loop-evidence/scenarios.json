@@ -614,7 +614,8 @@
       "labels_required": false,
       "input_contract": "Univariate valid PE or standardized residual stream; omit invalid/missing measurements and report coverage.",
       "implementation_status": "planned-baseline",
-      "source": "https://doi.org/10.1007/s41060-024-00620-y"
+      "source": "https://doi.org/10.1007/s41060-024-00620-y",
+      "comparison_track": "valid-pe-only"
     },
     {
       "id": "ewma-control-chart",
@@ -623,7 +624,8 @@
       "labels_required": false,
       "input_contract": "Univariate valid PE or standardized residual stream; freeze smoothing and alarm thresholds using a separate calibration stream.",
       "implementation_status": "planned-baseline",
-      "source": "https://doi.org/10.1007/s41060-024-00620-y"
+      "source": "https://doi.org/10.1007/s41060-024-00620-y",
+      "comparison_track": "valid-pe-only"
     },
     {
       "id": "page-hinkley",
@@ -632,7 +634,8 @@
       "labels_required": false,
       "input_contract": "Univariate numeric stream; use the same valid observations as the candidate and calibrate threshold away from scored seeds.",
       "implementation_status": "planned-baseline",
-      "source": "https://doi.org/10.1007/s41060-024-00620-y"
+      "source": "https://doi.org/10.1007/s41060-024-00620-y",
+      "comparison_track": "valid-pe-only"
     },
     {
       "id": "adwin",
@@ -641,7 +644,8 @@
       "labels_required": false,
       "input_contract": "Univariate numeric stream; compare on identical observation cadence and count only valid measurements.",
       "implementation_status": "planned-baseline",
-      "source": "https://riverml.xyz/latest/api/drift/ADWIN/"
+      "source": "https://riverml.xyz/latest/api/drift/ADWIN/",
+      "comparison_track": "valid-pe-only"
     },
     {
       "id": "kswin",
@@ -650,7 +654,8 @@
       "labels_required": false,
       "input_contract": "Univariate numeric stream; report window-size and significance-level sweeps on calibration seeds only.",
       "implementation_status": "planned-baseline",
-      "source": "https://riverml.xyz/latest/api/drift/KSWIN/"
+      "source": "https://riverml.xyz/latest/api/drift/KSWIN/",
+      "comparison_track": "valid-pe-only"
     },
     {
       "id": "discriminative-drift-detector",
@@ -659,7 +664,8 @@
       "labels_required": false,
       "input_contract": "Multivariate numeric observations or a frozen, documented feature embedding; no labels and no post-change test leakage.",
       "implementation_status": "external-adapter-required",
-      "source": "https://github.com/DFKI-NI/unsupervised-concept-drift-detection"
+      "source": "https://github.com/DFKI-NI/unsupervised-concept-drift-detection",
+      "comparison_track": "feature-only-unsupervised"
     },
     {
       "id": "image-based-drift-detector",
@@ -668,7 +674,8 @@
       "labels_required": false,
       "input_contract": "Multivariate observations transformed by a pinned time-window-to-image adapter; report transformation cost separately.",
       "implementation_status": "external-adapter-required",
-      "source": "https://github.com/DFKI-NI/unsupervised-concept-drift-detection"
+      "source": "https://github.com/DFKI-NI/unsupervised-concept-drift-detection",
+      "comparison_track": "feature-only-unsupervised"
     },
     {
       "id": "semi-parametric-log-likelihood",
@@ -677,7 +684,8 @@
       "labels_required": false,
       "input_contract": "Numerical multivariate reference window with documented clustering/covariance assumptions; no target labels; test abrupt and non-abrupt shifts separately.",
       "implementation_status": "external-adapter-required",
-      "source": "https://github.com/DFKI-NI/unsupervised-concept-drift-detection"
+      "source": "https://github.com/DFKI-NI/unsupervised-concept-drift-detection",
+      "comparison_track": "feature-only-unsupervised"
     },
     {
       "id": "seed",
