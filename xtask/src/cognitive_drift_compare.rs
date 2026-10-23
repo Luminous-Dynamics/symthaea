@@ -193,9 +193,18 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
 
     // Require a balanced scenario panel for every dataset and seed. Resampling must
     // not change the scenario mix while claiming a paired comparison.
+    let mut global_scenario_set: Option<BTreeSet<String>> = None;
     for (dataset_id, seeds) in &scenario_sets {
         let mut iterator = seeds.values();
         let reference = iterator.next().context("dataset has no seed/scenario records")?;
+        if let Some(global) = &global_scenario_set {
+            ensure!(
+                reference == global,
+                "unbalanced scenario panel for dataset {dataset_id}; all datasets must include the same scenarios"
+            );
+        } else {
+            global_scenario_set = Some(reference.clone());
+        }
         for scenarios in iterator {
             ensure!(
                 scenarios == reference,
@@ -471,6 +480,15 @@ mod tests {
     fn rejects_less_than_three_datasets() {
         let mut input = fixture(true);
         input.pairs.retain(|pair| pair.dataset_id != "dataset-c");
+        assert!(compare(input).is_err());
+    }
+
+    #[test]
+    fn rejects_dataset_with_missing_scenario_panel() {
+        let mut input = fixture(true);
+        input.pairs.retain(|pair| {
+            !(pair.dataset_id == "dataset-a" && pair.scenario_id == "gradual")
+        });
         assert!(compare(input).is_err());
     }
 
