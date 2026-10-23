@@ -64,9 +64,9 @@ The test source exercises:
 - latency-only admission failure without partial energy reservation;
 - energy-only admission failure without partial latency reservation;
 - multiple outstanding reservations competing for both resource caps;
-- unknown energy measurement with known latency, pair release, and blocked follow-on work;
-- single-resource reservation overrun;
-- total run-budget overrun;
+- unknown energy and unknown latency measurements independently, with pair release and blocked follow-on work;
+- latency and energy reservation overruns tested symmetrically;
+- total run-budget overrun reached through a valid ledger sequence;
 - unknown and duplicate settlement;
 - arithmetic overflow behavior;
 - unsafe cheap-path abstention when the estimate is missing;
