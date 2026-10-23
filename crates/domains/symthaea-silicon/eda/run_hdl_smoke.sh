@@ -60,6 +60,7 @@ oracle_generator_sha="$(hash_file "${oracle_generator}")"
 silicon_cargo_manifest_sha="$(hash_file "${silicon_cargo_manifest}")"
 canonical_binary_hv_sha="$(hash_file "${canonical_binary_hv}")"
 cargo_lock_sha="$(hash_file "${cargo_lock}")"
+oracle_fixture_receipt_sha="unavailable"
 git_head="$(git -C "${repo_root}" rev-parse HEAD 2>/dev/null || printf 'unavailable')"
 
 for required_file in "${rtl_xor}" "${tb_xor}" "${rtl_hamming}" "${tb_hamming}" "${oracle_generator}" "${silicon_cargo_manifest}" "${canonical_binary_hv}" "${cargo_lock}" "${manifest}" "${receipt_schema}" "${case_matrix}" "${receipt_validator}" "${flake_nix}" "${flake_lock}"; do
@@ -108,7 +109,12 @@ if (("${#missing[@]}" > 0)); then
     --arg receipt_validator_sha256 "${receipt_validator_sha}" \
     --arg flake_sha256 "${flake_sha}" \
     --arg flake_lock_sha256 "${flake_lock_sha}" \
-    '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, missing_tools:$missing_tools, source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,receipt_schema:$receipt_schema_sha256,case_matrix:$case_matrix_sha256,receipt_validator:$receipt_validator_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, widths_tested:[], architectures:["xor","linear_popcount","balanced_popcount"], case_results:[], output_directory:$out_dir, claim_ceiling:"No RTL simulation, formal proof, synthesis/PPA, FPGA observation, physical energy or SOTA claim."}' \
+    --arg oracle_generator_sha256 "${oracle_generator_sha}" \
+    --arg silicon_cargo_manifest_sha256 "${silicon_cargo_manifest_sha}" \
+    --arg canonical_binary_hv_sha256 "${canonical_binary_hv_sha}" \
+    --arg cargo_lock_sha256 "${cargo_lock_sha}" \
+    --arg oracle_fixture_receipt_sha256 "${oracle_fixture_receipt_sha}" \
+    '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, missing_tools:$missing_tools, source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,receipt_schema:$receipt_schema_sha256,case_matrix:$case_matrix_sha256,receipt_validator:$receipt_validator_sha256,oracle_generator:$oracle_generator_sha256,silicon_cargo_manifest:$silicon_cargo_manifest_sha256,canonical_binary_hv_source:$canonical_binary_hv_sha256,cargo_lock:$cargo_lock_sha256,oracle_fixture_receipt:$oracle_fixture_receipt_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256, widths_tested:[], architectures:["xor","linear_popcount","balanced_popcount"], case_results:[], output_directory:$out_dir, claim_ceiling:"No RTL simulation, formal proof, synthesis/PPA, FPGA observation, physical energy or SOTA claim."}' \
     > "${out_dir}/receipt.json"
   printf 'UNQUALIFIED: missing tools: %s\nReceipt: %s/receipt.json\n' "${missing[*]}" "${out_dir}" >&2
   exit 2
@@ -116,7 +122,7 @@ fi
 
 identity_failure=""
 if [[ ! "${git_head}" =~ ^[a-f0-9]{40}$ ]]; then identity_failure="git_head"; fi
-for digest in "${rtl_xor_sha}" "${tb_xor_sha}" "${rtl_hamming_sha}" "${tb_hamming_sha}" "${runner_sha}" "${manifest_sha}" "${receipt_schema_sha}" "${case_matrix_sha}" "${receipt_validator_sha}" "${flake_sha}" "${flake_lock_sha}"; do
+for digest in "${rtl_xor_sha}" "${tb_xor_sha}" "${rtl_hamming_sha}" "${tb_hamming_sha}" "${runner_sha}" "${manifest_sha}" "${receipt_schema_sha}" "${case_matrix_sha}" "${receipt_validator_sha}" "${flake_sha}" "${flake_lock_sha}" "${oracle_generator_sha}" "${silicon_cargo_manifest_sha}" "${canonical_binary_hv_sha}" "${cargo_lock_sha}"; do
   if [[ ! "${digest}" =~ ^[a-f0-9]{64}$ ]]; then identity_failure="source_hash"; break; fi
 done
 if [[ -n "${identity_failure}" ]]; then
@@ -137,7 +143,12 @@ if [[ -n "${identity_failure}" ]]; then
     --arg receipt_validator_sha256 "${receipt_validator_sha}" \
     --arg flake_sha256 "${flake_sha}" \
     --arg flake_lock_sha256 "${flake_lock_sha}" \
-    '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, missing_tools:[], source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,receipt_schema:$receipt_schema_sha256,case_matrix:$case_matrix_sha256,receipt_validator:$receipt_validator_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, widths_tested:[], architectures:["xor","linear_popcount","balanced_popcount"], case_results:[], output_directory:$out_dir, claim_ceiling:"No test started: Git checkout identity or a required source/configuration hash is unavailable."}' \
+    --arg oracle_generator_sha256 "${oracle_generator_sha}" \
+    --arg silicon_cargo_manifest_sha256 "${silicon_cargo_manifest_sha}" \
+    --arg canonical_binary_hv_sha256 "${canonical_binary_hv_sha}" \
+    --arg cargo_lock_sha256 "${cargo_lock_sha}" \
+    --arg oracle_fixture_receipt_sha256 "${oracle_fixture_receipt_sha}" \
+    '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, missing_tools:[], source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,receipt_schema:$receipt_schema_sha256,case_matrix:$case_matrix_sha256,receipt_validator:$receipt_validator_sha256,oracle_generator:$oracle_generator_sha256,silicon_cargo_manifest:$silicon_cargo_manifest_sha256,canonical_binary_hv_source:$canonical_binary_hv_sha256,cargo_lock:$cargo_lock_sha256,oracle_fixture_receipt:$oracle_fixture_receipt_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256, widths_tested:[], architectures:["xor","linear_popcount","balanced_popcount"], case_results:[], output_directory:$out_dir, claim_ceiling:"No test started: Git checkout identity or a required source/configuration hash is unavailable."}' \
     > "${out_dir}/receipt.json"
   printf 'UNQUALIFIED: Git checkout identity or source hash unavailable; receipt: %s/receipt.json\n' "${out_dir}" >&2
   exit 2
@@ -229,9 +240,14 @@ jq -n \
   --arg receipt_validator_sha256 "${receipt_validator_sha}" \
   --arg flake_sha256 "${flake_sha}" \
   --arg flake_lock_sha256 "${flake_lock_sha}" \
+  --arg oracle_generator_sha256 "${oracle_generator_sha}" \
+  --arg silicon_cargo_manifest_sha256 "${silicon_cargo_manifest_sha}" \
+  --arg canonical_binary_hv_sha256 "${canonical_binary_hv_sha}" \
+  --arg cargo_lock_sha256 "${cargo_lock_sha}" \
+  --arg oracle_fixture_receipt_sha256 "${oracle_fixture_receipt_sha}" \
   --argjson missing_tools "${missing_json}" \
   --argjson case_results "${case_results}" \
-  '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, widths_tested:[64,128,256,512], architectures:["xor","linear_popcount","balanced_popcount"], source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,receipt_schema:$receipt_schema_sha256,case_matrix:$case_matrix_sha256,receipt_validator:$receipt_validator_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, missing_tools:$missing_tools, case_results:$case_results, output_directory:$out_dir, claim_ceiling:"A pass qualifies only these word-level RTL/testbench cases. It is not formal proof, synthesis/PPA, FPGA observation, physical energy, throughput superiority or product/SOTA qualification."}' \
+  '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, widths_tested:[64,128,256,512], architectures:["xor","linear_popcount","balanced_popcount"], source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,receipt_schema:$receipt_schema_sha256,case_matrix:$case_matrix_sha256,receipt_validator:$receipt_validator_sha256,oracle_generator:$oracle_generator_sha256,silicon_cargo_manifest:$silicon_cargo_manifest_sha256,canonical_binary_hv_source:$canonical_binary_hv_sha256,cargo_lock:$cargo_lock_sha256,oracle_fixture_receipt:$oracle_fixture_receipt_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256, missing_tools:$missing_tools, case_results:$case_results, output_directory:$out_dir, claim_ceiling:"A pass qualifies only these word-level RTL/testbench cases. It is not formal proof, synthesis/PPA, FPGA observation, physical energy, throughput superiority or product/SOTA qualification."}' \
   > "${out_dir}/receipt.json"
 
 printf 'status=%s\nreceipt=%s/receipt.json\n' "${overall_status}" "${out_dir}/receipt.json"
