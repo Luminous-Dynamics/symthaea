@@ -177,6 +177,7 @@ def require_ready_event(path: Path, pr_block: list[str]) -> None:
 def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, int]:
     jobs = parse_jobs(text)
     runner_jobs = 0
+    pr_runner_jobs = 0
     draft_guarded = 0
     for job, block in jobs.items():
         if not has_runner_allocation(block):
@@ -185,6 +186,7 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
         expression = job_level_if_expression(block, job)
         if explicitly_excludes_pull_request(expression):
             continue
+        pr_runner_jobs += 1
         if not has_draft_guard(expression):
             raise SafetyError(
                 f"{path}: runner-capable job {job!r} lacks a job-level "
@@ -192,7 +194,11 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
             )
         draft_guarded += 1
 
-    if runner_jobs:
+    # A workflow may declare pull_request as an event but make every runner job
+    # dispatch/push/schedule-only. Such a workflow has no PR runner admission to
+    # protect and does not need ready_for_review. Requiring it based on runner_jobs
+    # alone contradicts the explicit non-PR guard handled above.
+    if pr_runner_jobs:
         require_ready_event(path, pr_block)
     return runner_jobs, draft_guarded
 
