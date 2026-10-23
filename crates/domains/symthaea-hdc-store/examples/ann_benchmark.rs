@@ -908,6 +908,38 @@ mod tests {
     }
 
     #[test]
+    fn lsh_config_parser_preserves_declared_sweep_order() {
+        assert_eq!(
+            parse_lsh_configs("32x8, 16x16,64x4").unwrap(),
+            vec![
+                LshConfig { bands: 32, rows: 8 },
+                LshConfig { bands: 16, rows: 16 },
+                LshConfig { bands: 64, rows: 4 },
+            ]
+        );
+    }
+
+    #[test]
+    fn lsh_config_parser_rejects_duplicates_and_invalid_arms() {
+        assert!(parse_lsh_configs("").is_err());
+        assert!(parse_lsh_configs("32x8,").is_err());
+        assert!(parse_lsh_configs("32x8,32x8").is_err());
+        assert!(parse_lsh_configs("0x8").is_err());
+        assert!(parse_lsh_configs("8x0").is_err());
+        assert!(parse_lsh_configs("not-an-arm").is_err());
+    }
+
+    #[test]
+    fn bootstrap_speedup_interval_is_reproducible_and_collapses_for_constant_data() {
+        let values = vec![2.0; 24];
+        let first = bootstrap_median_ci(&values, 12345);
+        let second = bootstrap_median_ci(&values, 12345);
+        assert_eq!(first, second);
+        assert_eq!(first, (2.0, 2.0));
+        assert_eq!(median_f64(&values), 2.0);
+    }
+
+    #[test]
     fn clustered_corpus_separates_within_cluster_from_between_cluster_similarity() {
         let config = Config {
             source_sha: "0123456789abcdef0123456789abcdef01234567".into(),
