@@ -18,7 +18,7 @@
     },
     {
       "pull_request": 8471,
-      "scope": "bounded nonce-lifecycle TLA+ model"
+      "scope": "bounded packet/fragment nonce lifecycle model, deterministic restart reset, counter wrap, truncated sender prefix collision, and nondeterministic 8-bit restart-epoch collision"
     },
     {
       "pull_request": 8491,
