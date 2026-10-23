@@ -47,9 +47,9 @@ A result has a single explicit `claim_ceiling`; it may not be promoted to a stro
 
 ## Preregistered scenarios
 
-The current versioned registry defines **20 security properties and 17 scenarios**. Both the scenario registry and the eventual run receipt have separate Draft 2020-12 schema contracts. All scenarios remain proposed and unexecuted until each has an exact implementation/model oracle and a machine-readable receipt.
+The current versioned registry defines **20 security properties and 18 scenarios**. Both the scenario registry and the eventual run receipt have separate Draft 2020-12 schema contracts. All scenarios remain proposed and unexecuted until each has an exact implementation/model oracle and a machine-readable receipt.
 
-The current registry separates nonce uniqueness, sender namespace, restart/rollback, counter wrap, snapshot cloning, key-rotation boundaries, fragmentation/MTU, transport-authenticated source binding, cleartext fallback, replay-window poisoning, spoofed-source rate-limit exhaustion, identity/transcript binding, mutual confirmation, real backend availability, downgrade, replay, resource limits and interoperability. Each scenario declares both a legacy expectation and a required replacement observation.
+The current registry separates nonce uniqueness, sender namespace, restart/rollback, counter wrap, snapshot cloning, key-rotation boundaries, fragmentation/MTU, transport-authenticated source binding, cleartext fallback, replay-window poisoning, spoofed-source rate-limit exhaustion, replay-table capacity exhaustion/recovery, identity/transcript binding, mutual confirmation, real backend availability, downgrade, replay, resource limits and interoperability. Each scenario declares both a legacy expectation and a required replacement observation.
 
 The known-failure cases are calibration, never novel discoveries. An attack task counts as correctly solved only when its specified witness is reproduced and its positive controls remain green. A repair only scores when it rejects the same attack and preserves valid controls on the exact repair revision.
 
