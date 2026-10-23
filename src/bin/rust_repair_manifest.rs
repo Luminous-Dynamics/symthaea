@@ -1455,6 +1455,8 @@ mod tests {
                 "run_index": run_index,
                 "test_patch_applied": true,
                 "solution_patch_applied": true,
+                "repo_head_exit_code": 0,
+                "repo_head_sha": "a".repeat(40),
                 "rebuild_exit_code": 0,
                 "test_exit_code": gold_test_exit_code,
                 "print_exit_code": 0,
@@ -1476,6 +1478,8 @@ mod tests {
             "baseline": {
                 "role": "baseline",
                 "test_patch_applied": true,
+                "repo_head_exit_code": 0,
+                "repo_head_sha": "a".repeat(40),
                 "rebuild_exit_code": 0,
                 "test_exit_code": 1,
                 "print_exit_code": 0,
@@ -1619,6 +1623,37 @@ mod tests {
         assert!(result.audit.unresolved);
         assert!(result.manifest_record.is_none());
         assert!(result.audit.reasons.iter().any(|reason| reason.contains("test-ID sets differ")));
+    }
+
+    #[test]
+    fn container_checkout_must_match_task_base_commit() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-wrong-checkout";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail")],
+            &[("bug-fixed", "pass")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let bytes = fs::read(&evidence_path).unwrap();
+        let mut evidence: Value = serde_json::from_slice(&bytes).unwrap();
+        evidence["gold_runs"][1]["repo_head_sha"] = Value::String("b".repeat(40));
+        fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"wrong checkout row"),
+        );
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result.audit.reasons.iter().any(|reason| {
+            reason.contains("repository HEAD differs from task base_commit")
+        }));
     }
 
     #[test]
@@ -1825,7 +1860,10 @@ mod tests {
         let controller = ControllerTaskRecord {
             run_index: 0,
             instance_id: "owner__repo-issue-1".to_string(),
-            docker_image: "image@sha256:deadbeef".to_string(),
+            repo_head_sha: "a".repeat(40),
+            docker_image_reference: "image@sha256:deadbeef".to_string(),
+            container_image_id: format!("sha256:{}", "b".repeat(64)),
+            network_mode: "none".to_string(),
         };
         let projected = serde_json::to_value(controller).unwrap();
         assert_eq!(
@@ -1833,7 +1871,10 @@ mod tests {
             serde_json::json!({
                 "run_index": 0,
                 "instance_id": "owner__repo-issue-1",
-                "docker_image": "image@sha256:deadbeef"
+                "repo_head_sha": "a".repeat(40),
+                "docker_image_reference": "image@sha256:deadbeef",
+                "container_image_id": format!("sha256:{}", "b".repeat(64)),
+                "network_mode": "none"
             })
         );
         let serialized = projected.to_string();
