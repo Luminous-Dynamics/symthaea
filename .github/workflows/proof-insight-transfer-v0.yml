@@ -616,6 +616,60 @@ jobs:
           assert report["metrics"] == {}, "synthetic fixtures must not generate model performance metrics"
           assert report["confirmatory_decision"] == "not_evaluated_synthetic_fixture"
           assert report["resource_usage"]["executed_rows_with_usage"] == 0
+
+          # Exercise the report schema's interval/component coupling directly.
+          # This does not substitute for Rust unit tests or prospective power analysis.
+          metric_validator = Draft202012Validator(
+              schema["properties"]["metrics"]["additionalProperties"],
+              format_checker=FormatChecker()
+          )
+
+          def metric(status, components, denominator, estimate, lower, upper):
+              return {
+                  "numerator": 0 if denominator == 0 else 1,
+                  "denominator": denominator,
+                  "estimate": estimate,
+                  "independent_components": components,
+                  "confidence_interval_95": {
+                      "method": "component_clustered_percentile_bootstrap",
+                      "status": status,
+                      "lower": lower,
+                      "upper": upper
+                  }
+              }
+
+          metric_validator.validate(metric(
+              "reported_descriptive_interval", 20, 20, 0.5, 0.2, 0.8
+          ))
+          metric_validator.validate(metric(
+              "suppressed_insufficient_independent_components", 19, 19, 0.5, None, None
+          ))
+          metric_validator.validate(metric(
+              "not_reported_no_observations", 0, 0, None, None, None
+          ))
+
+          def expect_metric_reject(value, description):
+              try:
+                  metric_validator.validate(value)
+              except Exception as error:
+                  if error.__class__.__name__ == "ValidationError":
+                      return
+                  raise
+              raise SystemExit(f"interval schema accepted an inconsistent metric: {description}")
+
+          expect_metric_reject(
+              metric("reported_descriptive_interval", 19, 19, 0.5, 0.2, 0.8),
+              "reported interval below the 20-component floor"
+          )
+          expect_metric_reject(
+              metric("suppressed_insufficient_independent_components", 19, 19, 0.5, 0.2, None),
+              "suppressed interval with a numeric bound"
+          )
+          expect_metric_reject(
+              metric("not_reported_no_observations", 0, 1, 0.5, None, None),
+              "no-observations status with a nonempty denominator"
+          )
+          print("PITB_INTERVAL_SCHEMA_CONTROLS_PASS: 3 valid metric states; 3 inconsistent states rejected")
           print("PITB_PROOF_STATE_ANALYZER_PASS: 4 synthetic pairs/8 not_run rows; no model metrics emitted")
           PY
       - name: Validate insight schema and synthetic positive/negative controls
