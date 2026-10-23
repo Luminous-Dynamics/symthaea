@@ -440,7 +440,7 @@ fn failure_receipt_json(path: &str, failure: &RunFailure, seed_base: u64) -> Str
     format!(
         concat!(
             "{{\n",
-            "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.mis-smoke-run.v4\",\n",
+            "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.mis-smoke-run.v5\",\n",
             "  \"benchmark_track\": \"correctness-smoke-not-competitive\",\n",
             "  \"return_status\": \"failed\",\n",
             "  \"source_path\": \"{}\",\n",
@@ -474,7 +474,7 @@ fn failure_receipt_json(path: &str, failure: &RunFailure, seed_base: u64) -> Str
     )
 }
 
-fn run(path: &str, seed_base: u64) -> Result<(), RunFailure> {
+fn run(path: &str, seed_base: u64, target_objective: Option<usize>) -> Result<(), RunFailure> {
     let end_to_end_start = Instant::now();
     let limits = MisDimacsLimits::default();
     let metadata = fs::metadata(path).map_err(|error| RunFailure {
@@ -515,6 +515,20 @@ fn run(path: &str, seed_base: u64) -> Result<(), RunFailure> {
         elapsed_ns: end_to_end_start.elapsed().as_nanos(),
     })?;
     let parse_ns = parse_start.elapsed().as_nanos();
+
+    if target_objective.is_some_and(|target| target > parsed.declared_vertex_count) {
+        return Err(RunFailure {
+            kind: "target_out_of_range",
+            message: format!(
+                "target objective {} exceeds vertex count {}",
+                target_objective.unwrap_or(0),
+                parsed.declared_vertex_count
+            ),
+            source_bytes: Some(source.len()),
+            source_fnv1a64: Some(source_hash),
+            elapsed_ns: end_to_end_start.elapsed().as_nanos(),
+        });
+    }
 
     let greedy_run = greedy_min_residual_degree_with_seed_trace(&parsed.graph, None);
     let greedy = &greedy_run.vertices;
@@ -616,12 +630,13 @@ fn run(path: &str, seed_base: u64) -> Result<(), RunFailure> {
         portfolio.best_vertices.iter().map(|vertex| (vertex + 1).to_string()).collect::<Vec<_>>().join(",")
     );
     let normalized = format!(
-        "v4|source={}|vertices={}|edges={}|seed_base={}|restarts={}|greedy-min-residual-degree|{}|portfolio={}|local_max_vertices={}|local_pair_budget={}|local={}|exact_max_vertices={}|exact={}",
+        "v5|source={}|vertices={}|edges={}|seed_base={}|restarts={}|target={}|greedy-min-residual-degree|{}|portfolio={}|local_max_vertices={}|local_pair_budget={}|local={}|exact_max_vertices={}|exact={}",
         format!("{source_hash:016x}"),
         parsed.declared_vertex_count,
         parsed.declared_edge_count,
         seed_base,
         MULTISTART_GREEDY_RUNS,
+        target_objective.map(|value| value.to_string()).unwrap_or_else(|| "none".to_owned()),
         greedy.iter().map(|vertex| (vertex + 1).to_string()).collect::<Vec<_>>().join(","),
         portfolio_normalized,
         LOCAL_SEARCH_MAX_VERTICES,
@@ -638,7 +653,7 @@ fn run(path: &str, seed_base: u64) -> Result<(), RunFailure> {
     println!(
         concat!(
             "{{\n",
-            "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.mis-smoke-run.v4\",\n",
+            "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.mis-smoke-run.v5\",\n",
             "  \"benchmark_track\": \"correctness-smoke-not-competitive\",\n",
             "  \"return_status\": \"completed\",\n",
             "  \"source_path\": \"{}\",\n",
@@ -646,6 +661,7 @@ fn run(path: &str, seed_base: u64) -> Result<(), RunFailure> {
             "  \"source_fnv1a64\": \"{:016x}\",\n",
             "  \"vertices\": {},\n",
             "  \"edges\": {},\n",
+            "  \"target_objective\": {},\n",
             "  \"greedy\": {{\"policy\": \"minimum-residual-degree-then-lowest-index\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"elapsed_ns\": {}}},\n",
             "  \"multi_start_greedy\": {{\"policy\": \"minimum-residual-degree-seeded-ties\", \"runs\": {}, \"best_seed\": \"{}\", \"best_objective\": {}, \"feasible\": {}, \"distinct_solutions\": {}, \"objectives_by_run\": {}, \"vertices_one_based\": {}, \"elapsed_ns\": {}}},\n",
             "  \"local_improvement\": {{\"neighborhood\": \"one-selected-for-two-unselected\", \"status\": \"{}\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"exchanges\": {}, \"pair_checks\": {}, \"elapsed_ns\": {}}},\n",
@@ -656,6 +672,7 @@ fn run(path: &str, seed_base: u64) -> Result<(), RunFailure> {
             "  \"resource_limits\": {{\"time_limit_ns\": null, \"memory_limit_bytes\": null, \"max_input_bytes\": {}, \"max_vertices\": {}, \"max_edges\": {}}},\n",
             "  \"normalized_result_fnv1a64\": \"{:016x}\",\n",
             "  \"qoblib_objective_time_series\": {{\"deterministic_greedy\": {}, \"multi_start_greedy_per_trial\": {}, \"local_improvement_stage\": {}}},\n",
+            "  \"target_analysis\": {},\n",
             "  \"randomness\": {{\"seed_base\": \"{}\", \"restarts\": {}, \"policy\": \"XorShift64 seeded tie-breaks\"}},\n",
             "  \"limitations\": [\"FNV-1a is a non-cryptographic integrity checksum\", \"wall-clock timings are local diagnostics and are not comparable across machines without a controlled protocol\", \"the bounded exact oracle is a correctness reference, not a competitive solver\", \"this run does not execute a quantum backend\"]\n",
             "}}"
@@ -665,6 +682,7 @@ fn run(path: &str, seed_base: u64) -> Result<(), RunFailure> {
         source_hash,
         parsed.declared_vertex_count,
         parsed.declared_edge_count,
+        target_objective.map(|value| value.to_string()).unwrap_or_else(|| "null".to_owned()),
         greedy_report.computed_objective,
         greedy_report.feasible,
         json_vertices(greedy),
@@ -704,6 +722,12 @@ fn run(path: &str, seed_base: u64) -> Result<(), RunFailure> {
         local.as_ref()
             .map(|result| qoblib_many_runs_series_json(&[result.objective_time_series.clone()]))
             .unwrap_or_else(|| "null".to_owned()),
+        target_analysis_json(
+            target_objective,
+            &greedy_run.objective_time_series,
+            &portfolio.objective_time_series,
+            local.as_ref().map(|result| result.objective_time_series.as_slice()),
+        ),
         seed_base.to_string(),
         MULTISTART_GREEDY_RUNS
     );
