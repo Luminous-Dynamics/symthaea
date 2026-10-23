@@ -1,0 +1,13 @@
+
+# RQ-006 integration qualification overlay.
+# This fragment is appended to the frozen product Cargo.toml only inside the
+# qualification process, then the product manifest is restored byte-for-byte.
+# It creates executable Cargo targets for the exact checked-in evidence programs
+# without changing the frozen product package metadata.
+[[example]]
+name = "benchmark_metacognitive_context"
+path = "examples/benchmark_metacognitive_context.rs"
+
+[[example]]
+name = "build_reasoning_capability_matrix"
+path = "examples/build_reasoning_capability_matrix.rs"

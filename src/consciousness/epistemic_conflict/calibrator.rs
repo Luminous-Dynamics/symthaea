@@ -3,36 +3,43 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Theory Calibrator
 //!
-//! Manages per-theory Brier scores, reliability weights, and the
-//! γ parameter for `Φ_eff = Φ × R^γ`. All updates are bounded
-//! by INV-9 to prevent reckless self-modification.
+//! Manages per-theory Brier/reliability calibration and the γ parameter for
+//! `Φ_eff = Φ × R^γ`.
+//!
+//! ## Gamma authority boundary
+//!
+//! Posthoc history currently records only `(gate_passed, outcome_was_good)`. That is sufficient
+//! for descriptive gate-outcome telemetry, but it cannot identify what the gate *would have done*
+//! under a different γ. Candidate-γ fitting therefore remains disabled until replayable decision
+//! context (or another independently justified calibration objective) is available and qualified.
+//! This is intentionally safer than applying a numerically bounded but causally unidentified
+//! self-update.
 
 use super::types::{MultiTheoryMetrics, TheoryCalibrations, TheoryId};
 use serde::{Deserialize, Serialize};
 
-/// Maximum single-step change in γ (INV-9).
-const DELTA_GAMMA_MAX: f64 = 0.1;
+/// Current configured γ prior. Automatic adaptation is intentionally frozen; see module docs.
+const DEFAULT_GAMMA: f64 = 2.0;
 
-/// Minimum observations before γ re-estimation.
-const GAMMA_MIN_OBSERVATIONS: usize = 200;
-
-/// γ bounds: [1.0, 4.0].
-const GAMMA_MIN: f64 = 1.0;
-const GAMMA_MAX: f64 = 4.0;
-
-/// The calibrator manages reliability weights and γ.
+/// The calibrator manages per-theory reliability weights and the current γ setting.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TheoryCalibrator {
     /// Per-theory calibrations.
     pub calibrations: TheoryCalibrations,
 
     /// Current γ value for Φ_eff = Φ × R^γ.
+    ///
+    /// This remains public for backward compatibility and explicit operator/configuration control,
+    /// but `record_outcome` does not mutate it from non-replayable posthoc history.
     pub gamma: f64,
 
-    /// Calibration version (incremented on each update for reproducibility).
+    /// Calibration version, incremented only when an actual calibrated parameter changes.
     pub version: u64,
 
-    /// History of (gate_passed, outcome_was_good) for γ calibration.
+    /// Descriptive history of (gate_passed, outcome_was_good).
+    ///
+    /// This history is deliberately *not* treated as sufficient evidence for counterfactual γ
+    /// optimization because it lacks the decision context needed to replay alternative γ values.
     posthoc_outcomes: Vec<(bool, bool)>,
 }
 
@@ -40,7 +47,7 @@ impl TheoryCalibrator {
     pub fn new() -> Self {
         Self {
             calibrations: TheoryCalibrations::new(),
-            gamma: 2.0, // initial value per spec
+            gamma: DEFAULT_GAMMA,
             version: 0,
             posthoc_outcomes: Vec::new(),
         }
@@ -105,68 +112,27 @@ impl TheoryCalibrator {
         self.posthoc_outcomes.len()
     }
 
-    /// Record a posthoc outcome for γ calibration.
+    /// Record a posthoc gate outcome for telemetry/counting.
     ///
     /// - `gate_passed`: whether the tool gate allowed the action.
-    /// - `outcome_good`: whether the action's outcome was positive.
+    /// - `outcome_good`: whether the action's eventual outcome was positive.
+    ///
+    /// ## Why this does not update γ
+    ///
+    /// These two booleans describe the decision made under the *already active* γ. They do not
+    /// contain enough information to determine whether another candidate γ would have changed the
+    /// gate decision. Updating γ from this history would therefore be an unidentified
+    /// counterfactual. The history is retained so future replay-capable calibration can migrate
+    /// without losing telemetry, but automatic γ adaptation is frozen until that richer evidence
+    /// contract is implemented and qualified.
     pub fn record_outcome(&mut self, gate_passed: bool, outcome_good: bool) {
         self.posthoc_outcomes.push((gate_passed, outcome_good));
-
-        // Re-estimate γ when enough data (INV-9 bounded)
-        if self.posthoc_outcomes.len() >= GAMMA_MIN_OBSERVATIONS
-            && self.posthoc_outcomes.len() % 50 == 0
-        {
-            self.recalibrate_gamma();
-        }
     }
 
-    /// Re-estimate γ via grid search, bounded by INV-9.
+    /// Update one theory calibration with an observed prediction/outcome pair.
     ///
-    /// Minimize "bad actions that passed gate" subject to
-    /// "good actions not over-gated".
-    fn recalibrate_gamma(&mut self) {
-        let mut best_gamma = self.gamma;
-        let mut best_score = f64::MAX;
-
-        // Grid search with 0.1 resolution
-        let search_min = (self.gamma - DELTA_GAMMA_MAX).max(GAMMA_MIN);
-        let search_max = (self.gamma + DELTA_GAMMA_MAX).min(GAMMA_MAX);
-
-        let mut g = search_min;
-        while g <= search_max + 1e-10 {
-            let score = self.evaluate_gamma(g);
-            if score < best_score {
-                best_score = score;
-                best_gamma = g;
-            }
-            g += 0.01;
-        }
-
-        // Apply bounded update (INV-9)
-        let delta = (best_gamma - self.gamma).clamp(-DELTA_GAMMA_MAX, DELTA_GAMMA_MAX);
-        self.gamma = (self.gamma + delta).clamp(GAMMA_MIN, GAMMA_MAX);
-        self.version += 1;
-    }
-
-    /// Evaluate a candidate γ value: score = false_allows + 0.5 * false_blocks.
-    fn evaluate_gamma(&self, _gamma: f64) -> f64 {
-        let mut false_allows = 0usize;
-        let mut false_blocks = 0usize;
-
-        for &(gate_passed, outcome_good) in &self.posthoc_outcomes {
-            if gate_passed && !outcome_good {
-                false_allows += 1; // bad: allowed a bad action
-            }
-            if !gate_passed && outcome_good {
-                false_blocks += 1; // bad: blocked a good action
-            }
-        }
-
-        // False allows are worse than false blocks (safety first)
-        false_allows as f64 + 0.5 * false_blocks as f64
-    }
-
-    /// Update theory calibration with a new observation.
+    /// This path remains adaptive because the update is directly identified by the supplied
+    /// `(predicted, actual)` observation and is independently bounded inside `TheoryCalibration`.
     pub fn update_theory(&mut self, theory: TheoryId, predicted: f64, actual: f64) {
         self.calibrations.get_mut(theory).update(predicted, actual);
         self.version += 1;
@@ -237,36 +203,52 @@ mod tests {
     }
 
     #[test]
-    fn test_gamma_bounded_update_inv9() {
+    fn posthoc_all_good_cannot_move_unidentified_gamma() {
         let mut calibrator = TheoryCalibrator::new();
         let initial_gamma = calibrator.gamma;
+        let initial_version = calibrator.version;
 
-        // Feed many outcomes
-        for _ in 0..GAMMA_MIN_OBSERVATIONS {
+        for _ in 0..500 {
             calibrator.record_outcome(true, true);
         }
 
-        // γ change should be bounded
-        let delta = (calibrator.gamma - initial_gamma).abs();
-        assert!(
-            delta <= DELTA_GAMMA_MAX + 1e-10,
-            "INV-9: Δγ = {} > {}",
-            delta,
-            DELTA_GAMMA_MAX
-        );
+        assert_eq!(calibrator.gamma, initial_gamma);
+        assert_eq!(calibrator.version, initial_version);
+        assert_eq!(calibrator.posthoc_count(), 500);
     }
 
     #[test]
-    fn test_gamma_stays_in_bounds() {
+    fn posthoc_all_bad_cannot_move_unidentified_gamma() {
         let mut calibrator = TheoryCalibrator::new();
-        calibrator.gamma = 1.0; // at minimum
+        let initial_gamma = calibrator.gamma;
 
-        for _ in 0..(GAMMA_MIN_OBSERVATIONS + 100) {
-            calibrator.record_outcome(true, false); // all bad
+        for _ in 0..500 {
+            calibrator.record_outcome(true, false);
         }
 
-        assert!(calibrator.gamma >= GAMMA_MIN);
-        assert!(calibrator.gamma <= GAMMA_MAX);
+        assert_eq!(calibrator.gamma, initial_gamma);
+        assert_eq!(calibrator.posthoc_count(), 500);
+    }
+
+    #[test]
+    fn posthoc_mixed_history_cannot_move_unidentified_gamma() {
+        let mut calibrator = TheoryCalibrator::new();
+        let initial_gamma = calibrator.gamma;
+
+        for i in 0..500 {
+            calibrator.record_outcome(i % 2 == 0, i % 3 == 0);
+        }
+
+        assert_eq!(calibrator.gamma, initial_gamma);
+        assert_eq!(calibrator.posthoc_count(), 500);
+    }
+
+    #[test]
+    fn identified_theory_update_still_advances_calibration_version() {
+        let mut calibrator = TheoryCalibrator::new();
+        let initial_version = calibrator.version;
+        calibrator.update_theory(TheoryId::IIT, 0.8, 1.0);
+        assert_eq!(calibrator.version, initial_version + 1);
     }
 
     #[test]
