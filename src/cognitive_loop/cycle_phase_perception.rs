@@ -572,6 +572,7 @@ impl CognitiveLoopService {
                 predicted_urgency: urgency_result.predicted_urgency,
                 prediction_coherence_urgency_bias: urgency_result.prediction_coherence_urgency_bias,
                 prediction_error_valid,
+                prediction_evidence: prediction_evidence.clone(),
                 prediction_error,
                 error_slope: urgency_result.error_slope,
                 oscillation_ratio: urgency_result.oscillation_ratio,
