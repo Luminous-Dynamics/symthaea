@@ -93,3 +93,28 @@ Do not compare hypervolume values obtained with different reference points or un
 ## Boundaries and nonclaims
 
 This module is a test-only Pareto metric, not a multi-objective Bayesian optimizer, material or process model, recipe generator, machine controller, or qualification mechanism. It creates no alternate manufacturing registry or evidence authority. It proves no improvement in defect rate, yield, energy, cost, throughput, safety or industrial competitiveness.
+
+## CASTING-002E — Front quality and coverage indicators
+
+Hypervolume is retained as the primary area-based indicator, but it must not be used alone: two approximations with similar hypervolume can differ in coverage and local point distribution. The test-only metric layer adds three complementary diagnostics for **two-objective minimization**:
+
+- **Additive epsilon indicator** against a fixed reference front. Lower is better; negative values are permitted when every reference point is dominated by the approximation. It measures worst-case objective-space gap, not physical utility.
+- **IGD+** against a fixed reference front. For each reference point it measures the nearest approximation point using only positive (worse-than-reference) objective deltas, then averages those distances. Lower is better and it is sensitive to missing reference-front regions.
+- **Nearest-neighbour spacing**: sample standard deviation of each approximation point's nearest Euclidean-neighbour distance. Lower indicates more even spacing, not a better or more complete front by itself.
+
+All three indicators require comparable objective directions and **the same frozen objective normalization** across methods. Epsilon and IGD+ require the same independent reference-front points. Do not derive normalization, reference points, or the reference front separately for each optimizer after observing results. When analytic ground truth is unavailable, do not fabricate a reference front to enable IGD+; report hypervolume and other reference-free diagnostics while labeling the limitation.
+
+The new tests include hand-calculated epsilon/IGD+/spacing examples, dominance behavior, input-order invariance, empty and too-small fronts, non-finite inputs, and arithmetic-overflow rejection. They are authored only; no Rust test execution is claimed here.
+
+Research rationale:
+- Yang, Katt & Kaski, *Multi-Objective Bayesian Optimization via Adaptive ε-Constraints Decomposition*, ICML 2026 (STAGE-BO): https://proceedings.mlr.press/v306/yang26af.html
+- *Novelty-aware evolutionary Bayesian optimisation for multi-objective discovery science*, Digital Discovery (2026): https://pubs.rsc.org/en/content/articlehtml/2026/dd/d6dd00134c
+- Daulton, Balandat & Bakshy, qNEHVI, NeurIPS 2021: https://papers.nips.cc/paper/2021/hash/11704817e347269b7254e744b5e22dac-Abstract.html
+
+Suggested focused validation remains:
+
+```sh
+cargo test -p symthaea-core casting_multiobjective_benchmark
+```
+
+CASTING-002E does not add an optimizer or prove SOTA performance. It adds metrics needed to compare a future coverage-seeking optimizer fairly.
