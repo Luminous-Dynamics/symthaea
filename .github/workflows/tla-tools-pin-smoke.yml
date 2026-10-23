@@ -72,7 +72,7 @@ jobs:
         continue-on-error: true
         with:
           version: tla2tools-2026.08.11.125311
-          sha256: 0000000000000000000000000000000000000000000000000000000000000000
+          sha256: "0000000000000000000000000000000000000000000000000000000000000000"
 
       - name: Assert altered-digest run failed closed before model execution
         if: always()
@@ -85,4 +85,4 @@ jobs:
             echo "::error::Altered digest unexpectedly succeeded"
             exit 1
           fi
-          echo "PASS: deliberately incorrect digest was rejected by the shared TLA+ tool action"
+          echo "PASS: valid-length but incorrect SHA-256 was rejected by the shared TLA+ tool action"
