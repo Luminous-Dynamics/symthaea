@@ -39,6 +39,12 @@ The interface does **not** accept patient records, clinical diagnoses, patient-s
 
 A synthetic example is provided at examples/careframe-tool-design-proposal-v0.example.json with its scenario fixture at examples/careframe-example-scenario-set-v0.json. Digests for the sample model/configuration/task are hashes of explicitly named placeholder strings, not hashes of real model artifacts. They demonstrate shape only and must never be used as provenance receipts.
 
+## Articulated-body proposal contract
+
+The body/morphology is a separate typed artifact, not a field silently smuggled into the tool manifest. The companion schema `schemas/careframe-morphology-v0.schema.json` and synthetic fixture `examples/careframe-wheeled-upper-body-morphology-v0.example.json` specify a rooted link/joint graph with fixed/revolute joint metadata, bounding primitives, units, limits, and hard-disabled command/authority flags. The exact fixture is shared byte-for-byte with the current Symtropy draft's morphology file, and its Rust validator separately checks unique IDs, link references, root/parent count, graph reachability, joint-axis/limit validity and fail-closed command state.
+
+JSON Schema can check field shape and local constraints but not graph reachability, cycle absence, normalized 3D axes, or engine-import correctness. Those remain separate graph/runtime conformance gates. Values in this fixture are synthetic placeholders, not engineering specifications.
+
 ## Contract alignment with Symtropy
 
 Current supported pairs:
