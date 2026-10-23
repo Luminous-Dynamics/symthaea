@@ -1,0 +1,153 @@
+{
+  "schema_version": "pitb.insight-record.v0",
+  "record_id": "candidate-openai-math-025-greedy-residue-v0",
+  "source": {
+    "repository_url": "https://github.com/openai/math",
+    "commit": "1581d4cbdd69a0faf34b2089614fe2a814316a6a",
+    "path": "lean/OAI/NumberTheory/ShortEgyptian/GreedyExistence.lean",
+    "sha256": "5f95d34394ea96a9a1096b4925ffc6d385c5eb871d09a1da538bd66dfe77ada7",
+    "family_id": "025",
+    "license_status": "needs_review",
+    "upstream_record_status": "formalized_supporting_result"
+  },
+  "theorem": {
+    "theorem_id": "OAI.ShortEgyptian.exists_expansion",
+    "statement_text": "theorem exists_expansion (a b : ℕ) (hab : a < b) : ∃ ns : List ℕ, IsExpansion a b ns",
+    "statement_digest": "7565d0240808cc2b1878b70742f1415a0b3b9d61ed32f701d5ad0135430749f8",
+    "domain": [
+      "number theory",
+      "rational decompositions",
+      "greedy algorithms",
+      "well-founded recursion"
+    ],
+    "claim_status": "formalized_supporting_result",
+    "assumptions": [
+      "The declaration is read under the imports and definitions of the pinned OpenAI math Lean project."
+    ]
+  },
+  "artifact": {
+    "kind": "lean_file",
+    "path": "lean/OAI/NumberTheory/ShortEgyptian/GreedyExistence.lean",
+    "sha256": "5f95d34394ea96a9a1096b4925ffc6d385c5eb871d09a1da538bd66dfe77ada7",
+    "lean_toolchain": "leanprover/lean4:v4.34.1",
+    "mathlib_revision": "d13f23b723b8a846827a245b89c10fc7d3f11612",
+    "verification_scope": "Static source inspection of the pinned artifact only. The source contains a proof body for exists_expansion; no Lean build, independent axiom/dependency audit, or statement-correspondence review was run during this authoring step.",
+    "verification_command": "cd lean && lake env lean OAI/NumberTheory/ShortEgyptian/GreedyExistence.lean (not run in this authoring session)"
+  },
+  "insight": {
+    "move_id": "strictly-decreasing-ceiling-residue-decomposition",
+    "obstacle": "A greedy unit-fraction step is not enough by itself: the residual fraction must remain exact, its numerator must strictly decrease to justify recursion, and the next denominator must be strictly larger than all denominators in the recursive tail.",
+    "strategy": "For 0 < a < b, choose z = ceil(b/a) and r = a*z - b. The ceiling/residue lemmas give z ≥ 2, r < a, and b + r = a*z, hence a/b = 1/z + r/(b*z). Recurse on the strictly smaller numerator r with denominator b*z. To establish the expansion's increasing-denominator invariant, first show the recursive tail has unit sum < 1/z; each tail term is at most the total unit sum, so any tail denominator n ≤ z would imply 1/z ≤ 1/n ≤ unitSum(tail) < 1/z, a contradiction. This couples a potential-decreasing decomposition with a separate global-sum argument that proves structural ordering.",
+    "preconditions": [
+      "For the recursive step, a and b are natural numbers with 0 < a < b.",
+      "The integer ceiling z = ceil(b/a) is defined and satisfies b ≤ a*z < b+a.",
+      "The residue r = a*z-b is a natural number with r<a.",
+      "The remainder identity b+r=a*z is preserved exactly; the residual problem uses numerator r and denominator b*z.",
+      "The unit-sum positivity and single-term lower bound are available to derive strict denominator ordering.",
+      "This is a pattern for exact rational decomposition with a well-founded decreasing measure; it does not directly apply where the residue is not well-founded or the invariant cannot be preserved."
+    ],
+    "transformation": {
+      "before_state": "An arbitrary rational a/b with 0 < a < b has no established expansion with strictly increasing denominators, and a locally plausible greedy choice does not yet prove global ordering.",
+      "after_state": "The fraction is decomposed exactly as 1/z + r/(b*z) with r<a; recursive expansion of the smaller remainder gives a tail whose unit sum is below 1/z, forcing every tail denominator to exceed z and making z :: tail a valid ordered expansion.",
+      "expected_obligation_change": "One target existence goal is split into (1) exact arithmetic decomposition, (2) a strictly decreasing recursive measure, (3) a tail-sum bound, and (4) a contradiction that establishes ordered/distinct denominators."
+    },
+    "evidence": [
+      {
+        "source_path": "lean/OAI/NumberTheory/ShortEgyptian/GreedyExistence.lean",
+        "locator": "theorem exists_expansion",
+        "evidence_kind": "lean_declaration",
+        "excerpt": "let z := quotient b a",
+        "supports": "The proof selects the next denominator using a ceiling quotient and defines the residual through the matching residue."
+      },
+      {
+        "source_path": "lean/OAI/NumberTheory/ShortEgyptian/GreedyExistence.lean",
+        "locator": "have hrlt : r < a",
+        "evidence_kind": "proof_step",
+        "excerpt": "have hrlt : r < a := (residue_spec hb ha).1",
+        "supports": "The numerator of the recursive remainder strictly decreases, supporting strong induction."
+      },
+      {
+        "source_path": "lean/OAI/NumberTheory/ShortEgyptian/GreedyExistence.lean",
+        "locator": "have hre : b + r = a * z",
+        "evidence_kind": "proof_step",
+        "excerpt": "have hre : b + r = a * z := (residue_spec hb ha).2",
+        "supports": "This remainder identity certifies the exact decomposition rather than an approximation."
+      },
+      {
+        "source_path": "lean/OAI/NumberTheory/ShortEgyptian/GreedyExistence.lean",
+        "locator": "have horder : ∀ n ∈ ns, z < n",
+        "evidence_kind": "proof_step",
+        "excerpt": "have hsmall : unitSum ns < (1 : ℚ) / z",
+        "supports": "The recursive tail's total sum, together with a term-wise lower bound, proves every tail denominator exceeds the newly chosen denominator."
+      },
+      {
+        "source_path": "lean/OAI/NumberTheory/ShortEgyptian/GreedyPreparation.lean",
+        "locator": "lemma greedy_step",
+        "evidence_kind": "lean_declaration",
+        "excerpt": "(r:ℝ)/(C*z) ≤ ((A:ℝ)/C)^2",
+        "supports": "A neighboring source lemma quantifies a stronger contraction property for the normalized remainder, suggesting a future quantitative extension; it is a separate source file and has not been independently checked here."
+      }
+    ],
+    "failure_boundaries": [
+      "If r is not strictly smaller than a, strong induction no longer closes.",
+      "If the decomposition only holds approximately, exact equality of the unit-fraction sum is lost.",
+      "The ordering argument depends on nonnegative unit terms and a valid term-wise lower bound; it cannot be ported unchanged to signed expansions.",
+      "For a different target representation, the denominator order may not be the right invariant; a replacement well-founded measure and a new global constraint would need proof.",
+      "This is a source-derived strategy annotation, not evidence that Symthaea successfully transferred it to any other theorem."
+    ],
+    "transfer_candidates": []
+  },
+  "verification": {
+    "status": "not_attempted",
+    "exact_statement_checked": false,
+    "checker": null,
+    "checker_version": null,
+    "exact_statement_digest": null,
+    "axiom_policy": "unknown",
+    "notes": [
+      "Pinned upstream file bytes were hashed for provenance. The proof body is present in the source snapshot, but the Lean compiler and axiom/dependency policy were not run independently during this authoring step.",
+      "statement_digest hashes the exact stored UTF-8 declaration-signature text shown in theorem.statement_text; it is not a normalized elaborated-expression digest."
+    ]
+  },
+  "semantic_validation": {
+    "status": "not_attempted",
+    "statement_correspondence": {
+      "status": "not_reviewed",
+      "independent_reviewer_count": 0,
+      "notes": [
+        "The theorem-signature text was copied from the pinned Lean declaration. Its correspondence to the intended manuscript claim remains to be independently reviewed."
+      ]
+    },
+    "successor_tests": [],
+    "mutation_controls": []
+  },
+  "constructive_transfer": {
+    "status": "not_applicable",
+    "unknowns": [],
+    "candidate_witness": {
+      "status": "absent",
+      "representation": null,
+      "notes": [
+        "This annotation describes a proof strategy for a supplied existence proposition; no hidden-answer witness task is scored."
+      ]
+    },
+    "proof_obligations": [],
+    "answer_equivalence": {
+      "method": "none",
+      "status": "not_applicable",
+      "score": null,
+      "notes": [
+        "Constructive answer discovery is not the target of this source annotation."
+      ]
+    }
+  },
+  "review": {
+    "status": "unreviewed",
+    "independent_review_count": 0,
+    "review_notes": [
+      "Training-family-only strategy annotation. It is intentionally not added to records.jsonl and contributes no scored benchmark result.",
+      "Family 025 is assigned to train in the frozen split file. No held-out family was opened to search for a target.",
+      "The source license remains needs_review until the source artifact's redistribution status is checked."
+    ]
+  }
+}

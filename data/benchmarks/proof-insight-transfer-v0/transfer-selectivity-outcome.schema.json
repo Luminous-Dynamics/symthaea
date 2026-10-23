@@ -1,0 +1,575 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/transfer-selectivity-outcome.schema.json",
+  "title": "Proof Insight Transfer Selectivity Outcome v0",
+  "description": "One provenance-linked source-insight/target-obligation compatibility judgment and system prediction. Structural validity is not evidence that the adjudicated label is mathematically correct.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "pair_id",
+    "split",
+    "component_id",
+    "source",
+    "target",
+    "adjudication",
+    "prediction",
+    "run"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.transfer-selectivity-outcome.v0"
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "split": {
+      "enum": [
+        "train",
+        "validation",
+        "test",
+        "external_challenge"
+      ]
+    },
+    "component_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "family_id",
+        "source_commit",
+        "artifact_sha256",
+        "insight_sha256"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "insight_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "theorem_id",
+        "family_id",
+        "source_commit",
+        "artifact_path",
+        "artifact_sha256",
+        "statement_sha256",
+        "obligation_sha256"
+      ],
+      "properties": {
+        "theorem_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "artifact_path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "statement_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "obligation_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "domain_labels": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "adjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "label",
+        "rubric_version",
+        "reviewer_decisions",
+        "receipt_sha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "adjudicated",
+            "unresolved",
+            "pending"
+          ]
+        },
+        "label": {
+          "enum": [
+            "compatible",
+            "incompatible",
+            "partial",
+            "unknown"
+          ]
+        },
+        "rubric_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewer_decisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reviewer_id",
+              "label",
+              "reason_codes",
+              "evidence_sha256"
+            ],
+            "properties": {
+              "reviewer_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "enum": [
+                  "compatible",
+                  "incompatible",
+                  "partial",
+                  "unknown"
+                ]
+              },
+              "reason_codes": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "missing_precondition",
+                    "object_type",
+                    "domain_mismatch",
+                    "inequality_direction",
+                    "predicate_mismatch",
+                    "quantifier_scope",
+                    "premise_unavailable",
+                    "irrelevant_near_neighbour",
+                    "other",
+                    "unknown"
+                  ]
+                }
+              },
+              "evidence_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "uniqueItems": true
+        },
+        "receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "adjudication_note": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "predicted_label",
+        "confidence",
+        "compatibility_probability",
+        "mismatch_codes",
+        "precondition_checks",
+        "receipt_sha256"
+      ],
+      "properties": {
+        "decision": {
+          "enum": [
+            "accept",
+            "reject",
+            "abstain"
+          ]
+        },
+        "predicted_label": {
+          "enum": [
+            "compatible",
+            "incompatible",
+            "partial",
+            "unknown"
+          ]
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Model-reported confidence in the selected label/action. This is distinct from compatibility_probability and must not be treated as the probability that a proposed transfer is mathematically compatible."
+        },
+        "mismatch_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "missing_precondition",
+              "object_type",
+              "domain_mismatch",
+              "inequality_direction",
+              "predicate_mismatch",
+              "quantifier_scope",
+              "premise_unavailable",
+              "irrelevant_near_neighbour",
+              "other",
+              "unknown"
+            ]
+          }
+        },
+        "precondition_checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "check_id",
+              "outcome",
+              "evidence_sha256"
+            ],
+            "properties": {
+              "check_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "outcome": {
+                "enum": [
+                  "satisfied",
+                  "violated",
+                  "unknown",
+                  "not_applicable"
+                ]
+              },
+              "evidence_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "compatibility_probability": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Estimated probability that the proposed transfer is compatible with the target obligation, regardless of whether the action is accept, reject, or abstain. Null means the system did not emit a probability; calibration metrics must report coverage and must not impute missing probabilities."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "accept"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          },
+          "then": {
+            "properties": {
+              "predicted_label": {
+                "const": "compatible"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "reject"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          },
+          "then": {
+            "properties": {
+              "predicted_label": {
+                "enum": [
+                  "incompatible",
+                  "partial"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "abstain"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          },
+          "then": {
+            "properties": {
+              "predicted_label": {
+                "enum": [
+                  "unknown",
+                  "compatible",
+                  "incompatible",
+                  "partial"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "model_version",
+        "prompt_sha256",
+        "config_sha256",
+        "input_sha256",
+        "output_sha256",
+        "budget"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "input_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "output_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_model_calls",
+            "max_tokens",
+            "max_wall_ms",
+            "max_cost_microusd"
+          ],
+          "properties": {
+            "max_model_calls": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_wall_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_cost_microusd": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "actual_model_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actual_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actual_wall_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actual_cost_microusd": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "status": {
+                "const": "adjudicated"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "adjudication"
+        ]
+      },
+      "then": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "label": {
+                "enum": [
+                  "compatible",
+                  "incompatible",
+                  "partial"
+                ]
+              },
+              "reviewer_decisions": {
+                "minItems": 2
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "status": {
+                "const": "unresolved"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "adjudication"
+        ]
+      },
+      "then": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "label": {
+                "const": "unknown"
+              },
+              "reviewer_decisions": {
+                "minItems": 2
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "status": {
+                "const": "pending"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "adjudication"
+        ]
+      },
+      "then": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "label": {
+                "const": "unknown"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

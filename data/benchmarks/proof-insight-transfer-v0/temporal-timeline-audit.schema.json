@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb.temporal-timeline-audit.v0.json",
+  "title": "PITB historical theorem timeline audit",
+  "description": "Read-only inventory of a pinned historical proof timeline. Each completion commit must be an ancestor of pinned HEAD; adjacent rows preserve CSV source order and report Git DAG ancestry without requiring a linear commit chain. Unsafe or machine-local source paths are rejected and redacted rather than read. This is provenance evidence, not a verified replay manifest and not benchmark outcome data.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "repository_url",
+    "repository_commit",
+    "timeline_path",
+    "timeline_sha256",
+    "repository_readme_sha256",
+    "readme_claimed_timeline_row_count",
+    "timeline_row_count_matches_readme_claim",
+    "lean_toolchain",
+    "lean_toolchain_sha256",
+    "mathlib_manifest_path",
+    "mathlib_manifest_sha256",
+    "mathlib_revision",
+    "total_timeline_rows",
+    "unique_completion_commit_count",
+    "non_ancestral_adjacent_transition_count",
+    "source_path_present_at_completion_count",
+    "source_path_missing_at_completion_count",
+    "source_path_not_recorded_count",
+    "source_path_rejected_count",
+    "verification_status_counts",
+    "events"
+  ],
+  "properties": {
+    "schema_version": {"const": "pitb.temporal-timeline-audit.v0"},
+    "repository_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://",
+      "minLength": 9
+    },
+    "repository_commit": {"$ref": "#/$defs/gitSha"},
+    "timeline_path": {"$ref": "#/$defs/repositoryPath"},
+    "timeline_sha256": {"$ref": "#/$defs/sha256"},
+    "repository_readme_sha256": {"$ref": "#/$defs/sha256"},
+    "readme_claimed_timeline_row_count": {
+      "oneOf": [
+        {"type": "integer", "minimum": 1},
+        {"type": "null"}
+      ]
+    },
+    "timeline_row_count_matches_readme_claim": {
+      "oneOf": [
+        {"type": "boolean"},
+        {"type": "null"}
+      ]
+    },
+    "lean_toolchain": {"type": "string", "minLength": 1},
+    "lean_toolchain_sha256": {"$ref": "#/$defs/sha256"},
+    "mathlib_manifest_path": {"$ref": "#/$defs/repositoryPath"},
+    "mathlib_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "mathlib_revision": {"$ref": "#/$defs/gitSha"},
+    "total_timeline_rows": {"type": "integer", "minimum": 1},
+    "unique_completion_commit_count": {"type": "integer", "minimum": 1},
+    "non_ancestral_adjacent_transition_count": {"type": "integer", "minimum": 0},
+    "source_path_present_at_completion_count": {"type": "integer", "minimum": 0},
+    "source_path_missing_at_completion_count": {"type": "integer", "minimum": 0},
+    "source_path_not_recorded_count": {"type": "integer", "minimum": 0},
+    "source_path_rejected_count": {"type": "integer", "minimum": 0},
+    "verification_status_counts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/event"}
+    }
+  },
+  "$defs": {
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$)).+$"
+    },
+    "nullableString": {
+      "oneOf": [
+        {"type": "string"},
+        {"type": "null"}
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position",
+        "event_key",
+        "timeline_id",
+        "lean_name",
+        "spec_theorem_path",
+        "function",
+        "verified_status",
+        "date_proven",
+        "completion_commit",
+        "commit_message",
+        "completion_commit_ancestor_verified",
+        "previous_completion_commit",
+        "previous_completion_is_ancestor",
+        "source_file_status",
+        "source_file_sha256",
+        "source_file_bytes"
+      ],
+      "properties": {
+        "position": {"type": "integer", "minimum": 0},
+        "event_key": {"type": "string", "minLength": 1},
+        "timeline_id": {"$ref": "#/$defs/nullableString"},
+        "lean_name": {"$ref": "#/$defs/nullableString"},
+        "spec_theorem_path": {
+          "oneOf": [
+            {"$ref": "#/$defs/repositoryPath"},
+            {"type": "null"}
+          ]
+        },
+        "function": {"$ref": "#/$defs/nullableString"},
+        "verified_status": {"type": "string", "minLength": 1},
+        "date_proven": {"type": "string"},
+        "completion_commit": {"$ref": "#/$defs/gitSha"},
+        "commit_message": {"type": "string"},
+        "completion_commit_ancestor_verified": {"const": true},
+        "previous_completion_commit": {
+          "oneOf": [
+            {"$ref": "#/$defs/gitSha"},
+            {"type": "null"}
+          ]
+        },
+        "previous_completion_is_ancestor": {
+          "oneOf": [
+            {"type": "boolean"},
+            {"type": "null"}
+          ]
+        },
+        "source_file_status": {
+          "enum": [
+            "present_at_completion",
+            "missing_at_completion",
+            "not_recorded",
+            "rejected_unsafe_path"
+          ]
+        },
+        "source_file_sha256": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        },
+        "source_file_bytes": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0},
+            {"type": "null"}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"previous_completion_commit": {"type": "null"}}},
+          "then": {"properties": {"previous_completion_is_ancestor": {"type": "null"}}}
+        },
+        {
+          "if": {"properties": {"previous_completion_commit": {"$ref": "#/$defs/gitSha"}}},
+          "then": {"properties": {"previous_completion_is_ancestor": {"type": "boolean"}}}
+        },
+        {
+          "if": {"properties": {"source_file_status": {"const": "present_at_completion"}}},
+          "then": {
+            "properties": {
+              "spec_theorem_path": {"$ref": "#/$defs/repositoryPath"},
+              "source_file_sha256": {"$ref": "#/$defs/sha256"},
+              "source_file_bytes": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"source_file_status": {"const": "missing_at_completion"}}},
+          "then": {
+            "properties": {
+              "spec_theorem_path": {"$ref": "#/$defs/repositoryPath"},
+              "source_file_sha256": {"type": "null"},
+              "source_file_bytes": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"source_file_status": {"const": "not_recorded"}}},
+          "then": {
+            "properties": {
+              "spec_theorem_path": {"type": "null"},
+              "source_file_sha256": {"type": "null"},
+              "source_file_bytes": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"source_file_status": {"const": "rejected_unsafe_path"}}},
+          "then": {
+            "properties": {
+              "spec_theorem_path": {"type": "null"},
+              "source_file_sha256": {"type": "null"},
+              "source_file_bytes": {"type": "null"}
+            }
+          }
+        }
+      ]
+    }
+  }
+}

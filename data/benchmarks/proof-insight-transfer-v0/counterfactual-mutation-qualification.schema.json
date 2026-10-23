@@ -1,0 +1,894 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/counterfactual-mutation-qualification.schema.json",
+  "title": "PITB Counterfactual Mutation Qualification Suite v0",
+  "description": "Separates source mutation integrity, elaboration validity, formal statement relation, strategy-contract applicability, truth evidence, and executed strategy outcome. Schema validity alone is not mathematical validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_kind",
+    "suite_id",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.counterfactual-mutation-qualification.v0"
+    },
+    "dataset_kind": {
+      "enum": [
+        "synthetic_fixture",
+        "reviewed_benchmark"
+      ]
+    },
+    "suite_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/qualification"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\.\\.(?:/|$)).+$"
+    },
+    "digest_or_null": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "qualification_id",
+        "source",
+        "target_pair",
+        "mutation",
+        "elaboration",
+        "statement_relation",
+        "contract_relation",
+        "truth_assessment",
+        "strategy_attempt",
+        "adjudication"
+      ],
+      "properties": {
+        "qualification_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "record_id",
+            "family_id",
+            "source_commit",
+            "insight_sha256"
+          ],
+          "properties": {
+            "record_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "family_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_commit": {
+              "$ref": "#/$defs/commit"
+            },
+            "insight_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "target_pair": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "variant_outcome_pair_id",
+            "base_outcome_pair_id",
+            "target_family_id",
+            "split",
+            "component_id",
+            "pair_id",
+            "target_id",
+            "source_commit",
+            "base_artifact_path",
+            "variant_artifact_path",
+            "base_artifact_sha256",
+            "variant_artifact_sha256",
+            "base_statement_sha256",
+            "variant_statement_sha256"
+          ],
+          "properties": {
+            "target_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_commit": {
+              "$ref": "#/$defs/commit"
+            },
+            "base_artifact_path": {
+              "$ref": "#/$defs/path"
+            },
+            "variant_artifact_path": {
+              "$ref": "#/$defs/path"
+            },
+            "base_artifact_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "variant_artifact_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "base_statement_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "variant_statement_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "pair_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            },
+            "component_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "split": {
+              "enum": [
+                "train",
+                "validation",
+                "test",
+                "external_challenge"
+              ]
+            },
+            "target_family_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "base_outcome_pair_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            },
+            "variant_outcome_pair_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            }
+          }
+        },
+        "mutation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "changed_field",
+            "single_factor",
+            "before_fragment_sha256",
+            "after_fragment_sha256",
+            "receipt_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "formatting_only",
+                "alpha_rename",
+                "equivalent_reformulation",
+                "precondition_removed",
+                "precondition_changed",
+                "inequality_direction_changed",
+                "object_type_changed",
+                "quantifier_scope_changed",
+                "premise_removed",
+                "predicate_changed",
+                "other"
+              ]
+            },
+            "changed_field": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "single_factor": {
+              "type": "boolean"
+            },
+            "before_fragment_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "after_fragment_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          }
+        },
+        "elaboration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lean_toolchain",
+            "environment_sha256",
+            "base_status",
+            "variant_status",
+            "base_type_sha256",
+            "variant_type_sha256",
+            "receipt_sha256",
+            "diagnostics_sha256"
+          ],
+          "properties": {
+            "lean_toolchain": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "base_status": {
+              "enum": [
+                "elaborated",
+                "parse_error",
+                "elaboration_error",
+                "not_attempted"
+              ]
+            },
+            "variant_status": {
+              "enum": [
+                "elaborated",
+                "parse_error",
+                "elaboration_error",
+                "not_attempted"
+              ]
+            },
+            "base_type_sha256": {
+              "$ref": "#/$defs/digest_or_null"
+            },
+            "variant_type_sha256": {
+              "$ref": "#/$defs/digest_or_null"
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/digest_or_null"
+            },
+            "diagnostics_sha256": {
+              "$ref": "#/$defs/digest_or_null"
+            }
+          }
+        },
+        "statement_relation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "relation",
+            "evidence_kind",
+            "receipt_sha256"
+          ],
+          "properties": {
+            "relation": {
+              "enum": [
+                "same_elaborated_type",
+                "propositionally_equivalent",
+                "formally_distinct",
+                "unknown",
+                "invalid_mutation"
+              ]
+            },
+            "evidence_kind": {
+              "enum": [
+                "kernel_checked_defeq_certificate",
+                "kernel_checked_equivalence_proof",
+                "checked_counterexample",
+                "distinctness_proof",
+                "independent_review",
+                "diagnostic_receipt",
+                "none"
+              ]
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/digest_or_null"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          }
+        },
+        "contract_relation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "precondition_id",
+            "evidence_kind",
+            "receipt_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "contract_satisfied",
+                "contract_violated",
+                "not_applicable",
+                "unknown"
+              ]
+            },
+            "precondition_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 160
+            },
+            "evidence_kind": {
+              "enum": [
+                "proof_state_snapshot",
+                "typed_context_comparison",
+                "independent_review",
+                "none"
+              ]
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/digest_or_null"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          }
+        },
+        "truth_assessment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "evidence_kind",
+            "receipt_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "proved",
+                "counterexample_found",
+                "unknown",
+                "not_assessed"
+              ]
+            },
+            "evidence_kind": {
+              "enum": [
+                "kernel_proof",
+                "checked_counterexample",
+                "independent_review",
+                "none"
+              ]
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/digest_or_null"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          }
+        },
+        "strategy_attempt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "exact_target_statement_checked",
+            "receipt_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "kernel_checked_success",
+                "checked_failure",
+                "timeout",
+                "tool_error",
+                "not_attempted"
+              ]
+            },
+            "exact_target_statement_checked": {
+              "type": "boolean"
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/digest_or_null"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          }
+        },
+        "adjudication": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "rubric_version",
+            "reviewers",
+            "receipt_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "adjudicated",
+                "unresolved",
+                "pending"
+              ]
+            },
+            "rubric_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reviewers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "reviewer_id",
+                  "statement_relation",
+                  "contract_relation",
+                  "evidence_sha256"
+                ],
+                "properties": {
+                  "reviewer_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "statement_relation": {
+                    "enum": [
+                      "same_elaborated_type",
+                      "propositionally_equivalent",
+                      "formally_distinct",
+                      "unknown",
+                      "invalid_mutation"
+                    ]
+                  },
+                  "contract_relation": {
+                    "enum": [
+                      "contract_satisfied",
+                      "contract_violated",
+                      "not_applicable",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                }
+              }
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "statement_relation": {
+                "properties": {
+                  "relation": {
+                    "const": "same_elaborated_type"
+                  }
+                },
+                "required": [
+                  "relation"
+                ]
+              }
+            },
+            "required": [
+              "statement_relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "elaboration": {
+                "properties": {
+                  "base_status": {
+                    "const": "elaborated"
+                  },
+                  "variant_status": {
+                    "const": "elaborated"
+                  },
+                  "base_type_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "variant_type_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "statement_relation": {
+                "properties": {
+                  "evidence_kind": {
+                    "const": "kernel_checked_defeq_certificate"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "statement_relation": {
+                "properties": {
+                  "relation": {
+                    "const": "propositionally_equivalent"
+                  }
+                },
+                "required": [
+                  "relation"
+                ]
+              }
+            },
+            "required": [
+              "statement_relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "elaboration": {
+                "properties": {
+                  "base_status": {
+                    "const": "elaborated"
+                  },
+                  "variant_status": {
+                    "const": "elaborated"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "statement_relation": {
+                "properties": {
+                  "evidence_kind": {
+                    "const": "kernel_checked_equivalence_proof"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "statement_relation": {
+                "properties": {
+                  "relation": {
+                    "const": "formally_distinct"
+                  }
+                },
+                "required": [
+                  "relation"
+                ]
+              }
+            },
+            "required": [
+              "statement_relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "elaboration": {
+                "properties": {
+                  "base_status": {
+                    "const": "elaborated"
+                  },
+                  "variant_status": {
+                    "const": "elaborated"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "statement_relation": {
+                "properties": {
+                  "evidence_kind": {
+                    "enum": [
+                      "checked_counterexample",
+                      "distinctness_proof",
+                      "independent_review"
+                    ]
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "statement_relation": {
+                "properties": {
+                  "relation": {
+                    "const": "invalid_mutation"
+                  }
+                },
+                "required": [
+                  "relation"
+                ]
+              }
+            },
+            "required": [
+              "statement_relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "elaboration": {
+                "required": [
+                  "diagnostics_sha256"
+                ],
+                "properties": {
+                  "variant_status": {
+                    "enum": [
+                      "parse_error",
+                      "elaboration_error"
+                    ]
+                  },
+                  "diagnostics_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "statement_relation": {
+                "properties": {
+                  "evidence_kind": {
+                    "const": "diagnostic_receipt"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "contract_relation": {
+                "properties": {
+                  "status": {
+                    "const": "unknown"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract_relation": {
+                "properties": {
+                  "status": {
+                    "const": "contract_violated"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "contract_relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "elaboration": {
+                "properties": {
+                  "base_status": {
+                    "const": "elaborated"
+                  },
+                  "variant_status": {
+                    "const": "elaborated"
+                  }
+                }
+              },
+              "contract_relation": {
+                "properties": {
+                  "evidence_kind": {
+                    "enum": [
+                      "proof_state_snapshot",
+                      "typed_context_comparison",
+                      "independent_review"
+                    ]
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "truth_assessment": {
+                "properties": {
+                  "status": {
+                    "const": "proved"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "truth_assessment"
+            ]
+          },
+          "then": {
+            "properties": {
+              "truth_assessment": {
+                "properties": {
+                  "evidence_kind": {
+                    "const": "kernel_proof"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "truth_assessment": {
+                "properties": {
+                  "status": {
+                    "const": "counterexample_found"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "truth_assessment"
+            ]
+          },
+          "then": {
+            "properties": {
+              "truth_assessment": {
+                "properties": {
+                  "evidence_kind": {
+                    "const": "checked_counterexample"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "strategy_attempt": {
+                "properties": {
+                  "status": {
+                    "const": "kernel_checked_success"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "strategy_attempt"
+            ]
+          },
+          "then": {
+            "properties": {
+              "strategy_attempt": {
+                "properties": {
+                  "exact_target_statement_checked": {
+                    "const": true
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "adjudication": {
+                "properties": {
+                  "status": {
+                    "const": "adjudicated"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "adjudication"
+            ]
+          },
+          "then": {
+            "properties": {
+              "adjudication": {
+                "properties": {
+                  "reviewers": {
+                    "minItems": 2
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

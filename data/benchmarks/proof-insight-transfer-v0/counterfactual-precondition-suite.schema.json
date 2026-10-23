@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/counterfactual-precondition-suite.schema.json",
+  "title": "PITB Counterfactual Precondition Suite v0",
+  "description": "Paired source-insight/target-obligation controls that alter one declared prerequisite or preserve semantics. Structural validity does not establish mathematical correctness; each pair needs independent review and exact target evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "suite_id",
+    "dataset_kind",
+    "pairs",
+    "suite_receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.counterfactual-precondition-suite.v0"
+    },
+    "suite_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "dataset_kind": {
+      "enum": [
+        "synthetic_fixture",
+        "reviewed_benchmark"
+      ]
+    },
+    "suite_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "pairs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/pair"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_id",
+        "base_outcome_pair_id",
+        "counterfactual_outcome_pair_id",
+        "component_id",
+        "split",
+        "source_insight",
+        "target",
+        "mutation",
+        "base_adjudication",
+        "counterfactual_adjudication"
+      ],
+      "properties": {
+        "pair_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "component_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "split": {
+          "enum": [
+            "train",
+            "validation",
+            "test",
+            "external_challenge"
+          ]
+        },
+        "source_insight": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "record_id",
+            "family_id",
+            "source_commit",
+            "source_artifact_sha256",
+            "insight_sha256"
+          ],
+          "properties": {
+            "record_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "family_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_commit": {
+              "$ref": "#/$defs/commit"
+            },
+            "insight_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "source_artifact_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "target_id",
+            "family_id",
+            "source_commit",
+            "artifact_path",
+            "base_artifact_sha256",
+            "counterfactual_artifact_path",
+            "counterfactual_artifact_sha256",
+            "base_statement_sha256",
+            "counterfactual_statement_sha256"
+          ],
+          "properties": {
+            "target_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "family_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_commit": {
+              "$ref": "#/$defs/commit"
+            },
+            "artifact_path": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+            },
+            "base_statement_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "counterfactual_statement_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "base_artifact_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "counterfactual_artifact_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "counterfactual_artifact_path": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+            }
+          }
+        },
+        "mutation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "semantic_change",
+            "changed_field",
+            "before_fragment_sha256",
+            "after_fragment_sha256",
+            "mutation_receipt_sha256",
+            "description"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "no_semantic_change",
+                "equivalent_reformulation",
+                "precondition_removed",
+                "precondition_strengthened",
+                "inequality_direction_reversed",
+                "object_type_changed",
+                "quantifier_scope_changed",
+                "premise_removed",
+                "predicate_changed",
+                "conclusion_weakened"
+              ]
+            },
+            "semantic_change": {
+              "enum": [
+                "none",
+                "changed"
+              ]
+            },
+            "changed_field": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "before_fragment_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "after_fragment_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "mutation_receipt_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          }
+        },
+        "base_adjudication": {
+          "$ref": "#/$defs/adjudication"
+        },
+        "counterfactual_adjudication": {
+          "$ref": "#/$defs/adjudication"
+        },
+        "base_outcome_pair_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "counterfactual_outcome_pair_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        }
+      }
+    },
+    "adjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "label",
+        "rubric_version",
+        "reviewer_decisions",
+        "receipt_sha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "adjudicated",
+            "unresolved",
+            "pending"
+          ]
+        },
+        "label": {
+          "enum": [
+            "compatible",
+            "incompatible",
+            "unknown"
+          ]
+        },
+        "rubric_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewer_decisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reviewer_id",
+              "label",
+              "reason_code",
+              "evidence_sha256"
+            ],
+            "properties": {
+              "reviewer_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "enum": [
+                  "compatible",
+                  "incompatible",
+                  "unknown"
+                ]
+              },
+              "reason_code": {
+                "enum": [
+                  "preconditions_satisfied",
+                  "missing_precondition",
+                  "precondition_strengthened",
+                  "inequality_direction",
+                  "object_type",
+                  "quantifier_scope",
+                  "premise_unavailable",
+                  "predicate_mismatch",
+                  "conclusion_mismatch",
+                  "no_semantic_change",
+                  "other",
+                  "unknown"
+                ]
+              },
+              "evidence_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "uniqueItems": true
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      }
+    }
+  }
+}

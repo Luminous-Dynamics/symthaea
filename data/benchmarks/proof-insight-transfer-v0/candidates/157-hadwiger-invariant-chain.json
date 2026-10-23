@@ -1,0 +1,216 @@
+{
+  "schema_version": "pitb.insight-record.v0",
+  "record_id": "candidate-openai-math-157-hadwiger-invariant-chain-v0",
+  "source": {
+    "repository_url": "https://github.com/openai/math",
+    "commit": "1581d4cbdd69a0faf34b2089614fe2a814316a6a",
+    "path": "preprints/A-counterexample-to-Hadwigers-conjecture-September-23-2026/paper.pdf",
+    "sha256": "a97293542586d3518b9355dcea732012b09d4ce809126da73d285ba0d3906128",
+    "family_id": "157",
+    "license_status": "needs_review",
+    "upstream_record_status": "formalized_main_result"
+  },
+  "theorem": {
+    "theorem_id": "OAI.HadwigerCounterexample.not_hadwiger_conjecture",
+    "statement_text": "¬ (∀ (m:ℕ)(G:SimpleGraph (Fin m)), G.chromaticNumber ≤ ↑(hadwigerNumber G))",
+    "statement_digest": "5a9a6c1a494845c9192b2b4579b23ecbe1b57d1ebc5f029e1c68e5e081e8e9c2",
+    "domain": [
+      "graph theory",
+      "graph coloring",
+      "clique minors",
+      "counterexample construction"
+    ],
+    "claim_status": "formalized_main_result",
+    "assumptions": []
+  },
+  "artifact": {
+    "kind": "lean_file",
+    "path": "lean/OAI/Combinatorics/HadwigerCounterexample/Main.lean",
+    "sha256": "d698079b6903b1ed5192109e21dfc985b489b724826f4567ad6f6ac234866bae",
+    "lean_toolchain": "leanprover/lean4:v4.34.1",
+    "mathlib_revision": "d13f23b723b8a846827a245b89c10fc7d3f11612",
+    "verification_scope": "The pinned Main.lean source contains a graph-existence construction, a rational-inequality bridge from connected-matching number to Hadwiger number and chromatic number, and the final negation of the universal Hadwiger inequality. Matching-minor bridge details are in OAI/Combinatorics/HadwigerMatching/Main.lean and MinorBound.lean. No local build or Comparator run occurred in this session.",
+    "verification_command": "cd lean && lake env comparator ComparatorChallenges/HadwigerCounterexample.json (not run in this authoring session)"
+  },
+  "insight": {
+    "move_id": "counterexample-via-bounded-invariant-bridge",
+    "obstacle": "To refute a universal graph inequality, constructing a large graph alone is insufficient; its clique-minor parameter and chromatic number must be separated by a strict, quantified bound.",
+    "strategy": "Decompose the counterexample into (1) an existence construction for arbitrarily large finite graphs with independence number at most two and a small connected-matching number, (2) a general matching–minor inequality bounding the Hadwiger number by vertex count and connected-matching number, (3) a graph-coloring lower bound from independence number, and (4) a short rational-inequality chain that makes the two bounds strictly separate. Keep the expensive object-existence argument independent from the small generic inequality bridge so later constructions can reuse or replace either layer.",
+    "preconditions": [
+      "The construction theorem produces a finite graph G with the exact invariant bounds required by the bridge.",
+      "The proxy invariant (connected matching number) has a formally proved bound on the target's primary parameter (Hadwiger number).",
+      "An independent lower bound on the target's competing parameter (chromatic number) follows from the construction's other invariant.",
+      "The rational thresholds are checked with strict inequalities and the finite-cardinality lower bound needed for their compatibility.",
+      "The target problem uses compatible graph invariants and admits a finite construction; this pattern does not directly transfer to unrelated geometric spaces without a replacement bridge."
+    ],
+    "transformation": {
+      "before_state": "A universal claim says every finite graph satisfies chromatic number ≤ Hadwiger number; the construction and invariant comparison are not yet composed.",
+      "after_state": "exists_graphs supplies G with α(G)≤2 and c(G)<m/100; full_matching_minor_proposition derives h(G)<26m/75+2/3<m/2≤χ(G); the final theorem uses h(G)<χ(G) to contradict the universal claim.",
+      "expected_obligation_change": "Separate the proof into constructive existence obligations, an invariant comparison theorem, and a final arithmetic contradiction. This permits ablation and reuse of the comparison bridge independently of the hard construction."
+    },
+    "evidence": [
+      {
+        "source_path": "lean/OAI/Combinatorics/HadwigerCounterexample/Main.lean",
+        "locator": "theorem exists_graphs",
+        "evidence_kind": "lean_declaration",
+        "excerpt": "G.indepNum ≤ 2",
+        "supports": "The construction layer states the independence-number and small connected-matching bounds for arbitrarily large finite graphs."
+      },
+      {
+        "source_path": "lean/OAI/Combinatorics/HadwigerMatching/Main.lean",
+        "locator": "theorem full_matching_minor_proposition",
+        "evidence_kind": "lean_declaration",
+        "excerpt": "26 * (m : ℚ) / 75 + 2 / 3 < (m : ℚ) / 2",
+        "supports": "The reusable invariant bridge turns the construction hypotheses into the quantitative strict separation."
+      },
+      {
+        "source_path": "lean/OAI/Combinatorics/HadwigerMatching/MinorBound.lean",
+        "locator": "theorem hadwiger_matching_bound",
+        "evidence_kind": "lean_declaration",
+        "excerpt": "3 * LinearListHadwiger.hadwigerNumber G ≤ Fintype.card V + 4 * connectedMatchingNumber G + 2",
+        "supports": "The minor-counting lemma bounds the clique-minor number using graph size and the auxiliary matching invariant."
+      },
+      {
+        "source_path": "lean/OAI/Combinatorics/HadwigerCounterexample/Main.lean",
+        "locator": "theorem not_hadwiger_conjecture",
+        "evidence_kind": "proof_step",
+        "excerpt": "exact h6.not_ge",
+        "supports": "Once the constructed graph is shown to have strictly more chromatic number than Hadwiger number, the universal conjecture is contradicted."
+      },
+      {
+        "source_path": "lean/docs/157.md",
+        "locator": "Scope",
+        "evidence_kind": "manuscript_span",
+        "supports": "The scope note summarizes the numerical separation and limits the selected formalized statement to the ordinary chromatic form."
+      }
+    ],
+    "failure_boundaries": [
+      "If the existence theorem misses either invariant hypothesis, the comparison bridge cannot be applied.",
+      "A weak or non-strict proxy bound may only yield equality and fail to contradict the universal claim.",
+      "Rational constants and the minimum graph size are proof-critical; changing them requires rechecking every inequality.",
+      "This record abstracts the proof architecture; it does not reproduce or shorten the substantial analytic/probabilistic graph-construction argument."
+    ],
+    "transfer_candidates": [
+      {
+        "target_family_id": "184",
+        "target_theorem_id": "OAI.CliqueFreeLog.logarithmic_independence_bound",
+        "rationale": "Rejected after checking that family 184 is a distinct train family. The source fact indepNum(G) ≤ 2 yields a lower bound on chromatic number via |V| ≤ 2χ(G); the target asks for a lower bound on indepNum(G) for clique-free graphs as a function of order and average degree. The source's premise bounds the same invariant in the opposite direction and does not discharge the target theorem's optimizer/degree-cutoff obligations.",
+        "preconditions_checked": [
+          "Confirmed family 184 is assigned to train before inspecting CliqueFree/Main.lean.",
+          "Read HadwigerMatching/ChromaticBound.lean: card_le_twice_chromaticNumber_of_indepNum assumes indepNum G ≤ 2 and concludes Fintype.card V ≤ 2 * chromaticNumber G.",
+          "Read CliqueFree/Main.lean: logarithmic_independence_bound assumes CliqueFree r and average degree ≥ 2 and concludes a positive logarithmic lower bound on indepNum G.",
+          "No target proof obligation is discharged by reversing the source upper bound on indepNum; no tactic or lemma transfer was attempted."
+        ],
+        "status": "rejected",
+        "directional_contract": {
+          "compatibility": "incompatible",
+          "mismatch_codes": [
+            "inequality_direction",
+            "predicate_mismatch",
+            "precondition_mismatch",
+            "domain_mismatch",
+            "quantifier_scope"
+          ],
+          "source_move_requires": "Use the source's premise indepNum(G) ≤ 2 to derive |V(G)| ≤ 2χ(G), a chromatic-number lower bound. The key independent-set fact is an upper bound on indepNum(G).",
+          "target_goal_requires": "For each r ≥ 4, show that there is c > 0 such that every finite r-clique-free graph G with average degree d ≥ 2 satisfies c·|V(G)|·log(d)/d ≤ indepNum(G), a lower bound on indepNum(G).",
+          "notes": [
+            "Same broad graph-theory vocabulary does not imply a reusable invariant move: source upper-bounds independence number, while target must lower-bound it under different hypotheses.",
+            "Static curator adjudication only; this is not an empirical failed proof attempt."
+          ],
+          "move_kind": "inequality_transfer",
+          "source_obligation": {
+            "domain": "extremal_graph_theory",
+            "object_type": "finite_simple_graph",
+            "predicate": "G.indepNum",
+            "relation": "upper_bound",
+            "quantifier_scope": "For any finite simple graph G with indepNum(G) ≤ 2; this permits a lower bound on chromatic number from graph order.",
+            "preconditions": [
+              "G is a finite simple graph.",
+              "G.indepNum ≤ 2."
+            ]
+          },
+          "target_obligation": {
+            "domain": "clique_free_extremal_graph_theory",
+            "object_type": "finite_simple_graph",
+            "predicate": "G.indepNum",
+            "relation": "lower_bound",
+            "quantifier_scope": "For every integer r ≥ 4, finite simple graph G, and average degree d ≥ 2 with G.CliqueFree r, a positive constant c(r) satisfies c·|V(G)|·log(d)/d ≤ indepNum(G).",
+            "preconditions": [
+              "r ≥ 4.",
+              "G is a finite simple graph.",
+              "G.CliqueFree r.",
+              "averageDegree(G) ≥ 2.",
+              "A positive constant is established through the target's weighted optimizer and degree-cutoff argument."
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "verification": {
+    "status": "not_attempted",
+    "exact_statement_checked": false,
+    "checker": null,
+    "checker_version": null,
+    "exact_statement_digest": null,
+    "axiom_policy": "unknown",
+    "notes": [
+      "The pinned formalization catalog and Comparator configuration identify the target declaration, but no Lean build, Comparator run, or axiom audit was executed during this authoring session.",
+      "The theorem statement digest is over the exact stored UTF-8 declaration text extracted from Main.lean; it is not a normalized elaborated-expression digest."
+    ]
+  },
+  "semantic_validation": {
+    "status": "not_attempted",
+    "statement_correspondence": {
+      "status": "not_reviewed",
+      "independent_reviewer_count": 0,
+      "notes": [
+        "lean/docs/157.md describes the ordinary chromatic counterexample claim and excludes the fractional-chromatic strengthening and Colin de Verdière consequence from the selected formalized statement. Independent statement review remains outstanding."
+      ]
+    },
+    "successor_tests": [],
+    "mutation_controls": [
+      {
+        "mutation_id": "strict-bound-weakened",
+        "description": "Mutate the strict numerical separation so it no longer implies h(G)<χ(G); the semantic gate should not count the final contradiction as discharged. This is a planned fixture, not an observed test.",
+        "expected_detection": true,
+        "observed_detection": false,
+        "status": "not_run",
+        "notes": [
+          "Must be implemented and executed by the benchmark gate before this candidate can become eligible."
+        ]
+      }
+    ]
+  },
+  "constructive_transfer": {
+    "status": "not_applicable",
+    "unknowns": [],
+    "candidate_witness": {
+      "status": "absent",
+      "representation": null,
+      "formal_term_digest": null,
+      "notes": [
+        "The task is a theorem/counterexample proof, not a hidden-answer witness benchmark."
+      ]
+    },
+    "proof_obligations": [],
+    "answer_equivalence": {
+      "method": "none",
+      "status": "not_applicable",
+      "score": null,
+      "notes": [
+        "Constructive answer discovery is not the target of this candidate."
+      ]
+    }
+  },
+  "review": {
+    "status": "unreviewed",
+    "independent_review_count": 0,
+    "review_notes": [
+      "Candidate-only annotation; excluded from records.jsonl and all scores.",
+      "Family 157 is a distinct training family in the frozen split. Its proof sources were inspected only after verifying that assignment.",
+      "No transfer from Borsuk family 156 is claimed; that specific transfer candidate is separately rejected based on structural mismatch.",
+      "Manuscript license state remains needs_review."
+    ]
+  }
+}

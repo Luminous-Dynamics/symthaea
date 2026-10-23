@@ -1,0 +1,247 @@
+{
+  "schema_version": "pitb.proof-state-intervention-outcomes.v0",
+  "suite_id": "synthetic-fixed-theorem-proof-state-interventions-v0",
+  "dataset_kind": "synthetic_fixture",
+  "outcomes": [
+    {
+      "outcome_id": "state-outcome-0-base",
+      "case_id": "state-intervention-0",
+      "pair_id": "state-pair-0",
+      "component_id": "state-component-0",
+      "split": "test",
+      "state_role": "base",
+      "source_insight_record_id": "synthetic-insight-0",
+      "source_insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_action_policy": "move_forbidden_or_replan",
+      "proof_state": {
+        "target_statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "snapshot_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "paired_snapshot_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "local_context_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "paired_local_context_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "execution": {
+        "status": "not_run",
+        "model": null,
+        "decision": null,
+        "original_move_applied": null,
+        "checker_result": "not_run",
+        "proof_sha256": null,
+        "run_receipt_sha256": null,
+        "resource_usage": null
+      }
+    },
+    {
+      "outcome_id": "state-outcome-0-variant",
+      "case_id": "state-intervention-0",
+      "pair_id": "state-pair-0",
+      "component_id": "state-component-0",
+      "split": "test",
+      "state_role": "variant",
+      "source_insight_record_id": "synthetic-insight-0",
+      "source_insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_action_policy": "move_forbidden_or_replan",
+      "proof_state": {
+        "target_statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "snapshot_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "paired_snapshot_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "local_context_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "paired_local_context_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "execution": {
+        "status": "not_run",
+        "model": null,
+        "decision": null,
+        "original_move_applied": null,
+        "checker_result": "not_run",
+        "proof_sha256": null,
+        "run_receipt_sha256": null,
+        "resource_usage": null
+      }
+    },
+    {
+      "outcome_id": "state-outcome-1-base",
+      "case_id": "state-intervention-1",
+      "pair_id": "state-pair-1",
+      "component_id": "state-component-1",
+      "split": "test",
+      "state_role": "base",
+      "source_insight_record_id": "synthetic-insight-1",
+      "source_insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_action_policy": "preserve_eligibility",
+      "proof_state": {
+        "target_statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "snapshot_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "paired_snapshot_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "local_context_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "paired_local_context_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "execution": {
+        "status": "not_run",
+        "model": null,
+        "decision": null,
+        "original_move_applied": null,
+        "checker_result": "not_run",
+        "proof_sha256": null,
+        "run_receipt_sha256": null,
+        "resource_usage": null
+      }
+    },
+    {
+      "outcome_id": "state-outcome-1-variant",
+      "case_id": "state-intervention-1",
+      "pair_id": "state-pair-1",
+      "component_id": "state-component-1",
+      "split": "test",
+      "state_role": "variant",
+      "source_insight_record_id": "synthetic-insight-1",
+      "source_insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_action_policy": "preserve_eligibility",
+      "proof_state": {
+        "target_statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "snapshot_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "paired_snapshot_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "local_context_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "paired_local_context_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "execution": {
+        "status": "not_run",
+        "model": null,
+        "decision": null,
+        "original_move_applied": null,
+        "checker_result": "not_run",
+        "proof_sha256": null,
+        "run_receipt_sha256": null,
+        "resource_usage": null
+      }
+    },
+    {
+      "outcome_id": "state-outcome-2-base",
+      "case_id": "state-intervention-2",
+      "pair_id": "state-pair-2",
+      "component_id": "state-component-2",
+      "split": "test",
+      "state_role": "base",
+      "source_insight_record_id": "synthetic-insight-2",
+      "source_insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_action_policy": "preserve_eligibility",
+      "proof_state": {
+        "target_statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "snapshot_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "paired_snapshot_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "local_context_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "paired_local_context_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "execution": {
+        "status": "not_run",
+        "model": null,
+        "decision": null,
+        "original_move_applied": null,
+        "checker_result": "not_run",
+        "proof_sha256": null,
+        "run_receipt_sha256": null,
+        "resource_usage": null
+      }
+    },
+    {
+      "outcome_id": "state-outcome-2-variant",
+      "case_id": "state-intervention-2",
+      "pair_id": "state-pair-2",
+      "component_id": "state-component-2",
+      "split": "test",
+      "state_role": "variant",
+      "source_insight_record_id": "synthetic-insight-2",
+      "source_insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_action_policy": "preserve_eligibility",
+      "proof_state": {
+        "target_statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "snapshot_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "paired_snapshot_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "local_context_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "paired_local_context_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "execution": {
+        "status": "not_run",
+        "model": null,
+        "decision": null,
+        "original_move_applied": null,
+        "checker_result": "not_run",
+        "proof_sha256": null,
+        "run_receipt_sha256": null,
+        "resource_usage": null
+      }
+    },
+    {
+      "outcome_id": "state-outcome-3-base",
+      "case_id": "state-intervention-3",
+      "pair_id": "state-pair-3",
+      "component_id": "state-component-3",
+      "split": "test",
+      "state_role": "base",
+      "source_insight_record_id": "synthetic-insight-3",
+      "source_insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_action_policy": "preserve_eligibility",
+      "proof_state": {
+        "target_statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "snapshot_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "paired_snapshot_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "local_context_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "paired_local_context_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "execution": {
+        "status": "not_run",
+        "model": null,
+        "decision": null,
+        "original_move_applied": null,
+        "checker_result": "not_run",
+        "proof_sha256": null,
+        "run_receipt_sha256": null,
+        "resource_usage": null
+      }
+    },
+    {
+      "outcome_id": "state-outcome-3-variant",
+      "case_id": "state-intervention-3",
+      "pair_id": "state-pair-3",
+      "component_id": "state-component-3",
+      "split": "test",
+      "state_role": "variant",
+      "source_insight_record_id": "synthetic-insight-3",
+      "source_insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_action_policy": "preserve_eligibility",
+      "proof_state": {
+        "target_statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "snapshot_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "paired_snapshot_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "local_context_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "paired_local_context_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "execution": {
+        "status": "not_run",
+        "model": null,
+        "decision": null,
+        "original_move_applied": null,
+        "checker_result": "not_run",
+        "proof_sha256": null,
+        "run_receipt_sha256": null,
+        "resource_usage": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,679 @@
+{
+  "schema_version": "pitb.counterfactual-precondition-suite.v0",
+  "suite_id": "synthetic-counterfactual-precondition-suite-v0",
+  "dataset_kind": "synthetic_fixture",
+  "suite_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "pairs": [
+    {
+      "pair_id": "cf-p0-noop",
+      "component_id": "component-p0-noop",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-0",
+        "family_id": "synthetic-source-family-0",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "target": {
+        "target_id": "synthetic-target-0",
+        "family_id": "synthetic-target-family-0",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "artifact_path": "synthetic/Target0.lean",
+        "base_statement_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "counterfactual_statement_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target0-counterfactual.lean"
+      },
+      "mutation": {
+        "kind": "no_semantic_change",
+        "semantic_change": "none",
+        "changed_field": "formatting",
+        "before_fragment_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "after_fragment_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "mutation_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "description": "Synthetic syntax-only normalization that preserves the intended mathematical statement."
+      },
+      "base_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ],
+        "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "note": "Synthetic structural fixture only for p0-noop; reviewer labels are placeholders, not expert judgments."
+      },
+      "counterfactual_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "no_semantic_change",
+            "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "no_semantic_change",
+            "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "note": "Synthetic structural fixture only for p0-noop; reviewer labels are placeholders, not expert judgments."
+      },
+      "base_outcome_pair_id": "outcome-cf-p0-noop-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p0-noop-cf"
+    },
+    {
+      "pair_id": "cf-p1-precondition",
+      "component_id": "component-p1-precondition",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-1",
+        "family_id": "synthetic-source-family-1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "target": {
+        "target_id": "synthetic-target-1",
+        "family_id": "synthetic-target-family-1",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "artifact_path": "synthetic/Target1.lean",
+        "base_statement_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "counterfactual_statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target1-counterfactual.lean"
+      },
+      "mutation": {
+        "kind": "precondition_removed",
+        "semantic_change": "changed",
+        "changed_field": "precondition",
+        "before_fragment_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "after_fragment_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "mutation_receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "description": "Synthetic control removes a prerequisite needed by the reusable strategy."
+      },
+      "base_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ],
+        "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "note": "Synthetic structural fixture only for p1-precondition; reviewer labels are placeholders, not expert judgments."
+      },
+      "counterfactual_adjudication": {
+        "status": "adjudicated",
+        "label": "incompatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "incompatible",
+            "reason_code": "missing_precondition",
+            "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "incompatible",
+            "reason_code": "missing_precondition",
+            "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "note": "Synthetic structural fixture only for p1-precondition; reviewer labels are placeholders, not expert judgments."
+      },
+      "base_outcome_pair_id": "outcome-cf-p1-precondition-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p1-precondition-cf"
+    },
+    {
+      "pair_id": "cf-p2-ineq",
+      "component_id": "component-p2-ineq",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-2",
+        "family_id": "synthetic-source-family-2",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "target": {
+        "target_id": "synthetic-target-2",
+        "family_id": "synthetic-target-family-2",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "artifact_path": "synthetic/Target2.lean",
+        "base_statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "counterfactual_statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target2-counterfactual.lean"
+      },
+      "mutation": {
+        "kind": "inequality_direction_reversed",
+        "semantic_change": "changed",
+        "changed_field": "relation",
+        "before_fragment_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "after_fragment_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "mutation_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "description": "Synthetic control reverses an inequality direction."
+      },
+      "base_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ],
+        "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "note": "Synthetic structural fixture only for p2-ineq; reviewer labels are placeholders, not expert judgments."
+      },
+      "counterfactual_adjudication": {
+        "status": "adjudicated",
+        "label": "incompatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "incompatible",
+            "reason_code": "inequality_direction",
+            "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "incompatible",
+            "reason_code": "inequality_direction",
+            "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "note": "Synthetic structural fixture only for p2-ineq; reviewer labels are placeholders, not expert judgments."
+      },
+      "base_outcome_pair_id": "outcome-cf-p2-ineq-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p2-ineq-cf"
+    },
+    {
+      "pair_id": "cf-p3-type",
+      "component_id": "component-p3-type",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-3",
+        "family_id": "synthetic-source-family-3",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "target": {
+        "target_id": "synthetic-target-3",
+        "family_id": "synthetic-target-family-3",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "artifact_path": "synthetic/Target3.lean",
+        "base_statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "counterfactual_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target3-counterfactual.lean"
+      },
+      "mutation": {
+        "kind": "object_type_changed",
+        "semantic_change": "changed",
+        "changed_field": "object_type",
+        "before_fragment_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "after_fragment_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "mutation_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "description": "Synthetic control changes the mathematical object type required by the move."
+      },
+      "base_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ],
+        "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "note": "Synthetic structural fixture only for p3-type; reviewer labels are placeholders, not expert judgments."
+      },
+      "counterfactual_adjudication": {
+        "status": "adjudicated",
+        "label": "incompatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "incompatible",
+            "reason_code": "object_type",
+            "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "incompatible",
+            "reason_code": "object_type",
+            "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "note": "Synthetic structural fixture only for p3-type; reviewer labels are placeholders, not expert judgments."
+      },
+      "base_outcome_pair_id": "outcome-cf-p3-type-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p3-type-cf"
+    },
+    {
+      "pair_id": "cf-p4-quantifier",
+      "component_id": "component-p4-quantifier",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-4",
+        "family_id": "synthetic-source-family-4",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "target": {
+        "target_id": "synthetic-target-4",
+        "family_id": "synthetic-target-family-4",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "artifact_path": "synthetic/Target4.lean",
+        "base_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "counterfactual_statement_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target4-counterfactual.lean"
+      },
+      "mutation": {
+        "kind": "quantifier_scope_changed",
+        "semantic_change": "changed",
+        "changed_field": "quantifier_scope",
+        "before_fragment_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "after_fragment_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "mutation_receipt_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "description": "Synthetic control changes the quantifier scope."
+      },
+      "base_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ],
+        "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "note": "Synthetic structural fixture only for p4-quantifier; reviewer labels are placeholders, not expert judgments."
+      },
+      "counterfactual_adjudication": {
+        "status": "adjudicated",
+        "label": "incompatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "incompatible",
+            "reason_code": "quantifier_scope",
+            "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "incompatible",
+            "reason_code": "quantifier_scope",
+            "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "note": "Synthetic structural fixture only for p4-quantifier; reviewer labels are placeholders, not expert judgments."
+      },
+      "base_outcome_pair_id": "outcome-cf-p4-quantifier-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p4-quantifier-cf"
+    },
+    {
+      "pair_id": "cf-p5-premise",
+      "component_id": "component-p5-premise",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-5",
+        "family_id": "synthetic-source-family-5",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "target": {
+        "target_id": "synthetic-target-5",
+        "family_id": "synthetic-target-family-5",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "artifact_path": "synthetic/Target5.lean",
+        "base_statement_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "counterfactual_statement_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target5-counterfactual.lean"
+      },
+      "mutation": {
+        "kind": "premise_removed",
+        "semantic_change": "changed",
+        "changed_field": "required_premise",
+        "before_fragment_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "after_fragment_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mutation_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "description": "Synthetic control removes a premise required for transfer."
+      },
+      "base_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ],
+        "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "note": "Synthetic structural fixture only for p5-premise; reviewer labels are placeholders, not expert judgments."
+      },
+      "counterfactual_adjudication": {
+        "status": "adjudicated",
+        "label": "incompatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "incompatible",
+            "reason_code": "premise_unavailable",
+            "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "incompatible",
+            "reason_code": "premise_unavailable",
+            "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "note": "Synthetic structural fixture only for p5-premise; reviewer labels are placeholders, not expert judgments."
+      },
+      "base_outcome_pair_id": "outcome-cf-p5-premise-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p5-premise-cf"
+    },
+    {
+      "pair_id": "cf-p6-predicate",
+      "component_id": "component-p6-predicate",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-6",
+        "family_id": "synthetic-source-family-6",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "target": {
+        "target_id": "synthetic-target-6",
+        "family_id": "synthetic-target-family-6",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "artifact_path": "synthetic/Target6.lean",
+        "base_statement_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "counterfactual_statement_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "base_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "counterfactual_artifact_path": "synthetic/Target6-counterfactual.lean"
+      },
+      "mutation": {
+        "kind": "predicate_changed",
+        "semantic_change": "changed",
+        "changed_field": "predicate",
+        "before_fragment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "after_fragment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "mutation_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "description": "Synthetic control changes the target predicate while preserving topical vocabulary."
+      },
+      "base_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ],
+        "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "note": "Synthetic structural fixture only for p6-predicate; reviewer labels are placeholders, not expert judgments."
+      },
+      "counterfactual_adjudication": {
+        "status": "adjudicated",
+        "label": "incompatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "incompatible",
+            "reason_code": "predicate_mismatch",
+            "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "incompatible",
+            "reason_code": "predicate_mismatch",
+            "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "note": "Synthetic structural fixture only for p6-predicate; reviewer labels are placeholders, not expert judgments."
+      },
+      "base_outcome_pair_id": "outcome-cf-p6-predicate-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p6-predicate-cf"
+    },
+    {
+      "pair_id": "cf-pending-unknown",
+      "component_id": "component-pending-unknown",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-pending",
+        "family_id": "synthetic-source-family-pending",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "source_artifact_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      "target": {
+        "target_id": "synthetic-target-pending",
+        "family_id": "synthetic-target-family-pending",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "artifact_path": "synthetic/TargetPending.lean",
+        "base_statement_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_statement_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "base_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "counterfactual_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "counterfactual_artifact_path": "synthetic/TargetPending-counterfactual.lean"
+      },
+      "mutation": {
+        "kind": "precondition_removed",
+        "semantic_change": "changed",
+        "changed_field": "precondition",
+        "before_fragment_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "after_fragment_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "mutation_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "description": "Synthetic pending-label row, used to verify denominator accounting only."
+      },
+      "base_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          }
+        ],
+        "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "note": "Synthetic structural fixture only for p0-noop; reviewer labels are placeholders, not expert judgments."
+      },
+      "counterfactual_adjudication": {
+        "status": "pending",
+        "label": "unknown",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [],
+        "receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "note": "Synthetic pending example; unknown must remain unknown and is excluded from scored pairs."
+      },
+      "base_outcome_pair_id": "outcome-cf-pending-unknown-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-pending-unknown-counterfactual"
+    },
+    {
+      "pair_id": "cf-p7-equivalent-reformulation",
+      "component_id": "component-p7-equivalent-reformulation",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-7",
+        "family_id": "synthetic-source-family-7",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "insight_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "source_artifact_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      "target": {
+        "target_id": "synthetic-target-7",
+        "family_id": "synthetic-target-family-7",
+        "source_commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "artifact_path": "synthetic/Target7.lean",
+        "base_statement_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_statement_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "base_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "counterfactual_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "counterfactual_artifact_path": "synthetic/Target7-equivalent.lean"
+      },
+      "mutation": {
+        "kind": "equivalent_reformulation",
+        "semantic_change": "none",
+        "changed_field": "global_equivalent_reformulation",
+        "before_fragment_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "after_fragment_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "mutation_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "description": "Synthetic global equivalent reformulation with changed surface syntax and a distinct fragment digest. Equivalence is a placeholder, not expert mathematical judgment."
+      },
+      "base_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ],
+        "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "note": "Synthetic structure-only base judgement for equivalent reformulation"
+      },
+      "counterfactual_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "no_semantic_change",
+            "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "no_semantic_change",
+            "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "note": "Synthetic placeholder label, not an expert judgement of equivalence"
+      },
+      "base_outcome_pair_id": "outcome-cf-p7-equivalent-reformulation-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p7-equivalent-reformulation-cf"
+    }
+  ]
+}

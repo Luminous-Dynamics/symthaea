@@ -1,0 +1,439 @@
+{
+  "schema_version": "pitb.proof-state-intervention-suite.v0",
+  "suite_id": "synthetic-fixed-theorem-proof-state-interventions-v0",
+  "dataset_kind": "synthetic_fixture",
+  "cases": [
+    {
+      "case_id": "state-intervention-0",
+      "pair_id": "state-pair-0",
+      "component_id": "state-component-0",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-0",
+        "family_id": "synthetic-source-family-0",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "target": {
+        "theorem_id": "Synthetic.target0",
+        "family_id": "synthetic-target-family-0",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "artifact_path": "synthetic/Target0.lean",
+        "artifact_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "lean_toolchain": "leanprover/lean4:v4.34.1"
+      },
+      "base_state": {
+        "snapshot_id": "base-0",
+        "snapshot_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "replay_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "lean_toolchain": "leanprover/lean4:v4.34.1",
+        "local_context_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "goal_count": 1
+      },
+      "variant_state": {
+        "snapshot_id": "variant-0",
+        "snapshot_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "replay_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "lean_toolchain": "leanprover/lean4:v4.34.1",
+        "local_context_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "goal_count": 1
+      },
+      "intervention": {
+        "kind": "required_hypothesis_cleared",
+        "operation": "clear_local_decl",
+        "single_factor": true,
+        "precondition_id": "requires-order-hypothesis",
+        "before_declaration": {
+          "stable_key": "fvar-h",
+          "user_name": "h",
+          "present": true,
+          "type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "role": "required_precondition",
+          "position": 2
+        },
+        "after_declaration": {
+          "stable_key": "fvar-h",
+          "user_name": null,
+          "present": false,
+          "type_sha256": null,
+          "role": "required_precondition",
+          "position": null
+        },
+        "operation_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "transition_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "note": "Synthetic contract example only; not a replayed Lean proof state."
+      },
+      "contract": {
+        "required_type_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "base_precondition_status": "available",
+        "variant_precondition_status": "absent",
+        "expected_action_policy": "move_forbidden_or_replan",
+        "note": "Placeholder expected contract outcome for synthetic CI only."
+      },
+      "adjudication": {
+        "status": "adjudicated",
+        "rubric_version": "pitb.proof-state-intervention.synthetic-v0",
+        "reviewers": [
+          {
+            "reviewer_id": "reviewer-a",
+            "base_precondition_status": "available",
+            "variant_precondition_status": "absent",
+            "expected_action_policy": "move_forbidden_or_replan",
+            "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "note": "Synthetic reviewer placeholder; not an independent mathematical judgment."
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "base_precondition_status": "available",
+            "variant_precondition_status": "absent",
+            "expected_action_policy": "move_forbidden_or_replan",
+            "evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "note": "Synthetic reviewer placeholder; not an independent mathematical judgment."
+          }
+        ],
+        "receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "note": "Placeholder reviewer labels; real benchmark requires independently replayed states and blind adjudication."
+      },
+      "outcome_links": {
+        "base_outcome_id": "state-outcome-0-base",
+        "variant_outcome_id": "state-outcome-0-variant",
+        "status": "not_run"
+      }
+    },
+    {
+      "case_id": "state-intervention-1",
+      "pair_id": "state-pair-1",
+      "component_id": "state-component-1",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-1",
+        "family_id": "synthetic-source-family-1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "target": {
+        "theorem_id": "Synthetic.target1",
+        "family_id": "synthetic-target-family-1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "artifact_path": "synthetic/Target1.lean",
+        "artifact_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "lean_toolchain": "leanprover/lean4:v4.34.1"
+      },
+      "base_state": {
+        "snapshot_id": "base-1",
+        "snapshot_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "replay_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "lean_toolchain": "leanprover/lean4:v4.34.1",
+        "local_context_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "goal_count": 1
+      },
+      "variant_state": {
+        "snapshot_id": "variant-1",
+        "snapshot_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "replay_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "lean_toolchain": "leanprover/lean4:v4.34.1",
+        "local_context_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "goal_count": 1
+      },
+      "intervention": {
+        "kind": "hypothesis_alpha_renamed",
+        "operation": "rename_local_decl",
+        "single_factor": true,
+        "precondition_id": "requires-order-hypothesis",
+        "before_declaration": {
+          "stable_key": "fvar-h",
+          "user_name": "h",
+          "present": true,
+          "type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "role": "required_precondition",
+          "position": 2
+        },
+        "after_declaration": {
+          "stable_key": "fvar-h",
+          "user_name": "h_renamed",
+          "present": true,
+          "type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "role": "required_precondition",
+          "position": 2
+        },
+        "operation_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "transition_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "note": "Synthetic contract example only; not a replayed Lean proof state."
+      },
+      "contract": {
+        "required_type_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "base_precondition_status": "available",
+        "variant_precondition_status": "available",
+        "expected_action_policy": "preserve_eligibility",
+        "note": "Placeholder expected contract outcome for synthetic CI only."
+      },
+      "adjudication": {
+        "status": "adjudicated",
+        "rubric_version": "pitb.proof-state-intervention.synthetic-v0",
+        "reviewers": [
+          {
+            "reviewer_id": "reviewer-a",
+            "base_precondition_status": "available",
+            "variant_precondition_status": "available",
+            "expected_action_policy": "preserve_eligibility",
+            "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "note": "Synthetic reviewer placeholder; not an independent mathematical judgment."
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "base_precondition_status": "available",
+            "variant_precondition_status": "available",
+            "expected_action_policy": "preserve_eligibility",
+            "evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "note": "Synthetic reviewer placeholder; not an independent mathematical judgment."
+          }
+        ],
+        "receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "note": "Placeholder reviewer labels; real benchmark requires independently replayed states and blind adjudication."
+      },
+      "outcome_links": {
+        "base_outcome_id": "state-outcome-1-base",
+        "variant_outcome_id": "state-outcome-1-variant",
+        "status": "not_run"
+      }
+    },
+    {
+      "case_id": "state-intervention-2",
+      "pair_id": "state-pair-2",
+      "component_id": "state-component-2",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-2",
+        "family_id": "synthetic-source-family-2",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "target": {
+        "theorem_id": "Synthetic.target2",
+        "family_id": "synthetic-target-family-2",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "artifact_path": "synthetic/Target2.lean",
+        "artifact_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "lean_toolchain": "leanprover/lean4:v4.34.1"
+      },
+      "base_state": {
+        "snapshot_id": "base-2",
+        "snapshot_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "replay_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "lean_toolchain": "leanprover/lean4:v4.34.1",
+        "local_context_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "goal_count": 1
+      },
+      "variant_state": {
+        "snapshot_id": "variant-2",
+        "snapshot_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "replay_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "lean_toolchain": "leanprover/lean4:v4.34.1",
+        "local_context_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "goal_count": 1
+      },
+      "intervention": {
+        "kind": "irrelevant_declaration_removed",
+        "operation": "remove_irrelevant_decl",
+        "single_factor": true,
+        "precondition_id": "requires-order-hypothesis",
+        "before_declaration": {
+          "stable_key": "fvar-k",
+          "user_name": "k",
+          "present": true,
+          "type_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "role": "irrelevant",
+          "position": 3
+        },
+        "after_declaration": {
+          "stable_key": "fvar-k",
+          "user_name": null,
+          "present": false,
+          "type_sha256": null,
+          "role": "irrelevant",
+          "position": null
+        },
+        "operation_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "transition_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "note": "Synthetic contract example only; not a replayed Lean proof state."
+      },
+      "contract": {
+        "required_type_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "base_precondition_status": "available",
+        "variant_precondition_status": "available",
+        "expected_action_policy": "preserve_eligibility",
+        "note": "Placeholder expected contract outcome for synthetic CI only."
+      },
+      "adjudication": {
+        "status": "adjudicated",
+        "rubric_version": "pitb.proof-state-intervention.synthetic-v0",
+        "reviewers": [
+          {
+            "reviewer_id": "reviewer-a",
+            "base_precondition_status": "available",
+            "variant_precondition_status": "available",
+            "expected_action_policy": "preserve_eligibility",
+            "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "note": "Synthetic reviewer placeholder; not an independent mathematical judgment."
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "base_precondition_status": "available",
+            "variant_precondition_status": "available",
+            "expected_action_policy": "preserve_eligibility",
+            "evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "note": "Synthetic reviewer placeholder; not an independent mathematical judgment."
+          }
+        ],
+        "receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "note": "Placeholder reviewer labels; real benchmark requires independently replayed states and blind adjudication."
+      },
+      "outcome_links": {
+        "base_outcome_id": "state-outcome-2-base",
+        "variant_outcome_id": "state-outcome-2-variant",
+        "status": "not_run"
+      }
+    },
+    {
+      "case_id": "state-intervention-3",
+      "pair_id": "state-pair-3",
+      "component_id": "state-component-3",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-3",
+        "family_id": "synthetic-source-family-3",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "target": {
+        "theorem_id": "Synthetic.target3",
+        "family_id": "synthetic-target-family-3",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "artifact_path": "synthetic/Target3.lean",
+        "artifact_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "lean_toolchain": "leanprover/lean4:v4.34.1"
+      },
+      "base_state": {
+        "snapshot_id": "base-3",
+        "snapshot_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "replay_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "lean_toolchain": "leanprover/lean4:v4.34.1",
+        "local_context_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "goal_count": 1
+      },
+      "variant_state": {
+        "snapshot_id": "variant-3",
+        "snapshot_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "replay_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "goal_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "lean_toolchain": "leanprover/lean4:v4.34.1",
+        "local_context_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "goal_count": 1
+      },
+      "intervention": {
+        "kind": "independent_declarations_reordered",
+        "operation": "reorder_independent_decls",
+        "single_factor": true,
+        "precondition_id": "requires-order-hypothesis",
+        "before_declaration": {
+          "stable_key": "fvar-j",
+          "user_name": "j",
+          "present": true,
+          "type_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "role": "irrelevant",
+          "position": 2
+        },
+        "after_declaration": {
+          "stable_key": "fvar-j",
+          "user_name": "j",
+          "present": true,
+          "type_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "role": "irrelevant",
+          "position": 4
+        },
+        "operation_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "transition_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "note": "Synthetic contract example only; not a replayed Lean proof state."
+      },
+      "contract": {
+        "required_type_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "base_precondition_status": "available",
+        "variant_precondition_status": "available",
+        "expected_action_policy": "preserve_eligibility",
+        "note": "Placeholder expected contract outcome for synthetic CI only."
+      },
+      "adjudication": {
+        "status": "adjudicated",
+        "rubric_version": "pitb.proof-state-intervention.synthetic-v0",
+        "reviewers": [
+          {
+            "reviewer_id": "reviewer-a",
+            "base_precondition_status": "available",
+            "variant_precondition_status": "available",
+            "expected_action_policy": "preserve_eligibility",
+            "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "note": "Synthetic reviewer placeholder; not an independent mathematical judgment."
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "base_precondition_status": "available",
+            "variant_precondition_status": "available",
+            "expected_action_policy": "preserve_eligibility",
+            "evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "note": "Synthetic reviewer placeholder; not an independent mathematical judgment."
+          }
+        ],
+        "receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "note": "Placeholder reviewer labels; real benchmark requires independently replayed states and blind adjudication."
+      },
+      "outcome_links": {
+        "base_outcome_id": "state-outcome-3-base",
+        "variant_outcome_id": "state-outcome-3-variant",
+        "status": "not_run"
+      }
+    }
+  ]
+}

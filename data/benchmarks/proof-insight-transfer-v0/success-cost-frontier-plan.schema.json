@@ -1,0 +1,308 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/success-cost-frontier-plan.schema.json",
+  "title": "PITB Success-Cost Frontier Preregistration Plan v0",
+  "description": "Frozen plan for comparing verified proof success against budget across methods. The plan specifies coverage and limits, not outcomes or a measured frontier.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "dataset_kind",
+    "split",
+    "target_manifest_sha256",
+    "targets",
+    "arms",
+    "budget_levels",
+    "assignments",
+    "analysis_policy",
+    "plan_receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.success-cost-frontier-plan.v0"
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "dataset_kind": {
+      "enum": [
+        "synthetic_fixture",
+        "reviewed_benchmark"
+      ]
+    },
+    "split": {
+      "enum": [
+        "validation",
+        "test",
+        "external_challenge"
+      ]
+    },
+    "target_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/target"
+      }
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/arm"
+      }
+    },
+    "budget_levels": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/budget"
+      }
+    },
+    "assignments": {
+      "type": "array",
+      "minItems": 18,
+      "items": {
+        "$ref": "#/$defs/assignment"
+      }
+    },
+    "analysis_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary_endpoint",
+        "success_gate",
+        "resampling_unit",
+        "minimum_budget_levels",
+        "require_complete_cartesian_coverage",
+        "confirmatory_decision"
+      ],
+      "properties": {
+        "primary_endpoint": {
+          "const": "exact_target_semantic_gate_success"
+        },
+        "success_gate": {
+          "const": "target_kernel_and_semantic_gate_and_applicable_successor_receipts"
+        },
+        "resampling_unit": {
+          "const": "target_component_id"
+        },
+        "minimum_budget_levels": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "require_complete_cartesian_coverage": {
+          "const": true
+        },
+        "confirmatory_decision": {
+          "const": "not_evaluated_until_real_outcomes_and_receipts_are_validated"
+        }
+      }
+    },
+    "plan_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_id",
+        "component_id",
+        "family_id",
+        "source_commit",
+        "artifact_path",
+        "artifact_sha256",
+        "statement_sha256"
+      ],
+      "properties": {
+        "target_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "component_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "family_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "source_commit": {
+          "$ref": "#/$defs/commit"
+        },
+        "artifact_path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "statement_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm_id",
+        "method_class",
+        "model_id",
+        "model_version",
+        "checker_id",
+        "checker_version",
+        "prompt_sha256",
+        "config_sha256",
+        "retry_policy",
+        "cache_policy"
+      ],
+      "properties": {
+        "arm_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "method_class": {
+          "enum": [
+            "minimal_shell_agent",
+            "fixed_local_recovery",
+            "typed_insight_local_recovery",
+            "global_recovery_coordinator",
+            "cost_aware_coordinator",
+            "strong_adaptive_retrieval",
+            "raw_proof_retrieval",
+            "no_retrieval"
+          ]
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checker_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checker_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "retry_policy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "cache_policy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "budget_id",
+        "max_model_calls",
+        "max_tokens",
+        "max_wall_ms",
+        "max_cost_microusd"
+      ],
+      "properties": {
+        "budget_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "max_model_calls": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_wall_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_cost_microusd": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "assignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "target_id",
+        "component_id",
+        "arm_id",
+        "budget_id",
+        "input_sha256"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "target_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "component_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "arm_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "budget_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

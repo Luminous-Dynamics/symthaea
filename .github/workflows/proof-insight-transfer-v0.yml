@@ -1,0 +1,2473 @@
+name: Proof Insight Transfer Indexer V0
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/bridges/symthaea-proof-insights/**"
+      - "data/benchmarks/proof-insight-transfer-v0/**"
+      - "docs/research/proof-insight-transfer-2026.md"
+      - ".github/workflows/proof-insight-transfer-v0.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proof-insight-indexer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Stage indexer as an isolated validation crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import re
+          import shutil
+          import tomllib
+          from pathlib import Path
+
+          root = Path.cwd()
+          crate_dir = root / "crates/bridges/symthaea-proof-insights"
+          crate_manifest_path = crate_dir / "Cargo.toml"
+          crate_text = crate_manifest_path.read_text()
+          crate = tomllib.loads(crate_text)
+          workspace = tomllib.loads((root / "Cargo.toml").read_text())
+          workspace_deps = workspace["workspace"]["dependencies"]
+          package_text = crate_text.split("[dependencies]", 1)[0].rstrip() + "\n\n[dependencies]\n"
+
+          def toml_value(value):
+              if isinstance(value, str):
+                  return json.dumps(value)
+              if isinstance(value, bool):
+                  return "true" if value else "false"
+              if isinstance(value, int):
+                  return str(value)
+              if isinstance(value, list):
+                  return "[" + ", ".join(toml_value(item) for item in value) + "]"
+              if isinstance(value, dict):
+                  return "{ " + ", ".join(f"{key} = {toml_value(item)}" for key, item in value.items()) + " }"
+              raise TypeError(f"unsupported TOML value: {type(value)!r}")
+
+          dependency_lines = []
+          for name, spec in crate.get("dependencies", {}).items():
+              if isinstance(spec, dict) and spec.get("workspace") is True:
+                  spec = workspace_deps[name]
+              dependency_lines.append(f"{name} = {toml_value(spec)}")
+
+          staged = Path(__import__("os").environ["RUNNER_TEMP"]) / "proof-insight-isolated"
+          if staged.exists():
+              shutil.rmtree(staged)
+          (staged / "src").mkdir(parents=True)
+          (staged / "Cargo.toml").write_text(package_text + "\n".join(dependency_lines) + "\n")
+          shutil.copy2(crate_dir / "src/main.rs", staged / "src/main.rs")
+          if (crate_dir / "src/bin").is_dir():
+              shutil.copytree(crate_dir / "src/bin", staged / "src/bin")
+          shutil.copy2(root / "Cargo.lock", staged / "Cargo.lock")
+          print(f"Staged isolated crate {crate['package']['name']} at {staged}")
+          PY
+          echo "PITB_MANIFEST=$RUNNER_TEMP/proof-insight-isolated/Cargo.toml" >> "$GITHUB_ENV"
+      - name: Check exact-package formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo fmt -- --check
+      - name: Run isolated indexer tests and freeze the derived lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          # The workspace lock contains every member of the large workspace.
+          # Staging this single package necessarily prunes unrelated workspace
+          # package entries. Let Cargo perform that pruning once in RUNNER_TEMP,
+          # then ensure every resolved registry package/version/source already
+          # existed in the repository's reviewed Cargo.lock.
+          cargo test
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          staged = tomllib.loads(Path("Cargo.lock").read_text())
+          workspace_path = Path(os.environ["GITHUB_WORKSPACE"]) / "Cargo.lock"
+          workspace = tomllib.loads(workspace_path.read_text())
+
+          def registry_packages(lock):
+              return {
+                  (entry["name"], entry["version"], entry.get("source"))
+                  for entry in lock["package"]
+                  if entry.get("source", "").startswith("registry+")
+              }
+
+          staged_packages = registry_packages(staged)
+          workspace_packages = registry_packages(workspace)
+          unexpected = sorted(staged_packages - workspace_packages)
+          if unexpected:
+              raise SystemExit(
+                  "isolated validation resolved registry packages absent from the reviewed workspace lock: "
+                  + repr(unexpected)
+              )
+          if not staged_packages:
+              raise SystemExit("isolated validation lock unexpectedly contains no registry packages")
+          print(
+              "PITB_ISOLATED_LOCK_PASS: "
+              f"{len(staged_packages)} registry package versions are present in the reviewed workspace lock"
+          )
+          PY
+          # Later test/lint/index steps use --locked against this exact temp lock.
+      - name: Validate checked-in transfer candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --locked --bin validate_transfer_contract -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/candidates/156-borsuk-nine-finite-obstruction.json"
+          cargo run --locked --bin validate_transfer_contract -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/candidates/157-hadwiger-invariant-chain.json"
+          cargo run --locked --bin validate_transfer_contract -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/candidates/026-eventual-subset-density-transfer.json"
+      - name: Run strict Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo clippy --locked --all-targets -- -D warnings
+      - name: Install independent Draft 2020-12 validator
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned schema-validation dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/jsonschema-venv"
+          "$RUNNER_TEMP/jsonschema-venv/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+      - name: Validate counterfactual mutation qualification schema and controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          root = Path("data/benchmarks/proof-insight-transfer-v0")
+          schema = json.loads((root / "counterfactual-mutation-qualification.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          fixture_path = root / "fixtures/counterfactual-mutation-qualification.synthetic.json"
+          fixture = json.loads(fixture_path.read_text())
+
+          def reject(condition, message):
+              if condition:
+                  raise ValueError(message)
+
+          def validate_suite(value):
+              validator.validate(value)
+              reject(value["schema_version"] != "pitb.counterfactual-mutation-qualification.v0", "unsupported qualification schema version")
+              cases = value["cases"]
+              ids = [item["qualification_id"] for item in cases]
+              pair_ids = [item["target_pair"]["pair_id"] for item in cases]
+              outcome_ids = [
+                  outcome_id
+                  for item in cases
+                  for outcome_id in (
+                      item["target_pair"]["base_outcome_pair_id"],
+                      item["target_pair"]["variant_outcome_pair_id"],
+                  )
+              ]
+              reject(len(ids) != len(set(ids)), "duplicate qualification IDs")
+              reject(len(pair_ids) != len(set(pair_ids)), "duplicate counterfactual pair IDs")
+              reject(len(outcome_ids) != len(set(outcome_ids)), "duplicate outcome join IDs")
+              family_splits = {}
+              component_splits = {}
+              for item in cases:
+                  split = item["target_pair"]["split"]
+                  target = item["target_pair"]
+                  for family_id in (item["source"]["family_id"], target["target_family_id"]):
+                      previous_split = family_splits.setdefault(family_id, split)
+                      reject(previous_split != split, f"family leakage across splits: {family_id}")
+                  previous_split = component_splits.setdefault(target["component_id"], split)
+                  reject(previous_split != split, f"component leakage across splits: {target['component_id']}")
+              for item in cases:
+                  pair = item["target_pair"]
+                  reject(pair["base_artifact_path"] == pair["variant_artifact_path"], "base and variant artifact paths must be distinct")
+                  adjudication = item["adjudication"]
+                  reviewers = adjudication["reviewers"]
+                  reviewer_ids = [reviewer["reviewer_id"] for reviewer in reviewers]
+                  reject(len(reviewer_ids) != len(set(reviewer_ids)), f"duplicate reviewer identity in {item['qualification_id']}")
+                  reject(adjudication["status"] == "adjudicated" and len(reviewers) < 2, f"adjudicated case lacks two reviewers: {item['qualification_id']}")
+                  if adjudication["status"] == "adjudicated":
+                      for reviewer in reviewers:
+                          reject(reviewer["statement_relation"] != item["statement_relation"]["relation"], f"reviewer statement relation disagrees in {item['qualification_id']}")
+                          reject(reviewer["contract_relation"] != item["contract_relation"]["status"], f"reviewer contract relation disagrees in {item['qualification_id']}")
+
+                  elaboration = item["elaboration"]
+                  relation = item["statement_relation"]
+                  contract = item["contract_relation"]
+                  if relation["relation"] == "same_elaborated_type":
+                      reject(elaboration["base_status"] != "elaborated" or elaboration["variant_status"] != "elaborated", "same-type relation requires both sides to elaborate")
+                      reject(not elaboration["base_type_sha256"] or elaboration["base_type_sha256"] != elaboration["variant_type_sha256"], "same-type relation requires equal elaborated type digests")
+                      reject(relation["evidence_kind"] != "kernel_checked_defeq_certificate" or not relation["receipt_sha256"], "same-type relation requires a checked definitional-equality receipt")
+                  elif relation["relation"] == "propositionally_equivalent":
+                      reject(elaboration["base_status"] != "elaborated" or elaboration["variant_status"] != "elaborated", "equivalence requires both sides to elaborate")
+                      reject(relation["evidence_kind"] != "kernel_checked_equivalence_proof" or not relation["receipt_sha256"], "propositional equivalence requires a checked equivalence receipt")
+                  elif relation["relation"] == "formally_distinct":
+                      reject(elaboration["base_status"] != "elaborated" or elaboration["variant_status"] != "elaborated", "formal distinction requires both sides to elaborate")
+                      reject(relation["evidence_kind"] not in {"checked_counterexample", "distinctness_proof", "independent_review"} or not relation["receipt_sha256"], "formal distinction lacks evidence")
+                  elif relation["relation"] == "invalid_mutation":
+                      reject(elaboration["variant_status"] not in {"parse_error", "elaboration_error"}, "invalid mutation must have a parser/elaborator diagnostic")
+                      reject(contract["status"] != "unknown", "invalid syntax/elaboration cannot establish strategy-contract violation")
+                      reject(relation["evidence_kind"] != "diagnostic_receipt" or not relation["receipt_sha256"] or not elaboration["diagnostics_sha256"], "invalid mutation lacks diagnostic receipts")
+
+                  if contract["status"] == "contract_violated":
+                      reject(elaboration["base_status"] != "elaborated" or elaboration["variant_status"] != "elaborated", "contract violation requires an elaborated pair")
+                      reject(contract["evidence_kind"] == "none" or not contract["receipt_sha256"], "contract violation lacks proof-state/context evidence")
+                  truth = item["truth_assessment"]
+                  if truth["status"] == "proved":
+                      reject(truth["evidence_kind"] != "kernel_proof" or not truth["receipt_sha256"], "proved truth status lacks a kernel proof receipt")
+                  if truth["status"] == "counterexample_found":
+                      reject(truth["evidence_kind"] != "checked_counterexample" or not truth["receipt_sha256"], "counterexample status lacks a checked counterexample receipt")
+                  attempt = item["strategy_attempt"]
+                  if attempt["status"] == "kernel_checked_success":
+                      reject(not attempt["exact_target_statement_checked"] or not attempt["receipt_sha256"], "verified success lacks exact-target checker evidence")
+
+          validate_suite(fixture)
+          if len(fixture["cases"]) < 4:
+              raise SystemExit("synthetic qualification fixture must cover at least four qualification states")
+          print(f"PITB_MUTATION_QUALIFICATION_SCHEMA_PASS: {len(fixture['cases'])} synthetic cases")
+
+          def expect_reject(mutant, description):
+              try:
+                  validate_suite(mutant)
+              except (ValidationError, ValueError):
+                  return
+              raise SystemExit(f"mutation-qualification negative control unexpectedly passed: {description}")
+
+          mutant = copy.deepcopy(fixture)
+          mutant["cases"][0]["statement_relation"]["receipt_sha256"] = None
+          expect_reject(mutant, "same type without a kernel certificate")
+
+          mutant = copy.deepcopy(fixture)
+          mutant["cases"][3]["elaboration"]["variant_status"] = "elaborated"
+          expect_reject(mutant, "invalid mutant without a parser/elaborator failure")
+
+          mutant = copy.deepcopy(fixture)
+          mutant["cases"][2]["contract_relation"]["receipt_sha256"] = None
+          mutant["cases"][2]["contract_relation"]["evidence_kind"] = "none"
+          expect_reject(mutant, "contract violation without applicability evidence")
+
+          mutant = copy.deepcopy(fixture)
+          mutant["cases"][0]["adjudication"]["reviewers"][1]["reviewer_id"] = mutant["cases"][0]["adjudication"]["reviewers"][0]["reviewer_id"]
+          expect_reject(mutant, "duplicate reviewer identity")
+
+          mutant = copy.deepcopy(fixture)
+          mutant["cases"][0]["strategy_attempt"]["status"] = "kernel_checked_success"
+          mutant["cases"][0]["strategy_attempt"]["exact_target_statement_checked"] = False
+          mutant["cases"][0]["strategy_attempt"]["receipt_sha256"] = "c" * 64
+          expect_reject(mutant, "success not bound to exact checked target")
+
+          mutant = copy.deepcopy(fixture)
+          mutant["cases"][2]["adjudication"]["reviewers"][0]["contract_relation"] = "contract_satisfied"
+          expect_reject(mutant, "reviewer disagreement hidden as adjudicated consensus")
+
+          print("PITB_MUTATION_QUALIFICATION_NEGATIVE_CONTROLS_PASS: 6 malformed qualification controls rejected")
+          PY
+      - name: Validate fixed-theorem proof-state intervention suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          root = Path("data/benchmarks/proof-insight-transfer-v0")
+          schema = json.loads((root / "proof-state-intervention-suite.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          fixture = json.loads((root / "fixtures/proof-state-intervention-suite.synthetic.json").read_text())
+
+          def reject(condition, message):
+              if condition:
+                  raise ValueError(message)
+
+          expected_operations = {
+              "required_hypothesis_cleared": ("clear_local_decl", "required_precondition", False),
+              "hypothesis_alpha_renamed": ("rename_local_decl", "required_precondition", True),
+              "irrelevant_declaration_removed": ("remove_irrelevant_decl", "irrelevant", False),
+              "independent_declarations_reordered": ("reorder_independent_decls", "irrelevant", True),
+          }
+
+          def validate_suite(value):
+              validator.validate(value)
+              reject(value["schema_version"] != "pitb.proof-state-intervention-suite.v0", "unsupported proof-state intervention version")
+              cases = value["cases"]
+              case_ids = [c["case_id"] for c in cases]
+              pair_ids = [c["pair_id"] for c in cases]
+              outcome_ids = [
+                  x for c in cases for x in (
+                      c["outcome_links"]["base_outcome_id"],
+                      c["outcome_links"]["variant_outcome_id"],
+                  )
+              ]
+              reject(len(case_ids) != len(set(case_ids)), "duplicate intervention case IDs")
+              reject(len(pair_ids) != len(set(pair_ids)), "duplicate intervention pair IDs")
+              reject(len(outcome_ids) != len(set(outcome_ids)), "duplicate outcome joins")
+
+              family_splits, component_splits = {}, {}
+              for case in cases:
+                  split = case["split"]
+                  target = case["target"]
+                  source = case["source_insight"]
+                  for family in (source["family_id"], target["family_id"]):
+                      previous = family_splits.setdefault(family, split)
+                      reject(previous != split, f"family leakage across split: {family}")
+                  previous = component_splits.setdefault(case["component_id"], split)
+                  reject(previous != split, f"component leakage across split: {case['component_id']}")
+
+                  base, variant = case["base_state"], case["variant_state"]
+                  for field in ("source_commit", "statement_sha256", "goal_type_sha256", "environment_sha256", "lean_toolchain"):
+                      reject(base[field] != variant[field], f"paired states drift on {field}")
+                      reject(target[field] != base[field], f"target/base binding drift on {field}")
+                  reject(base["snapshot_id"] == variant["snapshot_id"], "base and variant snapshot IDs must differ")
+                  reject(base["snapshot_sha256"] == variant["snapshot_sha256"], "an intervention must yield distinct snapshots")
+                  reject(base["replay_receipt_sha256"] == variant["replay_receipt_sha256"], "state replay receipts must bind separately")
+                  reject(base["local_context_sha256"] == variant["local_context_sha256"], "intervention did not change the local context digest")
+                  reject(base["goal_count"] != variant["goal_count"], "proof-state intervention changed the number of goals")
+
+                  intervention = case["intervention"]
+                  kind, operation, role, must_remain = (
+                      intervention["kind"],
+                      intervention["operation"],
+                      expected_operations[intervention["kind"]][1],
+                      expected_operations[intervention["kind"]][2],
+                  ) if intervention["kind"] in expected_operations else (None, None, None, None)
+                  reject(kind is None, "unregistered intervention kind")
+                  reject(intervention["operation"] != expected_operations[kind][0], "operation does not match intervention kind")
+                  reject(intervention["single_factor"] is not True, "intervention is not single-factor")
+                  before, after = intervention["before_declaration"], intervention["after_declaration"]
+                  reject(before["stable_key"] != after["stable_key"], "changed declaration identity across paired state")
+                  reject(before["role"] != role or after["role"] != role, "declaration role conflicts with intervention kind")
+                  reject(before["present"] is not True, "intervention's original declaration was absent")
+                  if kind in {"required_hypothesis_cleared", "irrelevant_declaration_removed"}:
+                      reject(after["present"] is not False or after["type_sha256"] is not None or after["user_name"] is not None or after["position"] is not None, "removed declaration remains present in variant")
+                      reject(before["type_sha256"] is None or before["user_name"] is None or before["position"] is None, "original declaration lacks type/name/position evidence")
+                  elif kind == "hypothesis_alpha_renamed":
+                      reject(after["present"] is not True or after["type_sha256"] != before["type_sha256"], "alpha-renaming must preserve declaration type and presence")
+                      reject(after["user_name"] == before["user_name"] or after["user_name"] is None, "alpha-renaming must change the displayed name")
+                      reject(after["position"] != before["position"], "alpha-renaming must preserve position")
+                  elif kind == "independent_declarations_reordered":
+                      reject(after["present"] is not True or after["type_sha256"] != before["type_sha256"] or after["user_name"] != before["user_name"], "reordering must preserve declaration identity/type")
+                      reject(after["position"] == before["position"], "reordering must change the declaration position")
+
+                  contract = case["contract"]
+                  policy = contract["expected_action_policy"]
+                  if kind == "required_hypothesis_cleared":
+                      reject(contract["base_precondition_status"] != "available" or contract["variant_precondition_status"] != "absent", "cleared prerequisite status is inconsistent")
+                      reject(policy != "move_forbidden_or_replan", "missing prerequisite must withdraw this move or trigger replanning")
+                  else:
+                      reject(contract["base_precondition_status"] != "available" or contract["variant_precondition_status"] != "available", "surface-only or irrelevant context change must preserve the prerequisite")
+                      reject(policy != "preserve_eligibility", "surface-only or irrelevant context change must preserve eligibility")
+
+                  adjudication = case["adjudication"]
+                  reviewers = adjudication["reviewers"]
+                  reviewer_ids = [r["reviewer_id"] for r in reviewers]
+                  reject(len(reviewer_ids) != len(set(reviewer_ids)), "duplicate reviewer identity")
+                  reject(adjudication["status"] == "adjudicated" and len(reviewers) < 2, "adjudicated state pair requires two reviewers")
+                  if adjudication["status"] == "adjudicated":
+                      for reviewer in reviewers:
+                          reject(reviewer["base_precondition_status"] != contract["base_precondition_status"], "reviewer/base precondition disagreement")
+                          reject(reviewer["variant_precondition_status"] != contract["variant_precondition_status"], "reviewer/variant precondition disagreement")
+                          reject(reviewer["expected_action_policy"] != policy, "reviewer/action-policy disagreement")
+                  links = case["outcome_links"]
+                  reject(links["base_outcome_id"] == links["variant_outcome_id"], "base and variant outcome IDs must be unique")
+                  if value["dataset_kind"] == "synthetic_fixture":
+                      reject(links["status"] != "not_run", "synthetic fixture cannot claim linked executed outcomes")
+
+          validate_suite(fixture)
+          if len(fixture["cases"]) < 4:
+              raise SystemExit("fixture must cover required-removal, alpha-renaming, irrelevant-removal and reordering")
+
+          def expect_reject(mutant, label):
+              try:
+                  validate_suite(mutant)
+              except (ValidationError, ValueError):
+                  return
+              raise SystemExit(f"proof-state negative control unexpectedly accepted: {label}")
+
+          mutants = []
+          m = copy.deepcopy(fixture); m["cases"][0]["variant_state"]["statement_sha256"] = "f" * 64; mutants.append((m, "theorem statement drift"))
+          m = copy.deepcopy(fixture); m["cases"][0]["variant_state"]["goal_type_sha256"] = "f" * 64; mutants.append((m, "goal type drift"))
+          m = copy.deepcopy(fixture); m["cases"][0]["variant_state"]["environment_sha256"] = "f" * 64; mutants.append((m, "environment drift"))
+          m = copy.deepcopy(fixture); m["cases"][0]["intervention"]["operation"] = "rename_local_decl"; mutants.append((m, "wrong state operation"))
+          m = copy.deepcopy(fixture); m["cases"][0]["contract"]["variant_precondition_status"] = "available"; mutants.append((m, "cleared precondition still available"))
+          m = copy.deepcopy(fixture); m["cases"][1]["variant_state"]["local_context_sha256"] = m["cases"][1]["base_state"]["local_context_sha256"]; mutants.append((m, "no context change receipt"))
+          m = copy.deepcopy(fixture); m["cases"][2]["contract"]["expected_action_policy"] = "move_forbidden_or_replan"; mutants.append((m, "overreacting to irrelevant fact removal"))
+          m = copy.deepcopy(fixture); m["cases"][0]["outcome_links"]["variant_outcome_id"] = m["cases"][0]["outcome_links"]["base_outcome_id"]; mutants.append((m, "duplicate outcome join"))
+          m = copy.deepcopy(fixture); m["cases"][3]["adjudication"]["reviewers"][1]["reviewer_id"] = m["cases"][3]["adjudication"]["reviewers"][0]["reviewer_id"]; mutants.append((m, "duplicate reviewer"))
+          for mutant, label in mutants:
+              expect_reject(mutant, label)
+          print(f"PITB_PROOF_STATE_INTERVENTION_SCHEMA_PASS: {len(fixture['cases'])} synthetic pairs; {len(mutants)}/{len(mutants)} negative controls rejected")
+          PY
+      - name: Validate paired proof-state outcome contract and joins
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          root = Path("data/benchmarks/proof-insight-transfer-v0")
+          outcome_schema = json.loads((root / "proof-state-intervention-outcome.schema.json").read_text())
+          suite = json.loads((root / "fixtures/proof-state-intervention-suite.synthetic.json").read_text())
+          bundle = json.loads((root / "fixtures/proof-state-intervention-outcomes.synthetic.json").read_text())
+          Draft202012Validator.check_schema(outcome_schema)
+          validator = Draft202012Validator(outcome_schema, format_checker=FormatChecker())
+
+          def reject(condition, message):
+              if condition:
+                  raise ValueError(message)
+
+          def validate_bundle(value):
+              validator.validate(value)
+              reject(value["schema_version"] != "pitb.proof-state-intervention-outcomes.v0", "unsupported outcome schema version")
+              reject(value["dataset_kind"] != "synthetic_fixture", "checked-in outcome fixture must stay explicitly synthetic")
+              reject(value["suite_id"] != suite["suite_id"], "outcome suite ID does not match its proof-state suite")
+              cases = {case["case_id"]: case for case in suite["cases"]}
+              by_id = {}
+              for row in value["outcomes"]:
+                  oid = row["outcome_id"]
+                  reject(oid in by_id, f"duplicate outcome ID: {oid}")
+                  by_id[oid] = row
+                  reject(row["case_id"] not in cases, f"unknown proof-state case ID: {row['case_id']}")
+                  case = cases[row["case_id"]]
+                  reject(row["pair_id"] != case["pair_id"], f"{oid}: pair ID does not match suite")
+                  reject(row["component_id"] != case["component_id"], f"{oid}: component does not match suite")
+                  reject(row["split"] != case["split"], f"{oid}: split does not match suite")
+                  reject(row["source_insight_record_id"] != case["source_insight"]["record_id"], f"{oid}: insight record does not match suite")
+                  reject(row["source_insight_sha256"] != case["source_insight"]["insight_sha256"], f"{oid}: insight digest does not match suite")
+                  reject(row["expected_action_policy"] != case["contract"]["expected_action_policy"], f"{oid}: expected action policy drift")
+                  role = row["state_role"]
+                  reject(oid != case["outcome_links"][f"{role}_outcome_id"], f"{oid}: outcome ID does not match its base/variant role")
+                  state, paired = (case["base_state"], case["variant_state"]) if role == "base" else (case["variant_state"], case["base_state"])
+                  proof_state = row["proof_state"]
+                  reject(proof_state["target_statement_sha256"] != case["target"]["statement_sha256"], f"{oid}: target statement digest drift")
+                  for field in ("goal_type_sha256", "environment_sha256"):
+                      reject(proof_state[field] != state[field], f"{oid}: state {field} drift")
+                  reject(proof_state["snapshot_sha256"] != state["snapshot_sha256"], f"{oid}: snapshot digest does not match suite")
+                  reject(proof_state["paired_snapshot_sha256"] != paired["snapshot_sha256"], f"{oid}: paired snapshot digest does not match suite")
+                  reject(proof_state["local_context_sha256"] != state["local_context_sha256"], f"{oid}: local-context digest does not match suite")
+                  reject(proof_state["paired_local_context_sha256"] != paired["local_context_sha256"], f"{oid}: paired local-context digest does not match suite")
+                  reject(row["execution"]["status"] != "not_run", f"{oid}: synthetic fixture must not claim executed model outcome")
+              expected = {
+                  outcome_id
+                  for case in suite["cases"]
+                  for outcome_id in (case["outcome_links"]["base_outcome_id"], case["outcome_links"]["variant_outcome_id"])
+              }
+              reject(set(by_id) != expected, "outcome rows must cover exactly the base and variant IDs in the suite")
+              return len(by_id)
+
+          def expect_reject(mutant, label):
+              try:
+                  validate_bundle(mutant)
+              except (ValidationError, ValueError):
+                  return
+              raise SystemExit(f"proof-state outcome negative control unexpectedly accepted: {label}")
+
+          count = validate_bundle(bundle)
+          reject(count != 2 * len(suite["cases"]), "expected exactly one base and one variant outcome for each suite case")
+
+          mutants = []
+          m = copy.deepcopy(bundle); m["outcomes"][1]["outcome_id"] = m["outcomes"][0]["outcome_id"]; mutants.append((m, "duplicate outcome ID"))
+          m = copy.deepcopy(bundle); m["outcomes"][1]["pair_id"] = "wrong-pair"; mutants.append((m, "cross-pair join"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["state_role"] = "variant"; mutants.append((m, "base/variant role mismatch"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["proof_state"]["snapshot_sha256"] = "0" * 64; mutants.append((m, "snapshot receipt drift"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["expected_action_policy"] = "preserve_eligibility" if m["outcomes"][0]["expected_action_policy"] == "move_forbidden_or_replan" else "move_forbidden_or_replan"; mutants.append((m, "policy mismatch"))
+          m = copy.deepcopy(bundle); m["outcomes"] = m["outcomes"][:-1]; mutants.append((m, "missing paired side"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["execution"]["status"] = "executed"; mutants.append((m, "synthetic outcome falsely marked executed"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["execution"]["checker_result"] = "checked_success"; mutants.append((m, "checker success without execution"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["source_insight_sha256"] = "f" * 64; mutants.append((m, "insight provenance mismatch"))
+
+          for mutant, label in mutants:
+              expect_reject(mutant, label)
+          # Exercise the executed-row branch independently of the all-not_run
+          # checked-in fixture. This object is in-memory schema test data only.
+          execution_schema = outcome_schema["properties"]["outcomes"]["items"]["properties"]["execution"]
+          execution_validator = Draft202012Validator(execution_schema, format_checker=FormatChecker())
+          valid_execution = {
+              "status": "executed",
+              "model": {"model_id": "schema-control-only", "model_version": "0", "config_sha256": "a" * 64},
+              "decision": "apply_original_move",
+              "original_move_applied": True,
+              "checker_result": "checked_success",
+              "proof_sha256": "b" * 64,
+              "run_receipt_sha256": "c" * 64,
+              "resource_usage": {"model_calls": 1, "input_tokens": 1, "output_tokens": 1, "wall_time_ms": 1, "cost_microusd": 1},
+          }
+          execution_validator.validate(valid_execution)
+          bad_execution = copy.deepcopy(valid_execution)
+          bad_execution["original_move_applied"] = False
+          try:
+              execution_validator.validate(bad_execution)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("executed-row schema accepted apply_original_move with original_move_applied=false")
+          bad_execution = copy.deepcopy(valid_execution)
+          bad_execution["decision"] = "replan"
+          try:
+              execution_validator.validate(bad_execution)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("executed-row schema accepted replan while original_move_applied=true")
+          bad_execution = copy.deepcopy(valid_execution)
+          del bad_execution["resource_usage"]["output_tokens"]
+          try:
+              execution_validator.validate(bad_execution)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("executed-row schema accepted missing measured resource usage")
+          print("PITB_PROOF_STATE_EXECUTION_SCHEMA_PASS: valid executed row accepted; 3 contradictory/incomplete execution controls rejected")
+          print(f"PITB_PROOF_STATE_OUTCOME_CONTRACT_PASS: {count} explicitly not_run state rows; {len(mutants)}/{len(mutants)} negative controls rejected")
+          PY
+      - name: Validate insight schema and synthetic positive/negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          path = Path("data/benchmarks/proof-insight-transfer-v0/insight-record.schema.json")
+          schema = json.loads(path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+
+          # Validate every checked-in candidate, not just a synthetic fixture.
+          # Candidates must remain unreviewed/unscored unless their evidence gates
+          # are actually passed; schema validity is only structural validation.
+          candidate_dir = Path("data/benchmarks/proof-insight-transfer-v0/candidates")
+          candidate_files = sorted(candidate_dir.glob("*.json"))
+          if not candidate_files:
+              raise SystemExit("no checked-in candidate records were found")
+          for candidate_path in candidate_files:
+              candidate = json.loads(candidate_path.read_text())
+              try:
+                  validator.validate(candidate)
+              except ValidationError as error:
+                  raise SystemExit(
+                      f"candidate schema validation failed for {candidate_path}: {error.message}"
+                  ) from error
+          print(f"PITB_CANDIDATE_SCHEMA_PASS: {len(candidate_files)} candidate record(s)")
+
+          # Deliberately synthetic schema probe: not a benchmark dataset row and
+          # not evidence that any manuscript theorem has been formalized.
+          digest = "0" * 64
+          record = {
+              "schema_version": "pitb.insight-record.v0",
+              "record_id": "synthetic-schema-probe-v0",
+              "source": {
+                  "repository_url": "https://example.invalid/synthetic-source",
+                  "commit": "a" * 40,
+                  "path": "synthetic/fixture.txt",
+                  "sha256": digest,
+                  "family_id": "synthetic-family",
+                  "license_status": "unknown"
+              },
+              "theorem": {
+                  "theorem_id": "synthetic-claim-not-a-theorem",
+                  "statement_digest": digest,
+                  "domain": ["synthetic-only"],
+                  "claim_status": "unknown"
+              },
+              "artifact": {
+                  "kind": "other",
+                  "path": "synthetic/fixture.txt",
+                  "sha256": digest
+              },
+              "insight": {
+                  "move_id": "synthetic-move",
+                  "obstacle": "Schema exercise only",
+                  "strategy": "No mathematical strategy is asserted",
+                  "preconditions": [],
+                  "transformation": {
+                      "before_state": "Unspecified",
+                      "after_state": "Unspecified"
+                  },
+                  "evidence": [{
+                      "source_path": "synthetic/fixture.txt",
+                      "locator": "synthetic fixture",
+                      "evidence_kind": "reviewer_annotation"
+                  }],
+                  "failure_boundaries": ["Synthetic-only; no transfer claim"],
+                  "transfer_candidates": [{
+                      "target_family_id": "synthetic-target",
+                      "rationale": "Schema fixture only",
+                      "status": "candidate",
+                      "directional_contract": {
+                          "compatibility": "compatible",
+                          "mismatch_codes": [],
+                          "move_kind": "other",
+                          "source_obligation": {
+                              "domain": "synthetic-only",
+                              "object_type": "synthetic-object",
+                              "predicate": "synthetic-source",
+                              "relation": "equality",
+                              "quantifier_scope": "synthetic fixture",
+                              "preconditions": []
+                          },
+                          "target_obligation": {
+                              "domain": "synthetic-only",
+                              "object_type": "synthetic-object",
+                              "predicate": "synthetic-target",
+                              "relation": "equality",
+                              "quantifier_scope": "synthetic fixture",
+                              "preconditions": []
+                          },
+                          "source_move_requires": "Synthetic source requirement",
+                          "target_goal_requires": "Synthetic target requirement",
+                          "notes": ["No mathematical transfer is asserted"]
+                      }
+                  }]
+              },
+              "verification": {
+                  "status": "not_attempted",
+                  "exact_statement_checked": False,
+                  "axiom_policy": "unknown"
+              },
+              "semantic_validation": {
+                  "status": "not_attempted",
+                  "statement_correspondence": {
+                      "status": "not_reviewed",
+                      "independent_reviewer_count": 0
+                  },
+                  "successor_tests": [],
+                  "mutation_controls": []
+              },
+              "constructive_transfer": {
+                  "status": "not_attempted",
+                  "unknowns": [],
+                  "candidate_witness": {
+                      "status": "absent",
+                      "representation": None
+                  },
+                  "proof_obligations": [],
+                  "answer_equivalence": {
+                      "method": "none",
+                      "status": "not_attempted"
+                  }
+              },
+              "review": {
+                  "status": "unreviewed",
+                  "independent_review_count": 0
+              }
+          }
+          validator.validate(record)
+
+          # Synthetic positive transfer fixture: all source/target text and
+          # receipts are placeholders used only to exercise schema guards.
+          target_verification = {
+              "status": "passed",
+              "target_source_commit": "a" * 40,
+              "target_artifact_path": "lean/Synthetic/Target.lean",
+              "target_artifact_sha256": digest,
+              "target_statement_digest": digest,
+              "checker": "synthetic Lean checker",
+              "checker_version": "synthetic-only",
+              "exact_statement_checked": True,
+              "axiom_policy": "declared_classical",
+              "receipt_sha256": digest,
+              "target_statement_correspondence": {
+                  "status": "matches_intended_claim",
+                  "independent_reviewer_count": 2
+              },
+              "successor_test_status": "passed",
+              "successor_tests": [{
+                  "test_id": "synthetic-successor",
+                  "source_path": "lean/Synthetic/Target.lean",
+                  "test_declaration": "Synthetic.successor",
+                  "outcome": "passed",
+                  "depends_on_candidate": True
+              }],
+              "mutation_control_status": "passed",
+              "mutation_controls": [{
+                  "mutation_id": "synthetic-mutated-target",
+                  "description": "Synthetic target statement mutation",
+                  "expected_detection": True,
+                  "observed_detection": True,
+                  "status": "detected_as_expected"
+              }],
+              "notes": ["Synthetic-only schema fixture; no real transfer is asserted"]
+          }
+          verified_record = copy.deepcopy(record)
+          verified_candidate = verified_record["insight"]["transfer_candidates"][0]
+          verified_candidate["status"] = "verified_transfer"
+          verified_candidate["target_theorem_id"] = "OAI.Synthetic.target"
+          verified_candidate["transfer_verification"] = target_verification
+          validator.validate(verified_record)
+
+          mutants = []
+          extra_property = copy.deepcopy(record)
+          extra_property["unspecified_authority"] = True
+          mutants.append(extra_property)
+
+          bad_commit = copy.deepcopy(record)
+          bad_commit["source"]["commit"] = "main"
+          mutants.append(bad_commit)
+
+          bad_uri = copy.deepcopy(record)
+          bad_uri["source"]["repository_url"] = "not a URI"
+          mutants.append(bad_uri)
+
+          bad_status = copy.deepcopy(record)
+          bad_status["verification"]["status"] = "verified-by-assertion"
+          mutants.append(bad_status)
+
+          missing_contract = copy.deepcopy(record)
+          del missing_contract["insight"]["transfer_candidates"][0]["directional_contract"]
+          mutants.append(missing_contract)
+
+          incompatible_verified_transfer = copy.deepcopy(verified_record)
+          incompatible_candidate = incompatible_verified_transfer["insight"]["transfer_candidates"][0]
+          incompatible_candidate["directional_contract"]["compatibility"] = "incompatible"
+          incompatible_candidate["directional_contract"]["mismatch_codes"] = ["inequality_direction"]
+          mutants.append(incompatible_verified_transfer)
+
+          verified_without_receipt = copy.deepcopy(record)
+          verified_candidate_without_receipt = verified_without_receipt["insight"]["transfer_candidates"][0]
+          verified_candidate_without_receipt["status"] = "verified_transfer"
+          verified_candidate_without_receipt["target_theorem_id"] = "OAI.Synthetic.target"
+          mutants.append(verified_without_receipt)
+
+          missing_target_evidence = copy.deepcopy(verified_record)
+          del missing_target_evidence["insight"]["transfer_candidates"][0]["transfer_verification"]
+          mutants.append(missing_target_evidence)
+          single_target_reviewer = copy.deepcopy(verified_record)
+          single_target_reviewer["insight"]["transfer_candidates"][0]["transfer_verification"]["target_statement_correspondence"]["independent_reviewer_count"] = 1
+          mutants.append(single_target_reviewer)
+
+          rejected_without_mismatch = copy.deepcopy(record)
+          rejected_candidate = rejected_without_mismatch["insight"]["transfer_candidates"][0]
+          rejected_candidate["status"] = "rejected"
+          rejected_candidate["directional_contract"]["compatibility"] = "unknown"
+          rejected_candidate["directional_contract"]["mismatch_codes"] = ["unknown"]
+          mutants.append(rejected_without_mismatch)
+
+          for index, mutant in enumerate(mutants, start=1):
+              try:
+                  validator.validate(mutant)
+              except ValidationError:
+                  continue
+              raise SystemExit(f"schema negative control {index} unexpectedly passed")
+          print(f"PITB Draft 2020-12 schema: PASS; synthetic positive control: PASS; {len(mutants)} negative controls rejected, including transfer-contract invariants")
+          PY
+      - name: Validate temporal replay manifest schema and mutation controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          schema_path = Path("data/benchmarks/proof-insight-transfer-v0/temporal-replay-manifest.schema.json")
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+
+          def sha(char, length=64):
+              return char * length
+
+          def commit(char):
+              return char * 40
+
+          manifest = {
+              "schema_version": "pitb.temporal-replay-manifest.v0",
+              "repository_url": "https://example.invalid/temporal-fixture",
+              "repository_commit": commit("5"),
+              "timeline_path": "proof_timeline.csv",
+              "timeline_sha256": sha("9"),
+              "lean_toolchain_path": "lean-toolchain",
+              "lean_toolchain": "leanprover/lean4:v4.34.1",
+              "mathlib_manifest_path": "lake-manifest.json",
+              "mathlib_manifest_sha256": sha("8"),
+              "mathlib_revision": commit("6"),
+              "events": [
+                  {
+                      "position": 0,
+                      "target_id": "target-000",
+                      "theorem_id": "Example.first",
+                      "target_state_commit": commit("1"),
+                      "proof_completion_commit": commit("2"),
+                      "statement_sha256": sha("a"),
+                      "statement_artifact_id": "statement-000",
+                      "completion_statement_artifact_id": "completion-statement-000",
+                      "proof_artifact_id": "proof-000",
+                      "visible_artifact_ids": ["statement-000"]
+                  },
+                  {
+                      "position": 1,
+                      "target_id": "target-001",
+                      "theorem_id": "Example.second",
+                      "target_state_commit": commit("2"),
+                      "proof_completion_commit": commit("3"),
+                      "statement_sha256": sha("c"),
+                      "statement_artifact_id": "statement-001",
+                      "completion_statement_artifact_id": "completion-statement-001",
+                      "proof_artifact_id": "proof-001",
+                      "visible_artifact_ids": ["statement-000", "proof-000", "statement-001"]
+                  }
+              ],
+              "artifacts": [
+                  {
+                      "artifact_id": "statement-000",
+                      "path": "lean/Example.lean",
+                      "artifact_kind": "theorem_statement",
+                      "content_sha256": sha("a"),
+                      "content_start_line": 1,
+                      "content_end_line": 1,
+                      "source_file_sha256": sha("e"),
+                      "source_commit": commit("1"),
+                      "available_at_position": 0,
+                      "target_position": None,
+                      "theorem_id": "Example.first"
+                  },
+                  {
+                      "artifact_id": "proof-000",
+                      "path": "lean/Example.lean",
+                      "artifact_kind": "proof_body",
+                      "content_sha256": sha("b"),
+                      "content_start_line": 2,
+                      "content_end_line": 2,
+                      "source_file_sha256": sha("f"),
+                      "source_commit": commit("2"),
+                      "available_at_position": None,
+                      "target_position": 0,
+                      "theorem_id": "Example.first"
+                  },
+                  {
+                      "artifact_id": "completion-statement-000",
+                      "path": "lean/Example.lean",
+                      "artifact_kind": "completion_statement",
+                      "content_sha256": sha("a"),
+                      "content_start_line": 1,
+                      "content_end_line": 1,
+                      "source_file_sha256": sha("f"),
+                      "source_commit": commit("2"),
+                      "available_at_position": None,
+                      "target_position": 0,
+                      "theorem_id": "Example.first"
+                  },
+                  {
+                      "artifact_id": "statement-001",
+                      "path": "lean/Example.lean",
+                      "artifact_kind": "theorem_statement",
+                      "content_sha256": sha("c"),
+                      "content_start_line": 3,
+                      "content_end_line": 3,
+                      "source_file_sha256": sha("7"),
+                      "source_commit": commit("2"),
+                      "available_at_position": 1,
+                      "target_position": None,
+                      "theorem_id": "Example.second"
+                  },
+                  {
+                      "artifact_id": "completion-statement-001",
+                      "path": "lean/Example.lean",
+                      "artifact_kind": "completion_statement",
+                      "content_sha256": sha("c"),
+                      "content_start_line": 3,
+                      "content_end_line": 3,
+                      "source_file_sha256": sha("8"),
+                      "source_commit": commit("3"),
+                      "available_at_position": None,
+                      "target_position": 1,
+                      "theorem_id": "Example.second"
+                  },
+                  {
+                      "artifact_id": "proof-001",
+                      "path": "lean/Example.lean",
+                      "artifact_kind": "proof_body",
+                      "content_sha256": sha("d"),
+                      "content_start_line": 4,
+                      "content_end_line": 4,
+                      "source_file_sha256": sha("8"),
+                      "source_commit": commit("3"),
+                      "available_at_position": None,
+                      "target_position": 1,
+                      "theorem_id": "Example.second"
+                  }
+              ]
+          }
+          validator.validate(manifest)
+
+          mutants = []
+          bad_digest = copy.deepcopy(manifest)
+          bad_digest["timeline_sha256"] = "not-a-sha256"
+          mutants.append(bad_digest)
+
+          traversal_path = copy.deepcopy(manifest)
+          traversal_path["artifacts"][0]["path"] = "../outside.lean"
+          mutants.append(traversal_path)
+
+          traversal_timeline = copy.deepcopy(manifest)
+          traversal_timeline["timeline_path"] = "../outside.csv"
+          mutants.append(traversal_timeline)
+
+          proof_marked_solver_visible = copy.deepcopy(manifest)
+          proof_marked_solver_visible["artifacts"][1]["available_at_position"] = 0
+          mutants.append(proof_marked_solver_visible)
+
+          theorem_marked_evaluator_only = copy.deepcopy(manifest)
+          theorem_marked_evaluator_only["artifacts"][0]["available_at_position"] = None
+          theorem_marked_evaluator_only["artifacts"][0]["target_position"] = 0
+          mutants.append(theorem_marked_evaluator_only)
+
+          unknown_authority_field = copy.deepcopy(manifest)
+          unknown_authority_field["trusted"] = True
+          mutants.append(unknown_authority_field)
+
+          for number, mutant in enumerate(mutants, start=1):
+              try:
+                  validator.validate(mutant)
+              except ValidationError:
+                  continue
+              raise SystemExit(f"temporal manifest negative control {number} unexpectedly passed")
+
+          print(
+              "PITB_TEMPORAL_SCHEMA_PASS: Draft 2020-12 positive fixture accepted; "
+              f"{len(mutants)} malformed-manifest controls rejected"
+          )
+
+          bundle_schema_path = Path("data/benchmarks/proof-insight-transfer-v0/temporal-target-bundle.schema.json")
+          bundle_schema = json.loads(bundle_schema_path.read_text())
+          Draft202012Validator.check_schema(bundle_schema)
+          bundle_validator = Draft202012Validator(bundle_schema, format_checker=FormatChecker())
+          bundle = {
+              "payload_sha256": sha("f"),
+              "payload": {
+                  "schema_version": "pitb.temporal-target-bundle.v0",
+                  "repository_url": "https://example.invalid/temporal-fixture",
+                  "repository_commit": commit("5"),
+                  "target_id": "target-001",
+                  "theorem_id": "Example.second",
+                  "position": 1,
+                  "target_state_commit": commit("2"),
+                  "statement_artifact_id": "statement-001",
+                  "statement_sha256": sha("c"),
+                  "visible_artifacts": [
+                      {
+                          "artifact_id": "statement-001",
+                          "path": "lean/Example.lean",
+                          "artifact_kind": "theorem_statement",
+                          "content_sha256": sha("c"),
+                          "source_file_sha256": sha("7"),
+                          "source_commit": commit("2"),
+                          "available_at_position": 1,
+                          "target_position": None,
+                          "theorem_id": "Example.second",
+                          "content": "theorem second : True :="
+                      },
+                      {
+                          "artifact_id": "proof-000",
+                          "path": "lean/Example.lean",
+                          "artifact_kind": "proof_body",
+                          "content_sha256": sha("b"),
+                          "source_file_sha256": sha("f"),
+                          "source_commit": commit("2"),
+                          "available_at_position": None,
+                          "target_position": 0,
+                          "theorem_id": "Example.first",
+                          "content": "exact True.intro"
+                      }
+                  ]
+              }
+          }
+          bundle_validator.validate(bundle)
+          bundle_mutants = []
+          bad_bundle_digest = copy.deepcopy(bundle)
+          bad_bundle_digest["payload_sha256"] = "not-a-digest"
+          bundle_mutants.append(bad_bundle_digest)
+          path_traversal_bundle = copy.deepcopy(bundle)
+          path_traversal_bundle["payload"]["visible_artifacts"][0]["path"] = "../outside.lean"
+          bundle_mutants.append(path_traversal_bundle)
+          evaluator_leak_kind = copy.deepcopy(bundle)
+          evaluator_leak_kind["payload"]["visible_artifacts"][0]["artifact_kind"] = "completion_statement"
+          bundle_mutants.append(evaluator_leak_kind)
+          unknown_bundle_authority = copy.deepcopy(bundle)
+          unknown_bundle_authority["payload"]["trusted"] = True
+          bundle_mutants.append(unknown_bundle_authority)
+          for number, mutant in enumerate(bundle_mutants, start=1):
+              try:
+                  bundle_validator.validate(mutant)
+              except ValidationError:
+                  continue
+              raise SystemExit(f"temporal target bundle negative control {number} unexpectedly passed")
+          print(
+              "PITB_TEMPORAL_BUNDLE_SCHEMA_PASS: Draft 2020-12 positive fixture accepted; "
+              f"{len(bundle_mutants)} invalid-bundle controls rejected"
+          )
+          PY
+      - name: Validate transfer-selectivity outcome schema and synthetic controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          path = Path("data/benchmarks/proof-insight-transfer-v0/transfer-selectivity-outcome.schema.json")
+          schema = json.loads(path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+
+          digest = "0" * 64
+          commit = "a" * 40
+          budget = {
+              "max_model_calls": 8,
+              "max_tokens": 16000,
+              "max_wall_ms": 300000,
+              "max_cost_microusd": 500000,
+          }
+
+          def make_pair(pair_id, label, decision, predicted_label, reviewer_labels=None, status="adjudicated", mismatch_codes=None):
+              reviewer_labels = reviewer_labels or [label, label]
+              code_by_label = {
+                  "compatible": "other",
+                  "incompatible": "inequality_direction",
+                  "partial": "missing_precondition",
+                  "unknown": "unknown",
+              }
+              return {
+                  "schema_version": "pitb.transfer-selectivity-outcome.v0",
+                  "pair_id": pair_id,
+                  "split": "train",
+                  "component_id": "synthetic-component-001",
+                  "source": {
+                      "record_id": "synthetic-source-insight",
+                      "family_id": "synthetic-source-family",
+                      "source_commit": commit,
+                      "artifact_sha256": digest,
+                      "insight_sha256": digest,
+                  },
+                  "target": {
+                      "theorem_id": "Synthetic.target",
+                      "family_id": "synthetic-target-family",
+                      "source_commit": commit,
+                      "artifact_path": "lean/Synthetic/Target.lean",
+                      "artifact_sha256": digest,
+                      "statement_sha256": digest,
+                      "obligation_sha256": digest,
+                      "domain_labels": ["synthetic-only"],
+                  },
+                  "adjudication": {
+                      "status": status,
+                      "label": label,
+                      "rubric_version": "synthetic-rubric-v0",
+                      "reviewer_decisions": [
+                          {
+                              "reviewer_id": reviewer_id,
+                              "label": reviewer_label,
+                              "reason_codes": [code_by_label[reviewer_label]],
+                              "evidence_sha256": digest,
+                          }
+                          for reviewer_id, reviewer_label in zip(["reviewer-a", "reviewer-b"], reviewer_labels)
+                      ],
+                      "receipt_sha256": digest,
+                      "adjudication_note": "Synthetic schema fixture; no mathematical claim is made.",
+                  },
+                  "prediction": {
+                      "decision": decision,
+                      "predicted_label": predicted_label,
+                      "confidence": 0.75,
+                      "compatibility_probability": 0.9 if predicted_label == "compatible" else (0.1 if predicted_label == "incompatible" else None),
+                      "mismatch_codes": mismatch_codes or [],
+                      "precondition_checks": [
+                          {
+                              "check_id": "synthetic-precondition",
+                              "outcome": "satisfied" if predicted_label == "compatible" else "violated",
+                              "evidence_sha256": digest,
+                          }
+                      ],
+                      "receipt_sha256": digest,
+                  },
+                  "run": {
+                      "model_id": "synthetic-only",
+                      "model_version": "synthetic-only-v0",
+                      "prompt_sha256": digest,
+                      "config_sha256": digest,
+                      "input_sha256": digest,
+                      "output_sha256": digest,
+                      "budget": budget,
+                      "actual_model_calls": 1,
+                      "actual_tokens": 100,
+                      "actual_wall_ms": 100,
+                      "actual_cost_microusd": 1,
+                  },
+              }
+
+          fixtures = [
+              make_pair("synthetic-positive-accept", "compatible", "accept", "compatible"),
+              make_pair("synthetic-negative-reject", "incompatible", "reject", "incompatible", mismatch_codes=["inequality_direction"]),
+              # A false accept must remain representable as an outcome so the evaluator can count it.
+              make_pair("synthetic-negative-false-accept", "incompatible", "accept", "compatible"),
+              make_pair("synthetic-unresolved-abstain", "unknown", "abstain", "unknown", ["unknown", "partial"], "unresolved"),
+          ]
+          for fixture in fixtures:
+              validator.validate(fixture)
+              reviewer_ids = [item["reviewer_id"] for item in fixture["adjudication"]["reviewer_decisions"]]
+              if len(reviewer_ids) != len(set(reviewer_ids)):
+                  raise SystemExit("independent reviewer IDs must be distinct")
+          if fixtures[2]["adjudication"]["label"] != "incompatible" or fixtures[2]["prediction"]["decision"] != "accept":
+              raise SystemExit("false-accept control must remain distinguishable from its adjudicated label")
+
+          mutants = []
+          missing_provenance = copy.deepcopy(fixtures[0])
+          del missing_provenance["source"]["insight_sha256"]
+          mutants.append(missing_provenance)
+          malformed_digest = copy.deepcopy(fixtures[0])
+          malformed_digest["target"]["statement_sha256"] = "not-a-sha256"
+          mutants.append(malformed_digest)
+          inconsistent_unresolved = copy.deepcopy(fixtures[3])
+          inconsistent_unresolved["adjudication"]["label"] = "compatible"
+          mutants.append(inconsistent_unresolved)
+          inconsistent_action = copy.deepcopy(fixtures[0])
+          inconsistent_action["prediction"]["predicted_label"] = "incompatible"
+          mutants.append(inconsistent_action)
+          invalid_probability = copy.deepcopy(fixtures[0])
+          invalid_probability["prediction"]["compatibility_probability"] = 1.01
+          mutants.append(invalid_probability)
+          for index, mutant in enumerate(mutants, start=1):
+              try:
+                  validator.validate(mutant)
+              except ValidationError:
+                  continue
+              raise SystemExit(f"transfer-selectivity schema negative control {index} unexpectedly passed")
+
+          print(
+              "PITB_TRANSFER_SELECTIVITY_SCHEMA_PASS: "
+              f"{len(fixtures)} synthetic controls valid; {len(mutants)} malformed controls rejected; "
+              "false-accept outcomes remain representable for evaluation"
+          )
+          PY
+      - name: Run transfer-selectivity analysis on synthetic clustered controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          out = Path(__import__("os").environ["RUNNER_TEMP"]) / "pitb-transfer-selectivity-synthetic.jsonl"
+          digest = "0" * 64
+          commit = "a" * 40
+          budget = {
+              "max_model_calls": 8,
+              "max_tokens": 16000,
+              "max_wall_ms": 300000,
+              "max_cost_microusd": 500000,
+          }
+          rows = []
+          for i in range(21):
+              for truth in ("compatible", "incompatible"):
+                  pair_id = f"{truth}-{i:03}"
+                  component_id = f"component-{truth}-{i:03}"
+                  decision = "accept" if truth == "compatible" and i < 20 else (
+                      "abstain" if truth == "compatible" else "reject"
+                  )
+                  predicted_label = {
+                      "accept": "compatible",
+                      "reject": "incompatible",
+                      "abstain": "unknown",
+                  }[decision]
+                  reason_code = "other" if truth == "compatible" else "inequality_direction"
+                  row = {
+                      "schema_version": "pitb.transfer-selectivity-outcome.v0",
+                      "pair_id": pair_id,
+                      "split": "test",
+                      "component_id": component_id,
+                      "source": {
+                          "record_id": f"source-{pair_id}",
+                          "family_id": f"source-family-{pair_id}",
+                          "source_commit": commit,
+                          "artifact_sha256": digest,
+                          "insight_sha256": digest,
+                      },
+                      "target": {
+                          "theorem_id": f"Synthetic.Target{pair_id.replace('-', '')}",
+                          "family_id": f"target-family-{pair_id}",
+                          "source_commit": commit,
+                          "artifact_path": f"lean/Synthetic/{pair_id}.lean",
+                          "artifact_sha256": digest,
+                          "statement_sha256": digest,
+                          "obligation_sha256": f"{i + (0 if truth == 'compatible' else 100):064x}",
+                          "domain_labels": ["synthetic-only"],
+                      },
+                      "adjudication": {
+                          "status": "adjudicated",
+                          "label": truth,
+                          "rubric_version": "synthetic-v0",
+                          "reviewer_decisions": [
+                              {"reviewer_id": "reviewer-a", "label": truth, "reason_codes": [reason_code], "evidence_sha256": digest},
+                              {"reviewer_id": "reviewer-b", "label": truth, "reason_codes": [reason_code], "evidence_sha256": digest},
+                          ],
+                          "receipt_sha256": digest,
+                          "adjudication_note": "Synthetic analyzer fixture only.",
+                      },
+                      "prediction": {
+                          "decision": decision,
+                          "predicted_label": predicted_label,
+                          "confidence": 0.9,
+                          "compatibility_probability": 0.9 if truth == "compatible" else 0.1,
+                          "mismatch_codes": [] if decision == "accept" else ([reason_code] if decision == "reject" else ["unknown"]),
+                          "precondition_checks": [
+                              {"check_id": "synthetic-check", "outcome": "satisfied" if decision == "accept" else ("violated" if decision == "reject" else "unknown"), "evidence_sha256": digest}
+                          ],
+                          "receipt_sha256": digest,
+                      },
+                      "run": {
+                          "model_id": "synthetic-only",
+                          "model_version": "synthetic-v0",
+                          "prompt_sha256": digest,
+                          "config_sha256": digest,
+                          "input_sha256": digest,
+                          "output_sha256": digest,
+                          "budget": budget,
+                          "actual_model_calls": 1,
+                          "actual_tokens": 100,
+                          "actual_wall_ms": 100,
+                          "actual_cost_microusd": 1,
+                      },
+                  }
+                  rows.append(row)
+          out.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows))
+          print(f"PITB_TRANSFER_SELECTIVITY_FIXTURE: rows={len(rows)} path={out}")
+          PY
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$RUNNER_TEMP/pitb-transfer-selectivity-synthetic.jsonl" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/transfer-selectivity-outcome.schema.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          outcomes_path, schema_path = map(Path, sys.argv[1:])
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          rows = [json.loads(line) for line in outcomes_path.read_text().splitlines() if line.strip()]
+          if len(rows) != 42:
+              raise SystemExit(f"expected exactly 42 synthetic outcome rows, found {len(rows)}")
+          for index, row in enumerate(rows, start=1):
+              validator.validate(row)
+              if row["split"] != "test":
+                  raise SystemExit(f"synthetic analyzer row {index} has a non-test split")
+          if len({row["pair_id"] for row in rows}) != len(rows):
+              raise SystemExit("synthetic analyzer fixture contains duplicate pair IDs")
+          print(f"PITB_TRANSFER_SELECTIVITY_INPUT_SCHEMA_PASS: {len(rows)} analyzer input rows conform to Draft 2020-12")
+          PY
+          report="$RUNNER_TEMP/pitb-transfer-selectivity-synthetic-report.json"
+          cargo run --locked --bin analyze_transfer_selectivity -- "$RUNNER_TEMP/pitb-transfer-selectivity-synthetic.jsonl" test "$report" 1000 20261021
+          python - "$report" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report = json.loads(Path(sys.argv[1]).read_text())
+          assert report["schema_version"] == "pitb.transfer-selectivity-analysis.v0"
+          assert report["counts"]["rows"] == 42
+          assert report["counts"]["binary_evaluable_pairs"] == 42
+          assert report["counts"]["compatible_components"] == 21
+          assert report["counts"]["incompatible_components"] == 21
+          assert abs(report["metrics"]["compatible_accept_recall"]["estimate"] - 20 / 21) < 1e-12
+          assert report["metrics"]["incompatible_false_accept_rate"]["estimate"] == 0.0
+          assert abs(report["metrics"]["binary_coverage"]["estimate"] - 41 / 42) < 1e-12
+          assert report["calibration"]["probability_scored_pairs"] == 42
+          assert report["calibration"]["complete_binary_coverage"] is True
+          assert abs(report["calibration"]["brier_score"] - 0.01) < 1e-12
+          assert abs(report["calibration"]["expected_calibration_error_10_bins"] - 0.1) < 1e-12
+          assert report["calibration"]["brier_score_ci_95"] is not None
+          assert report["calibration"]["brier_score_ci_95"]["lower"] <= 0.01 <= report["calibration"]["brier_score_ci_95"]["upper"]
+          assert report["calibration"]["calibration_error_ci_95"] is not None
+          assert report["calibration"]["calibration_error_ci_95"]["lower"] <= 0.1 <= report["calibration"]["calibration_error_ci_95"]["upper"]
+          assert report["proposed_gates"]["pair_selectivity_gate"] == "pair_track_thresholds_met"
+          assert report["proposed_gates"]["finite_mutation_suite_gate"] == "not_evaluated_by_this_analyzer"
+          assert report["proposed_gates"]["overall_confirmatory_decision"].startswith("not_evaluated_")
+          print("PITB_TRANSFER_SELECTIVITY_ANALYZER_PASS: 42 synthetic rows, clustered intervals, class metrics, abstention accounting, and fail-closed overall decision")
+          PY
+      - name: Validate transfer-selectivity analysis report schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$RUNNER_TEMP/pitb-transfer-selectivity-synthetic-report.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/transfer-selectivity-analysis-report.schema.json" <<'PY'
+          import copy
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          report = json.loads(Path(sys.argv[1]).read_text())
+          schema = json.loads(Path(sys.argv[2]).read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          validator.validate(report)
+
+          mutants = []
+          missing_digest = copy.deepcopy(report)
+          del missing_digest["input_sha256"]
+          mutants.append(missing_digest)
+          false_overall_pass = copy.deepcopy(report)
+          false_overall_pass["proposed_gates"]["overall_confirmatory_decision"] = "pass"
+          mutants.append(false_overall_pass)
+          malformed_interval = copy.deepcopy(report)
+          malformed_interval["calibration"]["brier_score_ci_95"] = {"lower": 0.9}
+          mutants.append(malformed_interval)
+          for index, mutant in enumerate(mutants, start=1):
+              try:
+                  validator.validate(mutant)
+              except ValidationError:
+                  continue
+              raise SystemExit(f"analysis report schema negative control {index} unexpectedly passed")
+          print("PITB_TRANSFER_SELECTIVITY_REPORT_SCHEMA_PASS: valid report accepted; 3 malformed/overclaiming mutations rejected")
+          PY
+      - name: Validate proof-progress trace schema and trace invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          base = Path("data/benchmarks/proof-insight-transfer-v0")
+          schema = json.loads((base / "proof-progress-trace.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          fixture = json.loads((base / "fixtures/proof-progress-trace.synthetic.json").read_text())
+
+          def validate_trace(trace):
+              validator.validate(trace)
+              events = trace["events"]
+              if [event["sequence"] for event in events] != list(range(len(events))):
+                  raise ValueError("event sequence must be contiguous from zero")
+              if len({event["event_id"] for event in events}) != len(events):
+                  raise ValueError("event IDs must be unique")
+              if events[0]["kind"] != "attempt_started":
+                  raise ValueError("first event must start the attempt")
+              terminal_indices = [i for i, event in enumerate(events) if event["kind"] == "attempt_terminated"]
+              if terminal_indices != [len(events) - 1]:
+                  raise ValueError("exactly one terminal event must be last")
+
+              budget = trace["run"]["budget"]
+              previous = {"elapsed_ms": -1, "cumulative_model_calls": -1,
+                          "cumulative_tokens": -1, "cumulative_cost_microusd": -1}
+              limits = {"elapsed_ms": budget["max_wall_ms"],
+                        "cumulative_model_calls": budget["max_model_calls"],
+                        "cumulative_tokens": budget["max_tokens"],
+                        "cumulative_cost_microusd": budget["max_cost_microusd"]}
+              root_id = trace["target"]["root_obligation_id"]
+              known = {root_id: trace["target"]["root_obligation_sha256"]}
+              expanded = {}
+              latest_transition = {root_id: "open"}
+              closed = set()
+              verified_closures = 0
+
+              for event in events:
+                  for field, limit in limits.items():
+                      value = event[field]
+                      if value < previous[field]:
+                          raise ValueError(f"{field} must be monotonic")
+                      if value > limit:
+                          raise ValueError(f"{field} exceeds frozen run budget")
+                      previous[field] = value
+
+                  seen_in_event = set()
+                  for transition in event["obligation_transitions"]:
+                      obligation_id = transition["obligation_id"]
+                      obligation_sha = transition["obligation_sha256"]
+                      kind = transition["transition"]
+                      receipt = transition["checker_receipt_sha256"]
+                      children = transition["children"]
+                      if obligation_id in seen_in_event:
+                          raise ValueError("one event cannot transition an obligation instance more than once")
+                      seen_in_event.add(obligation_id)
+                      if obligation_id not in known or known[obligation_id] != obligation_sha:
+                          raise ValueError("transition references an unknown obligation instance or digest")
+                      if obligation_id in expanded:
+                          raise ValueError("expanded parent obligation cannot transition again; use its child instance IDs")
+                      child_ids = [child["obligation_id"] for child in children]
+                      if len(set(child_ids)) != len(child_ids):
+                          raise ValueError("child obligation IDs must be unique within a transition")
+                      if kind in ("split", "refined"):
+                          if receipt is not None:
+                              raise ValueError("goal decomposition/refinement is not itself a verified closure")
+                          if obligation_id in expanded:
+                              raise ValueError("obligation lineage cannot be expanded twice")
+                          if kind == "split" and len(children) < 2:
+                              raise ValueError("split must identify at least two child obligations")
+                          if kind == "refined" and len(children) > 1:
+                              raise ValueError("refined transition can introduce at most one replacement obligation")
+                          for child in children:
+                              child_id = child["obligation_id"]
+                              if child_id in known:
+                                  raise ValueError("child obligation instance IDs must be globally unique in a trace")
+                              known[child_id] = child["obligation_sha256"]
+                              latest_transition[child_id] = "open"
+                          if children:
+                              expanded[obligation_id] = child_ids
+                          latest_transition[obligation_id] = kind
+                      elif kind == "discharged":
+                          if not receipt or children:
+                              raise ValueError("discharge requires checker receipt and no child obligations")
+                          if obligation_id in closed:
+                              raise ValueError("an obligation cannot be counted as newly discharged twice")
+                          if obligation_id in expanded:
+                              raise ValueError("an expanded parent cannot be counted as a discharged leaf")
+                          closed.add(obligation_id)
+                          latest_transition[obligation_id] = "discharged"
+                          verified_closures += 1
+                      else:
+                          if receipt is not None or children:
+                              raise ValueError("non-discharge/non-expansion transition cannot claim receipts or children")
+                          latest_transition[obligation_id] = kind
+
+              outcome = trace["outcome"]
+              final = events[-1]
+              observed = {
+                  "actual_model_calls": final["cumulative_model_calls"],
+                  "actual_tokens": final["cumulative_tokens"],
+                  "actual_wall_ms": final["elapsed_ms"],
+                  "actual_cost_microusd": final["cumulative_cost_microusd"],
+              }
+              for field, value in observed.items():
+                  if outcome[field] != value:
+                      raise ValueError(f"{field} differs from final event")
+              if outcome["terminal_status"] == "verified_success":
+                  if (outcome["target_kernel_status"] != "passed"
+                      or outcome["semantic_gate_status"] != "passed"
+                      or outcome["successor_status"] not in ("passed", "not_applicable")):
+                      raise ValueError("verified success requires kernel, semantic gate, and applicable successor checks")
+                  leaves = [obligation_id for obligation_id in known if obligation_id not in expanded]
+                  if not leaves or any(latest_transition.get(obligation_id) != "discharged" for obligation_id in leaves):
+                      raise ValueError("verified success requires every terminal obligation leaf to be receipt-backed discharged")
+                  for kind in ("target_kernel_checked", "semantic_gate_checked"):
+                      matches = [e for e in events if e["kind"] == kind and e["checker_receipt_sha256"]]
+                      if len(matches) != 1:
+                          raise ValueError(f"verified success requires one receipt-backed {kind} event")
+                  if outcome["successor_status"] == "passed":
+                      matches = [e for e in events if e["kind"] == "successor_check" and e["checker_receipt_sha256"]]
+                      if len(matches) != 1:
+                          raise ValueError("passed successor status requires one receipt-backed successor event")
+              return verified_closures
+
+          validator.validate(fixture)
+          if validate_trace(fixture) != 2:
+              raise SystemExit("synthetic fixture must count its two receipt-backed discharged leaves, not its split")
+          mutants = []
+
+          gap = copy.deepcopy(fixture)
+          gap["events"][3]["sequence"] = 99
+          mutants.append(gap)
+
+          decreasing_tokens = copy.deepcopy(fixture)
+          decreasing_tokens["events"][3]["cumulative_tokens"] = 100
+          mutants.append(decreasing_tokens)
+
+          split_as_closure = copy.deepcopy(fixture)
+          split_as_closure["events"][2]["obligation_transitions"][0]["checker_receipt_sha256"] = "f" * 64
+          mutants.append(split_as_closure)
+
+          discharge_without_receipt = copy.deepcopy(fixture)
+          discharge_without_receipt["events"][3]["obligation_transitions"][0]["checker_receipt_sha256"] = None
+          mutants.append(discharge_without_receipt)
+
+          double_discharge = copy.deepcopy(fixture)
+          double_discharge["events"][4]["obligation_transitions"] = copy.deepcopy(
+              double_discharge["events"][3]["obligation_transitions"]
+          )
+          mutants.append(double_discharge)
+
+          over_budget = copy.deepcopy(fixture)
+          over_budget["events"][-1]["cumulative_tokens"] = 1001
+          over_budget["outcome"]["actual_tokens"] = 1001
+          mutants.append(over_budget)
+
+          false_success = copy.deepcopy(fixture)
+          false_success["outcome"]["semantic_gate_status"] = "failed"
+          mutants.append(false_success)
+
+          unreceipted_kernel_success = copy.deepcopy(fixture)
+          next(e for e in unreceipted_kernel_success["events"] if e["kind"] == "target_kernel_checked")["checker_receipt_sha256"] = None
+          mutants.append(unreceipted_kernel_success)
+
+          missing_event_receipt = copy.deepcopy(fixture)
+          missing_event_receipt["events"][1]["event_receipt_sha256"] = "not-a-sha256"
+          mutants.append(missing_event_receipt)
+
+          terminal_not_last = copy.deepcopy(fixture)
+          terminal_not_last["events"][-1], terminal_not_last["events"][-2] = (
+              terminal_not_last["events"][-2], terminal_not_last["events"][-1]
+          )
+          mutants.append(terminal_not_last)
+
+          orphan_obligation = copy.deepcopy(fixture)
+          orphan_obligation["events"][3]["obligation_transitions"][0]["obligation_id"] = "orphan"
+          mutants.append(orphan_obligation)
+
+          missing_failure_class = copy.deepcopy(fixture)
+          missing_failure_class["events"][1]["kind"] = "failure_diagnosed"
+          mutants.append(missing_failure_class)
+
+          missing_failure_evidence = copy.deepcopy(fixture)
+          missing_failure_evidence["events"][1]["kind"] = "failure_diagnosed"
+          missing_failure_evidence["events"][1]["failure_class"] = "decomposition_error"
+          mutants.append(missing_failure_evidence)
+
+          missing_replan_receipt = copy.deepcopy(fixture)
+          missing_replan_receipt["events"][1]["kind"] = "global_replan"
+          mutants.append(missing_replan_receipt)
+
+          missing_route_economics = copy.deepcopy(fixture)
+          missing_route_economics["events"][1].update({
+              "kind": "action_routed",
+              "decision_receipt_sha256": "a" * 64,
+              "routed_action": "specialist_agent",
+              "estimated_success_probability": 0.7
+          })
+          mutants.append(missing_route_economics)
+
+          missing_retracted_ids = copy.deepcopy(fixture)
+          missing_retracted_ids["events"][1].update({
+              "kind": "subtree_retracted",
+              "decision_receipt_sha256": "b" * 64
+          })
+          mutants.append(missing_retracted_ids)
+
+          routed_positive = copy.deepcopy(fixture)
+          routed_positive["events"][1].update({
+              "kind": "action_routed",
+              "decision_receipt_sha256": "a" * 64,
+              "routed_action": "specialist_agent",
+              "estimated_success_probability": 0.7,
+              "estimated_action_cost_microusd": 250
+          })
+          validator.validate(routed_positive)
+          validate_trace(routed_positive)
+
+          diagnosed_positive = copy.deepcopy(fixture)
+          diagnosed_positive["events"][1].update({
+              "kind": "failure_diagnosed",
+              "failure_class": "decomposition_error",
+              "failure_evidence_sha256": "c" * 64
+          })
+          validator.validate(diagnosed_positive)
+          validate_trace(diagnosed_positive)
+
+          for index, mutant in enumerate(mutants, start=1):
+              try:
+                  validate_trace(mutant)
+              except (ValidationError, ValueError):
+                  continue
+              raise SystemExit(f"proof-progress trace negative control {index} unexpectedly passed")
+
+          print("PITB_PROOF_PROGRESS_TRACE_PASS: schema valid; obligation lineage; monotonic budgeted trace; terminal evidence gate; 2 receipt-backed closures; 16 negative controls rejected")
+          PY
+      - name: Validate counterfactual precondition suite and paired-review controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          base = Path("data/benchmarks/proof-insight-transfer-v0")
+          schema = json.loads((base / "counterfactual-precondition-suite.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          fixture = json.loads((base / "fixtures/counterfactual-precondition-suite.synthetic.json").read_text())
+
+          def validate_suite(suite):
+              validator.validate(suite)
+              pairs = suite["pairs"]
+              if len({pair["pair_id"] for pair in pairs}) != len(pairs):
+                  raise ValueError("pair IDs must be unique")
+              insight_splits = {}
+              family_components = {}
+              family_splits = {}
+              outcome_pair_ids = set()
+              for pair in pairs:
+                  pair_id = pair["pair_id"]
+                  for outcome_key in ("base_outcome_pair_id", "counterfactual_outcome_pair_id"):
+                      outcome_pair_id = pair[outcome_key]
+                      if outcome_pair_id in outcome_pair_ids:
+                          raise ValueError(f"{pair_id}: outcome pair IDs must uniquely link contrast rows")
+                      outcome_pair_ids.add(outcome_pair_id)
+                  src = pair["source_insight"]
+                  tgt = pair["target"]
+                  mutation = pair["mutation"]
+                  base_sha = tgt["base_statement_sha256"]
+                  variant_sha = tgt["counterfactual_statement_sha256"]
+                  if base_sha == variant_sha:
+                      raise ValueError(f"{pair_id}: target statement digests must identify distinct byte-level variants")
+                  if mutation["kind"] == "no_semantic_change":
+                      if mutation["semantic_change"] != "none" or mutation["before_fragment_sha256"] != mutation["after_fragment_sha256"]:
+                          raise ValueError(f"{pair_id}: syntax-only no-op must preserve its fragment and semantics")
+                  elif mutation["kind"] == "equivalent_reformulation":
+                      if mutation["semantic_change"] != "none" or mutation["before_fragment_sha256"] == mutation["after_fragment_sha256"]:
+                          raise ValueError(f"{pair_id}: equivalent reformulation must change surface fragments without changing intended semantics")
+                  else:
+                      if mutation["semantic_change"] != "changed" or mutation["before_fragment_sha256"] == mutation["after_fragment_sha256"]:
+                          raise ValueError(f"{pair_id}: changed mutation must declare changed semantics and distinct before/after fragments")
+                  if src["insight_sha256"] == "0" * 64:
+                      raise ValueError(f"{pair_id}: synthetic/real source digest cannot be the all-zero placeholder")
+                  for adjudication_name in ("base_adjudication", "counterfactual_adjudication"):
+                      adjudication = pair[adjudication_name]
+                      reviewers = adjudication["reviewer_decisions"]
+                      ids = [reviewer["reviewer_id"] for reviewer in reviewers]
+                      if len(ids) != len(set(ids)):
+                          raise ValueError(f"{pair_id}: duplicate reviewer IDs")
+                      if adjudication["status"] == "adjudicated":
+                          if adjudication["label"] == "unknown" or len(ids) < 2:
+                              raise ValueError(f"{pair_id}: adjudicated labels require at least two reviewers and known label")
+                          if any(reviewer["label"] != adjudication["label"] for reviewer in reviewers):
+                              raise ValueError(f"{pair_id}: reviewer labels disagree with adjudication")
+                      elif adjudication["label"] != "unknown":
+                          raise ValueError(f"{pair_id}: pending/unresolved label must remain unknown")
+                  base_reviewers = {x["reviewer_id"] for x in pair["base_adjudication"]["reviewer_decisions"]}
+                  variant_reviewers = {x["reviewer_id"] for x in pair["counterfactual_adjudication"]["reviewer_decisions"]}
+                  if pair["base_adjudication"]["status"] == "adjudicated" and pair["counterfactual_adjudication"]["status"] == "adjudicated" and base_reviewers != variant_reviewers:
+                      raise ValueError(f"{pair_id}: both sides of a paired contrast must share the same independent reviewers")
+                  for family in (src["family_id"], tgt["family_id"]):
+                      prev_component = family_components.setdefault(family, pair["component_id"])
+                      if prev_component != pair["component_id"]:
+                          raise ValueError(f"family {family} appears in multiple pair-graph components")
+                      prev_split = family_splits.setdefault(family, pair["split"])
+                      if prev_split != pair["split"]:
+                          raise ValueError(f"family {family} crosses dataset splits")
+                  prev_insight_split = insight_splits.setdefault(src["record_id"], pair["split"])
+                  if prev_insight_split != pair["split"]:
+                      raise ValueError(f"source insight {src['record_id']} crosses dataset splits")
+              if suite["dataset_kind"] == "synthetic_fixture":
+                  for pair in pairs:
+                      if pair["base_adjudication"]["label"] != "compatible":
+                          raise ValueError("synthetic counterfactual base must be the compatible control")
+                      if pair["counterfactual_adjudication"]["status"] == "adjudicated":
+                          expected = "compatible" if pair["mutation"]["kind"] in ("no_semantic_change", "equivalent_reformulation") else "incompatible"
+                      else:
+                          expected = "unknown"
+                      if pair["counterfactual_adjudication"]["label"] != expected:
+                          raise ValueError(f"{pair['pair_id']}: synthetic expected counterfactual label {expected}")
+              return len(pairs)
+
+          count = validate_suite(fixture)
+          if count != 9:
+              raise SystemExit(f"expected 9 synthetic counterfactual pairs; found {count}")
+
+          mutants = []
+          duplicate_pair = copy.deepcopy(fixture)
+          duplicate_pair["pairs"][1]["pair_id"] = duplicate_pair["pairs"][0]["pair_id"]
+          mutants.append(duplicate_pair)
+
+          duplicate_outcome_link = copy.deepcopy(fixture)
+          duplicate_outcome_link["pairs"][1]["base_outcome_pair_id"] = duplicate_outcome_link["pairs"][0]["base_outcome_pair_id"]
+          mutants.append(duplicate_outcome_link)
+
+          identical_statement = copy.deepcopy(fixture)
+          identical_statement["pairs"][1]["target"]["counterfactual_statement_sha256"] = identical_statement["pairs"][1]["target"]["base_statement_sha256"]
+          mutants.append(identical_statement)
+
+          changed_noop = copy.deepcopy(fixture)
+          changed_noop["pairs"][0]["mutation"]["after_fragment_sha256"] = "f" * 64
+          mutants.append(changed_noop)
+
+          equivalent_with_same_fragment = copy.deepcopy(fixture)
+          equivalent_with_same_fragment["pairs"][-1]["mutation"]["after_fragment_sha256"] = equivalent_with_same_fragment["pairs"][-1]["mutation"]["before_fragment_sha256"]
+          mutants.append(equivalent_with_same_fragment)
+
+          equivalent_mislabeled_as_changed = copy.deepcopy(fixture)
+          equivalent_mislabeled_as_changed["pairs"][-1]["mutation"]["semantic_change"] = "changed"
+          mutants.append(equivalent_mislabeled_as_changed)
+
+          unchanged_change = copy.deepcopy(fixture)
+          unchanged_change["pairs"][1]["mutation"]["after_fragment_sha256"] = unchanged_change["pairs"][1]["mutation"]["before_fragment_sha256"]
+          mutants.append(unchanged_change)
+
+          single_reviewer = copy.deepcopy(fixture)
+          single_reviewer["pairs"][1]["counterfactual_adjudication"]["reviewer_decisions"].pop()
+          mutants.append(single_reviewer)
+
+          duplicate_reviewer = copy.deepcopy(fixture)
+          duplicate_reviewer["pairs"][1]["base_adjudication"]["reviewer_decisions"][1]["reviewer_id"] = "reviewer-a"
+          mutants.append(duplicate_reviewer)
+
+          reviewer_disagreement = copy.deepcopy(fixture)
+          reviewer_disagreement["pairs"][1]["counterfactual_adjudication"]["reviewer_decisions"][1]["label"] = "compatible"
+          mutants.append(reviewer_disagreement)
+
+          invalid_base = copy.deepcopy(fixture)
+          invalid_base["pairs"][1]["base_adjudication"]["label"] = "incompatible"
+          mutants.append(invalid_base)
+
+          wrong_noop_label = copy.deepcopy(fixture)
+          wrong_noop_label["pairs"][0]["counterfactual_adjudication"]["label"] = "incompatible"
+          wrong_noop_label["pairs"][0]["counterfactual_adjudication"]["reviewer_decisions"] = [
+              dict(r, label="incompatible") for r in wrong_noop_label["pairs"][0]["counterfactual_adjudication"]["reviewer_decisions"]
+          ]
+          mutants.append(wrong_noop_label)
+
+          cross_split_family = copy.deepcopy(fixture)
+          cross_split_family["pairs"][1]["source_insight"]["family_id"] = cross_split_family["pairs"][0]["source_insight"]["family_id"]
+          cross_split_family["pairs"][1]["component_id"] = cross_split_family["pairs"][0]["component_id"]
+          cross_split_family["pairs"][1]["split"] = "test"
+          mutants.append(cross_split_family)
+
+          cross_component_family = copy.deepcopy(fixture)
+          cross_component_family["pairs"][1]["source_insight"]["family_id"] = cross_component_family["pairs"][0]["source_insight"]["family_id"]
+          mutants.append(cross_component_family)
+
+          pending_with_label = copy.deepcopy(fixture)
+          pending_with_label["pairs"][1]["counterfactual_adjudication"]["status"] = "pending"
+          mutants.append(pending_with_label)
+
+          for index, mutant in enumerate(mutants, start=1):
+              try:
+                  validate_suite(mutant)
+              except (ValidationError, ValueError):
+                  continue
+              raise SystemExit(f"counterfactual suite negative control {index} unexpectedly passed")
+
+          print("PITB_COUNTERFACTUAL_SUITE_PASS: 9 synthetic pairs including one unknown pending row; equivalent reformulation separated from syntax-only no-op; paired reviewers and split/component integrity enforced; 15 negative controls rejected")
+          PY
+      - name: Run paired counterfactual outcome analyzer and mutation controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          suite="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/counterfactual-precondition-suite.synthetic.json"
+          outcomes="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/counterfactual-outcomes.synthetic.jsonl"
+          outcome_schema="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/transfer-selectivity-outcome.schema.json"
+          suite_schema="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/counterfactual-precondition-suite.schema.json"
+          report_schema="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/counterfactual-sensitivity-report.schema.json"
+          report="$RUNNER_TEMP/pitb-counterfactual-sensitivity-report.json"
+
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$suite" "$outcomes" "$suite_schema" "$outcome_schema" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          suite_path, outcomes_path, suite_schema_path, outcome_schema_path = map(Path, sys.argv[1:])
+          suite_schema = json.loads(suite_schema_path.read_text())
+          outcome_schema = json.loads(outcome_schema_path.read_text())
+          Draft202012Validator.check_schema(suite_schema)
+          Draft202012Validator.check_schema(outcome_schema)
+          suite = json.loads(suite_path.read_text())
+          Draft202012Validator(suite_schema, format_checker=FormatChecker()).validate(suite)
+          row_validator = Draft202012Validator(outcome_schema, format_checker=FormatChecker())
+          rows = [json.loads(line) for line in outcomes_path.read_text().splitlines() if line.strip()]
+          if len(rows) != 18:
+              raise SystemExit(f"expected 18 synthetic paired outcomes; found {len(rows)}")
+          for index, row in enumerate(rows, start=1):
+              row_validator.validate(row)
+          print("PITB_COUNTERFACTUAL_INPUT_SCHEMA_PASS: 9 pairs and 18 synthetic outcome rows, including one pending contrast and one equivalent-reformulation pair")
+          PY
+
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --locked --bin analyze_transfer_selectivity -- "$outcomes" test "$RUNNER_TEMP/pitb-counterfactual-selectivity-report.json" 1000 17
+          cargo run --locked --bin analyze_counterfactual_sensitivity -- "$suite" "$outcomes" test "$report" 1000 17
+
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$report" "$report_schema" "$outcomes" "$suite" "$(pwd)/target/debug/analyze_counterfactual_sensitivity" <<'PY'
+          import copy
+          import json
+          import subprocess
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          report_path, report_schema_path, outcomes_path, suite_path, binary = map(Path, sys.argv[1:])
+          report = json.loads(report_path.read_text())
+          schema = json.loads(report_schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          validator.validate(report)
+          assert report["dataset_kind"] == "synthetic_fixture"
+          assert report["counts"]["suite_pairs_in_requested_split"] == 9
+          assert report["counts"]["adjudicated_pairs_analyzed"] == 8
+          assert report["counts"]["unresolved_or_pending_pairs"] == 1
+          assert report["counts"]["suite_pairs_in_requested_split"] == (
+              report["counts"]["adjudicated_pairs_analyzed"]
+              + report["counts"]["unresolved_or_pending_pairs"]
+          )
+          assert report["counts"]["base_compatible_pairs"] == 8
+          assert report["counts"]["counterfactual_compatible_pairs"] == 2
+          assert report["counts"]["counterfactual_incompatible_pairs"] == 6
+          assert report["counts"]["paired_contract_eligible_pairs"] == 6
+          assert report["metrics"]["base_compatible_accept_recall"]["estimate"] == 1.0
+          assert report["metrics"]["counterfactual_incompatible_sensitivity"]["estimate"] == 1.0
+          assert report["metrics"]["counterfactual_false_accept_rate"]["estimate"] == 0.0
+          assert report["metrics"]["paired_contract_adherence"]["estimate"] == 1.0
+          assert report["metrics"]["semantics_preserving_decision_stability"]["estimate"] == 1.0
+          assert report["by_mutation_kind"]["no_semantic_change"]["semantics_preserving_decision_stability"]["estimate"] == 1.0
+          assert report["by_mutation_kind"]["equivalent_reformulation"]["pair_count"] == 1
+          assert report["by_mutation_kind"]["equivalent_reformulation"]["semantics_preserving_decision_stability"]["estimate"] == 1.0
+          assert report["by_mutation_kind"]["equivalent_reformulation"]["semantics_preserving_mean_probability_absolute_delta"]["estimate"] == 0.0
+          assert abs(report["metrics"]["compatibility_probability_brier_score"]["estimate"] - 0.01) < 1e-9
+          assert report["metrics"]["mean_counterfactual_to_base_cost_ratio"]["statistic"] == "mean"
+          assert report["metrics"]["mean_counterfactual_to_base_cost_ratio"]["estimate"] == 1.0
+          assert report["metrics"]["mean_counterfactual_to_base_token_ratio"]["estimate"] == 1.0
+          assert report["metrics"]["mean_counterfactual_to_base_wall_time_ratio"]["estimate"] == 1.0
+          assert report["metrics"]["mean_counterfactual_cost_delta_microusd"]["statistic"] == "paired_difference"
+          assert report["metrics"]["mean_counterfactual_cost_delta_microusd"]["estimate"] == 0.0
+          assert report["metrics"]["mean_counterfactual_token_delta"]["estimate"] == 0.0
+          assert report["metrics"]["mean_counterfactual_wall_time_delta_ms"]["estimate"] == 0.0
+          assert report["resource_usage"]["paired_outcome_rows"] == 8
+          assert report["resource_usage"]["base_totals"]["cost_microusd"] == 800
+          assert report["resource_usage"]["counterfactual_totals"]["cost_microusd"] == 800
+          assert report["resource_usage"]["base_totals"]["tokens"] == 800
+          assert report["resource_usage"]["counterfactual_totals"]["tokens"] == 800
+          assert report["resource_usage"]["base_mean_per_pair"]["tokens"] == 100
+          assert report["resource_usage"]["counterfactual_mean_per_pair"]["tokens"] == 100
+          assert report["proposed_gates"]["overall_confirmatory_decision"].startswith("not_evaluated_")
+
+          source_rows = [json.loads(line) for line in outcomes_path.read_text().splitlines() if line.strip()]
+          suite = json.loads(suite_path.read_text())
+          cases = []
+
+          missing_row = source_rows[:-1]
+          cases.append(("missing pair row", missing_row))
+
+          bad_source = copy.deepcopy(source_rows)
+          bad_source[0]["source"]["insight_sha256"] = "0" * 64
+          cases.append(("source provenance mismatch", bad_source))
+
+          bad_review = copy.deepcopy(source_rows)
+          bad_review[0]["adjudication"]["reviewer_decisions"][0]["label"] = "incompatible"
+          bad_review[0]["adjudication"]["reviewer_decisions"][0]["reason_codes"] = ["other"]
+          cases.append(("reviewer receipt mismatch", bad_review))
+
+          over_budget = copy.deepcopy(source_rows)
+          over_budget[0]["run"]["actual_tokens"] = 1001
+          cases.append(("over-budget row", over_budget))
+
+          missing_usage = copy.deepcopy(source_rows)
+          del missing_usage[0]["run"]["actual_tokens"]
+          cases.append(("missing measured token usage", missing_usage))
+
+          unmatched_arm = copy.deepcopy(source_rows)
+          unmatched_arm[1]["run"]["config_sha256"] = "0" * 64
+          cases.append(("unmatched run configuration", unmatched_arm))
+
+          invalid_precondition = copy.deepcopy(source_rows)
+          invalid_precondition[0]["prediction"]["precondition_checks"][0]["outcome"] = "probably-satisfied"
+          cases.append(("invalid precondition outcome", invalid_precondition))
+
+          invalid_mismatch = copy.deepcopy(source_rows)
+          invalid_mismatch[0]["prediction"]["mismatch_codes"] = ["wrong-way"]
+          cases.append(("invalid mismatch code", invalid_mismatch))
+
+          reviewer_extra_field = copy.deepcopy(source_rows)
+          reviewer_extra_field[0]["adjudication"]["reviewer_decisions"][0]["unregistered"] = True
+          cases.append(("unknown reviewer field", reviewer_extra_field))
+
+          bad_source_artifact = copy.deepcopy(source_rows)
+          bad_source_artifact[0]["source"]["artifact_sha256"] = "0" * 64
+          cases.append(("source artifact digest mismatch", bad_source_artifact))
+
+          bad_variant_artifact = copy.deepcopy(source_rows)
+          bad_variant_artifact[1]["target"]["artifact_sha256"] = "0" * 64
+          cases.append(("counterfactual artifact digest mismatch", bad_variant_artifact))
+
+          bad_variant_path = copy.deepcopy(source_rows)
+          bad_variant_path[1]["target"]["artifact_path"] = "synthetic/Target0.lean"
+          cases.append(("counterfactual artifact path mismatch", bad_variant_path))
+
+          for name, rows in cases:
+              bad_path = Path(f"{report_path.parent}/bad-counterfactual-{name.replace(' ', '-')}.jsonl")
+              bad_path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+              result = subprocess.run(
+                  [str(binary), str(suite_path), str(bad_path), "test",
+                   str(bad_path.with_suffix(".report.json")), "1000", "17"],
+                  capture_output=True, text=True
+              )
+              if result.returncode == 0:
+                  raise SystemExit(f"counterfactual analyzer negative control unexpectedly passed: {name}")
+
+          # This mutant puts a shared source family in train/validation with one
+          # shared component ID. Analysis requests only test; the standalone
+          # analyzer must still reject leakage in all non-scored suite splits.
+          leaked_suite = copy.deepcopy(suite)
+          leaked_suite["pairs"][1]["source_insight"]["family_id"] = leaked_suite["pairs"][0]["source_insight"]["family_id"]
+          leaked_suite["pairs"][1]["component_id"] = leaked_suite["pairs"][0]["component_id"]
+          leaked_suite["pairs"][1]["split"] = "validation"
+          leaked_suite_path = report_path.parent / "bad-counterfactual-cross-split-suite.json"
+          leaked_suite_path.write_text(json.dumps(leaked_suite))
+          result = subprocess.run(
+              [str(binary), str(leaked_suite_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-cross-split.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly ignored cross-split family leakage")
+
+          same_artifact_suite = copy.deepcopy(suite)
+          same_artifact_suite["pairs"][1]["target"]["counterfactual_artifact_sha256"] = same_artifact_suite["pairs"][1]["target"]["base_artifact_sha256"]
+          same_artifact_suite_path = report_path.parent / "bad-counterfactual-identical-artifacts.json"
+          same_artifact_suite_path.write_text(json.dumps(same_artifact_suite))
+          result = subprocess.run(
+              [str(binary), str(same_artifact_suite_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-identical-artifacts.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly accepted identical artifact digests for distinct variants")
+
+          same_path_suite = copy.deepcopy(suite)
+          same_path_suite["pairs"][1]["target"]["counterfactual_artifact_path"] = same_path_suite["pairs"][1]["target"]["artifact_path"]
+          same_path_suite_path = report_path.parent / "bad-counterfactual-identical-paths.json"
+          same_path_suite_path.write_text(json.dumps(same_path_suite))
+          result = subprocess.run(
+              [str(binary), str(same_path_suite_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-identical-paths.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly accepted one artifact path for two distinct artifacts")
+
+          inconsistent_mutation = copy.deepcopy(suite)
+          inconsistent_mutation["pairs"][1]["mutation"]["after_fragment_sha256"] = inconsistent_mutation["pairs"][1]["mutation"]["before_fragment_sha256"]
+          inconsistent_mutation_path = report_path.parent / "bad-counterfactual-mutation-receipt.json"
+          inconsistent_mutation_path.write_text(json.dumps(inconsistent_mutation))
+          result = subprocess.run(
+              [str(binary), str(inconsistent_mutation_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-mutation-receipt.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly accepted changed mutation with identical before/after fragments")
+
+          single_reviewer_suite = copy.deepcopy(suite)
+          single_reviewer_suite["pairs"][1]["counterfactual_adjudication"]["reviewer_decisions"].pop()
+          single_reviewer_path = report_path.parent / "bad-counterfactual-single-reviewer.json"
+          single_reviewer_path.write_text(json.dumps(single_reviewer_suite))
+          result = subprocess.run(
+              [str(binary), str(single_reviewer_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-single-reviewer.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly accepted single-review adjudication")
+
+          source_identity_drift = copy.deepcopy(suite)
+          source_identity_drift["pairs"][1]["source_insight"]["record_id"] = source_identity_drift["pairs"][0]["source_insight"]["record_id"]
+          source_identity_drift["pairs"][1]["source_insight"]["insight_sha256"] = "0" * 64
+          source_identity_path = report_path.parent / "bad-counterfactual-source-identity-drift.json"
+          source_identity_path.write_text(json.dumps(source_identity_drift))
+          result = subprocess.run(
+              [str(binary), str(source_identity_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-source-identity-drift.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly accepted one source record ID with conflicting digests")
+
+          target_path_drift = copy.deepcopy(suite)
+          target_path_drift["pairs"][1]["target"]["artifact_path"] = target_path_drift["pairs"][0]["target"]["artifact_path"]
+          target_path_path = report_path.parent / "bad-counterfactual-target-path-drift.json"
+          target_path_path.write_text(json.dumps(target_path_drift))
+          result = subprocess.run(
+              [str(binary), str(target_path_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-target-path-drift.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly accepted one pinned commit/path with conflicting artifact digests")
+
+          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, explicit pending denominator, class-specific reformulation stability, component bootstrap, report schema, 11 malformed-outcome controls and 7 suite-integrity controls")
+          PY
+      - name: Validate preregistered success-cost frontier plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          base = Path("data/benchmarks/proof-insight-transfer-v0")
+          schema = json.loads((base / "success-cost-frontier-plan.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          plan = json.loads((base / "fixtures/success-cost-frontier-plan.synthetic.json").read_text())
+
+          def validate_plan(candidate):
+              validator.validate(candidate)
+              targets = candidate["targets"]
+              arms = candidate["arms"]
+              budgets = candidate["budget_levels"]
+              assignments = candidate["assignments"]
+              target_ids = [x["target_id"] for x in targets]
+              arm_ids = [x["arm_id"] for x in arms]
+              budget_ids = [x["budget_id"] for x in budgets]
+              run_ids = [x["run_id"] for x in assignments]
+              if len(set(target_ids)) != len(target_ids):
+                  raise ValueError("target IDs must be unique")
+              if len(set(arm_ids)) != len(arm_ids):
+                  raise ValueError("arm IDs must be unique")
+              if len(set(budget_ids)) != len(budget_ids):
+                  raise ValueError("budget IDs must be unique")
+              if len(set(run_ids)) != len(run_ids):
+                  raise ValueError("run IDs must be unique")
+              if len({x["method_class"] for x in arms}) < 3:
+                  raise ValueError("frontier plan needs at least three distinct method classes")
+              if candidate["analysis_policy"]["minimum_budget_levels"] > len(budgets):
+                  raise ValueError("minimum budget level requirement exceeds the frozen schedule")
+              budget_fields = ("max_model_calls", "max_tokens", "max_wall_ms", "max_cost_microusd")
+              for previous, current in zip(budgets, budgets[1:]):
+                  if any(current[field] <= previous[field] for field in budget_fields):
+                      raise ValueError("each ordered budget level must strictly increase every resource cap")
+              target_by_id = {x["target_id"]: x for x in targets}
+              arm_by_id = {x["arm_id"]: x for x in arms}
+              budget_by_id = {x["budget_id"]: x for x in budgets}
+              seen = set()
+              for assignment in assignments:
+                  triple = (assignment["target_id"], assignment["arm_id"], assignment["budget_id"])
+                  if triple in seen:
+                      raise ValueError(f"duplicate target/arm/budget cell {triple}")
+                  seen.add(triple)
+                  target = target_by_id.get(assignment["target_id"])
+                  arm = arm_by_id.get(assignment["arm_id"])
+                  budget = budget_by_id.get(assignment["budget_id"])
+                  if target is None or arm is None or budget is None:
+                      raise ValueError("assignment references undeclared target/arm/budget")
+                  if assignment["component_id"] != target["component_id"]:
+                      raise ValueError("assignment component does not match its frozen target")
+              expected = {
+                  (target["target_id"], arm["arm_id"], budget["budget_id"])
+                  for target in targets for arm in arms for budget in budgets
+              }
+              if seen != expected:
+                  missing = len(expected - seen)
+                  extra = len(seen - expected)
+                  raise ValueError(f"incomplete Cartesian coverage: {missing} missing, {extra} extra cells")
+              if len(assignments) != len(targets) * len(arms) * len(budgets):
+                  raise ValueError("assignment count does not equal target x arm x budget")
+              if candidate["dataset_kind"] == "synthetic_fixture" and candidate["split"] not in ("validation",):
+                  raise ValueError("synthetic frontier fixture cannot claim test/external challenge split")
+              return len(seen)
+
+          cells = validate_plan(plan)
+          if cells != 18:
+              raise SystemExit(f"expected 18 synthetic target/arm/budget cells; found {cells}")
+
+          mutants = []
+          missing_cell = copy.deepcopy(plan)
+          missing_cell["assignments"].pop()
+          mutants.append(("missing Cartesian cell", missing_cell))
+
+          duplicate_cell = copy.deepcopy(plan)
+          duplicate_cell["assignments"][1]["target_id"] = duplicate_cell["assignments"][0]["target_id"]
+          duplicate_cell["assignments"][1]["arm_id"] = duplicate_cell["assignments"][0]["arm_id"]
+          duplicate_cell["assignments"][1]["budget_id"] = duplicate_cell["assignments"][0]["budget_id"]
+          mutants.append(("duplicate Cartesian cell", duplicate_cell))
+
+          unknown_arm = copy.deepcopy(plan)
+          unknown_arm["assignments"][0]["arm_id"] = "undeclared-arm"
+          mutants.append(("unknown arm", unknown_arm))
+
+          component_drift = copy.deepcopy(plan)
+          component_drift["assignments"][0]["component_id"] = "wrong-component"
+          mutants.append(("component drift", component_drift))
+
+          nonmonotonic_budget = copy.deepcopy(plan)
+          nonmonotonic_budget["budget_levels"][1]["max_tokens"] = nonmonotonic_budget["budget_levels"][0]["max_tokens"]
+          mutants.append(("nonmonotonic budget schedule", nonmonotonic_budget))
+
+          duplicate_run = copy.deepcopy(plan)
+          duplicate_run["assignments"][1]["run_id"] = duplicate_run["assignments"][0]["run_id"]
+          mutants.append(("duplicate run ID", duplicate_run))
+
+          arm_method_duplicate = copy.deepcopy(plan)
+          arm_method_duplicate["arms"][1]["method_class"] = arm_method_duplicate["arms"][0]["method_class"]
+          arm_method_duplicate["arms"][2]["method_class"] = arm_method_duplicate["arms"][0]["method_class"]
+          mutants.append(("insufficient distinct methods", arm_method_duplicate))
+
+          unsafe_path = copy.deepcopy(plan)
+          unsafe_path["targets"][0]["artifact_path"] = "../escaped/Target.lean"
+          mutants.append(("unsafe target path", unsafe_path))
+
+          for index, (name, mutant) in enumerate(mutants, start=1):
+              try:
+                  validate_plan(mutant)
+              except (ValidationError, ValueError):
+                  continue
+              raise SystemExit(f"success-cost frontier negative control {index} unexpectedly passed: {name}")
+
+          print("PITB_SUCCESS_COST_FRONTIER_PLAN_PASS: 18 complete target/arm/budget cells, 3 monotonic caps, 8 negative controls rejected; fixture remains validation-only")
+          PY
+      - name: Audit pinned Dalek Lean Bench timeline
+        shell: bash
+        run: |
+          set -euo pipefail
+          dalek_sha="9fdbfd066420aebcf61a70b06eba57a108c41340"
+          dalek="$RUNNER_TEMP/dalek-lean-bench"
+          audit="$RUNNER_TEMP/dalek-temporal-timeline-audit.json"
+          git clone --quiet https://github.com/Beneficial-AI-Foundation/dalek-lean-bench.git "$dalek"
+          git -C "$dalek" checkout --quiet --detach "$dalek_sha"
+          test "$(git -C "$dalek" rev-parse HEAD)" = "$dalek_sha"
+          test -z "$(git -C "$dalek" status --porcelain)"
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --release --locked --bin symthaea-proof-insights -- \
+            --audit-temporal-timeline "$dalek" proof_timeline.csv "$audit"
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$audit" "$dalek" "$GITHUB_WORKSPACE" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          audit_path, dalek, workspace = map(Path, sys.argv[1:])
+          audit = json.loads(audit_path.read_text())
+          schema_path = workspace / "data/benchmarks/proof-insight-transfer-v0/temporal-timeline-audit.schema.json"
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema, format_checker=FormatChecker()).validate(audit)
+          expected_commit = "9fdbfd066420aebcf61a70b06eba57a108c41340"
+          if audit["repository_commit"] != expected_commit:
+              raise SystemExit("Dalek timeline audit references an unexpected repository commit")
+          if audit["total_timeline_rows"] != 248 or len(audit["events"]) != 248:
+              raise SystemExit("pinned Dalek proof_timeline.csv must contain exactly 248 data rows at this commit")
+          if [event["position"] for event in audit["events"]] != list(range(248)):
+              raise SystemExit("timeline positions are not contiguous and in source order")
+          if len({event["event_key"] for event in audit["events"]}) != 248:
+              raise SystemExit("timeline audit event keys are not unique")
+          if audit["events"][0]["previous_completion_commit"] is not None or audit["events"][0]["previous_completion_is_ancestor"] is not None:
+              raise SystemExit("first source-ordered timeline event must not invent a predecessor")
+          for previous, current in zip(audit["events"], audit["events"][1:]):
+              if current["previous_completion_commit"] != previous["completion_commit"]:
+                  raise SystemExit("timeline predecessor evidence does not preserve exact CSV source order")
+              if not isinstance(current["previous_completion_is_ancestor"], bool):
+                  raise SystemExit("adjacent Git DAG ancestry must be reported as true/false for every non-first row")
+          non_ancestral = sum(event["previous_completion_is_ancestor"] is False for event in audit["events"])
+          if audit["non_ancestral_adjacent_transition_count"] != non_ancestral:
+              raise SystemExit("non-ancestral adjacent transition count differs from per-row evidence")
+          counterexample = next((event for event in audit["events"] if event["event_key"] == "tl_0042_identity"), None)
+          if counterexample is None or counterexample["previous_completion_is_ancestor"] is not False:
+              raise SystemExit("pinned parallel-branch counterexample was not retained as DAG evidence")
+          if counterexample["previous_completion_commit"] != "b17c07a4557591072500914c50a5d100983b49c7":
+              raise SystemExit("pinned timeline predecessor for tl_0042_identity unexpectedly changed")
+          # The pinned README claims 249 entries, but the actual tracked CSV has
+          # 248 data rows (ids through tl_0247). Preserve and report this mismatch;
+          # do not silently pretend the README and CSV agree.
+          if audit["readme_claimed_timeline_row_count"] != 249:
+              raise SystemExit("pinned Dalek README timeline count claim unexpectedly changed")
+          if audit["timeline_row_count_matches_readme_claim"] is not False:
+              raise SystemExit("expected README/CSV row-count discrepancy was not captured in the audit")
+          if not all(event["completion_commit_ancestor_verified"] is True for event in audit["events"]):
+              raise SystemExit("one or more timeline completion commits are not ancestry-verified")
+          source_counts = (
+              audit["source_path_present_at_completion_count"]
+              + audit["source_path_missing_at_completion_count"]
+              + audit["source_path_not_recorded_count"]
+              + audit["source_path_rejected_count"]
+          )
+          if source_counts != 248:
+              raise SystemExit("timeline source-path accounting does not cover all 248 rows")
+          if audit["source_path_rejected_count"] != 1:
+              raise SystemExit("pinned timeline must account for exactly one rejected machine-local source path")
+          unsafe_event = next((event for event in audit["events"] if event["event_key"] == "tl_0056_is_negative"), None)
+          if unsafe_event is None:
+              raise SystemExit("pinned unsafe-path row tl_0056_is_negative disappeared")
+          if unsafe_event["source_file_status"] != "rejected_unsafe_path" or unsafe_event["spec_theorem_path"] is not None:
+              raise SystemExit("machine-local source path must be rejected and redacted, not read or echoed")
+          if unsafe_event["source_file_sha256"] is not None or unsafe_event["source_file_bytes"] is not None:
+              raise SystemExit("rejected source paths must not receive a file digest or size")
+          if sum(audit["verification_status_counts"].values()) != 248:
+              raise SystemExit("timeline verification-status accounting does not cover all 248 rows")
+          timeline_bytes = (dalek / audit["timeline_path"]).read_bytes()
+          if hashlib.sha256(timeline_bytes).hexdigest() != audit["timeline_sha256"]:
+              raise SystemExit("timeline digest differs from the exact pinned checkout bytes")
+          print(
+              "PITB_DALEK_TIMELINE_AUDIT_PASS: "
+              f"rows={audit['total_timeline_rows']} "
+              f"readme_claim={audit['readme_claimed_timeline_row_count']} "
+              f"readme_matches={audit['timeline_row_count_matches_readme_claim']} "
+              f"completion_commits={audit['unique_completion_commit_count']} "
+              f"non_ancestral_adjacent_transitions={audit['non_ancestral_adjacent_transition_count']} "
+              f"source_present={audit['source_path_present_at_completion_count']} "
+              f"source_missing={audit['source_path_missing_at_completion_count']} "
+              f"source_not_recorded={audit['source_path_not_recorded_count']} "
+              f"source_path_rejected={audit['source_path_rejected_count']} "
+              f"timeline_sha256={audit['timeline_sha256']}"
+          )
+          PY
+      - name: Audit pinned Dalek dataset-to-timeline joins
+        shell: bash
+        run: |
+          set -euo pipefail
+          dalek_sha="9fdbfd066420aebcf61a70b06eba57a108c41340"
+          dalek="$RUNNER_TEMP/dalek-lean-bench"
+          audit="$RUNNER_TEMP/dalek-temporal-dataset-audit.json"
+          test "$(git -C "$dalek" rev-parse HEAD)" = "$dalek_sha"
+          test -z "$(git -C "$dalek" status --porcelain)"
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --release --locked --bin symthaea-proof-insights -- \
+            --audit-temporal-dataset "$dalek" proof_timeline.csv dataset.jsonl "$audit"
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$audit" "$dalek" "$GITHUB_WORKSPACE" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          audit_path, dalek, workspace = map(Path, sys.argv[1:])
+          audit = json.loads(audit_path.read_text())
+          schema_path = workspace / "data/benchmarks/proof-insight-transfer-v0/temporal-dataset-join-audit.schema.json"
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema, format_checker=FormatChecker()).validate(audit)
+
+          expected_commit = "9fdbfd066420aebcf61a70b06eba57a108c41340"
+          if audit["repository_commit"] != expected_commit:
+              raise SystemExit("dataset join audit references an unexpected repository commit")
+          if audit["total_timeline_rows"] != 248:
+              raise SystemExit("dataset join audit expected exactly 248 timeline rows")
+          if audit["invalid_timeline_path_count"] != 1:
+              raise SystemExit("pinned timeline must explicitly account for its one rejected machine-local source path")
+          if audit["total_dataset_records"] != 146 or len(audit["events"]) != 146:
+              raise SystemExit("pinned Dalek dataset.jsonl must contain exactly 146 records")
+          if audit["unique_path_join_count"] != 39:
+              raise SystemExit("unexpected count of dataset records with exactly one timeline-path match")
+          if audit["ambiguous_path_join_count"] != 58:
+              raise SystemExit("unexpected count of dataset records with multiple timeline-path matches")
+          if audit["unmatched_path_join_count"] != 49:
+              raise SystemExit("unexpected count of dataset records with no timeline-path match")
+          if audit["invalid_dataset_path_count"] != 0:
+              raise SystemExit("pinned dataset contains an unsafe/noncanonical repository path")
+          if (
+              audit["unique_path_join_count"]
+              + audit["ambiguous_path_join_count"]
+              + audit["unmatched_path_join_count"]
+              + audit["invalid_dataset_path_count"]
+          ) != audit["total_dataset_records"]:
+              raise SystemExit("dataset join accounting does not cover all records")
+          dataset_bytes = (dalek / audit["dataset_path"]).read_bytes()
+          if hashlib.sha256(dataset_bytes).hexdigest() != audit["dataset_sha256"]:
+              raise SystemExit("dataset JSONL digest differs from the pinned checkout bytes")
+          if sum(audit["statement_match_relation_counts"].values()) != audit["total_dataset_records"]:
+              raise SystemExit("statement-match relation accounting does not cover all dataset records")
+          identity_total = (
+              audit["unique_theorem_identity_join_count"]
+              + audit["ambiguous_theorem_identity_join_count"]
+              + audit["unmatched_theorem_identity_join_count"]
+          )
+          if identity_total != audit["total_dataset_records"]:
+              raise SystemExit("theorem-identity join accounting does not cover all dataset records")
+          if sum(audit["theorem_identity_status_counts"].values()) != audit["total_dataset_records"]:
+              raise SystemExit("theorem-identity status counts do not cover all dataset records")
+          by_status = {event["path_join_status"]: 0 for event in audit["events"]}
+          for event in audit["events"]:
+              path_positions = set(event["candidate_timeline_positions"])
+              if not set(event["identity_candidate_timeline_positions"]).issubset(path_positions):
+                  raise SystemExit("theorem identity join refers to a timeline row outside its path candidates")
+              ambiguous_declarations = event["ambiguous_declaration_timeline_positions"]
+              if not set(ambiguous_declarations).issubset(path_positions):
+                  raise SystemExit("ambiguous declarations refer to a timeline row outside its path candidates")
+              if event["identity_join_status"] == "ambiguous_declaration_identity" and not ambiguous_declarations:
+                  raise SystemExit("ambiguous declaration status lacks explicit ambiguous timeline positions")
+              if event["identity_join_status"] == "unique_stable_theorem_proof_transition":
+                  if len(event["identity_candidate_timeline_positions"]) != 1:
+                      raise SystemExit("stable theorem identity must resolve to exactly one proof transition")
+                  if event["identity_statement_match_at_commit_before"] is not True or event["identity_statement_match_at_completion"] is not True:
+                      raise SystemExit("stable theorem identity lacks exact statement agreement")
+                  if event["identity_proof_matches_completion"] is not True or event["identity_proof_absent_at_commit_before"] is not True:
+                      raise SystemExit("stable theorem identity lacks proof provenance/hidden-target evidence")
+              by_status[event["path_join_status"]] += 1
+              if event["path_join_status"] == "unique_path_match":
+                  if len(event["candidate_timeline_positions"]) != 1 or not event["matched_completion_commit"]:
+                      raise SystemExit("unique path join does not identify exactly one completion event")
+              elif event["path_join_status"] == "ambiguous_path_match":
+                  if len(event["candidate_timeline_positions"]) < 2 or event["matched_completion_commit"] is not None:
+                      raise SystemExit("ambiguous path join was incorrectly resolved")
+              else:
+                  if event["candidate_timeline_positions"] or event["matched_completion_commit"] is not None:
+                      raise SystemExit("unmatched/invalid path retained a false timeline assignment")
+          print(
+              "PITB_DALEK_DATASET_JOIN_AUDIT_PASS: "
+              f"records={audit['total_dataset_records']} "
+              f"invalid_timeline_paths={audit['invalid_timeline_path_count']} "
+              f"unique_path={audit['unique_path_join_count']} "
+              f"ambiguous_path={audit['ambiguous_path_join_count']} "
+              f"unmatched_path={audit['unmatched_path_join_count']} "
+              f"unique_identity={audit['unique_theorem_identity_join_count']} "
+              f"ambiguous_identity={audit['ambiguous_theorem_identity_join_count']} "
+              f"unmatched_identity={audit['unmatched_theorem_identity_join_count']} "
+              f"identity_statuses={json.dumps(audit['theorem_identity_status_counts'], sort_keys=True)} "
+              f"before_commit_ancestor={audit['commit_before_ancestor_of_head_count']} "
+              f"before_commit_nonancestor={audit['commit_before_not_ancestor_of_head_count']} "
+              f"before_commit_missing_object={audit['commit_before_missing_commit_object_count']} "
+              f"statement_relations={json.dumps(audit['statement_match_relation_counts'], sort_keys=True)} "
+              f"dataset_sha256={audit['dataset_sha256']}"
+          )
+          PY
+      - name: Index pinned OpenAI math snapshot twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          upstream_sha="1581d4cbdd69a0faf34b2089614fe2a814316a6a"
+          upstream="$RUNNER_TEMP/openai-math"
+          first="$RUNNER_TEMP/proof-insight-source-index-1.json"
+          second="$RUNNER_TEMP/proof-insight-source-index-2.json"
+          git clone --quiet https://github.com/openai/math.git "$upstream"
+          git -C "$upstream" checkout --quiet --detach "$upstream_sha"
+          test "$(git -C "$upstream" rev-parse HEAD)" = "$upstream_sha"
+          test -z "$(git -C "$upstream" status --porcelain)"
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --locked --bin symthaea-proof-insights -- "$upstream" "$upstream_sha" "$first"
+          cargo run --locked --bin symthaea-proof-insights -- "$upstream" "$upstream_sha" "$second"
+          cmp "$first" "$second"
+          jq -e --arg sha "$upstream_sha" '
+            .upstream_commit == $sha and
+            .catalogue_claims.readme_claimed_family_count == 372 and
+            .catalogue_claims.parsed_family_header_count == 372 and
+            .family_split_plan.train_family_count == 260 and
+            .family_split_plan.validation_family_count == 56 and
+            .family_split_plan.test_family_count == 56 and
+            .summary.formalization_source_count == 173 and
+            .summary.main_result_declaration_count == 200 and
+            (.source_fingerprints | any(.path == "README.md")) and
+            (.source_fingerprints | any(.path == "CONTENTS.md")) and
+            (.source_fingerprints | any(.path == "lean/formalization.yaml")) and
+            (.source_fingerprints | any(.path == "lean/ComparatorChallenges/README.md"))
+          ' "$first" >/dev/null
+          test -z "$(git -C "$upstream" status --porcelain)"
+          python - "$upstream" "$first" "$GITHUB_WORKSPACE" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+
+          upstream, index_path, workspace = map(Path, sys.argv[1:])
+          candidate_paths = [
+              workspace / "data/benchmarks/proof-insight-transfer-v0/candidates/025-short-egyptian-greedy-residue.json",
+              workspace / "data/benchmarks/proof-insight-transfer-v0/candidates/026-eventual-subset-density-transfer.json",
+          ]
+          split_path = workspace / "data/benchmarks/proof-insight-transfer-v0/splits.json"
+          records = [(candidate_path, json.loads(candidate_path.read_text())) for candidate_path in candidate_paths]
+          index = json.loads(index_path.read_text())
+          split_manifest = json.loads(split_path.read_text())
+
+          # Independently compare the generated family assignments with the
+          # frozen manifest, not merely the summary counts or declared digest.
+          indexed_families = index["families"]
+          frozen_families = split_manifest["families"]
+          indexed_assignments = {
+              item["family_id"]: item["split"] for item in indexed_families
+          }
+          frozen_assignments = {
+              item["family_id"]: item["split"] for item in frozen_families
+          }
+          if len(indexed_families) != 372 or len(indexed_assignments) != 372:
+              raise SystemExit("generated index must contain 372 unique family assignments")
+          if len(frozen_families) != 372 or len(frozen_assignments) != 372:
+              raise SystemExit("frozen split must contain 372 unique family assignments")
+          if indexed_assignments != frozen_assignments:
+              differing = sorted(
+                  family_id
+                  for family_id in set(indexed_assignments) | set(frozen_assignments)
+                  if indexed_assignments.get(family_id) != frozen_assignments.get(family_id)
+              )
+              raise SystemExit(
+                  "generated family assignments differ from frozen splits.json: "
+                  + repr(differing[:20])
+              )
+          material = "".join(
+              f"{family_id}\t{indexed_assignments[family_id]}\n"
+              for family_id in sorted(indexed_assignments)
+          ).encode("utf-8")
+          partition_digest = hashlib.sha256(material).hexdigest()
+          if partition_digest != split_manifest["split_plan"]["partition_digest_sha256"]:
+              raise SystemExit("independently recomputed split digest differs from splits.json")
+          if partition_digest != index["family_split_plan"]["partition_digest_sha256"]:
+              raise SystemExit("generated index partition digest differs from independently recomputed digest")
+          print(f"PITB_FROZEN_SPLIT_REPRODUCTION_PASS: {partition_digest}")
+
+          for record_path, record in records:
+              relative = Path(record["source"]["path"])
+              if relative.is_absolute() or ".." in relative.parts:
+                  raise SystemExit("candidate source path must remain repository-relative")
+              source = upstream / relative
+              try:
+                  source.resolve().relative_to(upstream.resolve())
+              except ValueError as error:
+                  raise SystemExit("candidate source path escaped the pinned checkout") from error
+              source_bytes = source.read_bytes()
+              source_sha256 = hashlib.sha256(source_bytes).hexdigest()
+              if source_sha256 != record["source"]["sha256"]:
+                  raise SystemExit("candidate source SHA-256 differs from the pinned upstream bytes")
+              if source_sha256 != record["artifact"]["sha256"]:
+                  raise SystemExit("candidate artifact and source digests disagree")
+              statement = record["theorem"]["statement_text"]
+              statement_digest = hashlib.sha256(statement.encode("utf-8")).hexdigest()
+              if statement_digest != record["theorem"]["statement_digest"]:
+                  raise SystemExit("candidate statement digest does not match its exact stored UTF-8 text")
+              normalized_statement = " ".join(statement.split())
+              normalized_source = " ".join(source_bytes.decode("utf-8").split())
+              if normalized_statement not in normalized_source:
+                  raise SystemExit("candidate theorem signature is not present after whitespace normalization in the pinned source")
+              indexed = [
+                  item for item in index["source_fingerprints"]
+                  if item["path"] == record["source"]["path"]
+              ]
+              if len(indexed) > 1:
+                  raise SystemExit("candidate source path is duplicated in the reproducible source index")
+              if indexed and indexed[0]["sha256"] != source_sha256:
+                  raise SystemExit("candidate source digest disagrees with the reproducible source index")
+              # The upstream index is intentionally scoped to manifest and catalogue-linked
+              # artifacts, so a supporting Lean file may be absent. Its pinned-checkout
+              # bytes are still verified independently above.
+              family = record["source"]["family_id"]
+              assignments = [
+                  item for item in split_manifest["families"]
+                  if item["family_id"] == family
+              ]
+              if len(assignments) != 1 or assignments[0]["split"] != "train":
+                  raise SystemExit("new candidate must remain in exactly one frozen training family")
+              print(
+                  "PITB_TRAINING_CANDIDATE_PINNED_SOURCE_PASS: "
+                  f"family={family} indexed={bool(indexed)} source_sha256={source_sha256} statement_sha256={statement_digest}"
+              )
+          PY
+          echo "PITB_PINNED_SOURCE_INDEX_PASS: $upstream_sha"
+      - name: Upload exact-source index and receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof-insight-transfer-v0-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/proof-insight-source-index-*.json
+            ${{ runner.temp }}/proof-insight-isolated/Cargo.lock
+            ${{ runner.temp }}/dalek-temporal-timeline-audit.json
+            ${{ runner.temp }}/dalek-temporal-dataset-audit.json
+          if-no-files-found: error
+          retention-days: 30

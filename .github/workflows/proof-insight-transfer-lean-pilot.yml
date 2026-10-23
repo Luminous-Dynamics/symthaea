@@ -1,0 +1,379 @@
+name: Proof Insight Transfer Lean Pilot
+
+on:
+  pull_request:
+    paths:
+      - "data/benchmarks/proof-insight-transfer-v0/lean-pilot/**"
+      - ".github/workflows/proof-insight-transfer-lean-pilot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lean-counterfactual-pilot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact proposed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Build with pinned Lean and independent checker
+        id: lean-check
+        uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1
+        with:
+          lake-package-directory: data/benchmarks/proof-insight-transfer-v0/lean-pilot
+          auto-config: false
+          build: true
+          test: false
+          lint: false
+          use-mathlib-cache: false
+          nanoda: true
+          nanoda-allow-sorry: false
+          axiom-audit: true
+          axiom-audit-root: PITBCounterfactualPilot
+
+      - name: Produce content-addressed Lean pilot receipt
+        shell: bash
+        env:
+          PITB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PITB_WORKFLOW_RUN_ID: ${{ github.run_id }}
+          PITB_WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+          PITB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cd data/benchmarks/proof-insight-transfer-v0/lean-pilot
+          mkdir -p "$RUNNER_TEMP/pitb-lean-pilot-receipt"
+          out="$RUNNER_TEMP/pitb-lean-pilot-receipt"
+          log="$out/lake-build.log"
+          lake build 2>&1 | tee "$log"
+          olean=".lake/build/lib/lean/PITBCounterfactualPilot.olean"
+          test -s "$olean"
+          lean --version > "$out/lean-version.txt"
+          lake --version > "$out/lake-version.txt"
+
+          # Re-elaborate the source directly so proof-state trace messages are
+          # captured even when the preceding Lake build hit an incremental cache.
+          trace_log="$out/proof-state-trace.log"
+          lake env lean PITBCounterfactualPilot.lean -o "$out/PITBCounterfactualPilot.trace.olean" 2>&1 | tee "$trace_log"
+          python - "$RUNNER_TEMP/pitb-lean-pilot-receipt" "$olean" <<'PY'
+          import hashlib
+          import json
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          out = Path(sys.argv[1])
+          olean = Path(sys.argv[2])
+
+          def digest(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+          import re
+
+          source = Path("PITBCounterfactualPilot.lean")
+          state_trace_path = out / "proof-state-trace.log"
+          state_trace = state_trace_path.read_text()
+
+          def normalize(text):
+              return " ".join(text.split())
+
+          def extract_state(label):
+              begin = f"PITB_STATE_BEGIN:{label}"
+              end = f"PITB_STATE_END:{label}"
+              if state_trace.count(begin) != 1 or state_trace.count(end) != 1:
+                  raise SystemExit(f"expected exactly one structured {label} proof-state trace")
+              start = state_trace.index(begin)
+              finish = state_trace.index(end, start)
+              if finish <= start:
+                  raise SystemExit(f"malformed {label} proof-state trace boundaries")
+              block = state_trace[start:finish]
+              goal_lines = [
+                  line.split("PITB_STATE_GOAL:", 1)[1]
+                  for line in block.splitlines()
+                  if "PITB_STATE_GOAL:" in line
+              ]
+              declaration_lines = [
+                  line.split("PITB_STATE_DECL:", 1)[1]
+                  for line in block.splitlines()
+                  if "PITB_STATE_DECL:" in line
+              ]
+              if len(goal_lines) != 1:
+                  raise SystemExit(f"expected one target goal in {label} proof-state trace")
+              return {
+                  "block": block,
+                  "goal": normalize(goal_lines[0]),
+                  "declarations": [normalize(line) for line in declaration_lines],
+              }
+
+          base_state = extract_state("base")
+          variant_state = extract_state("variant")
+          if base_state["goal"] != variant_state["goal"]:
+              raise SystemExit("fixed-target intervention changed the elaborated goal type")
+          if not any(line.startswith("h:") and normalize(line[2:]) == "a ≤ b" for line in base_state["declarations"]):
+              raise SystemExit("base trace does not contain the required local declaration h : a ≤ b")
+          if any(line.startswith("h:") for line in variant_state["declarations"]):
+              raise SystemExit("variant trace still contains the cleared local declaration h")
+          if not any(line.startswith("hEq:") for line in variant_state["declarations"]):
+              raise SystemExit("variant trace lost the alternate equality route needed to close the same goal")
+          state_trace_receipt = {
+              "operation": "clear h",
+              "base_snapshot_sha256": hashlib.sha256(base_state["block"].encode("utf-8")).hexdigest(),
+              "variant_snapshot_sha256": hashlib.sha256(variant_state["block"].encode("utf-8")).hexdigest(),
+              "base_local_context_sha256": hashlib.sha256("\n".join(base_state["declarations"]).encode("utf-8")).hexdigest(),
+              "variant_local_context_sha256": hashlib.sha256("\n".join(variant_state["declarations"]).encode("utf-8")).hexdigest(),
+              "goal_type_sha256": hashlib.sha256(base_state["goal"].encode("utf-8")).hexdigest(),
+              "goal_type_preserved": True,
+              "required_declaration_present_before": True,
+              "required_declaration_absent_after": True,
+              "alternate_route_hypothesis_present_after": True,
+              "trace_log_sha256": hashlib.sha256(state_trace_path.read_bytes()).hexdigest(),
+          }
+
+          source = Path("PITBCounterfactualPilot.lean")
+          lakefile = Path("lakefile.lean")
+          toolchain = Path("lean-toolchain")
+          manifest = Path("lake-manifest.json")
+          cases_path = Path("cases.json")
+          cases_manifest = json.loads(cases_path.read_text())
+          source_text = " ".join(source.read_text().split())
+
+          if cases_manifest["purpose"] != "formal_harness_calibration_not_model_evaluation":
+              raise SystemExit("Lean pilot cases manifest must remain explicitly unscored")
+          if cases_manifest["toolchain"] != toolchain.read_text().strip():
+              raise SystemExit("case manifest and Lean toolchain file disagree")
+
+          def declaration_exists(name):
+              pattern = rf"\b(?:theorem|lemma|def|abbrev)\s+{re.escape(name)}\b"
+              return re.search(pattern, source.read_text()) is not None
+
+          case_bindings = []
+          for case in cases_manifest["cases"]:
+              for label in ("base_statement", "variant_statement"):
+                  normalized = " ".join(case[label].split())
+                  if normalized not in source_text:
+                      raise SystemExit(
+                          f"{case['case_id']} {label} is not present in the pinned Lean source"
+                      )
+              for declaration in case["evidence_declarations"]:
+                  if not declaration_exists(declaration):
+                      raise SystemExit(
+                          f"{case['case_id']} references missing Lean declaration {declaration}"
+                      )
+              case_bindings.append({
+                  "case_id": case["case_id"],
+                  "mutation_kind": case["mutation_kind"],
+                  "expected_relation": case["expected_relation"],
+                  "base_statement_fragment_sha256": hashlib.sha256(
+                      " ".join(case["base_statement"].split()).encode("utf-8")
+                  ).hexdigest(),
+                  "variant_statement_fragment_sha256": hashlib.sha256(
+                      " ".join(case["variant_statement"].split()).encode("utf-8")
+                  ).hexdigest(),
+                  "evidence_declarations": case["evidence_declarations"],
+                  "contract_precondition": case.get("contract_precondition"),
+                  "state_intervention": case.get("state_intervention"),
+                  "model_outcomes": case["model_outcomes"],
+              })
+
+          state_cases = [
+              binding for binding in case_bindings
+              if (binding.get("state_intervention") or {}).get("operation") == "clear h"
+          ]
+          if len(state_cases) != 1:
+              raise SystemExit("expected exactly one manifest case for the clear-h state intervention")
+          state_case = state_cases[0]
+          if state_case["model_outcomes"] != "not_run":
+              raise SystemExit("the formal calibration case must remain unscored")
+          if state_case["base_statement_fragment_sha256"] != state_case["variant_statement_fragment_sha256"]:
+              raise SystemExit("fixed-target state intervention must bind byte-normalized identical statement fragments")
+          state_trace_receipt["case_id"] = state_case["case_id"]
+          state_trace_receipt["case_manifest_sha256"] = digest(cases_path)
+          state_trace_receipt["target_statement_fragment_sha256"] = state_case["base_statement_fragment_sha256"]
+
+          receipt = {
+              "schema_version": "pitb.lean-pilot-ci-receipt.v0",
+              "repository": os.environ["PITB_REPOSITORY"],
+              "commit_sha": os.environ["PITB_HEAD_SHA"],
+              "workflow_run_id": int(os.environ["PITB_WORKFLOW_RUN_ID"]),
+              "workflow_run_attempt": int(os.environ["PITB_WORKFLOW_RUN_ATTEMPT"]),
+              "toolchain": toolchain.read_text().strip(),
+              "lean_version": (out / "lean-version.txt").read_text().strip(),
+              "lake_version": (out / "lake-version.txt").read_text().strip(),
+              "source": {
+                  "path": str(source),
+                  "sha256": digest(source),
+                  "case_manifest_path": str(cases_path),
+                  "case_manifest_sha256": digest(cases_path),
+                  "lakefile_sha256": digest(lakefile),
+                  "toolchain_file_sha256": digest(toolchain),
+                  "lake_manifest_sha256": digest(manifest) if manifest.exists() else None,
+                  "receipt_schema_path": "lean-pilot-ci-receipt.schema.json",
+                  "receipt_schema_sha256": digest(Path("lean-pilot-ci-receipt.schema.json")),
+              },
+              "checked_artifact": {
+                  "path": str(olean),
+                  "sha256": digest(olean),
+              },
+              "build_log_sha256": digest(out / "lake-build.log"),
+              "proof_state_intervention_trace": state_trace_receipt,
+              "checks": {
+                  "lake_build": "passed",
+                  "direct_reelaboration_with_structured_state_trace": "passed",
+                  "same_goal_and_required_hypothesis_withdrawal_verified_from_trace": "passed",
+                  "lean_kernel_checked_examples": "passed",
+                  "nanoda_independent_type_check": "passed",
+                  "sorry_disallowed_by_nanoda": True,
+                  "axiom_audit": "passed",
+                  "unlisted_axioms_disallowed": True,
+                  "axiom_allowlist": ["propext", "Classical.choice", "Quot.sound"],
+              },
+              "case_manifest_bindings": case_bindings,
+              "limitations": [
+                  "This validates only the checked-in small Lean examples under the pinned environment.",
+                  "It is not a model transfer experiment, does not adjudicate an insight dataset, and does not establish general utility.",
+              ],
+          }
+          encoded = json.dumps(receipt, sort_keys=True, indent=2) + "\n"
+          (out / "receipt.json").write_text(encoded)
+          (out / "receipt.sha256").write_text(
+              hashlib.sha256(encoded.encode("utf-8")).hexdigest() + "  receipt.json\n"
+          )
+          print("PITB_LEAN_PILOT_RECEIPT_PASS")
+          print(f"source_sha256={receipt['source']['sha256']}")
+          print(f"olean_sha256={receipt['checked_artifact']['sha256']}")
+          print(f"receipt_sha256={hashlib.sha256(encoded.encode('utf-8')).hexdigest()}")
+          PY
+
+          # A separately installed, pinned validator checks the emitted receipt
+          # against the checked-in strict schema; local parser checks alone are
+          # not accepted as sufficient receipt validation.
+          python -m venv "$RUNNER_TEMP/pitb-receipt-validator"
+          "$RUNNER_TEMP/pitb-receipt-validator/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+          "$RUNNER_TEMP/pitb-receipt-validator/bin/python" - "$out/receipt.json" "$out/receipt.sha256" <<'PY'
+          import hashlib
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          receipt_path = Path(sys.argv[1])
+          digest_path = Path(sys.argv[2])
+          schema_path = Path("lean-pilot-ci-receipt.schema.json")
+          receipt = json.loads(receipt_path.read_text())
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          def receipt_errors(candidate):
+              errors = [
+                  "schema " + (".".join(map(str, error.absolute_path)) or "<root>") + ": " + error.message
+                  for error in sorted(
+                      validator.iter_errors(candidate),
+                      key=lambda error: (list(map(str, error.absolute_path)), error.message),
+                  )
+              ]
+              if candidate.get("commit_sha") != os.environ["PITB_HEAD_SHA"]:
+                  errors.append("receipt commit SHA does not match the triggering head")
+              if candidate.get("repository") != os.environ["PITB_REPOSITORY"]:
+                  errors.append("receipt repository does not match the triggering repository")
+              source = candidate.get("source", {})
+              if source.get("receipt_schema_sha256") != hashlib.sha256(schema_path.read_bytes()).hexdigest():
+                  errors.append("receipt schema digest does not match the checked-in schema")
+              bindings = candidate.get("case_manifest_bindings", [])
+              case_ids = [case.get("case_id") for case in bindings]
+              if len(case_ids) != len(set(case_ids)):
+                  errors.append("receipt contains duplicate case-manifest binding IDs")
+              trace = candidate.get("proof_state_intervention_trace", {})
+              trace_id = trace.get("case_id")
+              trace_cases = [
+                  case for case in bindings
+                  if case.get("case_id") == trace_id
+                  and (case.get("state_intervention") or {}).get("operation") == "clear h"
+              ]
+              if len(trace_cases) != 1:
+                  errors.append("trace receipt is not bound to exactly one clear-h manifest case")
+              elif (
+                  trace_cases[0].get("base_statement_fragment_sha256")
+                  != trace_cases[0].get("variant_statement_fragment_sha256")
+              ):
+                  errors.append("clear-h trace does not preserve the normalized theorem statement")
+              return errors
+
+          errors = receipt_errors(receipt)
+          if errors:
+              for error in errors:
+                  print(f"RECEIPT_VALIDATION_ERROR: {error}", file=sys.stderr)
+              raise SystemExit(f"receipt failed {len(errors)} schema or binding checks")
+
+          # Negative controls make the evidence gate testable: each mutated
+          # receipt must be rejected by schema validation or by cross-field joins.
+          import copy
+
+          negative_controls = []
+          bad_commit = copy.deepcopy(receipt)
+          bad_commit["commit_sha"] = "a" * 40
+          negative_controls.append(("triggering commit mismatch", bad_commit))
+
+          bad_schema_digest = copy.deepcopy(receipt)
+          bad_schema_digest["source"]["receipt_schema_sha256"] = "0" * 64
+          negative_controls.append(("receipt schema digest mismatch", bad_schema_digest))
+
+          orphan_trace = copy.deepcopy(receipt)
+          orphan_trace["proof_state_intervention_trace"]["case_id"] = "missing-case"
+          negative_controls.append(("orphan proof-state trace", orphan_trace))
+
+          changed_goal = copy.deepcopy(receipt)
+          changed_goal["proof_state_intervention_trace"]["goal_type_preserved"] = False
+          negative_controls.append(("goal type changed", changed_goal))
+
+          duplicate_binding = copy.deepcopy(receipt)
+          duplicate_binding["case_manifest_bindings"][1]["case_id"] = duplicate_binding["case_manifest_bindings"][0]["case_id"]
+          negative_controls.append(("duplicate case binding", duplicate_binding))
+
+          scored_fixture = copy.deepcopy(receipt)
+          scored_fixture["case_manifest_bindings"][0]["model_outcomes"] = "pass"
+          negative_controls.append(("synthetic case falsely marked scored", scored_fixture))
+
+          changed_statement = copy.deepcopy(receipt)
+          trace_case = next(
+              case for case in changed_statement["case_manifest_bindings"]
+              if case["case_id"] == changed_statement["proof_state_intervention_trace"]["case_id"]
+          )
+          trace_case["variant_statement_fragment_sha256"] = "0" * 64
+          negative_controls.append(("theorem statement drift", changed_statement))
+
+          missing_artifact_digest = copy.deepcopy(receipt)
+          del missing_artifact_digest["checked_artifact"]["sha256"]
+          negative_controls.append(("missing checked artifact digest", missing_artifact_digest))
+
+          for name, invalid_receipt in negative_controls:
+              if not receipt_errors(invalid_receipt):
+                  raise SystemExit(f"receipt negative control unexpectedly accepted: {name}")
+          print(f"PITB_RECEIPT_NEGATIVE_CONTROLS_PASS: {len(negative_controls)}/{len(negative_controls)} rejected")
+          expected_schema_digest = hashlib.sha256(schema_path.read_bytes()).hexdigest()
+          actual_receipt_sha = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+          recorded_receipt_sha = digest_path.read_text().split()[0]
+          if actual_receipt_sha != recorded_receipt_sha:
+              raise SystemExit("receipt SHA-256 sidecar does not match receipt.json")
+          print("PITB_RECEIPT_SCHEMA_AND_BINDINGS_PASS")
+          print(f"receipt_sha256={actual_receipt_sha}")
+          print(f"receipt_schema_sha256={expected_schema_digest}")
+          PY
+
+      - name: Upload reproducible pilot evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-lean-pilot-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/pitb-lean-pilot-receipt/receipt.json
+            ${{ runner.temp }}/pitb-lean-pilot-receipt/receipt.sha256
+            ${{ runner.temp }}/pitb-lean-pilot-receipt/lean-version.txt
+            ${{ runner.temp }}/pitb-lean-pilot-receipt/lake-version.txt
+            ${{ runner.temp }}/pitb-lean-pilot-receipt/lake-build.log
+            ${{ runner.temp }}/pitb-lean-pilot-receipt/proof-state-trace.log
+            data/benchmarks/proof-insight-transfer-v0/lean-pilot/lean-pilot-ci-receipt.schema.json
+          if-no-files-found: error
+          retention-days: 90
