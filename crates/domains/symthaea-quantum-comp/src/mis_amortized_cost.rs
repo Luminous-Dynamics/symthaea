@@ -285,7 +285,9 @@ impl MisAmortizedCostProfile {
 /// its total may still be lower for a small requested cohort.
 ///
 /// This compares resource consumption only. It does not establish that solution quality,
-/// feasibility, or success probability is equivalent between the two methods.
+/// feasibility, or success probability is equivalent between the two methods. Wall-clock
+/// amortization assumes a fixed execution regime; when jobs run concurrently, measure
+/// actual end-to-end latency for each cohort size rather than assuming a linear formula.
 pub fn compare_mis_amortized_costs(
     candidate: &MisAmortizedCostProfile,
     baseline: &MisAmortizedCostProfile,
