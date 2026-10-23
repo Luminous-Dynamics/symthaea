@@ -83,6 +83,8 @@ impl CognitiveLoopService {
         let unified_psi = state.unified_psi;
         let coherence = state.coherence;
         let prediction_error = state.prediction_error;
+        let prediction_error_valid =
+            state.prediction_error_valid && prediction_error.is_finite();
         let phi_attention_weight = state.phi_attention_weight;
         let compressed_state = state.compressed_state;
         let input = state.input;
@@ -206,6 +208,7 @@ impl CognitiveLoopService {
                 hv16_cached,
                 branch_a_recent_hvs,
                 prediction_error,
+                prediction_error_valid,
                 coherence,
                 unified_psi,
                 total_cycles,
@@ -227,6 +230,7 @@ impl CognitiveLoopService {
                 branch_b_theory_calibrator,
                 coherence,
                 prediction_error,
+                prediction_error_valid,
                 unified_psi,
                 snap_prediction_confidence,
                 total_cycles,
