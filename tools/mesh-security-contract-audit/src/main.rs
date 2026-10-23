@@ -26,8 +26,8 @@ fn main() {
     match audit(&root) {
         Ok(receipt) => {
             let failed = receipt["status"] != "PASS";
-            emit(&receipt, output.as_deref());
-            if failed {
+            let emitted = emit(&receipt, output.as_deref());
+            if failed || !emitted {
                 std::process::exit(1);
             }
         }
@@ -356,26 +356,32 @@ fn sha256_file(path: &Path) -> Result<String, String> {
     Ok(digest.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
-fn emit(receipt: &Value, output: Option<&Path>) {
-    let serialized = serde_json::to_string_pretty(receipt)
-        .unwrap_or_else(|error| format!("{{\"status\":\"FAIL\",\"error\":\"JSON serialization failed: {error}\"}}"));
+fn emit(receipt: &Value, output: Option<&Path>) -> bool {
+    let serialized = match serde_json::to_string_pretty(receipt) {
+        Ok(serialized) => serialized,
+        Err(error) => {
+            eprintln!("cannot serialize contract audit receipt: {error}");
+            return false;
+        }
+    };
 
     if let Some(path) = output {
-        if let Some(parent) = path.parent() {
+        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
             if let Err(error) = fs::create_dir_all(parent) {
                 eprintln!("cannot create receipt directory {}: {error}", parent.display());
                 println!("{serialized}");
-                return;
+                return false;
             }
         }
         if let Err(error) = fs::write(path, &serialized) {
             eprintln!("cannot write receipt {}: {error}", path.display());
             println!("{serialized}");
-            return;
+            return false;
         }
     }
 
     println!("{serialized}");
+    true
 }
 
 fn emit_failure(error: &str, output: Option<&Path>) {
@@ -388,7 +394,7 @@ fn emit_failure(error: &str, output: Option<&Path>) {
             "Audit did not complete; no schema or registry pass is implied."
         ]
     });
-    emit(&receipt, output);
+    let _ = emit(&receipt, output);
 }
 
 #[cfg(test)]
