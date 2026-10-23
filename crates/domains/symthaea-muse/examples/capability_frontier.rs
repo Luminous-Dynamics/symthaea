@@ -314,8 +314,9 @@ fn run() -> Result<(), String> {
         .map_err(|e| format!("cannot serialize frontier report: {e}"))?;
     json.push(b'\n');
 
-    let output_path = env::args().nth(1);
-    if env::args().skip(2).next().is_some() {
+    let mut args = env::args().skip(1);
+    let output_path = args.next();
+    if args.next().is_some() {
         return Err("usage: capability_frontier [OUTPUT.json]".into());
     }
     if let Some(path) = output_path {
