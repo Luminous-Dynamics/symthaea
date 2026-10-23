@@ -72,9 +72,11 @@ Graph-generation overhead should be reported separately from solve time. Include
 3. Generate all workloads exactly once, independently validate simple d-regular invariants and record SHA-256 byte digest, byte length and attempts.
 4. Audit generator statistics over a larger exploratory seed sweep: duplicate graph rates, connected-component behavior, cycle/triangle counts and other relevant graph statistics. Do not call the outputs an unbiased benchmark distribution without this audit.
 5. Pin the paper's full methods and angle/configuration artifacts before naming a run a reproduction.
-6. Tune only on train, select policy settings on validation, and keep the 2,048/4,096-vertex test outcomes out of all tuning and selector feedback.
-7. Preserve exhausted attempts, invalid output, timeout, abstention and infeasible solution outcomes in all reports.
+6. For the extension manifest, tune only on its train partition, select policy settings on validation, and keep the 2,048/4,096-vertex test outcomes out of tuning and selector feedback.
+7. For the 1,400 paper-shaped workload manifest, reuse each graph ID across p=1/2/3/4 arms; do not call these graph-for-graph paper reproduction until the authors' graph instances/seed list and exact settings are pinned.
+8. For the 700,000-instance classical SOTA campaign, stream reproducible graph identities through the same pinned generator into both arms, preserve graph-level paired results and pre-register stopping/statistical procedures. Record the campaign seed range and failures so interrupted execution can resume without resampling earlier cases.
+9. Preserve exhausted attempts, invalid output, timeout, abstention and infeasible solution outcomes in all reports.
 
 ## Validation boundary
 
-This contribution defines a generator API and a cohort manifest; it has not generated or stored the 96 graph files, run a solver, called a simulator, or executed physical hardware. The Rust tests are authored but not compiled or executed in the authoring environment. It provides no SOTA, quantum-utility or quantum-advantage result.
+This contribution defines a generator API, a 96-workload extension, a 1,400-workload paper-shaped seed manifest, and a 700,000-instance streaming SOTA campaign specification. It has not generated/stored any cohort graph files, run a solver, called a simulator, or executed physical hardware. The Rust tests are authored but not compiled or executed in the authoring environment. The paper-shaped seeds use new workload identities rather than authors' original graphs, so this is not graph-for-graph reproduction. It provides no SOTA, quantum-utility or quantum-advantage result.
