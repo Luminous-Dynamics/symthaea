@@ -810,7 +810,7 @@ mod tests {
         assert!(receipt.contains("\"error\": \"bad \\\"header\\\"\\nline\""));
         assert!(receipt.contains("\"source_path\": \"graphs/farm\\n.gph\""));
         assert!(receipt.contains("\"time_limit_ns\": null"));
-        assert!(receipt.contains("\"seed_base\": 991"));
+        assert!(receipt.contains("\"seed_base\": \"991\""));
         assert!(receipt.contains("\"restarts\": 16"));
         assert!(receipt.contains("\"determinism\": \"not-attested: failed run; inspect error_kind and source identity\""));
     }
