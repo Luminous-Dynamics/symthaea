@@ -395,6 +395,23 @@ mod tests {
     }
 
     #[test]
+    fn earliest_deadline_matching_prevents_avoidable_missed_events() {
+        let result = score_trace(trace(
+            vec![
+                DriftEvent { id: "long-window".to_owned(), start_cycle: 100, end_cycle: 200 },
+                DriftEvent { id: "short-window".to_owned(), start_cycle: 150, end_cycle: 150 },
+            ],
+            vec![
+                Detection { cycle_index: 160, evidence_valid: true },
+                Detection { cycle_index: 210, evidence_valid: true },
+            ],
+        )).expect("trace scores");
+        assert_eq!(result.true_positive_events, 2);
+        assert_eq!(result.missed_events, 0);
+        assert_eq!(result.false_positive_alarms, 0);
+    }
+
+    #[test]
     fn trace_digest_is_invariant_to_event_and_alarm_order() {
         let first = trace(
             vec![
