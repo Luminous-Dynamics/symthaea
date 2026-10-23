@@ -272,11 +272,15 @@ fn expand_energy_model_family_after_alarm(
     candidate_pool: &[Experiment],
     hypotheses: &mut Vec<Expr>,
     live: &mut Vec<usize>,
+    rejected_candidates: &mut Vec<usize>,
     alarmed_candidate: usize,
 ) -> usize {
     let archived_count = hypotheses.len();
     if candidate_pool.is_empty() || alarmed_candidate >= archived_count {
         return 0;
+    }
+    if !rejected_candidates.contains(&alarmed_candidate) {
+        rejected_candidates.push(alarmed_candidate);
     }
 
     let units = demo_units();
@@ -296,7 +300,9 @@ fn expand_energy_model_family_after_alarm(
     // intentionally reconsidered because the old hard-elimination path can reject a true law
     // after one noisy measurement.
     live.clear();
-    live.extend((0..archived_count).filter(|index| *index != alarmed_candidate));
+    live.extend(
+        (0..archived_count).filter(|index| !rejected_candidates.contains(index)),
+    );
 
     let mut accepted = 0usize;
     let mut attempts = 0usize;
@@ -603,6 +609,7 @@ fn run_trial_with_discrepancy(
     let mut prequential_pit_alarm = false;
     let mut monitoring_protocol_invalid = false;
     let mut model_family_expansions = 0usize;
+    let mut rejected_after_alarm = Vec::<usize>::new();
     let mut terminal_pit_alarm = false;
 
     let mut round = 0usize;
@@ -856,6 +863,7 @@ fn run_trial_with_discrepancy(
                 &candidate_pool,
                 &mut hypotheses,
                 &mut live,
+                &mut rejected_after_alarm,
                 alarmed_index,
             );
             if added == 0 {
@@ -1359,12 +1367,14 @@ mod tests {
         ];
         let archived_count = hypotheses.len();
         let mut live = vec![0];
+        let mut rejected = Vec::new();
 
         let added = expand_energy_model_family_after_alarm(
             &mut rng,
             &pool,
             &mut hypotheses,
             &mut live,
+            &mut rejected,
             0,
         );
 
@@ -1380,6 +1390,20 @@ mod tests {
                 InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
             ));
         }
+
+        // A second alarm must not resurrect the first alarmed hypothesis.
+        let second_alarmed = archived_count;
+        let mut second_rng = 0x0DDC_0FFE_E0DD_F00D_u64;
+        let _ = expand_energy_model_family_after_alarm(
+            &mut second_rng,
+            &pool,
+            &mut hypotheses,
+            &mut live,
+            &mut rejected,
+            second_alarmed,
+        );
+        assert!(rejected.contains(&0) && rejected.contains(&second_alarmed));
+        assert!(!live.contains(&0) && !live.contains(&second_alarmed));
     }
 
     /// End-to-end integration check for the prequential PIT monitor. The monitor activates
