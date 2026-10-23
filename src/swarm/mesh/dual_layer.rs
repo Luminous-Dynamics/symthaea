@@ -780,13 +780,13 @@ mod tests {
         let sent = std::sync::Arc::new(Mutex::new(Vec::new()));
         let mesh = DualLayerMesh::new([0x42; 32]).with_lora(Box::new(RecordingTransport {
             sent: std::sync::Arc::clone(&sent),
-            mtu_bytes: 100,
+            mtu_bytes: 1,
         }));
 
         let error = mesh.send(&test_packet(MeshUrgency::Cruise)).unwrap_err();
         assert!(matches!(
             error,
-            MeshError::TransportMtuExceeded { frame_len, mtu: 100 } if frame_len > 100
+            MeshError::TransportMtuExceeded { frame_len, mtu: 1 } if frame_len > 1
         ));
         assert!(
             sent.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_empty(),
