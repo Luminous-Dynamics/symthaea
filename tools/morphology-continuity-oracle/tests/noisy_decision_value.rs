@@ -302,12 +302,8 @@ fn joint_hypothesis_permutations_preserve_risk_and_action_choice() {
             );
         }
         assert_eq!(
-            choose_by_evsi_per_cost(
-                &permuted_measurements,
-                weights,
-                &permuted_decisions,
-            )
-            .map(|item| item.id),
+            choose_by_evsi_per_cost(&permuted_measurements, weights, &permuted_decisions,)
+                .map(|item| item.id),
             expected_choice
         );
     }
