@@ -663,7 +663,9 @@ struct TrialOutcome {
     monitoring_protocol_invalid: bool,
     ground_truth_equivalent: bool,
     ground_truth_extrapolation_equivalent: bool,
+    initial_pool_contains_reference: bool,
     extrapolation_holdout_points: usize,
+    recovery_triggered_on_empty_pool: bool,
     typed_recovery_restarts: usize,
     structured_recovery_candidates: usize,
     terminal_pit_alarm: bool,
@@ -823,7 +825,9 @@ fn run_trial_with_mode(
             monitoring_protocol_invalid: true,
             ground_truth_equivalent: false,
             ground_truth_extrapolation_equivalent: false,
+            initial_pool_contains_reference: false,
             extrapolation_holdout_points: 0,
+            recovery_triggered_on_empty_pool: false,
             typed_recovery_restarts: 0,
             structured_recovery_candidates: 0,
             terminal_pit_alarm: false,
@@ -985,6 +989,7 @@ fn run_trial_with_mode(
     let mut monitoring_protocol_invalid = false;
     let mut typed_recovery_restarts = 0usize;
     let mut structured_recovery_candidates = 0usize;
+    let mut recovery_triggered_on_empty_pool = false;
     let mut rejected_after_alarm = Vec::<usize>::new();
     let mut terminal_pit_alarm = false;
 
@@ -1232,6 +1237,10 @@ fn run_trial_with_mode(
                 terminal_pit_alarm = true;
                 break;
             }
+            if !enable_recovery {
+                terminal_pit_alarm = true;
+                break;
+            }
             let Some(alarmed_index) = monitored_candidate else {
                 monitoring_protocol_invalid = true;
                 terminal_pit_alarm = true;
@@ -1255,10 +1264,54 @@ fn run_trial_with_mode(
             structured_recovery_candidates += recovery.structured_count;
             typed_recovery_restarts += 1;
             terminal_pit_alarm = false;
-            pit_monitor = Some(
-                PrequentialPitMartingale::new(0.05, VAR_NAMES.len())
-                    .expect("fixed alpha and context-channel count are valid"),
+            if pit_mode {
+                pit_monitor = Some(
+                    PrequentialPitMartingale::new(0.05, VAR_NAMES.len())
+                        .expect("fixed alpha and context-channel count are valid"),
+                );
+            }
+        }
+
+        // Open-ended recovery trigger: once every current candidate is contradicted, restart
+        // from the lowest-residual archived expression while excluding the entire falsified
+        // pool. This branch is evaluator-blind; it does not consult the reference law or OOD
+        // holdout. If recovery is disabled, the trial stays unresolved at an empty live set.
+        if truth_absent && enable_recovery && live.is_empty() {
+            if typed_recovery_restarts >= MAX_TYPED_RECOVERY_RESTARTS {
+                terminal_pit_alarm = true;
+                break;
+            }
+            let Some((base_index, _)) = hypotheses
+                .iter()
+                .enumerate()
+                .filter_map(|(index, expression)| {
+                    recovery_fit_score(expression, &measured_observations)
+                        .map(|score| (index, score))
+                })
+                .min_by(|left, right| left.1.total_cmp(&right.1))
+            else {
+                terminal_pit_alarm = true;
+                break;
+            };
+            rejected_after_alarm.extend(0..hypotheses.len());
+            let mut recovery_rng =
+                seed ^ 0x0DD0_5EED_2026_0001 ^ (typed_recovery_restarts as u64).rotate_left(23);
+            let recovery = reseed_typed_candidates_after_alarm(
+                &mut recovery_rng,
+                &candidate_pool,
+                &measured_observations,
+                &mut hypotheses,
+                &mut live,
+                &mut rejected_after_alarm,
+                base_index,
             );
+            if recovery.accepted_count == 0 || live.is_empty() {
+                terminal_pit_alarm = true;
+                break;
+            }
+            recovery_triggered_on_empty_pool = true;
+            structured_recovery_candidates += recovery.structured_count;
+            typed_recovery_restarts += 1;
         }
     }
 
@@ -1275,12 +1328,18 @@ fn run_trial_with_mode(
             &ground_truth,
             &extrapolation_holdout,
         );
+    // Evaluator-only audit of the initial candidate set. It runs after the policy ends and is
+    // used only to identify accidentally oracle-present trials in the truth-absent track.
+    let initial_pool_contains_reference = initial_hypotheses.iter().any(|candidate| {
+        evaluator_matches_reference(candidate, &ground_truth, &holdout)
+    });
 
     TrialOutcome {
         rounds_used: round,
         success: systematic_discrepancy == 0.0
             && ground_truth_equivalent
             && ground_truth_extrapolation_equivalent
+            && (!truth_absent || !initial_pool_contains_reference)
             && !terminal_pit_alarm
             && !monitoring_protocol_invalid,
         final_live: live.len(),
@@ -1295,7 +1354,9 @@ fn run_trial_with_mode(
         monitoring_protocol_invalid,
         ground_truth_equivalent,
         ground_truth_extrapolation_equivalent,
+        initial_pool_contains_reference,
         extrapolation_holdout_points: extrapolation_holdout.len(),
+        recovery_triggered_on_empty_pool,
         typed_recovery_restarts,
         structured_recovery_candidates,
         terminal_pit_alarm,
