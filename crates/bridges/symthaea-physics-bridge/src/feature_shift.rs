@@ -58,8 +58,12 @@ impl FeatureShiftScorer {
 
         let reference_means = column_means(reference_rows, feature_count)?;
         let reference_scales = column_scales(reference_rows, &reference_means, feature_count)?;
-        let reference_correlations =
-            pairwise_correlations(reference_rows, &reference_means, &reference_scales, feature_count)?;
+        let reference_correlations = pairwise_correlations(
+            reference_rows,
+            &reference_means,
+            &reference_scales,
+            feature_count,
+        )?;
 
         Some(Self {
             reference_means,
@@ -185,7 +189,9 @@ fn pairwise_correlations(
     scales: &[f64],
     feature_count: usize,
 ) -> Option<Vec<f64>> {
-    let mut correlations = Vec::with_capacity(feature_count.saturating_mul(feature_count.saturating_sub(1)) / 2);
+    let correlation_count =
+        feature_count.saturating_mul(feature_count.saturating_sub(1)) / 2;
+    let mut correlations = Vec::with_capacity(correlation_count);
     for left in 0..feature_count {
         for right in (left + 1)..feature_count {
             let left_scale = scales[left];
