@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0.0",
+  "title": "Mesh Runtime Nonce-Pair Oracle Corpus",
+  "status": "proposed",
+  "oracle": {
+    "invariant": "No two encryption invocations may share both effective key bytes and nonce bytes.",
+    "observation_source": "Nonce prefix captured from actual encryption helper output.",
+    "key_handling": "Test-only exact key bytes retained in-memory as a map key; never logged or serialized.",
+    "non_claims": [
+      "This corpus does not prove nonce uniqueness for executions it does not exercise.",
+      "Legacy witnesses are expected to reproduce the documented defect and are not security-passing assertions.",
+      "Runtime strict-path remediation must add opposite-expectation tests before this becomes a release gate."
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "RUNTIME-NONCE-PAIR-001",
+      "class": "legacy_witness",
+      "test": "runtime_nonce_pair_oracle_detects_collision_and_accepts_rekey_control",
+      "stimulus": "Invoke packet encryption twice with one key and distinct source IDs whose first six bytes, payload type, epoch, and sequence match; then repeat nonce bytes under a different key.",
+      "expected": "The oracle flags the second same-key pair and accepts the distinct-key positive control.",
+      "status": "authored_unverified"
+    },
+    {
+      "id": "RUNTIME-NONCE-PAIR-002",
+      "class": "cross_api_legacy_witness",
+      "test": "legacy_packet_and_fragment_apis_can_reuse_nonce_under_shared_key",
+      "stimulus": "Use source bytes 1122334455660088, valid WisdomVector packet type 0x00, epoch 0x88, packet sequence 0x00030201 and fragment thought ID 0x0201/index 3 under the same test key.",
+      "expected_nonce_hex": "112233445566008801020300",
+      "expected": "Packet and fragment helpers produce the same nonce; oracle flags the repeated same-key pair; equal-length ciphertexts expose plaintext XOR.",
+      "status": "authored_unverified"
+    },
+    {
+      "id": "RUNTIME-NONCE-PAIR-003",
+      "class": "legacy_witness",
+      "test": "legacy_fragment_nonce_reuses_after_16_bit_sequence_wrap",
+      "stimulus": "Encrypt fragments whose packet sequences differ by 65536 but whose thought_id values match, under the same key/source/index.",
+      "expected": "The actual helper outputs repeat the nonce and expose the ciphertext XOR relation.",
+      "status": "existing_witness_unverified"
+    },
+    {
+      "id": "RUNTIME-NONCE-PAIR-004",
+      "class": "transport_witness",
+      "test": "legacy_fragment_encryption_exceeds_lora_mtu",
+      "stimulus": "Encrypt an MTU-sized LoRa fragment with the legacy per-fragment AEAD wrapper.",
+      "expected_frame_bytes": 250,
+      "declared_mtu_bytes": 222,
+      "status": "existing_witness_unverified"
+    }
+  ],
+  "qualification_targets": {
+    "legacy_witnesses": "100% of registered legacy witnesses reproduced for their intended reason",
+    "strict_path_duplicate_key_nonce_pairs": 0,
+    "critical_false_acceptances": 0,
+    "positive_control_retention": "100% of required fresh-session/key-separation controls",
+    "evidence": "Exact commit, toolchain, feature set, command, output, and source digest required"
+  }
+}
