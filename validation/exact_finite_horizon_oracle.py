@@ -22,6 +22,14 @@ ACTIONS = tuple(VARIABLES)
 HORIZONS = (1, 2, 3)
 POLICIES = ("round_robin", "random_uniform", "greedy_graph_information", "greedy_kernel_information", "greedy_joint_information", "coverage_then_joint_information", "exact_bellman_oracle")
 
+# For attempted action i, the realized set is either {i} or {i, (i+1)%3}.
+def action_subsets(action):
+    one = 1 << action
+    pair = one | (1 << ((action + 1) % 3))
+    return ((one, 1.0), (pair, 1.0))
+
+OBSERVATIONS = {a: tuple((s, y) for s in (1 << a, (1 << a) | (1 << ((a + 1) % 3))) for y in range(8)) for a in ACTIONS}
+
 def entropy(ps):
     return -sum(p * math.log2(p) for p in ps if p > 0.0)
 
@@ -38,8 +46,6 @@ def likelihood(hyp, action, obs):
     else:
         return 0.0
     return p_subset * WORLD[graph_idx][s][y]
-
-OBSERVATIONS = {a: tuple((s, y) for s in (1 << a, (1 << a) | (1 << ((a + 1) % 3))) for y in range(8)) for a in ACTIONS}
 
 def predictive(posterior, action):
     return tuple((obs, sum(w * likelihood(h, action, obs) for h, w in zip(HYPOTHESES, posterior))) for obs in OBSERVATIONS[action])
@@ -101,7 +107,7 @@ def choose_action(policy, posterior, history):
 def terminal_entropy(posterior):
     return entropy(posterior)
 
-# Cache keys retain the full floating-point posterior tuple; no rounded-state merging.
+# Cached by posterior+remaining depth; posterior floats are deterministic from history.
 def oracle_value(posterior, remaining, cache=None):
     if cache is None:
         cache = {}
@@ -163,7 +169,10 @@ def run_benchmark(max_horizon=3):
     for horizon in range(1, max_horizon + 1):
         oracle = oracle_value(prior, horizon, cache)
         for policy in POLICIES:
-            expected_h = oracle if policy == "exact_bellman_oracle" else policy_value(prior, horizon, policy, cache=cache)
+            if policy == "exact_bellman_oracle":
+                expected_h = oracle
+            else:
+                expected_h = policy_value(prior, horizon, policy, cache=cache)
             gap = expected_h - oracle
             if gap < -1e-8:
                 raise AssertionError(f"policy {policy} beats exact oracle by {-gap} bits")
