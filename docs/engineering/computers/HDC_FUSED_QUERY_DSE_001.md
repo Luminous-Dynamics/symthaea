@@ -90,6 +90,12 @@ Independent Python mathematical model check (not Rust execution): 2,100 cases ac
 
 A single-query latency benchmark does not establish the best architecture for bursts of queries. FAISS documents that batch queries improve efficiency by amortizing index-memory access, and that CPU/GPU crossovers depend on index size, batch size and whether the index/query is already resident. Reference: [FAISS CPU/GPU comparison](https://github.com/facebookresearch/faiss/wiki/Comparing-GPU-vs-CPU) and [FAISS performance guidance](https://github.com/facebookresearch/faiss/wiki/How-to-make-Faiss-run-faster).
 
+Run the batch-order sweep independently of the fused/streaming search bench:
+
+```sh
+cargo bench -p symthaea-core --bench hdc_batch_search
+```
+
 The new independent `hdc_batch_search` Criterion target compares:
 - query-major traversal (finish the entire corpus scan for query 0, then query 1, etc.);
 - corpus-major traversal (visit each corpus candidate, update every query's incumbent before advancing);
