@@ -142,7 +142,11 @@ fn fail(message: impl Into<String>) -> String {
     message.into()
 }
 
-fn parse_table(input: &str, expected_header: &[&str], record_tag: &str) -> Result<Table, String> {
+fn parse_table(
+    input: &str,
+    expected_header: &[&str],
+    record_tag: &str,
+) -> Result<Table, String> {
     let mut meta = BTreeMap::new();
     let mut rows = Vec::new();
     let mut header: Option<Vec<String>> = None;
@@ -555,7 +559,11 @@ fn cvar95(losses: &[f64]) -> f64 {
 }
 
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { 0.0 } else { values.iter().sum::<f64>() / values.len() as f64 }
+    if values.is_empty() {
+        0.0
+    } else {
+        values.iter().sum::<f64>() / values.len() as f64
+    }
 }
 
 fn add_cost(total: &mut u64, increment: u64) -> bool {
@@ -628,7 +636,10 @@ fn pareto_prune(mut states: Vec<OracleState>) -> Vec<OracleState> {
             .then(left.energy_uj.cmp(&right.energy_uj))
             .then_with(|| right.weighted_gain.total_cmp(&left.weighted_gain))
     });
-    let mut energy_coordinates: Vec<u64> = states.iter().map(|state| state.energy_uj).collect();
+    let mut energy_coordinates: Vec<u64> = states
+        .iter()
+        .map(|state| state.energy_uj)
+        .collect();
     energy_coordinates.sort_unstable();
     energy_coordinates.dedup();
     let mut tree = vec![f64::NEG_INFINITY; energy_coordinates.len() + 1];
@@ -685,7 +696,10 @@ fn compute_hindsight_oracle(
             });
         }
     }
-    let base_group_means: Vec<f64> = cheap_by_group.values().map(|values| mean(values)).collect();
+    let base_group_means: Vec<f64> = cheap_by_group
+        .values()
+        .map(|values| mean(values))
+        .collect();
     let cheap_group_balanced_utility = mean(&base_group_means);
 
     let mut frontier = vec![OracleState {
@@ -781,7 +795,8 @@ fn score(
                 add_cost(&mut allocator_latency, action.allocator_latency_us);
             energy_accumulator_overflow |=
                 add_cost(&mut allocator_energy, action.allocator_energy_uj);
-            latency_accumulator_overflow |= add_cost(&mut latency, action.allocator_latency_us);
+            latency_accumulator_overflow |=
+                add_cost(&mut latency, action.allocator_latency_us);
             energy_accumulator_overflow |= add_cost(&mut energy, action.allocator_energy_uj);
             cheap_safety = cheap_safety.saturating_add(outcome.cheap_safety);
             let utility = match action.choice {
@@ -821,9 +836,13 @@ fn score(
                     }
                     chosen_safety = chosen_safety.saturating_add(outcome.full_safety);
                     let delta = outcome.full_utility - outcome.cheap_utility;
-                    if delta > 0.0 { beneficial += 1; }
-                    else if delta < 0.0 { harmful += 1; }
-                    else { neutral += 1; }
+                    if delta > 0.0 {
+                        beneficial += 1;
+                    } else if delta < 0.0 {
+                        harmful += 1;
+                    } else {
+                        neutral += 1;
+                    }
                     losses.push(-delta);
                     outcome.full_utility
                 }
@@ -866,7 +885,8 @@ fn score(
         m.allocator_latency_us = allocator_latency;
         m.allocator_energy_uj = allocator_energy;
         m.reservation_overruns = reservation_overruns;
-        m.latency_budget_violation = latency_accumulator_overflow || latency > m.latency_budget_us;
+        m.latency_budget_violation =
+            latency_accumulator_overflow || latency > m.latency_budget_us;
         m.energy_budget_violation = energy_accumulator_overflow || energy > m.energy_budget_uj;
         m.valid_budget_run = !m.latency_budget_violation && !m.energy_budget_violation;
         metrics.insert(run_key.clone(), m);
@@ -929,7 +949,12 @@ fn score(
     for ((comparison, policy), m) in &metrics {
         report.push_str(&format!(
             "RESULT\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-            comparison, policy, m.records, m.groups, m.chosen_utility_mean, m.group_balanced_utility,
+            comparison,
+            policy,
+            m.records,
+            m.groups,
+            m.chosen_utility_mean,
+            m.group_balanced_utility,
             m.beneficial_escalations, m.harmful_escalations, m.neutral_escalations,
             m.missed_beneficial_opportunities, m.beneficial_opportunities_not_affordable,
             m.cheap_safety_violations, m.chosen_safety_violations,
@@ -976,15 +1001,24 @@ fn fmt_opt_i64(value: Option<i64>) -> String {
 
 fn run_cli(args: &[String]) -> Result<String, String> {
     if args.len() != 5 {
-        return Err("usage: vision-dvpc-trace-scorer SPLIT OBSERVATIONS.tsv EVALUATIONS.tsv ACTIONS.tsv".to_owned());
+        return Err(
+            "usage: vision-dvpc-trace-scorer SPLIT OBSERVATIONS.tsv EVALUATIONS.tsv ACTIONS.tsv"
+                .to_owned(),
+        );
     }
     let split = args[1].as_str();
     if !matches!(split, "validation" | "test" | "private_test") {
-        return Err("SPLIT must be validation, test, or private_test; train scoring is not admitted".to_owned());
+        return Err(
+            "SPLIT must be validation, test, or private_test; train scoring is not admitted"
+                .to_owned(),
+        );
     }
-    let obs_text = fs::read_to_string(&args[2]).map_err(|e| fail(format!("read observations: {e}")))?;
-    let eval_text = fs::read_to_string(&args[3]).map_err(|e| fail(format!("read evaluations: {e}")))?;
-    let action_text = fs::read_to_string(&args[4]).map_err(|e| fail(format!("read actions: {e}")))?;
+    let obs_text = fs::read_to_string(&args[2])
+        .map_err(|e| fail(format!("read observations: {e}")))?;
+    let eval_text = fs::read_to_string(&args[3])
+        .map_err(|e| fail(format!("read evaluations: {e}")))?;
+    let action_text = fs::read_to_string(&args[4])
+        .map_err(|e| fail(format!("read actions: {e}")))?;
     let obs_table = parse_table(&obs_text, OBS_HEADER, "OBS")?;
     let eval_table = parse_table(&eval_text, EVAL_HEADER, "EVAL")?;
     let action_table = parse_table(&action_text, ACTION_HEADER, "ACTION")?;
@@ -1084,7 +1118,9 @@ mod tests {
         let (obs, _, _) = tables();
         let observations = read_observations(&obs, "test").unwrap();
         let action_table = parse_table(&broken, ACTION_HEADER, "ACTION").unwrap();
-        assert!(read_actions(&action_table, &observations).unwrap_err().contains("duplicate policy/trace"));
+        assert!(read_actions(&action_table, &observations)
+            .unwrap_err()
+            .contains("duplicate policy/trace"));
     }
 
     #[test]
@@ -1093,7 +1129,9 @@ mod tests {
         let (obs, _, _) = tables();
         let observations = read_observations(&obs, "test").unwrap();
         let action_table = parse_table(&broken, ACTION_HEADER, "ACTION").unwrap();
-        assert!(read_actions(&action_table, &observations).unwrap_err().contains("not marked committed"));
+        assert!(read_actions(&action_table, &observations)
+            .unwrap_err()
+            .contains("not marked committed"));
     }
 
     #[test]
@@ -1102,15 +1140,22 @@ mod tests {
         let (obs, _, _) = tables();
         let observations = read_observations(&obs, "test").unwrap();
         let action_table = parse_table(&broken, ACTION_HEADER, "ACTION").unwrap();
-        assert!(read_actions(&action_table, &observations).unwrap_err().contains("unknown trace"));
+        assert!(read_actions(&action_table, &observations)
+            .unwrap_err()
+            .contains("unknown trace"));
     }
 
     #[test]
     fn rejects_mismatched_snapshot_metadata() {
-        let broken = EVAL.replace("dataset_revision\tfixture-v1", "dataset_revision\tfixture-v2");
+        let broken = EVAL.replace(
+            "dataset_revision\tfixture-v1",
+            "dataset_revision\tfixture-v2",
+        );
         let (obs, _, act) = tables();
         let eval_table = parse_table(&broken, EVAL_HEADER, "EVAL").unwrap();
-        assert!(ensure_same_meta(&[&obs, &eval_table, &act]).unwrap_err().contains("metadata differ"));
+        assert!(ensure_same_meta(&[&obs, &eval_table, &act])
+            .unwrap_err()
+            .contains("metadata differ"));
     }
 
     #[test]
@@ -1119,7 +1164,9 @@ mod tests {
         let (obs, _, _) = tables();
         let observations = read_observations(&obs, "test").unwrap();
         let action_table = parse_table(&broken, ACTION_HEADER, "ACTION").unwrap();
-        assert!(read_actions(&action_table, &observations).unwrap_err().contains("unknown choice"));
+        assert!(read_actions(&action_table, &observations)
+            .unwrap_err()
+            .contains("unknown choice"));
     }
 
     #[test]
@@ -1130,7 +1177,9 @@ mod tests {
         let (obs, _, _) = tables();
         let observations = read_observations(&obs, "test").unwrap();
         let action_table = parse_table(&broken, ACTION_HEADER, "ACTION").unwrap();
-        assert!(read_actions(&action_table, &observations).unwrap_err().contains("sample digest mismatch"));
+        assert!(read_actions(&action_table, &observations)
+            .unwrap_err()
+            .contains("sample digest mismatch"));
     }
 
     #[test]
@@ -1144,7 +1193,9 @@ mod tests {
         let (obs, _, _) = tables();
         let observations = read_observations(&obs, "test").unwrap();
         let action_table = parse_table(&broken, ACTION_HEADER, "ACTION").unwrap();
-        assert!(read_actions(&action_table, &observations).unwrap_err().contains("duplicate commitment_index"));
+        assert!(read_actions(&action_table, &observations)
+            .unwrap_err()
+            .contains("duplicate commitment_index"));
     }
 
     #[test]
@@ -1169,6 +1220,12 @@ mod tests {
 
     #[test]
     fn cvar95_is_worst_five_percent_incremental_loss() {
-        assert_eq!(cvar95(&[0.0, -0.15, 0.08, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]), 0.08);
+        assert_eq!(
+            cvar95(&[
+                0.0, -0.15, 0.08, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            ]),
+            0.08
+        );
     }
 }
