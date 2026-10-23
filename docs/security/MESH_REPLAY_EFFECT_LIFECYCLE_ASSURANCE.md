@@ -27,6 +27,16 @@ The finite-state model holds one authenticated packet sequence constant and trac
 
 The workflow parses the exact model, verifies the pinned TLA+ tools digest, requires the strict configuration to report successful model completion, and requires each mutant run to report the **intended named invariant** violation. A generic nonzero exit is not counted as a successful counterexample. Model/config hashes and raw logs are uploaded as run artifacts.
 
+## Independent action-level sanity check
+
+Before TLC is available, an independent breadth-first exploration of the authored action guards was run as a small JavaScript translation. It is **not** a TLA+ parser or TLC result. It found the expected traces:
+
+- Effect-first mutant: `Authenticate → EffectBeforeCommit → Crash → Restart → Authenticate → EffectBeforeCommit` reaches `effectCount = 2` while the replay identity is still absent.
+- Commit-first mutant: `Authenticate → CommitBeforeEffect → Crash → Restart` reaches a recovered state where the replay identity is durable but `effectCount = 0`.
+- Atomic reference configuration: the translated finite state space had 11 reachable states and no violations of either invariant.
+
+These are useful action-level sanity checks, but they do not replace exact-head TLC parsing/model checking. The uploaded TLC logs and invariant counterexamples remain the authoritative model evidence.
+
 ## Implementation design choices
 
 A real implementation must choose and review one of these approaches; the abstract atomic action does not choose it for the project:
