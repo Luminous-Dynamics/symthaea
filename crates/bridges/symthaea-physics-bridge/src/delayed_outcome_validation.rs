@@ -79,6 +79,7 @@ pub enum DelayedOutcomeError {
     DuplicateOutcome,
     OutcomeArrivedBeforeObservation,
     FutureLabelArrival,
+    HistoricalLabelArrival,
     NonFiniteOutcome,
 }
 
@@ -203,8 +204,8 @@ impl DelayedOutcomeMonitor {
 
     /// Attach an outcome to the original observation when its label arrives.
     ///
-    /// arrival_index must already have been observed. This prevents future
-    /// labels from being consumed before they would exist in an online replay.
+    /// arrival_index must equal the current observed stream position. This
+    /// prevents future or retrospectively backdated labels in online replay.
     pub fn record_outcome(
         &mut self,
         observation_index: u64,
@@ -222,6 +223,9 @@ impl DelayedOutcomeMonitor {
         };
         if arrival_index > latest_index {
             return Err(DelayedOutcomeError::FutureLabelArrival);
+        }
+        if arrival_index < latest_index {
+            return Err(DelayedOutcomeError::HistoricalLabelArrival);
         }
         let observation = self
             .observations
@@ -505,6 +509,10 @@ mod tests {
         assert_eq!(
             monitor.record_outcome(5, 4, 1.0),
             Err(DelayedOutcomeError::OutcomeArrivedBeforeObservation)
+        );
+        assert_eq!(
+            monitor.record_outcome(5, 8, 1.0),
+            Err(DelayedOutcomeError::HistoricalLabelArrival)
         );
         assert_eq!(
             monitor.record_outcome(5, 9, f64::NAN),
