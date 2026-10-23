@@ -3,6 +3,9 @@
 Classification: Internal | Version: 1.0 | Date: 2026-03-08
 Owner: Tristan Stoltz, Luminous Dynamics
 
+
+> **Evidence-status clarification — 2026-10-09:** This document's historical statement that care-related moral classification achieved **91.1% accuracy** is **not currently qualified for use as a headline or comparative performance claim**. The current repository README records a canonical Hendrycks Ethics rerun of 56.2% overall and retracts earlier 91.1%/94.5%/84.7% figures as leakage-inflated. This file does not provide enough distinct dataset, split, metric, code-revision, and run-artifact provenance to establish whether its 91.1% care-related figure is the same result or an independently measured slice. Therefore, do not silently delete it or treat it as validated: preserve it as a historical claim and withhold reuse until its provenance is reconciled. Track the audit in [MORAL-PLURALISM-001 issue #7254](https://github.com/Luminous-Dynamics/symthaea/issues/7254).
+
 ---
 
 ## Purpose
