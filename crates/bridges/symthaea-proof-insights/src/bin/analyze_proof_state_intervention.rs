@@ -1064,14 +1064,28 @@ mod tests {
     }
 
     fn checked_in_synthetic_inputs() -> (Value, Value) {
-        let suite: Value = serde_json::from_str(include_str!(
-            "../../../../../data/benchmarks/proof-insight-transfer-v0/fixtures/proof-state-intervention-suite.synthetic.json"
-        ))
-        .expect("checked-in proof-state suite fixture must parse");
-        let outcomes: Value = serde_json::from_str(include_str!(
-            "../../../../../data/benchmarks/proof-insight-transfer-v0/fixtures/proof-state-intervention-outcomes.synthetic.json"
-        ))
-        .expect("checked-in proof-state outcomes fixture must parse");
+        // The dedicated workflow stages this crate under RUNNER_TEMP. Resolve
+        // fixtures from an explicit repository root there; ordinary workspace
+        // tests fall back to the real repo root three levels above the crate.
+        let repo_root = std::env::var_os("PITB_REPO_ROOT")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
+            });
+        let suite_path = repo_root.join(
+            "data/benchmarks/proof-insight-transfer-v0/fixtures/proof-state-intervention-suite.synthetic.json",
+        );
+        let outcomes_path = repo_root.join(
+            "data/benchmarks/proof-insight-transfer-v0/fixtures/proof-state-intervention-outcomes.synthetic.json",
+        );
+        let suite_bytes = std::fs::read(&suite_path)
+            .unwrap_or_else(|error| panic!("read {}: {error}", suite_path.display()));
+        let outcomes_bytes = std::fs::read(&outcomes_path)
+            .unwrap_or_else(|error| panic!("read {}: {error}", outcomes_path.display()));
+        let suite: Value =
+            serde_json::from_slice(&suite_bytes).expect("checked-in proof-state suite fixture must parse");
+        let outcomes: Value =
+            serde_json::from_slice(&outcomes_bytes).expect("checked-in proof-state outcomes fixture must parse");
         (suite, outcomes)
     }
 
