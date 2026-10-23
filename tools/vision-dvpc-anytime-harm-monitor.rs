@@ -191,10 +191,18 @@ impl AnytimeHarmMonitorV1 {
         if self.revoked_shift {
             return MonitorStatusV1::RevokedShift;
         }
-        if self.groups.values().all(|group| group.status == GroupMonitorStatusV1::Certified) {
+        if self
+            .groups
+            .values()
+            .all(|group| group.status == GroupMonitorStatusV1::Certified)
+        {
             return MonitorStatusV1::Certified;
         }
-        if self.groups.values().any(|group| group.escalation_count == 0) {
+        if self
+            .groups
+            .values()
+            .any(|group| group.escalation_count == 0)
+        {
             return MonitorStatusV1::InsufficientEvidence;
         }
         MonitorStatusV1::Monitoring
@@ -363,11 +371,7 @@ fn validate_config(config: &AnytimeMonitorConfigV1) -> Result<(), AnytimeMonitor
 /// For each q < r, the likelihood ratio is a nonnegative supermartingale under
 /// the conditional null p_t >= r. A fixed mixture remains a supermartingale;
 /// by Ville's inequality, P(sup_t E_t >= 1/delta) <= delta.
-fn log_mixture_e_value(
-    escalations: usize,
-    harmful: usize,
-    risk_limit: f64,
-) -> f64 {
+fn log_mixture_e_value(escalations: usize, harmful: usize, risk_limit: f64) -> f64 {
     if escalations == 0 || harmful > escalations {
         return f64::NEG_INFINITY;
     }
@@ -382,15 +386,16 @@ fn log_mixture_e_value(
         .collect();
     let maximum = logs.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     maximum
-        + logs.iter().map(|value| (value - maximum).exp()).sum::<f64>().ln()
+        + logs
+            .iter()
+            .map(|value| (value - maximum).exp())
+            .sum::<f64>()
+            .ln()
         - (ALTERNATIVE_FRACTIONS.len() as f64).ln()
 }
 
 fn valid_identifier(value: &str) -> bool {
-    !value.trim().is_empty()
-        && !value
-            .chars()
-            .any(|ch| matches!(ch, '\t' | '\r' | '\n'))
+    !value.trim().is_empty() && !value.chars().any(|ch| matches!(ch, '\t' | '\r' | '\n'))
 }
 
 fn digest_hex(digest: &EvidenceDigest) -> String {
@@ -457,10 +462,7 @@ mod tests {
             monitor.group_snapshots()[0].status,
             GroupMonitorStatusV1::Certified
         );
-        assert!(
-            monitor.group_snapshots()[0].log_e_value
-                >= monitor.log_certification_threshold()
-        );
+        assert!(monitor.group_snapshots()[0].log_e_value >= monitor.log_certification_threshold());
     }
 
     #[test]
@@ -470,10 +472,7 @@ mod tests {
             monitor.observe(event(index, "g1", true)).unwrap();
         }
         assert_eq!(monitor.status(), MonitorStatusV1::Monitoring);
-        assert!(
-            monitor.group_snapshots()[0].log_e_value
-                < monitor.log_certification_threshold()
-        );
+        assert!(monitor.group_snapshots()[0].log_e_value < monitor.log_certification_threshold());
     }
 
     #[test]
@@ -532,10 +531,14 @@ mod tests {
         let mut forward = AnytimeHarmMonitorV1::new(config(&["g1"])).unwrap();
         let mut reverse = AnytimeHarmMonitorV1::new(config(&["g1"])).unwrap();
         for index in 0..100 {
-            forward.observe(event(index, "g1", index % 13 == 0)).unwrap();
+            forward
+                .observe(event(index, "g1", index % 13 == 0))
+                .unwrap();
         }
         for index in (0..100).rev() {
-            reverse.observe(event(index, "g1", index % 13 == 0)).unwrap();
+            reverse
+                .observe(event(index, "g1", index % 13 == 0))
+                .unwrap();
         }
         assert_eq!(forward.group_snapshots(), reverse.group_snapshots());
         assert_eq!(forward.to_tsv(), reverse.to_tsv());
