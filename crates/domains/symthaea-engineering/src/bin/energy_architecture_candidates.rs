@@ -18,14 +18,15 @@ use std::{
 
 use serde::Serialize;
 use symthaea_engineering::energy_architecture::{
-    EnergySystemCandidate, bounded_parametric_design_space, reference_service_hub_candidates,
-    validate_candidate,
+    DesignSpaceSearchResult, EnergySystemCandidate, bounded_parametric_design_space,
+    reference_service_hub_candidates, validate_candidate,
 };
 
 #[derive(Debug, Default)]
 struct Args {
     candidate_id: Option<String>,
     output: Option<PathBuf>,
+    candidate_output_dir: Option<PathBuf>,
     design_space: bool,
 }
 
@@ -69,6 +70,25 @@ where
                     .into());
                 }
             }
+            "--candidate-output-dir" => {
+                let value = args.next().ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "--candidate-output-dir requires a directory",
+                    )
+                })?;
+                if parsed
+                    .candidate_output_dir
+                    .replace(PathBuf::from(value))
+                    .is_some()
+                {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "--candidate-output-dir may be supplied once",
+                    )
+                    .into());
+                }
+            }
             "--design-space" => {
                 if parsed.design_space {
                     return Err(io::Error::new(
@@ -81,7 +101,7 @@ where
             }
             "-h" | "--help" => {
                 println!(
-                    "usage: energy_architecture_candidates [--candidate-id ID] [--design-space] [--output PATH]\\n\\nDefault: export the three reference templates as a JSON array. --design-space: export the bounded parametric sweep manifest (36 declared candidates plus rejection records). --candidate-id: export one reference or parametric candidate object. Writes JSON to stdout unless --output is given."
+                    "usage: energy_architecture_candidates [--candidate-id ID] [--design-space] [--candidate-output-dir DIR] [--output PATH]\n\nDefault: export the three reference templates as a JSON array. --design-space: export the bounded parametric sweep manifest (36 declared candidates plus rejection records). --candidate-id: export one reference or parametric candidate object. With --design-space, --candidate-output-dir materializes all 36 candidate objects in stable <DIR>/<candidate-id>/candidate.json paths using the same generated in-memory candidates. Writes the manifest/candidate to stdout unless --output is given."
                 );
                 std::process::exit(0);
             }
@@ -101,6 +121,13 @@ where
         )
         .into());
     }
+    if parsed.candidate_output_dir.is_some() && !parsed.design_space {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "--candidate-output-dir requires --design-space",
+        )
+        .into());
+    }
     Ok(parsed)
 }
 
@@ -108,6 +135,35 @@ fn export_value<T: Serialize>(value: &T) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut bytes = serde_json::to_vec_pretty(value)?;
     bytes.push(b'\n');
     Ok(bytes)
+}
+
+fn write_design_space_candidates(
+    search: &DesignSpaceSearchResult,
+    output_dir: &PathBuf,
+) -> Result<(), Box<dyn Error>> {
+    if !search.rejected_candidates.is_empty() || search.candidates.len() != search.requested_candidate_count {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "refusing partial design-space export: requested={}, emitted={}, rejected={}",
+                search.requested_candidate_count,
+                search.candidates.len(),
+                search.rejected_candidates.len()
+            ),
+        )
+        .into());
+    }
+
+    for candidate in &search.candidates {
+        validate_candidate(candidate)?;
+    }
+    fs::create_dir_all(output_dir)?;
+    for candidate in &search.candidates {
+        let candidate_dir = output_dir.join(&candidate.candidate_id);
+        fs::create_dir_all(&candidate_dir)?;
+        fs::write(candidate_dir.join("candidate.json"), export_value(candidate)?)?;
+    }
+    Ok(())
 }
 
 fn build_output(args: &Args) -> Result<Vec<u8>, Box<dyn Error>> {
@@ -149,19 +205,24 @@ fn build_output(args: &Args) -> Result<Vec<u8>, Box<dyn Error>> {
             return export_value(candidate);
         }
 
-        let search = bounded_parametric_design_space();
         let valid_ids = reference_candidates
             .iter()
             .map(|candidate| candidate.candidate_id.as_str())
-            .chain(search.candidates.iter().map(|candidate| candidate.candidate_id.as_str()))
+            .chain(
+                search
+                    .candidates
+                    .iter()
+                    .map(|candidate| candidate.candidate_id.as_str()),
+            )
             .collect::<Vec<_>>();
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
             format!(
                 "unknown candidate ID {candidate_id}; valid IDs: {}",
                 valid_ids.join(", ")
-            )
-            .into());
+            ),
+        )
+        .into());
     }
 
     export_value(&reference_candidates)
@@ -169,7 +230,14 @@ fn build_output(args: &Args) -> Result<Vec<u8>, Box<dyn Error>> {
 
 fn run() -> Result<(), Box<dyn Error>> {
     let args = parse_args()?;
-    let output = build_output(&args)?;
+    let output = if let Some(output_dir) = &args.candidate_output_dir {
+        let search = bounded_parametric_design_space();
+        write_design_space_candidates(&search, output_dir)?;
+        export_value(&search)?
+    } else {
+        build_output(&args)?
+    };
+
     match args.output {
         Some(path) => fs::write(path, output)?,
         None => {
@@ -218,6 +286,7 @@ mod tests {
             let args = Args {
                 candidate_id: Some(candidate_id.to_owned()),
                 output: None,
+                candidate_output_dir: None,
                 design_space: false,
             };
             let bytes = build_output(&args).expect("known candidate exists");
@@ -234,6 +303,7 @@ mod tests {
         let args = Args {
             candidate_id: None,
             output: None,
+            candidate_output_dir: None,
             design_space: true,
         };
         let first = build_output(&args).expect("bounded design space exports");
@@ -247,19 +317,50 @@ mod tests {
     }
 
     #[test]
+    fn candidate_materialization_writes_manifest_equivalent_objects() {
+        let search = bounded_parametric_design_space();
+        let output_dir = env::temp_dir().join(format!(
+            "symthaea-energy-design-space-export-test-{}",
+            std::process::id()
+        ));
+        if output_dir.exists() {
+            fs::remove_dir_all(&output_dir).expect("remove stale test output");
+        }
+        write_design_space_candidates(&search, &output_dir).expect("complete design space materializes");
+        for candidate in &search.candidates {
+            let bytes = fs::read(output_dir.join(&candidate.candidate_id).join("candidate.json"))
+                .expect("exported candidate file exists");
+            let parsed: EnergySystemCandidate =
+                serde_json::from_slice(&bytes).expect("materialized candidate is JSON");
+            assert_eq!(&parsed, candidate, "materialized candidate differs from manifest object");
+        }
+        fs::remove_dir_all(output_dir).expect("clean temporary test output");
+    }
+
+    #[test]
     fn unknown_candidate_id_fails_instead_of_substituting_a_default() {
         let args = Args {
             candidate_id: Some("not-a-candidate".to_owned()),
             output: None,
+            candidate_output_dir: None,
             design_space: false,
         };
         assert!(build_output(&args).is_err());
     }
 
     #[test]
-    fn design_space_and_single_candidate_modes_are_mutually_exclusive() {
-        // Parser tests exercise argument boundaries separately from generation.
-        assert!(parse_args_from(["--design-space", "--candidate-id", "synthetic-grid-only"]).is_err());
+    fn design_space_output_directory_requires_design_space_mode() {
+        let args = parse_args_from(["--candidate-output-dir", "/tmp/candidates"]).unwrap_err();
+        assert!(args.to_string().contains("--design-space"));
     }
 
+    #[test]
+    fn design_space_and_single_candidate_modes_are_mutually_exclusive() {
+        assert!(parse_args_from([
+            "--design-space",
+            "--candidate-id",
+            "synthetic-grid-only"
+        ])
+        .is_err());
+    }
 }
