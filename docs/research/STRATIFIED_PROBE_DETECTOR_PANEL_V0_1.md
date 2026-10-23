@@ -15,6 +15,12 @@ For each family independently, it computes the empirical AUC of every detector, 
 
 The original fit API remains as a one-family wrapper so current callers keep the same signature. probe_family_coverage exposes the per-family coverage summary.
 
+## Paired dilution counterexample
+
+The deterministic contract test uses two probe families with 40 selector observations each. One moves only detector 0 by +3; the other moves only detector 1 by -2. For each family separately, the specialist's oriented AUC is 1.0, and the panel retains both specialists with their respective directions. If those families are pooled into one mixed perturbation set, both relevant detectors have oriented AUC 0.75: half of the perturbed examples for each detector are unchanged, so a predeclared AUC threshold of 0.8 rejects every detector. The test asserts that pooled fit returns NoInformativeDetectors while stratified fit succeeds and reports the uninformative third family as uncovered.
+
+These AUC values are calculated directly from the deterministic fixture's exact ranks, not from sampled power experiments. The Rust test is committed but not executed in the current environment; do not present the values as verified test output until the exact-head workflow passes.
+
 ## What this solves—and does not
 
 **Solved relative to pooled selection:** one strong probe family cannot directly dilute another family's AUC because each family is evaluated independently. Specialist channels can be retained for distinct declared families. An uncovered family is reported rather than silently lost. Selection direction is visible in the selected-detector receipt.
