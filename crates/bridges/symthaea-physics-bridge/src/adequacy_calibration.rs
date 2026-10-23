@@ -818,6 +818,21 @@ mod tests {
             (0..len).map(|_| self.next_normal()).collect()
         }
 
+        fn student_t4_batch(&mut self, len: usize) -> Vec<f64> {
+            (0..len)
+                .map(|_| {
+                    let numerator = self.next_normal();
+                    let chi_squared = (0..4)
+                        .map(|_| {
+                            let value = self.next_normal();
+                            value * value
+                        })
+                        .sum::<f64>();
+                    numerator * (2.0 / chi_squared).sqrt()
+                })
+                .collect()
+        }
+
         fn ar1_batch(&mut self, len: usize, rho: f64) -> Vec<f64> {
             let mut values = vec![0.0; len];
             if len == 0 {
@@ -857,6 +872,122 @@ mod tests {
         let half_width =
             z * ((p * (1.0 - p) / n + z * z / (4.0 * n * n)).sqrt()) / denominator;
         (center - half_width, center + half_width)
+    }
+
+    /// Verify calibration with two null families beyond a single Gaussian/noise regime:
+    /// matched heavy-tailed Student-t residuals, and heteroscedastic raw residuals divided by the
+    /// correct declared predictive scale. Each replication has its own calibration reference and
+    /// one independent audit, so the empirical false-alarm rate is not conditional on one lucky
+    /// fixed reference sample.
+    #[test]
+    fn matched_heavy_tail_and_standardized_heteroscedastic_null_smoke() {
+        const BATCH_SIZE: usize = 64;
+        const CALIBRATION_BATCHES: usize = 99;
+        const REPLICATIONS: usize = 1_200;
+        const ALPHA: f64 = 0.05;
+
+        let mut rng = DeterministicNormalRng::new(0xA42D_7C19_5E83_B601);
+        let zeros = vec![0.0; BATCH_SIZE];
+        let ones = vec![1.0; BATCH_SIZE];
+        let mut heavy_tail_alarms = [0_usize; 2];
+        let mut heteroscedastic_alarms = [0_usize; 2];
+
+        for _ in 0..REPLICATIONS {
+            let heavy_calibration = (0..CALIBRATION_BATCHES)
+                .map(|_| score_residual_batch(&rng.student_t4_batch(BATCH_SIZE), &zeros, &ones))
+                .collect::<Vec<_>>();
+            let heavy_rms = heavy_calibration
+                .iter()
+                .map(|score| score.rms_standardized_residual)
+                .collect::<Vec<_>>();
+            let heavy_max = heavy_calibration
+                .iter()
+                .map(|score| score.maximum())
+                .collect::<Vec<_>>();
+            let heavy_rms_calibrator =
+                ConformalAdequacyCalibrator::new(&heavy_rms, ALPHA).unwrap();
+            let heavy_max_calibrator =
+                ConformalAdequacyCalibrator::new(&heavy_max, ALPHA).unwrap();
+            let heavy_audit = score_residual_batch(&rng.student_t4_batch(BATCH_SIZE), &zeros, &ones);
+            heavy_tail_alarms[0] += usize::from(calibrated_alarm(
+                &heavy_rms_calibrator,
+                heavy_audit.rms_standardized_residual,
+            ));
+            heavy_tail_alarms[1] +=
+                usize::from(calibrated_alarm(&heavy_max_calibrator, heavy_audit.maximum()));
+
+            let gaussian_calibration = (0..CALIBRATION_BATCHES)
+                .map(|_| score_residual_batch(&rng.normal_batch(BATCH_SIZE), &zeros, &ones))
+                .collect::<Vec<_>>();
+            let gaussian_rms = gaussian_calibration
+                .iter()
+                .map(|score| score.rms_standardized_residual)
+                .collect::<Vec<_>>();
+            let gaussian_max = gaussian_calibration
+                .iter()
+                .map(|score| score.maximum())
+                .collect::<Vec<_>>();
+            let gaussian_rms_calibrator =
+                ConformalAdequacyCalibrator::new(&gaussian_rms, ALPHA).unwrap();
+            let gaussian_max_calibrator =
+                ConformalAdequacyCalibrator::new(&gaussian_max, ALPHA).unwrap();
+
+            let latent = rng.normal_batch(BATCH_SIZE);
+            let scales = (0..BATCH_SIZE)
+                .map(|index| 0.5 + (index % 8) as f64 * 0.25)
+                .collect::<Vec<_>>();
+            let heteroscedastic_observed = latent
+                .iter()
+                .zip(scales.iter())
+                .map(|(noise, scale)| noise * scale)
+                .collect::<Vec<_>>();
+            let heteroscedastic = standardized_residual_diagnostics(
+                &heteroscedastic_observed,
+                &zeros,
+                &scales,
+            )
+            .expect("known predictive scales standardize the null residuals");
+            heteroscedastic_alarms[0] += usize::from(calibrated_alarm(
+                &gaussian_rms_calibrator,
+                heteroscedastic.rms_standardized_residual,
+            ));
+            heteroscedastic_alarms[1] +=
+                usize::from(calibrated_alarm(&gaussian_max_calibrator, heteroscedastic.maximum()));
+        }
+
+        for (name, counts) in [
+            ("matched Student-t(df=4) null", heavy_tail_alarms),
+            ("standardized heteroscedastic null", heteroscedastic_alarms),
+        ] {
+            print!("{name}; ");
+            for (index, method) in ["RMS", "raw-max"].iter().enumerate() {
+                let (lower, upper) = wilson_interval(counts[index], REPLICATIONS);
+                print!(
+                    "{}={:.4} [{:.4},{:.4}]{}",
+                    method,
+                    counts[index] as f64 / REPLICATIONS as f64,
+                    lower,
+                    upper,
+                    if index == 1 { "" } else { "; " }
+                );
+            }
+            println!();
+        }
+
+        for counts in [heavy_tail_alarms, heteroscedastic_alarms] {
+            assert!(
+                counts
+                    .iter()
+                    .all(|count| (*count as f64 / REPLICATIONS as f64) <= 0.08),
+                "matched clean-null false-alarm rate exceeded the smoke envelope: {counts:?}"
+            );
+            assert!(
+                counts
+                    .iter()
+                    .all(|count| (*count as f64 / REPLICATIONS as f64) >= 0.02),
+                "matched clean-null false-alarm rate was unexpectedly conservative: {counts:?}"
+            );
+        }
     }
 
     /// Reproduces the score-fusion pilot inside Rust with a fixed seed and equal clean-calibration
