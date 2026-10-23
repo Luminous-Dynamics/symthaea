@@ -1981,6 +1981,8 @@ fn test_fragment_wrong_key_rejected() {
         decrypt_fragment(&ct, &key_b).is_none(),
         "Wrong key must fail"
     );
+}
+
 /// A requested fragment-AEAD mode must reject plaintext when no key is set.
 #[cfg(feature = "mesh-encryption")]
 #[test]
@@ -2001,4 +2003,3 @@ fn fragment_encryption_rejects_plaintext_when_key_is_missing() {
     assert_eq!(receiver.pending_count(), 0);
 }
 
-}
