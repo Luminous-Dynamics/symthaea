@@ -1,0 +1,375 @@
+{
+  "schema_version": 1,
+  "benchmark": "symthaea-cognitive-loop-evidence",
+  "status": "proposal-not-measured",
+  "purpose": "Pin deterministic evidence-validity, phase-causality, calibration, continual-learning, and systems-efficiency scenarios before implementing the runner.",
+  "notes": [
+    "A failed hard invariant cannot be averaged away by task reward.",
+    "Missing evidence is not the same label as zero error or maximal surprise.",
+    "Use deterministic seeds and retain raw per-cycle records.",
+    "Metric targets live in ../research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md and are aspirational until measured."
+  ],
+  "baselines": [
+    {
+      "id": "B0",
+      "name": "legacy-raw-scalar",
+      "purpose": "Reference failure mode; compare only where reproducible."
+    },
+    {
+      "id": "B1",
+      "name": "validity-gate-only",
+      "purpose": "Isolate evidence validity."
+    },
+    {
+      "id": "B2",
+      "name": "single-update-only",
+      "purpose": "Isolate phase duplication removal."
+    },
+    {
+      "id": "B3",
+      "name": "validity-plus-single-update-plus-replay-gate",
+      "purpose": "Candidate implementation."
+    },
+    {
+      "id": "B5",
+      "name": "stateless-adaptation-disabled",
+      "purpose": "Measure gain beyond no online learning."
+    },
+    {
+      "id": "B6",
+      "name": "persistence-or-last-valid",
+      "purpose": "Simple predictive baseline."
+    },
+    {
+      "id": "B7",
+      "name": "shuffled-outcome",
+      "purpose": "Negative control for spurious learning."
+    }
+  ],
+  "scenario_groups": [
+    {
+      "id": "S0-validity",
+      "hard_gate": true,
+      "cases": [
+        {
+          "id": "no-prior-prediction",
+          "inject": "First cycle has no prior prediction.",
+          "expected_valid": false,
+          "expected_pe_training_update": false,
+          "expected_replay_admission": false,
+          "assertions": [
+            "legacy diagnostic remains documented",
+            "control path uses explicit prior, not raw sentinel",
+            "PE histories unchanged",
+            "state window advances"
+          ]
+        },
+        {
+          "id": "empty-prediction",
+          "inject": "Prior prediction vector has length zero.",
+          "expected_valid": false,
+          "expected_pe_training_update": false,
+          "expected_replay_admission": false,
+          "assertions": [
+            "no PE attention update",
+            "no PE stat update",
+            "no replay sample from invalid transition"
+          ]
+        },
+        {
+          "id": "zero-norm-prediction",
+          "inject": "Prior prediction exists but its norm is zero or below declared tolerance.",
+          "expected_valid": false,
+          "expected_pe_training_update": false,
+          "expected_replay_admission": false,
+          "assertions": [
+            "legacy sentinel is not surprise evidence",
+            "PE-driven controller state does not change"
+          ]
+        },
+        {
+          "id": "dimension-mismatch",
+          "inject": "Predicted and observed representations cannot be compared in the declared common space.",
+          "expected_valid": false,
+          "expected_pe_training_update": false,
+          "expected_replay_admission": false,
+          "assertions": [
+            "explicit invalid reason",
+            "no silent truncation unless comparison contract explicitly permits it"
+          ]
+        },
+        {
+          "id": "non-finite-observation",
+          "inject": "Prediction or observation includes NaN or infinity.",
+          "expected_valid": false,
+          "expected_pe_training_update": false,
+          "expected_replay_admission": false,
+          "assertions": [
+            "finite fallback/control output",
+            "invalid reason retained"
+          ]
+        },
+        {
+          "id": "valid-identical",
+          "inject": "Valid prediction equals target under declared metric.",
+          "expected_valid": true,
+          "expected_pe_training_update": true,
+          "expected_replay_admission": true,
+          "assertions": [
+            "PE near metric-specific minimum",
+            "expected statistics update exactly once"
+          ]
+        },
+        {
+          "id": "valid-orthogonal",
+          "inject": "Valid unit vectors are orthogonal in the declared representation space.",
+          "expected_valid": true,
+          "expected_pe_training_update": true,
+          "expected_replay_admission": true,
+          "assertions": [
+            "PE near metric-specific reference",
+            "no range violation"
+          ]
+        },
+        {
+          "id": "valid-antiparallel",
+          "inject": "Valid normalized vectors point in opposite directions.",
+          "expected_valid": true,
+          "expected_pe_training_update": true,
+          "expected_replay_admission": true,
+          "assertions": [
+            "PE near metric-specific maximum",
+            "not classified as invalid"
+          ]
+        },
+        {
+          "id": "low-amplitude-nonzero",
+          "inject": "Both comparison vectors are nonzero but have small magnitudes.",
+          "expected_valid": "per-comparison-contract",
+          "expected_pe_training_update": "if-valid",
+          "expected_replay_admission": "if-valid",
+          "assertions": [
+            "norm tolerance is explicit",
+            "validity does not depend on arbitrary absolute scale when the metric is scale-invariant"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S1-phase-causality",
+      "hard_gate": true,
+      "cases": [
+        {
+          "id": "one-surprise-update",
+          "inject": "Hold input/state fixed and enable one surprise event.",
+          "assertions": [
+            "surprise/exploration stateful routine count equals one per cycle",
+            "log emitted update reason and target subsystem"
+          ]
+        },
+        {
+          "id": "one-urgency-update",
+          "inject": "Hold input/state fixed and run one perception cycle.",
+          "assertions": [
+            "urgency history advances at most once",
+            "low-error streak advances at most once",
+            "mode-transition count increases at most once"
+          ]
+        },
+        {
+          "id": "invalid-pe-counterfactual",
+          "inject": "Run paired trials differing only by an invalid PE sentinel.",
+          "assertions": [
+            "PE-gated state deltas are zero",
+            "independent sensory/safety/deadline effects remain enabled and separately attributed"
+          ]
+        },
+        {
+          "id": "valid-pe-counterfactual",
+          "inject": "Run paired trials differing only by a genuine PE value across threshold.",
+          "assertions": [
+            "only declared PE-dependent consumers respond",
+            "deltas and event order are reproducible by seed"
+          ]
+        },
+        {
+          "id": "duplicate-call-negative-control",
+          "inject": "Deliberately invoke a stateful phase twice in the test harness.",
+          "assertions": [
+            "single-update invariant test detects duplicate call"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S2-shift-and-calibration",
+      "hard_gate": false,
+      "cases": [
+        {
+          "id": "stable-stream",
+          "inject": "Stationary input distribution with labelled no-change intervals.",
+          "metrics": [
+            "false-surprise-rate",
+            "brier-score",
+            "log-loss",
+            "ece",
+            "p50-p95-p99-latency"
+          ]
+        },
+        {
+          "id": "abrupt-shift",
+          "inject": "Pre-registered level/rotation/distribution changes with exact change-point labels.",
+          "metrics": [
+            "change-recall",
+            "false-positive-rate",
+            "detection-delay",
+            "precision",
+            "auprc"
+          ]
+        },
+        {
+          "id": "gradual-drift",
+          "inject": "Slow continuous drift without an abrupt boundary.",
+          "metrics": [
+            "tracking-error",
+            "false-escalations",
+            "recovery-time",
+            "calibration-by-window"
+          ]
+        },
+        {
+          "id": "missingness-burst",
+          "inject": "Remove prediction/target observations for variable-length windows.",
+          "metrics": [
+            "false-surprise-rate",
+            "replay-contamination-rate",
+            "history-contamination-count",
+            "recovery-after-observation-returns"
+          ]
+        },
+        {
+          "id": "corrupted-predictor",
+          "inject": "Predictor emits zero vector, wrong dimensions, NaN, or infinity.",
+          "metrics": [
+            "invalid-evidence-contamination-count",
+            "finite-output-rate",
+            "downstream-state-delta"
+          ]
+        },
+        {
+          "id": "shuffled-outcome-negative-control",
+          "inject": "Shuffle labels/outcomes while preserving input distribution.",
+          "metrics": [
+            "adaptation-gain",
+            "reward-gain",
+            "confidence-change"
+          ],
+          "assertions": [
+            "no unexplained performance gain over matched stateless baseline"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S3-continual-learning",
+      "hard_gate": false,
+      "cases": [
+        {
+          "id": "sequential-motifs",
+          "inject": "Tasks share reusable motifs but vary surface context.",
+          "metrics": [
+            "reward-by-task",
+            "gain-over-stateless",
+            "samples-to-target",
+            "cost-per-task"
+          ]
+        },
+        {
+          "id": "distractor-interference",
+          "inject": "Previously learned motif is interleaved with unrelated task sequences.",
+          "metrics": [
+            "forgetting",
+            "retrieval-precision",
+            "false-memory-replay-rate"
+          ]
+        },
+        {
+          "id": "delayed-outcome",
+          "inject": "Prediction occurs before its outcome becomes observable.",
+          "metrics": [
+            "outcome-provenance-correctness",
+            "reward-assignment-error",
+            "adaptation-gain"
+          ]
+        },
+        {
+          "id": "post-shift-recovery",
+          "inject": "Previously stable task changes mapping after a measured baseline period.",
+          "metrics": [
+            "median-recovery-time",
+            "tail-recovery-time",
+            "pre-shift-retention",
+            "resource-cost"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S4-systems",
+      "hard_gate": false,
+      "cases": [
+        {
+          "id": "steady-state-throughput",
+          "inject": "Fixed input stream and fixed model/config on pinned hardware.",
+          "metrics": [
+            "cycles-per-second",
+            "p50-latency",
+            "p95-latency",
+            "p99-latency",
+            "peak-rss",
+            "allocations-if-instrumented"
+          ]
+        },
+        {
+          "id": "surprise-heavy-load",
+          "inject": "Frequent genuine shift events interspersed with stable segments.",
+          "metrics": [
+            "p95-latency",
+            "throughput",
+            "task-outcome",
+            "learning-work-per-event"
+          ]
+        },
+        {
+          "id": "resource-pressure",
+          "inject": "Constrain compute/resource budget while retaining a valid evidence source.",
+          "metrics": [
+            "deadline-miss-rate",
+            "task-quality",
+            "resource-cost",
+            "evidence-drop-rate"
+          ]
+        }
+      ]
+    }
+  ],
+  "result_contract": {
+    "required_fields": [
+      "repository_head_sha",
+      "configuration_digest",
+      "toolchain",
+      "feature_flags",
+      "hardware",
+      "scenario_id",
+      "seed",
+      "baseline_id",
+      "metric_version",
+      "cycle_records_digest",
+      "result_digest",
+      "hard_gate_violations",
+      "per_seed_metrics"
+    ],
+    "ci_policy": "queued/skipped/missing is not a pass",
+    "claim_policy": "No SOTA or benchmark improvement claim without pinned comparator configuration, reproducible raw records, and uncertainty intervals."
+  }
+}
