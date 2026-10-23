@@ -60,6 +60,15 @@ Targets should be revised only with a documented reason before confirmatory runs
 
 These methods have different assumptions and guarantees. They are targets for correct reproduction, not boxes to check with superficially similar code.
 
+## Industry baseline and what would count as better
+
+Operational data-monitoring platforms already combine feature-wise statistical tests or distance metrics with dataset-level aggregation and visual investigation. For example, Evidently documents tests/distances selected by feature type and data volume, and a configurable rule over the share of drifting columns; NannyML documents univariate methods plus PCA reconstruction error for multivariate drift; Arize Phoenix exposes embedding drift trends using distance between reference and current vectors. These are useful baselines, not straw men:
+- [Evidently drift algorithm](https://docs.evidentlyai.com/): column-wise tests/distances, reference datasets, and configurable dataset-level rules.
+- [NannyML documentation](https://docs.nannyml.com/): univariate drift and PCA-based multivariate reconstruction error.
+- [Arize Phoenix embedding analysis](https://arize.com/docs/phoenix/inferences/use-cases-inferences/embeddings-analysis): distance-based vector-drift investigation.
+
+This Rust scorer is not yet a replacement for those complete workflows: it provides a small, typed, calibratable statistic and deterministic CPU implementation. The potential distinction is *auditable repeated monitoring with explicit false-alarm contracts plus a resource-bounded sketch*, rather than richer dashboards. To beat operational baselines, benchmark the full decision pathway: calibration validity, alert quality, detection delay, diagnosis, memory and p95 latency. Also measure the cost of delayed labels and follow-up investigations; a statistically sensitive alert that cannot distinguish benign covariate shift from harmful conditional change is not sufficient.
+
 ## Current evidence boundary
 
 The implementation adds unit tests for (a) score compression from 8,001 to 120 correlation comparisons, (b) a diffuse mean-shift response, (c) malformed inputs, and (d) typed conformal assessment. At this writing, Rust tests and rustfmt have not been observed to pass on the exact head. The tests are committed; their outcomes remain unverified until the focused workflow reports success for that exact SHA.
