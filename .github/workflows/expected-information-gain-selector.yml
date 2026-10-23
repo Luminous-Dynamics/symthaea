@@ -47,17 +47,19 @@ jobs:
           components: rustfmt, clippy
       - name: Format focused selector and integration benchmark
         run: |
-          rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/model_adequacy.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/adequacy_calibration.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/feature_shift.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/random_projection_shift.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/detector_panel.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/delayed_outcome_validation.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/diagnostic_fusion_benchmark.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/sequential_adequacy.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs
+          format_status=0
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs || format_status=1
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs || format_status=1
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/model_adequacy.rs || format_status=1
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/adequacy_calibration.rs || format_status=1
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/feature_shift.rs || format_status=1
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/random_projection_shift.rs || format_status=1
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/detector_panel.rs || format_status=1
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/delayed_outcome_validation.rs || format_status=1
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/diagnostic_fusion_benchmark.rs || format_status=1
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/sequential_adequacy.rs || format_status=1
+          rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs || format_status=1
+          exit "$format_status"
       - name: Test information-gain selector
         run: cargo test -p symthaea-core hdc::conjecture_engine::experiment_selection --lib
       - name: Run paired law-discovery selector pilot
