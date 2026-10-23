@@ -701,6 +701,8 @@ fn run(cli: Cli) -> Result<(), String> {
     let cost_target_met = match (control_cost_per_fix, treatment_cost_per_fix) {
         (Some(control), Some(treatment)) => {
             quality_gates_pass
+                && control > 0.0
+                && treatment < control
                 && treatment <= control * (1.0 - cost_reduction_target)
                 && ci_lower >= -noninferiority_margin
         }
