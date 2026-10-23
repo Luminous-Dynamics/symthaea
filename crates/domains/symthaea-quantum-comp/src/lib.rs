@@ -40,6 +40,8 @@ pub mod experiment;
 pub mod fixtures;
 pub mod interop;
 pub mod matrix;
+pub mod mis_cost_risk;
+pub mod mis_pareto;
 pub mod migration;
 pub mod noise_sweep;
 pub mod phase_hdc;
