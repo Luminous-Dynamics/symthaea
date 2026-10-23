@@ -2145,3 +2145,157 @@ fn legacy_fragment_encryption_exceeds_lora_mtu() {
     );
     assert!(encrypted.len() > LORA_MTU);
 }
+
+
+// ============================================================================
+// Test-only runtime nonce-pair oracle
+// ============================================================================
+
+/// Records actual AEAD invocations as (effective key, emitted nonce) pairs.
+///
+/// This is deliberately test-only: it does not expose key material in output,
+/// does not claim to fingerprint keys cryptographically, and does not replace
+/// a protocol-level uniqueness guarantee. Keeping the key bytes as an in-memory
+/// HashMap key avoids treating a lossy/truncated identity or a display hash as
+/// the uniqueness authority. Never log or serialize this oracle.
+#[cfg(feature = "mesh-encryption")]
+#[derive(Default)]
+struct RuntimeNoncePairOracle {
+    seen: std::collections::HashMap<
+        ([u8; 32], [u8; AEAD_NONCE_SIZE]),
+        &'static str,
+    >,
+}
+
+#[cfg(feature = "mesh-encryption")]
+impl RuntimeNoncePairOracle {
+    /// Return the first and repeated labels when this exact key/nonce pair was
+    /// already observed. The input is the real encryption function's wire
+    /// output, whose prefix is the nonce.
+    fn observe(
+        &mut self,
+        effective_key: &[u8; 32],
+        encrypted_wire: &[u8],
+        label: &'static str,
+    ) -> Option<(&'static str, &'static str)> {
+        assert!(
+            encrypted_wire.len() >= AEAD_NONCE_SIZE + AEAD_TAG_SIZE,
+            "test oracle received a truncated AEAD output"
+        );
+        let nonce: [u8; AEAD_NONCE_SIZE] = encrypted_wire[..AEAD_NONCE_SIZE]
+            .try_into()
+            .expect("nonce prefix has exact AEAD nonce size");
+        let pair = (*effective_key, nonce);
+        if let Some(first_label) = self.seen.get(&pair).copied() {
+            Some((first_label, label))
+        } else {
+            self.seen.insert(pair, label);
+            None
+        }
+    }
+}
+
+/// The oracle must detect a same-key packet nonce collision from the actual
+/// packet encryption helper, but must not report identical nonce bytes under
+/// a genuinely different effective key as a collision.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn runtime_nonce_pair_oracle_detects_collision_and_accepts_rekey_control() {
+    let key_a = [0x5Au8; 32];
+    let key_b = [0x5Bu8; 32];
+    let source_a = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
+    let source_b = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x99, 0xAA];
+
+    let output_a = encrypt_packet_typed(b"packet-a", &key_a, &source_a, 3, 0x42, 7);
+    let output_b = encrypt_packet_typed(b"packet-b", &key_a, &source_b, 3, 0x42, 7);
+    let rekeyed = encrypt_packet_typed(b"packet-b", &key_b, &source_b, 3, 0x42, 7);
+
+    let mut oracle = RuntimeNoncePairOracle::default();
+    assert_eq!(oracle.observe(&key_a, &output_a, "first-key/source-a"), None);
+    assert_eq!(
+        oracle.observe(&key_a, &output_b, "same-key/source-b"),
+        Some(("first-key/source-a", "same-key/source-b")),
+        "same effective key plus duplicate nonce must be flagged"
+    );
+    assert_eq!(
+        &output_b[..AEAD_NONCE_SIZE],
+        &rekeyed[..AEAD_NONCE_SIZE],
+        "positive control intentionally retains the same nonce bytes"
+    );
+    assert_eq!(
+        oracle.observe(&key_b, &rekeyed, "fresh-effective-key"),
+        None,
+        "same nonce bytes under a different effective key are not a same-key nonce collision"
+    );
+}
+
+/// The packet and fragment APIs use separate nonce layouts, but the current
+/// layout does not itself provide key-domain separation. These parameters make
+/// their generated 12-byte nonce prefixes identical under one shared key:
+///
+/// packet:   source[0..6] | payload_type=0x77 | epoch=0x88 | seq=0x00030201 LE
+/// fragment: source[0..8] | thought_id=0x0201 LE | fragment_index=3 | 0
+///
+/// This is an executable cross-API collision witness, not a claim that every
+/// deployment shares the same effective key across both paths.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn legacy_packet_and_fragment_apis_can_reuse_nonce_under_shared_key() {
+    let key = [0xC3u8; 32];
+    let source_id = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
+    let packet_plaintext = *b"packet-domain-000";
+    let fragment_plaintext = *b"fragment-domain00";
+    assert_eq!(packet_plaintext.len(), fragment_plaintext.len());
+
+    let packet_wire = encrypt_packet_typed(
+        &packet_plaintext,
+        &key,
+        &source_id,
+        0x77,
+        0x88,
+        0x0003_0201,
+    );
+    let fragment_wire = encrypt_fragment(
+        &fragment_plaintext,
+        &key,
+        &source_id,
+        0x0201,
+        3,
+    );
+
+    assert_eq!(
+        &packet_wire[..AEAD_NONCE_SIZE],
+        &fragment_wire[..AEAD_NONCE_SIZE],
+        "packet and fragment nonce layouts unexpectedly overlap for these inputs"
+    );
+
+    let mut oracle = RuntimeNoncePairOracle::default();
+    assert_eq!(
+        oracle.observe(&key, &packet_wire, "packet-api"),
+        None
+    );
+    assert_eq!(
+        oracle.observe(&key, &fragment_wire, "fragment-api"),
+        Some(("packet-api", "fragment-api")),
+        "the runtime pair oracle must flag cross-API reuse when the effective key is shared"
+    );
+
+    let packet_ciphertext =
+        &packet_wire[AEAD_NONCE_SIZE..packet_wire.len() - AEAD_TAG_SIZE];
+    let fragment_ciphertext =
+        &fragment_wire[AEAD_NONCE_SIZE..fragment_wire.len() - AEAD_TAG_SIZE];
+    let observed_xor: Vec<u8> = packet_ciphertext
+        .iter()
+        .zip(fragment_ciphertext.iter())
+        .map(|(a, b)| *a ^ *b)
+        .collect();
+    let expected_xor: Vec<u8> = packet_plaintext
+        .iter()
+        .zip(fragment_plaintext.iter())
+        .map(|(a, b)| *a ^ *b)
+        .collect();
+    assert_eq!(
+        observed_xor, expected_xor,
+        "cross-API key/nonce reuse must reproduce the keystream-XOR witness"
+    );
+}
