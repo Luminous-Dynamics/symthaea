@@ -1,0 +1,178 @@
+name: Agency Time ABI Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/core/symthaea-agency-time/**"
+      - ".github/workflows/agency-time-abi-qualification.yml"
+
+concurrency:
+  group: agency-time-abi-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    if: >-
+      ${{ github.event.pull_request.draft == false &&
+          github.event.pull_request.head.ref == 'agency/time-abi-v1' &&
+          github.event.pull_request.base.ref == 'main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Assert exact source subject and changed-path closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_head='${{ github.event.pull_request.head.sha }}'
+          actual_head="$(git rev-parse HEAD)"
+          test "$actual_head" = "$expected_head"
+
+          base='5fd5259af776c0a7f1b9608f040bfae9009871a1'
+          git cat-file -e "${base}^{commit}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          test "$(git rev-list --count "${base}..HEAD")" -eq 1
+          test "$(git rev-parse HEAD^)" = "$base"
+
+          mapfile -t changed < <(git diff --name-only "$base" HEAD | sort)
+          expected=(
+            '.github/workflows/agency-time-abi-qualification.yml'
+            'crates/core/symthaea-agency-time/Cargo.toml'
+            'crates/core/symthaea-agency-time/src/lib.rs'
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${#changed[@]}" -eq "${#expected_sorted[@]}"
+          for i in "${!changed[@]}"; do
+            test "${changed[$i]}" = "${expected_sorted[$i]}"
+          done
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Ratchet temporal authority surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          source = Path('crates/core/symthaea-agency-time/src/lib.rs').read_text()
+          manifest = Path('crates/core/symthaea-agency-time/Cargo.toml').read_text()
+
+          assert 'pub enum TemporalRole' in source
+          assert 'pub struct RuntimeIncarnationId([u8; 32]);' in source
+          assert 'pub struct RuntimeTimeProfileId([u8; 16]);' in source
+          assert 'pub struct MonotonicLeaseDeadline {' in source
+          assert 'pub enum DeadlineRejection' in source
+          assert 'pub enum DeadlineEvaluation' not in source
+
+          marker = source.index('pub struct MonotonicLeaseDeadline')
+          derive_region = source[max(0, marker - 180):marker]
+          for forbidden in ('Debug', 'Clone', 'Copy', 'Serialize', 'Deserialize'):
+              assert forbidden not in derive_region, f'live deadline acquired forbidden derive: {forbidden}'
+          assert not re.search(
+              r'impl(?:<[^>]+>)?\s+(?:std::fmt::)?Debug\s+for\s+MonotonicLeaseDeadline',
+              source,
+          ), 'live deadline gained a raw-coordinate Debug implementation'
+
+          impl_match = re.search(
+              r'impl\s+MonotonicLeaseDeadline\s*\{(?P<body>.*?)\n\}',
+              source,
+              flags=re.S,
+          )
+          assert impl_match, 'missing MonotonicLeaseDeadline impl'
+          body = impl_match.group('body')
+          assert not re.search(r'pub\s+(?:const\s+)?fn\s+(?:new|from_[A-Za-z0-9_]*)\s*\(', body), \
+              'live deadline gained a public mint/reconstruction constructor'
+          assert 'deadline_coordinate' not in body, 'raw live deadline coordinate escaped through public impl'
+
+          assert 'DeadlineEvaluation::Current' not in source
+          assert 'pub struct CurrentDeadline' not in source
+          assert 'pub enum CurrentDeadline' not in source
+
+          forbidden_surfaces = (
+              'pub trait MonotonicClock',
+              'pub trait RuntimeClock',
+              'std::time::SystemTime',
+              'std::time::Instant',
+          )
+          for forbidden in forbidden_surfaces:
+              assert forbidden not in source, f'provider semantics leaked into ABI tranche: {forbidden}'
+
+          assert '[dependencies]' not in manifest, 'ABI tranche must remain dependency-free'
+          PY
+
+      - name: Materialize mechanical lock state without short-circuiting source evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cargo metadata --format-version 1 --no-deps >/dev/null
+
+          if git diff --quiet -- Cargo.lock; then
+            echo 'AGENCY_TIME_LOCK_RECONCILIATION_REQUIRED=0' >> "$GITHUB_ENV"
+          else
+            echo 'AGENCY_TIME_LOCK_RECONCILIATION_REQUIRED=1' >> "$GITHUB_ENV"
+            git diff -- Cargo.lock > /tmp/agency-time-lock-reconciliation.diff
+            echo 'Cargo.lock changed mechanically; continuing source qualification with the generated lock.'
+          fi
+
+          mapfile -t unexpected < <(git diff --name-only | grep -v '^Cargo.lock$' || true)
+          if (( ${#unexpected[@]} != 0 )); then
+            printf 'cargo metadata unexpectedly changed non-lock paths:\n' >&2
+            printf '  %s\n' "${unexpected[@]}" >&2
+            exit 1
+          fi
+
+      - name: Format
+        run: cargo fmt --check -p symthaea-agency-time
+
+      - name: Check with mechanically reconciled lock state
+        run: cargo check --locked -p symthaea-agency-time
+
+      - name: Test library
+        run: cargo test --locked -p symthaea-agency-time --lib
+
+      - name: Test compile-fail doctests
+        run: cargo test --locked -p symthaea-agency-time --doc
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-agency-time --all-targets -- -D warnings
+
+      - name: Require source tree unchanged by qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t unexpected < <(git diff --name-only | grep -v '^Cargo.lock$' || true)
+          if (( ${#unexpected[@]} != 0 )); then
+            printf 'qualification changed unexpected non-lock paths:\n' >&2
+            printf '  %s\n' "${unexpected[@]}" >&2
+            exit 1
+          fi
+
+      - name: Final lockfile evidence gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${AGENCY_TIME_LOCK_RECONCILIATION_REQUIRED:-0}" == '1' ]]; then
+            echo 'Source gates completed against the mechanically generated lock state.' >&2
+            echo 'Exact subject is NOT qualified because committed Cargo.lock does not contain that state.' >&2
+            echo 'Create a separate evidence-driven lock reconciliation child; do not hand-edit Cargo.lock.' >&2
+            echo 'Mechanical Cargo.lock diff follows:' >&2
+            cat /tmp/agency-time-lock-reconciliation.diff >&2
+            exit 1
+          fi
+
+          git diff --exit-code
