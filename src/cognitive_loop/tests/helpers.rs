@@ -172,9 +172,31 @@ fn test_run_surprise_exploration_no_bridge() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Default config has no surprise bridge
     let compressed = vec![0.3f32; 128];
-    let (triggered, action) = service.run_surprise_exploration(&compressed);
+    let (triggered, action) = service.run_surprise_exploration(&compressed, false);
     assert!(!triggered, "No surprise bridge → no trigger");
     assert!(action.is_none(), "No surprise bridge → no action");
+}
+
+#[test]
+#[allow(clippy::field_reassign_with_default)]
+fn test_invalid_pe_does_not_trigger_surprise_or_exploration() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_surprise_exploration = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+    let compressed = vec![0.5f32; 128];
+    service.last_state = Some(compressed.clone());
+    service.last_prediction = Some(vec![0.0f32; 128]);
+    let initial_urge = service.behavior.curiosity_drive.exploration_urge;
+
+    let (triggered, action) = service.run_surprise_exploration(&compressed, false);
+
+    assert!(!triggered, "invalid PE must not become surprise");
+    assert!(action.is_none(), "invalid PE must not generate a perturbation");
+    assert_eq!(
+        service.behavior.curiosity_drive.exploration_urge,
+        initial_urge,
+        "invalid PE must not change the exploration drive"
+    );
 }
 
 #[test]
@@ -187,7 +209,7 @@ fn test_run_surprise_exploration_with_bridge() {
     let compressed = vec![0.5f32; 128];
     service.last_state = Some(compressed.clone());
     service.last_prediction = Some(vec![0.0f32; 128]); // large mismatch
-    let (triggered, action) = service.run_surprise_exploration(&compressed);
+    let (triggered, action) = service.run_surprise_exploration(&compressed, true);
     // We can't guarantee triggering (threshold-dependent), but verify no panic
     // and that action is coherent with triggered
     if triggered {
