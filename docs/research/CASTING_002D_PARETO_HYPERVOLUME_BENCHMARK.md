@@ -205,3 +205,32 @@ Focused command:
     cargo test -p symthaea-core casting_multiobjective_benchmark
 
 These tests have not been compiled or run in this authoring environment; exact-head execution is still mandatory.
+
+## CASTING-002I — Weighted conformal under covariate shift
+
+The new test-only weighted conformal fitter augments exchangeable split conformal for an explicitly stated covariate-shift setting. Each calibration score is weighted by a supplied non-negative finite importance weight proportional to target/source covariate-density ratio. The test candidate supplies its own strictly positive finite importance weight.
+
+For normalized absolute-residual scores s_i = |y_i - mu_i| / sigma_i, finite calibration scores must accumulate weight at least
+
+    (1 - alpha) * (sum calibration weights + test-point weight).
+
+The test point contributes its own weight at positive infinity in the weighted conformal distribution. A high target/source weight may leave insufficient finite calibration mass. The implementation explicitly errors in that case; it does not discard test-point mass, clip the quantile, or return a falsely finite interval.
+
+Importance weights are normalized by a common maximum before sums and weighted effective sample size (ESS) are computed; this preserves weighted quantiles and ESS while reducing overflow risk. The receipt reports target test-point weight share, weighted ESS and the finite quantile's weight fraction for audit.
+
+### Statistical limits
+
+The coverage interpretation depends on correctly specified importance ratios and a valid covariate-shift assumption. This does not repair label/conditional drift, unknown or badly estimated density ratios, arbitrary adaptive selection shift, or physically inaccurate surrogate predictions. We do not estimate density ratios here. Post-selection coverage must be evaluated separately. Low weighted ESS or a failed finite quantile is a refusal signal, not a reason to silently relax alpha.
+
+Research:
+- Jonkers et al., Conformal Predictive Systems Under Covariate Shift, COPA 2024: https://proceedings.mlr.press/v230/jonkers24a.html
+- Conformal prediction with local weights: randomization enables robust guarantees, JRSS B (2025): https://academic.oup.com/jrsssb/article/87/2/549/7889096
+- Pournaderi, Sharp training-conditional coverage bounds under covariate shift (27 September 2026): https://arxiv.org/abs/2609.33456
+
+Six new tests cover a hand-calculated quantile including test-point mass, common weight-scale invariance, refusal when finite quantile mass is insufficient, invalid/zero-total weights, underflowing ratios, invalid alpha, and an integration from weighted objective-1 calibration into the epsilon proposal policy. Total: 41 authored test cases in this test-only module.
+
+Focused command:
+
+    cargo test -p symthaea-core casting_multiobjective_benchmark
+
+These tests have not been compiled or run in the current authoring environment. Exact-head execution is still mandatory.

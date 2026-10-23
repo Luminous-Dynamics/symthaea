@@ -73,6 +73,10 @@ enum ParetoMetricError {
     InvalidPredictiveScale,
     InvalidConformalMultiplier,
     NonFiniteCalibrationMetric,
+    InvalidImportanceWeight,
+    ZeroTotalCalibrationWeight,
+    InsufficientWeightedCalibrationSupport,
+    NonFiniteWeightedConformalMetric,
 }
 
 impl fmt::Display for ParetoMetricError {
@@ -138,6 +142,10 @@ impl fmt::Display for ParetoMetricError {
             Self::InvalidPredictiveScale => f.write_str("predictive standard deviation must be finite and strictly positive"),
             Self::InvalidConformalMultiplier => f.write_str("conformal multiplier must be finite and non-negative"),
             Self::NonFiniteCalibrationMetric => f.write_str("conformal calibration score or assessment metric is non-finite"),
+            Self::InvalidImportanceWeight => f.write_str("importance weights must be finite and non-negative; target-point weight must be positive"),
+            Self::ZeroTotalCalibrationWeight => f.write_str("weighted calibration requires positive total calibration weight"),
+            Self::InsufficientWeightedCalibrationSupport => f.write_str("test-point weight leaves insufficient finite calibration mass for the requested weighted conformal quantile"),
+            Self::NonFiniteWeightedConformalMetric => f.write_str("weighted conformal normalization, effective sample size, or quantile mass is non-finite"),
         }
     }
 }
@@ -610,6 +618,137 @@ fn assess_conformal_holdout(
         empirical_coverage: covered_count as f64 / holdout.len() as f64,
         mean_absolute_standardized_residual,
         mean_gaussian_negative_log_likelihood,
+    })
+}
+
+
+/// One normalized-residual calibration observation with an importance weight
+/// proportional to target/source covariate-density ratio.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct WeightedPredictionCalibrationSample {
+    sample: PredictionCalibrationSample,
+    importance_weight: f64,
+}
+
+/// Weighted conformal multiplier for one explicitly weighted test candidate.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct WeightedSplitConformalMultiplier {
+    alpha: f64,
+    multiplier: f64,
+    calibration_count: usize,
+    weighted_effective_sample_size: f64,
+    test_point_weight_share: f64,
+    finite_quantile_mass_fraction: f64,
+}
+
+/// Fit a weighted split-conformal multiplier under a specified covariate-shift model.
+///
+/// test_point_importance_weight is the target/source density ratio for the new candidate.
+/// The weighted conformal distribution places this test point's weight at positive infinity.
+/// Thus finite calibration scores must accumulate weight at least
+/// (1-alpha) * (sum calibration weights + test-point weight). If not, this function
+/// refuses to emit a finite multiplier instead of dropping the test-point mass.
+///
+/// This only has a coverage interpretation if importance ratios and covariate-shift
+/// assumptions are appropriate. It does not handle arbitrary conditional/label shift.
+fn fit_weighted_split_conformal_multiplier(
+    calibration: &[WeightedPredictionCalibrationSample],
+    test_point_importance_weight: f64,
+    alpha: f64,
+) -> Result<WeightedSplitConformalMultiplier, ParetoMetricError> {
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
+        return Err(ParetoMetricError::InvalidMiscoverage);
+    }
+    if calibration.is_empty() {
+        return Err(ParetoMetricError::EmptyCalibrationSet);
+    }
+    if !test_point_importance_weight.is_finite() || test_point_importance_weight <= 0.0 {
+        return Err(ParetoMetricError::InvalidImportanceWeight);
+    }
+
+    let mut scored = Vec::with_capacity(calibration.len());
+    let mut max_weight = test_point_importance_weight;
+    for item in calibration {
+        if !item.importance_weight.is_finite() || item.importance_weight < 0.0 {
+            return Err(ParetoMetricError::InvalidImportanceWeight);
+        }
+        let score = standardized_absolute_residual(item.sample)?;
+        max_weight = max_weight.max(item.importance_weight);
+        scored.push((score, item.importance_weight));
+    }
+    if !max_weight.is_finite() || max_weight <= 0.0 {
+        return Err(ParetoMetricError::InvalidImportanceWeight);
+    }
+
+    // Common scaling leaves weighted quantiles and ESS unchanged while reducing overflow.
+    for (_, weight) in &mut scored {
+        let normalized = *weight / max_weight;
+        if *weight > 0.0 && normalized == 0.0 {
+            return Err(ParetoMetricError::NonFiniteWeightedConformalMetric);
+        }
+        *weight = normalized;
+    }
+    let normalized_test_weight = test_point_importance_weight / max_weight;
+    if !normalized_test_weight.is_finite() || normalized_test_weight <= 0.0 {
+        return Err(ParetoMetricError::NonFiniteWeightedConformalMetric);
+    }
+
+    let calibration_weight_sum: f64 = scored.iter().map(|(_, weight)| *weight).sum();
+    let squared_weight_sum: f64 = scored.iter().map(|(_, weight)| *weight * *weight).sum();
+    if !calibration_weight_sum.is_finite() || !squared_weight_sum.is_finite() {
+        return Err(ParetoMetricError::NonFiniteWeightedConformalMetric);
+    }
+    if calibration_weight_sum <= 0.0 || squared_weight_sum <= 0.0 {
+        return Err(ParetoMetricError::ZeroTotalCalibrationWeight);
+    }
+
+    let total_weight = calibration_weight_sum + normalized_test_weight;
+    let required_finite_mass = (1.0 - alpha) * total_weight;
+    let weighted_effective_sample_size =
+        calibration_weight_sum * calibration_weight_sum / squared_weight_sum;
+    if !total_weight.is_finite()
+        || !required_finite_mass.is_finite()
+        || !weighted_effective_sample_size.is_finite()
+        || weighted_effective_sample_size <= 0.0
+    {
+        return Err(ParetoMetricError::NonFiniteWeightedConformalMetric);
+    }
+    if required_finite_mass > calibration_weight_sum {
+        return Err(ParetoMetricError::InsufficientWeightedCalibrationSupport);
+    }
+
+    scored.sort_by(|left, right| left.0.total_cmp(&right.0));
+    let mut cumulative_weight = 0.0;
+    let mut selected_multiplier = None;
+    let mut selected_cumulative_weight = 0.0;
+    for (score, weight) in scored {
+        cumulative_weight += weight;
+        if !cumulative_weight.is_finite() {
+            return Err(ParetoMetricError::NonFiniteWeightedConformalMetric);
+        }
+        if cumulative_weight >= required_finite_mass {
+            selected_multiplier = Some(score);
+            selected_cumulative_weight = cumulative_weight;
+            break;
+        }
+    }
+    let multiplier =
+        selected_multiplier.ok_or(ParetoMetricError::InsufficientWeightedCalibrationSupport)?;
+    let finite_quantile_mass_fraction = selected_cumulative_weight / total_weight;
+    let test_point_weight_share = normalized_test_weight / total_weight;
+    if !finite_quantile_mass_fraction.is_finite()
+        || !test_point_weight_share.is_finite()
+    {
+        return Err(ParetoMetricError::NonFiniteWeightedConformalMetric);
+    }
+
+    Ok(WeightedSplitConformalMultiplier {
+        alpha,
+        multiplier,
+        calibration_count: calibration.len(),
+        weighted_effective_sample_size,
+        test_point_weight_share,
+        finite_quantile_mass_fraction,
     })
 }
 
@@ -1601,6 +1740,162 @@ mod tests {
             ),
             Err(ParetoMetricError::NonFiniteCalibrationMetric)
         );
+    }
+
+
+    fn weighted_calibration_samples(
+        scores_and_weights: &[(f64, f64)],
+    ) -> Vec<WeightedPredictionCalibrationSample> {
+        scores_and_weights.iter().map(|(score, weight)| WeightedPredictionCalibrationSample {
+            sample: PredictionCalibrationSample {
+                predicted_mean: 0.0,
+                predictive_std_dev: 1.0,
+                observed_value: *score,
+            },
+            importance_weight: *weight,
+        }).collect()
+    }
+
+    #[test]
+    fn weighted_conformal_known_answer_includes_test_point_mass() {
+        let calibration = weighted_calibration_samples(&[(1.0, 1.0), (2.0, 2.0), (3.0, 1.0)]);
+        let result = fit_weighted_split_conformal_multiplier(&calibration, 1.0, 0.25).unwrap();
+        assert_abs_close(result.multiplier, 3.0, 1e-12);
+        assert_abs_close(result.weighted_effective_sample_size, 8.0 / 3.0, 1e-12);
+        assert_abs_close(result.test_point_weight_share, 0.2, 1e-12);
+        assert_abs_close(result.finite_quantile_mass_fraction, 0.8, 1e-12);
+        assert_eq!(result.calibration_count, 3);
+    }
+
+    #[test]
+    fn weighted_conformal_is_invariant_to_common_weight_rescaling() {
+        let first = fit_weighted_split_conformal_multiplier(
+            &weighted_calibration_samples(&[(1.0, 1.0), (2.0, 2.0), (3.0, 1.0)]),
+            1.0,
+            0.25,
+        ).unwrap();
+        let scaled = fit_weighted_split_conformal_multiplier(
+            &weighted_calibration_samples(&[(1.0, 10.0), (2.0, 20.0), (3.0, 10.0)]),
+            10.0,
+            0.25,
+        ).unwrap();
+        assert_abs_close(first.multiplier, scaled.multiplier, 1e-12);
+        assert_abs_close(first.weighted_effective_sample_size, scaled.weighted_effective_sample_size, 1e-12);
+        assert_abs_close(first.test_point_weight_share, scaled.test_point_weight_share, 1e-12);
+        assert_abs_close(first.finite_quantile_mass_fraction, scaled.finite_quantile_mass_fraction, 1e-12);
+    }
+
+    #[test]
+    fn weighted_conformal_fails_closed_when_test_point_mass_blocks_finite_quantile() {
+        let calibration = weighted_calibration_samples(&[(1.0, 1.0), (2.0, 1.0), (3.0, 1.0)]);
+        assert_eq!(
+            fit_weighted_split_conformal_multiplier(&calibration, 4.0, 0.25),
+            Err(ParetoMetricError::InsufficientWeightedCalibrationSupport)
+        );
+        assert_eq!(
+            fit_weighted_split_conformal_multiplier(&calibration, 1.0, 0.1),
+            Err(ParetoMetricError::InsufficientWeightedCalibrationSupport)
+        );
+    }
+
+    #[test]
+    fn weighted_conformal_rejects_bad_or_zero_total_weights() {
+        assert_eq!(
+            fit_weighted_split_conformal_multiplier(
+                &weighted_calibration_samples(&[(1.0, -1.0), (2.0, 1.0)]),
+                1.0,
+                0.5
+            ),
+            Err(ParetoMetricError::InvalidImportanceWeight)
+        );
+        assert_eq!(
+            fit_weighted_split_conformal_multiplier(
+                &weighted_calibration_samples(&[(1.0, 0.0), (2.0, 0.0)]),
+                1.0,
+                0.5
+            ),
+            Err(ParetoMetricError::ZeroTotalCalibrationWeight)
+        );
+        assert_eq!(
+            fit_weighted_split_conformal_multiplier(
+                &weighted_calibration_samples(&[(1.0, 1.0)]),
+                f64::NAN,
+                0.5
+            ),
+            Err(ParetoMetricError::InvalidImportanceWeight)
+        );
+        assert_eq!(
+            fit_weighted_split_conformal_multiplier(
+                &weighted_calibration_samples(&[(1.0, 1.0)]),
+                0.0,
+                0.5
+            ),
+            Err(ParetoMetricError::InvalidImportanceWeight)
+        );
+    }
+
+    #[test]
+    fn weighted_conformal_rejects_underflowing_weight_ratios_and_bad_alpha() {
+        assert_eq!(
+            fit_weighted_split_conformal_multiplier(
+                &weighted_calibration_samples(&[(1.0, f64::MIN_POSITIVE), (2.0, f64::MAX)]),
+                f64::MIN_POSITIVE,
+                0.5
+            ),
+            Err(ParetoMetricError::NonFiniteWeightedConformalMetric)
+        );
+        assert_eq!(
+            fit_weighted_split_conformal_multiplier(
+                &weighted_calibration_samples(&[(1.0, 1.0)]),
+                1.0,
+                f64::NAN
+            ),
+            Err(ParetoMetricError::InvalidMiscoverage)
+        );
+    }
+
+
+    #[test]
+    fn weighted_conformal_multiplier_can_drive_objective_specific_epsilon_selection() {
+        let weighted_q = fit_weighted_split_conformal_multiplier(
+            &weighted_calibration_samples(&[(1.0, 1.0), (2.0, 2.0), (3.0, 1.0)]),
+            1.0,
+            0.25,
+        ).unwrap();
+        let unweighted_q = fit_split_conformal_multiplier(
+            &calibration_samples(&[0.5, 1.0, 2.0, 4.0]),
+            0.4,
+        ).unwrap();
+        assert_abs_close(unweighted_q.multiplier, 2.0, 1e-12);
+        assert_abs_close(weighted_q.multiplier, 3.0, 1e-12);
+
+        let candidates = [
+            PredictedObjectiveCandidate {
+                candidate_id: 10,
+                predicted_mean: [2.0, 3.0],
+                predictive_std_dev: [0.1, 0.1],
+            },
+            PredictedObjectiveCandidate {
+                candidate_id: 11,
+                predicted_mean: [1.8, 3.1],
+                predictive_std_dev: [0.5, 0.1],
+            },
+            PredictedObjectiveCandidate {
+                candidate_id: 12,
+                predicted_mean: [1.6, 4.0],
+                predictive_std_dev: [0.5, 0.5],
+            },
+        ];
+        let proposal = propose_largest_gap_epsilon(
+            &gap_front(),
+            &candidates,
+            [1.0, 2.0],
+            [unweighted_q.multiplier, weighted_q.multiplier],
+        ).unwrap();
+        assert_eq!(proposal.selected_candidate_id, 11);
+        assert_abs_close(proposal.objective_0_lower_confidence_bound, 0.8, 1e-12);
+        assert_abs_close(proposal.objective_1_upper_confidence_bound, 3.4, 1e-12);
+        assert!(proposal.objective_1_upper_confidence_bound <= proposal.epsilon);
     }
 
     fn assert_abs_close(actual: f64, expected: f64, tolerance: f64) {
