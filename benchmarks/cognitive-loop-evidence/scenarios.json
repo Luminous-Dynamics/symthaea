@@ -965,7 +965,23 @@
         "gradual"
       ],
       "important_limit": "ABCD(X) and other feature-only methods cannot detect pure target-only changes without feature distribution change; do not use labels as hidden inputs.",
-      "status": "reference protocol declared; adapters and datasets are not yet implemented/pinned"
+      "status": "reference protocol declared; adapters and datasets are not yet implemented/pinned",
+      "method_families": [
+        "ADWIN",
+        "CUSUM",
+        "DDM",
+        "EDDM",
+        "EWMA",
+        "GMA",
+        "HDDMA",
+        "HDDMW",
+        "Page-Hinkley (PH)",
+        "RDDM",
+        "SEED",
+        "STEPD",
+        "ABCD (error stream and ABCD(X) feature stream)",
+        "STUDD+ADWIN"
+      ]
     }
   }
 }
