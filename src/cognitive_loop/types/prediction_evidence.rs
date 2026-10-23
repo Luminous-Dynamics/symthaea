@@ -97,6 +97,34 @@ impl<'de> Deserialize<'de> for PredictionErrorEvidence {
 }
 
 impl PredictionErrorEvidence {
+    /// Construct evidence from an explicit status and optional measurement.
+    ///
+    /// A Valid status without a finite value is downgraded to a non-usable
+    /// status. Invalid statuses always discard the numeric payload.
+    pub fn from_comparison(
+        status: PredictionEvidenceStatus,
+        value: Option<f32>,
+        prediction_cycle: Option<u64>,
+        observation_cycle: u64,
+    ) -> Self {
+        let (status, value) = match status {
+            PredictionEvidenceStatus::Valid => match value {
+                Some(value) if value.is_finite() => {
+                    (PredictionEvidenceStatus::Valid, Some(value))
+                }
+                Some(_) => (PredictionEvidenceStatus::NonFiniteInput, None),
+                None => (PredictionEvidenceStatus::SourceUnavailable, None),
+            },
+            invalid_status => (invalid_status, None),
+        };
+        Self {
+            status,
+            value,
+            prediction_cycle,
+            observation_cycle,
+        }
+    }
+
     /// Build valid evidence. Non-finite values are rejected rather than
     /// silently normalized to a sentinel.
     pub fn valid(
@@ -246,6 +274,29 @@ mod tests {
         assert_eq!(evidence.value_for_observation(5), Some(0.25));
         assert_eq!(evidence.value_for_observation(6), None);
         assert!(!evidence.is_usable_for(6));
+    }
+
+    #[test]
+    fn explicit_comparison_status_cannot_leak_invalid_numeric_payloads() {
+        for value in [Some(0.0), Some(1.0), Some(f32::NAN), Some(f32::INFINITY), None] {
+            let evidence = PredictionErrorEvidence::from_comparison(
+                PredictionEvidenceStatus::NoPriorPrediction,
+                value,
+                None,
+                7,
+            );
+            assert_eq!(evidence.status(), PredictionEvidenceStatus::NoPriorPrediction);
+            assert_eq!(evidence.value_for_observation(7), None);
+        }
+
+        let non_finite = PredictionErrorEvidence::from_comparison(
+            PredictionEvidenceStatus::Valid,
+            Some(f32::NAN),
+            None,
+            7,
+        );
+        assert_eq!(non_finite.status(), PredictionEvidenceStatus::NonFiniteInput);
+        assert_eq!(non_finite.value_for_observation(7), None);
     }
 
     #[test]
