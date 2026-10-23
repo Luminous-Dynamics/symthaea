@@ -156,9 +156,20 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
             && kdd_protocol.get("datasets_count").and_then(Value::as_u64) == Some(7),
         "KDD reference protocol must state 14 method families and seven datasets"
     );
-    for field in ["dataset_names_to_pin", "drift_types", "transitions"] {
-        nonempty_string_array(kdd_protocol, field, "kdd26_reference_protocol")?;
-    }
+    let dataset_names = nonempty_string_array(kdd_protocol, "dataset_names_to_pin", "kdd26_reference_protocol")?;
+    ensure!(
+        dataset_names.len() == 7 && dataset_names.iter().collect::<BTreeSet<_>>().len() == 7,
+        "KDD reference protocol must list seven unique datasets to pin"
+    );
+    let method_families = nonempty_string_array(kdd_protocol, "method_families", "kdd26_reference_protocol")?;
+    ensure!(
+        method_families.len() == 14 && method_families.iter().collect::<BTreeSet<_>>().len() == 14,
+        "KDD reference protocol must list 14 unique detector families"
+    );
+    let drift_types = nonempty_string_array(kdd_protocol, "drift_types", "kdd26_reference_protocol")?;
+    ensure!(drift_types.len() == 4, "KDD reference protocol must cover four drift types");
+    let transitions = nonempty_string_array(kdd_protocol, "transitions", "kdd26_reference_protocol")?;
+    ensure!(transitions.len() == 2, "KDD reference protocol must cover abrupt and gradual transitions");
     for field in ["monitored_classifier", "stream_protocol", "hyperparameter_protocol", "important_limit", "status"] {
         nonempty_string_field(kdd_protocol, field, "kdd26_reference_protocol")?;
     }
@@ -526,6 +537,7 @@ mod tests {
                     "detector_family_count": 14,
                     "datasets_count": 7,
                     "dataset_names_to_pin": ["Asfault", "Electricity", "Covertype", "GasSensorArray", "NOAA", "Posture", "Rialto"],
+                    "method_families": ["ADWIN", "CUSUM", "DDM", "EDDM", "EWMA", "GMA", "HDDMA", "HDDMW", "Page-Hinkley (PH)", "RDDM", "SEED", "STEPD", "ABCD (error stream and ABCD(X) feature stream)", "STUDD+ADWIN"],
                     "monitored_classifier": "Hoeffding Tree",
                     "stream_protocol": "Prequential test-then-train, per-instance observed correctness/error.",
                     "hyperparameter_protocol": "Leave one dataset out, tune on remaining datasets.",
@@ -674,6 +686,14 @@ mod tests {
         manifest["external_drift_detectors"][1]["id"] = json!("fixed-threshold");
         let error = validate_value(&manifest).unwrap_err().to_string();
         assert!(error.contains("duplicate external drift detector id"));
+    }
+
+    #[test]
+    fn rejects_duplicate_kdd_method_families() {
+        let mut manifest = valid_manifest();
+        manifest["drift_protocol"]["kdd26_reference_protocol"]["method_families"][1] = json!("ADWIN");
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("14 unique detector families"));
     }
 
     #[test]
