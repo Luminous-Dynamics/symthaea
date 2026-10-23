@@ -123,11 +123,11 @@ pub struct PrincipledSignals {
 }
 
 impl PrincipledSignals {
-    /// Create new signals with default (neutral) values
+    /// Create neutral signals before any comparison has been observed.
     pub fn new() -> Self {
         Self {
             prediction_error: 0.5,
-            prediction_error_valid: true,
+            prediction_error_valid: false,
             uncertainty: 0.5,
             coherence: 0.5,
             confidence: 0.5,
