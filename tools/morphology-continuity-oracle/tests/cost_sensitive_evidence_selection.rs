@@ -34,7 +34,8 @@ fn expected_brier_reduction(action: CandidateAction) -> f64 {
         .zip(action.outcomes)
     {
         *group_weights.entry(outcome).or_default() += weight;
-        *group_square_sums.entry(outcome).or_default() += u128::from(weight) * u128::from(weight);
+        *group_square_sums.entry(outcome).or_default() +=
+            u128::from(weight) * u128::from(weight);
         prior_square_sum += u128::from(weight) * u128::from(weight);
     }
 
@@ -43,7 +44,8 @@ fn expected_brier_reduction(action: CandidateAction) -> f64 {
     let expected_posterior_concentration: f64 = group_square_sums
         .iter()
         .map(|(outcome, square_sum)| {
-            *square_sum as f64 / (total * f64::from(*group_weights.get(outcome).expect("group exists") as u32))
+            let group_weight = *group_weights.get(outcome).expect("group exists") as u32;
+            *square_sum as f64 / (total * f64::from(group_weight))
         })
         .sum();
 
@@ -66,7 +68,8 @@ fn choose_action(actions: &[CandidateAction]) -> Option<CandidateAction> {
             None => true,
             Some((current, current_gain)) => {
                 gain_per_cost > current_gain + 1.0e-12
-                    || ((gain_per_cost - current_gain).abs() <= 1.0e-12 && action.id < current.id)
+                    || ((gain_per_cost - current_gain).abs() <= 1.0e-12
+                        && action.id < current.id)
             }
         };
         if replace {
