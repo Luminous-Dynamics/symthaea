@@ -297,7 +297,7 @@ impl AnytimeHarmMonitorV1 {
 
     pub fn to_tsv(&self) -> String {
         let mut out = format!(
-            "DVPC011\\t{}\\t{}\\t{}\\t{}\\t{}\\t{:.9}\\t{:.9}\\t{}\\t{}\\n",
+            "DVPC011\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{:.9}\\t{:.9}\\t{}\\t{:.9}\\n",
             self.status().label(),
             self.config.policy_id,
             digest_hex(&self.config.policy_digest),
@@ -307,7 +307,7 @@ impl AnytimeHarmMonitorV1 {
             self.config.family_wise_delta,
             self.config.maximum_harm_rate,
             self.groups.len(),
-            digest_hex(&self.config.policy_digest),
+            self.adjusted_delta,
         );
         for snapshot in self.group_snapshots() {
             out.push_str(&format!(
@@ -516,10 +516,13 @@ mod tests {
         for index in 0..150 {
             monitor.observe(event(index, "g1", false)).unwrap();
         }
-        for index in 150..299 {
+        for index in 150..160 {
             monitor.observe(event(index, "g2", false)).unwrap();
         }
         assert_eq!(monitor.status(), MonitorStatusV1::Monitoring);
+        for index in 160..299 {
+            monitor.observe(event(index, "g2", false)).unwrap();
+        }
         monitor.observe(event(299, "g2", false)).unwrap();
         assert_eq!(monitor.status(), MonitorStatusV1::Certified);
     }
