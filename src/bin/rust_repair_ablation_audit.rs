@@ -444,7 +444,10 @@ fn load_score_report(
     })?;
     let unresolved_path = canonical_root.join(relative_path);
     let path = fs::canonicalize(&unresolved_path).map_err(|error| {
-        format!("cannot resolve score report {}: {error}", unresolved_path.display())
+        format!(
+            "cannot resolve score report {}: {error}",
+            unresolved_path.display()
+        )
     })?;
     if !path.starts_with(&canonical_root) {
         return Err(format!(
@@ -559,8 +562,7 @@ fn load_score_report(
         expected_lockable.then(|| success_count as f64 / outcomes.len() as f64);
     let observed_pass_at_1 = report.get("pass_at_1").and_then(Value::as_f64);
     if observed_pass_at_1 != expected_pass_at_1
-        || (expected_pass_at_1.is_none()
-            && !report.get("pass_at_1").is_some_and(Value::is_null))
+        || (expected_pass_at_1.is_none() && !report.get("pass_at_1").is_some_and(Value::is_null))
     {
         return Err(format!(
             "score report {} has inconsistent pass_at_1 aggregate",
@@ -964,9 +966,9 @@ fn make_report(
         }
         _ => false,
     };
-    let noninferiority_satisfied =
-        cluster_bootstrap_ci95.is_some_and(|interval| interval.lower_percentage_points >= -1.5)
-            && unresolved_sensitivity_lower_percentage_points >= -1.5;
+    let noninferiority_satisfied = cluster_bootstrap_ci95
+        .is_some_and(|interval| interval.lower_percentage_points >= -1.5)
+        && unresolved_sensitivity_lower_percentage_points >= -1.5;
     let cost_efficiency_noninferiority_gate_met = cost_reduction_satisfied
         && noninferiority_satisfied
         && at_least_10_resolved_repositories
@@ -1468,14 +1470,16 @@ mod tests {
         report["success_count"] = serde_json::json!(0);
         let bytes = serde_json::to_vec(&report).unwrap();
         fs::write(temp.path().join("score.json"), &bytes).unwrap();
-        assert!(load_score_report(
-            temp.path(),
-            "score.json",
-            &sha256_bytes(&bytes),
-            &task_manifest
-        )
-        .unwrap_err()
-        .contains("success_count aggregate"));
+        assert!(
+            load_score_report(
+                temp.path(),
+                "score.json",
+                &sha256_bytes(&bytes),
+                &task_manifest
+            )
+            .unwrap_err()
+            .contains("success_count aggregate")
+        );
     }
 
     #[cfg(unix)]
@@ -1490,9 +1494,11 @@ mod tests {
         fs::write(&outside, b"{}").unwrap();
         symlink(&outside, reports.join("alias.json")).unwrap();
         let digest = sha256_bytes(b"{}");
-        assert!(load_score_report(&reports, "alias.json", &digest, &"a".repeat(64))
-            .unwrap_err()
-            .contains("escapes score-report directory"));
+        assert!(
+            load_score_report(&reports, "alias.json", &digest, &"a".repeat(64))
+                .unwrap_err()
+                .contains("escapes score-report directory")
+        );
     }
 
     #[test]
