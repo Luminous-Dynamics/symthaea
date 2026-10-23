@@ -54,7 +54,7 @@ Each comparison/policy result includes:
 - Paired group-balanced utility delta, CVaR95 delta and safety-violation delta versus `policy_id=all_cheap` in the same `comparison_id`.
 - Utility gap to a post-commit hindsight oracle when the policy stays within both resource budgets.
 
-All rows remain visible, including runs that exceed budget. A run that exceeds latency or energy budget is not a valid resource-constrained win. Reservation overruns are separately counted; the scorer does not clip their actual realized costs.
+All rows remain visible, including runs that exceed budget. A run that exceeds latency or energy budget, or violates any per-action resource reservation, is not a valid resource-constrained win and receives no utility-gap-to-oracle score. Reservation overruns are separately counted; the scorer does not clip their actual realized costs.
 
 ## Deliberate limits in v1
 
