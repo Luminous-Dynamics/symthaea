@@ -43,6 +43,7 @@ struct TaskRecordForDigest {
     runtime_evidence_sha256: String,
     container_image_id: String,
     network_mode: String,
+    workspace_clean: bool,
     container_ids: Vec<String>,
     fail_to_pass_count: usize,
     pass_to_pass_count: usize,
@@ -84,6 +85,10 @@ fn task_record_for_digest(value: &Value) -> Result<TaskRecordForDigest, String> 
         runtime_evidence_sha256: string("runtime_evidence_sha256")?,
         container_image_id: string("container_image_id")?,
         network_mode: string("network_mode")?,
+        workspace_clean: value
+            .get("workspace_clean")
+            .and_then(Value::as_bool)
+            .ok_or_else(|| "task manifest workspace_clean missing or invalid".to_string())?,
         container_ids,
         fail_to_pass_count: count("fail_to_pass_count")?,
         pass_to_pass_count: count("pass_to_pass_count")?,
@@ -134,6 +139,7 @@ struct TaskScore {
     container_image_id: Option<String>,
     required_test_count: usize,
     required_tests_passing: usize,
+    workspace_clean_exit_code: Option<i64>,
     network_mode_observed: Option<String>,
     repo_head_sha_observed: Option<String>,
     scored_test_exit_code: Option<i64>,
@@ -451,6 +457,9 @@ fn validate_locked_runtime_logs(
     if task.get("network_mode").and_then(Value::as_str) != Some("none") {
         errors.push("locked task manifest network_mode must be 'none'".to_string());
     }
+    if task.get("workspace_clean").and_then(Value::as_bool) != Some(true) {
+        errors.push("locked task manifest workspace_clean must be true".to_string());
+    }
     let expected_container_ids = task
         .get("container_ids")
         .and_then(Value::as_array)
@@ -463,6 +472,9 @@ fn validate_locked_runtime_logs(
     let baseline = evidence.get("baseline").unwrap_or(&Value::Null);
     if baseline.get("role").and_then(Value::as_str) != Some("baseline") {
         errors.push("runtime sidecar baseline role is invalid".to_string());
+    }
+    if !workspace_is_clean(baseline) {
+        errors.push("baseline worktree was dirty or cleanliness inspection failed".to_string());
     }
     if !repo_head_matches(
         expected_repo_head,
@@ -570,6 +582,11 @@ fn validate_locked_runtime_logs(
             }
         }
 
+        if !workspace_is_clean(run) {
+            errors.push(format!(
+                "gold runtime run {index} worktree was dirty or cleanliness inspection failed"
+            ));
+        }
         if !repo_head_matches(
             expected_repo_head,
             run.get("repo_head_sha").and_then(Value::as_str),
@@ -767,6 +784,10 @@ fn repo_head_matches(
         && observed_repo_head.is_some_and(|observed| observed.eq_ignore_ascii_case(expected_base_commit))
 }
 
+fn workspace_is_clean(run: &Value) -> bool {
+    run.get("workspace_clean_exit_code").and_then(Value::as_i64) == Some(0)
+}
+
 fn canonical_id_digest(ids: &BTreeSet<String>) -> String {
     let mut canonical = ids.iter().cloned().collect::<Vec<_>>().join("\n");
     if !canonical.is_empty() {
@@ -871,6 +892,7 @@ fn audit_scored_task(
     let mut scored_log_sha = None;
     let mut evaluation_evidence_sha = None;
     let mut image_id_observed = None;
+    let mut workspace_clean_exit_code = None;
     let mut network_mode_observed = None;
     let mut repo_head_sha_observed = None;
 
@@ -890,6 +912,7 @@ fn audit_scored_task(
                     repo_head_sha_observed: None,
                     required_test_count: 0,
                     required_tests_passing: 0,
+                    workspace_clean_exit_code: None,
                     scored_test_exit_code: None,
                     non_required_failure_count: 0,
                 };
@@ -909,6 +932,7 @@ fn audit_scored_task(
             repo_head_sha_observed: None,
             required_test_count: required_tests.len(),
             required_tests_passing: 0,
+            workspace_clean_exit_code: None,
             scored_test_exit_code: None,
             non_required_failure_count: 0,
         };
@@ -933,6 +957,7 @@ fn audit_scored_task(
                 repo_head_sha_observed: None,
                 required_test_count: required_tests.len(),
                 required_tests_passing: 0,
+                workspace_clean_exit_code: None,
                 scored_test_exit_code: None,
                 non_required_failure_count: 0,
             };
@@ -954,12 +979,19 @@ fn audit_scored_task(
                 repo_head_sha_observed: None,
                 required_test_count: required_tests.len(),
                 required_tests_passing: 0,
+                workspace_clean_exit_code: None,
                 scored_test_exit_code: None,
                 non_required_failure_count: 0,
             };
         }
     };
 
+    workspace_clean_exit_code = evidence
+        .get("workspace_clean_exit_code")
+        .and_then(Value::as_i64);
+    if workspace_clean_exit_code != Some(0) {
+        reasons.push("scored worktree was dirty or cleanliness inspection failed".to_string());
+    }
     network_mode_observed = evidence
         .get("container_identity")
         .and_then(|identity| identity.get("network_mode"))
@@ -1550,6 +1582,20 @@ mod tests {
         assert_eq!(headline_pass_at_1(10, 7, 2, 1), None);
         assert_eq!(headline_pass_at_1(10, 7, 3, 0), Some(0.7));
         assert_eq!(headline_pass_at_1(0, 0, 0, 0), None);
+    }
+
+    #[test]
+    fn workspace_cleanliness_is_fail_closed() {
+        assert!(workspace_is_clean(&serde_json::json!({
+            "workspace_clean_exit_code": 0
+        })));
+        assert!(!workspace_is_clean(&serde_json::json!({
+            "workspace_clean_exit_code": 1
+        })));
+        assert!(!workspace_is_clean(&serde_json::json!({})));
+        assert!(!workspace_is_clean(&serde_json::json!({
+            "workspace_clean_exit_code": null
+        })));
     }
 
     #[test]
