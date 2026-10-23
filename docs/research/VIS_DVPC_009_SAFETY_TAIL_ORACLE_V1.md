@@ -55,9 +55,10 @@ The twelve authored unit tests cover:
 6. row-order-invariant selection and deterministic receipts;
 7. fail-closed exact-search cap;
 8. duplicate IDs and non-finite utility rejection;
-9. aggregate resource and safety-count overflow;
-10. invalid identifiers and invalid constraints;
-11. receipt fields, constraint values and enumerated-subset count.
+9. aggregate resource-cost overflow;
+10. aggregate safety-count overflow;
+11. invalid identifiers and invalid constraints;
+12. receipt fields, constraint values and enumerated-subset count.
 
 Synthetic tests validate selector mechanics only; they do not establish safe perception, calibrated risk, a real-trace gain, or SOTA.
 
