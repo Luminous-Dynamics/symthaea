@@ -1246,6 +1246,9 @@ fn zdt_reference_front(
 mod tests {
     use super::*;
 
+    // Selection-shift Monte Carlo stress benchmark, kept separate for readability.
+    mod selection_shift_monte_carlo;
+
     fn feasible(trial_id: u64, first: f64, second: f64, cost_units: u64) -> ParetoTrial {
         ParetoTrial {
             trial_id,
