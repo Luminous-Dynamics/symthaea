@@ -94,7 +94,12 @@ pub struct CycleSnapshot {
 
     /// Prediction error from last cycle (cosine distance between predicted
     /// and actual CfC state). Higher = more surprise.
+    /// Check `prediction_error_valid` before interpreting the numeric error.
     pub prediction_error: f32,
+
+    /// Whether prediction_error is a genuine, comparable finite observation.
+    /// Stored as u8 rather than bool to preserve repr(C) / WASM-friendly layout.
+    pub prediction_error_valid: u8,
 
     /// Conversation coherence (0.0–1.0). Smoothed EMA of semantic similarity
     /// between consecutive inputs.
@@ -199,6 +204,7 @@ impl Default for CycleSnapshot {
             prediction_confidence: 0.5,
             fep_lr_boost: 1.0,
             prediction_error: 0.0,
+            prediction_error_valid: 0,
             coherence: 0.5,
             unified_psi: 0.0,
             phi_attention_weight: 1.0,
@@ -707,6 +713,7 @@ impl CycleSnapshot {
         prediction_confidence: f64,
         fep_lr_boost: f64,
         prediction_error: f32,
+        prediction_error_valid: bool,
         coherence: f32,
         unified_psi: f64,
         phi_attention_weight: f32,
@@ -741,6 +748,7 @@ impl CycleSnapshot {
             prediction_confidence,
             fep_lr_boost,
             prediction_error,
+            prediction_error_valid: u8::from(prediction_error_valid),
             coherence,
             unified_psi,
             phi_attention_weight,
