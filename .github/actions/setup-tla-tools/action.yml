@@ -1,0 +1,65 @@
+name: Set up pinned TLA+ tools
+description: Download an immutable TLA+ tools build, validate its SHA-256, and expose its path.
+inputs:
+  version:
+    description: Immutable build tag for the TLA+ tools JAR
+    required: false
+    default: tla2tools-2026.08.11.125311
+  sha256:
+    description: Expected lowercase SHA-256 of the exact JAR bytes
+    required: false
+    default: ab323b79802aedc3203b3f9af37c6aca3ed43f4e0225b36f2aa77b26de46c05f
+outputs:
+  tool-path:
+    description: Absolute path to the verified TLA+ tools JAR
+    value: \${{ steps.install.outputs.tool-path }}
+  version:
+    description: Verified TLA+ build identifier
+    value: \${{ steps.install.outputs.version }}
+  sha256:
+    description: Verified SHA-256
+    value: \${{ steps.install.outputs.sha256 }}
+runs:
+  using: composite
+  steps:
+    - name: Set up Java 21
+      uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      with:
+        distribution: temurin
+        java-version: "21"
+    - name: Download and verify immutable JAR
+      id: install
+      shell: bash
+      env:
+        TLA_VERSION: \${{ inputs.version }}
+        TLA_SHA256: \${{ inputs.sha256 }}
+      run: |
+        set -euo pipefail
+        if [[ ! "$TLA_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+          echo "::error::TLA SHA-256 must be 64 lowercase hexadecimal characters"
+          exit 1
+        fi
+        tool_jar="$RUNNER_TEMP/$TLA_VERSION.jar"
+        url="https://github.com/zactionsz/tla-tools/releases/download/$TLA_VERSION/tla2tools.jar"
+        curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
+          "$url" --output "$tool_jar"
+        actual_sha256="$(sha256sum "$tool_jar" | cut -d' ' -f1)"
+        if [[ "$actual_sha256" != "$TLA_SHA256" ]]; then
+          echo "::error::TLA+ tools SHA-256 mismatch: expected $TLA_SHA256, got $actual_sha256"
+          rm -f "$tool_jar"
+          exit 1
+        fi
+        if ! jar tf "$tool_jar" >/dev/null; then
+          echo "::error::Verified TLA+ tools artifact is not a readable JAR"
+          rm -f "$tool_jar"
+          exit 1
+        fi
+        {
+          printf 'tool-path=%s\n' "$tool_jar"
+          printf 'version=%s\n' "$TLA_VERSION"
+          printf 'sha256=%s\n' "$actual_sha256"
+        } >> "$GITHUB_OUTPUT"
+        {
+          printf 'TLA_VERSION=%s\n' "$TLA_VERSION"
+          printf 'TLA_SHA256=%s\n' "$actual_sha256"
+        } | tee "$RUNNER_TEMP/tla-tools-identity.txt"
