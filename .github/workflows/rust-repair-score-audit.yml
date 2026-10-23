@@ -5,9 +5,11 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "src/bin/rust_repair_score_audit.rs"
+      - "tools/rust-repair-benchmark-harness/**"
       - "src/bin/rust_repair_manifest.rs"
       - "Cargo.toml"
       - "docs/research/patches/swe-bench-live-validation-evidence.patch"
+      - "docs/research/patches/repolaunch-network-isolation.patch"
       - ".github/workflows/rust-repair-score-audit.yml"
   workflow_dispatch:
 
@@ -35,20 +37,32 @@ jobs:
           repository: microsoft/SWE-bench-Live
           ref: 62d02936a0726fbf4597b05bd07b09fb99eddae6
           path: benchmark-source
-      - name: Apply and syntax-check the pinned runtime-evidence overlay
+      - name: Apply the pinned SWE-bench-Live evidence overlay
         run: |
           git -C benchmark-source apply --check "$GITHUB_WORKSPACE/docs/research/patches/swe-bench-live-validation-evidence.patch"
           git -C benchmark-source apply "$GITHUB_WORKSPACE/docs/research/patches/swe-bench-live-validation-evidence.patch"
-          python3 -m py_compile benchmark-source/evaluation/validation.py benchmark-source/evaluation/evaluation.py
+      - name: Initialize and verify the pinned RepoLaunch submodule
+        run: |
+          git -C benchmark-source submodule update --init launch
+          test "$(git -C benchmark-source/launch rev-parse HEAD)" = "c4b623d930f3728e5338664bb634021b98492cbf"
+      - name: Enforce offline test containers
+        run: |
+          git -C benchmark-source/launch apply --check "$GITHUB_WORKSPACE/docs/research/patches/repolaunch-network-isolation.patch"
+          git -C benchmark-source/launch apply "$GITHUB_WORKSPACE/docs/research/patches/repolaunch-network-isolation.patch"
+          python3 -m py_compile benchmark-source/evaluation/validation.py benchmark-source/evaluation/evaluation.py benchmark-source/launch/launch/core/platforms/linux.py
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: clippy, rustfmt
       - name: Check Rust formatting
-        run: rustfmt --edition 2024 --check src/bin/rust_repair_score_audit.rs
+        run: rustfmt --edition 2024 --check src/bin/rust_repair_manifest.rs src/bin/rust_repair_score_audit.rs
+      - name: Verify committed standalone lockfile
+        run: test -s tools/rust-repair-benchmark-harness/Cargo.lock
       - name: Test task-manifest auditor
-        run: cargo test --locked --bin rust-repair-manifest --features rust-repair-manifest
+        run: cargo test --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-manifest
       - name: Test scored-run auditor
-        run: cargo test --locked --bin rust-repair-score-audit --features rust-repair-manifest
-      - name: Run strict Clippy on scored-run auditor
-        run: cargo clippy --locked --bin rust-repair-score-audit --features rust-repair-manifest -- -D warnings
+        run: cargo test --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-score-audit
+      - name: Run strict Clippy on audit binaries
+        run: |
+          cargo clippy --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-manifest -- -D warnings
+          cargo clippy --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-score-audit -- -D warnings

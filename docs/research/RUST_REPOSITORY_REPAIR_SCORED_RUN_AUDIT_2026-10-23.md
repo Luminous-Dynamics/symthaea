@@ -15,6 +15,18 @@ Before running an agent, pin the SHA-256 of the locked task-manifest file in the
 
 The prediction input accepts the standard SWE-bench JSONL record shape (`instance_id`, `model_patch`), a JSON array of those records, or an ID-keyed JSON object. JSONL/array records must have unique `instance_id` values. A missing/malformed `model_patch` becomes an unresolved attempt; a duplicate or unidentifiable record is a protocol error. The exact input file SHA-256 is included in the output report. A task absent from the prediction map, or with no string patch payload, is an **unresolved assigned attempt**, not a dropped denominator row. IDs outside the locked manifest are rejected as a protocol violation.
 
+The strict protocol is Linux-only. The pinned RepoLaunch overlay modifies its Linux runtime; each receipt therefore includes the runtime object's platform label, and the task/scored auditors require exactly `linux`. A Windows, Android, missing, or otherwise different runtime platform is unresolved and cannot enter headline pass@1. This platform label is runtime-reported telemetry rather than a hardware attestation, so the pinned runtime source and Docker evidence remain part of the audit package.
+
+
+
+Task/gold and scored-run receipts require the Docker-inspected `HostConfig.NetworkMode` to equal `none` for the four oracle-validation containers and the scored prediction container. The pinned RepoLaunch submodule patch is applied to commit `c4b623d930f3728e5338664bb634021b98492cbf` before evaluation. Receipts store the observed mode and the Rust auditors reject missing or network-enabled modes.
+
+The pinned RepoLaunch runtime also sanitizes Git metadata before returning a Linux container to a caller: it rejects a dirty non-ignored worktree, preserves only the currently checked-out branch ref (when one exists), expires reflogs, prunes unreachable objects, removes custom hook configuration and hook files, removes graft metadata, deletes `FETCH_HEAD`/`ORIG_HEAD` and merge/rebase/bisect pseudo-ref or replay state, clears the rerere cache, and verifies that no unexpected refs or unreachable objects remain. The runtime fails closed if sanitation fails, and the inspected result is recorded as `git_metadata_sanitization_exit_code=0` in the container identity evidence. This means the cleanup occurs before an agent or grader receives the container, rather than only after an agent has returned a patch. Ignored dependency caches are retained to avoid making tasks un-runnable; they remain a residual leakage surface requiring image-level review.
+
+A second precondition is that each container starts with a clean Git working tree and the exact task `base_commit`. The runtime overlay records the exit code from `git -c core.excludesFile=/dev/null status --porcelain --untracked-files=all` plus the observed `git rev-parse HEAD`; the task auditor validates these for the baseline and every gold run, while the scored auditor validates them again for the model patch. A dirty worktree or mismatched checkout is unresolved, not an agent failure or a dropped row. This is a necessary hygiene check, not proof that ignored files, extra refs, hooks or caches contain no leakage; sanitize and independently inspect task images.
+
+This is a control on the repository/test container's network namespace, not proof that the model-serving process or every external tool is offline. The agent harness must separately disable browser/search and task-specific retrieval. Dependencies must be preloaded into the immutable image or a preregistered local cache; tasks requiring live egress are not silently granted a looser policy.
+
 ## Scoring contract
 
 For every task in the locked manifest, the tool verifies:
@@ -78,6 +90,6 @@ A claim of "better than state of the art" requires the same task split, protocol
 
 ## Evidence boundary
 
-The implementation has 13 authored Rust unit tests. This authoring environment has no `rustc`, `cargo`, or `rustfmt`; those tests and the formatter/Clippy checks have not been executed locally. The dedicated GitHub Actions workflow is configured to check the pinned upstream overlay, task auditor and scored-run auditor, but queued/in-progress runs are not passes.
+The task-manifest auditor has 22 authored Rust unit tests and the scored-run auditor has 20 authored Rust unit tests. This authoring environment has no `rustc`, `cargo`, or `rustfmt`; those tests and the formatter/Clippy checks have not been executed locally. The dedicated GitHub Actions workflow is configured to check the pinned upstream overlay, task auditor and scored-run auditor, but queued/in-progress runs are not passes.
 
 Docker API IDs, command exit codes and hashes are useful execution evidence, not cryptographic host attestation. The tool does not run the containers itself, prove that a trusted runner generated the sidecars, or establish a state-of-the-art result. Before publishing a result, an independent party should reproduce the environment and grading from the preserved artifacts.

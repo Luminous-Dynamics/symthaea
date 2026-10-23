@@ -1,0 +1,90 @@
+diff --git a/launch/core/platforms/linux.py b/launch/core/platforms/linux.py
+--- a/launch/core/platforms/linux.py
++++ b/launch/core/platforms/linux.py
+@@ -245,10 +245,11 @@
+         shell_command = "/bin/bash"
+         working_dir = "/testbed"
+         run_kwargs = {
+             "cpu_quota": int(CPU_CORES * 100000),
+             "mem_limit": MEM_LIMIT,
++            "network_mode": "none",
+         }
+ 
+         container = client.containers.run(
+             image_name,
+             name=container_name,
+@@ -269,13 +270,73 @@
+             },
+             **run_kwargs,
+         )
+ 
+         session = cls(
+-                    container, 
++                    container,
+                     command_timeout=command_timeout,
+                 )
++        # A task image may have the correct HEAD but still expose the fixing
++        # commit through a remote ref, stash, reflog, or executable Git hook.
++        # Fail closed if the visible worktree is already dirty, then remove all
++        # refs except the currently checked-out branch, expire reflogs, prune
++        # unreachable objects, and clear hooks before any agent receives the
++        # container. Keep ignored dependency caches intact.
++        sanitize_command = """(
++set -eu
++test -d .git
++test -d .git/objects
++test ! -e .git/commondir
++test ! -e .git/objects/info/alternates
++: > .git/info/exclude
++git config --local core.hooksPath /dev/null
++test -z "$(git -c core.excludesFile=/dev/null status --porcelain --untracked-files=all)"
++git config --local core.hooksPath /dev/null
++rm -rf .git/hooks
++mkdir -p .git/hooks
++rm -f .git/info/grafts
++# FETCH_HEAD/ORIG_HEAD and merge/rebase/bisect state are pseudo-refs or
++# metadata files that ordinary ref enumeration and reflog pruning do not cover.
++rm -f .git/FETCH_HEAD .git/ORIG_HEAD .git/MERGE_HEAD .git/CHERRY_PICK_HEAD \
++    .git/REVERT_HEAD .git/REBASE_HEAD .git/AUTO_MERGE .git/BISECT_*
++rm -rf .git/sequencer .git/rebase-apply .git/rebase-merge .git/rr-cache
++head_ref="$(git symbolic-ref -q HEAD || true)"
++git for-each-ref --format='%(refname)' | while IFS= read -r ref; do
++    [ "$ref" = "$head_ref" ] || git update-ref -d "$ref"
++done
++git reflog expire --expire=now --expire-unreachable=now --all
++git gc --prune=now
++remaining_ref_count="$(git for-each-ref --format='%(refname)' | wc -l)"
++if [ -n "$head_ref" ]; then
++    [ "$remaining_ref_count" -eq 1 ]
++else
++    [ "$remaining_ref_count" -eq 0 ]
++fi
++test -z "$(git stash list)"
++git fsck --no-reflogs --unreachable >/tmp/repolaunch-fsck.txt 2>&1
++if grep -v '^notice:' /tmp/repolaunch-fsck.txt; then
++    rm -f /tmp/repolaunch-fsck.txt
++    exit 86
++fi
++rm -f /tmp/repolaunch-fsck.txt
++test -z "$(git -c core.excludesFile=/dev/null status --porcelain --untracked-files=all)"
++)"""
++        sanitize_result = session.send_command(sanitize_command)
++        sanitize_code = getattr(
++            getattr(sanitize_result, "metadata", None), "exit_code", None
++        )
++        session.git_metadata_sanitization_exit_code = (
++            int(sanitize_code) if sanitize_code is not None else -1
++        )
++        if session.git_metadata_sanitization_exit_code != 0:
++            session.container.stop()
++            session.container.remove(force=True)
++            raise RuntimeError(
++                "Git metadata sanitization failed for "
++                f"{container_name}: exit "
++                f"{session.git_metadata_sanitization_exit_code}"
++            )
+ 
+         return session
+ 
+     @classmethod
+     def start_runtime_from_launch_image(

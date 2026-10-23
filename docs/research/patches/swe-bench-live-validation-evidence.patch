@@ -1,7 +1,8 @@
 diff --git a/evaluation/validation.py b/evaluation/validation.py
 --- a/evaluation/validation.py
 +++ b/evaluation/validation.py
-@@ -2,6 +2,7 @@
+@@ -1,15 +1,70 @@
+ import sys, os
  sys.path.insert(0, os.path.join(os.getcwd(), "launch"))
  from launch.core.runtime import SetupRuntime
  from launch.scripts.parser import run_parser
@@ -9,7 +10,7 @@ diff --git a/evaluation/validation.py b/evaluation/validation.py
  import json
  from typing import Literal, TypedDict
  from fire import Fire
-@@ -9,6 +10,41 @@
+ from concurrent.futures import ThreadPoolExecutor, as_completed
  
  TIMEOUT = 90*60
  
@@ -38,6 +39,11 @@ diff --git a/evaluation/validation.py b/evaluation/validation.py
 +            "container_id": getattr(docker_container, "id", None) or attrs.get("Id"),
 +            "configured_image": (attrs.get("Config") or {}).get("Image"),
 +            "container_image_id": attrs.get("Image"),
++            "runtime_platform": getattr(runtime, "platform", None),
++            "network_mode": (attrs.get("HostConfig") or {}).get("NetworkMode"),
++            "git_metadata_sanitization_exit_code": getattr(
++                runtime, "git_metadata_sanitization_exit_code", None
++            ),
 +            "repo_digests": image_attrs.get("RepoDigests") or [],
 +        }
 +    except Exception as error:
@@ -48,14 +54,32 @@ diff --git a/evaluation/validation.py b/evaluation/validation.py
 +    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 +
 +
++def _repo_head_sha(result):
++    """Extract the checked-out Git HEAD from a completed runtime command."""
++    if result is None:
++        return None
++    output = getattr(result, "output", "")
++    for line in reversed(str(output).splitlines()):
++        candidate = line.strip()
++        if len(candidate) in (40, 64) and all(
++            char in "0123456789abcdefABCDEF" for char in candidate
++        ):
++            return candidate.lower()
++    return None
++
++
  class ExecutionResult(TypedDict):
      instance_id: str
      pre_patch_status: dict[str, Literal['pass', 'fail', 'skip']]
-@@ -47,30 +83,58 @@
+     post_patch_status: dict[str, Literal['pass', 'fail', 'skip']]
+@@ -46,32 +101,70 @@
+                     platform: Literal["windows", "linux"],
                      output_dir: str,
                      ) -> ValidationResult:
      container: SetupRuntime = SetupRuntime.from_launch_image(image, instance_id, platform, command_timeout=TIMEOUT)
 -    container.apply_patch(test_patch, verbose=True)
++    baseline_workspace_result = container.send_command('test -z "$(git -c core.excludesFile=/dev/null status --porcelain --untracked-files=all)"')
++    baseline_repo_head_result = container.send_command("git rev-parse HEAD")
 +    baseline_test_patch_applied = container.apply_patch(test_patch, verbose=True)
      # Remember to rebuild after modifications to source codes !!!
 -    container.send_command(rebuild_cmd)
@@ -74,6 +98,9 @@ diff --git a/evaluation/validation.py b/evaluation/validation.py
 +        "rebuild_exit_code": _exit_code(baseline_rebuild_result),
 +        "test_exit_code": _exit_code(baseline_test_result),
 +        "print_exit_code": _exit_code(baseline_print_result),
++        "workspace_clean_exit_code": _exit_code(baseline_workspace_result),
++        "repo_head_exit_code": _exit_code(baseline_repo_head_result),
++        "repo_head_sha": _repo_head_sha(baseline_repo_head_result),
 +        "container_identity": _runtime_identity(container),
 +        "log_sha256": _sha256_text(pre_patch_log),
 +        "parsed_status": pre_patch_status,
@@ -93,6 +120,8 @@ diff --git a/evaluation/validation.py b/evaluation/validation.py
 -        container.send_command(rebuild_cmd)
 -        container.send_command(test_cmd)
 -        post_patch_log: str = container.send_command(print_cmd).output
++        workspace_result = container.send_command('test -z "$(git -c core.excludesFile=/dev/null status --porcelain --untracked-files=all)"')
++        repo_head_result = container.send_command("git rev-parse HEAD")
 +        test_patch_applied = container.apply_patch(test_patch, verbose=True)
 +        solution_patch_applied = container.apply_patch(solution_patch, verbose=True)
 +        rebuild_result = container.send_command(rebuild_cmd)
@@ -113,6 +142,9 @@ diff --git a/evaluation/validation.py b/evaluation/validation.py
 +            "rebuild_exit_code": _exit_code(rebuild_result),
 +            "test_exit_code": _exit_code(test_result),
 +            "print_exit_code": _exit_code(print_result),
++            "workspace_clean_exit_code": _exit_code(workspace_result),
++            "repo_head_exit_code": _exit_code(repo_head_result),
++            "repo_head_sha": _repo_head_sha(repo_head_result),
 +            "container_identity": _runtime_identity(container),
 +            "log_sha256": _sha256_text(post_patch_log),
 +            "parsed_status": parsed_status,
@@ -120,7 +152,9 @@ diff --git a/evaluation/validation.py b/evaluation/validation.py
          container.cleanup()
          del container
      all_tests = set(post_patch_status_under_inspect[0].keys()) | set(post_patch_status_under_inspect[1].keys()) | set(post_patch_status_under_inspect[2].keys())
-@@ -102,6 +166,15 @@
+     for test in all_tests:
+@@ -101,8 +194,17 @@
+     if len(res["FAIL_TO_PASS"]) > 0:
          print("Find one valid instance:", instance_id, flush=True)
      with open(os.path.join(output_dir, "status.json"), "w", encoding="utf-8") as f:
          json.dump(res, f, indent = True)
@@ -136,11 +170,13 @@ diff --git a/evaluation/validation.py b/evaluation/validation.py
      return res
  
  def run_instance(instance: dict[str, str],
+                     platform: Literal["windows", "linux"],
 
 diff --git a/evaluation/evaluation.py b/evaluation/evaluation.py
 --- a/evaluation/evaluation.py
 +++ b/evaluation/evaluation.py
-@@ -3,6 +3,7 @@
+@@ -2,8 +2,9 @@
+ sys.path.insert(0, os.path.join(os.getcwd(), "launch"))
  from launch.core.runtime import SetupRuntime
  from launch.scripts.parser import run_parser
  import json
@@ -148,7 +184,9 @@ diff --git a/evaluation/evaluation.py b/evaluation/evaluation.py
  import argparse
  import traceback
  import re
-@@ -14,6 +15,36 @@
+ from typing import Literal, TypedDict
+@@ -13,8 +14,57 @@
+ 
  TIMEOUT = 150*60
  
  
@@ -176,16 +214,37 @@ diff --git a/evaluation/evaluation.py b/evaluation/evaluation.py
 +            "container_id": getattr(docker_container, "id", None) or attrs.get("Id"),
 +            "configured_image": (attrs.get("Config") or {}).get("Image"),
 +            "container_image_id": attrs.get("Image"),
++            "runtime_platform": getattr(runtime, "platform", None),
++            "network_mode": (attrs.get("HostConfig") or {}).get("NetworkMode"),
++            "git_metadata_sanitization_exit_code": getattr(
++                runtime, "git_metadata_sanitization_exit_code", None
++            ),
 +            "repo_digests": image_attrs.get("RepoDigests") or [],
 +        }
 +    except Exception as error:
 +        return {"capture_error": f"{type(error).__name__}: {error}"}
 +
 +
++def _runtime_evidence_repo_head_sha(result):
++    """Extract the checked-out Git HEAD from a completed runtime command."""
++    if result is None:
++        return None
++    output = getattr(result, "output", "")
++    for line in reversed(str(output).splitlines()):
++        candidate = line.strip()
++        if len(candidate) in (40, 64) and all(
++            char in "0123456789abcdefABCDEF" for char in candidate
++        ):
++            return candidate.lower()
++    return None
++
++
  def normalize_month(month: str) -> str:
      if not re.fullmatch(r"\d{4}-\d{2}", month):
          raise ValueError(f"Invalid month format: {month}. Expected YYYY-MM.")
-@@ -99,31 +130,33 @@
+     return month
+@@ -98,43 +148,69 @@
+         container.apply_patch(solution_patch, verbose=True)
          container.send_command(r"cd C:\testbed")
      return
  
@@ -209,6 +268,8 @@ diff --git a/evaluation/evaluation.py b/evaluation/evaluation.py
      container: SetupRuntime = SetupRuntime.from_launch_image(image, instance_id, platform, command_timeout=TIMEOUT)
 -    container.apply_patch(test_patch)
 -    container.apply_patch(solution_patch, verbose=True)
++    workspace_result = container.send_command('test -z "$(git -c core.excludesFile=/dev/null status --porcelain --untracked-files=all)"')
++    repo_head_result = container.send_command("git rev-parse HEAD")
 +    test_patch_applied = container.apply_patch(test_patch)
 +    prediction_patch_applied = container.apply_patch(solution_patch, verbose=True)
      # Remember to rebuild after modifications to source codes !!!
@@ -229,7 +290,7 @@ diff --git a/evaluation/evaluation.py b/evaluation/evaluation.py
      with open(os.path.join(output_dir, "post_patch_log.txt"), "w", encoding="utf-8") as f:
          f.write(post_patch_log)
      if parser.lower().strip() == "pytest":
-@@ -131,9 +164,28 @@
+         # for backward compatibility with SWE-bench-Live/SWE-bench-Live (Python)
          post_patch_status: dict[str, Literal['pass', 'fail', 'skip']] = default_pytest_parser(post_patch_log)
      else:
          post_patch_status: dict[str, Literal['pass', 'fail', 'skip']] = run_parser(parser, post_patch_log)
@@ -244,6 +305,9 @@ diff --git a/evaluation/evaluation.py b/evaluation/evaluation.py
 +        "image_reference": image,
 +        "test_patch_applied": test_patch_applied,
 +        "prediction_patch_applied": prediction_patch_applied,
++        "workspace_clean_exit_code": _runtime_evidence_exit_code(workspace_result),
++        "repo_head_exit_code": _runtime_evidence_exit_code(repo_head_result),
++        "repo_head_sha": _runtime_evidence_repo_head_sha(repo_head_result),
 +        "rebuild_exit_code": _runtime_evidence_exit_code(rebuild_result),
 +        "test_exit_code": _runtime_evidence_exit_code(test_result),
 +        "print_exit_code": _runtime_evidence_exit_code(print_result),
@@ -258,3 +322,4 @@ diff --git a/evaluation/evaluation.py b/evaluation/evaluation.py
      return post_patch_status
  
  def run_instance(
+                     instance: dict,
