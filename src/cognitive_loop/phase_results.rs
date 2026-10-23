@@ -418,7 +418,10 @@ pub(super) struct FbReasoning {
     pub(super) epistemic_conflict_count: usize,
     pub(super) epistemic_gate_confidence: f32,
     pub(super) epistemic_gate_approved: bool,
+    /// Heuristic signal; not a qualified probability of answer correctness.
     pub(super) meta_reasoning_confidence: f64,
+    /// Historical LR effect retained as telemetry only; it is not applied to learning.
+    pub(super) meta_reasoning_counterfactual_lr_boost: f32,
     pub(super) meta_reasoning_insights: usize,
     pub(super) code_primitives_selected: usize,
 }

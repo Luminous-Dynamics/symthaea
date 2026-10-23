@@ -13,6 +13,19 @@ use std::time::Instant;
 
 use super::CognitiveLoopService;
 
+const META_REASONING_LR_BOOST_THRESHOLD: f64 = 0.7;
+const META_REASONING_LR_BOOST_SCALE: f64 = 0.1;
+
+/// Reconstructs the historical learning-rate delta for telemetry only.
+/// This function is intentionally pure and must not mutate learning state.
+fn counterfactual_meta_reasoning_lr_boost(confidence: f64) -> f32 {
+    if confidence > META_REASONING_LR_BOOST_THRESHOLD {
+        ((confidence - META_REASONING_LR_BOOST_THRESHOLD) * META_REASONING_LR_BOOST_SCALE) as f32
+    } else {
+        0.0
+    }
+}
+
 /// Values computed by the advanced subsystems phase.
 pub(crate) struct SubsystemMetrics {
     pub hierarchical_ltc_phi: f32,
@@ -32,7 +45,11 @@ pub(crate) struct SubsystemMetrics {
     pub epistemic_gate_approved: bool,
     pub primitive_validation_phi_gain: f64,
     pub primitive_validation_p_value: f64,
+    /// Heuristic meta-confidence is measurement-only until RQ-006 qualification.
     pub meta_reasoning_confidence: f64,
+    /// Counterfactual learning-rate boost the legacy threshold would have applied.
+    /// Recorded for offline qualification; never applied to live learning.
+    pub meta_reasoning_counterfactual_lr_boost: f32,
     pub meta_reasoning_insights: usize,
     pub code_primitives_selected: usize,
     pub empathic_compassion: f64,
@@ -635,14 +652,12 @@ impl CognitiveLoopService {
         };
         module_timings.meta_cognitive_reasoning = _t.elapsed().as_micros() as u64;
 
-        // FEEDBACK: High meta-cognitive confidence boosts learning rate
-        // The MetaCognitiveReasoner path is fully deterministic (ContextAwareOptimizer
-        // uses weighted selection, not RNG). Safe for genesis determinism.
-        // Science: Nelson & Narens (1990) — monitoring-control loop
-        if meta_reasoning_confidence > 0.7 {
-            let meta_boost = (meta_reasoning_confidence - 0.7) * 0.1;
-            self.adjust_lr("meta_reasoning", meta_boost as f32);
-        }
+        // RQ-006H: heuristic meta-confidence remains MeasurementOnly.
+        // Preserve the boost the historical rule would have applied so a held-out,
+        // matched intervention can evaluate it offline. Do not grant this signal
+        // live learning-rate authority until prospective calibration/utility is qualified.
+        let meta_reasoning_counterfactual_lr_boost =
+            counterfactual_meta_reasoning_lr_boost(meta_reasoning_confidence);
 
         // ═══════════════════════════════════════════════════════════════════════
         // CODE PRIMITIVE ROUTER: Consciousness-aware code reasoning
@@ -784,6 +799,7 @@ impl CognitiveLoopService {
             primitive_validation_phi_gain,
             primitive_validation_p_value,
             meta_reasoning_confidence,
+            meta_reasoning_counterfactual_lr_boost,
             meta_reasoning_insights,
             code_primitives_selected,
             empathic_compassion,
@@ -827,6 +843,17 @@ mod tests {
             #[cfg(feature = "semantic-encoder")]
             semantic_embedding: None,
         }
+    }
+
+    #[test]
+    fn heuristic_meta_confidence_boost_is_recorded_but_not_authorized_here() {
+        assert_eq!(counterfactual_meta_reasoning_lr_boost(0.5), 0.0);
+        assert_eq!(counterfactual_meta_reasoning_lr_boost(0.7), 0.0);
+        assert!(
+            (counterfactual_meta_reasoning_lr_boost(0.9) - 0.02).abs() < 1e-7
+        );
+        // NaN fails the historical comparison and must not create a boost.
+        assert_eq!(counterfactual_meta_reasoning_lr_boost(f64::NAN), 0.0);
     }
 
     // ── Budget interval multiplier ────────────────────────────────────
@@ -932,6 +959,7 @@ mod tests {
         assert!(m.multimodal_integrated_phi.is_finite());
         assert!(m.epistemic_gate_confidence.is_finite());
         assert!(m.meta_reasoning_confidence.is_finite());
+        assert!(m.meta_reasoning_counterfactual_lr_boost.is_finite());
         assert!(m.empathic_compassion.is_finite());
         assert!(m.empathic_tone_adj.is_finite());
         assert!(m.grid_encoding_norm.is_finite());
