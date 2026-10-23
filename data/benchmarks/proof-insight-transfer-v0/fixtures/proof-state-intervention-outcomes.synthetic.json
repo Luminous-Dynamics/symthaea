@@ -32,7 +32,8 @@
         "run_receipt_sha256": null,
         "resource_usage": null,
         "applicability_judgment": null,
-        "checked_target_statement_sha256": null
+        "checked_target_statement_sha256": null,
+        "budget_caps": null
       },
       "expected_applicability": "eligible"
     },
@@ -65,7 +66,8 @@
         "run_receipt_sha256": null,
         "resource_usage": null,
         "applicability_judgment": null,
-        "checked_target_statement_sha256": null
+        "checked_target_statement_sha256": null,
+        "budget_caps": null
       },
       "expected_applicability": "not_applicable"
     },
@@ -98,7 +100,8 @@
         "run_receipt_sha256": null,
         "resource_usage": null,
         "applicability_judgment": null,
-        "checked_target_statement_sha256": null
+        "checked_target_statement_sha256": null,
+        "budget_caps": null
       },
       "expected_applicability": "eligible"
     },
@@ -131,7 +134,8 @@
         "run_receipt_sha256": null,
         "resource_usage": null,
         "applicability_judgment": null,
-        "checked_target_statement_sha256": null
+        "checked_target_statement_sha256": null,
+        "budget_caps": null
       },
       "expected_applicability": "eligible"
     },
@@ -164,7 +168,8 @@
         "run_receipt_sha256": null,
         "resource_usage": null,
         "applicability_judgment": null,
-        "checked_target_statement_sha256": null
+        "checked_target_statement_sha256": null,
+        "budget_caps": null
       },
       "expected_applicability": "eligible"
     },
@@ -197,7 +202,8 @@
         "run_receipt_sha256": null,
         "resource_usage": null,
         "applicability_judgment": null,
-        "checked_target_statement_sha256": null
+        "checked_target_statement_sha256": null,
+        "budget_caps": null
       },
       "expected_applicability": "eligible"
     },
@@ -230,7 +236,8 @@
         "run_receipt_sha256": null,
         "resource_usage": null,
         "applicability_judgment": null,
-        "checked_target_statement_sha256": null
+        "checked_target_statement_sha256": null,
+        "budget_caps": null
       },
       "expected_applicability": "eligible"
     },
@@ -263,7 +270,8 @@
         "run_receipt_sha256": null,
         "resource_usage": null,
         "applicability_judgment": null,
-        "checked_target_statement_sha256": null
+        "checked_target_statement_sha256": null,
+        "budget_caps": null
       },
       "expected_applicability": "eligible"
     }
