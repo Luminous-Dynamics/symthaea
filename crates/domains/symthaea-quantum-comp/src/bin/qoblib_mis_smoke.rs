@@ -75,6 +75,61 @@ fn qoblib_many_runs_series_json(runs: &[Vec<(u128, usize)>]) -> String {
     format!("[{body}]")
 }
 
+fn time_to_target_nanos(trace: &[(u128, usize)], target_objective: usize) -> Option<u128> {
+    trace.iter()
+        .find(|point| point.1 >= target_objective)
+        .map(|point| point.0)
+}
+
+/// Summarize fixed-target attainment across independent, relative-time traces.
+fn target_trial_summary_json(
+    target_objective: usize,
+    runs: &[Vec<(u128, usize)>],
+) -> String {
+    let hit_times = runs.iter()
+        .map(|trace| time_to_target_nanos(trace, target_objective))
+        .collect::<Vec<_>>();
+    let target_hits = hit_times.iter().filter(|time| time.is_some()).count();
+    let trial_count = hit_times.len();
+    let empirical_hit_rate = if trial_count == 0 {
+        0.0
+    } else {
+        target_hits as f64 / trial_count as f64
+    };
+    let times = hit_times.iter()
+        .map(|time| match time {
+            Some(nanos) => format!("{:.9}", *nanos as f64 / 1_000_000_000.0),
+            None => "null".to_owned(),
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "{{\"trial_count\": {trial_count}, \"target_hits\": {target_hits}, \"empirical_hit_rate\": {empirical_hit_rate:.6}, \"time_to_target_seconds_by_trial\": [{times}]}}"
+    )
+}
+
+/// Build optional target-hit summaries from the same incumbent traces emitted in the receipt.
+/// Stage-local time for local improvement is kept separate from full greedy-run time.
+fn target_analysis_json(
+    target_objective: Option<usize>,
+    deterministic_trace: &[(u128, usize)],
+    portfolio_traces: &[Vec<(u128, usize)>],
+    local_improvement_trace: Option<&[(u128, usize)]>,
+) -> String {
+    let Some(target) = target_objective else {
+        return "null".to_owned();
+    };
+    let deterministic_runs = vec![deterministic_trace.to_vec()];
+    let deterministic = target_trial_summary_json(target, &deterministic_runs);
+    let portfolio = target_trial_summary_json(target, portfolio_traces);
+    let local = local_improvement_trace
+        .map(|trace| target_trial_summary_json(target, &[trace.to_vec()]))
+        .unwrap_or_else(|| "null".to_owned());
+    format!(
+        "{{\"target_objective\": {target}, \"deterministic_greedy\": {deterministic}, \"multi_start_greedy_per_trial\": {portfolio}, \"local_improvement_stage\": {local}}}"
+    )
+}
+
 const MULTISTART_GREEDY_RUNS: usize = 16;
 const MULTISTART_GREEDY_SEED_BASE: u64 = 0x5143_4f4d_505f_3031;
 
