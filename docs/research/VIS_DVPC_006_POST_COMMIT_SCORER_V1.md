@@ -47,7 +47,7 @@ The action file must be frozen before the evaluator outcome file is made availab
 Each comparison/policy result includes:
 
 - Mean chosen utility and group-balanced utility, averaging within each source group first and then giving each group equal weight.
-- Beneficial, harmful and neutral escalations based on the sign of `full_utility - cheap_utility`; missed beneficial opportunities where the policy chose cheap although the full outcome scores higher.
+- Beneficial, harmful and neutral escalations based on the sign of `full_utility - cheap_utility`. A missed beneficial opportunity counts only if both its declared reservation and realized extra cost would fit the remaining latency and energy budgets at that commitment; utility-improving but unaffordable counterfactuals are counted separately.
 - Cheap-path and chosen-path safety violations as separate counts. Utility gains do not cancel safety regressions.
 - CVaR95 incremental decision loss. A full choice contributes `cheap_utility - full_utility`; cheap contributes zero. The measure is the mean of the worst ceil(5% of per-trace losses), with positive values indicating harm.
 - Allocator overhead, total incremental latency/energy, fixed run budgets, reservation overruns, and explicit latency/energy budget-violation booleans.
