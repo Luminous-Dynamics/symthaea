@@ -71,7 +71,7 @@ The size-held-out partition tests extrapolation within this regular-graph family
 5. qReduMIS-style quantum-informed reduction as a distinct algorithm track; do not conflate its mechanism with a QAOA-marginal-informed greedy policy.
 6. Physical QPU, ideal-circuit simulation, tensor-network simulation and classical replay as distinct evidence classes.
 
-The workload treatment must stay fixed while graph, degree, seed, candidate pool and stopping budget are paired. Freeze all angle parameters, marginal estimation, tie-breaking, sample counts, shot allocation and classical budgets before evaluating the held-out sizes.
+For the fixed-instance solver panel, graph digest, degree, candidate pool, stopping budget and replicate schedule must be identical across arms; pair by graph digest, not seed labels alone. The generator-coupled Marino–Kirkpatrick comparison is separately unpaired at the distribution level. Freeze all QAOA angle parameters, marginal estimation, tie-breaking, sample counts, shot allocation and classical budgets before evaluating the held-out sizes.
 
 ## Required outputs
 
