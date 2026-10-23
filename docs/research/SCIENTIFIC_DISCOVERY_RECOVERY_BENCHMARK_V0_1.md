@@ -51,9 +51,9 @@ For each world, keep its law, noise process, variable units, admissible actions,
 
 ### Tier D — recovery after falsification
 
-Compare: stop and return unresolved; restart the original candidate pool; bounded typed reseeding; structured additive-residual proposals; multiplicative-correction proposals; scenario-robust EIG; and bounded exhaustive/MDL reference search where feasible.
+Compare: stop and return unresolved; restart the original candidate pool; bounded typed reseeding; structured additive corrections; multiplicative corrections; interaction corrections; fitted scalar coefficients versus fixed coefficients/grid search; scenario-robust EIG; and bounded exhaustive/MDL reference search where feasible. Record fitting cost and parameter count. Fit only on discovery observations, never the evaluator-only holdout.
 
-Recovery may use existing observations to propose hypotheses, but a replacement must be evaluated on fresh outcomes. Previously used measurement points remain consumed. Record rejected model IDs, proposed family, dimensional checks, reason for alarm, validation evidence, and final status. An alarm followed by a guessed law is not a successful recovery.
+Recovery may use existing observations to propose hypotheses, but a replacement must be evaluated on fresh outcomes. Previously used measurement points remain consumed. Record rejected model IDs, proposed family, dimensional checks, reason for alarm, validation evidence, and final status. An alarm followed by a guessed law is not a successful recovery. A corrected structure with fitted parameters is a new combined structure-plus-parameter hypothesis, and its validation must evaluate that combined hypothesis on fresh points; never treat the coefficient-fit data as independent confirmation.
 
 ### Tier E — real-world scientific use
 
