@@ -40,6 +40,7 @@ struct TaskManifestRecord {
     instance_id: String,
     repo: String,
     base_commit: String,
+    repo_head_sha: String,
     docker_image: String,
     problem_statement_sha256: String,
     gold_patch_sha256: String,
@@ -86,6 +87,7 @@ struct AgentPromptRecord {
 struct ControllerTaskRecord {
     run_index: usize,
     instance_id: String,
+    repo_head_sha: String,
     docker_image_reference: String,
     container_image_id: String,
     network_mode: String,
@@ -124,6 +126,7 @@ struct TaskAudit {
     gold_validation_log_sha256: Option<String>,
     runtime_evidence_sha256: Option<String>,
     container_image_id: Option<String>,
+    repo_head_sha: Option<String>,
     network_mode: Option<String>,
 }
 
@@ -443,6 +446,7 @@ fn run_marker_counts(log: &str) -> Vec<usize> {
 struct RuntimeEvidenceSummary {
     container_image_id: String,
     network_mode: String,
+    repo_head_sha: String,
     container_ids: Vec<String>,
 }
 
@@ -506,6 +510,7 @@ fn validate_container_identity(
 fn verify_logged_run(
     run: &Value,
     expected_image_reference: &str,
+    expected_base_commit: &str,
     expected_role: &str,
     expected_index: Option<usize>,
     expected_test_ids: &BTreeSet<String>,
@@ -525,6 +530,23 @@ fn verify_logged_run(
     }
     if gold && run.get("solution_patch_applied").and_then(Value::as_bool) != Some(true) {
         return Err("gold solution patch application did not return true".to_string());
+    }
+    if command_exit_code(run, "repo_head_exit_code")? != 0 {
+        return Err("repository HEAD inspection did not exit zero".to_string());
+    }
+    let observed_repo_head = run
+        .get("repo_head_sha")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "repo_head_sha missing or not a string".to_string())?
+        .to_ascii_lowercase();
+    if !(is_hex(&observed_repo_head, 40) || is_hex(&observed_repo_head, 64)) {
+        return Err("repo_head_sha must be a 40- or 64-character Git SHA".to_string());
+    }
+    if observed_repo_head != expected_base_commit.to_ascii_lowercase() {
+        return Err(format!(
+            "container repository HEAD differs from task base_commit: expected {}, observed {}",
+            expected_base_commit, observed_repo_head
+        ));
     }
     if command_exit_code(run, "rebuild_exit_code")? != 0 {
         return Err("rebuild command did not exit zero".to_string());
@@ -590,6 +612,11 @@ fn validate_runtime_evidence(
         Ok(value) => value,
         Err(error) => return Err(vec![error]),
     };
+    let expected_base_commit = match required_string(row, "base_commit") {
+        Ok(value) if is_hex(value, 40) || is_hex(value, 64) => value.to_ascii_lowercase(),
+        Ok(_) => return Err(vec!["candidate base_commit is not a valid Git SHA".to_string()]),
+        Err(error) => return Err(vec![error]),
+    };
     if evidence.get("image_reference").and_then(Value::as_str)
         != Some(expected_image_reference)
     {
@@ -616,6 +643,7 @@ fn validate_runtime_evidence(
     match verify_logged_run(
         baseline,
         expected_image_reference,
+        &expected_base_commit,
         "baseline",
         None,
         &expected_test_ids,
@@ -656,6 +684,7 @@ fn validate_runtime_evidence(
         match verify_logged_run(
             &gold_runs[index],
             expected_image_reference,
+            &expected_base_commit,
             "gold",
             Some(index),
             &expected_test_ids,
@@ -714,6 +743,7 @@ fn validate_runtime_evidence(
     Ok(RuntimeEvidenceSummary {
         container_image_id: image_ids[0].clone(),
         network_mode: "none".to_string(),
+        repo_head_sha: expected_base_commit,
         container_ids: run_ids,
     })
 }
@@ -967,6 +997,9 @@ fn audit_candidate(
         container_image_id: runtime_summary
             .as_ref()
             .map(|summary| summary.container_image_id.clone()),
+        repo_head_sha: runtime_summary
+            .as_ref()
+            .map(|summary| summary.repo_head_sha.clone()),
         network_mode: runtime_summary
             .as_ref()
             .map(|summary| summary.network_mode.clone()),
@@ -977,6 +1010,11 @@ fn audit_candidate(
             instance_id: instance_id.to_string(),
             repo: repo.expect("eligible task has repo"),
             base_commit: base_commit.expect("eligible task has base commit"),
+            repo_head_sha: runtime_summary
+                .as_ref()
+                .expect("eligible task has runtime summary")
+                .repo_head_sha
+                .clone(),
             docker_image: docker_image.expect("eligible task has docker image"),
             problem_statement_sha256: problem_statement_sha256.expect("eligible task has prompt"),
             gold_patch_sha256: gold_patch_sha256.expect("eligible task has gold patch"),
@@ -1100,6 +1138,7 @@ fn run(cli: Cli) -> Result<(), String> {
                 instance_id: record.instance_id.clone(),
                 repo: record.repo.clone(),
                 base_commit: record.base_commit.clone(),
+                repo_head_sha: record.repo_head_sha.clone(),
                 docker_image: record.docker_image.clone(),
                 problem_statement_sha256: record.problem_statement_sha256.clone(),
                 gold_patch_sha256: record.gold_patch_sha256.clone(),
@@ -1169,6 +1208,7 @@ fn run(cli: Cli) -> Result<(), String> {
                     .map(|(run_index, task)| ControllerTaskRecord {
                         run_index,
                         instance_id: task.instance_id.clone(),
+                        repo_head_sha: task.repo_head_sha.clone(),
                         docker_image_reference: task.docker_image.clone(),
                         container_image_id: task.container_image_id.clone(),
                         network_mode: task.network_mode.clone(),
