@@ -1,0 +1,1 @@
+{"schema_version":"cyber-hunt-query-v1","filters":[{"kind":"text_equals","field":"event_type","value":"network.transfer"},{"kind":"bytes_sent_at_least","minimum":9000000}],"projection":["record_id","event_time_ms","ingest_time_ms","host_id","principal_id","source_address","destination","bytes_sent","device_posture","change_ticket","integrity_state"],"limit":10}

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Luminous-Dynamics/symthaea/main/tools/cyber-hunt-fixture/schemas/query-batch-line-v1.schema.json",
+  "title": "Synthetic cyber hunt query-batch line v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "line_number",
+        "ok",
+        "response",
+        "error"
+      ],
+      "properties": {
+        "line_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ok": {
+          "const": true
+        },
+        "response": {
+          "$ref": "./query-response-v1.schema.json"
+        },
+        "error": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "line_number",
+        "ok",
+        "response",
+        "error"
+      ],
+      "properties": {
+        "line_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ok": {
+          "const": false
+        },
+        "response": {
+          "type": "null"
+        },
+        "error": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  ]
+}

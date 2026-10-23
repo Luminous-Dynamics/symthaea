@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Luminous-Dynamics/symthaea/main/tools/cyber-hunt-fixture/schemas/evaluation-receipt-v1.schema.json",
+  "title": "Synthetic cyber hunt scoring receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "disposition",
+    "run_id",
+    "source_commit",
+    "source_commit_pinned",
+    "dataset_manifest_sha256",
+    "solver_manifest_sha256",
+    "event_store_sha256",
+    "prediction_set_sha256",
+    "total_events",
+    "ground_truth_malicious",
+    "ground_truth_benign",
+    "true_positives",
+    "false_positives",
+    "false_negatives",
+    "true_negatives",
+    "precision_basis_points",
+    "recall_basis_points",
+    "false_positives_per_10000_benign_milli",
+    "abstained_events",
+    "abstained_malicious_events",
+    "abstained_benign_events",
+    "benign_change_decoy_false_positives",
+    "phase_metrics",
+    "campaign_metrics",
+    "non_claims"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cyber-hunt-evaluation-v1"
+    },
+    "disposition": {
+      "const": "SCORED_UNQUALIFIED_SYNTHETIC_ONLY"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128
+    },
+    "source_commit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_commit_pinned": {
+      "type": "boolean"
+    },
+    "dataset_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "solver_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "event_store_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prediction_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "total_events": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "ground_truth_malicious": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "ground_truth_benign": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "true_positives": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "false_positives": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "false_negatives": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "true_negatives": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "precision_basis_points": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "recall_basis_points": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "false_positives_per_10000_benign_milli": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "abstained_events": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "abstained_malicious_events": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "abstained_benign_events": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "benign_change_decoy_false_positives": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "phase_metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "phase",
+          "ground_truth_malicious",
+          "detected_malicious",
+          "missed_malicious",
+          "recall_basis_points"
+        ],
+        "properties": {
+          "phase": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ground_truth_malicious": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "detected_malicious": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missed_malicious": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "recall_basis_points": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      }
+    },
+    "campaign_metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "campaign_id",
+          "ground_truth_malicious",
+          "detected_malicious",
+          "missed_malicious",
+          "recall_basis_points"
+        ],
+        "properties": {
+          "campaign_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ground_truth_malicious": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "detected_malicious": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missed_malicious": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "recall_basis_points": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      }
+    },
+    "non_claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

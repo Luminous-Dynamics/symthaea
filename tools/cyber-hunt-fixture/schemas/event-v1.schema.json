@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Luminous-Dynamics/symthaea/main/tools/cyber-hunt-fixture/schemas/event-v1.schema.json",
+  "title": "Synthetic cyber hunt event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "source_event_id",
+    "delivery_id",
+    "event_time_ms",
+    "ingest_time_ms",
+    "host_id",
+    "principal_id",
+    "source_address",
+    "destination",
+    "bytes_sent",
+    "device_posture",
+    "source",
+    "event_type",
+    "result",
+    "summary",
+    "change_ticket",
+    "integrity_state"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cyber-hunt-event-v1"
+    },
+    "record_id": {
+      "type": "string",
+      "pattern": "^evt-[0-9]{8}$"
+    },
+    "source_event_id": {
+      "type": "string",
+      "pattern": "^src-([0-9]{8}|[0-9a-f]{16})$"
+    },
+    "delivery_id": {
+      "type": "string",
+      "pattern": "^delivery-[0-9]{8}$"
+    },
+    "event_time_ms": {
+      "type": "integer"
+    },
+    "ingest_time_ms": {
+      "type": "integer"
+    },
+    "host_id": {
+      "type": "string",
+      "pattern": "^host-[0-9]{3}$"
+    },
+    "principal_id": {
+      "type": "string",
+      "pattern": "^principal-[0-9]{3}$"
+    },
+    "source_address": {
+      "type": "string",
+      "pattern": "^(192\\.0\\.2|198\\.51\\.100|203\\.0\\.113)\\.[0-9]{1,3}$"
+    },
+    "destination": {
+      "type": "string",
+      "pattern": "\\.example\\.test$"
+    },
+    "bytes_sent": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "device_posture": {
+      "enum": [
+        "managed",
+        "unmanaged",
+        "unknown",
+        "not-applicable"
+      ]
+    },
+    "source": {
+      "enum": [
+        "identity",
+        "endpoint",
+        "dns",
+        "proxy",
+        "cloud-audit",
+        "application",
+        "file-audit",
+        "change-system"
+      ]
+    },
+    "event_type": {
+      "enum": [
+        "auth.success",
+        "auth.failure",
+        "process.start",
+        "dns.query",
+        "network.connection",
+        "network.transfer",
+        "file.read",
+        "admin.change",
+        "service.deploy",
+        "backup.complete",
+        "identity.role_grant",
+        "endpoint.remote_session",
+        "file.archive_create"
+      ]
+    },
+    "result": {
+      "enum": [
+        "success",
+        "denied",
+        "observed",
+        "allowed",
+        "accepted",
+        "approved",
+        "closed"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "change_ticket": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "integrity_state": {
+      "enum": [
+        "observed",
+        "duplicate_delivery",
+        "source_id_conflict"
+      ]
+    }
+  }
+}

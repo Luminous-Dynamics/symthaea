@@ -1,0 +1,82 @@
+name: Cyber Hunt Fixture
+
+on:
+  pull_request:
+    paths:
+      - "tools/cyber-hunt-fixture/**"
+      - "docs/research/cyber-hunt-benchmark-v1.md"
+      - ".github/workflows/cyber-hunt-fixture.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact tested revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install stable Rust
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
+        with:
+          toolchain: stable
+
+      - name: Unit and negative-control tests
+        run: cargo test --manifest-path tools/cyber-hunt-fixture/Cargo.toml
+
+      - name: Generate and inspect 1k, 10k, and 100k fixtures
+        env:
+          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          for size in 1000 10000 100000; do
+            out="$RUNNER_TEMP/cyber-hunt-$size"
+            cargo run --manifest-path tools/cyber-hunt-fixture/Cargo.toml -- --records "$size" --seed 42 --out-dir "$out" > "$RUNNER_TEMP/report-$size.json"
+            jq -e --argjson count "$size" --arg commit "$SOURCE_COMMIT" '.verification.disposition == "STRUCTURAL_PASS_NOT_CAPABILITY_PASS" and .verification.source_commit_pinned == true and .verification.source_commit == $commit and .manifest.synthetic_only == true and .manifest.qualification_state == "UNSCORED" and .manifest.source_commit == $commit and .manifest.actual_record_count == $count and .manifest.files["solver/events.jsonl"].record_count == $count and .manifest.files["solver/manifest.json"].record_count == 1 and .manifest.files["evaluator/oracle.json"].record_count == $count and .solver_manifest.record_count == $count and ((.solver_manifest | has("source_commit")) == false) and ((.solver_manifest | has("source_commit_pinned")) == false) and ((.solver_manifest | has("seed")) == false)' "$RUNNER_TEMP/report-$size.json"
+          done
+
+      - name: Run read-only query against solver-only mount
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path tools/cyber-hunt-fixture/Cargo.toml -- query --store-dir "$RUNNER_TEMP/cyber-hunt-10000/solver" --requests-jsonl tools/cyber-hunt-fixture/examples/high-volume-transfer-hunt-v1.jsonl > "$RUNNER_TEMP/query-receipt.jsonl"
+          jq -s -e 'length == 1 and .[0].ok == true and .[0].response.receipt.disposition == "READ_ONLY_EVIDENCE_RESULTS_NOT_A_SECURITY_CONCLUSION" and .[0].response.receipt.rows_examined == 10000 and .[0].response.receipt.rows_returned == 4 and ([.[0].response.records[].fields.change_ticket | select(. != null)] | length) == 2' "$RUNNER_TEMP/query-receipt.jsonl"
+
+      - name: Score an explicit zero-alert evaluator plumbing baseline
+        run: |
+          set -euo pipefail
+          dataset="$RUNNER_TEMP/cyber-hunt-10000"
+          manifest="$dataset/manifest.json"
+          solver_sha="$(jq -r '.files["solver/manifest.json"].sha256' "$manifest")"
+          event_sha="$(jq -r '.files["solver/events.jsonl"].sha256' "$manifest")"
+          jq -n --arg solver_sha "$solver_sha" --arg event_sha "$event_sha" '{
+            schema_version: "cyber-hunt-predictions-v1",
+            run_id: "ci-zero-alert-plumbing",
+            solver_manifest_sha256: $solver_sha,
+            event_store_sha256: $event_sha,
+            suspects: [],
+            abstained_record_ids: [],
+            non_claims: ["This empty prediction set is a scorer plumbing baseline only; it is not a model output or capability claim."]
+          }' > "$RUNNER_TEMP/zero-alert-predictions.json"
+          cargo run --manifest-path tools/cyber-hunt-fixture/Cargo.toml -- evaluate --dataset-root "$dataset" --predictions "$RUNNER_TEMP/zero-alert-predictions.json" > "$RUNNER_TEMP/zero-alert-evaluation.json"
+          jq -e '.disposition == "SCORED_UNQUALIFIED_SYNTHETIC_ONLY" and .total_events == 10000 and .true_positives == 0 and .false_positives == 0 and .false_negatives == .ground_truth_malicious and .precision_basis_points == null and .recall_basis_points == 0 and .source_commit_pinned == true' "$RUNNER_TEMP/zero-alert-evaluation.json"
+
+      - name: Preserve structural and query receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cyber-hunt-fixture-manifests-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/report-*.json
+            ${{ runner.temp }}/query-receipt.jsonl
+            ${{ runner.temp }}/zero-alert-predictions.json
+            ${{ runner.temp }}/zero-alert-evaluation.json
+          if-no-files-found: error
+          retention-days: 14
