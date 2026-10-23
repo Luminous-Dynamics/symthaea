@@ -8,6 +8,28 @@ An accepted Physical Review Research paper dated 19 October 2026, *Scalable quan
 
 QOBLIB is still the public shared benchmark for its named MIS instances; it does not substitute for a separately controlled random-regular cohort. The new track isolates graph distribution and size generalization instead of pooling results that answer different questions. This is a proposed independent evaluation, not a claim to have reproduced that paper.
 
+## Paper-shaped cohort and stronger classical baseline
+
+The public [preprint](https://arxiv.org/abs/2601.21923) reports a study of **3-regular graphs** at N = 50, 100, 200, 500, 1,000, 2,000 and 5,000, with 200 instances per size for its simulation comparisons. It uses fixed QAOA angles derived from tree neighborhoods and feeds local expectations into sequential minimum-degree greedy selection. The paper identifies **Marino–Kirkpatrick prioritized search** ([arXiv:2003.12293](https://arxiv.org/abs/2003.12293)) as the strong classical state-of-the-art baseline. Plain minimum-degree greedy alone is not a credible SOTA comparator.
+
+The JSON therefore contains a separate 1,400-workload, degree-3 seed manifest matching those reported sizes and counts. These are **newly derived seeds**, not the paper authors' exact graphs: an exact public graph/seed list was not located during this pass. This is replication-scale independent sampling, not graph-for-graph reproduction. The original 96-workload degree-3/4, size-held-out manifest remains an extension/generalization track and must not be pooled with the paper-shaped cohort as if they were one distribution.
+
+The larger SOTA campaign is specified separately as 100,000 3-regular instances per size (700,000 total seed-defined workloads). It is a streaming campaign specification, not 700,000 materialized graph files and not a completed experiment. Follow the paper's reported significance scope carefully: pre-register N ≤ 2,000 as the primary comparison, and report N = 5,000 separately as a scaling/sensitivity result.
+
+### Required identity and controls
+
+- **p = 1 control:** the paper derives the p=1 selection rule as equivalent to classical minimum-degree greedy (with randomized tie handling). Require an identity test on a common graph fixture before interpreting p > 1.
+- **Fixed angles:** pin the exact regular-tree angle values, depth, mixer/cost conventions and implementation artifact. Merely setting p=4 is not a reproduction.
+- **Same instances across arms:** for each generated graph, compare p=4 hybrid, Marino–Kirkpatrick, minimum-degree greedy and randomized classical controls under paired graph identity and explicit budgets.
+- **Hardware vs simulation:** the paper uses tensor-network simulation for larger circuits and notes that some p=3 light cones exceed a 20-qubit device's capacity, so noiseless simulated expectations were substituted for those cases. Such rows must be labelled mixed hardware/simulator, never hardware-only.
+- **Generalization:** new sizes and degree-4 workloads test extensions; they do not replace the paper-shaped degree-3 comparison.
+
+### Reusable setup cost changes the economic question
+
+The paper builds reusable local-QAOA expectation information for subgraph topologies and reuses it across graph instances. Our comparison must consequently separate (1) one-time or cohort-fixed table/circuit acquisition cost, (2) amortized per-instance inference cost and (3) total end-to-end deployment cost.
+
+Report the exact number of graphs served by each shared table, the measured or estimated setup expense, marginal cost per graph, and break-even cohort size against the classical baseline. Include measured shots, circuit batches, transpilation/compilation, calibration, queue, classical preprocessing, CPU/GPU compute and end-to-end wall time. Do not charge a reusable setup cost to every graph when it was paid once, but do not hide it either. Re-run at multiple cohort sizes or calculate the break-even point from the fixed and marginal terms. The QOBLIB named-instance track remains separately reported with QOBLIB's own runtime conventions alongside a broader all-in cost view.
+
 ## Generator
 
 The dependency-free Rust API generate_random_regular_mis_graph uses a configuration-model stub-pairing sampler with explicit rejection of self-loops and duplicate undirected edges. Successful outputs are canonical sorted simple graphs whose degrees are checked exactly. DIMACS export uses one-based vertex IDs and records the generator version, seed, attempt count and requested degree in a comment.
