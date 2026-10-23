@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/instrument-engineering/mus_eng_corpus_v0_1.schema.json",
+  "title": "MUS-ENG synthetic benchmark corpus v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "corpus_id",
+    "status",
+    "evidence_note",
+    "cases"
+  ],
+  "properties": {
+    "manifest_version": {
+      "const": "musical-instrument-benchmark-corpus/0.1"
+    },
+    "corpus_id": {
+      "const": "MUS-ENG-001"
+    },
+    "status": {
+      "const": "PROPOSED_SYNTHETIC_FIXTURES_NOT_QUALIFIED"
+    },
+    "evidence_note": {
+      "const": "Every case is a synthetic policy fixture; this corpus contains no physical measurements or qualified hardware."
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "case_type",
+        "instrument_family",
+        "candidate_claim",
+        "available_evidence",
+        "missing_evidence",
+        "faults",
+        "expected_disposition",
+        "expected_reason",
+        "evidence_ceiling"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^(SYN|POS|NEG)-[0-9]{3}$"
+        },
+        "case_type": {
+          "enum": [
+            "synthetic_baseline",
+            "positive_control",
+            "negative_control"
+          ]
+        },
+        "instrument_family": {
+          "enum": [
+            "shared_fixture",
+            "acoustic_resonator",
+            "plucked_string",
+            "percussion",
+            "electronic_instrument",
+            "hybrid",
+            "controller"
+          ]
+        },
+        "candidate_claim": {
+          "enum": [
+            "digital_contract_integrity",
+            "analytical_prediction",
+            "numerical_prediction",
+            "surrogate_prediction",
+            "physical_measurement",
+            "human_perceptual_claim",
+            "release_readiness",
+            "repair_success",
+            "reproducibility_claim"
+          ]
+        },
+        "available_evidence": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "requirements",
+              "design_manifest",
+              "bom",
+              "model_report",
+              "numerical_solver_receipt",
+              "calibration_record",
+              "raw_measurement",
+              "as_built_manifest",
+              "license_manifest",
+              "repeated_trials",
+              "complete_trial_denominator",
+              "post_repair_test",
+              "human_study_protocol",
+              "human_study_results"
+            ]
+          }
+        },
+        "missing_evidence": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "requirements",
+              "design_manifest",
+              "bom",
+              "model_report",
+              "numerical_solver_receipt",
+              "calibration_record",
+              "raw_measurement",
+              "as_built_manifest",
+              "license_manifest",
+              "repeated_trials",
+              "complete_trial_denominator",
+              "post_repair_test",
+              "human_study_protocol",
+              "human_study_results"
+            ]
+          }
+        },
+        "faults": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "none",
+              "simulation_promoted_to_measurement",
+              "expired_calibration",
+              "unbound_as_built_substitution",
+              "stale_design_revision",
+              "unresolved_asset_rights",
+              "cherry_picked_trials",
+              "missing_post_repair_test",
+              "human_claim_without_protocol"
+            ]
+          }
+        },
+        "expected_disposition": {
+          "enum": [
+            "CONSISTENT_UNQUALIFIED",
+            "INCOMPLETE",
+            "REJECT_CLAIM",
+            "BLOCK_RELEASE"
+          ]
+        },
+        "expected_reason": {
+          "type": "string",
+          "minLength": 12
+        },
+        "evidence_ceiling": {
+          "enum": [
+            "schema_only",
+            "model_only",
+            "physical_claim_rejected",
+            "release_blocked",
+            "repair_claim_rejected",
+            "human_claim_rejected",
+            "none"
+          ]
+        }
+      }
+    }
+  }
+}
