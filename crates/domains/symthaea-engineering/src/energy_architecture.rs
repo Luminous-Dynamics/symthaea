@@ -1249,7 +1249,15 @@ pub fn bounded_parametric_design_space() -> DesignSpaceSearchResult {
             for battery_power_kw in PARAMETRIC_BATTERY_POWER_KW {
                 for grid_power_kw in PARAMETRIC_GRID_POWER_KW {
                     let candidate_id = format!(
-                        "synthetic-parametric-pv-{pv_power_kw:.0}kw-battery-{battery_capacity_kwh:.0}kwh-battery-power-{battery_power_kw:.0}kw-grid-{grid_power_kw:.0}kw"
+                        concat!(
+                            "synthetic-parametric-pv-{:.0}kw-",
+                            "battery-{:.0}kwh-battery-power-{:.0}kw-",
+                            "grid-{:.0}kw"
+                        ),
+                        pv_power_kw,
+                        battery_capacity_kwh,
+                        battery_power_kw,
+                        grid_power_kw
                     );
                     let mut candidate = base.clone();
                     candidate.candidate_id = candidate_id.clone();
@@ -1327,7 +1335,11 @@ pub fn bounded_parametric_design_space() -> DesignSpaceSearchResult {
         axis_values,
         candidates,
         rejected_candidates,
-        claim_ceiling: "Deterministic synthetic sizing sweep only; no real-site optimization, dynamic-simulation, lifecycle-cost, physical-safety or field-performance claim.".to_owned(),
+        claim_ceiling: concat!(
+            "Deterministic synthetic sizing sweep only; no real-site optimization, ",
+            "dynamic-simulation, lifecycle-cost, physical-safety or field-performance claim."
+        )
+        .to_owned(),
     }
 }
 
