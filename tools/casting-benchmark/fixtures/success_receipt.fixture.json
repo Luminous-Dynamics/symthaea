@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0.0",
+  "protocol_id": "CASTING-MO-BO-001",
+  "run_id": "fixture-sobol-ZDT1-d30-b64-s17",
+  "status": "success",
+  "synthetic_fixture_only": true,
+  "algorithm": {
+    "id": "sobol",
+    "version": "fixture-revision-not-for-results",
+    "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "suite": {
+    "id": "zdt_standard",
+    "version": "fixture-suite-v1",
+    "instance_id": "ZDT1",
+    "dimension": 30,
+    "objective_count": 2,
+    "objective_direction": "minimize_all",
+    "objective_evaluator_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "source_revision": "2222222222222222222222222222222222222222",
+  "protocol_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "environment_lock_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "analysis_lock_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "seed": 17,
+  "budget": {
+    "objective_evaluations": 64,
+    "initial_design_evaluations": 16
+  },
+  "accounting": {
+    "objective_evaluations": 64,
+    "feasible_evaluations": 60,
+    "infeasible_evaluations": 2,
+    "invalid_evaluations": 1,
+    "failed_evaluations": 1,
+    "wall_clock_ms": 1150,
+    "peak_memory_bytes": 1048576,
+    "objective_oracle_cost_units": 64
+  },
+  "termination_reason": "budget_exhausted",
+  "metrics": {
+    "final_hypervolume": 0.73,
+    "normalized_hypervolume_auc": 0.55,
+    "igd_plus": 0.18,
+    "spacing": 0.04,
+    "feasible_fraction": 0.9375,
+    "invalid_or_failed_fraction": 0.03125,
+    "evaluations_to_target": null,
+    "post_selection_coverage": null,
+    "regional_min_coverage": null,
+    "weighted_ess": null,
+    "mean_interval_width_proxy": null,
+    "abstention_fraction": 0
+  },
+  "artifacts": {
+    "raw_trace_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "result_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "log_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+  },
+  "notes": "SYNTHETIC STRUCTURE FIXTURE ONLY. These values are placeholders and are not measured benchmark output."
+}
