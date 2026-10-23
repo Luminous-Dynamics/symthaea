@@ -362,7 +362,13 @@ fn run_marker_counts(log: &str) -> Vec<usize> {
 }
 
 fn hash_field(row: &Value, field: &str) -> Result<String, String> {
-    let value = required_string(row, field)?;
+    let value = row
+        .get(field)
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| format!("missing or empty field {field}"))?;
+    // Hash the exact field bytes. Leading/trailing whitespace in task text or
+    // patches is semantically relevant and must not be normalized away.
     Ok(sha256_bytes(value.as_bytes()))
 }
 
@@ -996,6 +1002,19 @@ mod tests {
         assert!(result.audit.unresolved);
         assert!(result.manifest_record.is_none());
         assert!(result.audit.reasons.iter().any(|reason| reason.contains("test-ID sets differ")));
+    }
+
+    #[test]
+    fn task_field_hash_preserves_leading_and_trailing_whitespace() {
+        let row = serde_json::json!({"problem_statement": "  exact bytes  "});
+        assert_eq!(
+            hash_field(&row, "problem_statement").unwrap(),
+            sha256_bytes(b"  exact bytes  ")
+        );
+        assert_ne!(
+            hash_field(&row, "problem_statement").unwrap(),
+            sha256_bytes(b"exact bytes")
+        );
     }
 
     #[test]
