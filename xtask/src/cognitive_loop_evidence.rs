@@ -364,6 +364,7 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
         "same contiguous cycle panel",
         "repository head SHA",
         "not a deployable detector",
+        "Each arm carries its own observed exogenous-stream digest",
     ] {
         ensure!(
             replay_identity.iter().any(|requirement| requirement.contains(phrase)),
@@ -379,6 +380,9 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
         "no_adapt.mean_task_loss",
         "detector_triggered.mean_task_loss",
         "oracle_timed.mean_task_loss",
+        "no_adapt.exogenous_stream_sha256",
+        "detector_triggered.exogenous_stream_sha256",
+        "oracle_timed.exogenous_stream_sha256",
         "detector_task_loss_improvement_vs_no_adapt",
         "detector_task_loss_regret_vs_oracle_timed",
         "detector_adaptation_cost_delta_vs_no_adapt",
@@ -639,12 +643,16 @@ mod tests {
                         "All arms consume the same pinned exogenous stream digest.",
                         "All arms emit the same contiguous cycle panel beginning at zero.",
                         "Pin arm version, repository head SHA, and configuration digest separately.",
-                        "Oracle-timed policy uses ground-truth change timing only as a reference arm; it is not a deployable detector."
+                        "Oracle-timed policy uses ground-truth change timing only as a reference arm; it is not a deployable detector.",
+                        "Each arm carries its own observed exogenous-stream digest and must match the shared stream digest."
                     ],
                     "required_metrics": [
                         "no_adapt.mean_task_loss",
                         "detector_triggered.mean_task_loss",
                         "oracle_timed.mean_task_loss",
+                        "no_adapt.exogenous_stream_sha256",
+                        "detector_triggered.exogenous_stream_sha256",
+                        "oracle_timed.exogenous_stream_sha256",
                         "detector_task_loss_improvement_vs_no_adapt",
                         "detector_task_loss_regret_vs_oracle_timed",
                         "detector_adaptation_cost_delta_vs_no_adapt",
@@ -778,6 +786,17 @@ mod tests {
             json!("Only report one composite utility score.");
         let error = validate_value(&manifest).unwrap_err().to_string();
         assert!(error.contains("keep loss and cost separate"));
+    }
+
+    #[test]
+    fn rejects_counterfactual_protocol_that_omits_per_arm_stream_attestation() {
+        let mut manifest = valid_manifest();
+        manifest["drift_protocol"]["adaptation_counterfactual_protocol"]["replay_identity_requirements"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|item| !item.as_str().unwrap_or("").contains("Each arm carries its own"));
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("Each arm carries its own observed exogenous-stream digest"));
     }
 
     #[test]
