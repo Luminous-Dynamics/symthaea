@@ -413,7 +413,7 @@ fn tie_aware_recall_at_k(exact: &[(u64, f32)], approximate: &[(u64, f32)]) -> f6
     };
     let recovered = approximate
         .iter()
-        .filter(|(_, similarity)| *similarity >= *cutoff_similarity)
+        .filter(|neighbor| neighbor.1 >= *cutoff_similarity)
         .count()
         .min(exact.len());
     recovered as f64 / exact.len() as f64
