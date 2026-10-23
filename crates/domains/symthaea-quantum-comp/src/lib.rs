@@ -114,7 +114,7 @@ pub use matrix::{
 };
 pub use migration::{MigrationGuide, MigrationRisk, MigrationStep, alpha9_to_alpha10_migration};
 pub use mis_dimacs::{MisDimacsError, MisDimacsLimits, ParsedMisDimacs, parse_dimacs_mis, parse_dimacs_mis_with_limits, parse_qoblib_solution};
-pub use mis_random_regular::{MisRandomRegularConfig, MisRandomRegularError, MisRandomRegularReport, generate_mis_random_regular};
+pub use mis_random_regular::{MisRandomRegularConfig, MisRandomRegularError, MisRandomRegularReport, generate_mis_random_regular, MAX_MIS_RANDOM_REGULAR_STUBS, MAX_MIS_RANDOM_REGULAR_VERTICES};
 pub use noise_sweep::{NoiseSweepConfig, NoiseSweepPoint, NoiseSweepReport, NoiseSweepRunner};
 pub use phase_hdc::PhaseHypervector;
 pub use preflight::{
