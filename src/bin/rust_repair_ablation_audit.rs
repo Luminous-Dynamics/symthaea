@@ -436,7 +436,28 @@ fn load_score_report(
     expected_task_manifest_sha256: &str,
 ) -> Result<BTreeMap<String, Outcome>, String> {
     validate_relative_report_path(relative_path)?;
-    let path = reports_dir.join(relative_path);
+    let canonical_root = fs::canonicalize(reports_dir).map_err(|error| {
+        format!(
+            "cannot resolve score-report directory {}: {error}",
+            reports_dir.display()
+        )
+    })?;
+    let unresolved_path = canonical_root.join(relative_path);
+    let path = fs::canonicalize(&unresolved_path).map_err(|error| {
+        format!("cannot resolve score report {}: {error}", unresolved_path.display())
+    })?;
+    if !path.starts_with(&canonical_root) {
+        return Err(format!(
+            "score report path escapes score-report directory through a symlink: {}",
+            unresolved_path.display()
+        ));
+    }
+    if !path.is_file() {
+        return Err(format!(
+            "score report {} is not a regular file",
+            path.display()
+        ));
+    }
     let bytes = fs::read(&path)
         .map_err(|error| format!("cannot read score report {}: {error}", path.display()))?;
     let observed_sha256 = sha256_bytes(&bytes);
@@ -500,6 +521,51 @@ fn load_score_report(
                 path.display()
             ));
         }
+    }
+    let success_count = outcomes
+        .values()
+        .filter(|outcome| **outcome == Outcome::Pass)
+        .count();
+    let failure_count = outcomes
+        .values()
+        .filter(|outcome| **outcome == Outcome::Fail)
+        .count();
+    let unresolved_count = outcomes
+        .values()
+        .filter(|outcome| **outcome == Outcome::Unresolved)
+        .count();
+    let scored_count = success_count + failure_count;
+    for (field, expected) in [
+        ("success_count", success_count),
+        ("failure_count", failure_count),
+        ("unresolved_count", unresolved_count),
+        ("scored_count", scored_count),
+    ] {
+        if report.get(field).and_then(Value::as_u64) != Some(expected as u64) {
+            return Err(format!(
+                "score report {} has inconsistent {field} aggregate",
+                path.display()
+            ));
+        }
+    }
+    let expected_lockable = !outcomes.is_empty() && unresolved_count == 0;
+    if report.get("lockable").and_then(Value::as_bool) != Some(expected_lockable) {
+        return Err(format!(
+            "score report {} has inconsistent lockable aggregate",
+            path.display()
+        ));
+    }
+    let expected_pass_at_1 =
+        expected_lockable.then(|| success_count as f64 / outcomes.len() as f64);
+    let observed_pass_at_1 = report.get("pass_at_1").and_then(Value::as_f64);
+    if observed_pass_at_1 != expected_pass_at_1
+        || (expected_pass_at_1.is_none()
+            && !report.get("pass_at_1").is_some_and(Value::is_null))
+    {
+        return Err(format!(
+            "score report {} has inconsistent pass_at_1 aggregate",
+            path.display()
+        ));
     }
     Ok(outcomes)
 }
@@ -1383,6 +1449,53 @@ mod tests {
     }
 
     #[test]
+    fn score_receipt_rejects_inconsistent_aggregates() {
+        let temp = tempfile::tempdir().unwrap();
+        let task_manifest = "a".repeat(64);
+        let mut report = serde_json::json!({
+            "format_version": 1,
+            "protocol_id": SCORE_PROTOCOL_ID,
+            "task_manifest_sha256": task_manifest,
+            "task_count": 1,
+            "scored_count": 1,
+            "success_count": 1,
+            "failure_count": 0,
+            "unresolved_count": 0,
+            "lockable": true,
+            "pass_at_1": 1.0,
+            "tasks": [{"instance_id":"task-a","outcome":"pass"}]
+        });
+        report["success_count"] = serde_json::json!(0);
+        let bytes = serde_json::to_vec(&report).unwrap();
+        fs::write(temp.path().join("score.json"), &bytes).unwrap();
+        assert!(load_score_report(
+            temp.path(),
+            "score.json",
+            &sha256_bytes(&bytes),
+            &task_manifest
+        )
+        .unwrap_err()
+        .contains("success_count aggregate"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn score_report_symlink_escape_is_rejected() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().unwrap();
+        let reports = temp.path().join("reports");
+        fs::create_dir(&reports).unwrap();
+        let outside = temp.path().join("outside.json");
+        fs::write(&outside, b"{}").unwrap();
+        symlink(&outside, reports.join("alias.json")).unwrap();
+        let digest = sha256_bytes(b"{}");
+        assert!(load_score_report(&reports, "alias.json", &digest, &"a".repeat(64))
+            .unwrap_err()
+            .contains("escapes score-report directory"));
+    }
+
+    #[test]
     fn score_receipt_requires_the_pinned_manifest_and_task_outcomes() {
         let temp = tempfile::tempdir().unwrap();
         let task_manifest = "a".repeat(64);
@@ -1391,6 +1504,12 @@ mod tests {
             "protocol_id": SCORE_PROTOCOL_ID,
             "task_manifest_sha256": task_manifest,
             "task_count": 1,
+            "scored_count": 1,
+            "success_count": 1,
+            "failure_count": 0,
+            "unresolved_count": 0,
+            "lockable": true,
+            "pass_at_1": 1.0,
             "tasks": [{"instance_id":"task-a","outcome":"pass"}]
         });
         let bytes = serde_json::to_vec(&report).unwrap();
