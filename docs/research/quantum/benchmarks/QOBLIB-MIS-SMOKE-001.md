@@ -10,6 +10,10 @@ From the Symthaea workspace root, after Rust dependencies/toolchain are availabl
 
 The command reads one DIMACS edge-format graph and writes exactly one JSON record to stdout. On successful runs the receipt has return_status=completed; on input/read/verification failures it emits a return_status=failed receipt with an error kind, escaped error text, elapsed time, and source byte/hash identity when the input was readable, then exits nonzero. It also writes a diagnostic to stderr. This preserves failures as data instead of silently dropping them. Keep stdout as the raw inspectable receipt. Receipt schema v2 also contains a bounded deterministic 1-for-2 local-improvement result for graphs of at most 250 vertices; pair-search is capped at 2,000,000 checks, and a budget-exhausted result is explicitly not labelled locally optimal. The pinned source cohort is tracked in QOBLIB-MIS-COHORT-001.json.
 
+## Fail-closed parser limits
+
+The runner reads file metadata before reading graph contents and refuses an input larger than 64 MiB. The parser also defaults to at most 100,000 vertices and 5,000,000 declared/observed edges; declarations are checked before graph allocation, and the observed edge budget is enforced during parsing. These defaults cover the pinned QOBLIB cohort, including its documented 45 MB C4000-5 file. The library API exposes MisDimacsLimits and parse_dimacs_mis_with_limits for deliberately provisioned custom workloads. Raising those limits does not add a runtime or memory watchdog, which remain explicitly unconfigured in the smoke receipt.
+
 ## Output contract
 
 The receipt records:
