@@ -38,6 +38,8 @@ Test dimensional inference, finite outputs, deterministic seeds, candidate dedup
 
 ### Tier B — controlled structural recovery
 
+Report two task modes separately: **oracle-present discrimination**, where the reference-equivalent law is deliberately included in the hypothesis pool; and **truth-absent recovery**, where the initial pool is generated independently of the hidden reference and is evaluator-audited only after the policy ends. Never pool their success rates. In truth-absent trials, the selector, candidate generator, recovery policy and stop rule must not receive the hidden expression or truth-derived labels.
+
 Start with at least 60 held-out structural worlds across six or more task families and at least 20 paired seeds per world. Include exact in-class laws across expression depths; dimensionally valid near-misses; coefficient-identifiability traps; irrelevant and correlated features; deceptive shortcuts; interpolation versus extrapolation; and observationally equivalent laws that cannot be uniquely identified.
 
 Keep at least three evaluator-only regimes distinct: (1) IID/in-domain, (2) interpolation with held-out combinations or feature correlations, and (3) true range extrapolation where each relevant feature is outside its discovery interval. For range extrapolation, include lower-tail, upper-tail, mixed-tail and scale-shift cases; generate evaluation points from an independent seed; never pass them into candidate generation, parameter fitting, EIG, stopping, or monitor calibration. Log how many reference-valid OOD points were available; do not replace invalid OOD points with in-domain data. Where the reference law itself is undefined or numerically unstable, record the case as not evaluable under the declared domain rather than silently scoring it as successful.
@@ -97,13 +99,13 @@ Initial acceptance thresholds are **targets, not current results**:
 2. False confident singleton rate falls by at least 20% relatively on the preregistered misspecification mix, with a nonzero baseline and a paired uncertainty interval supporting the effect.
 3. Sensitivity reaches at least 80% on practically important alternatives designated before held-out evaluation, with clean-null alarms controlled at the chosen level.
 4. Median measurement cost to validated recovery or explicit unresolved status improves by at least 20% versus the strongest simple matched-budget baseline, with world-clustered uncertainty supporting the effect.
-5. Negative controls show no hidden-truth leakage or invalid monitor inputs; terminal failures are reported unresolved, not accepted.
+5. Negative controls show no hidden-truth leakage or invalid monitor inputs; terminal failures are reported unresolved, not accepted.\n6. Oracle-present discrimination and truth-absent recovery are reported as distinct tracks. The truth-absent track has zero reference-equivalent members in the initial hypothesis pool according to evaluator-only audits; trials with accidental inclusion are reported as invalid for the open-ended track, not silently retried or discarded.
 
 If a gate fails, retain and publish the negative result. Do not tune thresholds or task composition after inspection of the held-out set.
 
 ## Proposed Symthaea differentiator
 
-The plausible contribution is not simply faster equation generation. It is a combined system: constructive unit-aware generation; experiment selection robust to declared uncertainty scenarios; pre-outcome predictive records; monitoring with explicit statistical assumptions; bounded structural recovery after falsification; fresh validation; and a typed `validated`, `rejected`, or `unresolved` outcome with cost and provenance receipts.
+The plausible contribution is not simply faster equation generation. The benchmark must first distinguish oracle-present candidate discrimination from truth-absent recovery before making an open-ended discovery claim. It is a combined system: constructive unit-aware generation; experiment selection robust to declared uncertainty scenarios; pre-outcome predictive records; monitoring with explicit statistical assumptions; bounded structural recovery after falsification; fresh validation; and a typed `validated`, `rejected`, or `unresolved` outcome with cost and provenance receipts.
 
 To substantiate the claim, first compete on a shared symbolic-regression suite with strong baselines. Then run a separate held-out active-discovery/recovery benchmark under matched information and compute budgets. Until both pass, describe the combined loop as a research hypothesis—not state of the art.
 
