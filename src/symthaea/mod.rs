@@ -3903,6 +3903,7 @@ mod tests {
         let reasoning = crate::knowledge::ReasoningContext {
             relevant_facts: vec![
                 crate::knowledge::GroundedFact {
+                    provenance: None,
                     text: "fire causes smoke".into(),
                     confidence: 0.9,
                     similarity: 0.8,
@@ -3910,6 +3911,7 @@ mod tests {
                     is_causal: true,
                 },
                 crate::knowledge::GroundedFact {
+                    provenance: None,
                     text: "the sky is blue".into(),
                     confidence: 0.9,
                     similarity: 0.8,
@@ -3917,6 +3919,7 @@ mod tests {
                     is_causal: false,
                 },
                 crate::knowledge::GroundedFact {
+                    provenance: None,
                     text: "trust requires reciprocity".into(),
                     confidence: 0.7,
                     similarity: 0.6,
