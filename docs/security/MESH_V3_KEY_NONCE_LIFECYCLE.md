@@ -130,6 +130,26 @@ Report per scenario class: true-positive and false-positive counts, mutant kill 
 
 A claim of outperforming industry/SOTA requires an independently reviewed, held-out, matched-budget comparison with confidence intervals—not raw counts of generated findings or success of a single bounded model.
 
+## 6.1 Industry qualification baseline and the gap this benchmark fills
+
+Use established primitive and implementation test suites as baselines; do not rebrand a home-grown nonce harness as a replacement for them.
+
+- [RFC 8439 §2.8](https://www.rfc-editor.org/rfc/rfc8439.html#section-2.8) specifies a 96-bit ChaCha20-Poly1305 nonce that must differ for each invocation under the same key. [RFC 5116 §3.1](https://www.rfc-editor.org/rfc/rfc5116.html#section-3.1) explicitly discusses nonce generation and multi-device coordination when multiple devices use one key.
+- [C2SP/Wycheproof](https://github.com/C2SP/wycheproof) provides implementation-agnostic vectors for known attacks, specification inconsistencies and implementation bugs, including ChaCha20-Poly1305. Integrate applicable upstream vectors for primitive behavior and malformed/invalid input handling.
+- [NIST CAVP](https://www.nist.gov/programs-projects/cryptographic-algorithm-validation-program) provides formal algorithm/component validation for approved and recommended algorithms. It is a distinct assurance layer and does not, by itself, certify this application's session lifecycle, key-sharing configuration, snapshot rollback policy or the coupling of packet and fragment APIs.
+
+The gap for Symthaea is **composition and lifecycle**: library vectors usually give a concrete key/nonce/input and expected primitive result; they do not infer whether every production call site across APIs reuses an effective key or whether a cloned process can reuse state. The runtime nonce-pair oracle therefore complements, rather than replaces, upstream vectors.
+
+| Assurance layer | Baseline | Additional Symthaea target |
+|---|---|---|
+| Primitive correctness | RFC vectors and applicable Wycheproof cases | Keep upstream tests pinned/traceable; no weakening of tag, parse or wrong-key rejection |
+| Protocol/model properties | Bounded TLC strict models + intended legacy counterexamples | Record exact state counts, raw traces, model/config/tool hashes and claim ceiling |
+| Runtime key/nonce lifecycle | Actual helper outputs and fault-injected sender/recovery states | Observe all encryption entry points; zero repeated (effective key, nonce) pairs in strict scope |
+| Integration/transport | Interoperability and adapter MTU checks | Zero partial sends on MTU preflight failure, zero cleartext fallback, valid controls retained |
+| Comparative claim | Independent review / held-out tests | Equal-budget baselines, held-out mutants, false-acceptance rates, review cost and latency/airtime percentiles |
+
+A credible outperform-SOTA claim requires results from all relevant layers, measured against a frozen test corpus and an independent reviewer. A larger number of generated findings, more TLC states, or more passing vectors is not on its own a better security result.
+
 ## 7. Migration plan (must be versioned)
 
 1. Keep v2 decoding and its limitations explicit; never reinterpret its nonce bytes under new semantics.
