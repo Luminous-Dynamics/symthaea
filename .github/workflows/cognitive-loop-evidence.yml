@@ -43,3 +43,19 @@ jobs:
         run: cargo test --locked -p xtask cognitive_loop_evidence
       - name: Test drift trace scoring failure modes
         run: cargo test --locked -p xtask cognitive_drift_score
+
+      - name: Run the drift scorer CLI against the synthetic fixture
+        run: |
+          cargo run --locked -p xtask -- score-cognitive-loop-drift \\
+            --input benchmarks/cognitive-loop-evidence/synthetic-smoke-trace.json \\
+            --out "$RUNNER_TEMP/drift-score.json"
+          jq -e '
+            .stream_id == "synthetic-smoke-fixture-not-measured" and
+            .ground_truth_events == 2 and
+            .true_positive_events == 2 and
+            .false_positive_alarms == 1 and
+            .missed_events == 0 and
+            .hard_gate_pass == true and
+            (.canonical_trace_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/drift-score.json"
