@@ -36,6 +36,12 @@ EDHOC is specifically designed for constrained scenarios and identifies LoRaWAN 
 
 This split surfaces the actual engineering trade: a compact classical authenticated handshake may be viable on a low-power link while a post-quantum hybrid exchange may incur substantial fragmentation and retransmission cost. The right response is to report the trade-off and require an explicit policy decision—not to silently downgrade the cryptographic property or claim that protocol crypto-agility implies an available PQ suite.
 
+## Restart-epoch collision experiment
+
+The TLA+ model now has an explicit nondeterministic restart operation, RestartWithEpoch(sender, epoch), in addition to the deterministic default-epoch restart. The paired packet_restart_epoch_collision_legacy.cfg and packet_restart_epoch_collision_strict.cfg configurations explore whether an epoch previously used by the sender can be selected again after a counter reset. The legacy configuration must produce a NoNonceReuse counterexample; the strict configuration must preserve that invariant by refusing a repeated complete (effective key, nonce) pair.
+
+This is a possibility proof, not a probability estimate. TLC's nondeterministic choice explores collisions but does not model a cryptographic random generator or show that epochs are independently uniform. The 1/256 collision probability applies only when two epoch draws are independent and uniform over 256 values. Even that idealized probability is far too weak to treat an 8-bit epoch as durable nonce-uniqueness protection.
+
 ## Threat model and assumptions
 
 The protected properties are claim-specific and not interchangeable:
