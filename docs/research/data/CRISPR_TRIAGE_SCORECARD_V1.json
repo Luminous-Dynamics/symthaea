@@ -1,0 +1,1747 @@
+{
+  "schema_version": "1.0.0",
+  "record_type": "benchmark_scorecard_contract",
+  "benchmark_id": "CRISPR-OT-001",
+  "title": "CRISPR off-target decision triage scorecard",
+  "status": "planning_only",
+  "authored_on": "2026-10-16",
+  "parent_contract": "docs/research/CRISPR_COST_AWARE_BENCHMARK_V1.md",
+  "protocol_document": "docs/research/CRISPR_TRIAGE_SCORECARD_V1.md",
+  "authority_ceiling": "retrospective computational research only; no clinical, biological safety, wet-lab, or guide-selection authority",
+  "execution_status": {
+    "source_artifacts_downloaded": false,
+    "source_terms_reviewed": false,
+    "artifact_digests_verified": false,
+    "cohort_reconstructed": false,
+    "metric_layer_executed": false,
+    "specialist_baseline_reproduced": false,
+    "symthaea_policy_evaluated": false,
+    "independent_verification_completed": false,
+    "improvement_demonstrated": false,
+    "rust_metric_kernel_compiled": false,
+    "rust_unit_tests_executed": false,
+    "paired_delta_label_sensitivity_bounds_executed": false,
+    "fixed_budget_cardinality_fixtures_executed": false,
+    "dataset_license_explicitly_verified": false,
+    "pareto_frontier_kernel_compiled": false,
+    "pareto_frontier_unit_tests_executed": false,
+    "selective_risk_kernel_compiled": false,
+    "selective_risk_unit_tests_executed": false,
+    "calibration_metrics_executed": false,
+    "risk_coverage_metrics_executed": false,
+    "measurement_allocator_compiled": false,
+    "measurement_allocator_unit_tests_executed": false,
+    "measurement_allocation_fixture_executed": false,
+    "interval_frontier_compiled": false,
+    "interval_frontier_unit_tests_executed": false,
+    "interval_frontier_fixture_executed": false,
+    "transportability_kernel_compiled": false,
+    "transportability_unit_tests_executed": false,
+    "transportability_fixture_executed": false,
+    "shift_robustness_radius_compiled": false,
+    "shift_robustness_radius_tests_executed": false,
+    "shift_robustness_radius_fixture_executed": false,
+    "verification_bias_kernel_compiled": false,
+    "verification_bias_unit_tests_executed": false,
+    "verification_bias_fixture_executed": false,
+    "probability_sampled_verification_audit_executed": false,
+    "selective_risk_zero_coverage_origin_implemented": true,
+    "selective_risk_zero_coverage_regression_test_authored": true
+  },
+  "label_states": [
+    {
+      "id": "positive",
+      "meaning": "An outcome identified as positive by the pinned reference definition and assay context."
+    },
+    {
+      "id": "assay_defined_negative",
+      "meaning": "A negative only under the explicit assay, tested scope, threshold and reference label rules."
+    },
+    {
+      "id": "unknown_unassayed",
+      "meaning": "Missing, unreported, untested, not nominated, or otherwise not established. Never silently convert to negative."
+    }
+  ],
+  "metric_tracks": [
+    {
+      "id": "T0_source_replay",
+      "required_before_performance_claims": true,
+      "metrics": [
+        "exact_count_reconciliation",
+        "sha256_artifact_manifest",
+        "exclusion_census",
+        "prediction_output_census"
+      ],
+      "acceptance": "Pinned artifacts and source transformations reconciled; any unexplained discrepancy blocks later claims."
+    },
+    {
+      "id": "T1_native_nomination",
+      "required": true,
+      "metrics": [
+        "native_positive_coverage",
+        "uncaptured_positive_count",
+        "per_guide_coverage"
+      ],
+      "denominator_rule": "Use all eligible measured positive sites in the reference cohort; native nominations are measured before any positive seeding."
+    },
+    {
+      "id": "T2_conditional_ranking",
+      "required": true,
+      "metrics": [
+        "macro_recall_at_k",
+        "micro_recall_at_k",
+        "precision_at_k_when_labels_support_it",
+        "pr_auc_when_valid",
+        "false_negative_census",
+        "recall_label_sensitivity_bounds",
+        "precision_label_sensitivity_bounds",
+        "fixed_budget_candidate_count"
+      ],
+      "denominator_rule": "Freeze and identify one exact candidate universe; report whether positive sites were seeded into it. Ranking performance is not nomination performance. For Recall@K, K must be positive and at least K candidates must exist. If the ranking has fewer than K candidates, report not_estimable_at_budget_K rather than silently taking a shorter list."
+    },
+    {
+      "id": "T3_budgeted_review",
+      "required": true,
+      "metrics": [
+        "recall_at_fixed_slots",
+        "slots_at_baseline_recall",
+        "precision_tradeoff",
+        "candidate_review_slots"
+      ],
+      "denominator_rule": "Compare policies at the same eligible reference and identical review budget. Candidate slots are a review-burden proxy, not measured lab cost."
+    },
+    {
+      "id": "T4_calibration_abstention",
+      "required_when_labels_support_it": true,
+      "metrics": [
+        "brier_score_on_measured_labels",
+        "log_loss_without_silent_endpoint_clipping",
+        "fixed_bin_reliability",
+        "expected_calibration_error_with_bin_counts",
+        "risk_coverage_curve",
+        "observed_label_risk",
+        "unknown_aware_error_rate_bounds",
+        "abstention_rate",
+        "per_context_calibration_and_risk_coverage"
+      ],
+      "denominator_rule": "Calibration losses use measured positive/assay-defined-negative outcomes and report unknown counts; values are conditional on label ascertainment. Each risk-coverage point includes accepted coverage, observed-label coverage, accepted-label completeness, observed-label risk, and sharp unknown-label error bounds. Confidence ties enter together. Results are per preregistered context; no labels means calibration not estimable. The curve includes an explicit zero-coverage origin; any risk/bound/completeness ratio with zero accepted cases is not estimable and must be null rather than zero."
+    },
+    {
+      "id": "T5_shift_robustness",
+      "required_for_generalization_claims": true,
+      "metrics": [
+        "leave_guide_cas9_group_out_delta",
+        "leave_assay_family_out_delta",
+        "independent_cohort_delta",
+        "per_group_results"
+      ],
+      "denominator_rule": "Keep guide/Cas9 groups, duplicates, known derivatives and prior-derived examples on the correct side of split boundaries."
+    },
+    {
+      "id": "T6_incrementality",
+      "required": true,
+      "metrics": [
+        "paired_delta_at_equal_budget",
+        "ablation_delta",
+        "runtime_and_resource_delta",
+        "paired_recall_delta_label_sensitivity_bounds"
+      ],
+      "denominator_rule": "Hold specialist outputs, candidate universe, and budget fixed when isolating the Symthaea-added policy. Where unknowns exist, policy comparisons require identical candidate IDs and label mappings, shared latent outcomes for unknown sites, and paired worst/best-case Recall@K-delta bounds."
+    },
+    {
+      "id": "T7_evidence_integrity",
+      "required": true,
+      "metrics": [
+        "deterministic_replay",
+        "manifest_digest",
+        "negative_control_failures",
+        "source_and_lineage_completeness"
+      ],
+      "denominator_rule": "Evidence receipts establish provenance/integrity only; they cannot by themselves establish biological truth."
+    },
+    {
+      "id": "T8_partial_label_identification",
+      "required_when_unknown_candidates_exist": true,
+      "metrics": [
+        "observed_known_label_recall_at_k",
+        "worst_case_recall_bound",
+        "best_case_recall_bound",
+        "worst_case_precision_bound",
+        "best_case_precision_bound",
+        "unknown_count_inside_and_outside_review_budget"
+      ],
+      "assumptions": [
+        "only label assignments of unknown candidates inside the exact declared ranking universe are varied",
+        "known positives use the frozen reference definition",
+        "known negatives are negatives only under the declared assay, threshold and detection scope",
+        "unknowns outside the candidate universe and positives missed by every nomination method are not bounded by this conditional calculation"
+      ],
+      "interpretation": "These are sharp worst/best-case label-assignment bounds, not statistical confidence intervals, posterior probabilities or safety guarantees."
+    },
+    {
+      "id": "T9_multi_objective_frontier",
+      "required": true,
+      "metrics": [
+        "complete_objective_vector_by_policy",
+        "pareto_frontier_policy_ids",
+        "dominated_policy_count",
+        "excluded_policy_ids_and_reasons",
+        "objective_direction_unit_and_availability_manifest"
+      ],
+      "objectives_must_be_preregistered": true,
+      "objective_policy": "Selective-risk objectives must use the same preregistered coverage tier, eligible episodes, and label-availability rule for every policy. Do not mix metrics computed on different subsets or zero-fill unknown/not-estimable values.",
+      "acceptance": "All compared policy vectors use the same objective definitions, units, direction, held-out episodes and metric availability rule. Every nondominated policy and full vector is reported.",
+      "candidate_objectives": [
+        "macro_recall_at_fixed_budget",
+        "review_slots_at_fixed_recall",
+        "worst_guide_cas9_group_recall",
+        "paired_label_sensitivity_bounds",
+        "brier_score_or_log_loss_when_estimable",
+        "upper_unknown_aware_error_rate_bound_at_fixed_coverage",
+        "accepted_label_completeness_at_fixed_coverage",
+        "measured_runtime_and_compute",
+        "lower_target_mixture_recall_delta_when_estimable",
+        "nominal_critical_population_shift_tv_radius_when_estimable",
+        "conservative_lower_bound_shift_tv_radius_when_estimable"
+      ]
+    },
+    {
+      "id": "T10_selective_prediction",
+      "required_when_probability_or_confidence_outputs_exist": true,
+      "metrics": [
+        "brier_score_on_measured_labels",
+        "log_loss_on_measured_labels",
+        "fixed_bin_reliability_and_counts",
+        "expected_calibration_error_with_counts",
+        "risk_coverage_curve",
+        "observed_label_risk",
+        "unknown_aware_error_bounds",
+        "per_context_calibration",
+        "per_context_label_completeness"
+      ],
+      "abstention_policy": "Freeze the confidence score and acceptance rule before holdout reveal. Accept confidence tiers in descending order; exact ties enter together. Predicted positive iff probability_positive > 0.5; score endpoints are not clipped to hide overconfident errors.",
+      "denominator_rule": "Calibration losses use measured positives and assay-defined negatives only; report unknowns explicitly and do not call conditional known-label metrics full-cohort calibration. Error bounds over accepted cases assign unknown outcomes best/worst for the prediction. These bounds are not confidence intervals.",
+      "acceptance": "Publish full curves and context-specific summaries; calibration is not estimable if a context has no valid measured labels. Missing thresholds and not-estimable metrics are reported explicitly."
+    },
+    {
+      "id": "T11_decision_critical_measurement",
+      "required_when_unknown_outcomes_and_multiple_policies_exist": true,
+      "metrics": [
+        "differential_unknown_labels_resolved_at_declared_cost_budget",
+        "residual_direct_paired_numerator_ambiguity_count",
+        "measurement_cost_units_spent_and_unused",
+        "per_context_allocation_counts",
+        "paired_recall_label_sensitivity_bounds_before_after_observed_labels"
+      ],
+      "objective_definition": "Maximize count of unknown candidates whose top-K membership differs between policies A and B that can be measured under the declared cost-unit budget, for one frozen shared candidate universe and K. Each such label has unit impact on the paired positive-hit-count numerator if positive.",
+      "allocation_policy": "Compute top-K membership from complete one-based ranks under both policies; consider only UnknownUnassayed candidates selected by exactly one policy; select lowest declared positive cost units first, breaking ties deterministically by context and candidate ID.",
+      "exclusions": "Same-membership unknowns are counted but not selected by this narrow objective. This does not resolve denominator uncertainty, unknown labels in both/ neither top-K sets, positives omitted from the candidate universe, or the full paired sensitivity interval.",
+      "baseline_requirement": "Compare against random, highest-confidence/score-first, and top-ranked-unknown-first allocations at equal declared cost on identical preregistered episodes.",
+      "acceptance": "Same complete candidate universe, exact one-based full rankings, identical K, explicit costs, deterministic output, exact spend accounting, and explicit residual ambiguity. This is a measurement allocation heuristic, not an expected-value-of-information or lab-savings claim."
+    },
+    {
+      "id": "T12_interval_aware_robust_frontier",
+      "required_when_metric_intervals_are_available": true,
+      "metrics": [
+        "robust_frontier_policy_ids",
+        "definitely_dominated_policy_ids",
+        "robust_dominance_pairs",
+        "possible_only_dominance_pairs",
+        "point_vs_interval_frontier_disagreement_count",
+        "interval_provenance_and_joint_coverage_notes"
+      ],
+      "definitions": {
+        "robust_dominance": "A's worst-case bound is no worse than B's best-case bound for every objective, with strict improvement for at least one objective.",
+        "possible_only_dominance": "At least one assignment inside the supplied coordinate-wise intervals permits A to dominate B, but robust dominance is not established.",
+        "robust_frontier": "Policies not definitely dominated by another policy under the declared interval vectors."
+      },
+      "requirements": [
+        "Input intervals are supplied by a documented metric/uncertainty procedure; this utility does not derive confidence intervals.",
+        "All policy vectors use identical preregistered objectives, directions, episodes and availability policy.",
+        "Report interval provenance, grouping, pairing, and whether joint/simultaneous coverage across policies/objectives was addressed.",
+        "Do not interpret coordinate-wise intervals as expressing covariance or joint coverage.",
+        "Possible dominance is not a win; an enlarged robust frontier may signal insufficient evidence to distinguish options."
+      ],
+      "acceptance": "F11 and adversarial fixtures validate definite, possible-only, and incomparable relations. Publish robust frontier and possible-only relations separately; compare against point-estimate frontier without converting intervals to midpoints."
+    },
+    {
+      "id": "T13_target_mixture_transportability",
+      "required_when_target_context_prevalence_may_differ_from_source": true,
+      "metrics": [
+        "context_specific_paired_recall_delta_intervals",
+        "target_prevalence_bounds_by_context",
+        "lower_target_mixture_delta",
+        "upper_target_mixture_delta",
+        "lower_endpoint_prevalence_witness",
+        "upper_endpoint_prevalence_witness",
+        "robust_positive_nonpositive_or_inconclusive_status",
+        "source_vs_target_sign_change"
+      ],
+      "estimand": "Target-population mixture of context-specific paired Recall@K deltas for one frozen policy-versus-baseline comparison and one declared K, over all target prevalence vectors consistent with preregistered context-specific lower/upper bounds.",
+      "calculation": "For the lower bound, use each context's delta lower endpoint and minimize the weighted sum over the bounded simplex; for the upper bound use delta upper endpoints and maximize the weighted sum. Initialize weights at prevalence lower bounds and allocate remaining mass in sorted objective order up to each upper bound.",
+      "acceptance": "Every context with positive feasible target prevalence has supported, permitted context-specific evidence; weights are in [0,1]; lower-bound sum <= 1 <= upper-bound sum; endpoint witness weights obey bounds and sum to one. A positive-transfer claim requires lower target-mixture bound > 0.",
+      "fail_closed_rules": [
+        "Unsupported target context is not assigned zero and blocks the target comparison.",
+        "Infeasible prevalence intervals fail closed.",
+        "Group-effect intervals and target prevalence bounds need separate provenance and joint-coverage caveats.",
+        "The envelope is not a confidence interval or proof of exchangeability."
+      ]
+    },
+    {
+      "id": "T14_shift_robustness_radius",
+      "required_when_context_prevalence_shift_is_in_scope": true,
+      "metrics": [
+        "source_mixture_nominal_effect",
+        "nominal_critical_tv_shift_radius",
+        "nominal_sign_change_witness_weights",
+        "source_mixture_conservative_lower_effect",
+        "conservative_critical_tv_shift_radius",
+        "conservative_sign_change_witness_weights",
+        "erasable_or_not_within_declared_target_bounds"
+      ],
+      "definition": "Minimum total-variation distance from the source context-prevalence vector to a feasible target prevalence vector whose weighted context effect is non-positive, constrained by preregistered target-prevalence bounds. TV=0.5*L1 distance.",
+      "nominal_analysis": "Uses preregistered point effects for each context.",
+      "conservative_analysis": "Uses supplied lower effect bound for each context; if the source mix is already non-positive, radius is zero.",
+      "requirements": [
+        "Source weights sum to one and lie within declared target prevalence bounds; prevalence bounds form a feasible simplex.",
+        "Group effect values/intervals and source/target prevalence weights have separate provenance.",
+        "Output includes a feasible sign-change witness and checks its TV distance; no witness means no reversal is feasible within the declared bounds.",
+        "Always report nominal and conservative radii separately; a positive nominal radius does not override a zero conservative radius.",
+        "Do not infer empirical target shift, clinical harm, laboratory savings or safety from this sensitivity metric."
+      ]
+    },
+    {
+      "id": "T15_probability_sampled_verification",
+      "metrics": [
+        "verified_population_candidate_count_estimate",
+        "design_weighted_population_positive_count_estimate",
+        "design_weighted_top_k_positive_count_estimate",
+        "design_weighted_recall_at_k_ratio_estimate",
+        "design_weighted_precision_at_k_ratio_estimate",
+        "naive_audit_sample_metrics_for_contrast",
+        "overall_and_top_k_kish_effective_sample_size",
+        "frame_coverage_and_inclusion_probability_manifest",
+        "resolved_outcome_inclusion_probability_manifest"
+      ],
+      "acceptance": "Only report population-oriented estimates when the complete ranking census and audit frame are frozen and independently verified, all frame members have known nonzero inclusion probability, and selection is outcome-blind conditional on the declared design. Publish weighted estimates alongside naïve sample-only diagnostics and design details; report no claim for unobserved/unincluded candidates outside the frame. Ratio estimates are not finite-sample unbiased, and this kernel does not compute confidence intervals. Inclusion probabilities must apply to resolved, analyzable audit outcomes rather than merely invitations to test; any unresolved outcome in the submitted audit rows blocks this kernel instead of becoming negative."
+    }
+  ],
+  "primary_targets": {
+    "status": "proposed_not_validated_not_a_clinical_standard",
+    "success_alternatives": [
+      {
+        "id": "equal_budget_recall",
+        "target": "+5 absolute percentage points in macro Recall@K versus the strongest fair baseline on preregistered held-out guide/Cas9 groups",
+        "required_conditions": [
+          "same candidate universe and same fixed K for all compared policies",
+          "endpoint, splits, exclusions, analysis and interval procedure preregistered before holdout reveal",
+          "report precision, false negatives and all per-group deltas",
+          "paired group-aware interval excludes no improvement",
+          "report paired label-sensitivity bounds when unknown candidates exist; call the improvement label-robust within the fixed universe only if the paired worst-case lower bound is above zero",
+          "When unknown candidates exist, label-robust superiority within the exact candidate universe requires the paired worst-case Recall@K-delta lower bound to exceed zero; a statistical improvement on observed labels alone must be reported as observed-label improvement."
+        ]
+      },
+      {
+        "id": "equal_recall_review_budget",
+        "target": "20% fewer candidate review slots to reach the baseline's preregistered recall target on the same episodes",
+        "required_conditions": [
+          "same eligible positive reference and same candidate universe",
+          "baseline recall target fixed before holdout reveal",
+          "report precision, false negatives and all per-group deltas",
+          "paired group-aware interval excludes no improvement",
+          "report paired label-sensitivity bounds when unknown candidates exist; call the improvement label-robust within the fixed universe only if the paired worst-case lower bound is above zero",
+          "When unknown candidates exist, label-robust superiority within the exact candidate universe requires the paired worst-case Recall@K-delta lower bound to exceed zero; a statistical improvement on observed labels alone must be reported as observed-label improvement."
+        ]
+      }
+    ],
+    "inconclusive_rule": "If the interval includes no improvement or effective independent group sample is inadequate, label the result null_or_inconclusive.",
+    "cross_dataset_rule": "Do not claim robustness across datasets without at least one separately sourced cohort whose terms explicitly permit the intended use.",
+    "secondary_selective_prediction": {
+      "status": "aspirational_engineering_targets_not_clinical_standards",
+      "targets": [
+        "Publish full risk-coverage curves with accepted coverage, known-label coverage, accepted-label completeness, observed-label risk and unknown-aware error bounds.",
+        "Compare calibration only on identical measured-label held-out cases; aspirational target is at least 10% relative Brier-score reduction without worse log loss versus the strongest fair calibrated baseline, with group-paired uncertainty and no claimed win if the interval includes no improvement.",
+        "Report context-specific calibration and risk-coverage summaries; a context with no measured labels has calibration marked not estimable.",
+        "At 50%, 80% and 90% coverage where attainable without splitting confidence ties, report observed-label risk and label-assignment bounds; do not substitute a nearby threshold when unattainable."
+      ],
+      "caveats": [
+        "No target is a clinical standard or claim of safety.",
+        "Calibration and risk estimates may be conditional on label ascertainment.",
+        "Bins, confidence policy and thresholds must be fixed before held-out outcomes are revealed."
+      ]
+    },
+    "secondary_measurement_allocation": {
+      "status": "aspirational_engineering_targets_not_clinical_standards",
+      "targets": [
+        "At equal declared cost budget, resolve at least 20% more policy-differential unknown labels than random allocation on preregistered synthetic/stress-test episodes, if the fixture mix makes that comparison estimable.",
+        "On permitted real cohorts, compare the same policy against random, confidence-first and top-ranked-unknown baselines; publish measured result, context coverage, spend and residual paired sensitivity bounds.",
+        "Never describe direct paired-numerator ambiguity resolution as resolving all label uncertainty or proving expected experimental value."
+      ],
+      "caveats": [
+        "Unit cost is a preregistered cost proxy, not actual laboratory cost or dollars.",
+        "No biological source data or assay outcomes were used for this planning contract.",
+        "The planner is not a wet-lab protocol or clinical decision system."
+      ]
+    },
+    "secondary_interval_frontier": {
+      "status": "proposed_engineering_target_not_validated",
+      "targets": [
+        "100% of compared policies provide intervals on the same preregistered objective axes or are explicitly excluded with a reason.",
+        "0 robust-dominance claims where worst-vs-best interval separation does not hold on every objective with strict separation on at least one.",
+        "Report robust frontier, definite dominators, possible-only pairs and point-frontier disagreements."
+      ],
+      "caveats": [
+        "Intervals must be generated by an independently documented procedure.",
+        "Marginal intervals alone do not ensure simultaneous coverage across multiple objectives/policies.",
+        "Robust dominance of computational endpoints is not biological or clinical safety."
+      ]
+    },
+    "secondary_transportability": {
+      "status": "proposed_engineering_gates_not_clinical_standards",
+      "targets": [
+        "100% of target contexts with nonzero feasible prevalence have supported context-specific metric episodes, or comparison is marked not estimable.",
+        "Zero positive-transfer claims when the conservative lower target-mixture delta is at or below zero.",
+        "Report both endpoint witness weight vectors and compare source-weighted, nominal-target and bounded-target-mixture conclusions.",
+        "Report every context effect interval plus source/target population and provenance and joint-coverage limits of prevalence/effect bounds."
+      ],
+      "caveats": [
+        "Target prevalence bounds must be preregistered or externally justified; they are not estimated by this utility.",
+        "Effect intervals are supplied inputs, and dependence between context effects and weights may make the envelope conservative.",
+        "A target-mixture Recall@K result is a computational endpoint only, not a clinical safety or efficacy claim."
+      ]
+    },
+    "secondary_shift_radius": {
+      "status": "proposed_methodological_target_not_validated",
+      "targets": [
+        "Report the nominal and conservative robustness radius for 100% of estimable target-mixture comparisons.",
+        "Every finite radius includes an independently checked witness weight vector with weighted effect <=0 and TV equal to half the L1 change.",
+        "Where the conservative radius is zero, do not describe the improvement as robustly positive.",
+        "Report whether the radius is small relative to an independently justified plausible-shift range; do not invent a universal acceptable radius."
+      ],
+      "caveats": [
+        "The utility does not estimate group effects, target prevalence, or real-world shift magnitude.",
+        "The conservative radius is conditional on supplied effect intervals and target bounds; unsupported contexts remain blockers.",
+        "This is a sign-change sensitivity analysis, not a confidence interval or clinical endpoint."
+      ]
+    }
+  },
+  "non_negotiable_gates": [
+    {
+      "id": "G0_rights_and_identity",
+      "target": "100% of used artifacts have source identity, terms/permission status, retrieval/version metadata and verified SHA-256 digests",
+      "failure_action": "Block ingestion or benchmark execution for artifacts with unresolved rights/identity."
+    },
+    {
+      "id": "G1_label_semantics",
+      "target": "100% of outcomes use positive, assay_defined_negative or unknown_unassayed semantics",
+      "failure_action": "Reject any scorer that silently converts unknown outcomes into negatives."
+    },
+    {
+      "id": "G2_reporting_denominators",
+      "target": "100% of reported metrics identify candidate universe, seeding status, independent group unit, denominator and missingness policy",
+      "failure_action": "Block performance comparison."
+    },
+    {
+      "id": "G3_adversarial_fixtures",
+      "target": "100% of deliberately corrupted provenance/leakage fixtures are rejected by the independent verifier",
+      "failure_action": "Block performance claims until the verifier catches all required negative controls."
+    },
+    {
+      "id": "G4_deterministic_replay",
+      "target": "Same pinned inputs produce identical canonical metric outputs and manifest digest",
+      "failure_action": "Block reproducibility claim."
+    },
+    {
+      "id": "G5_evidence_ceiling",
+      "target": "Prediction/schema/signature receipts cannot promote prediction evidence to observation, assessment or replication",
+      "failure_action": "Reject the invalid evidence-state transition."
+    },
+    {
+      "id": "G6_partial_label_reporting",
+      "target": "100% of metrics affected by unknown/unassayed candidates report explicit label-sensitivity bounds or a declared not-estimable state",
+      "failure_action": "Reject any report that silently coerces unknown outcomes into negatives or presents known-label metrics as complete-reference truth."
+    },
+    {
+      "id": "G7_paired_delta_label_sensitivity",
+      "target": "Policy superiority claims involving unknown labels use a paired comparison on identical candidate IDs and label mappings, with shared unknown outcomes and explicit worst/best-case delta bounds",
+      "failure_action": "Reject claims derived solely from overlapping/non-overlapping independent metric intervals or from treating an unknown candidate as a negative."
+    },
+    {
+      "id": "G8_fixed_budget_cardinality",
+      "target": "Every fixed-budget comparison has at least K candidates under every compared policy, or the metric is explicitly marked not estimable",
+      "failure_action": "Reject comparisons that silently evaluate a shorter candidate list as if it used the same review budget."
+    },
+    {
+      "id": "G9_pareto_no_scalarization",
+      "target": "Report context-appropriate, complete objective vectors and the full Pareto frontier; do not collapse endpoints into a single universal CRISPR safety score",
+      "failure_action": "Reject missing-value zero-fill, undocumented objective directions, changing objective sets after evaluation, or unsupported utility weights."
+    },
+    {
+      "id": "G10_selective_prediction_integrity",
+      "target": "100% of calibration/risk-coverage reports identify measured-label denominators, unknown counts, fixed bins, abstention/confidence policy, tie handling, and per-context results.",
+      "failure_action": "Reject silent unknown-to-negative conversion, post-hoc threshold/bin selection, clipped overconfident errors, or pooled summaries that hide contexts with no labels."
+    },
+    {
+      "id": "G11_decision_critical_measurement_integrity",
+      "target": "100% of measurement plans derive policy-exclusive top-K membership from full rankings over the same candidate universe, respect K and declared cost units, and publish residual ambiguity.",
+      "failure_action": "Reject caller-supplied unverified disagreement flags, rank overlap/gaps, unknown-to-negative conversion, underfilled fixed-budget comparisons, post-hoc allocation, or claims that the narrow numerator objective resolves all uncertainty."
+    },
+    {
+      "id": "G12_interval_frontier_integrity",
+      "target": "100% of robust dominance claims satisfy worst-bound vs best-bound comparison in every declared objective; possible-only relations are never reported as definite wins.",
+      "failure_action": "Reject invalid/reversed/non-finite intervals, cross-objective mismatch, midpoint-only substitution, undocumented interval provenance, or claims that interval dominance establishes biological/clinical safety."
+    },
+    {
+      "id": "G13_target_mixture_transportability",
+      "target": "100% of target contexts with nonzero feasible prevalence have supported context-specific effect intervals; endpoint witness mixtures are feasible; robust positive-transfer requires lower bound > 0.",
+      "failure_action": "Reject unsupported-context zero imputation, infeasible prevalence ranges, missing witness vectors, undocumented group effect/prevalence provenance, or positive-transfer claims from nominal weights alone."
+    },
+    {
+      "id": "G14_shift_radius_integrity",
+      "target": "100% of finite robustness radii include a feasible sign-change witness, correct TV distance, and separate nominal/conservative interpretation.",
+      "failure_action": "Reject source weights outside the target simplex bounds, unsupported contexts, invalid effects, infeasible prevalence ranges, a witness whose effect remains positive, or reporting nominal radius as a substitute for the conservative radius."
+    },
+    {
+      "id": "G15_probability_verification_integrity",
+      "target": "100% of population-oriented audit estimates use a verified complete candidate frame/ranking, known nonzero inclusion probabilities and an outcome-blind probability sample declared before outcomes are revealed.",
+      "failure_action": "Reject convenience samples with unknown inclusion probabilities, zero-inclusion strata, post-outcome ranking changes, unverified ranking censuses, duplicate candidate/rank identities, or invalid propensities. Never convert unknown labels to negatives or claim coverage of candidates outside the frozen frame. Inclusion probabilities must describe the final resolved-label sample, not merely audit invitations; any unresolved outcome row blocks estimation rather than being coerced to negative."
+    }
+  ],
+  "comparator_policies": [
+    "B0_simple_deterministic_baseline",
+    "B1_best_qualified_permitted_specialist",
+    "B2_simple_rank_fusion",
+    "B3_specialist_without_symthaea_triage",
+    "S1_symthaea_coverage_and_provenance",
+    "S2_S1_plus_disagreement_uncertainty",
+    "S3_S2_plus_abstention",
+    "S4_full_preregistered_symthaea_policy",
+    "N0_seeded_random_order_sanity_reference"
+  ],
+  "split_policy": {
+    "preferred_independent_unit": "guide_cas9_group",
+    "additional_grouping_controls": [
+      "near_identical_guides",
+      "duplicate_genomic_sites",
+      "source_study_derivatives",
+      "prior_knowledge_source_examples",
+      "assay_or_dataset_ancestry"
+    ],
+    "row_random_split_role": "diagnostic_only",
+    "statistical_uncertainty": "paired group-aware intervals; publish all group results; do not use row-level bootstrap as the sole uncertainty method",
+    "limitation": "A cohort with 26 guide/Cas9 groups is small; interval precision and generalization claims must reflect this."
+  },
+  "source_rights_constraints": [
+    {
+      "source_id": "Kaufmann-2026-OffTarget-Benchmark",
+      "doi": "10.1177/10430342261466407",
+      "use_status": "blocked_until_explicit_artifact_license_or_rights_holder_confirmation",
+      "note": "Public reproduction code declares MIT in pyproject.toml, but this is not a data license. The Zenodo record (DOI 10.5281/zenodo.20627722) lists the 190.7 MB archive and record-exposed MD5 611cb28ab0516e471c5dc59ea44a330a; its retrieved Rights/License view showed no license value. Archive was not downloaded and no SHA-256 verified.",
+      "zenodo_artifact_audit": {
+        "record_url": "https://zenodo.org/records/20627722",
+        "record_doi": "10.5281/zenodo.20627722",
+        "archive_filename": "offtarget_prediction_benchmark_zenodo_artifacts_v1.zip",
+        "published_archive_size": "190.7 MB",
+        "record_exposed_md5": "611cb28ab0516e471c5dc59ea44a330a",
+        "sha256_verified": false,
+        "observed_rights_state": "Zenodo record view exposes a Rights/License section but no license value was visible in the retrieved record content",
+        "permission_status": "unresolved_blocked_until_explicit_data_license_or_rights_holder_confirmation",
+        "rule": "Do not download, ingest, or use the archive for benchmark/model development until intended use and data rights are explicitly verified. The reproduction repository's MIT code declaration does not grant dataset rights.",
+        "source_observation_url": "https://zenodo.org/records/20627722"
+      }
+    },
+    {
+      "source_id": "Kinney-2026-UNCOVERseq",
+      "doi": "10.1038/s41467-026-74623-7",
+      "use_status": "blocked_for_model_development_until_written_permission_for_intended_use",
+      "allowed_current_use": "literature context only, within the paper's study-specific scope"
+    }
+  ],
+  "cost_interpretation": {
+    "immediate_measurables": [
+      "candidate_review_slots",
+      "runtime",
+      "compute_resources"
+    ],
+    "only_if_measured": [
+      "human_review_minutes",
+      "cost_per_qualified_result"
+    ],
+    "prohibited_inference": "Fewer candidate review slots do not by themselves establish reduced wet-lab spend, healthcare costs, reimbursement or final treatment prices."
+  },
+  "nonclaims": [
+    "Symthaea outperforms specialist tools",
+    "a predicted site establishes clinical safety",
+    "a therapy or guide is validated",
+    "lab or treatment costs have been reduced",
+    "a new therapy has been discovered",
+    "cryptographic integrity proves biological truth"
+  ],
+  "references": [
+    "https://doi.org/10.1177/10430342261466407",
+    "https://www.nature.com/articles/s42003-025-08275-6",
+    "https://academic.oup.com/bib/article/27/2/bbag140/8559621",
+    "https://doi.org/10.1038/s41588-025-02428-3",
+    "https://doi.org/10.1016/j.tibtech.2026.07.015",
+    "https://doi.org/10.1093/nar/gkae759",
+    "https://doi.org/10.1016/j.ins.2026.123217",
+    "https://proceedings.mlr.press/v337/laghuvarapu26a.html",
+    "https://doi.org/10.1214/26-EJS2506",
+    "https://arxiv.org/abs/2609.27955",
+    "https://doi.org/10.1287/opre.2022.0658",
+    "https://proceedings.mlr.press/v306/agirman26a.html"
+  ],
+  "synthetic_contract_fixtures": [
+    {
+      "id": "F1_nomination_is_not_seeded_ranking",
+      "purpose": "Prove that adding measured positives to a ranking universe cannot improve the native candidate-generator's historical nomination coverage.",
+      "eligible_positive_ids": [
+        "p1",
+        "p2",
+        "p3",
+        "p4"
+      ],
+      "native_nominated_ids": [
+        "p1",
+        "p3",
+        "n1"
+      ],
+      "post_seeded_ranking": [
+        "p1",
+        "n1",
+        "p3",
+        "p2",
+        "p4",
+        "n2"
+      ],
+      "expected": {
+        "native_positive_coverage": 0.5,
+        "uncaptured_positive_ids": [
+          "p2",
+          "p4"
+        ],
+        "recall_at_k": {
+          "3": 0.5,
+          "5": 1
+        },
+        "invariant": "native nomination coverage stays 0.5 even when ranking on the post-seeded universe later reaches recall 1.0"
+      }
+    },
+    {
+      "id": "F2_unknown_is_not_negative",
+      "purpose": "Ensure unassayed outcomes are not silently turned into true negatives or used to claim precision.",
+      "ranked_candidates": [
+        {
+          "id": "u1",
+          "label": "unknown_unassayed"
+        },
+        {
+          "id": "p1",
+          "label": "positive"
+        },
+        {
+          "id": "n1",
+          "label": "assay_defined_negative"
+        }
+      ],
+      "review_budget": 2,
+      "expected": {
+        "positives_in_top_k": 1,
+        "eligible_positive_denominator": 1,
+        "recall_at_k": 1,
+        "precision_at_k": "not_estimable_due_to_unknown_in_review_set"
+      }
+    },
+    {
+      "id": "F3_digest_mismatch_blocks_replay",
+      "purpose": "A source digest mismatch must stop metric execution rather than allow an unqualified report.",
+      "input_manifest_sha256": "fixture:expected-digest",
+      "observed_artifact_sha256": "fixture:changed-digest",
+      "expected": {
+        "replay_status": "blocked",
+        "metric_claim_allowed": false
+      }
+    },
+    {
+      "id": "F4_group_leakage_blocks_generalization",
+      "purpose": "The same guide/Cas9 group cannot appear in both train and held-out partitions when group holdout is the declared split.",
+      "group_id": "guide-cas9-group-07",
+      "train_group_ids": [
+        "guide-cas9-group-01",
+        "guide-cas9-group-07"
+      ],
+      "held_out_group_ids": [
+        "guide-cas9-group-07",
+        "guide-cas9-group-18"
+      ],
+      "expected": {
+        "split_status": "invalid",
+        "generalization_claim_allowed": false
+      }
+    },
+    {
+      "id": "F5_partial_labels_have_bounds",
+      "purpose": "Use label-sensitivity bounds rather than treating unknown candidates as negatives.",
+      "eligible_positive_ids": [
+        "p1",
+        "p2"
+      ],
+      "candidates_by_rank": [
+        {
+          "id": "p1",
+          "label": "positive"
+        },
+        {
+          "id": "u1",
+          "label": "unknown_unassayed"
+        },
+        {
+          "id": "p2",
+          "label": "positive"
+        },
+        {
+          "id": "u2",
+          "label": "unknown_unassayed"
+        }
+      ],
+      "k": 2,
+      "expected": {
+        "known_label_recall_at_k": 0.5,
+        "recall_lower_bound": 0.3333333333333333,
+        "recall_upper_bound": 0.6666666666666666,
+        "precision_lower_bound": 0.5,
+        "precision_upper_bound": 1,
+        "note": "Conditional on this exact candidate universe; not a bound on positives outside it."
+      }
+    },
+    {
+      "id": "F6_paired_policy_delta_bounds",
+      "purpose": "Prove that the same unknown candidate label is coupled across two policy rankings.",
+      "eligible_positive_ids": [
+        "p1",
+        "p2"
+      ],
+      "policy_a": [
+        {
+          "id": "p1",
+          "rank": 1,
+          "label": "positive"
+        },
+        {
+          "id": "u1",
+          "rank": 2,
+          "label": "unknown_unassayed"
+        },
+        {
+          "id": "p2",
+          "rank": 3,
+          "label": "positive"
+        },
+        {
+          "id": "u2",
+          "rank": 4,
+          "label": "unknown_unassayed"
+        },
+        {
+          "id": "u3",
+          "rank": 5,
+          "label": "unknown_unassayed"
+        }
+      ],
+      "policy_b": [
+        {
+          "id": "p2",
+          "rank": 1,
+          "label": "positive"
+        },
+        {
+          "id": "u2",
+          "rank": 2,
+          "label": "unknown_unassayed"
+        },
+        {
+          "id": "p1",
+          "rank": 3,
+          "label": "positive"
+        },
+        {
+          "id": "u1",
+          "rank": 4,
+          "label": "unknown_unassayed"
+        },
+        {
+          "id": "u3",
+          "rank": 5,
+          "label": "unknown_unassayed"
+        }
+      ],
+      "k": 2,
+      "expected": {
+        "observed_known_label_recall_delta": 0,
+        "policy_a_only_unknown_count": 1,
+        "policy_b_only_unknown_count": 1,
+        "neutral_unknown_count": 1,
+        "paired_delta_lower_bound": -0.3333333333333333,
+        "paired_delta_upper_bound": 0.3333333333333333,
+        "note": "Both policy rankings use the same candidate IDs and label mapping; bound is conditional on this universe and is not a statistical confidence interval."
+      }
+    },
+    {
+      "id": "F7_fixed_budget_underfill",
+      "purpose": "Ensure a candidate ranking with fewer than K candidates is not scored as though it fulfilled a fixed review budget.",
+      "eligible_positive_ids": [
+        "p1",
+        "p2"
+      ],
+      "candidates": [
+        {
+          "id": "p1",
+          "rank": 1,
+          "label": "positive"
+        }
+      ],
+      "k": 2,
+      "expected": {
+        "recall_at_k": "not_estimable_at_budget_K",
+        "partial_label_sensitivity_at_k": "not_estimable_at_budget_K",
+        "rule": "Do not silently reduce K from 2 to 1."
+      }
+    },
+    {
+      "id": "F8_pareto_frontier_without_scalarization",
+      "purpose": "Retain legitimate trade-offs while removing a policy dominated on every objective.",
+      "objectives": [
+        {
+          "name": "macro_recall",
+          "direction": "maximize"
+        },
+        {
+          "name": "review_slots",
+          "direction": "minimize"
+        },
+        {
+          "name": "worst_group_recall",
+          "direction": "maximize"
+        }
+      ],
+      "policies": [
+        {
+          "id": "recall_first",
+          "values": [
+            0.9,
+            500,
+            0.55
+          ]
+        },
+        {
+          "id": "budget_first",
+          "values": [
+            0.82,
+            300,
+            0.7
+          ]
+        },
+        {
+          "id": "balanced",
+          "values": [
+            0.86,
+            350,
+            0.68
+          ]
+        },
+        {
+          "id": "dominated",
+          "values": [
+            0.8,
+            520,
+            0.5
+          ]
+        }
+      ],
+      "expected_frontier": [
+        "balanced",
+        "budget_first",
+        "recall_first"
+      ],
+      "expected_dominated": [
+        "dominated"
+      ],
+      "expected": "No scalar weighted score is calculated. Policies on the frontier are trade-offs, not automatically a winner or clinically superior."
+    },
+    {
+      "id": "F9_calibration_abstention_unknown_risk",
+      "purpose": "Ensure calibration is conditional on measured labels, unknown accepted outcomes widen error bounds, exact confidence ties are accepted together, and an unlabelled context does not acquire a fabricated calibration score.",
+      "calibration_cases": [
+        {
+          "id": "cal_pos",
+          "context": "g-cal",
+          "probability_positive": 0.9,
+          "confidence": 0.9,
+          "label": "positive"
+        },
+        {
+          "id": "cal_neg",
+          "context": "g-cal",
+          "probability_positive": 0.2,
+          "confidence": 0.8,
+          "label": "assay_defined_negative"
+        },
+        {
+          "id": "cal_unknown",
+          "context": "g-cal",
+          "probability_positive": 0.8,
+          "confidence": 0.7,
+          "label": "unknown_unassayed"
+        }
+      ],
+      "risk_cases": [
+        {
+          "id": "risk_correct",
+          "context": "g-risk",
+          "probability_positive": 0.9,
+          "confidence": 0.9,
+          "label": "positive"
+        },
+        {
+          "id": "risk_unknown",
+          "context": "g-risk",
+          "probability_positive": 0.2,
+          "confidence": 0.8,
+          "label": "unknown_unassayed"
+        },
+        {
+          "id": "risk_wrong",
+          "context": "g-risk",
+          "probability_positive": 0.8,
+          "confidence": 0.1,
+          "label": "assay_defined_negative"
+        }
+      ],
+      "tie_cases": [
+        {
+          "id": "tie-a",
+          "context": "g-tie",
+          "probability_positive": 0.9,
+          "confidence": 0.7,
+          "label": "positive"
+        },
+        {
+          "id": "tie-b",
+          "context": "g-tie",
+          "probability_positive": 0.1,
+          "confidence": 0.7,
+          "label": "assay_defined_negative"
+        },
+        {
+          "id": "tie-c",
+          "context": "g-tie",
+          "probability_positive": 0.9,
+          "confidence": 0.5,
+          "label": "positive"
+        }
+      ],
+      "no_label_context_cases": [
+        {
+          "id": "unassayed",
+          "context": "g-unassayed",
+          "probability_positive": 0.8,
+          "confidence": 0.5,
+          "label": "unknown_unassayed"
+        }
+      ],
+      "calibration_bin_count": 5,
+      "expected": {
+        "measured_label_count": 2,
+        "unknown_label_count": 1,
+        "brier_score": 0.025,
+        "expected_calibration_error": 0.15,
+        "risk_all_cases_observed_label_risk": 0.5,
+        "risk_all_cases_error_rate_lower_bound": 0.3333333333333333,
+        "risk_all_cases_error_rate_upper_bound": 0.6666666666666666,
+        "confidence_tie_first_tier_accepted_count": 2,
+        "no_label_context_calibration": "not_estimable"
+      },
+      "interpretation": "Synthetic method check only; not biological data or performance evidence."
+    },
+    {
+      "id": "F10_decision_critical_measurement_allocation",
+      "purpose": "Resolve unknown labels whose outcome can directly change the paired positive-hit-count numerator for a fixed top-K policy comparison.",
+      "review_budget_k": 3,
+      "budget_units": 2,
+      "candidate_universe": [
+        {
+          "id": "u-a",
+          "context": "guide-a",
+          "rank_a": 1,
+          "rank_b": 5,
+          "label": "unknown_unassayed",
+          "assay_cost_units": 2
+        },
+        {
+          "id": "u-b",
+          "context": "guide-a",
+          "rank_a": 5,
+          "rank_b": 2,
+          "label": "unknown_unassayed",
+          "assay_cost_units": 1
+        },
+        {
+          "id": "u-common",
+          "context": "guide-a",
+          "rank_a": 2,
+          "rank_b": 1,
+          "label": "unknown_unassayed",
+          "assay_cost_units": 3
+        },
+        {
+          "id": "p1",
+          "context": "guide-a",
+          "rank_a": 3,
+          "rank_b": 3,
+          "label": "positive",
+          "assay_cost_units": 1
+        },
+        {
+          "id": "n1",
+          "context": "guide-b",
+          "rank_a": 4,
+          "rank_b": 4,
+          "label": "assay_defined_negative",
+          "assay_cost_units": 1
+        },
+        {
+          "id": "u-neither",
+          "context": "guide-b",
+          "rank_a": 6,
+          "rank_b": 6,
+          "label": "unknown_unassayed",
+          "assay_cost_units": 1
+        }
+      ],
+      "expected": {
+        "initial_unknown_count": 4,
+        "initially_differential_unknown_count": 2,
+        "unknown_a_only_count": 1,
+        "unknown_b_only_count": 1,
+        "unknown_same_membership_count": 2,
+        "selected_ids": [
+          "u-b"
+        ],
+        "selected_cost_units": 1,
+        "unspent_cost_units": 1,
+        "unresolved_differential_unknown_count": 1
+      },
+      "interpretation": "Synthetic allocation fixture only. Does not represent experimental outcomes, full value of information, laboratory savings, or biological safety."
+    },
+    {
+      "id": "F11_interval_aware_frontier",
+      "purpose": "Ensure interval uncertainty prevents unsupported dominance claims and definite dominance removes only policies separated in the favorable direction on all objectives.",
+      "objectives": [
+        {
+          "name": "macro_recall",
+          "direction": "maximize"
+        },
+        {
+          "name": "review_slots",
+          "direction": "minimize"
+        }
+      ],
+      "policies": [
+        {
+          "id": "robust",
+          "values": [
+            {
+              "lower": 0.9,
+              "upper": 0.92
+            },
+            {
+              "lower": 90,
+              "upper": 100
+            }
+          ]
+        },
+        {
+          "id": "uncertain",
+          "values": [
+            {
+              "lower": 0.8,
+              "upper": 0.93
+            },
+            {
+              "lower": 95,
+              "upper": 130
+            }
+          ]
+        },
+        {
+          "id": "dominated",
+          "values": [
+            {
+              "lower": 0.7,
+              "upper": 0.75
+            },
+            {
+              "lower": 120,
+              "upper": 140
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "robust_frontier_ids": [
+          "robust",
+          "uncertain"
+        ],
+        "definitely_dominated_ids": [
+          "dominated"
+        ],
+        "robust_dominator_pairs": [
+          [
+            "robust",
+            "dominated"
+          ]
+        ],
+        "possible_only_dominator_pairs": [
+          [
+            "robust",
+            "uncertain"
+          ],
+          [
+            "uncertain",
+            "dominated"
+          ],
+          [
+            "uncertain",
+            "robust"
+          ]
+        ]
+      },
+      "interpretation": "Synthetic interval-relations fixture only. Inputs are not empirical CRISPR metrics, statistical confidence intervals or safety evidence."
+    },
+    {
+      "id": "F12_bounded_target_mixture_transportability",
+      "purpose": "Show that a positive nominal mixture can be inconclusive under plausible target-context prevalence and per-context effect intervals.",
+      "contexts": [
+        {
+          "context_id": "A",
+          "delta_lower": 0.08,
+          "delta_upper": 0.12,
+          "target_prevalence_lower": 0.2,
+          "target_prevalence_upper": 0.5,
+          "context_supported": true
+        },
+        {
+          "context_id": "B",
+          "delta_lower": 0.02,
+          "delta_upper": 0.07,
+          "target_prevalence_lower": 0.3,
+          "target_prevalence_upper": 0.6,
+          "context_supported": true
+        },
+        {
+          "context_id": "C",
+          "delta_lower": -0.25,
+          "delta_upper": -0.15,
+          "target_prevalence_lower": 0.1,
+          "target_prevalence_upper": 0.4,
+          "context_supported": true
+        }
+      ],
+      "nominal_mix": {
+        "A": 0.35,
+        "B": 0.45,
+        "C": 0.2
+      },
+      "expected": {
+        "nominal_midpoint_delta": 0.01525,
+        "lower_mixture_delta": -0.076,
+        "upper_mixture_delta": 0.073,
+        "lower_witness": {
+          "A": 0.2,
+          "B": 0.4,
+          "C": 0.4
+        },
+        "upper_witness": {
+          "A": 0.5,
+          "B": 0.4,
+          "C": 0.1
+        },
+        "conclusion": "inconclusive"
+      },
+      "interpretation": "Synthetic method fixture only; no target-population or biological data are supplied."
+    },
+    {
+      "id": "F13_population_shift_robustness_radius",
+      "purpose": "Measure minimum population-composition change that removes nominal and conservative paired Recall@K gains.",
+      "contexts": [
+        {
+          "id": "A",
+          "nominal_delta": 0.1,
+          "lower_delta": 0.08,
+          "upper_delta": 0.12,
+          "source_weight": 0.35,
+          "target_weight_lower": 0.2,
+          "target_weight_upper": 0.5,
+          "context_supported": true
+        },
+        {
+          "id": "B",
+          "nominal_delta": 0.045,
+          "lower_delta": 0.02,
+          "upper_delta": 0.07,
+          "source_weight": 0.45,
+          "target_weight_lower": 0.3,
+          "target_weight_upper": 0.6,
+          "context_supported": true
+        },
+        {
+          "id": "C",
+          "nominal_delta": -0.2,
+          "lower_delta": -0.25,
+          "upper_delta": -0.15,
+          "source_weight": 0.2,
+          "target_weight_lower": 0.1,
+          "target_weight_upper": 0.4,
+          "context_supported": true
+        }
+      ],
+      "expected": {
+        "source_nominal_delta": 0.01525,
+        "nominal_critical_tv_radius": 0.0508333333333333,
+        "nominal_sign_change_witness": {
+          "A": 0.2991666666666667,
+          "B": 0.45,
+          "C": 0.2508333333333333
+        },
+        "source_conservative_lower_delta": -0.013,
+        "conservative_critical_tv_radius": 0,
+        "conservative_conclusion": "already_non_positive"
+      },
+      "interpretation": "Synthetic sensitivity fixture only; TV radius and context intervals are not measured biological properties."
+    },
+    {
+      "id": "F14_probability_sampled_verification",
+      "purpose": "Demonstrate design-weighted recall/precision estimates when audit inclusion probabilities differ by candidate, and expose how the complete-case audit-subset recall can disagree.",
+      "design": {
+        "design_id": "f14-audit-v1",
+        "population_size": 10,
+        "top_k": 4,
+        "probability_sample": true,
+        "all_candidates_have_nonzero_inclusion_probability": true,
+        "ranking_frozen_before_outcome_reveal": true,
+        "selection_outcome_blind": true,
+        "full_ranking_census_verified": true,
+        "resolved_outcome_inclusion_probabilities_verified": true
+      },
+      "sample": [
+        {
+          "candidate_id": "r1",
+          "rank": 1,
+          "inclusion_probability": 0.5,
+          "outcome_state": "positive"
+        },
+        {
+          "candidate_id": "r2",
+          "rank": 2,
+          "inclusion_probability": 0.5,
+          "outcome_state": "assay_defined_negative"
+        },
+        {
+          "candidate_id": "r5",
+          "rank": 5,
+          "inclusion_probability": 0.25,
+          "outcome_state": "positive"
+        },
+        {
+          "candidate_id": "r7",
+          "rank": 7,
+          "inclusion_probability": 0.5,
+          "outcome_state": "assay_defined_negative"
+        }
+      ],
+      "expected": {
+        "audited_count": 4,
+        "audited_positive_count": 2,
+        "audited_top_k_count": 2,
+        "audited_top_k_positive_count": 1,
+        "estimated_population_candidate_count": 10,
+        "estimated_population_positive_count": 6,
+        "estimated_top_k_candidate_count": 4,
+        "estimated_top_k_positive_count": 2,
+        "design_weighted_recall_at_k": 0.3333333333333333,
+        "design_weighted_precision_at_k": 0.5,
+        "design_weighted_positive_prevalence": 0.6,
+        "naive_audit_sample_recall_at_k": 0.5,
+        "naive_audit_sample_precision_at_k": 0.5
+      },
+      "interpretation": "Synthetic design-based arithmetic only. The weighted ratio recall (1/3) differs from naive audit-sample recall (0.5); neither is a biological result. Correctness depends on a verified frame and truthful inclusion probabilities. Ratio estimates are not finite-sample unbiased and no confidence interval is computed."
+    }
+  ],
+  "implementation_artifact": {
+    "source_path": "scripts/crispr_triage_verifier.rs",
+    "style": "dependency-free Rust; no biological artifacts required for synthetic unit tests",
+    "suggested_command": "rustc --edition=2024 --test scripts/crispr_triage_verifier.rs -o /tmp/crispr-triage-tests && /tmp/crispr-triage-tests",
+    "current_local_execution_status": "not_executed_rust_toolchain_unavailable_in_authoring_environment",
+    "test_cases_to_run": [
+      "fixed_budget_recall_is_not_estimable_when_budget_is_unavailable"
+    ],
+    "unit_test_count": 15,
+    "test_coverage_summary": [
+      "F1: nomination coverage remains distinct from seeded ranking recall",
+      "F2: unknown outcome blocks point precision",
+      "F3: malformed or mismatched SHA-256 claims rejected",
+      "F4: train/holdout group overlap rejected",
+      "F5: individual partial-label bounds",
+      "F6: paired partial-label policy delta bounds",
+      "F7: underfilled fixed-budget ranking is not estimable",
+      "invalid recall targets, duplicate IDs/ranks, contradictory reference labels, mismatched policy universes/labels, and positive IDs outside the reference are rejected"
+    ],
+    "additional_source_paths": [
+      "scripts/crispr_decision_frontier.rs",
+      "scripts/crispr_selective_risk.rs",
+      "scripts/crispr_measurement_priority.rs",
+      "scripts/crispr_interval_frontier.rs",
+      "scripts/crispr_transportability.rs",
+      "scripts/crispr_shift_robustness_radius.rs",
+      "scripts/crispr_verification_bias.rs"
+    ],
+    "additional_test_suites": [
+      {
+        "path": "scripts/crispr_decision_frontier.rs",
+        "unit_test_count": 10,
+        "suggested_command": "rustc --edition=2024 --test scripts/crispr_decision_frontier.rs -o /tmp/crispr-frontier-tests && /tmp/crispr-frontier-tests",
+        "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment"
+      },
+      {
+        "path": "scripts/crispr_selective_risk.rs",
+        "unit_test_count": 14,
+        "suggested_command": "rustc --edition=2024 --test scripts/crispr_selective_risk.rs -o /tmp/crispr-selective-tests && /tmp/crispr-selective-tests",
+        "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment",
+        "test_coverage_summary": [
+          "Brier/log-loss/fixed-bin calibration with unknown labels excluded and counted",
+          "probability endpoints and non-finite/out-of-range input rejection",
+          "no-label calibration returns not estimable",
+          "risk-coverage tiers with exact confidence ties grouped together",
+          "unknown accepted labels widen error-rate bounds rather than become negatives",
+          "context-stratified sorted output and unlabelled context handling"
+        ]
+      },
+      {
+        "path": "scripts/crispr_measurement_priority.rs",
+        "unit_test_count": 19,
+        "suggested_command": "rustc --edition=2024 --test scripts/crispr_measurement_priority.rs -o /tmp/crispr-measurement-tests && /tmp/crispr-measurement-tests",
+        "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment",
+        "test_coverage_summary": [
+          "only unknown policy-exclusive top-K cases are selected for this narrow objective",
+          "cheapest-first fixed-cost allocation and deterministic tie breaks",
+          "explicit A/B numerator contribution sign for a positive label",
+          "same-membership unknowns counted but not overclaimed as direct numerator value",
+          "no unknown-to-negative coercion",
+          "zero budget/zero K/underfilled universe handling",
+          "duplicate IDs, duplicate/gapped per-policy rankings, blank context and zero costs rejected"
+        ]
+      },
+      {
+        "path": "scripts/crispr_interval_frontier.rs",
+        "unit_test_count": 15,
+        "suggested_command": "rustc --edition=2024 --test scripts/crispr_interval_frontier.rs -o /tmp/crispr-interval-tests && /tmp/crispr-interval-tests",
+        "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment",
+        "test_coverage_summary": [
+          "separated maximize/minimize intervals produce robust dominance",
+          "overlapping intervals produce possible-only relations, not robust removal",
+          "equal point intervals do not strictly dominate",
+          "crossed objectives remain incomparable",
+          "empty/duplicate/mismatched/non-finite/reversed inputs fail closed"
+        ]
+      },
+      {
+        "path": "scripts/crispr_transportability.rs",
+        "unit_test_count": 16,
+        "suggested_command": "rustc --edition=2024 --test scripts/crispr_transportability.rs -o /tmp/crispr-transport-tests && /tmp/crispr-transport-tests",
+        "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment",
+        "test_coverage_summary": [
+          "mixed context effects can make an uncertain target mix inconclusive",
+          "robust positive and robust non-positive conclusions",
+          "fixed target mix and explicit endpoint witnesses",
+          "witness weights obey bounds and sum to one",
+          "unsupported contexts fail closed",
+          "infeasible prevalence mass, invalid intervals and invalid prevalence ranges rejected",
+          "duplicate and blank context identifiers rejected",
+          "deterministic ties"
+        ]
+      },
+      {
+        "path": "scripts/crispr_shift_robustness_radius.rs",
+        "unit_test_count": 13,
+        "suggested_command": "rustc --edition=2024 --test scripts/crispr_shift_robustness_radius.rs -o /tmp/crispr-shift-radius-tests && /tmp/crispr-shift-radius-tests",
+        "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment",
+        "test_coverage_summary": [
+          "nominal sign-change radius and witness",
+          "conservative source-mixture lower effect and zero radius",
+          "not erasable within target bounds",
+          "source effect already non-positive",
+          "witness prevalence feasibility and TV identity",
+          "unsupported contexts and invalid source/target weights fail closed",
+          "invalid intervals, non-finite effects and invalid identities fail closed"
+        ]
+      },
+      {
+        "path": "scripts/crispr_verification_bias.rs",
+        "unit_test_count": 21,
+        "suggested_command": "rustc --edition=2024 --test scripts/crispr_verification_bias.rs -o /tmp/crispr-verification-bias-tests && /tmp/crispr-verification-bias-tests",
+        "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment",
+        "test_coverage_summary": [
+          "full census recovers exact top-K estimates",
+          "F14 unequal-inclusion-probability audit weighting and contrast with complete-case sample metrics",
+          "top-K membership derived from the frozen one-based ranking",
+          "non-probability designs, zero-inclusion frames, outcome-informed selection, post-outcome ranking and unverified ranking census fail closed",
+          "blank and duplicate IDs, duplicate sampled ranks, invalid ranks and invalid probabilities rejected",
+          "empty/underfilled/non-positive and invalid-budget estimability cases",
+          "unresolved outcomes in the audit sample rejected; resolved-label inclusion-probability attestation required"
+        ]
+      }
+    ]
+  },
+  "partial_label_identification": {
+    "status": "method_specified_synthetic_test_added_not_compiled",
+    "recall_at_k": {
+      "symbols": {
+        "P": "count of eligible measured-positive reference sites",
+        "p_k": "measured-positive sites in top K",
+        "U": "unknown/unassayed candidates in the fixed ranking universe",
+        "u_k": "unknown/unassayed candidates in top K"
+      },
+      "lower_bound": "p_k / (P + U - u_k)",
+      "upper_bound": "(p_k + u_k) / (P + u_k)",
+      "known_label_point_estimate": "p_k / P",
+      "note": "Bounds result from worst/best-case assignments to unknown labels within the fixed universe; they do not cover positive sites absent from the universe."
+    },
+    "precision_at_k": {
+      "lower_bound": "p_k / K",
+      "upper_bound": "(p_k + u_k) / K",
+      "precondition": "at least K candidates exist in the declared ranking universe and K > 0",
+      "note": "Do not report the lower bound as a point estimate when selected outcomes are unknown."
+    },
+    "paired_policy_delta": {
+      "status": "specified_and_source_added_not_compiled_or_executed",
+      "preconditions": [
+        "identical candidate ID universe",
+        "identical observed label mapping",
+        "same latent label assignment of each unknown site across policies",
+        "same eligible-positive reference",
+        "same K and K candidates available in the universe"
+      ],
+      "symbols": {
+        "P": "eligible measured-positive reference count",
+        "d": "measured-positive hits in policy A top K minus policy B top K",
+        "a": "unknown IDs selected by A but not B",
+        "b": "unknown IDs selected by B but not A",
+        "n": "all remaining unknown IDs (selected by both or neither)"
+      },
+      "lower": {
+        "numerator": "d - b",
+        "denominator": "P + b + (n if d - b > 0 else 0)"
+      },
+      "upper": {
+        "numerator": "d + a",
+        "denominator": "P + a + (n if d + a < 0 else 0)"
+      },
+      "interpretation": "A positive lower bound indicates improvement robust to every unknown-label assignment inside the shared candidate universe. Bounds spanning zero mean the observed-label delta is not robust to all assignments. Not a confidence interval, posterior or safety guarantee."
+    }
+  },
+  "updated_on": "2026-10-16",
+  "method_validation": {
+    "paired_label_sensitivity_formula_check": {
+      "status": "passed_independent_formula_check_only",
+      "executed_on": "2026-10-16",
+      "deterministic_paired_ranking_cases": 1763520,
+      "method": "For each deterministically selected pair of rankings, enumerate every binary assignment to all unknown labels in the small shared candidate universe; compare exhaustive minimum/maximum of Recall@K(A)-Recall@K(B) with the closed-form lower/upper bounds.",
+      "result": "No bound mismatches found.",
+      "not_evidence_of": [
+        "Rust source compiling or unit tests passing",
+        "source cohort or publication metrics reproduced",
+        "biological validity or safety",
+        "candidate discovery beyond the declared universe"
+      ]
+    },
+    "pareto_frontier_fixture_check": {
+      "status": "passed_direct_contract_evaluation_only",
+      "executed_on": "2026-10-16",
+      "fixture_id": "F8_pareto_frontier_without_scalarization",
+      "expected_frontier": [
+        "balanced",
+        "budget_first",
+        "recall_first"
+      ],
+      "observed_frontier": [
+        "balanced",
+        "budget_first",
+        "recall_first"
+      ],
+      "expected_dominated": [
+        "dominated"
+      ],
+      "observed_dominated": [
+        "dominated"
+      ],
+      "result": "Contract-level fixture matches the declared Pareto frontier and dominated policy.",
+      "not_evidence_of": [
+        "Rust source compilation or unit tests passing",
+        "reproduction of the biological source cohort",
+        "clinical safety, biological utility, or Symthaea superiority"
+      ]
+    },
+    "selective_risk_contract_check": {
+      "status": "passed_direct_synthetic_calculation_only",
+      "executed_on": "2026-10-16",
+      "calculations": {
+        "f9_brier_score": 0.025,
+        "f9_five_bin_expected_calibration_error": 0.15,
+        "f9_full_coverage_observed_label_risk": 0.5,
+        "f9_full_coverage_error_rate_lower_bound": 0.3333333333333333,
+        "f9_full_coverage_error_rate_upper_bound": 0.6666666666666666,
+        "f9_equal_confidence_first_tier_accepted_count": 2
+      },
+      "result": "Direct arithmetic checks match the declared F9 expected values.",
+      "not_evidence_of": [
+        "Rust source compiling or unit tests passing",
+        "source cohort or publication metrics reproduced",
+        "biological validity or safety",
+        "candidate discovery beyond the declared universe",
+        "Symthaea performance improvement"
+      ]
+    },
+    "decision_critical_allocation_fixture": {
+      "status": "passed_direct_fixture_calculation_only",
+      "expected": {
+        "selected_ids": [
+          "u-b"
+        ],
+        "initially_differential_unknown_count": 2,
+        "spent_units": 1,
+        "unspent_units": 1,
+        "unresolved_differential_unknown_count": 1
+      },
+      "note": "The F10 top-K memberships and cheapest eligible item were evaluated directly from the synthetic contract and matched the expected plan; this is not Rust execution."
+    },
+    "measurement_allocation_cost_optimality_check": {
+      "status": "passed_independent_cost_selection_oracle_only",
+      "executed_on": "2026-10-16",
+      "eligible_candidate_cost_vectors": 21844,
+      "budget_comparisons": 240284,
+      "cost_values_checked": "integer cost units in [1,4]",
+      "candidate_count_range": "1..=7",
+      "budget_range": "0..=10",
+      "result": "Cheapest-first maximized the number of selected unit-value candidates under every enumerated budget; zero mismatches against exhaustive subset enumeration.",
+      "scope_limit": "This validates the narrow cheapest-first cardinality rule only. It does not compile or test the Rust source, verify rank input from a real source cohort, estimate expected value of information, or establish biological/clinical benefit."
+    },
+    "interval_frontier_fixture": {
+      "status": "passed_direct_contract_evaluation_only",
+      "expected": {
+        "robust_frontier_ids": [
+          "robust",
+          "uncertain"
+        ],
+        "definitely_dominated_ids": [
+          "dominated"
+        ],
+        "robust_dominator_pairs": [
+          [
+            "robust",
+            "dominated"
+          ]
+        ],
+        "possible_only_dominator_pairs": [
+          [
+            "robust",
+            "uncertain"
+          ],
+          [
+            "uncertain",
+            "dominated"
+          ],
+          [
+            "uncertain",
+            "robust"
+          ]
+        ]
+      },
+      "observed": {
+        "robust_frontier_ids": [
+          "robust",
+          "uncertain"
+        ],
+        "definitely_dominated_ids": [
+          "dominated"
+        ],
+        "robust_dominator_pairs": [
+          [
+            "robust",
+            "dominated"
+          ]
+        ],
+        "possible_only_dominator_pairs": [
+          [
+            "robust",
+            "uncertain"
+          ],
+          [
+            "uncertain",
+            "dominated"
+          ],
+          [
+            "uncertain",
+            "robust"
+          ]
+        ]
+      },
+      "scope_limit": "Independent interval arithmetic on F11 only; no Rust execution or statistical/biological validation."
+    },
+    "interval_relation_exhaustive_oracle": {
+      "status": "passed_independent_interval_relation_oracle_only",
+      "executed_on": "2026-10-16",
+      "objective_count": 2,
+      "direction_combinations": 4,
+      "interval_pair_vectors_checked": 5184,
+      "endpoint_assignments_checked": 82944,
+      "interval_endpoints_tested": [
+        0,
+        1,
+        2
+      ],
+      "possible_dominance_mismatches": 0,
+      "robust_dominance_mismatches": 0,
+      "result": "Coordinate-wise possible and robust dominance formulas matched exhaustive endpoint evaluation for every tested interval pair.",
+      "scope_limit": "This validates relation semantics for the enumerated two-objective intervals only. It does not compile or test the Rust module, derive statistical confidence intervals, handle covariance/joint coverage, or establish biological/clinical validity."
+    },
+    "transportability_fixture": {
+      "status": "passed_direct_grid_oracle_only",
+      "executed_on": "2026-10-16",
+      "check": {
+        "feasible_tenth_step_prevalence_vectors": 12,
+        "context_delta_endpoint_assignments": 8,
+        "combined_assignments": 96,
+        "nominal_midpoint_delta": 0.01525,
+        "lower_mixture_delta": -0.076,
+        "upper_mixture_delta": 0.073,
+        "lower_witness": {
+          "A": 0.2,
+          "B": 0.4,
+          "C": 0.4
+        },
+        "upper_witness": {
+          "A": 0.5,
+          "B": 0.4,
+          "C": 0.1
+        }
+      },
+      "result": "Independent grid enumeration matched both bounded-simplex extrema and witness weights.",
+      "scope_limit": "Synthetic finite-grid check only; not Rust compilation, statistical interval estimation, target-population estimation, or biological validation."
+    },
+    "transportability_exhaustive_grid_oracle": {
+      "status": "passed_independent_bounded_simplex_grid_oracle_only",
+      "executed_on": "2026-10-16",
+      "deterministic_fixture_count": 2000,
+      "contexts_per_fixture": 3,
+      "feasible_prevalence_weight_vectors_enumerated": 10856,
+      "endpoint_assignments_checked": 86848,
+      "prevalence_grid_step": 0.1,
+      "effect_delta_endpoints_grid_step": 0.1,
+      "mismatches": 0,
+      "result": "Greedy lower/upper target-mixture envelopes matched exhaustive feasible 0.1-grid weight enumeration and all per-context interval endpoint combinations for every tested fixture.",
+      "scope_limit": "This validates bounded-simplex arithmetic for deterministic grid fixtures only. It does not compile/run Rust, estimate real target-group prevalences, derive group confidence intervals, establish exchangeability, or establish biological/clinical validity."
+    },
+    "shift_robustness_radius_f13": {
+      "status": "passed_independent_vertex_oracle_only",
+      "executed_on": "2026-10-16",
+      "deterministic_three_context_fixtures": 2500,
+      "nominal_and_lower_bound_comparisons": 5000,
+      "vertex_oracle_mismatches": 0,
+      "erasable_cases": 4041,
+      "not_erasable_cases": 959,
+      "result": "Greedy radius matched exhaustive feasible-polytope vertex enumeration in all tested cases.",
+      "scope_limit": "This verifies the optimizer formulation on tested three-context cases only; not Rust compilation, interval provenance, target shift estimation, or biological/clinical validity."
+    },
+    "verification_bias_f14_direct_arithmetic_check": {
+      "status": "passed_independent_synthetic_arithmetic_check_only",
+      "executed_on": "2026-10-16",
+      "fixture_id": "F14_probability_sampled_verification",
+      "observed": {
+        "audited_count": 4,
+        "audited_positive_count": 2,
+        "audited_top_k_count": 2,
+        "audited_top_k_positive_count": 1,
+        "estimated_population_candidate_count": 10,
+        "estimated_population_positive_count": 6,
+        "estimated_top_k_candidate_count": 4,
+        "estimated_top_k_positive_count": 2,
+        "design_weighted_recall_at_k": 0.3333333333333333,
+        "design_weighted_precision_at_k": 0.5,
+        "design_weighted_positive_prevalence": 0.6,
+        "naive_audit_sample_recall_at_k": 0.5,
+        "naive_audit_sample_precision_at_k": 0.5
+      },
+      "result": "Independent inverse-inclusion-weight sums matched F14 exactly. Complete-case audit-sample recall is 0.5 while the design-weighted ratio estimate is 1/3, demonstrating that they answer different questions under unequal inclusion probabilities.",
+      "scope_limit": "Direct synthetic arithmetic only; it does not execute Rust, verify a real sample design, produce confidence intervals, validate biology, or demonstrate Symthaea improvement."
+    },
+    "verification_bias_ht_count_unbiasedness_oracle": {
+      "status": "passed_independent_conditional_bernoulli_ht_count_oracle_only",
+      "executed_on": "2026-10-16",
+      "deterministic_fixtures": 2048,
+      "nonempty_sample_subsets_enumerated": 128512,
+      "maximum_absolute_expectation_errors": {
+        "population_candidate_count": 5.329070518200751e-15,
+        "population_positive_count": 1.3322676295501878e-15,
+        "top_k_candidate_count": 5.329070518200751e-15,
+        "top_k_positive_count": 8.881784197001252e-16
+      },
+      "result": "Conditional independent-Bernoulli audit designs were exhaustively enumerated for non-empty samples. Inverse-inclusion-probability totals recovered the exact finite-population candidate, positive, top-K candidate and top-K positive counts in design expectation, with maximum absolute errors below 6e-15.",
+      "scope_limit": "This checks Horvitz-Thompson count-estimator mathematics on the enumerated designs only. It does not test Rust, validate real sampling declarations, establish ratio-estimator unbiasedness, produce confidence interval coverage, or support biological or Symthaea performance claims."
+    }
+  },
+  "follow_on_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7571",
+  "follow_on_issues": [
+    {
+      "id": "CRISPR-OT-002",
+      "number": 7571,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7571",
+      "scope": "context-stratified Pareto frontier"
+    },
+    {
+      "id": "CRISPR-OT-003",
+      "number": 7580,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7580",
+      "scope": "selective prediction and calibration"
+    },
+    {
+      "id": "CRISPR-OT-004",
+      "number": 7589,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7589",
+      "scope": "decision-critical unknown-label measurement allocation"
+    },
+    {
+      "id": "CRISPR-OT-005",
+      "number": 7602,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7602",
+      "scope": "interval-aware robust Pareto frontier"
+    },
+    {
+      "id": "CRISPR-OT-006",
+      "number": 7615,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7615",
+      "scope": "robust target-mixture transportability"
+    },
+    {
+      "id": "CRISPR-OT-007",
+      "number": 7623,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7623",
+      "scope": "minimum population-shift robustness radius"
+    },
+    {
+      "id": "CRISPR-OT-008",
+      "number": 7633,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7633",
+      "scope": "probability-sampled verification to correct ascertainment bias"
+    }
+  ]
+}
