@@ -835,7 +835,7 @@
       "sota_coverage_gate": {
         "minimum_datasets": 7,
         "minimum_seeds_per_dataset": 50,
-        "meaning": "Coverage eligibility only, not a performance result or evidence of superiority. A scientific claim still requires matched protocols, actual comparator runs, per-dataset reporting, costs, and uncertainty."
+        "meaning": "Coverage eligibility only, not a performance result and not evidence of superiority. A scientific claim still requires matched protocols, actual comparator runs, per-dataset reporting, costs, and uncertainty."
       }
     }
   }
