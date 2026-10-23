@@ -15,6 +15,11 @@
 //! the same fixed FeatureShiftScorer. The reference rows, feature order, scale floor, audit batch
 //! size, and score definition must remain fixed throughout that calibration epoch.
 
+use crate::adequacy_calibration::{
+    CalibrationError, ConformalAdequacyCalibrator, ConformalAdequacyResult,
+};
+use crate::model_adequacy::{AdequacyAssessment, AdequacyDiagnostic};
+
 /// Components of one fixed-reference feature-shift assessment.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FeatureShiftScore {
@@ -26,6 +31,74 @@ pub struct FeatureShiftScore {
     pub normalized_correlation_shift: f64,
     /// Maximum of the three components; calibrate this scalar if a single alarm is required.
     pub aggregate: f64,
+}
+
+/// Errors from scoring and calibrating a feature-shift audit.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FeatureShiftError {
+    /// The audit batch is empty, malformed, non-finite, or has incompatible feature width.
+    InvalidAuditBatch,
+    /// The shared conformal calibrator rejected the audit contract.
+    Calibration(CalibrationError),
+}
+
+/// Classified combination of model-adequacy and feature-distribution evidence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ShiftTriageDecision {
+    /// One or both channels are missing, uncalibrated, non-independent, or mislabeled.
+    EvidenceInsufficient,
+    /// Both channels are calibrated/independent and neither raised an alarm; not proof of truth.
+    NoDetectedShift,
+    /// A trusted model-adequacy alarm without a feature-distribution alarm.
+    ModelAdequacySignalOnly,
+    /// A trusted feature-distribution alarm without a model-adequacy alarm.
+    FeatureDistributionShiftOnly,
+    /// Both trusted channels raised alarms.
+    JointAdequacyAndFeatureShift,
+}
+
+/// Classify two independently calibrated channels without conflating their meanings.
+///
+/// The first input is a model-adequacy assessment. The second is the feature-shift assessment
+/// returned by `FeatureShiftScorer::assess`. That method labels an alarm as
+/// `QueryDistributionShift`; this function rejects using that label in the model channel or using
+/// another diagnostic label in the feature channel. A no-alarm result is not a proof of adequacy.
+pub fn classify_shift_evidence(
+    model_adequacy: AdequacyAssessment,
+    feature_shift: AdequacyAssessment,
+) -> ShiftTriageDecision {
+    let model_alarm = match model_adequacy {
+        AdequacyAssessment::Clear {
+            calibrated: true,
+            independent_audit: true,
+        } => false,
+        AdequacyAssessment::Alarm {
+            diagnostic,
+            calibrated: true,
+            independent_audit: true,
+        } if diagnostic != AdequacyDiagnostic::QueryDistributionShift => true,
+        _ => return ShiftTriageDecision::EvidenceInsufficient,
+    };
+
+    let feature_alarm = match feature_shift {
+        AdequacyAssessment::Clear {
+            calibrated: true,
+            independent_audit: true,
+        } => false,
+        AdequacyAssessment::Alarm {
+            diagnostic: AdequacyDiagnostic::QueryDistributionShift,
+            calibrated: true,
+            independent_audit: true,
+        } => true,
+        _ => return ShiftTriageDecision::EvidenceInsufficient,
+    };
+
+    match (model_alarm, feature_alarm) {
+        (false, false) => ShiftTriageDecision::NoDetectedShift,
+        (true, false) => ShiftTriageDecision::ModelAdequacySignalOnly,
+        (false, true) => ShiftTriageDecision::FeatureDistributionShiftOnly,
+        (true, true) => ShiftTriageDecision::JointAdequacyAndFeatureShift,
+    }
 }
 
 /// Fixed feature reference used to score independent calibration and audit batches.
@@ -132,6 +205,30 @@ impl FeatureShiftScorer {
             normalized_correlation_shift,
             aggregate,
         })
+    }
+
+    /// Score and conformally assess one feature batch against this fixed reference.
+    ///
+    /// The supplied calibrator must have been fitted on independent clean batches scored against
+    /// this exact reference profile. A feature alarm is labeled `QueryDistributionShift` so it
+    /// remains distinct from predictive residual/model-adequacy failures.
+    pub fn assess(
+        &self,
+        calibrator: &ConformalAdequacyCalibrator,
+        audit_rows: &[Vec<f64>],
+        independent_audit: bool,
+    ) -> Result<ConformalAdequacyResult, FeatureShiftError> {
+        let aggregate = self
+            .score(audit_rows)
+            .ok_or(FeatureShiftError::InvalidAuditBatch)?
+            .aggregate;
+        calibrator
+            .assess_audit_score_with_diagnostic(
+                aggregate,
+                independent_audit,
+                AdequacyDiagnostic::QueryDistributionShift,
+            )
+            .map_err(FeatureShiftError::Calibration)
     }
 
     /// Number of features represented by the fixed reference.
@@ -268,6 +365,86 @@ mod tests {
         let scale_score = scorer.score(&scale_shift).unwrap();
         assert!(scale_score.normalized_scale_shift > 8.0);
         assert!(scale_score.normalized_scale_shift > scale_score.normalized_mean_shift);
+    }
+
+    fn clear() -> AdequacyAssessment {
+        AdequacyAssessment::Clear {
+            calibrated: true,
+            independent_audit: true,
+        }
+    }
+
+    fn alarm(diagnostic: AdequacyDiagnostic) -> AdequacyAssessment {
+        AdequacyAssessment::Alarm {
+            diagnostic,
+            calibrated: true,
+            independent_audit: true,
+        }
+    }
+
+    #[test]
+    fn calibrated_feature_alarm_keeps_its_distinct_diagnostic_label() {
+        let reference = rows_with_correlation(128, 0.0);
+        let scorer = FeatureShiftScorer::fit(&reference, 1e-9).unwrap();
+        let calibrator = ConformalAdequacyCalibrator::new(&[0.0; 99], 0.05).unwrap();
+        let shifted = rows_with_correlation(128, 0.8);
+        let result = scorer.assess(&calibrator, &shifted, true).unwrap();
+        assert!(matches!(
+            result.assessment,
+            AdequacyAssessment::Alarm {
+                diagnostic: AdequacyDiagnostic::QueryDistributionShift,
+                calibrated: true,
+                independent_audit: true,
+            }
+        ));
+    }
+
+    #[test]
+    fn shift_triage_keeps_model_and_feature_failures_separate() {
+        assert_eq!(
+            classify_shift_evidence(clear(), clear()),
+            ShiftTriageDecision::NoDetectedShift
+        );
+        assert_eq!(
+            classify_shift_evidence(alarm(AdequacyDiagnostic::PredictiveMisfit), clear()),
+            ShiftTriageDecision::ModelAdequacySignalOnly
+        );
+        assert_eq!(
+            classify_shift_evidence(clear(), alarm(AdequacyDiagnostic::QueryDistributionShift)),
+            ShiftTriageDecision::FeatureDistributionShiftOnly
+        );
+        assert_eq!(
+            classify_shift_evidence(
+                alarm(AdequacyDiagnostic::CalibrationFailure),
+                alarm(AdequacyDiagnostic::QueryDistributionShift)
+            ),
+            ShiftTriageDecision::JointAdequacyAndFeatureShift
+        );
+        assert_eq!(
+            classify_shift_evidence(
+                AdequacyAssessment::NotEvaluated,
+                alarm(AdequacyDiagnostic::QueryDistributionShift)
+            ),
+            ShiftTriageDecision::EvidenceInsufficient
+        );
+        assert_eq!(
+            classify_shift_evidence(
+                alarm(AdequacyDiagnostic::QueryDistributionShift),
+                clear()
+            ),
+            ShiftTriageDecision::EvidenceInsufficient
+        );
+        assert_eq!(
+            classify_shift_evidence(
+                clear(),
+                AdequacyAssessment::Alarm {
+                    diagnostic: AdequacyDiagnostic::QueryDistributionShift,
+                    calibrated: false,
+                    independent_audit: true,
+                }
+            ),
+            ShiftTriageDecision::EvidenceInsufficient
+        );
     }
 
     #[test]
