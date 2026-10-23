@@ -57,7 +57,7 @@ The supplied calibration-manifest digest is retained in the receipt but this sta
 
 ## Adversarial tests
 
-The twelve authored Rust tests cover:
+The thirteen authored Rust tests cover:
 1. exact zero-harm bound and the 71-vs-72 example for a 5% target with adjusted (delta=0.025);
 2. a known one-harm/ten-escalation Clopper–Pearson reference value;
 3. rejection of tiny clean samples that do not certify the population target;
@@ -66,10 +66,11 @@ The twelve authored Rust tests cover:
 6. stronger correction for a larger predeclared policy family;
 7. a rare group failing its bound even when the pooled bound passes;
 8. a represented group with no escalations returning insufficient evidence;
-9. duplicate trace IDs, malformed labels and stale policy digests;
-10. shift states and absent predeclared groups failing closed;
-11. deterministic, input-order-invariant receipts bound to policy/manifest metadata;
-12. bound monotonicity and the all-harm boundary.
+9. a demonstrated failing group's risk bound taking precedence over another group's insufficient evidence;
+10. duplicate trace IDs, malformed labels and stale policy digests;
+11. shift states and absent predeclared groups failing closed;
+12. deterministic, input-order-invariant receipts bound to policy/manifest metadata;
+13. bound monotonicity and the all-harm boundary.
 
 Passing these tests would validate the reference calculations and state machine only, not coverage on real data.
 
