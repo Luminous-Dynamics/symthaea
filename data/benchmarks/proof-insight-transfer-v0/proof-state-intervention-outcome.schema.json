@@ -148,6 +148,7 @@
               "applicability_judgment",
               "decision",
               "original_move_applied",
+              "checked_target_statement_sha256",
               "checker_result",
               "proof_sha256",
               "run_receipt_sha256",
@@ -300,6 +301,17 @@
                     "type": "null"
                   }
                 ]
+              },
+              "checked_target_statement_sha256": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "allOf": [
@@ -339,6 +351,9 @@
                     },
                     "applicability_judgment": {
                       "type": "null"
+                    },
+                    "checked_target_statement_sha256": {
+                      "type": "null"
                     }
                   }
                 }
@@ -363,7 +378,8 @@
                     "checker_result",
                     "run_receipt_sha256",
                     "resource_usage",
-                    "applicability_judgment"
+                    "applicability_judgment",
+                    "checked_target_statement_sha256"
                   ],
                   "properties": {
                     "model": {
@@ -400,6 +416,10 @@
                         "not_applicable",
                         "uncertain"
                       ]
+                    },
+                    "checked_target_statement_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
                     }
                   }
                 }
@@ -505,8 +525,7 @@
           "expected_applicability": {
             "enum": [
               "eligible",
-              "not_applicable",
-              "uncertain"
+              "not_applicable"
             ]
           }
         },
