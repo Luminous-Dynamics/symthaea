@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 mod crate_status;
+mod cognitive_loop_evidence;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -65,6 +66,11 @@ enum Commands {
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
+    },
+    /// Validate the cognitive-loop evidence benchmark manifest and hard-gate contracts.
+    ValidateCognitiveLoopEvidence {
+        #[arg(long, default_value = "benchmarks/cognitive-loop-evidence/scenarios.json")]
+        manifest: PathBuf,
     },
 }
 
@@ -147,6 +153,22 @@ fn main() -> anyhow::Result<()> {
             } else {
                 crate_status::check(&root, &registry_path, require_classified, strict)?;
             }
+        }
+        Commands::ValidateCognitiveLoopEvidence { manifest } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            let manifest_path = if manifest.is_absolute() {
+                manifest
+            } else {
+                root.join(manifest)
+            };
+            let summary = cognitive_loop_evidence::validate_manifest(&manifest_path)?;
+            println!(
+                "OK: cognitive-loop evidence manifest has {} baselines, {} suites, {} scenarios; hard-gate and provenance contracts are complete.",
+                summary.baseline_count, summary.suite_count, summary.case_count
+            );
         }
     }
     Ok(())
