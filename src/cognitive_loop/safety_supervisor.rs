@@ -24,7 +24,7 @@ impl SafetySupervisor {
         }
     }
 
-    /// Assess the current state and return the enforcement result.
+    /// Compatibility entry point for callers with an explicit numeric PE.
     pub fn assess(
         &mut self,
         consciousness_level: f32,
@@ -36,7 +36,30 @@ impl SafetySupervisor {
             &crate::cognitive_loop::collective_immunity::CollectiveImmuneState,
         >,
     ) -> SafetyEnforcementResult {
-        let result = safety_enforcement::compute_enforcement(
+        self.assess_with_evidence(
+            consciousness_level,
+            Some(prediction_error),
+            temporal_coherence,
+            integrity_critical,
+            cycle,
+            #[cfg(feature = "sentinel")]
+            collective_immune,
+        )
+    }
+
+    /// Assess current state with explicit PE evidence provenance.
+    pub fn assess_with_evidence(
+        &mut self,
+        consciousness_level: f32,
+        prediction_error: Option<f32>,
+        temporal_coherence: f32,
+        integrity_critical: bool,
+        cycle: usize,
+        #[cfg(feature = "sentinel")] collective_immune: Option<
+            &crate::cognitive_loop::collective_immunity::CollectiveImmuneState,
+        >,
+    ) -> SafetyEnforcementResult {
+        let result = safety_enforcement::compute_enforcement_with_evidence(
             &mut self.agent,
             consciousness_level,
             prediction_error,
