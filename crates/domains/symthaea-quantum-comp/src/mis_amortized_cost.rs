@@ -81,7 +81,10 @@ pub struct MisAmortizedCostEntry {
     pub fixed_setup_units: Option<u64>,
     /// Marginal amount consumed for each completed instance served by the method.
     ///
-    /// Use Some(0) when measured/configured as zero. None means unrecorded and fails closed.
+    /// For cumulative resources this is an additive amount. For wall-clock time, fixed
+    /// plus N times marginal is meaningful only under a declared serial execution regime;
+    /// parallel/batched latency must be measured separately at each cohort size.
+    /// Use Some(0) when explicitly zero. None means unrecorded and fails closed.
     pub marginal_units_per_instance: Option<u64>,
 }
 
