@@ -27,6 +27,10 @@
     {
       "pull_request": 8508,
       "scope": "LoRa fragment-AEAD fail-closed behavior, transport-authenticated source binding, and preflight against actual MTU"
+    },
+    {
+      "pull_request": 8355,
+      "scope": "authenticated mesh replay windows, MAC-before-replay state mutation, timestamp freshness, bounded replay-table capacity, and spoofed-source rate-limit regression"
     }
   ],
   "non_claims": [
@@ -177,6 +181,12 @@
       "claim": "A security mode configured to require AEAD rejects traffic when the required key or security provider is unavailable; it never silently admits plaintext.",
       "layer": "security-mode",
       "mandatory": true
+    },
+    {
+      "id": "AUTHENTICATED-RATE-LIMIT",
+      "claim": "Packet-controlled source identifiers on unauthenticated inputs cannot consume the rate-limit budget of an authenticated peer.",
+      "layer": "ingress-rate-limit",
+      "mandatory": true
     }
   ],
   "scenarios": [
@@ -301,12 +311,12 @@
       "id": "MESH-RECOVERY-001",
       "property": "REPLAY-RESISTANCE",
       "class": "adversarial",
-      "stimulus": "Deliver duplicate, stale-epoch, reordered, replayed, and post-revocation traffic across reconnect.",
-      "expected_legacy": "Any accepted replay outside documented policy is a failure.",
-      "required_replacement": "Defined replay window/epoch policy with zero duplicate protected application effects.",
+      "stimulus": "Deliver duplicate, stale-epoch, reordered, replayed, and post-revocation traffic across reconnect; also inject an invalid-MAC packet sharing the tuple of a later valid packet.",
+      "expected_legacy": "Duplicate packets can be delivered again on the whole-packet path; unauthenticated duplicates may poison dedup state before MAC verification; behavior across receiver restart is not protected by in-memory windows.",
+      "required_replacement": "Reject duplicate/stale authenticated sequences while permitting bounded out-of-order traffic, mutate authenticated replay state only after valid MAC verification, and explicitly declare cross-restart limits unless epoch/persistence support is present.",
       "model_config": null,
       "strict_config": null,
-      "implementation_target": "state-machine trace generator and receiver conformance suite",
+      "implementation_target": "PR #8355: AuthenticatedSequenceWindow::check_and_mark; ContinuousMind::tick replay admission; authenticated_mesh_replay_is_rejected_without_second_delivery; unauthenticated_duplicate_cannot_poison_authenticated_replay_state",
       "positive_control": "Allowed reordering and one-time valid message delivery succeeds.",
       "status": "proposed"
     },
@@ -386,6 +396,19 @@
       "strict_config": null,
       "implementation_target": "fragment_aead_without_a_key_fails_closed_before_emitting_any_frame; fragment_encryption_rejects_plaintext_when_key_is_missing",
       "positive_control": "packet_envelope_aead_remains_available_with_mtu_safe_fragments",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-RATE-001",
+      "property": "AUTHENTICATED-RATE-LIMIT",
+      "class": "known-break",
+      "stimulus": "Establish one authenticated peer, then send more than 100 invalid-MAC packets claiming that peer's source ID inside the same 10-second rate-limit window, followed by a fresh valid packet.",
+      "expected_legacy": "Invalid-MAC inputs consume the claimed peer's rate budget and cause subsequent valid traffic to be dropped.",
+      "required_replacement": "Perform authenticated peer rate-limit accounting only after MAC verification and replay admission; a forged claimed source ID must not consume the authenticated peer's quota.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "PR #8355: spoofed_source_id_cannot_exhaust_authenticated_peer_rate_limit",
+      "positive_control": "A correctly signed, fresh packet from the tracked peer is still accepted after the invalid-MAC injection.",
       "status": "proposed"
     }
   ]
