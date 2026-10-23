@@ -56,10 +56,21 @@ jobs:
           components: clippy, rustfmt
       - name: Check Rust formatting
         run: rustfmt --edition 2024 --check src/bin/rust_repair_manifest.rs src/bin/rust_repair_score_audit.rs
+      - name: Generate standalone lockfile (temporary bootstrap)
+        run: |
+          cargo generate-lockfile --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml
+          python3 - <<'PY'
+          import base64
+          from pathlib import Path
+          lockfile = Path("tools/rust-repair-benchmark-harness/Cargo.lock").read_bytes()
+          print("CANONICAL_HARNESS_LOCK_BEGIN")
+          print(base64.b64encode(lockfile).decode("ascii"))
+          print("CANONICAL_HARNESS_LOCK_END")
+          PY
       - name: Test task-manifest auditor
-        run: cargo test --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-manifest
+        run: cargo test --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-manifest
       - name: Test scored-run auditor
-        run: cargo test --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-score-audit
+        run: cargo test --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-score-audit
       - name: Run strict Clippy on scored-run auditor
-        run: cargo clippy --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-manifest -- -D warnings
-          cargo clippy --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-score-audit -- -D warnings
+        run: cargo clippy --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-manifest -- -D warnings
+          cargo clippy --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-score-audit -- -D warnings
