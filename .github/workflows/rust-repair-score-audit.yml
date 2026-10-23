@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "src/bin/rust_repair_score_audit.rs"
+      - "tools/rust-repair-benchmark-harness/**"
       - "src/bin/rust_repair_manifest.rs"
       - "Cargo.toml"
       - "docs/research/patches/swe-bench-live-validation-evidence.patch"
@@ -56,8 +57,9 @@ jobs:
       - name: Check Rust formatting
         run: rustfmt --edition 2024 --check src/bin/rust_repair_manifest.rs src/bin/rust_repair_score_audit.rs
       - name: Test task-manifest auditor
-        run: cargo test --locked --bin rust-repair-manifest --features rust-repair-manifest
+        run: cargo test --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-manifest
       - name: Test scored-run auditor
-        run: cargo test --locked --bin rust-repair-score-audit --features rust-repair-manifest
+        run: cargo test --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-score-audit
       - name: Run strict Clippy on scored-run auditor
-        run: cargo clippy --locked --bin rust-repair-score-audit --features rust-repair-manifest -- -D warnings
+        run: cargo clippy --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-manifest -- -D warnings
+          cargo clippy --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-score-audit -- -D warnings
