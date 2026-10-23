@@ -402,6 +402,7 @@ fn pairwise_correlations(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::feature_shift::FeatureShiftScorer;
     use crate::model_adequacy::AdequacyAssessment;
 
     fn orthogonal_reference() -> Vec<Vec<f64>> {
@@ -444,6 +445,30 @@ mod tests {
             "diffuse mean-shift score was {}",
             shifted_score.normalized_mean_shift
         );
+    }
+
+    #[test]
+    fn random_projection_feature_shift_exposes_sparse_shift_tradeoff() {
+        let reference = orthogonal_reference();
+        let projected =
+            RandomProjectionFeatureShiftScorer::fit(&reference, 16, 1e-8, 0xA4D2_9187).unwrap();
+        let exact = FeatureShiftScorer::fit(&reference, 1e-8).unwrap();
+        let sparse_shift = reference
+            .iter()
+            .map(|row| {
+                let mut shifted = row.clone();
+                shifted[0] += 0.5;
+                shifted
+            })
+            .collect::<Vec<_>>();
+
+        let exact_score = exact.score(&sparse_shift).unwrap();
+        let projected_score = projected.score(&sparse_shift).unwrap();
+
+        // One-coordinate effects are diluted in random projections; retain the exact scorer
+        // or another detector when sparse shifts are material to the application.
+        assert!(exact_score.normalized_mean_shift > 5.0);
+        assert!(projected_score.normalized_mean_shift < 1.0);
     }
 
     #[test]
