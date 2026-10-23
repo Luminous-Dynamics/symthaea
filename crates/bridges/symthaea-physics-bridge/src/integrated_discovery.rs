@@ -72,7 +72,7 @@ use symthaea_core::hdc::conjecture_engine::{
     select_experiment_by_worst_case_information_gain_per_cost, select_most_informative_experiment,
 };
 
-use crate::dimensional_inference::UnitMap;
+use crate::dimensional_inference::{infer_dimensions, InferenceResult, UnitMap};
 use crate::prequential_pit_martingale::{
     PrequentialPitDecision, PrequentialPitMartingale,
 };
@@ -258,6 +258,93 @@ fn typed_distractor(rng: &mut u64, gt_vals: &[f64], probes: &[Experiment]) -> Ex
     panic!("could not draw a sane, distinct typed distractor within the attempt cap");
 }
 
+const MAX_MODEL_FAMILY_EXPANSIONS: usize = 2;
+const RECOVERY_CANDIDATES_PER_EXPANSION: usize = 4;
+const RECOVERY_GENERATION_ATTEMPT_CAP: usize = 256;
+
+/// Reopen archived candidates after a predictive-adequacy alarm and reseed the typed
+/// ENERGY-dimensional grammar. This function deliberately receives no observations, evaluator
+/// discrepancy value, or ground-truth handle: candidate generation is driven only by the public
+/// task signature, the existing symbolic hypotheses, and a fixed pre-generated experiment pool.
+/// The alarmed provisional candidate is archived but excluded from the new live set.
+fn expand_energy_model_family_after_alarm(
+    rng: &mut u64,
+    candidate_pool: &[Experiment],
+    hypotheses: &mut Vec<Expr>,
+    live: &mut Vec<usize>,
+    alarmed_candidate: usize,
+) -> usize {
+    let archived_count = hypotheses.len();
+    if candidate_pool.is_empty() || alarmed_candidate >= archived_count {
+        return 0;
+    }
+
+    let units = demo_units();
+    let mut known_predictions: Vec<Vec<f64>> = hypotheses[..archived_count]
+        .iter()
+        .filter_map(|expression| {
+            candidate_pool
+                .iter()
+                .map(|point| eval_at(expression, point))
+                .collect::<Option<Vec<_>>>()
+        })
+        .collect();
+
+    // Recovery is a bounded model-search restart, not a claim that the alarm identifies the
+    // right replacement. Restore archived alternatives except the alarmed model, then add
+    // dimensionally-valid, functionally novel candidates. Previously rejected candidates are
+    // intentionally reconsidered because the old hard-elimination path can reject a true law
+    // after one noisy measurement.
+    live.clear();
+    live.extend((0..archived_count).filter(|index| *index != alarmed_candidate));
+
+    let mut accepted = 0usize;
+    let mut attempts = 0usize;
+    while accepted < RECOVERY_CANDIDATES_PER_EXPANSION
+        && attempts < RECOVERY_GENERATION_ATTEMPT_CAP
+    {
+        attempts += 1;
+        let candidate = random_expr_with_dimension(
+            rng,
+            DimensionalSignature::ENERGY,
+            &units,
+            GEN_MAX_DEPTH,
+        );
+        if !matches!(
+            infer_dimensions(&candidate, &units),
+            InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
+        ) {
+            continue;
+        }
+
+        let Some(values) = candidate_pool
+            .iter()
+            .map(|point| eval_at(&candidate, point))
+            .collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        if !values.iter().all(|value| value.abs() < 1.0e6)
+            || !values.iter().any(|value| value.abs() > 1.0e-6)
+        {
+            continue;
+        }
+        if known_predictions
+            .iter()
+            .any(|known| !functionally_distinct(&values, known))
+        {
+            continue;
+        }
+
+        let index = hypotheses.len();
+        hypotheses.push(candidate);
+        live.push(index);
+        known_predictions.push(values);
+        accepted += 1;
+    }
+    accepted
+}
+
 /// An untyped distractor: same distinctness/sanity bar, but drawn from the naive grammar (no
 /// dimensional constraint at all) -- this is the candidate-generation ablation factor's "off"
 /// arm. Deliberately allowed to fall back to its last (possibly degenerate) draw if the
@@ -327,6 +414,8 @@ struct TrialOutcome {
     overconfident_under_misspecification: bool,
     prequential_pit_alarm: bool,
     monitoring_protocol_invalid: bool,
+    model_family_expansions: usize,
+    terminal_pit_alarm: bool,
 }
 
 const POOL_SIZE: usize = 6;
@@ -441,6 +530,8 @@ fn run_trial_with_discrepancy(
             overconfident_under_misspecification: false,
             prequential_pit_alarm: false,
             monitoring_protocol_invalid: true,
+            model_family_expansions: 0,
+            terminal_pit_alarm: false,
         };
     }
     let mut setup_rng = seed ^ 0x5EED_0000_0000_0001;
@@ -511,6 +602,8 @@ fn run_trial_with_discrepancy(
     };
     let mut prequential_pit_alarm = false;
     let mut monitoring_protocol_invalid = false;
+    let mut model_family_expansions = 0usize;
+    let mut terminal_pit_alarm = false;
 
     let mut round = 0usize;
     while round < max_rounds
@@ -685,6 +778,11 @@ fn run_trial_with_discrepancy(
                 )
         };
 
+        let monitored_candidate = if pit_mode && live.len() == 1 {
+            Some(live[0])
+        } else {
+            None
+        };
         let mut pit_alarm_this_round = false;
         if pit_mode && live.len() == 1 {
             let Some(prediction) = eval_at(&hypotheses[live[0]], &chosen) else {
@@ -739,10 +837,37 @@ fn run_trial_with_discrepancy(
         });
         round += 1;
         if pit_alarm_this_round {
-            // The candidate remains a benchmark-visible provisional hypothesis, but the run
-            // must not accept it as valid or keep using the terminal monitor. A production
-            // controller should route this typed alarm into model-family expansion/recovery.
-            break;
+            // An alarm is evidence against this provisional model, not evidence for any
+            // replacement. Reopen the archived pool, exclude the alarmed candidate, add a
+            // bounded set of dimensionally-valid proposals, and begin a fresh monitor epoch.
+            if model_family_expansions >= MAX_MODEL_FAMILY_EXPANSIONS {
+                terminal_pit_alarm = true;
+                break;
+            }
+            let Some(alarmed_index) = monitored_candidate else {
+                monitoring_protocol_invalid = true;
+                terminal_pit_alarm = true;
+                break;
+            };
+            let mut recovery_rng =
+                seed ^ 0xF1A1_1E5E_2026_0001 ^ (model_family_expansions as u64).rotate_left(19);
+            let added = expand_energy_model_family_after_alarm(
+                &mut recovery_rng,
+                &candidate_pool,
+                &mut hypotheses,
+                &mut live,
+                alarmed_index,
+            );
+            if added == 0 {
+                terminal_pit_alarm = true;
+                break;
+            }
+            model_family_expansions += 1;
+            terminal_pit_alarm = false;
+            pit_monitor = Some(
+                PrequentialPitMartingale::new(0.05, VAR_NAMES.len())
+                    .expect("fixed alpha and context-channel count are valid"),
+            );
         }
     }
 
@@ -751,7 +876,7 @@ fn run_trial_with_discrepancy(
         success: systematic_discrepancy == 0.0
             && live.len() == 1
             && live[0] == 0
-            && !prequential_pit_alarm
+            && !terminal_pit_alarm
             && !monitoring_protocol_invalid,
         final_live: live.len(),
         selection_failed,
@@ -763,6 +888,8 @@ fn run_trial_with_discrepancy(
             && !prequential_pit_alarm,
         prequential_pit_alarm,
         monitoring_protocol_invalid,
+        model_family_expansions,
+        terminal_pit_alarm,
     }
 }
 
@@ -1203,6 +1330,56 @@ mod tests {
         assert!(round_ci_low.is_finite() && round_ci_high.is_finite());
         assert!((0.0..=1.0).contains(&(raw_successes as f64 / SEEDS as f64)));
         assert!((0.0..=1.0).contains(&(eig_successes as f64 / SEEDS as f64)));
+    }
+
+    #[test]
+    fn post_alarm_recovery_reopens_archived_candidates_and_adds_typed_candidates() {
+        let mut rng = 0xBADC_0FFE_E0DD_F00D_u64;
+        let mut pool_rng = 0x1234_5678_9ABC_DEF0_u64;
+        let pool: Vec<Experiment> = (0..EXPERIMENT_POOL_SIZE)
+            .map(|_| random_experiment(&mut pool_rng))
+            .collect();
+        let energy = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".to_string())),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let mut hypotheses = vec![
+            energy,
+            Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("m".to_string())),
+                Box::new(Expr::Var("v".to_string())),
+            ),
+            Expr::Var("r".to_string()),
+        ];
+        let archived_count = hypotheses.len();
+        let mut live = vec![0];
+
+        let added = expand_energy_model_family_after_alarm(
+            &mut rng,
+            &pool,
+            &mut hypotheses,
+            &mut live,
+            0,
+        );
+
+        assert!(added > 0, "bounded typed recovery failed to add any candidate");
+        assert!(added <= RECOVERY_CANDIDATES_PER_EXPANSION);
+        assert!(!live.contains(&0), "the alarmed provisional candidate stayed live");
+        assert!(live.contains(&1) && live.contains(&2), "archived alternatives were not reopened");
+        assert_eq!(live.len(), archived_count - 1 + added);
+        let units = demo_units();
+        for index in archived_count..hypotheses.len() {
+            assert!(matches!(
+                infer_dimensions(&hypotheses[index], &units),
+                InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
+            ));
+        }
     }
 
     /// End-to-end integration check for the prequential PIT monitor. The monitor activates
