@@ -472,6 +472,10 @@ mod tests {
 
         assert!(evidence.duration_scale_consistency < 0.85);
         assert!(
+            evidence.overall_similarity < 0.85,
+            "the transformation score itself must reflect non-uniform scaling"
+        );
+        assert!(
             !evidence.meets_threshold(0.85),
             "a high aggregate score must not hide non-uniform per-note scaling"
         );
