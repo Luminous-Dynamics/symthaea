@@ -47,6 +47,15 @@ const FIXTURES: &[Fixture] = &[
     Fixture { id: "unknown-08", text: "Did she refuse consent?", expected: ConsentState::Unknown },
     Fixture { id: "conflict-01", text: "She refused consent, but later said yes; the timeline is unclear.", expected: ConsentState::Unknown },
     Fixture { id: "conflict-02", text: "She gave consent initially, then withdrew consent before the action.", expected: ConsentState::Unknown },
+    Fixture { id: "uncertain-09", text: "They did not refuse consent.", expected: ConsentState::Unknown },
+    Fixture { id: "uncertain-10", text: "There is no evidence that she gave consent.", expected: ConsentState::Unknown },
+    Fixture { id: "uncertain-11", text: "There is no verified evidence that she gave consent.", expected: ConsentState::Unknown },
+    Fixture { id: "uncertain-12", text: "It is unclear whether she gave consent.", expected: ConsentState::Unknown },
+    Fixture { id: "uncertain-13", text: "She may have given consent.", expected: ConsentState::Unknown },
+    Fixture { id: "uncertain-14", text: "No one can confirm that she gave consent.", expected: ConsentState::Unknown },
+    Fixture { id: "uncertain-15", text: "She did not withdraw consent.", expected: ConsentState::Unknown },
+    Fixture { id: "uncertain-16", text: "The claim that she gave consent is unverified.", expected: ConsentState::Unknown },
+    Fixture { id: "uncertain-17", text: "She might have consented.", expected: ConsentState::Unknown },
 ];
 
 const STATES: [ConsentState; 5] = [
@@ -298,6 +307,15 @@ fn main() {
         ("request-only-to-affirmative-answer",
          "I asked my daughter before discussing her health.", ConsentState::Unknown,
          "After my daughter agreed, I discussed her health.", ConsentState::Given),
+        ("no-evidence-to-asserted-grant",
+         "There is no evidence that she gave consent.", ConsentState::Unknown,
+         "She gave consent to share the report.", ConsentState::Given),
+        ("non-refusal-to-explicit-refusal",
+         "They did not refuse consent.", ConsentState::Unknown,
+         "They refused consent.", ConsentState::Denied),
+        ("uncertain-to-explicit-absence",
+         "She may have given consent.", ConsentState::Unknown,
+         "She did not give consent.", ConsentState::Absent),
     ];
     let mut candidate_directional_correct = 0usize;
     let mut baseline_directional_correct = 0usize;
