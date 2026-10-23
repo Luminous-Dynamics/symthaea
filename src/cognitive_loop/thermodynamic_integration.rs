@@ -305,7 +305,9 @@ impl ThermodynamicIntegration {
         } else {
             0.0
         };
-        if budget_fraction > thresholds::THERMO_LANDAUER_MEMORY_PRESSURE_THRESHOLD {
+        if input.prediction_error_valid
+            && budget_fraction > thresholds::THERMO_LANDAUER_MEMORY_PRESSURE_THRESHOLD
+        {
             feedback.memory_consolidation_suppressed = true;
         }
 
