@@ -49,8 +49,8 @@ jobs:
         run: cargo test -p symthaea-core hdc::conjecture_engine::experiment_selection --lib
       - name: Run paired law-discovery selector pilot
         run: cargo test -p symthaea-physics-bridge expected_information_gain_vs_variance_on_paired_seeds --lib -- --nocapture
-      - name: Test conformal adequacy calibration
-        run: cargo test -p symthaea-physics-bridge adequacy_calibration --lib
+      - name: Test conformal adequacy calibration and matched null controls
+        run: cargo test -p symthaea-physics-bridge adequacy_calibration --lib -- --nocapture
       - name: Run deterministic diagnostic-fusion benchmark
         run: cargo test -p symthaea-physics-bridge --test diagnostic_fusion_benchmark -- --nocapture
       - name: Test finite-horizon sequential adequacy monitor
