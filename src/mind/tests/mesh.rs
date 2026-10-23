@@ -3604,6 +3604,45 @@ fn authenticated_mesh_packet_without_timestamp_fails_closed() {
     assert_eq!(receiver.mesh_stats.packets_replay_rejected, 1);
 }
 
+#[cfg(feature = "mesh")]
+#[test]
+fn authenticated_mesh_packets_outside_timestamp_freshness_window_are_rejected() {
+    let key = [0x8F; 32];
+    let now_s = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system clock follows Unix epoch")
+        .as_secs()
+        .min(u32::MAX as u64) as u32;
+
+    let stale = signed_replay_test_packet(
+        [0x84; 8],
+        10,
+        now_s.saturating_sub(120),
+        key,
+    );
+    let future = signed_replay_test_packet(
+        [0x85; 8],
+        20,
+        now_s.saturating_add(10),
+        key,
+    );
+
+    let mut receiver = ContinuousMind::default();
+    receiver.set_mesh_auth_key(Some(key));
+    receiver.mesh_inbox.push(stale);
+    receiver.mesh_inbox.push(future);
+    receiver.tick();
+
+    assert_eq!(
+        receiver.mesh_stats.wisdom_received, 0,
+        "stale and excessively future-dated packets must not be delivered"
+    );
+    assert_eq!(
+        receiver.mesh_stats.packets_replay_rejected, 2,
+        "both freshness violations should be observable"
+    );
+}
+
 
 #[cfg(feature = "mesh")]
 fn signed_rate_limit_test_packet(
