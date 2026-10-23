@@ -59,6 +59,14 @@ Proposed engineering goals, **not current results**:
 
 Targets should be revised only with a documented reason before confirmatory runs, never in response to hidden test results.
 
+## Strong reference-free benchmark comparator: DecayBench
+
+Xu and Tian's *DecayBench: A Reference-Free Benchmark for Trustworthy Drift Detection* (Mathematics, published 24 August 2026) directly matches this research problem better than evaluating only synthetic residual streams: it compares ten detectors on ten NLP, vision, and multimodal datasets, calibrates a fixed clean false-positive operating point, uses paired-bootstrap significance tests and reports detection delay. It frames trustworthiness using five axes: calibration, consequential validity, timeliness, no-regret behavior, and adaptivity. Its proposed Alert combiner selects detector families using clean-data self-perturbation detectability, then conformally calibrates a combined score. The reported no-regret property is conditional on no single detector dominating; the paper also explicitly identifies dominant-single-detector regimes (including MMD on CLIP) as an exception. We should test that boundary, not present the result as a universal guarantee.
+
+Reference: [Xu & Tian, 2026, DOI 10.3390/math14173045](https://doi.org/10.3390/math14173045), [full paper](https://www.mdpi.com/2227-7390/14/17/3045).
+
+This changes our next benchmark gate: feature-shift scores should not only be compared as isolated detectors. Add a calibration-only, frozen detector-selector/combiner baseline; measure whether it beats the best constituent on held-out worlds, while retaining exact-scoring fallback for sparse shifts and testing worlds where one method dominates. Selection must not see confirmatory shift labels, and all composite scores need independent outer calibration after the selector is frozen.
+
 ## Literature and benchmark rationale
 
 - Cerqueira et al., KDD 2026, [A Framework for Evaluating and Benchmarking Concept Drift Detection Methods](https://doi.org/10.1145/3770855.3819070): emphasizes structural diversity, timing-aware metrics, and leave-one-dataset-out tuning.
