@@ -449,7 +449,8 @@ fn analyze(
             "seed": seed,
             "interval": "percentile_95",
             "note": concat!(
-                "Intervals are component-clustered descriptive intervals; the analyzer never certifies ",
+                "Intervals are component-clustered descriptive intervals; ",
+                "the analyzer never certifies ",
                 "the independent truth of the supplied labels."
             ),
         },
@@ -458,7 +459,8 @@ fn analyze(
         "resource_usage": Value::Object(resource_usage),
         "limitations": [
             concat!(
-                "The analyzer validates suite-to-outcome joins but does not establish the mathematical ",
+                "The analyzer validates suite-to-outcome joins but does not ",
+                "establish the mathematical 
                 "correctness of reviewer labels."
             ),
             concat!(
