@@ -826,9 +826,17 @@
         "bootstrap_fraction_effect_above_zero",
         "per_dataset",
         "canonical_input_sha256",
-        "result_sha256"
+        "result_sha256",
+        "minimum_seeds_per_dataset",
+        "sota_coverage_gate_pass",
+        "sota_coverage_gate_reason"
       ],
-      "claim_policy": "A positive interval supports a positive paired effect only for the pinned metric, dataset set, evidence-access track, and configurations. It is not a universal SOTA claim. Report costs and all per-dataset outcomes."
+      "claim_policy": "A positive interval supports a positive paired effect only for the pinned metric, dataset set, evidence-access track, and configurations. It is not a universal SOTA claim. Report costs and all per-dataset outcomes.",
+      "sota_coverage_gate": {
+        "minimum_datasets": 7,
+        "minimum_seeds_per_dataset": 50,
+        "meaning": "Coverage eligibility only, not a performance result or evidence of superiority. A scientific claim still requires matched protocols, actual comparator runs, per-dataset reporting, costs, and uncertainty."
+      }
     }
   }
 }
