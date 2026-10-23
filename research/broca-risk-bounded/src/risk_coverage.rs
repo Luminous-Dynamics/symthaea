@@ -314,13 +314,14 @@ fn summarize_at_threshold(
     let coverage = accepted_count as f64 / total_count as f64;
     let labelled_coverage = labelled_accepted_count as f64 / total_count as f64;
     let accepted_label_completeness = (accepted_count > 0)
-        .then_some(labelled_accepted_count as f64 / accepted_count as f64);
+        .then(|| labelled_accepted_count as f64 / accepted_count as f64);
     let observed_label_risk = (labelled_accepted_count > 0)
-        .then_some(unsafe_labelled_count as f64 / labelled_accepted_count as f64);
+        .then(|| unsafe_labelled_count as f64 / labelled_accepted_count as f64);
     let optimistic_risk =
-        (accepted_count > 0).then_some(unsafe_labelled_count as f64 / accepted_count as f64);
-    let pessimistic_risk = (accepted_count > 0)
-        .then_some((unsafe_labelled_count + unknown_accepted_count) as f64 / accepted_count as f64);
+        (accepted_count > 0).then(|| unsafe_labelled_count as f64 / accepted_count as f64);
+    let pessimistic_risk = (accepted_count > 0).then(|| {
+        (unsafe_labelled_count + unknown_accepted_count) as f64 / accepted_count as f64
+    });
 
     RiskCoveragePoint {
         threshold,
