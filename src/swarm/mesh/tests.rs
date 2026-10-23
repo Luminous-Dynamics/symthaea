@@ -2161,10 +2161,7 @@ fn legacy_fragment_encryption_exceeds_lora_mtu() {
 #[cfg(feature = "mesh-encryption")]
 #[derive(Default)]
 struct RuntimeNoncePairOracle {
-    seen: std::collections::HashMap<
-        ([u8; 32], [u8; AEAD_NONCE_SIZE]),
-        &'static str,
-    >,
+    seen: std::collections::HashMap<([u8; 32], [u8; AEAD_NONCE_SIZE]), &'static str>,
 }
 
 #[cfg(feature = "mesh-encryption")]
@@ -2255,13 +2252,7 @@ fn legacy_packet_and_fragment_apis_can_reuse_nonce_under_shared_key() {
         0x88,
         0x0003_0201,
     );
-    let fragment_wire = encrypt_fragment(
-        &fragment_plaintext,
-        &key,
-        &source_id,
-        0x0201,
-        3,
-    );
+    let fragment_wire = encrypt_fragment(&fragment_plaintext, &key, &source_id, 0x0201, 3);
 
     assert_eq!(
         &packet_wire[..AEAD_NONCE_SIZE],
@@ -2270,10 +2261,7 @@ fn legacy_packet_and_fragment_apis_can_reuse_nonce_under_shared_key() {
     );
 
     let mut oracle = RuntimeNoncePairOracle::default();
-    assert_eq!(
-        oracle.observe(&key, &packet_wire, "packet-api"),
-        None
-    );
+    assert_eq!(oracle.observe(&key, &packet_wire, "packet-api"), None);
     assert_eq!(
         oracle.observe(&key, &fragment_wire, "fragment-api"),
         Some(("packet-api", "fragment-api")),
