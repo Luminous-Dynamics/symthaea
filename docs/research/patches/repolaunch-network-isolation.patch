@@ -13,7 +13,7 @@ diff --git a/launch/core/platforms/linux.py b/launch/core/platforms/linux.py
          container = client.containers.run(
              image_name,
              name=container_name,
-@@ -269,13 +270,62 @@
+@@ -269,13 +270,67 @@
              },
              **run_kwargs,
          )
@@ -31,14 +31,19 @@ diff --git a/launch/core/platforms/linux.py b/launch/core/platforms/linux.py
 +        # container. Keep ignored dependency caches intact.
 +        sanitize_command = """(
 +set -eu
-+test -z "$(git status --porcelain --untracked-files=all)"
++test -d .git
++test -d .git/objects
++test ! -e .git/commondir
++test ! -e .git/objects/info/alternates
++: > .git/info/exclude
++git config --local core.hooksPath /dev/null
++test -z "$(git -c core.excludesFile=/dev/null status --porcelain --untracked-files=all)"
 +head_ref="$(git symbolic-ref -q HEAD || true)"
 +git for-each-ref --format='%(refname)' | while IFS= read -r ref; do
 +    [ "$ref" = "$head_ref" ] || git update-ref -d "$ref"
 +done
 +git reflog expire --expire=now --expire-unreachable=now --all
 +git gc --prune=now
-+git config --local --unset-all core.hooksPath || true
 +rm -rf .git/hooks
 +mkdir -p .git/hooks
 +rm -f .git/info/grafts
@@ -55,7 +60,7 @@ diff --git a/launch/core/platforms/linux.py b/launch/core/platforms/linux.py
 +    exit 86
 +fi
 +rm -f /tmp/repolaunch-fsck.txt
-+test -z "$(git status --porcelain --untracked-files=all)"
++test -z "$(git -c core.excludesFile=/dev/null status --porcelain --untracked-files=all)"
 +)"""
 +        sanitize_result = session.send_command(sanitize_command)
 +        sanitize_code = getattr(
