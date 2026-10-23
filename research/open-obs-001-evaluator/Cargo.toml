@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+
+[package]
+name = "open-obs-evaluator"
+version = "0.2.0"
+edition = "2024"
+publish = false
+description = "Strict, deterministic evaluator for OPEN-OBS-001 grouped observation manifests"
+
+[dependencies]
+sha2 = "0.10"
