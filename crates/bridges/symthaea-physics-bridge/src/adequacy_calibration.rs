@@ -115,10 +115,29 @@ impl ConformalAdequacyCalibrator {
         audit_score: f64,
         independent_audit: bool,
     ) -> Result<ConformalAdequacyResult, CalibrationError> {
+        self.assess_audit_score_with_diagnostic(
+            audit_score,
+            independent_audit,
+            AdequacyDiagnostic::PredictiveMisfit,
+        )
+    }
+
+    /// Calibrate an audit score while preserving the meaning of the diagnostic channel.
+    ///
+    /// For example, residual scores should use `PredictiveMisfit`, while a separately
+    /// calibrated input-feature score should use `QueryDistributionShift`. The score function
+    /// and diagnostic label must be predeclared; changing a label cannot repair a mismatched or
+    /// non-exchangeable calibration protocol.
+    pub fn assess_audit_score_with_diagnostic(
+        &self,
+        audit_score: f64,
+        independent_audit: bool,
+        diagnostic: AdequacyDiagnostic,
+    ) -> Result<ConformalAdequacyResult, CalibrationError> {
         let p_value = self.audit_p_value(audit_score, independent_audit)?;
         let assessment = if p_value <= self.alpha {
             AdequacyAssessment::Alarm {
-                diagnostic: AdequacyDiagnostic::PredictiveMisfit,
+                diagnostic,
                 calibrated: true,
                 independent_audit: true,
             }
@@ -712,6 +731,30 @@ mod tests {
             result.assessment,
             AdequacyAssessment::Alarm {
                 diagnostic: AdequacyDiagnostic::PredictiveMisfit,
+                calibrated: true,
+                independent_audit: true,
+            }
+        );
+    }
+
+    #[test]
+    fn calibrated_assessment_preserves_the_declared_diagnostic_channel() {
+        let calibrator = ConformalAdequacyCalibrator::new(
+            &(1..=99).map(|value| value as f64).collect::<Vec<_>>(),
+            0.05,
+        )
+        .unwrap();
+        let feature_result = calibrator
+            .assess_audit_score_with_diagnostic(
+                100.0,
+                true,
+                AdequacyDiagnostic::QueryDistributionShift,
+            )
+            .unwrap();
+        assert_eq!(
+            feature_result.assessment,
+            AdequacyAssessment::Alarm {
+                diagnostic: AdequacyDiagnostic::QueryDistributionShift,
                 calibrated: true,
                 independent_audit: true,
             }
