@@ -176,6 +176,27 @@ The differentiator is a **causal, evidence-audited cognitive loop**: one observa
 `benchmarks/cognitive-loop-evidence/scenarios.json` is the implementation-facing companion to this contract. It currently defines **30 cases across six suites (S0–S5)**: validity invariants, calibration and distribution shift, continual learning, phase causality, end-to-end benchmark adapters, and system behavior. It includes the B0–B7 baseline matrix, including B4 for calibrated uncertainty. These are proposed cases and configurations; the manifest is not yet a runnable benchmark suite and no results are implied.
 
 
+## External drift-detector baselines
+
+B0–B7 are **internal ablations**, not state-of-the-art comparators. The shift-detection suite therefore also declares a separate external-reference track in the manifest. This distinction prevents a win over legacy Symthaea from being reported as a win over specialist drift detectors.
+
+| Reference | What it tests | Input/label caveat | Status |
+|---|---|---|---|
+| Fixed threshold | Minimum viable alarm policy | Valid PE/residual only; threshold calibrated off scored seeds | Planned |
+| EWMA control chart | Smoothed deviation and sensitivity/noise trade-off | Unlabelled scalar stream; calibration separated from evaluation | Planned |
+| Page–Hinkley | Sequential mean-shift detection | Unlabelled numeric stream; primarily a mean-change test | Planned |
+| ADWIN | Adaptive window-size change detection | Unlabelled numeric stream; valid-observation cadence must match | Planned |
+| KSWIN | Two-window distributional change test | Unlabelled numeric stream; pin window/significance configuration | Planned |
+| Discriminative Drift Detector (D3) | Fully unsupervised multivariate feature-space drift | Requires a pinned external adapter and common feature contract | Adapter required |
+| Image-Based Drift Detector (IBDD) | Drift from a window-to-image representation | Transformation and representation costs must be included | Adapter required |
+| Semi-Parametric Log-Likelihood (SPLL) | Likelihood change against a reference distribution | Numerical features; clustering/covariance assumptions must be documented | Adapter required |
+
+The D3/IBDD/SPLL candidates come from a survey and real-world benchmark of fully unsupervised concept-drift detectors. That study emphasizes an important limit: feature-space methods cannot detect a pure change in the posterior (P(y\mid X)) unless it also changes the feature distribution, and it finds current drift metrics imperfect for incremental/gradual changes. See [Lukats et al. (2024/2025)](https://doi.org/10.1007/s41060-024-00620-y) and its [reproducibility repository](https://github.com/DFKI-NI/unsupervised-concept-drift-detection).
+
+The harness must pre-register a disjoint calibration stream, pin versions/configs/seeds, and use the same valid observations. Do not map invalid PE to a numerical value for a detector to consume. Report false alarms per 1,000 valid observations, missed-drift rate, detection-delay distributions, precision/recall stratified by abrupt, gradual and recurring drift, coverage, throughput, peak memory, and per-seed event traces. Do not rank only by one aggregate such as Mean Time Ratio: detector-quality metrics have assumptions, and the cited review reports limitations for both MTR and lift-per-drift.
+
+These are **planned comparators**, not implementations or results. The new Rust command validates that their contracts are present; it does not execute them.
+
 ## Manifest validator
 
 The JSON manifest is now checked by a small Rust validator in `xtask`; this validates the experiment contract, **not benchmark performance**. Run it from the repository root:
