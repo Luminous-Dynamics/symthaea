@@ -165,6 +165,44 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+fn validate_case_state_contract(case: &Value, context: &str) -> Result<()> {
+    let target = field(case, "target", context)?;
+    let base = field(case, "base_state", context)?;
+    let variant = field(case, "variant_state", context)?;
+
+    // A proof-state intervention changes the local context, not the theorem,
+    // elaborated goal, source identity, toolchain, or environment.
+    for (state_role, state) in [("base_state", base), ("variant_state", variant)] {
+        for key in [
+            "source_commit",
+            "statement_sha256",
+            "goal_type_sha256",
+            "environment_sha256",
+            "lean_toolchain",
+        ] {
+            let state_value = string(state, key, &format!("{context}.{state_role}"))?;
+            let target_value = string(target, key_for_target(key), &format!("{context}.target"))?;
+            if state_value != target_value {
+                bail!(
+                    "{context}.{state_role}.{key} differs from target identity/evaluation contract"
+                );
+            }
+        }
+    }
+
+    let base_goal_count = unsigned(base, "goal_count", &format!("{context}.base_state"))?;
+    let variant_goal_count = unsigned(variant, "goal_count", &format!("{context}.variant_state"))?;
+    if base_goal_count != variant_goal_count {
+        bail!("{context}: proof-state intervention changed goal_count");
+    }
+    Ok(())
+}
+
+fn key_for_target(state_key: &str) -> &str {
+    // State and target contracts use the same names for all invariant fields.
+    state_key
+}
+
 fn analyze(
     suite: &Value,
     bundle: &Value,
@@ -225,6 +263,7 @@ fn analyze(
         ) {
             bail!("{context}: unsupported intervention kind {kind:?}");
         }
+        validate_case_state_contract(case, &context)?;
         let links = field(case, "outcome_links", &context)?;
         for role in ["base", "variant"] {
             let outcome_id = string(links, &format!("{role}_outcome_id"), &context)?.to_owned();
@@ -1211,6 +1250,37 @@ mod tests {
         let outcomes: Value = serde_json::from_slice(&outcomes_bytes)
             .expect("checked-in proof-state outcomes fixture must parse");
         (suite, outcomes)
+    }
+
+    #[test]
+    fn paired_state_must_preserve_target_goal_environment_and_source_identity() {
+        let (suite, _) = checked_in_synthetic_inputs();
+        let original = suite["cases"][0].clone();
+        validate_case_state_contract(&original, "test-case")
+            .expect("fixture state pair should preserve its target contract");
+
+        for (field_name, wrong_value) in [
+            ("goal_type_sha256", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
+            ("environment_sha256", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
+            ("source_commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+            ("statement_sha256", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
+            ("lean_toolchain", "leanprover/lean4:v0.0.0-invalid"),
+        ] {
+            let mut mutant = original.clone();
+            mutant["variant_state"][field_name] = Value::String(wrong_value.into());
+            let error = validate_case_state_contract(&mutant, "test-mutant")
+                .expect_err("pair with changed invariant target identity must fail closed");
+            assert!(
+                error.to_string().contains("differs from target identity/evaluation contract"),
+                "unexpected diagnostic for {field_name}: {error}"
+            );
+        }
+
+        let mut changed_goal_count = original;
+        changed_goal_count["variant_state"]["goal_count"] = json!(2);
+        let error = validate_case_state_contract(&changed_goal_count, "test-mutant")
+            .expect_err("pair with changed goal count must fail closed");
+        assert!(error.to_string().contains("changed goal_count"));
     }
 
     #[test]
