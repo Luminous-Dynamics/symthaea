@@ -43,8 +43,8 @@ jobs:
 
       - name: Verify frozen metamorphic evidence request digest
         run: echo "4aadbcbcaccb4bf1bc96cf1e650b8c967b3ef798520cd4934885f4063c58a182  tools/morphology-continuity-oracle/active_evidence_request_v0_2.txt" | sha256sum --check -
- 
-     - name: Verify frozen decision-sensitive request digest
+
+      - name: Verify frozen decision-sensitive request digest
         run: echo "39960eca4c0b5e86729a83cb4f560515b77ce00ed9d2cdd996367fdfc663aa4e  tools/morphology-continuity-oracle/decision_sensitive_request_v0_3.txt" | sha256sum --check -
 
       - name: Formatting
