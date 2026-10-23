@@ -56,7 +56,7 @@ jobs:
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/model_adequacy_contract.rs
       - name: Diagnose workspace lockfile drift
         run: |
-          cargo update --workspace --offline
+          cargo update --workspace
           echo "=== Cargo.lock diff stat ==="
           git diff --stat -- Cargo.lock
           echo "=== Cargo.lock reconciliation diff ==="
