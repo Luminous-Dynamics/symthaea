@@ -32,6 +32,7 @@ struct TaskRecordForDigest {
     instance_id: String,
     repo: String,
     base_commit: String,
+    repo_head_sha: String,
     docker_image: String,
     problem_statement_sha256: String,
     gold_patch_sha256: String,
@@ -72,6 +73,7 @@ fn task_record_for_digest(value: &Value) -> Result<TaskRecordForDigest, String> 
         instance_id: string("instance_id")?,
         repo: string("repo")?,
         base_commit: string("base_commit")?,
+        repo_head_sha: string("repo_head_sha")?,
         docker_image: string("docker_image")?,
         problem_statement_sha256: string("problem_statement_sha256")?,
         gold_patch_sha256: string("gold_patch_sha256")?,
@@ -132,6 +134,8 @@ struct TaskScore {
     container_image_id: Option<String>,
     required_test_count: usize,
     required_tests_passing: usize,
+    network_mode_observed: Option<String>,
+    repo_head_sha_observed: Option<String>,
     scored_test_exit_code: Option<i64>,
     non_required_failure_count: usize,
 }
@@ -439,6 +443,11 @@ fn validate_locked_runtime_logs(
         .get("container_image_id")
         .and_then(Value::as_str)
         .unwrap_or("");
+    let expected_repo_head = task.get("repo_head_sha").and_then(Value::as_str).unwrap_or("");
+    let candidate_base_commit = candidate.get("base_commit").and_then(Value::as_str).unwrap_or("");
+    if expected_repo_head.is_empty() || expected_repo_head != candidate_base_commit {
+        errors.push("locked task repository HEAD differs from candidate base_commit".to_string());
+    }
     if task.get("network_mode").and_then(Value::as_str) != Some("none") {
         errors.push("locked task manifest network_mode must be 'none'".to_string());
     }
@@ -454,6 +463,12 @@ fn validate_locked_runtime_logs(
     let baseline = evidence.get("baseline").unwrap_or(&Value::Null);
     if baseline.get("role").and_then(Value::as_str) != Some("baseline") {
         errors.push("runtime sidecar baseline role is invalid".to_string());
+    }
+    if baseline.get("repo_head_exit_code").and_then(Value::as_i64) != Some(0) {
+        errors.push("baseline repository HEAD inspection did not exit zero".to_string());
+    }
+    if baseline.get("repo_head_sha").and_then(Value::as_str) != Some(expected_repo_head) {
+        errors.push("baseline repository HEAD differs from locked task base commit".to_string());
     }
     let baseline_identity = baseline.get("container_identity").unwrap_or(&Value::Null);
     if baseline_identity.get("network_mode").and_then(Value::as_str) != Some("none") {
@@ -551,6 +566,12 @@ fn validate_locked_runtime_logs(
             }
         }
 
+        if run.get("repo_head_exit_code").and_then(Value::as_i64) != Some(0) {
+            errors.push(format!("gold runtime run {index} repository HEAD inspection did not exit zero"));
+        }
+        if run.get("repo_head_sha").and_then(Value::as_str) != Some(expected_repo_head) {
+            errors.push(format!("gold runtime run {index} repository HEAD differs from locked task base commit"));
+        }
         let identity = run.get("container_identity").unwrap_or(&Value::Null);
         if identity.get("network_mode").and_then(Value::as_str) != Some("none") {
             errors.push(format!("gold runtime run {index} network_mode must be 'none'"));
