@@ -258,7 +258,7 @@ fn typed_distractor(rng: &mut u64, gt_vals: &[f64], probes: &[Experiment]) -> Ex
     panic!("could not draw a sane, distinct typed distractor within the attempt cap");
 }
 
-const MAX_MODEL_FAMILY_EXPANSIONS: usize = 2;
+const MAX_TYPED_RECOVERY_RESTARTS: usize = 2;
 const RECOVERY_CANDIDATES_PER_EXPANSION: usize = 4;
 const RECOVERY_GENERATION_ATTEMPT_CAP: usize = 256;
 
@@ -267,7 +267,7 @@ const RECOVERY_GENERATION_ATTEMPT_CAP: usize = 256;
 /// discrepancy value, or ground-truth handle: candidate generation is driven only by the public
 /// task signature, the existing symbolic hypotheses, and a fixed pre-generated experiment pool.
 /// The alarmed provisional candidate is archived but excluded from the new live set.
-fn expand_energy_model_family_after_alarm(
+fn reseed_typed_candidates_after_alarm(
     rng: &mut u64,
     candidate_pool: &[Experiment],
     hypotheses: &mut Vec<Expr>,
@@ -420,7 +420,7 @@ struct TrialOutcome {
     overconfident_under_misspecification: bool,
     prequential_pit_alarm: bool,
     monitoring_protocol_invalid: bool,
-    model_family_expansions: usize,
+    typed_recovery_restarts: usize,
     terminal_pit_alarm: bool,
 }
 
@@ -536,7 +536,7 @@ fn run_trial_with_discrepancy(
             overconfident_under_misspecification: false,
             prequential_pit_alarm: false,
             monitoring_protocol_invalid: true,
-            model_family_expansions: 0,
+            typed_recovery_restarts: 0,
             terminal_pit_alarm: false,
         };
     }
@@ -608,7 +608,7 @@ fn run_trial_with_discrepancy(
     };
     let mut prequential_pit_alarm = false;
     let mut monitoring_protocol_invalid = false;
-    let mut model_family_expansions = 0usize;
+    let mut typed_recovery_restarts = 0usize;
     let mut rejected_after_alarm = Vec::<usize>::new();
     let mut terminal_pit_alarm = false;
 
@@ -847,7 +847,7 @@ fn run_trial_with_discrepancy(
             // An alarm is evidence against this provisional model, not evidence for any
             // replacement. Reopen the archived pool, exclude the alarmed candidate, add a
             // bounded set of dimensionally-valid proposals, and begin a fresh monitor epoch.
-            if model_family_expansions >= MAX_MODEL_FAMILY_EXPANSIONS {
+            if typed_recovery_restarts >= MAX_TYPED_RECOVERY_RESTARTS {
                 terminal_pit_alarm = true;
                 break;
             }
@@ -857,8 +857,8 @@ fn run_trial_with_discrepancy(
                 break;
             };
             let mut recovery_rng =
-                seed ^ 0xF1A1_1E5E_2026_0001 ^ (model_family_expansions as u64).rotate_left(19);
-            let added = expand_energy_model_family_after_alarm(
+                seed ^ 0xF1A1_1E5E_2026_0001 ^ (typed_recovery_restarts as u64).rotate_left(19);
+            let added = reseed_typed_candidates_after_alarm(
                 &mut recovery_rng,
                 &candidate_pool,
                 &mut hypotheses,
@@ -870,7 +870,7 @@ fn run_trial_with_discrepancy(
                 terminal_pit_alarm = true;
                 break;
             }
-            model_family_expansions += 1;
+            typed_recovery_restarts += 1;
             terminal_pit_alarm = false;
             pit_monitor = Some(
                 PrequentialPitMartingale::new(0.05, VAR_NAMES.len())
@@ -896,7 +896,7 @@ fn run_trial_with_discrepancy(
             && !prequential_pit_alarm,
         prequential_pit_alarm,
         monitoring_protocol_invalid,
-        model_family_expansions,
+        typed_recovery_restarts,
         terminal_pit_alarm,
     }
 }
@@ -1369,7 +1369,7 @@ mod tests {
         let mut live = vec![0];
         let mut rejected = Vec::new();
 
-        let added = expand_energy_model_family_after_alarm(
+        let added = reseed_typed_candidates_after_alarm(
             &mut rng,
             &pool,
             &mut hypotheses,
@@ -1394,7 +1394,7 @@ mod tests {
         // A second alarm must not resurrect the first alarmed hypothesis.
         let second_alarmed = archived_count;
         let mut second_rng = 0x0DDC_0FFE_E0DD_F00D_u64;
-        let _ = expand_energy_model_family_after_alarm(
+        let _ = reseed_typed_candidates_after_alarm(
             &mut second_rng,
             &pool,
             &mut hypotheses,
@@ -1429,7 +1429,7 @@ mod tests {
         let mut misspec_pit_detections = 0usize;
         let mut pit_audit_queries = 0usize;
         let mut protocol_failures = 0usize;
-        let mut total_model_family_expansions = 0usize;
+        let mut total_typed_recovery_restarts = 0usize;
         let mut terminal_pit_alarms = 0usize;
 
         for seed in 1..=SEEDS {
@@ -1472,8 +1472,8 @@ mod tests {
             misspec_pit_detections +=
                 if misspecified_pit.model_discrepancy_detected { 1 } else { 0 };
             pit_audit_queries += misspecified_pit.audit_queries + clean_pit.audit_queries;
-            total_model_family_expansions +=
-                clean_pit.model_family_expansions + misspecified_pit.model_family_expansions;
+            total_typed_recovery_restarts +=
+                clean_pit.typed_recovery_restarts + misspecified_pit.typed_recovery_restarts;
             terminal_pit_alarms += if clean_pit.terminal_pit_alarm { 1 } else { 0 };
             terminal_pit_alarms += if misspecified_pit.terminal_pit_alarm { 1 } else { 0 };
             protocol_failures += if clean_pit.monitoring_protocol_invalid { 1 } else { 0 };
@@ -1488,7 +1488,7 @@ mod tests {
                 "misspec_baseline_false_singletons={misspec_baseline_false_singletons},",
                 "misspec_pit_false_singletons={misspec_pit_false_singletons},",
                 "misspec_pit_detections={misspec_pit_detections},",
-                "pit_audit_queries={pit_audit_queries},model_family_expansions={total_model_family_expansions},",
+                "pit_audit_queries={pit_audit_queries},typed_recovery_restarts={total_typed_recovery_restarts},",
                 "terminal_pit_alarms={terminal_pit_alarms},protocol_failures={protocol_failures}"
             )
         );
@@ -1501,7 +1501,7 @@ mod tests {
             pit_audit_queries > 0,
             "the integrated policy never reached a singleton audit"
         );
-        assert!(total_model_family_expansions <= 4 * SEEDS as usize);
+        assert!(total_typed_recovery_restarts <= 4 * SEEDS as usize);
         assert!(terminal_pit_alarms <= 2 * SEEDS as usize);
         assert!(clean_baseline_successes <= SEEDS as usize);
         assert!(clean_pit_successes <= SEEDS as usize);
