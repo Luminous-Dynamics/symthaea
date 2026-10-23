@@ -90,8 +90,8 @@ BindIdentityAndTranscript ==
   /\ chosenProfile \in Profiles
   /\ \/ AdmissionMode = "downgrade"
      \/ ProfileAllowed(chosenProfile)
-  /\ peerIdentityBound' = AdmissionMode # "identity-unbound"
-  /\ transcriptBound' = AdmissionMode # "transcript-unbound"
+  /\ peerIdentityBound' = (AdmissionMode # "identity-unbound")
+  /\ transcriptBound' = (AdmissionMode # "transcript-unbound")
   /\ candidateSecretPresent' = (BackendUsable
                                \/ AdmissionMode = "stub-backend")
   /\ phase' = "Candidate"
