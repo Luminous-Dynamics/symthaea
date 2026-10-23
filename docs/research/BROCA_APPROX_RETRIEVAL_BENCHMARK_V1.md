@@ -31,6 +31,12 @@ done
 
 To test the approximate path with its candidate-count and empty-result fallbacks disabled, run a separate arm with `--candidate-multiplier=0 --fallback-on-empty=false`. Keep the default-fallback arm as well: disabling fallback may improve latency while degrading recall, so neither arm is sufficient by itself.
 
+The example includes focused tests for deterministic workload replay, exact corruption count, Recall@K denominator behavior and latency percentile calculation. Run them with:
+
+```sh
+cargo test -p symthaea-hdc-store --example ann_benchmark
+```
+
 The CLI rejects an unpinned or malformed source SHA, unknown arguments, zero size/query/round/top-K values, and noise levels above the vector dimension.
 
 ## Workload contract
