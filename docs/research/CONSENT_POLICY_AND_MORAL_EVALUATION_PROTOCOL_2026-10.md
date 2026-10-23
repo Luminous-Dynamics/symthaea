@@ -88,3 +88,17 @@ Do not call any target a pass until the exact commit and corpus digest have been
 ## Interpretation
 
 The immediate engineering achievement is a more explicit type boundary and a reproducible diagnostic command. It does **not** establish that Symthaea outperforms current industry systems, understands consent generally, or provides legal/security authorization. Those claims require independent evidence and held-out evaluations.
+
+## Point-of-use enforcement and evaluation
+
+Parser quality is not the end safety outcome. For action-bearing systems, a separate acceptance property is that the protected action closure is not called when its consent precondition returns `Blocked`. The implementation in `src/hdc/moral_algebra/consent_policy.rs` adds `execute_after_consent_check`, with regression tests for a blocked decision (zero invocations) and a satisfied decision (exactly one invocation). These tests are authored but have not been executed here.
+
+Measure this separately from parser precision/recall:
+- **Blocked action invocations:** target 0 on a preregistered deterministic state/scope matrix; publish numerator, denominator and test coverage.
+- **Required-consent false permits:** target 0 observed for missing, Unknown, Implied, Absent, Denied, unverified, scope-mismatched, not-yet-valid, expired and revoked records; report denominators and uncertainty.
+- **Gate coverage:** map every protected dispatch boundary and target 100% coverage of declared in-scope actions.
+- **Freshness/revocation:** test old snapshots, revocation immediately before dispatch, policy lookup failure, replay and concurrent state changes.
+- **Non-regression:** show explicitly NotRequired actions remain usable and show that all other authorization and safety gates still apply.
+- **Performance:** report p50/p95/p99 gate latency separately from external record retrieval.
+
+The helper only enforces the consent-specific precondition at its call site. It does not authenticate records, choose the action policy, guarantee a trusted clock, integrate every executor, or make an external side effect atomic with a revocation store. Callers must obtain fresh verified evidence immediately before use and complete other required checks. If a resource can change concurrently, use resource-side version/transaction enforcement. Do not infer end-to-end safety or SOTA superiority from the helper, parser F1 or a handful of unit tests.
