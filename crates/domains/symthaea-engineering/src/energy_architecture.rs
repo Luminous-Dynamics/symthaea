@@ -1437,4 +1437,102 @@ mod tests {
         assert!(candidates.iter().any(|candidate| candidate.candidate_id == "synthetic-pv-grid"));
         assert!(candidates.iter().any(|candidate| candidate.candidate_id == "synthetic-pv-battery-grid"));
     }
+ 
+    #[test]
+    fn bounded_parametric_design_space_is_deterministic_and_fully_validated() {
+        let first = bounded_parametric_design_space();
+        let second = bounded_parametric_design_space();
+        assert_eq!(first, second, "sweep ordering and candidate serialization inputs must be stable");
+        assert_eq!(first.search_schema_version, "energy-architecture-search-v0.1");
+        assert_eq!(first.requested_candidate_count, 36);
+        assert_eq!(first.candidates.len() + first.rejected_candidates.len(), 36);
+        assert_eq!(first.candidates.len(), 36);
+        assert!(first.rejected_candidates.is_empty());
+
+        let ids: BTreeSet<_> = first
+            .candidates
+            .iter()
+            .map(|candidate| candidate.candidate_id.as_str())
+            .collect();
+        assert_eq!(ids.len(), 36, "candidate IDs must be unique");
+        for candidate in &first.candidates {
+            validate_candidate(candidate).expect("every emitted search candidate must pass validation");
+        }
+    }
+
+    #[test]
+    fn parametric_sweep_covers_each_declared_axis_endpoint() {
+        let result = bounded_parametric_design_space();
+        assert_eq!(result.axis_values["pv_rated_power_kw"], vec![1.0, 2.0, 3.0]);
+        assert_eq!(
+            result.axis_values["battery_capacity_kwh"],
+            vec![1.0, 2.0, 3.0]
+        );
+        assert_eq!(
+            result.axis_values["battery_charge_discharge_power_kw"],
+            vec![1.0, 2.0]
+        );
+        assert_eq!(result.axis_values["grid_import_power_kw"], vec![1.0, 2.0]);
+
+        let candidate = result
+            .candidates
+            .iter()
+            .find(|candidate| {
+                candidate.candidate_id
+                    == "synthetic-parametric-pv-1kw-battery-1kwh-battery-power-1kw-grid-1kw"
+            })
+            .expect("the minimum-axis design is emitted");
+        assert_eq!(candidate.components.len(), 4);
+        assert_eq!(candidate.horizon.interval_seconds, 3600);
+        assert!(candidate.synthetic);
+        assert!(candidate.claim_ceiling.contains("synthetic sizing sweep"));
+        assert_eq!(
+            candidate.scenarios[0].intervals[0]
+                .resource_available_kwh
+                .iter()
+                .find(|resource| resource.component_id == "pv")
+                .unwrap()
+                .available_kwh,
+            1.0
+        );
+        assert_eq!(
+            candidate.scenarios[0].intervals[0]
+                .resource_available_kwh
+                .iter()
+                .find(|resource| resource.component_id == "grid")
+                .unwrap()
+                .available_kwh,
+            1.0
+        );
+        assert_eq!(
+            candidate.scenarios[0].intervals[1]
+                .resource_available_kwh
+                .iter()
+                .find(|resource| resource.component_id == "grid")
+                .unwrap()
+                .available_kwh,
+            0.0,
+            "outage resources remain zero after sizing mutations"
+        );
+    }
+
+    #[test]
+    fn parametric_variants_keep_missing_economic_evidence_unknown() {
+        let result = bounded_parametric_design_space();
+        let candidate = &result.candidates[0];
+        let cost = candidate
+            .objectives
+            .iter()
+            .find(|objective| objective.objective_id == ObjectiveId::OperatingCost)
+            .expect("operating-cost objective is declared");
+        assert!(cost.description.contains("unknown, not zero"));
+        let emissions = candidate
+            .objectives
+            .iter()
+            .find(|objective| objective.objective_id == ObjectiveId::Emissions)
+            .expect("emissions objective is declared");
+        assert!(emissions.description.contains("unknown, not zero"));
+        assert!(result.claim_ceiling.contains("no real-site optimization"));
+    }
+
 }
