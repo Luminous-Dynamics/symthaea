@@ -10,7 +10,9 @@ use symthaea_physics_bridge::adequacy_calibration::{
     standardized_rms_residual, sum_log_component_p_fusion_score,
     ConformalAdequacyCalibrator, ResidualDiagnosticScores,
 };
-use symthaea_physics_bridge::feature_shift::FeatureShiftScorer;
+use symthaea_physics_bridge::feature_shift::{
+    classify_shift_evidence, FeatureShiftScorer, ShiftTriageDecision,
+};
 
 #[derive(Debug)]
 struct DeterministicNormalRng {
@@ -153,16 +155,15 @@ fn feature_shift_detects_input_drift_when_residual_monitor_is_silent() {
     let mut clean_residual_alarms = 0_usize;
     let mut shifted_residual_alarms = 0_usize;
 
+    let mut feature_only_triage = 0_usize;
     for _ in 0..AUDIT_BATCHES {
         let clean = correlated_feature_batch(&mut rng, BATCH_SIZE, 0.0);
         let shifted = correlated_feature_batch(&mut rng, BATCH_SIZE, 0.8);
 
-        let clean_feature_score = scorer.score(&clean).unwrap().aggregate;
-        let shifted_feature_score = scorer.score(&shifted).unwrap().aggregate;
-        clean_feature_alarms +=
-            calibrated_alarm(&feature_calibrator, clean_feature_score) as usize;
-        shifted_feature_alarms +=
-            calibrated_alarm(&feature_calibrator, shifted_feature_score) as usize;
+        let clean_feature_result = scorer.assess(&feature_calibrator, &clean, true).unwrap();
+        let shifted_feature_result = scorer.assess(&feature_calibrator, &shifted, true).unwrap();
+        clean_feature_alarms += usize::from(clean_feature_result.p_value <= ALPHA);
+        shifted_feature_alarms += usize::from(shifted_feature_result.p_value <= ALPHA);
 
         // The predictor observes both input dimensions and remains exact in either regime.
         // Residual-only monitoring therefore gets zero in both the clean and shifted batches.
@@ -172,10 +173,22 @@ fn feature_shift_detects_input_drift_when_residual_monitor_is_silent() {
             standardized_rms_residual(&zero_residuals, &zero_residuals, &unit_scales).unwrap();
         let shifted_residual_score =
             standardized_rms_residual(&zero_residuals, &zero_residuals, &unit_scales).unwrap();
-        clean_residual_alarms +=
-            calibrated_alarm(&residual_calibrator, clean_residual_score) as usize;
-        shifted_residual_alarms +=
-            calibrated_alarm(&residual_calibrator, shifted_residual_score) as usize;
+        let clean_model_result = residual_calibrator
+            .assess_audit_score(clean_residual_score, true)
+            .unwrap();
+        let shifted_model_result = residual_calibrator
+            .assess_audit_score(shifted_residual_score, true)
+            .unwrap();
+        clean_residual_alarms += usize::from(clean_model_result.p_value <= ALPHA);
+        shifted_residual_alarms += usize::from(shifted_model_result.p_value <= ALPHA);
+
+        if classify_shift_evidence(
+            shifted_model_result.assessment,
+            shifted_feature_result.assessment,
+        ) == ShiftTriageDecision::FeatureDistributionShiftOnly
+        {
+            feature_only_triage += 1;
+        }
     }
 
     let clean_rate = clean_feature_alarms as f64 / AUDIT_BATCHES as f64;
@@ -196,6 +209,7 @@ fn feature_shift_detects_input_drift_when_residual_monitor_is_silent() {
     );
     assert_eq!(clean_residual_alarms, 0);
     assert_eq!(shifted_residual_alarms, 0);
+    assert_eq!(feature_only_triage, shifted_feature_alarms);
 }
 
 /// Verify calibration with two null families beyond a single Gaussian/noise regime:
