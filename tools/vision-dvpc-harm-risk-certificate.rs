@@ -632,6 +632,31 @@ mod tests {
     }
 
     #[test]
+    fn subgroup_multiplicity_changes_zero_harm_sample_requirement() {
+        let group_ids = ["g1", "g2", "g3", "g4"];
+        let mut just_short = Vec::new();
+        for (index, group) in group_ids.iter().enumerate() {
+            just_short.extend(clean_escalations(89, index * 89, group));
+        }
+        let failed = certify_harm_rate_v1(&config(&group_ids), &just_short).unwrap();
+        assert_eq!(failed.status, RiskCertificateStatusV1::NotCertifiedRiskBound);
+        assert!(failed.groups.iter().all(|group| {
+            group.one_sided_upper_bound.unwrap() > 0.05
+        }));
+
+        let mut enough = Vec::new();
+        for (index, group) in group_ids.iter().enumerate() {
+            enough.extend(clean_escalations(90, index * 90, group));
+        }
+        let passed = certify_harm_rate_v1(&config(&group_ids), &enough).unwrap();
+        assert_eq!(passed.status, RiskCertificateStatusV1::Certified);
+        assert_eq!(passed.hypothesis_count, 5);
+        assert!(passed.groups.iter().all(|group| {
+            group.one_sided_upper_bound.unwrap() <= 0.05
+        }));
+    }
+
+    #[test]
     fn one_bad_group_fails_even_when_global_rate_passes() {
         let mut observations = clean_escalations(1000, 0, "common");
         observations
