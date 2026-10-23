@@ -4,7 +4,8 @@
 **Scope:** PR #8376, #8412, #8365, #8471 and #8491  
 **Machine-readable suite:** `mesh-security-scenarios-v1.json`  
 **Suite schema:** `mesh-security-scenarios-v1.schema.json`  
-**Receipt schema:** `mesh-security-evidence-v1.schema.json`
+**Evidence receipt schema:** `mesh-security-evidence-v1.schema.json`  
+**Contract-audit receipt schema:** `mesh-security-contract-audit-v1.schema.json`
 
 ## Research proposition
 
