@@ -70,6 +70,14 @@ Restart(sender) ==
   /\ epochs' = [epochs EXCEPT ![sender] = DefaultEpoch]
   /\ UNCHANGED <<usedPairs, reuseDetected>>
 
+\* Model an externally selected/random restart epoch as nondeterministic. TLC
+\* must explore collisions too; this does not estimate their probability.
+RestartWithEpoch(sender, epoch) ==
+  /\ epoch \in EpochValues
+  /\ nextSeq' = [nextSeq EXCEPT ![sender] = 0]
+  /\ epochs' = [epochs EXCEPT ![sender] = epoch]
+  /\ UNCHANGED <<usedPairs, reuseDetected>>
+
 \* Rotation may choose any configured epoch, including a previously used one.
 \* Epoch reuse alone is not necessarily a collision: the strict property is
 \* uniqueness of each complete (effective-key, nonce) pair. This model keeps
@@ -85,6 +93,8 @@ Next ==
          \E fragmentIndex \in FragmentIndices :
            Send(sender, payloadType, fragmentIndex)
   \/ \E sender \in SenderIDs : Restart(sender)
+  \/ \E sender \in SenderIDs :
+       \E epoch \in EpochValues : RestartWithEpoch(sender, epoch)
   \/ \E sender \in SenderIDs :
        \E epoch \in EpochValues : RotateEpoch(sender, epoch)
 
