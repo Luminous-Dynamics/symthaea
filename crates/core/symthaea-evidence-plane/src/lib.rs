@@ -8,6 +8,10 @@
 //! (what actually happened, instrumented at the call site), and a
 //! hard-failing integrity check that the two agree.
 //!
+//! The crate also owns the small cross-domain [`ContentAddress32`] runtime
+//! reference used to carry externally computed content identities without
+//! conflating identity, epistemic authority, causal provenance, or authenticity.
+//!
 //! This crate did not originate as a from-scratch design. It generalizes a
 //! pattern that already existed twice, independently, in this codebase, with
 //! two different shapes:
@@ -46,8 +50,11 @@
 //! and `SYMTHAEA_COGNITIVE_ARCHITECTURE_AUDIT_ADDENDUM_2026-07-28.md` (§0.1)
 //! at the monorepo root for the audit trail behind this crate.
 
+pub mod content_address;
 pub mod seed_plan;
 pub mod task_validator;
+
+pub use content_address::{ContentAddress32, ContentAddressError};
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashMap};
