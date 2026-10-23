@@ -129,3 +129,35 @@ The most defensible breakthrough claim would be: *a typed proof insight improves
 2. Continue the analysis independently of CI, but never treat queued jobs as evidence. Build a reproducible local/CI-independent check for the receipt format and run the checked-in synthetic negative controls where tools permit.
 3. Extend the real Lean calibration to more than one precondition pattern and independently reachable alternative route before recruiting models.
 4. Populate a reviewed pilot with real state pairs and actual runs only after the evidence and split contracts are stable.
+
+
+## 2026-10-23 update: external benchmark lessons and executable cost frontier
+
+This update adds recent published evidence and an executable descriptive evaluator; neither changes the primary PITB endpoint nor represents measured PITB results.
+
+### Fresh external comparators and what they change
+
+**First Proof Batch 3 (published 14 October 2026)** is a useful stress test for claims about “research-level mathematical reasoning”. The project assessed five systems on ten unpublished research-mathematics problems with 24 hours per system and no human input, using around 30 expert reviewers and separate scores for correctness, exposition, and attribution. Its release reports 9/10 problems answered correctly by the ProofCouncil multi-model harness versus 7/10 for the direct GPT-6 Astra submission; every problem was solved by at least one system. The release also reports $1,888 total cost for ProofCouncil versus $36 for the direct Astra run, adequate citations on 7/10 ProofCouncil submissions versus 4/10 direct Astra submissions, and negative average exposition scores for about one third of ProofCouncil responses. The open-weight Kimi K3 harness's submissions all contained major errors in this setup. See the [First Proof official release](https://1stproof.org/third-batch-press-release.html) and [published benchmark material](https://1stproof.org/third-batch.html).
+
+That is not a head-to-head result against PITB: it is expert-graded informal research mathematics, with different targets and scoring from Lean kernel checking and typed insight-transfer interventions. It does, however, reinforce a design decision: **never collapse mathematical correctness, evidence attribution, exposition, abstention, and cost into one vague reasoning score.** A future PITB research-assistant track could evaluate citation/source fidelity, explanation quality, uncertainty-aware abstention, and expert judgment separately after the formal-transfer track is operational.
+
+**Cost-aware proof orchestration is now a first-class SOTA comparison axis.** The October 2026 CoCo-Prover preprint describes action selection over proof and lemma-dependency graphs and reports a better success/cost frontier, with up to 30.9% lower cost than its strongest baseline in its own five-benchmark Lean program-verification setup ([paper](https://arxiv.org/abs/2610.09681)). The October 19 Maestro preprint focuses on global failure diagnosis, correcting false lemmas, retracting flawed subtrees, and replanning; it reports 669/672 PutnamBench and 59/60 Lean-IMO-Bench solves under its own setup ([paper](https://arxiv.org/abs/2610.25920)). These claims suggest strong features and baselines to reproduce, not results we can transfer numerically to PITB. In particular, cost gains must be compared on the same fixed target set, checker, and resource caps; a different benchmark's percentage is not our baseline.
+
+### Engineering increment now committed to PITB
+
+The branch now contains:
+- `crates/bridges/symthaea-proof-insights/src/bin/analyze_success_cost_frontier.rs`: a descriptive evaluator for the preregistered target × method × budget matrix. It validates full cell coverage and joins results against run/target/component/arm/budget/input identity; checks frozen model/checker/config identities and actual resource caps; binds an executed check to the exact planned theorem-statement digest; computes success curves with the assigned-target denominator, same-budget paired differences with component-clustered bootstrap intervals, actual cost per assigned target / verified solve, and the observed non-dominated success-cost frontier.
+- `success-cost-frontier-outcome.schema.json` and `success-cost-frontier-analysis-report.schema.json`: strict Draft 2020-12 contracts for run rows and aggregate output.
+- `fixtures/success-cost-frontier-outcomes.synthetic.jsonl`: all 18 planned cells explicitly `not_attempted`, with zero usage and null evidence.
+- An added workflow stage that runs the analyzer in the isolated research crate, validates both schemas with pinned `jsonschema[format]==4.26.0`, checks report/source/plan/outcome digests, and mutates one row to try to pass a forged execution in a synthetic fixture.
+
+The new analyzer deliberately emits no curves, paired effects, or frontier points for a synthetic dataset and permanently reports an unassessed confirmatory decision. It does not inspect receipt contents or determine theorem truth; the primary `analyze_pitb_results` power and utility gate remains authoritative. The frontier report can diagnose cost efficiency but cannot make a primary utility/SOTA claim.
+
+### Remaining integrity work before performance experiments
+
+1. Execute the exact-head Rust/Clippy/workflow checks; no latest-head Rust pass is asserted in this note.
+2. Run independent JSON Schema validation through the newly added workflow step; this session's local structural checks were JavaScript parsing/joins, not an independent Draft 2020-12 engine.
+3. Create and independently audit a small set of real target bundles, theorem correspondence and successor receipts; preserve unresolved items as unknown.
+4. Produce actual outcomes under the frozen baseline, matched configurations and at least three preregistered caps. Include every assignment, failure, timeout, tool-unavailable and non-attempt.
+5. Report (a) primary exact-target improvement with preregistered power/cluster uncertainty, (b) false acceptance and compatible recall on counterfactual transfer, and (c) cost frontier separately. Do not transfer First Proof / CoCo-Prover / Maestro headline metrics to PITB or describe the proposed +10pp solve-rate / aspirational 25% cost gates as achieved.
+
