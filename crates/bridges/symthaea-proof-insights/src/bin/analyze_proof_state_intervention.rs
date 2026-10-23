@@ -391,7 +391,7 @@ fn analyze(
         wall_time_ms: selected.iter().map(|row| row.wall_time_ms).sum(),
         cost_microusd: selected.iter().map(|row| row.cost_microusd).sum(),
     };
-    resource_usage.insert("paired_rows_with_executed_usage".into(), json!(executed_count));
+    resource_usage.insert("executed_rows_with_usage".into(), json!(executed_count));
     resource_usage.insert("totals".into(), json!(totals));
     resource_usage.insert(
         "mean_per_executed_row".into(),
@@ -482,9 +482,6 @@ fn parse_execution(execution: &Value, context: &str, dataset_kind: &str) -> Resu
         bail!("{context}: unsupported execution status {status:?}");
     }
     if status == "not_run" {
-        if dataset_kind == "reviewed_benchmark" {
-            // Unrun rows are allowed in descriptive output but force an incomplete-coverage decision.
-        }
         for key in ["model", "decision", "applicability_judgment", "original_move_applied", "proof_sha256", "run_receipt_sha256", "resource_usage"] {
             if !field(execution, key, context)?.is_null() {
                 bail!("{context}: not_run execution must set {key} to null");
@@ -683,7 +680,7 @@ fn compute_metrics(
         success: base.execution_status == "executed"
             && variant.execution_status == "executed"
             && base.applicability_judgment.as_deref().is_some_and(|x| x != "uncertain")
-            && base.applicability_judgment == variant.applicability_judgment,
+            && base.applicability_judgment.as_deref() == variant.applicability_judgment.as_deref(),
     }).collect();
     metrics.insert("semantics_preserving_applicability_stability_on_assigned_pairs".into(), metric_json(estimate(pair_stability, bootstrap_replicates, seed.wrapping_add(7))));
 
@@ -709,9 +706,18 @@ fn compute_metrics(
     metrics.insert("applicability_accuracy_among_decisive_executed_rows".into(), metric_json(estimate(decisive, bootstrap_replicates, seed.wrapping_add(9))));
 
     let matched_config = selected.iter().filter(|row| row.execution_status == "executed").collect::<Vec<_>>();
-    let executed_configurations: BTreeSet<_> = matched_config.iter().filter_map(|row| row.config_sha256.as_deref()).collect();
+    let executed_configurations: BTreeSet<_> = matched_config
+        .iter()
+        .filter_map(|row| {
+            Some((
+                row.model_id.as_deref()?,
+                row.model_version.as_deref()?,
+                row.config_sha256.as_deref()?,
+            ))
+        })
+        .collect();
     if executed_configurations.len() > 1 {
-        bail!("requested split contains multiple config hashes; analyze one frozen comparison arm at a time");
+        bail!("requested split contains multiple model/configuration identities; analyze one frozen comparison arm at a time");
     }
     Ok(metrics)
 }
