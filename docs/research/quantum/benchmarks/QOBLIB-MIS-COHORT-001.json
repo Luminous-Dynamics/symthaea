@@ -786,5 +786,72 @@
       "Published metadata is preserved as reported, not independently reproduced by Symthaea.",
       "The QOBLIB graph source cohort remains pinned independently to source_snapshot.commit; the comparison evidence snapshot is a separate pin so graph data and result records are not conflated."
     ]
-  }
+  },
+  "external_reproduction_tracks": [
+    {
+      "track_id": "QREDUMIS-UJ-REPRO-001",
+      "status": "planned-source-pinned-reproduction-track-not-a-Symthaea-result",
+      "repository": "jpmorganchase/qReduMIS",
+      "repository_url": "https://github.com/jpmorganchase/qReduMIS",
+      "commit": "43feb7502ca4c90e10bde24e077c1d54427f8fef",
+      "commit_date_utc": "2025-06-23T18:47:13Z",
+      "license": "Apache-2.0",
+      "paper": {
+        "title": "Quantum-informed reduction algorithm for the maximum independent set problem",
+        "doi": "10.1103/nh3b-1wv5",
+        "publication_date": "2026-09-10",
+        "note": "Published paper claims are external references, not independently reproduced results from Symthaea."
+      },
+      "workload": {
+        "upstream_description": "Random unit-disk instances with Union-Jack connectivity, radius sqrt(2), density 0.8, varying grid length L and seeds, as described by the pinned upstream results README.",
+        "intended_track": "Paper-reproduction and transfer track, kept separate from QOBLIB's 50 heterogeneous MIS graphs.",
+        "published_scale_context": "Paper reports hardware experiments up to 231 qubits; this is context, not a Symthaea result.",
+        "ground_truth_method": "Pinned upstream README says MIS ground truth was computed by a sweeping-line algorithm; independently verify the corresponding solution/bound artifacts before consuming them.",
+        "immutable_repository_root": "https://github.com/jpmorganchase/qReduMIS/tree/43feb7502ca4c90e10bde24e077c1d54427f8fef"
+      },
+      "paper_arms": {
+        "QAA": "Standard quantum approximate annealing baseline.",
+        "qReduMIS": "Quantum-informed classical reduction; the pinned upstream README describes 20 classical shots, in-set selection, and no fixed depth/iteration limit in the paper's extensive experiment protocol.",
+        "randomReduMIS": "Replaces the quantum-informed in-set choice with a random pick for the same number of classical iterations, as described by the pinned upstream README.",
+        "simulatedAnnealing": "The published paper also reports a matched classical simulated-annealing comparison. A replication must pin its exact code/configuration and resource accounting rather than infer them from this summary."
+      },
+      "execution_conventions": {
+        "backend_shots_per_execution": 1000,
+        "same_annealing_schedule_for_backend_arms": true,
+        "postprocessing": "Pinned README describes removal/addition fixup for backend counts and additional loading-error postprocessing for hardware data.",
+        "source_artifacts": [
+          {
+            "path": "results_experiments/README.md",
+            "git_blob_sha1": "2811fcf18db3c16b88cef29c89ea6ea33d42dd8f",
+            "url": "https://github.com/jpmorganchase/qReduMIS/blob/43feb7502ca4c90e10bde24e077c1d54427f8fef/results_experiments/README.md"
+          },
+          {
+            "path": "results_experiments/HOW_TO_RUN.md",
+            "git_blob_sha1": "fa6ef7a5660b323485a011f3d9051b7b833c0393",
+            "url": "https://github.com/jpmorganchase/qReduMIS/blob/43feb7502ca4c90e10bde24e077c1d54427f8fef/results_experiments/HOW_TO_RUN.md"
+          },
+          {
+            "path": "results_experiments/reproduce_paper_extensive.ipynb",
+            "git_blob_sha1": "ca9310336107eeea6fa323e38e4963240998e886",
+            "url": "https://github.com/jpmorganchase/qReduMIS/blob/43feb7502ca4c90e10bde24e077c1d54427f8fef/results_experiments/reproduce_paper_extensive.ipynb"
+          },
+          {
+            "path": "results_experiments/reproduce_paper_table.ipynb",
+            "git_blob_sha1": "848c4a70d46c7799d59c2efdbc23a1f4c2503d3a",
+            "url": "https://github.com/jpmorganchase/qReduMIS/blob/43feb7502ca4c90e10bde24e077c1d54427f8fef/results_experiments/reproduce_paper_table.ipynb"
+          }
+        ],
+        "dependency_note": "The pinned upstream instructions require Python 3.9 and a custom Amazon Braket tensor-network simulator branch for some simulator reproduction. Treat this as an isolated external reproduction environment, not a Symthaea production dependency.",
+        "source_artifact_gap": "The pinned results README references generator/generate.py, but no file at that path was present in the inspected pinned repository tree. Do not claim a generator-based recreation until its exact source is located or graph coordinates/parameters are independently frozen."
+      },
+      "comparison_gates": [
+        "Record exact graph coordinate bytes, input parameters, random seed and SHA-256 digest for every UJ instance.",
+        "Separate published raw hardware receipts, newly executed QPU output, tensor-network simulation, and postprocessed replay.",
+        "Match reducer implementation, in-set/out-set selection policy, iteration budget, candidate/shot budget, postprocessing and stopping conditions across arms.",
+        "Report success probability and cost-to-target together; count all classical and hardware costs and retries.",
+        "Run a separate comparison against randomReduMIS and strong classical local-search/solver-population informers.",
+        "Do not pool this graph family with the QOBLIB cohort or claim state-of-the-art from a cross-paper comparison."
+      ]
+    }
+  ]
 }
