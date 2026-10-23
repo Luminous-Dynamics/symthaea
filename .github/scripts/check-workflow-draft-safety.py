@@ -31,6 +31,8 @@ RUNNER_JOB = re.compile(r"^    (?:runs-on|uses):")
 DRAFT_FALSE = re.compile(
     r"github\.event\.pull_request\.draft\s*==\s*false"
 )
+
+READY_EVENT = re.compile(r"(?<![A-Za-z0-9_-])['\"]?ready_for_review['\"]?(?![A-Za-z0-9_-])")
 EVENT_EQ = {
     event: re.compile(
         rf"github\.event_name\s*==\s*['\"]{re.escape(event)}['\"]"
@@ -72,7 +74,40 @@ def top_level_section(text: str, key: str) -> list[str]:
 
 
 def pull_request_block(text: str) -> list[str] | None:
-    on_lines = top_level_section(text, "on")
+    lines = text.splitlines()
+    top_level_on_index: int | None = None
+    top_level_on_value = ""
+    for index, line in enumerate(lines):
+        match = re.fullmatch(r"""(['"]?)on\1\s*:\s*(.*)""", line)
+        if match:
+            top_level_on_index = index
+            top_level_on_value = match.group(2).strip()
+            break
+        if line and not line.startswith(" ") and re.match(r"""(?:['"]?)on(?:['"]?)\s*:""", line):
+            raise SafetyError(
+                "unsupported top-level on: declaration; refusing to infer PR safety"
+            )
+
+    if top_level_on_index is None:
+        return None
+
+    if top_level_on_value:
+        # Flow-style trigger declarations are supported only when their entire
+        # trigger surface is visible on the same line. This prevents a PR
+        # workflow from disappearing from the ratchet merely by switching the
+        # top-level `on:` mapping to flow syntax.
+        if "pull_request" in top_level_on_value:
+            return [lines[top_level_on_index]]
+        if any(
+            event in top_level_on_value
+            for event in ("push", "workflow_dispatch", "schedule")
+        ):
+            return None
+        raise SafetyError(
+            "unsupported inline top-level on: declaration; refusing to infer PR safety"
+        )
+
+    on_lines = lines[top_level_on_index + 1 :]
     for index, line in enumerate(on_lines):
         match = re.fullmatch(r"  pull_request:\s*(.*)", line)
         if not match:
@@ -153,6 +188,36 @@ def has_runner_allocation(block: str) -> bool:
     return any(RUNNER_JOB.match(line) for line in block.splitlines())
 
 
+def expression_match_is_active(expression: str, start: int) -> bool:
+    """Reject predicate matches hidden inside string literals or comments."""
+    single = False
+    double = False
+    escaped = False
+    for character in expression[:start]:
+        if escaped:
+            escaped = False
+            continue
+        if (single or double) and character == "\\":
+            escaped = True
+            continue
+        if character == "'" and not double:
+            single = not single
+            continue
+        if character == '"' and not single:
+            double = not double
+            continue
+        if character == '#' and not single and not double:
+            return False
+    return not single and not double
+
+
+def active_pattern_search(pattern: re.Pattern[str], expression: str) -> re.Match[str] | None:
+    for match in pattern.finditer(expression):
+        if expression_match_is_active(expression, match.start()):
+            return match
+    return None
+
+
 def explicitly_excludes_pull_request(expression: str | None) -> bool:
     if expression is None:
         return False
@@ -160,24 +225,46 @@ def explicitly_excludes_pull_request(expression: str | None) -> bool:
     # infer exclusion through disjunctions because one branch could admit PRs.
     if "||" in expression:
         return False
-    return any(pattern.search(expression) for pattern in EVENT_EQ.values())
+    return any(
+        active_pattern_search(pattern, expression) is not None
+        for pattern in EVENT_EQ.values()
+    )
 
 
 def has_draft_guard(expression: str | None) -> bool:
-    return expression is not None and DRAFT_FALSE.search(expression) is not None
+    return (
+        expression is not None
+        and active_pattern_search(DRAFT_FALSE, expression) is not None
+    )
 
 
 def require_ready_event(path: Path, pr_block: list[str]) -> None:
-    if not any("ready_for_review" in line for line in pr_block):
-        raise SafetyError(
-            f"{path}: runner-capable pull_request workflow must include ready_for_review"
-        )
+    for index, line in enumerate(pr_block):
+        code = line.split("#", 1)[0]
+        match = re.search(r"\btypes\s*:\s*(.*)$", code)
+        if not match:
+            continue
+        payload = match.group(1).strip()
+        if payload and READY_EVENT.search(payload):
+            return
+        if payload:
+            continue
+        base_indent = indentation(line)
+        for candidate in pr_block[index + 1 :]:
+            if candidate.strip() and indentation(candidate) <= base_indent:
+                break
+            if READY_EVENT.search(candidate.split("#", 1)[0]):
+                return
+    raise SafetyError(
+        f"{path}: runner-capable pull_request workflow must include ready_for_review"
+    )
 
 
 def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, int]:
     jobs = parse_jobs(text)
     runner_jobs = 0
     draft_guarded = 0
+    pull_request_runner_jobs = 0
     for job, block in jobs.items():
         if not has_runner_allocation(block):
             continue
@@ -185,6 +272,7 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
         expression = job_level_if_expression(block, job)
         if explicitly_excludes_pull_request(expression):
             continue
+        pull_request_runner_jobs += 1
         if not has_draft_guard(expression):
             raise SafetyError(
                 f"{path}: runner-capable job {job!r} lacks a job-level "
@@ -192,13 +280,23 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
             )
         draft_guarded += 1
 
-    if runner_jobs:
+    if pull_request_runner_jobs:
         require_ready_event(path, pr_block)
     return runner_jobs, draft_guarded
 
 
 def require_contains(expression: str | None, needle: str, label: str) -> None:
-    if expression is None or needle not in expression:
+    if expression is None:
+        raise SafetyError(f"benchmarks.yml {label} lost required expression {needle!r}")
+    event_names = {
+        "github.event_name == 'push'": "push",
+        "github.event_name == 'workflow_dispatch'": "workflow_dispatch",
+    }
+    if needle in event_names:
+        if active_pattern_search(EVENT_EQ[event_names[needle]], expression) is None:
+            raise SafetyError(f"benchmarks.yml {label} lost required expression {needle!r}")
+        return
+    if needle not in expression:
         raise SafetyError(f"benchmarks.yml {label} lost required expression {needle!r}")
 
 
@@ -309,6 +407,105 @@ jobs:
     # A workflow whose only runner root explicitly excludes PR does not need a
     # ready_for_review event because no PR runner can ever be allocated.
     assert validate_generic(Path("manual.yml"), manual, pr) == (1, 0)
+
+    inline = """on: {pull_request: {types: [opened, synchronize, reopened, ready_for_review]}}
+jobs:
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+"""
+    pr = pull_request_block(inline)
+    assert pr is not None
+    assert validate_generic(Path("inline-safe.yml"), inline, pr) == (1, 1)
+
+    inline_no_ready = inline.replace(", ready_for_review", "")
+    try:
+        validate_generic(
+            Path("inline-no-ready.yml"),
+            inline_no_ready,
+            pull_request_block(inline_no_ready) or [],
+        )
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError("inline pull_request workflow without ready_for_review was accepted")
+
+    quoted_inline = """'on': {pull_request: {types: [opened, synchronize, reopened, ready_for_review]}}
+jobs:
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+"""
+    pr = pull_request_block(quoted_inline)
+    assert pr is not None
+    assert validate_generic(Path("quoted-inline-safe.yml"), quoted_inline, pr) == (1, 1)
+
+    spaced_on = """on : {pull_request: {types: [opened, synchronize, reopened, ready_for_review]}}
+jobs:
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+"""
+    pr = pull_request_block(spaced_on)
+    assert pr is not None
+    assert validate_generic(Path("spaced-on-safe.yml"), spaced_on, pr) == (1, 1)
+
+    branch_named_ready = """on:
+  pull_request:
+    branches: [ready_for_review]
+jobs:
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+"""
+    try:
+        validate_generic(
+            Path("branch-named-ready.yml"),
+            branch_named_ready,
+            pull_request_block(branch_named_ready) or [],
+        )
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError("branch name was incorrectly treated as ready_for_review activity")
+
+    spoofed_draft_guard = safe.replace(
+        "    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false\n",
+        "    if: ${{ true && \"github.event.pull_request.draft == false\" }}\n",
+    )
+    try:
+        validate_generic(
+            Path("spoofed-draft-guard.yml"),
+            spoofed_draft_guard,
+            pull_request_block(spoofed_draft_guard) or [],
+        )
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError("draft guard hidden in a string literal was accepted")
+
+    spoofed_event_exclusion = safe.replace(
+        "    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false\n",
+        "    if: ${{ true && \"github.event_name == 'workflow_dispatch'\" }}\n",
+    )
+    try:
+        validate_generic(
+            Path("spoofed-event-exclusion.yml"),
+            spoofed_event_exclusion,
+            pull_request_block(spoofed_event_exclusion) or [],
+        )
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError("event exclusion hidden in a string literal was accepted")
 
 
 def main() -> int:
