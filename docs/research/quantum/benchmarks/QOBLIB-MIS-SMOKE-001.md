@@ -25,7 +25,7 @@ The receipt records:
 - failure receipts for source-read errors, DIMACS parse errors, local verification failures and exact-oracle failures;
 - limitations that prevent treating smoke timings as an SOTA result.
 
-The greedy policy recomputes each active vertex's residual degree at every selection and breaks ties by lower vertex index. It is deterministic and requires no random seed. The local improvement is deterministic, only runs on graphs up to 250 vertices, and returns a feasible solution even if its pair-check budget is exhausted. It is a baseline/control, not a competitive replacement for dedicated MIS methods. The exact reference uses the deliberately bounded branch-and-bound oracle and must not be run on large benchmark instances.
+The greedy policy recomputes each active vertex's residual degree at every selection and breaks ties by lower vertex index. It is deterministic and requires no random seed. The local improvement is deterministic, only runs on graphs up to 250 vertices, and returns a feasible solution even if its pair-check budget is exhausted. A locally-optimal label means only that no improving one-selected-for-two-unselected exchange remains in the searched neighborhood; it is not a global-optimality claim. It is a baseline/control, not a competitive replacement for dedicated MIS methods. The exact reference uses the deliberately bounded branch-and-bound oracle and must not be run on large benchmark instances.
 
 ## Example correctness anchor
 
