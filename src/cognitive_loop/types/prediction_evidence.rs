@@ -1,0 +1,266 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Typed, cycle-bound prediction-error evidence.
+//!
+//! A numeric prediction error is not sufficient provenance. This type keeps
+//! validity status separate from the compatibility float used by older APIs.
+//! Invalid evidence never carries a value, and deserialization validates the
+//! same invariant as construction so malformed persisted records fail closed.
+
+use serde::{Deserialize, Deserializer, Serialize};
+
+/// Why a prediction-error comparison is or is not usable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PredictionEvidenceStatus {
+    /// A finite comparison is available for the recorded observation cycle.
+    Valid,
+    /// The cognitive loop has not yet produced a prior prediction.
+    NoPriorPrediction,
+    /// A prediction exists but cannot be compared because its norm is zero.
+    ZeroNormPrediction,
+    /// The observation did not contain a comparable state.
+    EmptyObservation,
+    /// Prediction and observation dimensions do not match.
+    DimensionMismatch,
+    /// A purported comparison contains a NaN or infinite numeric value.
+    NonFiniteInput,
+    /// Evidence belongs to a different or out-of-order observation cycle.
+    StaleOrOutOfOrder,
+    /// The upstream source did not provide a trustworthy comparison.
+    SourceUnavailable,
+}
+
+/// A prediction error with status and observation provenance.
+///
+/// The numeric value is intentionally private and accessible only through
+/// value_for_observation; invalid statuses must not carry a numeric value.
+/// The observation cycle is always explicit. Prediction-cycle provenance is
+/// optional while legacy call sites are being migrated.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PredictionErrorEvidence {
+    status: PredictionEvidenceStatus,
+    value: Option<f32>,
+    prediction_cycle: Option<u64>,
+    observation_cycle: u64,
+}
+
+#[derive(Deserialize)]
+struct PredictionErrorEvidenceWire {
+    status: PredictionEvidenceStatus,
+    value: Option<f32>,
+    prediction_cycle: Option<u64>,
+    observation_cycle: u64,
+}
+
+impl<'de> Deserialize<'de> for PredictionErrorEvidence {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error as _;
+
+        let wire = PredictionErrorEvidenceWire::deserialize(deserializer)?;
+        match wire.status {
+            PredictionEvidenceStatus::Valid => {
+                let value = wire.value.ok_or_else(|| {
+                    D::Error::custom("valid prediction evidence requires a value")
+                })?;
+                if !value.is_finite() {
+                    return Err(D::Error::custom(
+                        "valid prediction evidence must contain a finite value",
+                    ));
+                }
+                Ok(Self {
+                    status: wire.status,
+                    value: Some(value),
+                    prediction_cycle: wire.prediction_cycle,
+                    observation_cycle: wire.observation_cycle,
+                })
+            }
+            _ => {
+                if wire.value.is_some() {
+                    return Err(D::Error::custom(
+                        "invalid prediction evidence must not contain a value",
+                    ));
+                }
+                Ok(Self {
+                    status: wire.status,
+                    value: None,
+                    prediction_cycle: wire.prediction_cycle,
+                    observation_cycle: wire.observation_cycle,
+                })
+            }
+        }
+    }
+}
+
+impl PredictionErrorEvidence {
+    /// Build valid evidence. Non-finite values are rejected rather than
+    /// silently normalized to a sentinel.
+    pub fn valid(
+        value: f32,
+        prediction_cycle: Option<u64>,
+        observation_cycle: u64,
+    ) -> Result<Self, &'static str> {
+        if !value.is_finite() {
+            return Err("prediction error must be finite");
+        }
+        Ok(Self {
+            status: PredictionEvidenceStatus::Valid,
+            value: Some(value),
+            prediction_cycle,
+            observation_cycle,
+        })
+    }
+
+    /// Build evidence for an explicitly invalid comparison.
+    pub fn invalid(
+        status: PredictionEvidenceStatus,
+        prediction_cycle: Option<u64>,
+        observation_cycle: u64,
+    ) -> Result<Self, &'static str> {
+        if status == PredictionEvidenceStatus::Valid {
+            return Err("invalid evidence cannot use the Valid status");
+        }
+        Ok(Self {
+            status,
+            value: None,
+            prediction_cycle,
+            observation_cycle,
+        })
+    }
+
+    /// Adapt legacy float-plus-boolean APIs without trusting the float when
+    /// their validity flag is false. A non-finite value marked valid is
+    /// downgraded to NonFiniteInput.
+    pub fn from_compatibility_fields(
+        value: f32,
+        valid: bool,
+        prediction_cycle: Option<u64>,
+        observation_cycle: u64,
+    ) -> Self {
+        if !valid {
+            return Self {
+                status: PredictionEvidenceStatus::SourceUnavailable,
+                value: None,
+                prediction_cycle,
+                observation_cycle,
+            };
+        }
+        if !value.is_finite() {
+            return Self {
+                status: PredictionEvidenceStatus::NonFiniteInput,
+                value: None,
+                prediction_cycle,
+                observation_cycle,
+            };
+        }
+        Self {
+            status: PredictionEvidenceStatus::Valid,
+            value: Some(value),
+            prediction_cycle,
+            observation_cycle,
+        }
+    }
+
+    /// Evidence classification.
+    #[inline]
+    pub fn status(&self) -> PredictionEvidenceStatus {
+        self.status
+    }
+
+    /// Originating cycle for the prediction, when known.
+    #[inline]
+    pub fn prediction_cycle(&self) -> Option<u64> {
+        self.prediction_cycle
+    }
+
+    /// Cycle whose observation was compared.
+    #[inline]
+    pub fn observation_cycle(&self) -> u64 {
+        self.observation_cycle
+    }
+
+    /// Return a value only when the evidence is valid and belongs to the
+    /// requested observation cycle. This prevents reusing an old sample as
+    /// though it were a fresh outcome.
+    #[inline]
+    pub fn value_for_observation(&self, observation_cycle: u64) -> Option<f32> {
+        if self.status != PredictionEvidenceStatus::Valid
+            || self.observation_cycle != observation_cycle
+        {
+            return None;
+        }
+        self.value.filter(|value| value.is_finite())
+    }
+
+    /// Whether this evidence can be consumed for the requested cycle.
+    #[inline]
+    pub fn is_usable_for(&self, observation_cycle: u64) -> bool {
+        self.value_for_observation(observation_cycle).is_some()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PredictionErrorEvidence, PredictionEvidenceStatus};
+
+    #[test]
+    fn invalid_compatibility_payload_never_becomes_a_value() {
+        for payload in [0.0, 1.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let evidence =
+                PredictionErrorEvidence::from_compatibility_fields(payload, false, Some(4), 5);
+            assert_eq!(evidence.status(), PredictionEvidenceStatus::SourceUnavailable);
+            assert_eq!(evidence.value_for_observation(5), None);
+        }
+    }
+
+    #[test]
+    fn non_finite_value_marked_valid_is_downgraded() {
+        for payload in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let evidence =
+                PredictionErrorEvidence::from_compatibility_fields(payload, true, Some(4), 5);
+            assert_eq!(evidence.status(), PredictionEvidenceStatus::NonFiniteInput);
+            assert_eq!(evidence.value_for_observation(5), None);
+        }
+    }
+
+    #[test]
+    fn valid_evidence_is_only_available_for_its_observation_cycle() {
+        let evidence = PredictionErrorEvidence::valid(0.25, Some(4), 5).unwrap();
+        assert_eq!(evidence.value_for_observation(5), Some(0.25));
+        assert_eq!(evidence.value_for_observation(6), None);
+        assert!(!evidence.is_usable_for(6));
+    }
+
+    #[test]
+    fn invalid_constructor_rejects_valid_status() {
+        assert!(PredictionErrorEvidence::invalid(PredictionEvidenceStatus::Valid, None, 1).is_err());
+        assert!(PredictionErrorEvidence::valid(f32::NAN, None, 1).is_err());
+    }
+
+    #[test]
+    fn serde_round_trip_preserves_valid_evidence() {
+        let evidence = PredictionErrorEvidence::valid(0.75, Some(8), 9).unwrap();
+        let json = serde_json::to_string(&evidence).unwrap();
+        let restored: PredictionErrorEvidence = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored, evidence);
+        assert_eq!(restored.value_for_observation(9), Some(0.75));
+    }
+
+    #[test]
+    fn serde_rejects_inconsistent_validity_and_value() {
+        let missing = r#"{"status":"valid","value":null,"prediction_cycle":1,"observation_cycle":2}"#;
+        assert!(serde_json::from_str::<PredictionErrorEvidence>(missing).is_err());
+
+        let invalid_with_value =
+            r#"{"status":"source_unavailable","value":1.0,"prediction_cycle":1,"observation_cycle":2}"#;
+        assert!(serde_json::from_str::<PredictionErrorEvidence>(invalid_with_value).is_err());
+
+        let non_finite =
+            r#"{"status":"valid","value":1e999,"prediction_cycle":1,"observation_cycle":2}"#;
+        assert!(serde_json::from_str::<PredictionErrorEvidence>(non_finite).is_err());
+    }
+}
