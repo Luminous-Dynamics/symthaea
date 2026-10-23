@@ -316,7 +316,7 @@ pub fn certify_harm_rate_v1(
         RiskCertificateStatusV1::Certified
     };
 
-Ok(RiskCertificateV1 {
+    Ok(RiskCertificateV1 {
         policy_id: config.policy_id.clone(),
         policy_digest: config.policy_digest,
         loss_profile_id: config.loss_profile_id.clone(),
@@ -342,7 +342,10 @@ fn validate_config(config: &HarmRiskConfigV1) -> Result<(), RiskCertificateError
         || !valid_identifier(&config.calibration_split_id)
         || !valid_identifier(&config.domain_id)
         || config.policy_digest.iter().all(|byte| *byte == 0)
-        || config.calibration_manifest_digest.iter().all(|byte| *byte == 0)
+        || config
+            .calibration_manifest_digest
+            .iter()
+            .all(|byte| *byte == 0)
         || config.predeclared_group_ids.is_empty()
         || config.predeclared_group_ids.len() > MAX_GROUPS
         || config.policy_family_size == 0
@@ -435,12 +438,7 @@ pub fn clopper_pearson_upper(
         if midpoint <= lower || midpoint >= upper {
             break;
         }
-        let log_cdf = log_binomial_cdf(
-            harmful,
-            escalations,
-            midpoint,
-            &log_factorials,
-        );
+        let log_cdf = log_binomial_cdf(harmful, escalations, midpoint, &log_factorials);
         if log_cdf == f64::NEG_INFINITY {
             upper = midpoint;
             continue;
@@ -480,9 +478,7 @@ fn log_binomial_cdf(
     let mut maximum = f64::NEG_INFINITY;
     let mut terms = Vec::with_capacity(max_events + 1);
     for events in 0..=max_events {
-        let term = log_n_factorial
-            - log_factorials[events]
-            - log_factorials[trials - events]
+        let term = log_n_factorial - log_factorials[events] - log_factorials[trials - events]
             + events as f64 * log_p
             + (trials - events) as f64 * log_q;
         maximum = maximum.max(term);
@@ -500,10 +496,7 @@ fn log_binomial_cdf(
 }
 
 fn valid_identifier(value: &str) -> bool {
-    !value.trim().is_empty()
-        && !value
-            .chars()
-            .any(|ch| matches!(ch, '\t' | '\r' | '\n'))
+    !value.trim().is_empty() && !value.chars().any(|ch| matches!(ch, '\t' | '\r' | '\n'))
 }
 
 fn digest_hex(digest: &EvidenceDigest) -> String {
@@ -521,10 +514,12 @@ fn write_bound_row(out: &mut String, name: &str, bound: &HarmRateBoundV1) {
         bound.status.label(),
         bound.escalations,
         bound.harmful_escalations,
-        bound.empirical_harm_rate
+        bound
+            .empirical_harm_rate
             .map(|value| format!("{value:.9}"))
             .unwrap_or_else(|| "NA".to_owned()),
-        bound.one_sided_upper_bound
+        bound
+            .one_sided_upper_bound
             .map(|value| format!("{value:.12}"))
             .unwrap_or_else(|| "NA".to_owned()),
         bound.adjusted_delta,
@@ -609,7 +604,10 @@ mod tests {
         assert_eq!(cert.status, RiskCertificateStatusV1::InsufficientEvidence);
         assert_eq!(cert.overall.empirical_harm_rate, None);
         assert_eq!(cert.overall.one_sided_upper_bound, None);
-        assert_eq!(cert.groups[0].status, RiskCertificateStatusV1::InsufficientEvidence);
+        assert_eq!(
+            cert.groups[0].status,
+            RiskCertificateStatusV1::InsufficientEvidence
+        );
     }
 
     #[test]
@@ -636,22 +634,23 @@ mod tests {
     #[test]
     fn one_bad_group_fails_even_when_global_rate_passes() {
         let mut observations = clean_escalations(1000, 0, "common");
-        observations.extend((1000..1010).map(|index| {
-            row(index, "rare", true, Some(index == 1000))
-        }));
+        observations
+            .extend((1000..1010).map(|index| row(index, "rare", true, Some(index == 1000))));
         let cert = certify_harm_rate_v1(&config(&["common", "rare"]), &observations).unwrap();
         assert!(cert.overall.one_sided_upper_bound.unwrap() < 0.05);
         assert_eq!(cert.groups[0].status, RiskCertificateStatusV1::Certified);
-        assert_eq!(cert.groups[1].status, RiskCertificateStatusV1::NotCertifiedRiskBound);
+        assert_eq!(
+            cert.groups[1].status,
+            RiskCertificateStatusV1::NotCertifiedRiskBound
+        );
         assert_eq!(cert.status, RiskCertificateStatusV1::NotCertifiedRiskBound);
     }
 
     #[test]
     fn known_group_risk_failure_is_not_hidden_by_another_insufficient_group() {
         let mut observations = clean_escalations(1000, 0, "common");
-        observations.extend((1000..1010).map(|index| {
-            row(index, "rarebad", true, Some(index == 1000))
-        }));
+        observations
+            .extend((1000..1010).map(|index| row(index, "rarebad", true, Some(index == 1000))));
         observations.push(row(1010, "no-escalations", false, None));
         let cert = certify_harm_rate_v1(
             &config(&["common", "rarebad", "no-escalations"]),
@@ -666,10 +665,7 @@ mod tests {
             cert.groups[2].status,
             RiskCertificateStatusV1::InsufficientEvidence
         );
-        assert_eq!(
-            cert.status,
-            RiskCertificateStatusV1::NotCertifiedRiskBound
-        );
+        assert_eq!(cert.status, RiskCertificateStatusV1::NotCertifiedRiskBound);
     }
 
     #[test]
@@ -677,7 +673,10 @@ mod tests {
         let mut observations = clean_escalations(100, 0, "common");
         observations.push(row(100, "rare", false, None));
         let cert = certify_harm_rate_v1(&config(&["common", "rare"]), &observations).unwrap();
-        assert_eq!(cert.groups[1].status, RiskCertificateStatusV1::InsufficientEvidence);
+        assert_eq!(
+            cert.groups[1].status,
+            RiskCertificateStatusV1::InsufficientEvidence
+        );
         assert_eq!(cert.status, RiskCertificateStatusV1::InsufficientEvidence);
     }
 
