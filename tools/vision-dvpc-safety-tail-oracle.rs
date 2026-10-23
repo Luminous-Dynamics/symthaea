@@ -68,10 +68,7 @@ pub struct SafetyTailOracleResultV1 {
 impl SafetyTailOracleResultV1 {
     /// Deterministic tab-separated evaluator receipt. Trace IDs cannot contain
     /// separators, so the selected set is unambiguous when joined with commas.
-    pub fn to_tsv(
-        &self,
-        constraints: SafetyTailConstraintsV1,
-    ) -> String {
+    pub fn to_tsv(&self, constraints: SafetyTailConstraintsV1) -> String {
         format!(
             "ORACLE\tEXACT_SAFETY_TAIL_RESOURCE\t{}\t{:.6}\t{:.6}\t{}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             self.selected_full_trace_ids.join(","),
@@ -115,12 +112,13 @@ pub fn select_exact_safety_tail_oracle_v1(
     traces.sort_by(|left, right| left.trace_id.cmp(&right.trace_id));
 
     let group_sizes = group_sizes(&traces);
-    let subset_count = 1_u64
-        .checked_shl(traces.len() as u32)
-        .ok_or(OracleErrorV1::InstanceTooLarge {
-            traces: traces.len(),
-            maximum: MAX_EXACT_TRACES,
-        })?;
+    let subset_count =
+        1_u64
+            .checked_shl(traces.len() as u32)
+            .ok_or(OracleErrorV1::InstanceTooLarge {
+                traces: traces.len(),
+                maximum: MAX_EXACT_TRACES,
+            })?;
 
     let mut best: Option<CandidateMetrics> = None;
     for mask in 0..subset_count {
@@ -200,7 +198,11 @@ fn validate_input(
             .checked_add(trace.extra_energy_uj)
             .ok_or(OracleErrorV1::AggregateCostOverflow)?;
         max_safety = max_safety
-            .checked_add(trace.cheap_safety_violations.max(trace.full_safety_violations))
+            .checked_add(
+                trace
+                    .cheap_safety_violations
+                    .max(trace.full_safety_violations),
+            )
             .ok_or(OracleErrorV1::AggregateSafetyCountOverflow)?;
     }
 
@@ -251,7 +253,9 @@ fn score_mask(
             trace.cheap_utility
         };
         record_utility_sum += utility;
-        *group_utility_sums.entry(trace.group_id.as_str()).or_insert(0.0) += utility;
+        *group_utility_sums
+            .entry(trace.group_id.as_str())
+            .or_insert(0.0) += utility;
         safety_violations = safety_violations
             .checked_add(if full {
                 trace.full_safety_violations
@@ -352,12 +356,7 @@ mod tests {
         }
     }
 
-    fn constraints(
-        latency: u64,
-        energy: u64,
-        safety: u64,
-        cvar: f64,
-    ) -> SafetyTailConstraintsV1 {
+    fn constraints(latency: u64, energy: u64, safety: u64, cvar: f64) -> SafetyTailConstraintsV1 {
         SafetyTailConstraintsV1 {
             latency_budget_us: latency,
             energy_budget_uj: energy,
@@ -372,21 +371,16 @@ mod tests {
             trace("unsafe-high-gain", "g1", 0.40, 0.90, 0, 1, 10, 10),
             trace("safe-gain", "g2", 0.50, 0.60, 0, 0, 10, 10),
         ];
-        let utility_only = select_exact_safety_tail_oracle_v1(
-            &traces,
-            constraints(20, 20, u64::MAX, 1.0),
-        )
-        .unwrap();
+        let utility_only =
+            select_exact_safety_tail_oracle_v1(&traces, constraints(20, 20, u64::MAX, 1.0))
+                .unwrap();
         assert_eq!(
             utility_only.selected_full_trace_ids,
             vec!["safe-gain".to_owned(), "unsafe-high-gain".to_owned()]
         );
 
-        let constrained = select_exact_safety_tail_oracle_v1(
-            &traces,
-            constraints(20, 20, 0, 0.0),
-        )
-        .unwrap();
+        let constrained =
+            select_exact_safety_tail_oracle_v1(&traces, constraints(20, 20, 0, 0.0)).unwrap();
         assert_eq!(constrained.selected_full_trace_ids, vec!["safe-gain"]);
         assert_eq!(constrained.chosen_safety_violations, 0);
         assert!((constrained.group_balanced_utility - 0.50).abs() < 1e-12);
@@ -399,11 +393,8 @@ mod tests {
             trace("b", "gb", 0.10, 0.70, 0, 0, 2, 8),
             trace("c", "gc", 0.10, 0.55, 0, 0, 5, 5),
         ];
-        let result = select_exact_safety_tail_oracle_v1(
-            &traces,
-            constraints(10, 10, 0, 0.0),
-        )
-        .unwrap();
+        let result =
+            select_exact_safety_tail_oracle_v1(&traces, constraints(10, 10, 0, 0.0)).unwrap();
         assert_eq!(
             result.selected_full_trace_ids,
             vec!["a".to_owned(), "b".to_owned()]
@@ -431,11 +422,8 @@ mod tests {
             trace("common-b", "common", 0.0, 0.50, 0, 0, 1, 1),
             trace("rare", "rare", 0.0, 0.30, 0, 0, 1, 1),
         ];
-        let result = select_exact_safety_tail_oracle_v1(
-            &traces,
-            constraints(1, 1, 0, 0.0),
-        )
-        .unwrap();
+        let result =
+            select_exact_safety_tail_oracle_v1(&traces, constraints(1, 1, 0, 0.0)).unwrap();
         assert_eq!(result.selected_full_trace_ids, vec!["rare"]);
         assert!((result.group_balanced_utility - 0.15).abs() < 1e-12);
         assert!((result.record_mean_utility - 0.10).abs() < 1e-12);
@@ -445,8 +433,7 @@ mod tests {
     fn no_feasible_policy_returns_explicit_infeasibility() {
         let traces = vec![trace("already-unsafe", "g", 0.10, 0.20, 1, 2, 1, 1)];
         let error =
-            select_exact_safety_tail_oracle_v1(&traces, constraints(10, 10, 0, 0.0))
-                .unwrap_err();
+            select_exact_safety_tail_oracle_v1(&traces, constraints(10, 10, 0, 0.0)).unwrap_err();
         assert_eq!(error, OracleErrorV1::NoFeasiblePolicy);
     }
 
@@ -469,21 +456,13 @@ mod tests {
     #[test]
     fn oversized_instance_is_rejected_without_approximation() {
         let traces = (0..=MAX_EXACT_TRACES)
-            .map(|index| {
-                trace(
-                    &format!("trace-{index:02}"),
-                    "g",
-                    0.1,
-                    0.2,
-                    0,
-                    0,
-                    1,
-                    1,
-                )
-            })
+            .map(|index| trace(&format!("trace-{index:02}"), "g", 0.1, 0.2, 0, 0, 1, 1))
             .collect::<Vec<_>>();
         assert_eq!(
-            select_exact_safety_tail_oracle_v1(&traces, constraints(u64::MAX, u64::MAX, u64::MAX, 1.0)),
+            select_exact_safety_tail_oracle_v1(
+                &traces,
+                constraints(u64::MAX, u64::MAX, u64::MAX, 1.0)
+            ),
             Err(OracleErrorV1::InstanceTooLarge {
                 traces: MAX_EXACT_TRACES + 1,
                 maximum: MAX_EXACT_TRACES,
