@@ -263,7 +263,7 @@ fn run(path: &str) -> Result<(), String> {
     println!(
         concat!(
             "{{\n",
-            "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.mis-smoke-run.v1\",\n",
+            "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.mis-smoke-run.v2\",\n",
             "  \"benchmark_track\": \"correctness-smoke-not-competitive\",\n",
             "  \"source_path\": \"{}\",\n",
             "  \"source_bytes\": {},\n",
