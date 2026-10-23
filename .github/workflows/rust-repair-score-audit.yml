@@ -54,7 +54,7 @@ jobs:
         with:
           components: clippy, rustfmt
       - name: Check Rust formatting
-        run: rustfmt --edition 2024 --check src/bin/rust_repair_score_audit.rs
+        run: rustfmt --edition 2024 --check src/bin/rust_repair_manifest.rs src/bin/rust_repair_score_audit.rs
       - name: Test task-manifest auditor
         run: cargo test --locked --bin rust-repair-manifest --features rust-repair-manifest
       - name: Test scored-run auditor
