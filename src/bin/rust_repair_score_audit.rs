@@ -1553,9 +1553,10 @@ mod tests {
     #[test]
     fn repository_head_must_match_pinned_task_commit() {
         let base = "a".repeat(40);
-        assert!(repo_head_matches(&base, Some(&base), Some(0)));
-        assert!(!repo_head_matches(&base, Some(&"b".repeat(40)), Some(0)));
-        assert!(!repo_head_matches(&base, Some(&base), Some(1)));
+        let wrong = "b".repeat(40);
+        assert!(repo_head_matches(&base, Some(base.as_str()), Some(0)));
+        assert!(!repo_head_matches(&base, Some(wrong.as_str()), Some(0)));
+        assert!(!repo_head_matches(&base, Some(base.as_str()), Some(1)));
         assert!(!repo_head_matches(&base, None, Some(0)));
     }
 
