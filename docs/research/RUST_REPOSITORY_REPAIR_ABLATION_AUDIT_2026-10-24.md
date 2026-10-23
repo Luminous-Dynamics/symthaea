@@ -88,9 +88,9 @@ V1 intentionally supports one paired attempt per task; repeated-run reliability 
 
 ## Preregistered internal gates (targets, not industry standards)
 
-**GCS superiority target:** resolved paired effect at least +5 absolute percentage points, repository-clustered 95% CI lower bound above zero, at least 10 resolved repository clusters, overall unresolved rate below 2%, and absolute unresolved-rate difference between arms below 1 percentage point.
+**GCS superiority target:** resolved paired effect at least +5 absolute percentage points, repository-clustered 95% CI lower bound above zero, full-assignment unresolved sensitivity lower bound above zero, at least 10 resolved repository clusters, overall unresolved rate below 2%, and absolute unresolved-rate difference between arms below 1 percentage point.
 
-**Cost-efficiency alternative:** at least 20% lower cost per verified fix, the same unresolved-rate/repository gates, and a clustered 95% CI lower bound no worse than -1.5 percentage points for correctness.
+**Cost-efficiency alternative:** at least 20% lower cost per verified fix, the same unresolved-rate/repository gates, and both the clustered 95% CI and full-assignment unresolved sensitivity lower bound no worse than -1.5 percentage points for correctness.
 
 These are proposed internal decision thresholds, not evidence of a current improvement and not a claim of leaderboard superiority. If a gate is not met, report the estimate, interval (when estimable), sensitivity bounds, failures, unresolved outcomes, cost and latency. Do not tune the gate after seeing results.
 
