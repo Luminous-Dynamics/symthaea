@@ -42,14 +42,27 @@ cargo run --locked --bin rust-repair-manifest \
   --upstream-code-revision 62d02936a0726fbf4597b05bd07b09fb99eddae6 \
   --expected-candidate-count 171 \
   --manifest-out build/rust-repair/eligible-task-manifest.json \
-  --report-out build/rust-repair/task-audit-report.json
+  --report-out build/rust-repair/task-audit-report.json \
+  --agent-prompts-out build/rust-repair/agent-prompts.jsonl \
+  --controller-manifest-out build/rust-repair/controller-manifest.evaluator-only.json
 ```
 
 The source digest and candidate count above are the currently recorded pins; the binary is expected to refuse a mismatch. Do not override a mismatch to force a pass. Re-investigate the upstream snapshot/file metadata and correct the preregistration first.
 
+
+
+## Agent prompt projection and data-leakage controls
+
+The auditor now emits two separate artifacts only when the full candidate set has complete validation evidence and at least one task survives the strict eligibility audit:
+
+- `agent-prompts.jsonl`: one JSON object per eligible task, containing only `problem_statement`. It contains no instance ID, repository, base commit, gold patch, test patch, hint, expected test labels, or commit URL. Line order is pinned by sorted task identity through the separate controller map.
+- `controller-manifest.evaluator-only.json`: maps zero-based line number to instance ID and requested Docker image, and binds the ordered eligible-ID digest plus safe prompt projection digest. This artifact is explicitly evaluator-only and must never enter the agent's prompt, filesystem, retrieval context or tool outputs.
+
+The unit tests serialize the projection structs and assert exact allowed fields plus absence of representative prohibited fields. This prevents accidental field copying at the data-contract level; it does not enforce operating-system access controls. The runner still must mount or expose only the prompt and sandbox to the agent and keep the controller/evaluator files in a separate trust domain.
+
 ## Digest contract
 
-The manifest contains both the pinned source Parquet SHA-256 and the exact candidate-JSONL SHA-256. Eligible task IDs are sorted lexicographically and encoded as UTF-8 IDs joined with LF and a final LF before SHA-256. `task_records_sha256` is SHA-256 over the compact serde JSON serialization of the emitted task-record array after sorting by `instance_id`. The audit report retains the exact status/log hashes and per-task reasons.
+The manifest contains both the pinned source Parquet SHA-256 and the exact candidate-JSONL SHA-256. On a lockable audit, the tool also emits an agent-facing JSONL projection that serializes **only** `problem_statement` per line and a separate evaluator-only controller manifest containing the line index, instance ID and requested sandbox image. The report pins hashes of both projections. Never place the controller manifest, gold patch, test patch, hints, or evaluator status fields in the coding agent's context. Keep controller metadata access-separated from the agent process. Eligible task IDs are sorted lexicographically and encoded as UTF-8 IDs joined with LF and a final LF before SHA-256. `task_records_sha256` is SHA-256 over the compact serde JSON serialization of the emitted task-record array after sorting by `instance_id`. The audit report retains the exact status/log hashes and per-task reasons.
 
 The binary deliberately does not expose raw prompt, gold patch, hidden test patch or test names in its manifest. It does not prove that the candidate JSONL was correctly generated from the Parquet; the source and projection digests allow independent regeneration and comparison. A hash proves byte identity, not source authenticity or execution. Independent reviewers must preserve and re-run the evidence.
 
