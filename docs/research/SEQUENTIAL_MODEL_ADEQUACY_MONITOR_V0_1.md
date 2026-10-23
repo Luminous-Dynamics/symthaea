@@ -4,6 +4,8 @@
 
 This follow-on builds on the calibrated batch audit in PR #8439 and joint prior/model/noise robust acquisition in PR #8361. It adds explicit fixed-horizon error-budget allocation; it does not replace either component.
 
+A separate fixed-reference feature-shift scorer is now included as a complementary diagnostic. It intentionally answers a different question from residual adequacy: *is the input batch's mean/scale/correlation structure outside the declared reference, even when the model still predicts correctly?* A feature-shift alarm means review support and operating conditions; it is not, by itself, proof that the governing law is wrong or the predictions are harmful.
+
 ## 1. Research problem and paradigm shift
 
 Scientific discovery often audits a model more than once: after new experiments, new conditions, or changes in instrument state. A single batch conformal p-value at level 0.05 is not permission to repeat the same test indefinitely at level 0.05. Repeated thresholding inflates the probability of at least one false alarm. A detector that keeps appending post-change observations to its reference can also dilute evidence of real shift.
@@ -57,6 +59,14 @@ The monitor accepts one scalar score per fresh batch. `standardized_rms_residual
 
 The second fusion path exposes `minimum_component_p_fusion_score` and `sum_log_component_p_fusion_score`. It ranks each diagnostic against an independent normalization split, aggregates the component tail scores, and then requires a *separate untouched outer calibration split* to calibrate the aggregate. This second stage is crucial: the minimum p-value or sum of negative log p-values is not, by itself, a final calibrated p-value. The outer rank calibration avoids independence assumptions between diagnostic views, conditional on the fixed normalization split, at the cost of additional clean calibration data. All score functions, component order, batch length, target distribution, and split roles must remain fixed; changing them requires fresh calibration. None of the scores can detect unrepresented subgroup failures unless subgroup diagnostics are explicitly included. A non-alarm never certifies the model.
 
+### Separate track: feature-distribution shift
+
+`feature_shift.rs` adds `FeatureShiftScorer`, fit once on a fixed reference feature set. It produces a scalar maximum of three predeclared components: standardized per-feature mean shift, log-scale shift, and pairwise-correlation shift. It is intended to reveal covariate/support shifts that a residual score cannot see when the conditional predictor remains accurate.
+
+The scorer returns a **nonconformity statistic, not a p-value**. For finite-sample marginal false-alarm control, fit it on one frozen reference set, compute its score on an independent clean calibration set, and calibrate that scalar with `ConformalAdequacyCalibrator`; score future batches against the same fixed reference with the same feature order, batch size, and scale floor. The calibration/audit batches must be exchangeable conditional on that reference under the clean null. Refit the reference or change its feature pipeline only by starting a new epoch and gathering fresh calibration data.
+
+This statistic is a lightweight first baseline, not a full conditional two-sample test. Pairwise correlations are quadratic in feature count; the current implementation does not model higher-order dependence, temporal windows, missingness patterns, or subgroup/conditional drift. A detected feature shift can be benign; a feature-shift non-alarm does not establish that a system remains in-distribution. Evaluate its components separately and against stronger feature-embedding and two-sample baselines.
+
 ## 4. Contract tests and receipt requirements
 
 Focused Rust tests cover equal-spending resolution, invalid budgets/horizons, weighted schedule validation, threshold ordering, early-versus-late decision semantics, cumulative budget bounds, terminal behavior, and the rule that invalid audit input does not consume the horizon. A fixed-seed 20,000-stream null smoke test compares the corrected policy against repeatedly reusing an unadjusted 0.05 threshold with the same calibration sizes and audit scores. This is a regression check, not a confidence interval, distribution-free proof, or substitute for a larger preregistered evaluation.
@@ -69,7 +79,8 @@ Freeze candidate pools, score statistics, calibration policy, target distributio
 
 Compare under matched total audit/measurement budgets:
 
-1. one-shot conformal audit at a single predeclared endpoint;
+1. residual-only adequacy against a feature-shift-only alarm, including a counterexample with exact predictions but a shifted feature correlation;
+2. one-shot conformal audit at a single predeclared endpoint;
 2. RMS-only residual score with equal-spending finite-horizon Bonferroni baseline;
 3. maximum-statistic multi-view score with the same calibrator, batches, alpha and horizon;
 4. two-stage minimum-p and sum-log score fusion, with matched total clean-calibration budget;
@@ -100,6 +111,7 @@ CCTM, PRM, WATCH and restart-based monitoring remain comparators, **not implemen
 - structural law recovery on hidden truth after alarm and after no alarm;
 - calibration count, query budget, runtime, memory, and recalibration overhead;
 - performance under heteroscedastic/heavy-tailed noise, covariate shift, score-distribution shift, rare-region failure, and change points;
+- feature-shift sensitivity when predictive residuals stay near zero, plus false alarms under benign covariate changes and feature-map/missingness changes;
 - contamination resistance: post-change observations must never silently enter the frozen null reference;
 - family- and world-clustered confidence intervals, with every paired run and negative control retained.
 
@@ -132,7 +144,9 @@ The key finding is the trade-off: raw maximum is highly sensitive to mean bias a
 
 ## 6. Next paradigm shift
 
-The immediate step is to run and reconcile the committed Rust replication against the independent JavaScript reference, then strengthen it with heavy-tailed/heteroscedastic nulls and held-out structural families. After that, implement a faithful head-to-head PRM and CCTM comparison, followed by the October 2026 restart/parameter-free method, under one `SequentialMonitor` interface. Benchmark at matched false-alarm budget, calibration size, and measurement cost; evaluate abrupt and gradual changes, early and late shifts, multiple drift types, and leave-one-family/dataset-out tuning, while keeping exact conditional-rank dependence and reference uncertainty intact.
+The current Rust test harness now also includes a covariate-shift counterexample: the feature correlation changes from approximately zero to 0.8 while the predictive residuals remain exactly zero. It should report both feature-shift clean-null alarm rate and shifted detection rate. The exact-head execution remains pending, so its intended thresholds are test gates, not results.
+
+The immediate step is to run and reconcile the committed Rust replication against the independent JavaScript reference, then strengthen it with heavy-tailed/heteroscedastic nulls, feature-shift controls, and held-out structural families. After that, implement a faithful head-to-head PRM and CCTM comparison, followed by the October 2026 restart/parameter-free method, under one `SequentialMonitor` interface. Benchmark at matched false-alarm budget, calibration size, and measurement cost; evaluate abrupt and gradual changes, early and late shifts, multiple drift types, and leave-one-family/dataset-out tuning, while keeping exact conditional-rank dependence and reference uncertainty intact.
 
 The long-term scientific-discovery loop should be:
 
