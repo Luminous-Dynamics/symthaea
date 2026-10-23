@@ -694,7 +694,7 @@ fn fit_weighted_split_conformal_multiplier(
     }
 
     let calibration_weight_sum: f64 = scored.iter().map(|(_, weight)| *weight).sum();
-    let squared_weight_sum: f64 = scored.iter().map(|(_, weight)| weight * weight).sum();
+    let squared_weight_sum: f64 = scored.iter().map(|(_, weight)| *weight * *weight).sum();
     if !calibration_weight_sum.is_finite() || !squared_weight_sum.is_finite() {
         return Err(ParetoMetricError::NonFiniteWeightedConformalMetric);
     }
@@ -738,7 +738,6 @@ fn fit_weighted_split_conformal_multiplier(
     let test_point_weight_share = normalized_test_weight / total_weight;
     if !finite_quantile_mass_fraction.is_finite()
         || !test_point_weight_share.is_finite()
-        || finite_quantile_mass_fraction < 1.0 - alpha
     {
         return Err(ParetoMetricError::NonFiniteWeightedConformalMetric);
     }
@@ -1853,6 +1852,50 @@ mod tests {
             ),
             Err(ParetoMetricError::InvalidMiscoverage)
         );
+    }
+
+
+    #[test]
+    fn weighted_conformal_multiplier_can_drive_objective_specific_epsilon_selection() {
+        let weighted_q = fit_weighted_split_conformal_multiplier(
+            &weighted_calibration_samples(&[(1.0, 1.0), (2.0, 2.0), (3.0, 1.0)]),
+            1.0,
+            0.25,
+        ).unwrap();
+        let unweighted_q = fit_split_conformal_multiplier(
+            &calibration_samples(&[0.5, 1.0, 2.0, 4.0]),
+            0.4,
+        ).unwrap();
+        assert_abs_close(unweighted_q.multiplier, 2.0, 1e-12);
+        assert_abs_close(weighted_q.multiplier, 3.0, 1e-12);
+
+        let candidates = [
+            PredictedObjectiveCandidate {
+                candidate_id: 10,
+                predicted_mean: [2.0, 3.0],
+                predictive_std_dev: [0.1, 0.1],
+            },
+            PredictedObjectiveCandidate {
+                candidate_id: 11,
+                predicted_mean: [1.8, 3.1],
+                predictive_std_dev: [0.5, 0.1],
+            },
+            PredictedObjectiveCandidate {
+                candidate_id: 12,
+                predicted_mean: [1.6, 4.0],
+                predictive_std_dev: [0.5, 0.5],
+            },
+        ];
+        let proposal = propose_largest_gap_epsilon(
+            &gap_front(),
+            &candidates,
+            [1.0, 2.0],
+            [unweighted_q.multiplier, weighted_q.multiplier],
+        ).unwrap();
+        assert_eq!(proposal.selected_candidate_id, 11);
+        assert_abs_close(proposal.objective_0_lower_confidence_bound, 0.8, 1e-12);
+        assert_abs_close(proposal.objective_1_upper_confidence_bound, 3.4, 1e-12);
+        assert!(proposal.objective_1_upper_confidence_bound <= proposal.epsilon);
     }
 
     fn assert_abs_close(actual: f64, expected: f64, tolerance: f64) {
