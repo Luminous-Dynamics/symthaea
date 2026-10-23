@@ -996,7 +996,7 @@ fn run(cli: Cli) -> Result<(), String> {
                         container_image_id: task.container_image_id.clone(),
                     })
                     .collect(),
-                visibility_warning: "EVALUATOR-ONLY: never expose this controller manifest to the coding agent. Agent-visible JSONL contains only problem_statement. The runner may use docker_image to launch the prebuilt sandbox.".to_string(),
+                visibility_warning: "EVALUATOR-ONLY: never expose this controller manifest to the coding agent. Agent-visible JSONL contains only problem_statement. Retain the configured image reference and use container_image_id as the observed immutable runtime identity when reproducing the task environment.".to_string(),
             };
             let mut controller_bytes = serde_json::to_vec_pretty(&controller)
                 .map_err(|error| format!("cannot serialize controller manifest: {error}"))?;
