@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/proof-state-intervention-outcome.schema.json",
   "title": "PITB Proof-State Intervention Outcome v0",
-  "description": "One paired fixed-theorem proof-state case's model action and exact-target checker result. Structural validation does not determine mathematical truth. Synthetic fixtures must remain not_run.",
+  "description": "One state-side outcome row (base or variant) for a paired fixed-theorem proof-state intervention. Rows join to the suite's base/variant outcome IDs. Structural validation does not determine mathematical truth. Synthetic fixtures must remain not_run.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -38,6 +38,7 @@
           "pair_id",
           "component_id",
           "split",
+          "state_role",
           "source_insight_record_id",
           "source_insight_sha256",
           "expected_action_policy",
@@ -74,6 +75,12 @@
               "external_challenge"
             ]
           },
+          "state_role": {
+            "enum": [
+              "base",
+              "variant"
+            ]
+          },
           "source_insight_record_id": {
             "type": "string",
             "minLength": 1
@@ -95,10 +102,10 @@
               "target_statement_sha256",
               "goal_type_sha256",
               "environment_sha256",
-              "base_snapshot_sha256",
-              "variant_snapshot_sha256",
-              "base_local_context_sha256",
-              "variant_local_context_sha256"
+              "snapshot_sha256",
+              "paired_snapshot_sha256",
+              "local_context_sha256",
+              "paired_local_context_sha256"
             ],
             "properties": {
               "target_statement_sha256": {
@@ -113,19 +120,19 @@
                 "type": "string",
                 "pattern": "^[0-9a-f]{64}$"
               },
-              "base_snapshot_sha256": {
+              "snapshot_sha256": {
                 "type": "string",
                 "pattern": "^[0-9a-f]{64}$"
               },
-              "variant_snapshot_sha256": {
+              "paired_snapshot_sha256": {
                 "type": "string",
                 "pattern": "^[0-9a-f]{64}$"
               },
-              "base_local_context_sha256": {
+              "local_context_sha256": {
                 "type": "string",
                 "pattern": "^[0-9a-f]{64}$"
               },
-              "variant_local_context_sha256": {
+              "paired_local_context_sha256": {
                 "type": "string",
                 "pattern": "^[0-9a-f]{64}$"
               }
