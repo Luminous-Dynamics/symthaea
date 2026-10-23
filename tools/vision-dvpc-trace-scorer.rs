@@ -700,11 +700,26 @@ mod tests {
         let outcomes = read_outcomes(&eval_table, &observations).unwrap();
         let actions = read_actions(&action_table, &observations).unwrap();
         let report = score(&observations, &outcomes, &actions).unwrap();
-        assert!(report.contains("RESULT\tmatched\tall_cheap"));
-        assert!(report.contains("RESULT\tmatched\tall_full"));
-        assert!(report.contains("RESULT\tmatched\tvalue_router"));
-        assert!(report.contains("META\toracle\tNOT_COMPUTED_IN_V1"));
-        assert!(report.contains("true")); // At least one budget violation remains visible.
+        assert!(report.contains("RESULT\\tmatched\\tall_cheap\\t3\\t2\\t0.333333\\t0.375000"));
+        assert!(report.contains("RESULT\\tmatched\\tvalue_router\\t3\\t2\\t0.383333\\t0.412500"));
+        assert!(report.contains("META\\toracle\\tNOT_COMPUTED_IN_V1"));
+        let full_row = report
+            .lines()
+            .find(|line| line.starts_with("RESULT\\tmatched\\tall_full\\t"))
+            .expect("full baseline row should remain visible");
+        let fields: Vec<&str> = full_row.split('\\t').collect();
+        assert_eq!(fields[16], "35000");
+        assert_eq!(fields[20], "true");
+        assert_eq!(fields[22], "2");
+        assert_eq!(fields[23], "false");
+        let router_row = report
+            .lines()
+            .find(|line| line.starts_with("RESULT\\tmatched\\tvalue_router\\t"))
+            .expect("router row should remain visible");
+        let router_fields: Vec<&str> = router_row.split('\\t').collect();
+        assert_eq!(router_fields[16], "15000");
+        assert_eq!(router_fields[20], "false");
+        assert_eq!(router_fields[23], "true");
     }
 
     #[test]
