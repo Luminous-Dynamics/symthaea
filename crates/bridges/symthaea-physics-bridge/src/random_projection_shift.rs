@@ -506,4 +506,94 @@ mod tests {
             }
         ));
     }
+
+    fn benchmark_rows(row_count: usize, feature_count: usize, seed: u64) -> Vec<Vec<f64>> {
+        let mut state = seed;
+        (0..row_count)
+            .map(|_| {
+                (0..feature_count)
+                    .map(|_| {
+                        state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+                        if mix64(state) & 1 == 0 { 1.0 } else { -1.0 }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
+    fn timing_percentile(samples: &mut [u128], percentile: usize) -> u128 {
+        samples.sort_unstable();
+        let index = ((samples.len() - 1) * percentile).div_ceil(100);
+        samples[index.min(samples.len() - 1)]
+    }
+
+    /// Manual timing harness. Run with:
+    /// cargo test -p symthaea-physics-bridge random_projection_feature_shift_reports_timing --lib -- --ignored --nocapture
+    #[test]
+    #[ignore = "manual microbenchmark; timings are environment-dependent"]
+    fn random_projection_feature_shift_reports_timing() {
+        use std::hint::black_box;
+        use std::time::Instant;
+
+        const ROWS: usize = 64;
+        const FEATURES: usize = 512;
+        const PROJECTIONS: usize = 32;
+        const REPEATS: usize = 9;
+        let reference = benchmark_rows(ROWS, FEATURES, 0x0123_4567_89AB_CDEF);
+        let audit = benchmark_rows(ROWS, FEATURES, 0xFEDC_BA98_7654_3210)
+            .into_iter()
+            .map(|row| row.into_iter().map(|value| value + 0.1).collect())
+            .collect::<Vec<Vec<f64>>>();
+
+        let exact_fit_start = Instant::now();
+        let exact = FeatureShiftScorer::fit(&reference, 1e-8).unwrap();
+        let exact_fit_us = exact_fit_start.elapsed().as_micros();
+        let projected_fit_start = Instant::now();
+        let projected =
+            RandomProjectionFeatureShiftScorer::fit(&reference, PROJECTIONS, 1e-8, 0xA4D2_9187)
+                .unwrap();
+        let projected_fit_us = projected_fit_start.elapsed().as_micros();
+
+        black_box(exact.score(&audit).unwrap());
+        black_box(projected.score(&audit).unwrap());
+        let mut exact_times = Vec::with_capacity(REPEATS);
+        let mut projected_times = Vec::with_capacity(REPEATS);
+        for _ in 0..REPEATS {
+            let start = Instant::now();
+            black_box(exact.score(black_box(&audit)).unwrap());
+            exact_times.push(start.elapsed().as_micros());
+
+            let start = Instant::now();
+            black_box(projected.score(black_box(&audit)).unwrap());
+            projected_times.push(start.elapsed().as_micros());
+        }
+
+        let exact_p50 = timing_percentile(&mut exact_times, 50);
+        let exact_p95 = timing_percentile(&mut exact_times, 95);
+        let projected_p50 = timing_percentile(&mut projected_times, 50);
+        let projected_p95 = timing_percentile(&mut projected_times, 95);
+        let exact_pairs = exact.correlation_count();
+        let projected_pairs = projected.projected_correlation_count();
+        let exact_reference_bytes = FEATURES * 2 * std::mem::size_of::<f64>()
+            + exact_pairs * std::mem::size_of::<f64>();
+        let projected_reference_bytes = FEATURES * 2 * std::mem::size_of::<f64>()
+            + FEATURES * PROJECTIONS * std::mem::size_of::<i8>()
+            + PROJECTIONS * 2 * std::mem::size_of::<f64>()
+            + projected_pairs * std::mem::size_of::<f64>();
+
+        println!(
+            "feature-shift timing: rows={ROWS}, features={FEATURES}, projections={PROJECTIONS}, repeats={REPEATS}"
+        );
+        println!(
+            "exact: fit_us={exact_fit_us}, p50_score_us={exact_p50}, p95_score_us={exact_p95}, correlations={exact_pairs}, approx_reference_bytes={exact_reference_bytes}"
+        );
+        println!(
+            "projected: fit_us={projected_fit_us}, p50_score_us={projected_p50}, p95_score_us={projected_p95}, correlations={projected_pairs}, approx_reference_bytes={projected_reference_bytes}"
+        );
+        println!(
+            "observed_median_scoring_speedup={:.3}x",
+            exact_p50 as f64 / projected_p50.max(1) as f64
+        );
+    }
+
 }
