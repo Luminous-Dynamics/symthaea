@@ -192,5 +192,57 @@
     "phone": "https://mlcommons.org/2026/06/mlperf-mobile-v6/",
     "gpu_release": "https://github.com/vortexgpgpu/vortex/releases/tag/v3.0",
     "status": "public reference points only; no candidate measured in this fixture"
+  },
+  "hdc_accelerator_microarchitecture_sweep": {
+    "status": "proposed_not_measured",
+    "canonical_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5808",
+    "related_rtl_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/8463",
+    "datapath_widths_bits": [
+      64,
+      128,
+      256,
+      512
+    ],
+    "variants": [
+      {
+        "id": "bind_xor",
+        "operation": "exact XOR word bind/unbind",
+        "parameter": "DATA_W",
+        "architectural_note": "one-entry elastic output; same semantics across widths"
+      },
+      {
+        "id": "hamming_linear_popcount",
+        "operation": "exact popcount(operand_a XOR operand_b)",
+        "parameters": [
+          "DATA_W",
+          "BALANCED_TREE=0"
+        ],
+        "architectural_note": "linear combinational accumulation reference"
+      },
+      {
+        "id": "hamming_balanced_tree",
+        "operation": "exact popcount(operand_a XOR operand_b)",
+        "parameters": [
+          "DATA_W",
+          "BALANCED_TREE=1"
+        ],
+        "architectural_note": "balanced adder tree hypothesis; timing/area advantage not measured"
+      }
+    ],
+    "expected_simulation_cases": 12,
+    "comparison_metrics_after_synthesis": [
+      "lint/elaboration",
+      "formal/differential correctness",
+      "logic depth or timing under same constraints",
+      "area/resources",
+      "host transfer and accumulator cost",
+      "power/energy only under explicit measured boundary"
+    ],
+    "fail_closed_rules": [
+      "any width/architecture mismatch against reference fails that exact case",
+      "one passing variant does not qualify another width or architecture",
+      "simulation success is not synthesis/PPA/FPGA/ASIC evidence",
+      "do not rank linear versus tree on simulated cycle results alone"
+    ]
   }
 }
