@@ -710,7 +710,7 @@ mod tests {
     }
 
     #[test]
-    fn charge_overflow_saturates_and_marks_the_run_invalid() {
+    fn charge_overflow_saturates_and_reports_overflow() {
         assert_eq!(add_charge(u64::MAX, Some(1)), (u64::MAX, true));
         assert_eq!(add_charge(u64::MAX, None), (u64::MAX, false));
     }
@@ -761,8 +761,16 @@ mod tests {
         let first = commit.to_tsv();
         let second = commit.to_tsv();
         assert_eq!(first, second);
-        assert!(first.starts_with("COMMIT\t7\tescalate\tpositive_conservative_value\t0.200000000\t10\t20\t1\t100\t100\t"));
-        assert!(first.ends_with(&format!("{}\n", "0808".repeat(16))));
+        let fields: Vec<&str> = first.trim_end().split('\t').collect();
+        assert_eq!(fields.len(), 11);
+        assert_eq!(
+            &fields[..10],
+            [
+                "COMMIT", "7", "escalate", "positive_conservative_value", "0.200000000",
+                "10", "20", "1", "100", "100",
+            ]
+        );
+        assert_eq!(fields[10], "08".repeat(32).as_str());
     }
 
     #[test]
