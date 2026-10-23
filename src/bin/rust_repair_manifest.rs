@@ -51,6 +51,8 @@ struct TaskManifestRecord {
     runtime_evidence_sha256: String,
     container_image_id: String,
     network_mode: String,
+    repo_head_sha: String,
+    workspace_clean: bool,
     container_ids: Vec<String>,
     fail_to_pass_count: usize,
     pass_to_pass_count: usize,
@@ -91,6 +93,8 @@ struct ControllerTaskRecord {
     docker_image_reference: String,
     container_image_id: String,
     network_mode: String,
+    repo_head_sha: String,
+    workspace_clean: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -128,6 +132,7 @@ struct TaskAudit {
     container_image_id: Option<String>,
     repo_head_sha: Option<String>,
     network_mode: Option<String>,
+    workspace_clean: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -447,6 +452,7 @@ struct RuntimeEvidenceSummary {
     container_image_id: String,
     network_mode: String,
     repo_head_sha: String,
+    workspace_clean: bool,
     container_ids: Vec<String>,
 }
 
@@ -530,6 +536,9 @@ fn verify_logged_run(
     }
     if gold && run.get("solution_patch_applied").and_then(Value::as_bool) != Some(true) {
         return Err("gold solution patch application did not return true".to_string());
+    }
+    if command_exit_code(run, "workspace_clean_exit_code")? != 0 {
+        return Err("repository worktree is dirty or cleanliness inspection failed".to_string());
     }
     if command_exit_code(run, "repo_head_exit_code")? != 0 {
         return Err("repository HEAD inspection did not exit zero".to_string());
@@ -744,6 +753,7 @@ fn validate_runtime_evidence(
         container_image_id: image_ids[0].clone(),
         network_mode: "none".to_string(),
         repo_head_sha: expected_base_commit,
+        workspace_clean: true,
         container_ids: run_ids,
     })
 }
@@ -1003,6 +1013,7 @@ fn audit_candidate(
         network_mode: runtime_summary
             .as_ref()
             .map(|summary| summary.network_mode.clone()),
+        workspace_clean: runtime_summary.as_ref().map(|summary| summary.workspace_clean),
     };
 
     let manifest_record = if eligible {
@@ -1035,6 +1046,10 @@ fn audit_candidate(
                 .expect("eligible task has runtime summary")
                 .network_mode
                 .clone(),
+            workspace_clean: runtime_summary
+                .as_ref()
+                .expect("eligible task has runtime summary")
+                .workspace_clean,
             container_ids: runtime_summary
                 .as_ref()
                 .expect("eligible task has runtime summary")
@@ -1149,6 +1164,7 @@ fn run(cli: Cli) -> Result<(), String> {
                 runtime_evidence_sha256: record.runtime_evidence_sha256.clone(),
                 container_image_id: record.container_image_id.clone(),
                 network_mode: record.network_mode.clone(),
+                workspace_clean: record.workspace_clean,
                 container_ids: record.container_ids.clone(),
                 fail_to_pass_count: record.fail_to_pass_count,
                 pass_to_pass_count: record.pass_to_pass_count,
@@ -1212,6 +1228,7 @@ fn run(cli: Cli) -> Result<(), String> {
                         docker_image_reference: task.docker_image.clone(),
                         container_image_id: task.container_image_id.clone(),
                         network_mode: task.network_mode.clone(),
+                        workspace_clean: task.workspace_clean,
                     })
                     .collect(),
                 visibility_warning: "EVALUATOR-ONLY: never expose this controller manifest to the coding agent. Agent-visible JSONL contains only problem_statement. Retain the configured image reference and use container_image_id as the observed immutable runtime identity when reproducing the task environment.".to_string(),
@@ -1455,6 +1472,7 @@ mod tests {
                 "run_index": run_index,
                 "test_patch_applied": true,
                 "solution_patch_applied": true,
+                "workspace_clean_exit_code": 0,
                 "repo_head_exit_code": 0,
                 "repo_head_sha": "a".repeat(40),
                 "rebuild_exit_code": 0,
