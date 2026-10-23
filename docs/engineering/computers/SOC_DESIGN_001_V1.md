@@ -79,6 +79,15 @@ Every candidate needs a software oracle and differential fixture. Do not make a 
 
 These values define the first design sweep, not an assertion that 512 bits or a particular architecture will win. The 2,048-byte vector size makes data movement and local buffering important; measure them rather than assuming compute cycles dominate.
 
+### First executable architecture slice: HDC binding and similarity
+
+Draft [#8463](https://github.com/Luminous-Dynamics/symthaea/pull/8463) now contains two word-level primitives under the existing #5808 ownership:
+
+- exact XOR bind/unbind with a one-entry elastic ready/valid output;
+- exact per-word Hamming count, with `BALANCED_TREE=0` (linear addition chain) and `BALANCED_TREE=1` (balanced adder tree) variants.
+
+The receipt-producing runner defines twelve intended correctness cases: XOR, linear popcount and balanced popcount at 64/128/256/512-bit widths. This is a functional qualification matrix, **not a speed benchmark**. Once all cases pass on a pinned simulator, the next comparison is synthesis resource/timing under identical constraints, then physical FPGA evidence. Do not claim the balanced tree is faster until measurements confirm it.
+
 ### Non-negotiable instrumentation
 
 Each operation should expose accepted commands, completed commands, busy cycles, stall reason, bytes transferred, error/timeout status and a deterministic configuration identity. Clock and power counters can support profiling; they are not substitutes for calibrated wall/rail measurement.
