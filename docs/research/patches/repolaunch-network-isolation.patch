@@ -1,7 +1,8 @@
 diff --git a/launch/core/platforms/linux.py b/launch/core/platforms/linux.py
 --- a/launch/core/platforms/linux.py
 +++ b/launch/core/platforms/linux.py
-@@ -246,8 +246,9 @@
+@@ -245,10 +245,11 @@
+         shell_command = "/bin/bash"
          working_dir = "/testbed"
          run_kwargs = {
              "cpu_quota": int(CPU_CORES * 100000),
@@ -11,7 +12,9 @@ diff --git a/launch/core/platforms/linux.py b/launch/core/platforms/linux.py
  
          container = client.containers.run(
              image_name,
-@@ -270,11 +271,52 @@
+             name=container_name,
+@@ -269,13 +270,62 @@
+             },
              **run_kwargs,
          )
  
@@ -26,7 +29,8 @@ diff --git a/launch/core/platforms/linux.py b/launch/core/platforms/linux.py
 +        # refs except the currently checked-out branch, expire reflogs, prune
 +        # unreachable objects, and clear hooks before any agent receives the
 +        # container. Keep ignored dependency caches intact.
-+        sanitize_command = """set -eu
++        sanitize_command = """(
++set -eu
 +test -z "$(git status --porcelain --untracked-files=all)"
 +head_ref="$(git symbolic-ref -q HEAD || true)"
 +git for-each-ref --format='%(refname)' | while IFS= read -r ref; do
@@ -38,6 +42,13 @@ diff --git a/launch/core/platforms/linux.py b/launch/core/platforms/linux.py
 +rm -rf .git/hooks
 +mkdir -p .git/hooks
 +rm -f .git/info/grafts
++remaining_ref_count="$(git for-each-ref --format='%(refname)' | wc -l)"
++if [ -n "$head_ref" ]; then
++    [ "$remaining_ref_count" -eq 1 ]
++else
++    [ "$remaining_ref_count" -eq 0 ]
++fi
++test -z "$(git stash list)"
 +git fsck --no-reflogs --unreachable >/tmp/repolaunch-fsck.txt 2>&1
 +if grep -v '^notice:' /tmp/repolaunch-fsck.txt; then
 +    rm -f /tmp/repolaunch-fsck.txt
@@ -45,7 +56,7 @@ diff --git a/launch/core/platforms/linux.py b/launch/core/platforms/linux.py
 +fi
 +rm -f /tmp/repolaunch-fsck.txt
 +test -z "$(git status --porcelain --untracked-files=all)"
-+"""
++)"""
 +        sanitize_result = session.send_command(sanitize_command)
 +        sanitize_code = getattr(
 +            getattr(sanitize_result, "metadata", None), "exit_code", None
@@ -65,3 +76,4 @@ diff --git a/launch/core/platforms/linux.py b/launch/core/platforms/linux.py
          return session
  
      @classmethod
+     def start_runtime_from_launch_image(
