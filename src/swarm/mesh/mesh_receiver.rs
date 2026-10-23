@@ -80,6 +80,8 @@ pub struct ReceiverStats {
     pub whole_packets: u64,
     /// Packets that failed decryption (wrong key or corrupted ciphertext).
     pub packets_decrypt_failed: u64,
+    /// Poll attempts rejected because the transport cannot authenticate fragment source identity.
+    pub fragment_source_unavailable: u64,
     /// Fragments rejected due to excessive reordering (gap > 3 from last index).
     pub fragments_reordered: u64,
     /// Fragments rejected due to key fingerprint mismatch (mid-stream key rotation).
@@ -200,6 +202,24 @@ impl MeshReceiver {
         self
     }
 
+    /// Whether this receiver requires per-fragment AEAD before reassembly.
+    pub(crate) fn fragment_encryption_enabled(&self) -> bool {
+        #[cfg(feature = "mesh-encryption")]
+        {
+            self.fragment_encryption
+        }
+        #[cfg(not(feature = "mesh-encryption"))]
+        {
+            false
+        }
+    }
+
+    /// Record that a requested fragment-AEAD receive profile could not obtain
+    /// authenticated source identity from the configured transport.
+    pub(crate) fn record_fragment_identity_unavailable(&mut self) {
+        self.stats.fragment_source_unavailable += 1;
+    }
+
     /// Set the timeout for incomplete assemblies.
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
@@ -260,7 +280,10 @@ impl MeshReceiver {
                     }
                 }
             } else {
-                raw
+                // A requested encrypted-fragment profile must never silently
+                // become plaintext merely because the key has not propagated.
+                self.stats.packets_decrypt_failed += 1;
+                return None;
             }
         } else {
             raw

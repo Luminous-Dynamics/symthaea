@@ -1982,3 +1982,24 @@ fn test_fragment_wrong_key_rejected() {
         "Wrong key must fail"
     );
 }
+
+/// A requested fragment-AEAD mode must reject plaintext when no key is set.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn fragment_encryption_rejects_plaintext_when_key_is_missing() {
+    let fragments = fragment(0x1234, &[0xA5; PAYLOAD_SIZE]);
+    let fragment = fragments.first().expect("non-empty payload yields a fragment");
+    let mut frame = [0u8; LORA_MTU];
+    let frame_len = fragment.to_bytes(&mut frame);
+
+    let mut receiver = MeshReceiver::new().with_fragment_encryption(true);
+    assert!(
+        receiver
+            .receive_fragment([0u8; 8], &frame[..frame_len])
+            .is_none(),
+        "a missing fragment-AEAD key must not silently admit a cleartext frame"
+    );
+    assert_eq!(receiver.stats().packets_decrypt_failed, 1);
+    assert_eq!(receiver.pending_count(), 0);
+}
+

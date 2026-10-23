@@ -46,6 +46,25 @@ pub trait MeshTransport: Send + Sync {
     /// Receive raw bytes. Returns the number of bytes read.
     fn recv_raw(&self, buf: &mut [u8]) -> Result<usize, MeshError>;
 
+    /// Receive a frame together with its authenticated mesh source identity.
+    ///
+    /// Fragment-level AEAD binds the source identity into the nonce. An adapter
+    /// may implement this only when it can provide the identity from an
+    /// authenticated transport/session binding; copying the sender-controlled
+    /// nonce prefix or trusting an unauthenticated radio address is not enough.
+    ///
+    /// The default refuses this operation so transports that cannot establish
+    /// that binding cannot accidentally admit fragment-AEAD traffic.
+    fn recv_raw_with_source(
+        &self,
+        _buf: &mut [u8],
+    ) -> Result<(usize, [u8; 8]), MeshError> {
+        Err(MeshError::SecurityProfileUnavailable(
+            "transport does not provide authenticated mesh source identity for fragment AEAD"
+                .to_owned(),
+        ))
+    }
+
     /// Maximum transmission unit (bytes per frame).
     fn mtu(&self) -> usize;
 
@@ -248,6 +267,21 @@ impl DualLayerMesh {
     pub fn send(&self, packet: &WisdomPacket) -> Result<MeshRoute, MeshError> {
         let route = self.route(packet.urgency).ok_or(MeshError::NoTransport)?;
 
+        // The current fragment wrapper adds 28 bytes to every already-MTU-sized
+        // LoRa frame, and the raw transport API does not define authenticated
+        // source binding for receive-side nonce validation. Refuse this profile
+        // before emitting any bytes. Packet-envelope AEAD remains available
+        // with fragment encryption disabled.
+        #[cfg(feature = "mesh-encryption")]
+        if route == MeshRoute::LoRa && self.fragment_encryption {
+            let reason = if self.encryption_key.is_none() {
+                "fragment encryption was requested without an encryption key"
+            } else {
+                "fragment AEAD is disabled until authenticated source binding and MTU-aware framing are implemented"
+            };
+            return Err(MeshError::SecurityProfileUnavailable(reason.to_owned()));
+        }
+
         // Compress the packet into an envelope (1-byte header + payload).
         // COMPRESS_NONE if compression doesn't help; COMPRESS_LZ4 if it does.
         let raw = packet.to_bytes();
@@ -276,25 +310,27 @@ impl DualLayerMesh {
             MeshRoute::LoRa => {
                 let transport = self.lora.as_ref().ok_or(MeshError::NoTransport)?;
                 let frags = fragment(packet.thought_id(), &envelope);
+
+                // Serialize and validate every frame before the first send.
+                // This prevents a smaller physical adapter MTU from causing a
+                // partially transmitted packet followed by an oversize failure.
+                let mut frames = Vec::with_capacity(frags.len());
                 let mut buf = [0u8; LORA_MTU];
                 for frag in &frags {
                     let len = frag.to_bytes(&mut buf);
-                    // Optionally encrypt each fragment individually
-                    #[cfg(feature = "mesh-encryption")]
-                    if self.fragment_encryption {
-                        if let Some(ref key) = self.encryption_key {
-                            let encrypted = super::encrypt_fragment(
-                                &buf[..len],
-                                key,
-                                &packet.source_id,
-                                packet.thought_id(),
-                                frag.fragment_index,
-                            );
-                            transport.send_raw(&encrypted)?;
-                            continue;
-                        }
-                    }
-                    transport.send_raw(&buf[..len])?;
+                    frames.push(buf[..len].to_vec());
+                }
+
+                let mtu = transport.mtu();
+                if let Some(frame) = frames.iter().find(|frame| frame.len() > mtu) {
+                    return Err(MeshError::TransportMtuExceeded {
+                        frame_len: frame.len(),
+                        mtu,
+                    });
+                }
+
+                for frame in &frames {
+                    transport.send_raw(frame)?;
                 }
             }
             MeshRoute::Batman => {
@@ -317,16 +353,39 @@ impl DualLayerMesh {
     pub fn poll_incoming(&self, receiver: &mut super::MeshReceiver) -> Vec<WisdomPacket> {
         let mut completed = Vec::new();
 
-        // Poll LoRa (fragmented path)
+        // Poll LoRa (fragmented path). Fragment AEAD requires a transport-
+        // authenticated identity binding; never substitute a zero ID or trust
+        // the sender-controlled nonce prefix for that binding.
         if let Some(ref transport) = self.lora {
             let mut buf = [0u8; LORA_MTU];
-            while let Ok(n) = transport.recv_raw(&mut buf) {
-                if n == 0 {
-                    break;
+            if receiver.fragment_encryption_enabled() {
+                loop {
+                    match transport.recv_raw_with_source(&mut buf) {
+                        Ok((n, source)) => {
+                            if n == 0 || n > buf.len() {
+                                break;
+                            }
+                            if let Some(packet) = receiver.receive_fragment(source, &buf[..n]) {
+                                completed.push(packet);
+                            }
+                        }
+                        Err(MeshError::SecurityProfileUnavailable(_)) => {
+                            receiver.record_fragment_identity_unavailable();
+                            break;
+                        }
+                        Err(_) => break,
+                    }
                 }
-                // Use source_id [0;8] as placeholder — real impl reads from radio header
-                if let Some(packet) = receiver.receive_fragment([0u8; 8], &buf[..n]) {
-                    completed.push(packet);
+            } else {
+                while let Ok(n) = transport.recv_raw(&mut buf) {
+                    if n == 0 || n > buf.len() {
+                        break;
+                    }
+                    // The source is only a reassembly label in this unencrypted
+                    // path; it must never satisfy fragment-AEAD identity checks.
+                    if let Some(packet) = receiver.receive_fragment([0u8; 8], &buf[..n]) {
+                        completed.push(packet);
+                    }
                 }
             }
         }
@@ -614,6 +673,157 @@ mod tests {
             ttl: 0,
             wisdom: test_hv(0xAB),
         }
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[derive(Clone)]
+    struct RecordingTransport {
+        sent: std::sync::Arc<Mutex<Vec<Vec<u8>>>>,
+        mtu_bytes: usize,
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    impl MeshTransport for RecordingTransport {
+        fn send_raw(&self, data: &[u8]) -> Result<(), MeshError> {
+            self.sent
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(data.to_vec());
+            Ok(())
+        }
+
+        fn recv_raw(&self, _buf: &mut [u8]) -> Result<usize, MeshError> {
+            Ok(0)
+        }
+
+        fn mtu(&self) -> usize {
+            self.mtu_bytes
+        }
+
+        fn name(&self) -> &str {
+            "recording-lora"
+        }
+
+        fn is_available(&self) -> bool {
+            true
+        }
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn fragment_aead_fails_closed_before_emitting_any_lora_frame() {
+        let sent = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let mesh = DualLayerMesh::new([0x42; 32])
+            .with_lora(Box::new(RecordingTransport {
+                sent: std::sync::Arc::clone(&sent),
+                mtu_bytes: LORA_MTU,
+            }))
+            .with_encryption_key([0x5A; 32])
+            .with_fragment_encryption(true);
+
+        let error = mesh.send(&test_packet(MeshUrgency::Cruise)).unwrap_err();
+        assert!(matches!(error, MeshError::SecurityProfileUnavailable(_)));
+        assert!(
+            sent.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_empty(),
+            "unsupported fragment-AEAD must not emit any partially encrypted traffic"
+        );
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn fragment_aead_without_a_key_fails_closed_before_emitting_any_frame() {
+        let sent = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let mesh = DualLayerMesh::new([0x42; 32])
+            .with_lora(Box::new(RecordingTransport {
+                sent: std::sync::Arc::clone(&sent),
+                mtu_bytes: LORA_MTU,
+            }))
+            .with_fragment_encryption(true);
+
+        let error = mesh.send(&test_packet(MeshUrgency::Cruise)).unwrap_err();
+        assert!(matches!(error, MeshError::SecurityProfileUnavailable(_)));
+        assert!(
+            sent.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_empty(),
+            "missing fragment-AEAD key must not cause plaintext fragments to be sent"
+        );
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn packet_envelope_aead_remains_available_with_mtu_safe_fragments() {
+        let sent = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let mesh = DualLayerMesh::new([0x42; 32])
+            .with_lora(Box::new(RecordingTransport {
+                sent: std::sync::Arc::clone(&sent),
+                mtu_bytes: LORA_MTU,
+            }))
+            .with_encryption_key([0x5A; 32]);
+
+        assert_eq!(
+            mesh.send(&test_packet(MeshUrgency::Cruise)).unwrap(),
+            MeshRoute::LoRa
+        );
+        let frames = sent.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        assert!(
+            !frames.is_empty(),
+            "valid packet-envelope AEAD traffic should still send"
+        );
+        assert!(
+            frames.iter().all(|frame| frame.len() <= LORA_MTU),
+            "every emitted frame must remain within the declared LoRa MTU"
+        );
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn actual_transport_mtu_is_preflighted_before_any_lora_frame() {
+        let sent = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let mesh = DualLayerMesh::new([0x42; 32]).with_lora(Box::new(RecordingTransport {
+            sent: std::sync::Arc::clone(&sent),
+            mtu_bytes: 1,
+        }));
+
+        let error = mesh.send(&test_packet(MeshUrgency::Cruise)).unwrap_err();
+        assert!(matches!(
+            error,
+            MeshError::TransportMtuExceeded { frame_len, mtu: 1 } if frame_len > 1
+        ));
+        assert!(
+            sent.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_empty(),
+            "MTU validation must reject the whole packet before any fragment is emitted"
+        );
+    }
+
+    #[test]
+    fn default_transport_source_api_rejects_unauthenticated_identity() {
+        let transport = LoopbackTransport::lora();
+        let mut buffer = [0u8; LORA_MTU];
+        assert!(matches!(
+            transport.recv_raw_with_source(&mut buffer),
+            Err(MeshError::SecurityProfileUnavailable(_))
+        ));
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn poll_incoming_records_missing_authenticated_source_adapter() {
+        let mesh = DualLayerMesh::new([0x42; 32])
+            .with_lora(Box::new(LoopbackTransport::lora()));
+        let mut receiver = super::super::MeshReceiver::new()
+            .with_encryption_key([0x5A; 32])
+            .with_fragment_encryption(true);
+
+        assert!(mesh.poll_incoming(&mut receiver).is_empty());
+        assert_eq!(
+            receiver.stats().fragment_source_unavailable,
+            1,
+            "the unavailable source-binding profile must be observable"
+        );
+        assert_eq!(
+            receiver.stats().packets_decrypt_failed,
+            0,
+            "no packet decryption was attempted without authenticated source metadata"
+        );
     }
 
     // -- Routing --
