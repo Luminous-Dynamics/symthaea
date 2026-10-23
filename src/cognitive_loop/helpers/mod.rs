@@ -192,7 +192,11 @@ impl CognitiveLoopService {
             };
 
         // 9. Store experience
-        self.create_experience(&compressed_state, &prediction, prediction_error);
+        self.create_experience(
+            &compressed_state,
+            &prediction,
+            prediction_error_valid.then_some(prediction_error),
+        );
 
         // 7 (deferred). Move prediction to encoder (no clone needed)
         self.encoder.set_prediction(prediction);
@@ -351,7 +355,11 @@ impl CognitiveLoopService {
             };
 
         // 7. Store experience
-        self.create_experience(&compressed_state, &prediction, prediction_error);
+        self.create_experience(
+            &compressed_state,
+            &prediction,
+            prediction_error_valid.then_some(prediction_error),
+        );
 
         // 5 (deferred). Move prediction to encoder (no clone needed)
         self.encoder.set_prediction(prediction);
@@ -567,16 +575,22 @@ impl CognitiveLoopService {
         }
     }
 
-    pub(super) fn create_experience(&mut self, state: &[f32], prediction: &[f32], error: f32) {
-        // Update last experience with next_state
-        // Own the taken value (not `ref`) so we can move it into Experience without cloning
-        if let Some(last_state) = self.last_state.take() {
-            if let Some(last_pred) = self.last_prediction.take() {
-                // Calculate importance based on error
+    pub(super) fn create_experience(
+        &mut self,
+        state: &[f32],
+        prediction: &[f32],
+        error: Option<f32>,
+    ) {
+        // Missing/degenerate prediction comparisons must not enter replay as a
+        // zero-error (successful) experience. Still advance the state window so
+        // the next cycle can compare against the current prediction.
+        if let Some(error) = error {
+            if let (Some(last_state), Some(last_pred)) =
+                (self.last_state.take(), self.last_prediction.take())
+            {
                 let importance = error + EXPERIENCE_BASE_IMPORTANCE;
-
                 let exp = Experience {
-                    state: last_state, // move, not clone
+                    state: last_state,
                     prediction: last_pred,
                     next_state: Some(state.to_vec()),
                     error,
@@ -590,7 +604,8 @@ impl CognitiveLoopService {
             }
         }
 
-        // Store current state for next cycle
+        // Always roll the current state/prediction forward, independent of whether
+        // this cycle supplied a valid error observation.
         self.last_state = Some(state.to_vec());
         self.last_prediction = Some(prediction.to_vec());
     }
