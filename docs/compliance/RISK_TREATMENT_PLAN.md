@@ -55,10 +55,10 @@ The ethics pipeline (MoralParser → MoralAlgebra → ValueEvaluator → Harmoni
 |--------|--------|----------|
 | 3-stage ethics pipeline with escalating scrutiny | Done | `ethics_engine.rs` — MoralAlgebra → ValueEvaluator → HarmoniesIntegrator |
 | Adversarial moral test suite | Done | 26 tests in `adversarial_moral_algebra.rs` |
-| Consent violation detection via explicit ConsentState | Done | `judge_consent_action()` — bypasses HDC inference |
+| Consent violation detection via explicit ConsentState | Partial | Denied/Absent have deterministic handling; draft `fix/moral-consent-unknown-v1` separates Unknown from Implied/Given. Exact-head validation and action-specific consent-required policy remain open. |
 | Moral topology anomaly detection | Done | `moral_topology.rs` — detects embedding space anomalies |
 | Property-based testing of moral algebra | Done | Proptest suite verifies cross-equation consistency |
-| 91.1% moral classification accuracy baseline | Done | Validated against moral scenario benchmark |
+| Historical 91.1% moral classification accuracy claim | Unqualified; not valid for current headline use | Baseline provenance reconciliation remains open in [MORAL-PLURALISM-001](https://github.com/Luminous-Dynamics/symthaea/issues/7254) and [PR #7263](https://github.com/Luminous-Dynamics/symthaea/pull/7263); split, metric, exact revision and artifact must be reconciled before reuse |
 
 ### Residual Risk
 **Low-Medium**. The multi-stage pipeline with adversarial testing provides strong coverage. Edge cases in novel moral scenarios remain possible but are mitigated by the Warn (rather than silent Allow) default for ambiguous cases.
@@ -81,7 +81,7 @@ Tristan Stoltz
 ### Risk Description
 The consent violation detection mechanism may fail to identify scenarios where consent is absent or denied, leading to ethical violations.
 
-### Treatment Strategy: Mitigate (Fixed)
+### Treatment Strategy: Mitigate (In progress; not fully fixed)
 
 | Action | Status | Evidence |
 |--------|--------|----------|
@@ -89,16 +89,23 @@ The consent violation detection mechanism may fail to identify scenarios where c
 | Implement `judge_consent_action()` with explicit ConsentState parameter | Done | `moral_algebra.rs` — bypasses HDC inference entirely |
 | Wire direct ConsentState check into EthicsEngine pipeline | Done | `EncodedMoralScenario::is_consent_violation()` checks `Absent | Denied` |
 | Regression tests for consent detection | Done | 5 tests in adversarial suite specifically for consent |
-| Monotonic ordering test (Denied > Absent > Implied > Given) | Done | `consistency_consent_violation_sim_monotonic` |
+| Consent severity proxy ordering (Denied > Absent > Unknown > Implied > Given) | Draft / unqualified | `consistency_consent_violation_sim_monotonic`; score ordering is not a calibrated probability or violation verdict |
+| Scope-bound consent precondition | Added; unverified | `evaluate_consent_gate` blocks `Unresolved`, Unknown, Implied, Absent and Denied; checks exact subject/action/purpose, verification flags, validity, expiry and revocation; not wired to sensitive action dispatch and does not cryptographically verify records |
+| Question/quoted-claim adversarial fixtures and confusion-matrix diagnostic | Added; unverified | Parser tests and `cargo run --example consent_semantics_bench`; no compile/test results are claimed |
 
 ### Residual Risk
-**Low**. The explicit ConsentState approach eliminates the unreliable HDC inference path. When consent state is known (the common case), detection is deterministic. When consent state must be inferred from text, the HDC path remains available as a fallback with known limitations.
+**High pending exact-head validation and integration.** Policy-resolution uncertainty now has an explicit `Unresolved` state that blocks instead of defaulting open. Explicit Denied/Absent states have a direct evaluation path, and a pure consent-specific precondition now exists. However, the parser remains heuristic; the legacy verdict enum cannot distinguish Neutral from underdetermined; the helper does not authenticate records or choose which actions require consent; and no sensitive action dispatcher has been shown to enforce it. Do not treat parser output or this helper alone as permission.
 
 ### Acceptance Criteria
 - `judge_consent_action(_, ConsentState::Denied)` always returns `ConsentViolation` verdict
 - `judge_consent_action(_, ConsentState::Absent)` always returns `ConsentViolation` verdict
-- Monotonic ordering maintained: severity(Denied) > severity(Absent) > severity(Implied) > severity(Given)
-- Zero regression in consent detection tests
+- `ConsentState::Unknown` remains distinct from Given, Denied, Absent and Implied in encoded state
+- Unknown or Implied consent cannot produce a positive consent-sensitive verdict; Neutral is not an authorization permit
+- Parser silence or an unanswered request is not classified as explicit consent
+- The pure consent gate blocks Unresolved requirement policy, Unknown, Implied, Absent, Denied, missing/unverified/out-of-scope/expired/revoked evidence in authored focused unit tests; those tests still need exact-head execution
+- A trusted adapter and a reviewed action-specific integration are mandatory before any sensitive action depends on this helper
+- The diagnostic benchmark reports its confusion matrix and false-Given cases but is not a blinded safety certification
+- Exact-head formatting, compilation, focused tests and downstream compatibility pass; no CI result is inferred from authored tests
 
 ### Risk Owner
 Tristan Stoltz

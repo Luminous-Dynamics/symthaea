@@ -41,10 +41,12 @@
 //! Semantic roles      Bound HVs            Judgment
 //! ```
 
+mod consent_policy;
 mod judgment;
 mod operators;
 mod primitives;
 
+pub use consent_policy::*;
 pub use judgment::*;
 pub use operators::*;
 pub use primitives::*;
@@ -421,15 +423,20 @@ mod tests {
         let denied = algebra.encode_consent(ConsentState::Denied);
         let absent = algebra.encode_consent(ConsentState::Absent);
         let implied = algebra.encode_consent(ConsentState::Implied);
+        let unknown = algebra.encode_consent(ConsentState::Unknown);
 
-        // All pairs should be distinguishable
+        // All five epistemic states should have distinct representations.
         let pairs = [
             (&given, &denied, "Given vs Denied"),
             (&given, &absent, "Given vs Absent"),
             (&given, &implied, "Given vs Implied"),
+            (&given, &unknown, "Given vs Unknown"),
             (&denied, &absent, "Denied vs Absent"),
             (&denied, &implied, "Denied vs Implied"),
+            (&denied, &unknown, "Denied vs Unknown"),
             (&absent, &implied, "Absent vs Implied"),
+            (&absent, &unknown, "Absent vs Unknown"),
+            (&implied, &unknown, "Implied vs Unknown"),
         ];
 
         for (a, b, label) in &pairs {

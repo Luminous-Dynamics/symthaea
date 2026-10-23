@@ -192,15 +192,40 @@ impl Magnitude {
     }
 }
 
-/// Consent state
+/// Epistemic state of consent evidence in a moral scenario.
+///
+/// These labels describe what the supplied scenario establishes; they are not
+/// authorization capabilities. Even `Given` does not establish scope, identity,
+/// freshness, or authority required by a downstream permission system.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ConsentState {
-    /// Explicit consent given
+    /// Explicit affirmative consent is stated in the available evidence.
     Given,
-    /// Explicit consent denied
+    /// An explicit refusal, denial, or withdrawal is stated.
     Denied,
-    /// No consent requested (absent)
+    /// The evidence states that consent was not obtained (for example, acting
+    /// without asking or proceeding after no response).
     Absent,
-    /// Implicit/assumed consent
+    /// The scenario explicitly describes consent as assumed or implied.
+    /// This is not equivalent to affirmative consent.
     Implied,
+    /// The supplied evidence does not establish whether consent was given,
+    /// denied, or absent. Missing mention is unknown, not implied consent.
+    Unknown,
+}
+
+impl ConsentState {
+    /// Whether the evidence explicitly records an affirmative consent signal.
+    ///
+    /// This is a semantic predicate, not an authorization decision: downstream
+    /// policy must still validate subject, scope, purpose, freshness and authority.
+    pub const fn is_explicitly_given(self) -> bool {
+        matches!(self, Self::Given)
+    }
+
+    /// Whether consent state needs clarification because the evidence is silent
+    /// or inconclusive.
+    pub const fn requires_clarification(self) -> bool {
+        matches!(self, Self::Unknown)
+    }
 }

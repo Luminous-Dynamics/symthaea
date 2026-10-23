@@ -55,6 +55,10 @@ pub struct ParsedMoralScenario {
     /// Detected consent state
     pub consent: ConsentState,
 
+    /// Evidence trace supporting the consent label. This remains text-level
+    /// evidence and must not be treated as identity, provenance, or authorization.
+    pub consent_assessment: ConsentTextAssessment,
+
     /// Detected magnitude (for proportionality)
     pub magnitude: Option<Magnitude>,
 
@@ -85,7 +89,8 @@ impl Default for ParsedMoralScenario {
             action: None,
             patient: None,
             intent: MoralIntent::Unknown,
-            consent: ConsentState::Implied,
+            consent: ConsentState::Unknown,
+            consent_assessment: ConsentTextAssessment::default(),
             magnitude: None,
             has_negation: false,
             confidence: 0.0,
@@ -93,6 +98,88 @@ impl Default for ParsedMoralScenario {
             excuse: None,
             effort: None,
             reward: None,
+        }
+    }
+}
+
+/// Which kind of unquoted text signal supported a consent-state assessment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConsentEvidenceBasis {
+    /// No recognized unquoted consent signal was established.
+    NoAssertedEvidence,
+    /// A recognized explicit affirmative phrase was found outside quoted text.
+    ExplicitAffirmativeCue,
+    /// A recognized explicit refusal/withdrawal phrase was found.
+    ExplicitDenialCue,
+    /// A recognized statement that consent was not obtained was found.
+    ExplicitAbsenceCue,
+    /// The text explicitly characterized permission as assumed or presumed.
+    ExplicitAssumptionCue,
+    /// The unquoted input was interrogative; no proposition is asserted.
+    Interrogative,
+    /// A relevant consent cue was qualified by uncertainty or a negation that does not establish consent.
+    UncertaintySuppressed,
+    /// A structured CONSENT field supplied the state; truth/provenance remain unverified.
+    StructuredField,
+    /// Incompatible grant/non-grant cues appeared without reliable temporal resolution.
+    ConflictingSignals,
+}
+
+/// Auditable text-level consent assessment.
+///
+/// This reports lexical evidence only. It does not authenticate a speaker,
+/// establish that a claim is true, or authorize an action. The selected cue is
+/// the deterministic longest match in its category, not proof that the
+/// statement is accurate or that consent is in scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConsentTextAssessment {
+    /// Classified epistemic state.
+    pub state: ConsentState,
+    /// Category selected by the parser.
+    pub basis: ConsentEvidenceBasis,
+    /// Recognized cue, when one was selected.
+    pub matched_phrase: Option<String>,
+    /// Competing grant/non-grant phrases that prevented a determinate label.
+    pub conflicting_phrases: Vec<String>,
+    /// Whether an unquoted question mark forced the result to Unknown.
+    pub question_suppressed: bool,
+    /// Whether text inside supported quote delimiters was masked from matching.
+    pub quoted_text_suppressed: bool,
+}
+
+impl Default for ConsentTextAssessment {
+    fn default() -> Self {
+        Self {
+            state: ConsentState::Unknown,
+            basis: ConsentEvidenceBasis::NoAssertedEvidence,
+            matched_phrase: None,
+            conflicting_phrases: Vec::new(),
+            question_suppressed: false,
+            quoted_text_suppressed: false,
+        }
+    }
+}
+
+impl ConsentTextAssessment {
+    /// Whether a lexical affirmative cue was found. This is not authorization.
+    pub fn has_affirmative_cue(&self) -> bool {
+        self.state == ConsentState::Given
+            && self.basis == ConsentEvidenceBasis::ExplicitAffirmativeCue
+            && self.matched_phrase.is_some()
+    }
+
+    /// A short explanation suitable for diagnostic logs.
+    pub fn explanation(&self) -> &'static str {
+        match self.basis {
+            ConsentEvidenceBasis::NoAssertedEvidence => "No recognized unquoted consent evidence",
+            ConsentEvidenceBasis::ExplicitAffirmativeCue => "Explicit affirmative wording detected; truth and scope unverified",
+            ConsentEvidenceBasis::ExplicitDenialCue => "Explicit refusal or withdrawal wording detected",
+            ConsentEvidenceBasis::ExplicitAbsenceCue => "Wording states consent was not obtained",
+            ConsentEvidenceBasis::ExplicitAssumptionCue => "Consent is described as assumed, not affirmatively granted",
+            ConsentEvidenceBasis::Interrogative => "Question does not assert a consent state",
+            ConsentEvidenceBasis::UncertaintySuppressed => "Consent wording is uncertain or negated in a way that does not establish an affirmative state",
+            ConsentEvidenceBasis::StructuredField => "Structured consent field extracted; truth, identity and provenance unverified",
+            ConsentEvidenceBasis::ConflictingSignals => "Grant and non-grant cues conflict; chronology and speaker attribution are unresolved",
         }
     }
 }
@@ -106,10 +193,16 @@ pub struct MoralParser {
     /// Words indicating bad intent
     bad_intent_words: HashSet<String>,
 
-    /// Words indicating consent given
+    /// Phrases indicating explicit affirmative consent
     consent_given_words: HashSet<String>,
 
-    /// Words indicating consent absent/denied
+    /// Phrases indicating explicit refusal or withdrawal
+    consent_denied_words: HashSet<String>,
+
+    /// Phrases indicating assumed or implied consent
+    consent_implied_words: HashSet<String>,
+
+    /// Phrases stating that consent was not obtained
     consent_absent_words: HashSet<String>,
 
     /// Negation words
@@ -363,20 +456,73 @@ impl MoralParser {
             .collect(),
 
             consent_given_words: [
-                "asked",
-                "asking",
-                "permission",
-                "permitted",
-                "consent",
+                "gave consent",
+                "given consent",
                 "consented",
-                "agreed",
-                "agreeing",
-                "allowed",
-                "allowing",
-                "approved",
-                "approving",
+                "said yes",
+                "gave permission",
+                "granted permission",
                 "with permission",
-                "after asking",
+                "with their permission",
+                "with her permission",
+                "with his permission",
+                "permission was granted",
+                "allowed me to",
+                "approved the request",
+                "explicitly authorized",
+                "affirmatively consented",
+                "my daughter agreed",
+                "after my daughter agreed",
+                "they agreed to",
+                "she agreed to",
+                "he agreed to",
+                "agreed to proceed",
+                "agreed to share",
+                "agreed to treatment",
+                "agreed to the request",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+
+            consent_denied_words: [
+                "denied consent",
+                "refused consent",
+                "refused permission",
+                "declined consent",
+                "said no",
+                "told me no",
+                "withdrew consent",
+                "revoked consent",
+                "consent was withdrawn",
+                "consent was revoked",
+                "did not consent",
+                "didn't consent",
+                "does not consent",
+                "doesn't consent",
+                "did not agree",
+                "didn't agree",
+                "never agreed",
+                "never consented",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+
+            consent_implied_words: [
+                "assumed consent",
+                "assumed permission",
+                "assumed they agreed",
+                "assumed she agreed",
+                "assumed he agreed",
+                "implied consent",
+                "implicitly consented",
+                "presumed consent",
+                "presumed permission",
+                "assumed my friend was okay with it",
+                "assumed they were okay with it",
+                "assumed she was okay with it",
+                "assumed he was okay with it",
             ]
             .iter()
             .map(|s| s.to_string())
@@ -386,11 +532,43 @@ impl MoralParser {
                 "without asking",
                 "without permission",
                 "without consent",
+                "without explicit consent",
+                "without her permission",
+                "without their permission",
+                "without his permission",
+                "without their consent",
+                "did not give consent",
+                "didn't give consent",
+                "did not give explicit consent",
+                "didn't give explicit consent",
+                "not given consent",
+                "not explicitly authorized",
+                "not explicitly consented",
+                "not consented",
+                "never given consent",
+                "did not say yes",
+                "didn't say yes",
+                "not approved the request",
+                "did not approve the request",
                 "didn't ask",
                 "did not ask",
                 "never asked",
-                "secretly",
-                "behind",
+                "no response",
+                "no reply",
+                "didn't reply",
+                "did not reply",
+                "never replied",
+                "did not answer",
+                "didn't answer",
+                "have not received a reply",
+                "haven't received a reply",
+                "waiting for consent",
+                "awaiting consent",
+                "waiting for permission",
+                "awaiting permission",
+                "did not get consent",
+                "didn't get consent",
+                "did not obtain consent",
                 "without telling",
                 "without informing",
                 "without notifying",
@@ -866,8 +1044,13 @@ impl MoralParser {
                     _ => {}
                 }
 
-                // Merge consent information (absent consent anywhere is significant)
-                if sub_parsed.consent == ConsentState::Absent {
+                // A refusal anywhere is a strong signal; otherwise, stated absence
+                // overrides weaker or unknown consent evidence from another clause.
+                if sub_parsed.consent == ConsentState::Denied {
+                    primary.consent = ConsentState::Denied;
+                } else if sub_parsed.consent == ConsentState::Absent
+                    && primary.consent != ConsentState::Denied
+                {
                     primary.consent = ConsentState::Absent;
                 }
             }
@@ -888,8 +1071,9 @@ impl MoralParser {
             ..Default::default()
         };
 
-        // Detect consent state (check phrases first, then words)
-        scenario.consent = self.detect_consent(&lower);
+        // Preserve both the classification and its evidence trace.
+        scenario.consent_assessment = self.assess_consent_evidence(&lower);
+        scenario.consent = scenario.consent_assessment.state;
 
         // Detect negation
         scenario.has_negation = self.detect_negation(&words);
@@ -923,24 +1107,217 @@ impl MoralParser {
         scenario
     }
 
-    /// Detect consent state from text
-    fn detect_consent(&self, text: &str) -> ConsentState {
-        // Check for absent consent phrases first (more specific)
-        for phrase in &self.consent_absent_words {
-            if text.contains(phrase.as_str()) {
-                return ConsentState::Absent;
+    /// Remove quoted material before assigning consent semantics. Quoted claims
+    /// may be examples, reports, disputed statements, or adversarial payloads;
+    /// this heuristic parser cannot reliably establish who asserted them.
+    /// Unmatched opening quotes mask the remainder (conservative fallback).
+    fn strip_quoted_consent_text(text: &str) -> String {
+        let mut result = String::with_capacity(text.len());
+        let mut closing_quote: Option<char> = None;
+        for ch in text.chars() {
+            if let Some(end) = closing_quote {
+                if ch == end {
+                    closing_quote = None;
+                }
+                result.push(' ');
+                continue;
+            }
+            match ch {
+                '"' => {
+                    closing_quote = Some('"');
+                    result.push(' ');
+                }
+                '`' => {
+                    closing_quote = Some('`');
+                    result.push(' ');
+                }
+                '“' => {
+                    closing_quote = Some('”');
+                    result.push(' ');
+                }
+                '‘' => {
+                    closing_quote = Some('’');
+                    result.push(' ');
+                }
+                '”' | '’' => result.push(' '),
+                _ => result.push(ch),
             }
         }
+        result
+    }
 
-        // Check for given consent phrases
-        for phrase in &self.consent_given_words {
-            if text.contains(phrase.as_str()) {
-                return ConsentState::Given;
-            }
+    /// Return a traceable, text-level assessment of consent evidence.
+    ///
+    /// Supported quoted spans are masked; interrogative inputs are conservatively
+    /// Unknown; cues are selected deterministically (longest match, then lexical
+    /// tie-break) so logs and benchmark outputs are reproducible. This is not an
+    /// authorization decision or speaker/provenance verification.
+    pub fn assess_consent_evidence(&self, text: &str) -> ConsentTextAssessment {
+        let normalized = text.to_lowercase();
+        let evidence_text = Self::strip_quoted_consent_text(&normalized);
+        let quoted_text_suppressed = evidence_text.as_str() != normalized.as_str();
+
+        if evidence_text.contains('?') {
+            return ConsentTextAssessment {
+                state: ConsentState::Unknown,
+                basis: ConsentEvidenceBasis::Interrogative,
+                matched_phrase: None,
+                conflicting_phrases: Vec::new(),
+                question_suppressed: true,
+                quoted_text_suppressed,
+            };
         }
 
-        // Default to implied
-        ConsentState::Implied
+        // These are conservative phrase-level scope guards, not a general
+        // natural-language negation parser. They prevent common uncertainty
+        // and "absence of refusal" constructions from being promoted to
+        // affirmative or denied consent merely because they contain a cue.
+        // Explicit denial/absence phrases such as "did not consent" and
+        // "did not give consent" remain handled by their dedicated categories.
+        const UNCERTAINTY_CUES: &[&str] = &[
+            "there is no evidence that",
+            "no verified evidence that",
+            "no evidence that",
+            "not verified whether",
+            "not verified that",
+            "not confirmed whether",
+            "not confirmed that",
+            "not sure whether",
+            "not sure if",
+            "unclear whether",
+            "unclear if",
+            "unknown whether",
+            "no one can confirm that",
+            "no one knows whether",
+            "cannot confirm that",
+            "can't confirm that",
+            "did not refuse consent",
+            "didn't refuse consent",
+            "does not mean she gave consent",
+            "doesn't mean she gave consent",
+            "did not withdraw consent",
+            "didn't withdraw consent",
+            "may have given consent",
+            "might have given consent",
+            "could have given consent",
+            "may have consented",
+            "might have consented",
+            "possibly gave consent",
+            "allegedly gave consent",
+            "the claim that she gave consent is unverified",
+            "the consent record is unverified",
+            "the consent record is not verified",
+            "the consent claim is unverified",
+            "the consent claim is not verified",
+            "affirmative consent is unverified",
+        ];
+
+        fn uncertainty_cue_is_consent_scoped(text: &str, cue: &str) -> bool {
+            text.match_indices(cue).any(|(start, matched)| {
+                let end = start + matched.len();
+                let clause_start = text[..start]
+                    .rfind(['.', ';', '!', '?'])
+                    .map_or(0, |index| index + 1);
+                let clause_end = text[end..]
+                    .find(['.', ';', '!', '?'])
+                    .map_or(text.len(), |offset| end + offset);
+                let clause = &text[clause_start..clause_end];
+                ["consent", "permission", "authorized", "agreed"]
+                    .iter()
+                    .any(|signal| clause.contains(signal))
+            })
+        }
+
+        // Suppress only when an uncertainty phrase and consent-related wording
+        // share a punctuation-delimited clause. This also catches negated
+        // non-refusal forms that lack a matching ordinary state cue.
+        if let Some(cue) = UNCERTAINTY_CUES
+            .iter()
+            .filter(|cue| uncertainty_cue_is_consent_scoped(&evidence_text, **cue))
+            .max_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)))
+        {
+            return ConsentTextAssessment {
+                state: ConsentState::Unknown,
+                basis: ConsentEvidenceBasis::UncertaintySuppressed,
+                matched_phrase: Some((*cue).to_string()),
+                conflicting_phrases: Vec::new(),
+                question_suppressed: false,
+                quoted_text_suppressed,
+            };
+        }
+
+        fn longest_matching_cue(cues: &HashSet<String>, text: &str) -> Option<String> {
+            cues.iter()
+                .map(String::as_str)
+                .filter(|cue| text.contains(*cue))
+                .max_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)))
+                .map(str::to_owned)
+        }
+
+        let categories = [
+            (&self.consent_denied_words, ConsentState::Denied, ConsentEvidenceBasis::ExplicitDenialCue),
+            (&self.consent_absent_words, ConsentState::Absent, ConsentEvidenceBasis::ExplicitAbsenceCue),
+            (&self.consent_implied_words, ConsentState::Implied, ConsentEvidenceBasis::ExplicitAssumptionCue),
+            (&self.consent_given_words, ConsentState::Given, ConsentEvidenceBasis::ExplicitAffirmativeCue),
+        ];
+
+        let matches: Vec<(ConsentState, ConsentEvidenceBasis, String)> = categories
+            .iter()
+            .filter_map(|(cues, state, basis)| {
+                longest_matching_cue(cues, &evidence_text)
+                    .map(|phrase| (*state, *basis, phrase))
+            })
+            .collect();
+
+        let has_given = matches.iter().any(|(state, _, _)| *state == ConsentState::Given);
+        let conflicting_phrases: Vec<String> = matches
+            .iter()
+            .filter(|(state, _, _)| *state != ConsentState::Given)
+            .map(|(state, _, phrase)| format!("{state:?}: {phrase}"))
+            .collect();
+
+        // Do not guess at chronology when the same unquoted text contains both
+        // affirmative and non-affirmative signals. Example: "she refused, then
+        // agreed" needs temporal/speaker resolution, not a keyword priority.
+        if has_given && !conflicting_phrases.is_empty() {
+            let mut all_phrases = conflicting_phrases;
+            if let Some((_, _, affirmative)) = matches
+                .iter()
+                .find(|(state, _, _)| *state == ConsentState::Given)
+            {
+                all_phrases.push(format!("Given: {affirmative}"));
+            }
+            all_phrases.sort();
+            all_phrases.dedup();
+            return ConsentTextAssessment {
+                state: ConsentState::Unknown,
+                basis: ConsentEvidenceBasis::ConflictingSignals,
+                matched_phrase: None,
+                conflicting_phrases: all_phrases,
+                question_suppressed: false,
+                quoted_text_suppressed,
+            };
+        }
+
+        if let Some((state, basis, phrase)) = matches.into_iter().next() {
+            return ConsentTextAssessment {
+                state,
+                basis,
+                matched_phrase: Some(phrase),
+                conflicting_phrases: Vec::new(),
+                question_suppressed: false,
+                quoted_text_suppressed,
+            };
+        }
+
+        ConsentTextAssessment {
+            state: ConsentState::Unknown,
+            basis: ConsentEvidenceBasis::NoAssertedEvidence,
+            matched_phrase: None,
+            conflicting_phrases: Vec::new(),
+            question_suppressed: false,
+            quoted_text_suppressed,
+        }
     }
 
     /// Detect negation in words
@@ -1060,7 +1437,7 @@ impl MoralParser {
         if scenario.intent != MoralIntent::Unknown {
             score += 0.18;
         }
-        if scenario.consent != ConsentState::Implied {
+        if scenario.consent != ConsentState::Unknown {
             score += 0.12;
         }
         if scenario.magnitude.is_some() {
@@ -1320,10 +1697,19 @@ impl MoralParser {
                 let consent = consent.trim();
                 scenario.consent = match consent {
                     "given" | "yes" | "explicit" => ConsentState::Given,
-                    "denied" | "refused" | "no" => ConsentState::Denied,
-                    "absent" | "missing" | "not asked" => ConsentState::Absent,
+                    "denied" | "refused" | "no" | "withdrawn" => ConsentState::Denied,
+                    "absent" | "missing" | "not asked" | "no response" => ConsentState::Absent,
                     "implied" | "assumed" => ConsentState::Implied,
-                    _ => ConsentState::Implied,
+                    "unknown" | "unspecified" | "not stated" | "unclear" => ConsentState::Unknown,
+                    _ => ConsentState::Unknown,
+                };
+                scenario.consent_assessment = ConsentTextAssessment {
+                    state: scenario.consent,
+                    basis: ConsentEvidenceBasis::StructuredField,
+                    matched_phrase: Some(format!("consent: {consent}")),
+                    conflicting_phrases: Vec::new(),
+                    question_suppressed: false,
+                    quoted_text_suppressed: false,
                 };
             } else if let Some(magnitude) = line.strip_prefix("magnitude:") {
                 let magnitude = magnitude.trim();
@@ -1363,7 +1749,8 @@ AGENT: [who performs the action]
 ACTION: [the main verb/action]
 PATIENT: [who is affected by the action]
 INTENT: [good/bad/neutral]
-CONSENT: [given/denied/absent/implied]
+CONSENT: [given/denied/absent/implied/unknown]
+Use "unknown" when the scenario or evidence does not establish consent; do not infer consent from silence or from the fact that someone asked.
 MAGNITUDE: [tiny/small/medium/large/huge]"#
         )
     }
@@ -1660,13 +2047,220 @@ mod tests {
         let result = parser.parse("I discussed my daughter's health without asking first");
         assert_eq!(result.consent, ConsentState::Absent);
 
-        // With consent
-        let result = parser.parse("After asking my daughter, I discussed her health");
+        // Asking is a request, not evidence that affirmative consent followed.
+        let result = parser.parse("I asked my daughter, but she did not answer, so I discussed her health");
+        assert_eq!(result.consent, ConsentState::Absent);
+
+        // Asking is not the same as receiving an affirmative answer.
+        let result = parser.parse("I asked my daughter before discussing her health");
+        assert_eq!(result.consent, ConsentState::Unknown);
+
+        // Explicit affirmative consent
+        let result = parser.parse("After my daughter agreed, I discussed her health");
         assert_eq!(result.consent, ConsentState::Given);
 
-        // Implied (no explicit mention)
-        let result = parser.parse("I helped my friend move");
+        let result = parser.parse("With her permission, I shared the report");
+        assert_eq!(result.consent, ConsentState::Given);
+
+        // Explicit refusal is distinct from missing consent.
+        let result = parser.parse("She refused consent, but I shared her health information");
+        assert_eq!(result.consent, ConsentState::Denied);
+
+        // Negated mentions of consent must not turn into affirmative consent.
+        let result = parser.parse("I did not give explicit consent, so I should not proceed");
+        assert_eq!(result.consent, ConsentState::Absent);
+
+        // Assumed consent is only inferred when assumption is actually stated.
+        let result = parser.parse("I assumed my friend was okay with it");
         assert_eq!(result.consent, ConsentState::Implied);
+        let result = parser.parse("I assumed she agreed");
+        assert_eq!(result.consent, ConsentState::Implied);
+
+        // No consent information is unknown, not implied.
+        let result = parser.parse("I helped my friend move");
+        assert_eq!(result.consent, ConsentState::Unknown);
+        assert!(result.consent.requires_clarification());
+        assert!(!result.consent.is_explicitly_given());
+    }
+
+    #[test]
+    fn consent_positive_surface_forms_in_questions_and_quotes_stay_unknown() {
+        let parser = MoralParser::new();
+        for text in [
+            "Who gave permission?",
+            "Would permission be needed here?",
+            "The note says \"she gave consent\"; I have not verified it.",
+            "The report says “she gave consent” but its source is unclear.",
+            "Did she refuse consent?",
+            "Did I proceed without consent?",
+            "The note says “she refused consent” but the source is unverified.",
+        ] {
+            assert_eq!(
+                parser.parse(text).consent,
+                ConsentState::Unknown,
+                "unverified question/quote must not become affirmative consent: {text}"
+            );
+        }
+
+        assert_eq!(
+            parser.parse("She gave consent to share the report.").consent,
+            ConsentState::Given
+        );
+        assert_eq!(
+            parser.assess_consent_evidence("SHE GAVE CONSENT TO SHARE THE REPORT.").state,
+            ConsentState::Given,
+            "public evidence assessment should be case-insensitive"
+        );
+        let curly_quoted =
+            parser.assess_consent_evidence("The note says ‘she gave consent’ but its source is unknown.");
+        assert_eq!(curly_quoted.state, ConsentState::Unknown);
+        assert!(curly_quoted.quoted_text_suppressed);
+        let code_quoted = parser.assess_consent_evidence("The report contains `she gave consent` as an example.");
+        assert_eq!(code_quoted.state, ConsentState::Unknown);
+        assert!(code_quoted.quoted_text_suppressed);
+    }
+
+    #[test]
+    fn consent_uncertainty_and_negation_do_not_create_false_assertions() {
+        let parser = MoralParser::new();
+        use super::ConsentEvidenceBasis;
+
+        for text in [
+            "They did not refuse consent.",
+            "There is no evidence that she gave consent.",
+            "There is no verified evidence that she gave consent.",
+            "It is unclear whether she gave consent.",
+            "She may have given consent.",
+            "No one can confirm that she gave consent.",
+            "She did not withdraw consent.",
+            "The claim that she gave consent is unverified.",
+            "She might have consented.",
+        ] {
+            let assessment = parser.assess_consent_evidence(text);
+            assert_eq!(
+                assessment.state,
+                ConsentState::Unknown,
+                "uncertainty or negated non-refusal must not establish consent: {text}"
+            );
+            assert_eq!(
+                assessment.basis,
+                ConsentEvidenceBasis::UncertaintySuppressed,
+                "the evidence trace must explain why a matching cue was suppressed: {text}"
+            );
+            assert!(!assessment.has_affirmative_cue());
+        }
+
+        // Explicit negative statements retain their dedicated semantics.
+        assert_eq!(
+            parser.assess_consent_evidence("She did not consent.").state,
+            ConsentState::Denied
+        );
+        assert_eq!(
+            parser.assess_consent_evidence("I did not give consent.").state,
+            ConsentState::Absent
+        );
+
+        // Uncertainty unrelated to consent must not change the evidence basis,
+        // and an unrelated unverified sentence must not suppress an explicit grant.
+        let unrelated_uncertainty =
+            parser.assess_consent_evidence("I am not sure whether it will rain.");
+        assert_eq!(unrelated_uncertainty.state, ConsentState::Unknown);
+        assert_eq!(
+            unrelated_uncertainty.basis,
+            ConsentEvidenceBasis::NoAssertedEvidence
+        );
+        let unrelated_unverified = parser.assess_consent_evidence(
+            "She gave consent to share the report. The weather report is unverified.",
+        );
+        assert_eq!(unrelated_unverified.state, ConsentState::Given);
+        assert!(unrelated_unverified.has_affirmative_cue());
+
+        let unrelated_uncertainty_in_later_clause = parser.assess_consent_evidence(
+            "She gave consent to share the report. I am not sure whether it will rain.",
+        );
+        assert_eq!(unrelated_uncertainty_in_later_clause.state, ConsentState::Given);
+    }
+
+    #[test]
+    fn consent_assessment_explains_state_and_selects_cues_deterministically() {
+        use super::ConsentEvidenceBasis;
+
+        let parser = MoralParser::new();
+        let given = parser.assess_consent_evidence("She gave consent to share the report.");
+        assert_eq!(given.state, ConsentState::Given);
+        assert_eq!(given.basis, ConsentEvidenceBasis::ExplicitAffirmativeCue);
+        assert!(given.has_affirmative_cue());
+        assert!(given.matched_phrase.is_some());
+
+        let denied = parser.assess_consent_evidence("She refused consent before I continued.");
+        assert_eq!(denied.state, ConsentState::Denied);
+        assert_eq!(denied.basis, ConsentEvidenceBasis::ExplicitDenialCue);
+        assert!(!denied.has_affirmative_cue());
+
+        let implied = parser.assess_consent_evidence("I assumed she agreed to treatment.");
+        assert_eq!(implied.state, ConsentState::Implied);
+        assert_eq!(implied.basis, ConsentEvidenceBasis::ExplicitAssumptionCue);
+
+        let question = parser.assess_consent_evidence("Did she refuse consent?");
+        assert_eq!(question.state, ConsentState::Unknown);
+        assert_eq!(question.basis, ConsentEvidenceBasis::Interrogative);
+        assert!(question.question_suppressed);
+        assert!(!question.has_affirmative_cue());
+
+        let conflict = parser.assess_consent_evidence(
+            "She refused consent, but later said yes; the timeline is unclear.",
+        );
+        assert_eq!(conflict.state, ConsentState::Unknown);
+        assert_eq!(conflict.basis, ConsentEvidenceBasis::ConflictingSignals);
+        assert!(conflict.matched_phrase.is_none());
+        assert!(conflict.conflicting_phrases.len() >= 2);
+        assert!(conflict.conflicting_phrases.iter().any(|s| s.starts_with("Given:")));
+        assert!(conflict.conflicting_phrases.iter().any(|s| s.starts_with("Denied:")));
+
+        let quoted = parser.assess_consent_evidence("The report says \"she gave consent\" but the source is unknown.");
+        assert_eq!(quoted.state, ConsentState::Unknown);
+        assert!(quoted.quoted_text_suppressed);
+        assert_eq!(quoted.basis, ConsentEvidenceBasis::NoAssertedEvidence);
+    }
+
+    #[test]
+    fn test_structured_parser_preserves_unknown_consent() {
+        let parser = MoralParser::new();
+        let parsed = parser
+            .parse_with_llm_response(
+                "A consent-sensitive action was described.",
+                Some(
+                    "AGENT: Alice\nACTION: share records\nPATIENT: Bob\nINTENT: good\nCONSENT: unknown",
+                ),
+            )
+            .expect("structured response contains meaningful extracted fields");
+        assert_eq!(parsed.consent, ConsentState::Unknown);
+        assert!(parsed.consent.requires_clarification());
+        assert_eq!(parsed.consent_assessment.state, parsed.consent);
+        assert_eq!(parsed.consent_assessment.basis, ConsentEvidenceBasis::StructuredField);
+        assert!(!parsed.consent_assessment.has_affirmative_cue());
+
+        let structured_given = parser
+            .parse_with_llm_response(
+                "A consent-sensitive action was described.",
+                Some("AGENT: Alice\nACTION: share records\nPATIENT: Bob\nINTENT: good\nCONSENT: given"),
+            )
+            .expect("structured response with an affirmative field has enough extracted fields");
+        assert_eq!(structured_given.consent, ConsentState::Given);
+        assert_eq!(structured_given.consent_assessment.state, ConsentState::Given);
+        assert_eq!(structured_given.consent_assessment.basis, ConsentEvidenceBasis::StructuredField);
+        assert!(
+            !structured_given.consent_assessment.has_affirmative_cue(),
+            "an LLM-supplied field is not a verified lexical or authorization signal"
+        );
+
+        let omitted = parser
+            .parse_with_llm_response(
+                "A consent-sensitive action was described.",
+                Some("AGENT: Alice\nACTION: share records\nPATIENT: Bob\nINTENT: good"),
+            )
+            .expect("response without consent still contains meaningful fields");
+        assert_eq!(omitted.consent, ConsentState::Unknown);
     }
 
     #[test]

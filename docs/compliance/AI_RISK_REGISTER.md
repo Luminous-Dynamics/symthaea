@@ -71,7 +71,7 @@ Risks are scored using: **Likelihood** (1-5) x **Impact** (1-5) = **Risk Score**
 | Field | Value |
 |-------|-------|
 | **Description** | HDC moral algebra produces incorrect moral verdicts on novel or adversarial inputs outside training distribution |
-| **Likelihood** | 3 (Moderate — 91.1% classification accuracy leaves ~9% error rate; adversarial inputs not systematically tested) |
+| **Likelihood** | 3 (Moderate — the historical 91.1% classification score is unqualified and is not a validated estimate of residual error; adversarial inputs remain incompletely tested) |
 | **Impact** | 5 (Critical — incorrect moral verdicts could permit harmful actions or block beneficial ones) |
 | **Risk Score** | **15 (High)** |
 | **Existing Controls** | Three-stage ethics pipeline (MoralParser + MoralAlgebra -> ValueEvaluator -> HarmoniesIntegrator); deontological verdict with consent violation detection; moral topology anomaly detection (drift alerts, completeness failures); veto system (Allow/Warn/Veto) |
@@ -100,10 +100,10 @@ Risks are scored using: **Likelihood** (1-5) x **Impact** (1-5) = **Risk Score**
 | **Likelihood** | 3 (Moderate — consent detection relies on HDC pattern matching, which may miss implicit coercion) |
 | **Impact** | 5 (Critical — consent violations are the most serious ethical failure mode) |
 | **Risk Score** | **15 (High)** |
-| **Existing Controls** | `consent_violation: bool` in EthicsEngineOutput; deontological verdict includes violations list; moral concern threshold (-0.3) triggers conservative override; `judge_consent_action()` with explicit ConsentState (Denied=1.0, Absent=0.8); `denied_consent_violation_prototype()`; 26 adversarial moral tests |
-| **Residual Risk** | Medium (reduced from High — explicit consent path closes primary gap; HDC inference path remains unreliable for arbitrary strings) |
-| **Mitigation** | (a) ~~Dedicated consent test suite~~ DONE (26 adversarial tests); (b) `judge_consent_action()` bypasses HDC inference when ConsentState is known; (c) Conservative bias: ambiguous consent cases default to flagging; (d) Human review queue for consent-adjacent decisions |
-| **Evidence** | `src/cognitive_loop/ethics_engine.rs`, `src/hdc/moral_algebra.rs`, `tests/adversarial_moral_algebra.rs` |
+| **Existing Controls** | `consent_violation: bool` in EthicsEngineOutput; direct Denied/Absent handling in `judge_consent_action()`; five-state consent evidence; conservative quote/question parsing guards; standalone scope/identity/action/purpose/validity/revocation precondition in `src/hdc/moral_algebra/consent_policy.rs`; adversarial tests and diagnostic confusion-matrix runner |
+| **Residual Risk** | **High until exact-head validation passes and the precondition is integrated behind a trusted evidence adapter and action-specific policy.** The pure helper does not verify cryptographic provenance, is not wired to action dispatch, and does not make parser output an authorization record. The parser remains heuristic and the legacy verdict type has no dedicated Undetermined value. |
+| **Mitigation** | (a) Preserve explicit Denied and Absent violation checks; (b) represent missing/unspecified consent as `ConsentState::Unknown`, never as implied consent; (c) fail closed on an Unresolved requirement-policy result; for consent-required actions, fail closed for Unknown/Implied and require exact subject/action/purpose, validity, revocation, identity and authority checks; (d) integrate `evaluate_consent_gate` only behind independently verified evidence and retain human review for consent-adjacent cases; (e) do not call the policy helper a standalone authorization/security boundary |
+| **Evidence** | `src/cognitive_loop/ethics_engine.rs`, `src/hdc/moral_algebra/{primitives.rs,operators.rs,consent_policy.rs}`, `src/hdc/moral_parser.rs`, `tests/adversarial_moral_algebra.rs`, `examples/consent_semantics_bench.rs`, `ConsentTextAssessment` propagation through `ParsedMoralScenario` / `EthicsEngineOutput`, `CognitiveLoopService::assess_consent_evidence`, and `docs/research/CONSENT_POLICY_AND_MORAL_EVALUATION_PROTOCOL_2026-10.md`; exact-head compile/test evidence still pending |
 
 ---
 

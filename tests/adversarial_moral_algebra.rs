@@ -91,6 +91,36 @@ fn consent_given_allows_action() {
 }
 
 #[test]
+fn consent_unknown_does_not_become_positive_judgment() {
+    let ma = algebra();
+    let action = ma.encode_consent_action("share medical records", "patient", ConsentState::Unknown);
+    let judgment = ma.judge_consent_action(&action, ConsentState::Unknown);
+
+    assert_eq!(
+        judgment.verdict,
+        MoralVerdict::Neutral,
+        "Unknown consent evidence must not be upgraded to Good from action similarity"
+    );
+    assert!(
+        (judgment.consent_violation_similarity - 0.3).abs() < f32::EPSILON,
+        "Unknown consent should remain on the documented underdetermined boundary"
+    );
+    assert!(!ConsentState::Unknown.is_explicitly_given());
+    assert!(ConsentState::Unknown.requires_clarification());
+
+    let implied = ma.judge_consent_action(&action, ConsentState::Implied);
+    assert_eq!(
+        implied.verdict,
+        MoralVerdict::Neutral,
+        "An explicit assumption must not be upgraded to a positive consent-sensitive verdict"
+    );
+    assert!(
+        implied.consent_violation_similarity < judgment.consent_violation_similarity,
+        "An assumption is less severe than unknown evidence in this score contract"
+    );
+}
+
+#[test]
 fn consent_implied_is_weaker_than_given() {
     let ma = algebra();
     let proto = ma.consent_violation_prototype();
@@ -532,12 +562,13 @@ fn consistency_harm_always_worse_than_help() {
 fn consistency_consent_violation_sim_monotonic() {
     let ma = algebra();
 
-    // Using judge_consent_action, the consent violation similarity must be
-    // monotonically ordered: Denied > Absent > Implied > Given
+    // This severity proxy is ordered: Denied > Absent > Unknown > Implied > Given.
+    // Unknown is not itself a violation verdict; its score marks the underdetermined boundary.
     let action = ma.encode_consent_action("act", "person", ConsentState::Given);
 
     let denied = ma.judge_consent_action(&action, ConsentState::Denied);
     let absent = ma.judge_consent_action(&action, ConsentState::Absent);
+    let unknown = ma.judge_consent_action(&action, ConsentState::Unknown);
     let implied = ma.judge_consent_action(&action, ConsentState::Implied);
     let given = ma.judge_consent_action(&action, ConsentState::Given);
 
@@ -553,6 +584,12 @@ fn consistency_consent_violation_sim_monotonic() {
         "Absent must have higher violation signal than Implied \
          (absent={:.3}, implied={:.3})",
         absent.consent_violation_similarity,
+        implied.consent_violation_similarity,
+    );
+    assert!(
+        unknown.consent_violation_similarity > implied.consent_violation_similarity,
+        "Unknown must be more cautious than explicit assumption (unknown={:.3}, implied={:.3})",
+        unknown.consent_violation_similarity,
         implied.consent_violation_similarity,
     );
     assert!(

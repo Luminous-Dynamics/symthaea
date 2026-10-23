@@ -30,7 +30,8 @@ fn main() {
 
     let consent_scenarios = [
         "I discussed my daughter's health without asking first",
-        "After asking my daughter, I discussed her health with the doctor",
+        "After my daughter agreed, I discussed her health with the doctor",
+        "I asked my daughter before discussing her health",
         "I shared my friend's secret without permission",
         "I told everyone about the surprise party after getting approval",
     ];
@@ -52,10 +53,18 @@ fn main() {
         // Use the fixed is_consent_violation() method which directly checks
         // consent state rather than relying on HDC similarity
         let is_violation = encoded.is_consent_violation();
-        let verdict = if is_violation {
-            "⚠️  Potential Consent Violation"
-        } else {
-            "✓ Consent Respected"
+        let verdict = match parsed.consent {
+            symthaea::hdc::moral_algebra::ConsentState::Denied
+            | symthaea::hdc::moral_algebra::ConsentState::Absent => {
+                "⚠️  Potential Consent Violation"
+            }
+            symthaea::hdc::moral_algebra::ConsentState::Given => {
+                "✓ Explicit consent stated (scope/authority still need validation)"
+            }
+            symthaea::hdc::moral_algebra::ConsentState::Implied
+            | symthaea::hdc::moral_algebra::ConsentState::Unknown => {
+                "? Consent not established; clarify before consent-dependent action"
+            }
         };
 
         // Also show HDC similarity for comparison
@@ -301,7 +310,7 @@ fn main() {
     println!("║    • ACTION (what happens)                                   ║");
     println!("║    • PATIENT (who is affected)                               ║");
     println!("║    • INTENT (good/bad/neutral)                               ║");
-    println!("║    • CONSENT (given/absent/implied)                          ║");
+    println!("║    • CONSENT (given/denied/absent/implied/unknown)           ║");
     println!("║    • MAGNITUDE (tiny to huge)                                ║");
     println!("║    • NEGATION (inverts moral meaning)                        ║");
     println!("╟──────────────────────────────────────────────────────────────╢");

@@ -141,7 +141,7 @@ proptest! {
 
     // =========================================================================
     // Property 5: All consent states are mutually distinguishable
-    // Pairwise similarity of all 4 consent states should be < 0.3
+    // Pairwise similarity of all 5 consent states should be < 0.3
     // =========================================================================
     #[test]
     fn prop_all_consent_states_distinguishable(_dummy in 0u8..1u8) {
@@ -151,6 +151,7 @@ proptest! {
             ConsentState::Denied,
             ConsentState::Absent,
             ConsentState::Implied,
+            ConsentState::Unknown,
         ];
         let encoded: Vec<_> = states.iter().map(|s| algebra.encode_consent(*s)).collect();
 
