@@ -51,8 +51,8 @@ jobs:
       - name: Validate score schema and paired results
         run: |
           awk -F '\t' '
-            $1 == "RESULT_HEADER" { if (NF != 28) exit 2; header = 1 }
-            $1 == "RESULT" { if (NF != 28) exit 3; rows += 1 }
+            $1 == "RESULT_HEADER" { if (NF != 29) exit 2; header = 1 }
+            $1 == "RESULT" { if (NF != 29) exit 3; rows += 1 }
             $1 == "ORACLE_HEADER" { if (NF != 9) exit 5; oracle_header = 1 }
             $1 == "ORACLE" { if (NF != 9) exit 6; oracle_rows += 1 }
             END {
