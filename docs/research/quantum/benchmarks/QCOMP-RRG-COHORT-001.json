@@ -12245,5 +12245,53 @@
       "https://arxiv.org/abs/2601.21923",
       "https://journals.aps.org/prresearch/accepted/10.1103/ds1n-wsdm"
     ]
+  },
+  "external_algorithm_sources": {
+    "marino_kirkpatrick_prioritized_search": {
+      "paper": {
+        "title": "Large independent sets on random d-regular graphs with fixed degree d",
+        "authors": [
+          "Raffaele Marino",
+          "Scott Kirkpatrick"
+        ],
+        "arxiv": "https://arxiv.org/abs/2003.12293",
+        "published_version": "https://doi.org/10.3390/computation11100206",
+        "key_sections": [
+          "Section 2: deferred-decision generation of random simple d-regular graphs",
+          "Section 3: deferred-decision prioritized algorithm for d=3"
+        ]
+      },
+      "reference_repository": {
+        "url": "https://github.com/RaffaeleMarino/Large-Independent-Set-on-random-d-regular-graphs-with-small-and-fixed-connectivity-d",
+        "commit": "ae59badc1c07fc27d12088593546e8b98e909c8a",
+        "commit_date": "2020-03-27T22:12:01Z",
+        "tree": "ba9a3371fecc925e93864dc560c4f2b81416a84a",
+        "files": [
+          {
+            "path": "main.cpp",
+            "git_blob_sha1": "60a076e70d47825a1c27ae0ed716e1edd17eeb6c",
+            "size_bytes": 43803
+          },
+          {
+            "path": "Random.hpp",
+            "git_blob_sha1": "a22ba638a7cc6db23f5833fdbb4eb7acd2529f50",
+            "size_bytes": 4556
+          },
+          {
+            "path": "Header.h",
+            "git_blob_sha1": "9d76291d16fdc8201a7011da376fa97fb87ba262",
+            "size_bytes": 863
+          },
+          {
+            "path": "README.md",
+            "git_blob_sha1": "0cdeb91be523896d1c2364870fd53994570222c5",
+            "size_bytes": 243
+          }
+        ],
+        "license_note": "The inspected source has copyright notices and no explicit open-source license was found in the pinned repository tree. Treat it as all-rights-reserved; do not copy or redistribute source into Symthaea without permission. Use it as a referenced executable baseline only if usage/permission is cleared. Prefer an independently written implementation from the published algorithm if a code port is required."
+      },
+      "compatibility": "Original algorithm constructs graph and independent set jointly through deferred edge revelation. It is not automatically a fixed-input MIS solver for arbitrary pre-materialized graph files.",
+      "source_identity_scope": "Git commit and Git object IDs pin the source snapshot; they are not SHA-256 raw file digests."
+    }
   }
 }
