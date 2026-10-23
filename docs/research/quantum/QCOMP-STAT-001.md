@@ -22,6 +22,14 @@ The test is exact only when the null makes paired signs exchangeable, such as a 
 
 Values are rescaled before summation, reducing overflow risk for finite input values. Non-finite values, empty samples, invalid confidence, invalid exact limits and zero Monte Carlo draws fail explicitly.
 
+### 4. Holm-Bonferroni family-wise error control
+
+The new `holm_bonferroni_adjust` helper converts a preregistered family of valid p-values into family-wise-error-adjusted p-values, preserving the original input order. It validates that every p-value is finite and in [0, 1], handles ties deterministically by original index, and returns an empty vector for an empty family.
+
+This is the step-down Holm procedure: sort p-values ascending, multiply rank (i) by the number of hypotheses remaining, cap at one, then take a cumulative maximum over the sorted sequence before mapping results back to original order. It controls family-wise error under arbitrary dependence when the individual p-values are valid.
+
+The correction does **not** fix post-hoc selection of which comparisons to include, invalidate-to-valid transformations, violated sign-flip exchangeability, repeated-seed pseudoreplication, or dependence among graph families. Freeze the family of hypotheses before confirmatory analysis and report raw and adjusted p-values side by side. Adjusted p-values do not replace effect sizes, uncertainty intervals, or practical cost-to-target metrics.
+
 ### 3. Hierarchical graph-cluster bootstrap
 
 The new `hierarchical_cluster_bootstrap_mean` function accepts paired differences grouped by independent graph instance. It samples graph clusters with replacement in the outer stage, then resamples each selected graph's repeated paired trials within that graph, preserving its repetition count. Each graph is weighted equally in the reported mean, so a graph with many repeated seeds does not become many independent graphs.
@@ -38,12 +46,12 @@ The bootstrap is intended for graph-level paired *effects* (for example, one del
 - Preserve the paired deltas and their graph/cohort identities so inference can be replayed from raw records.
 - Freeze direction, statistic, cohort, exclusions and analysis plan before confirmatory evaluation.
 - Report the effect size and paired raw outcomes alongside p-values. A p-value alone is not a practical-value measurement.
-- Add a documented multiplicity procedure for preregistered families of policy comparisons before using these helpers for a confirmatory leaderboard.
-- Hierarchical graph-cluster bootstrap is implemented as an approximate percentile interval. Multiple-comparison correction and Pareto-frontier stability remain follow-up work.
+- Holm-Bonferroni adjustment is implemented for preregistered families of valid p-values. The comparison family still needs to be frozen before confirmatory evaluation, and raw plus adjusted p-values should both be reported.
+- Hierarchical graph-cluster bootstrap is implemented as an approximate percentile interval, and Holm-Bonferroni adjusts preregistered p-value families. Pareto-frontier stability remains follow-up work.
 - Keep synthetic, classical solver, ideal simulator, tensor-network simulator, circuit-export-only and physical-QPU evidence separate. These helpers do not attest evidence provenance or verify MIS feasibility.
 
 ## Tests authored
 
-The module includes hand-computed fixtures for an exact three-pair sign-flip p-value and a 95% median interval with six observations; a small-sample median-coverage sweep against integer-binomial reference values; non-finite/invalid-input checks; large finite magnitudes; deterministic Monte Carlo replay; and graph-cluster bootstrap fixtures for equal cluster weighting, deterministic replay, and malformed clusters.
+The module includes hand-computed fixtures for an exact three-pair sign-flip p-value and a 95% median interval with six observations; a small-sample median-coverage sweep against integer-binomial reference values; non-finite/invalid-input checks; large finite magnitudes; deterministic Monte Carlo replay; and graph-cluster bootstrap fixtures for equal cluster weighting, deterministic replay, and malformed clusters; and hand-computed Holm-adjustment fixtures, including ties, preserved input order, monotonicity, and invalid p-values.
 
 **Validation boundary:** these Rust tests are authored but have not been compiled or executed in this authoring environment. The code has not been used to analyze a QOBLIB or physical-QPU cohort. No performance, quantum advantage, SOTA, or statistical calibration claim is made. CI is not treated as passed until a result is actually published.
