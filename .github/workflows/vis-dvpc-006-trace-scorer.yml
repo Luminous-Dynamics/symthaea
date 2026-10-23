@@ -62,6 +62,8 @@ jobs:
           ' /tmp/vis-dvpc-006-a.tsv
           grep -F $'RESULT\tmatched\tall_cheap\t3\t2\t0.333333\t0.375000' /tmp/vis-dvpc-006-a.tsv
           grep -F $'RESULT\tmatched\tvalue_router\t3\t2\t0.383333\t0.412500' /tmp/vis-dvpc-006-a.tsv
+          awk -F '\\t' '$1 == "ORACLE" && $2 == "matched" && $3 == "EXACT_TWO_RESOURCE" && $4 == "0.437500" && $5 == "2" && $6 == "20000" && $7 == "800" && $8 == "25000" && $9 == "2500" { found = 1 } END { exit !found }' /tmp/vis-dvpc-006-a.tsv
+          grep -F 'oracle_allocator_overhead' /tmp/vis-dvpc-006-a.tsv
           grep -F 
 ORACLE\tmatched\tEXACT_TWO_RESOURCE\t0.437500\t2\t20000\t800\t25000\t2500' /tmp/vis-dvpc-006-a.tsv
           grep -F 
