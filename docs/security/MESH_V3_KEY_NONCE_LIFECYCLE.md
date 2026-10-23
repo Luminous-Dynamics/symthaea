@@ -63,6 +63,22 @@ A different function name, packet type, route, or nonce field layout is not proo
 
 A session identifier helps bind contexts and route messages; it is not a nonce uniqueness mechanism unless it actually separates effective keys or forms part of a correctly analyzed nonce namespace.
 
+### 3.2.1 Defense-in-depth candidate: nonce-misuse-resistant AEAD
+
+The v3 comparison should include a reviewed **nonce-misuse-resistant AEAD** as a separate experimental profile, not only variants of the current ChaCha20-Poly1305 discipline. RFC 8452 specifies AES-GCM-SIV and explicitly targets the catastrophic consequences of accidental nonce reuse; it still leaks equality when the same nonce encrypts identical plaintext, so reuse must remain a failed correctness/security gate rather than an accepted operating mode. RFC 8452 recommends random nonces even for this construction and is an IRTF Informational RFC, not an Internet Standards Track specification ([RFC 8452](https://www.rfc-editor.org/rfc/rfc8452.html)).
+
+The RustCrypto `aes-gcm-siv` crate documents RFC 8452 support and a no-alloc in-place path, but its current crate-level security warning says the crate itself has not been audited; some dependencies were audited in the context of `aes-gcm`, which is not equivalent to an audit of the complete crate/construction/integration ([crate documentation](https://docs.rs/aes-gcm-siv/latest/aes_gcm_siv/)). This candidate therefore requires threat-model review, dependency audit, target-side constant-time suitability review, and independent cryptographic assessment before use.
+
+Benchmark at least these arms under the same fault corpus:
+
+1. **Baseline:** current ChaCha20-Poly1305 with strict per-effective-key nonce uniqueness and fail-closed rollback recovery.
+2. **Misuse-resistant candidate:** AES-256-GCM-SIV (or an approved equivalent), with independently generated nonces and the same key-domain separation, replay, and recovery controls.
+3. **Broken-control arm:** intentionally reuse a nonce under each candidate to verify that the oracle detects the repeated pair and that the measured confidentiality impact matches each primitive's documented guarantees. This is a negative control only; never enable deliberate reuse in deployment.
+
+Measure p50/p95/p99 encryption/decryption latency, energy per packet, peak memory and code size on each supported CPU class, cold-start cost, ciphertext bytes including nonce/tag/framing, adapter MTU fit, and fault-injection behavior on restart/snapshot/rollback. RFC 8452 reports slower encryption due to its two-pass construction and near-AES-GCM decryption performance for multikilobyte messages; those figures are not a substitute for measurements on the small frames and target CPUs used by this mesh.
+
+Do **not** assume misuse resistance is a free fix. It reduces catastrophic consequences of some nonce mistakes; it does not remove identity/authentication bugs, replay risk, key compromise, equality leakage, or the need for an explicit protocol version and tested key lifecycle. The existing hard target remains zero duplicate `(effective key, nonce)` pairs for supported strict profiles.
+
 ### 3.3 Clone, snapshot and rollback
 
 Treat these as different threat models, not one generic "restart" test:
