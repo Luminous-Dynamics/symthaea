@@ -1,0 +1,87 @@
+name: Continuous HV Bundle Contract V1
+
+on:
+  pull_request:
+    paths:
+      - "docs/release/evidence/continuous-hv-bundle-contract-v1.patch"
+      - ".github/workflows/continuous-hv-bundle-contract-v1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/release/evidence/continuous-hv-bundle-contract-v1.patch"
+      - ".github/workflows/continuous-hv-bundle-contract-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qualification toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+
+      - name: Freeze patch ownership and fail-closed contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          PATCH=docs/release/evidence/continuous-hv-bundle-contract-v1.patch
+
+          grep -Fq 'crates/core/symthaea-core/src/hdc/unified_hv.rs' "$PATCH"
+          grep -Fq 'crates/core/symthaea-core/src/hdc/simd_continuous.rs' "$PATCH"
+          grep -Fq 'crates/core/symthaea-core/tests/continuous_hv_bundle_contract.rs' "$PATCH"
+
+          grep -Fq 'Dimension mismatch in bundle()' "$PATCH"
+          grep -Fq 'Dimension mismatch in bundle_owned()' "$PATCH"
+          grep -Fq 'Dimension mismatch in weighted_bundle()' "$PATCH"
+          grep -Fq 'Number of HVs must match number of weights' "$PATCH"
+          grep -Fq 'weights must be finite' "$PATCH"
+          grep -Fq 'weight sum must be finite' "$PATCH"
+          grep -Fq 'weight sum magnitude must exceed 1e-10' "$PATCH"
+          grep -Fq 'weighted_bundle_retains_finite_negative_weight_support' "$PATCH"
+          grep -Fq 'direct_simd_bundle_rejects_undefined_normalization' "$PATCH"
+
+          # The candidate must remove both permissive fallbacks rather than
+          # merely adding tests around them.
+          grep -Fq -- '-            // SIMD path requires uniform dimensions; fall through to scalar if mismatched' "$PATCH"
+          grep -Fq -- '-        // Scalar fallback (also used when dimensions are non-uniform)' "$PATCH"
+          grep -Fq -- '-        let inv_weight_sum = if weight_sum.abs() > 1e-10 {' "$PATCH"
+
+      - name: Apply exact candidate patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          PATCH=docs/release/evidence/continuous-hv-bundle-contract-v1.patch
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+
+          test -f crates/core/symthaea-core/tests/continuous_hv_bundle_contract.rs
+          git diff --check
+          echo '=== APPLIED PRODUCT DIFF ==='
+          git diff -- \
+            crates/core/symthaea-core/src/hdc/unified_hv.rs \
+            crates/core/symthaea-core/src/hdc/simd_continuous.rs \
+            crates/core/symthaea-core/tests/continuous_hv_bundle_contract.rs
+
+      - name: Rustfmt candidate
+        run: cargo fmt --check -p symthaea-core
+
+      - name: Scalar contract
+        run: cargo test --locked -p symthaea-core --no-default-features --features parallel --test continuous_hv_bundle_contract
+
+      - name: Default SIMD contract
+        run: cargo test --locked -p symthaea-core --test continuous_hv_bundle_contract
+
+      - name: Existing focused HDC tests
+        run: cargo test --locked -p symthaea-core --lib hdc::unified_hv::tests
+
+      - name: Strict Clippy scalar candidate
+        run: cargo clippy --locked -p symthaea-core --no-default-features --features parallel --test continuous_hv_bundle_contract -- -D warnings
+
+      - name: Strict Clippy default candidate
+        run: cargo clippy --locked -p symthaea-core --test continuous_hv_bundle_contract -- -D warnings
