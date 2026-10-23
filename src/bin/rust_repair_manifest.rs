@@ -47,6 +47,9 @@ struct TaskManifestRecord {
     validation_status_sha256: String,
     baseline_validation_log_sha256: String,
     gold_validation_log_sha256: String,
+    runtime_evidence_sha256: String,
+    container_image_id: String,
+    container_ids: Vec<String>,
     fail_to_pass_count: usize,
     pass_to_pass_count: usize,
 }
@@ -82,7 +85,8 @@ struct AgentPromptRecord {
 struct ControllerTaskRecord {
     run_index: usize,
     instance_id: String,
-    docker_image: String,
+    docker_image_reference: String,
+    container_image_id: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -116,6 +120,8 @@ struct TaskAudit {
     validation_status_sha256: Option<String>,
     baseline_validation_log_sha256: Option<String>,
     gold_validation_log_sha256: Option<String>,
+    runtime_evidence_sha256: Option<String>,
+    container_image_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -367,7 +373,10 @@ fn transition_sets(
     let explicit_fail_to_pass = baseline
         .iter()
         .filter(|(test_id, status)| {
-            status.as_str() == "fail" && gold.get(*test_id).is_some_and(|post| post.as_str() == "pass")
+            status.as_str() == "fail"
+                && gold
+                    .get(*test_id)
+                    .is_some_and(|post| post.as_str() == "pass")
         })
         .map(|(test_id, _)| test_id.clone())
         .collect::<BTreeSet<_>>();
@@ -424,6 +433,275 @@ fn run_marker_counts(log: &str) -> Vec<usize> {
         .iter()
         .map(|marker| log.match_indices(marker).count())
         .collect()
+}
+
+
+#[derive(Debug)]
+struct RuntimeEvidenceSummary {
+    container_image_id: String,
+    container_ids: Vec<String>,
+}
+
+fn command_exit_code(run: &Value, key: &str) -> Result<i64, String> {
+    run.get(key)
+        .and_then(Value::as_i64)
+        .ok_or_else(|| format!("{key} missing or not an integer"))
+}
+
+fn validate_container_identity(
+    run: &Value,
+    expected_image_reference: &str,
+) -> Result<(String, String), String> {
+    let identity = run
+        .get("container_identity")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "container_identity missing or not an object".to_string())?;
+    let container_id = identity
+        .get("container_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "container_identity.container_id missing".to_string())?
+        .to_ascii_lowercase();
+    if !is_hex(&container_id, 64) {
+        return Err(
+            "container_identity.container_id must be a 64-character Docker ID".to_string(),
+        );
+    }
+
+    let configured_image = identity
+        .get("configured_image")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "container_identity.configured_image missing".to_string())?;
+    if configured_image != expected_image_reference {
+        return Err(format!(
+            "configured image reference differs: expected {expected_image_reference:?}, got {configured_image:?}"
+        ));
+    }
+
+    let image_id = identity
+        .get("container_image_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "container_identity.container_image_id missing".to_string())?
+        .to_ascii_lowercase();
+    if !image_id.starts_with("sha256:") || !is_hex(&image_id[7..], 64) {
+        return Err(
+            "container_image_id must be an immutable sha256:<64-hex> Docker image ID".to_string(),
+        );
+    }
+    Ok((container_id, image_id))
+}
+
+fn verify_logged_run(
+    run: &Value,
+    expected_image_reference: &str,
+    expected_role: &str,
+    expected_index: Option<usize>,
+    expected_test_ids: &BTreeSet<String>,
+    expected_log_path: &Path,
+    gold: bool,
+) -> Result<(BTreeMap<String, String>, String, String), String> {
+    if run.get("role").and_then(Value::as_str) != Some(expected_role) {
+        return Err(format!("expected run role {expected_role:?}"));
+    }
+    if let Some(index) = expected_index {
+        if run.get("run_index").and_then(Value::as_u64) != Some(index as u64) {
+            return Err(format!("run_index must be {index}"));
+        }
+    }
+    if run.get("test_patch_applied").and_then(Value::as_bool) != Some(true) {
+        return Err("test patch application did not return true".to_string());
+    }
+    if gold && run.get("solution_patch_applied").and_then(Value::as_bool) != Some(true) {
+        return Err("gold solution patch application did not return true".to_string());
+    }
+    if command_exit_code(run, "rebuild_exit_code")? != 0 {
+        return Err("rebuild command did not exit zero".to_string());
+    }
+
+    let test_exit = command_exit_code(run, "test_exit_code")?;
+    if test_exit == 124 || test_exit < 0 {
+        return Err(format!("test command is unresolved (exit code {test_exit})"));
+    }
+    if command_exit_code(run, "print_exit_code")? != 0 {
+        return Err("print/log command did not exit zero".to_string());
+    }
+
+    let (container_id, image_id) =
+        validate_container_identity(run, expected_image_reference)?;
+    let parsed = parse_status_map(run, "parsed_status")?;
+    let observed_ids = parsed.keys().cloned().collect::<BTreeSet<_>>();
+    if &observed_ids != expected_test_ids {
+        return Err(
+            "per-run parsed test-ID set differs from the baseline test-ID set".to_string(),
+        );
+    }
+    if gold && test_exit != 0 && parsed.values().all(|state| state == "pass") {
+        return Err(format!(
+            "gold test command exited {test_exit}, but parser reports every test passing"
+        ));
+    }
+
+    let log_sha = run
+        .get("log_sha256")
+        .and_then(Value::as_str)
+        .filter(|value| is_hex(value, 64))
+        .ok_or_else(|| "log_sha256 missing or malformed".to_string())?
+        .to_ascii_lowercase();
+    let actual_log_sha = sha256_file(expected_log_path)?;
+    if log_sha != actual_log_sha {
+        return Err(format!(
+            "raw run log SHA-256 mismatch for {}",
+            expected_log_path.display()
+        ));
+    }
+    Ok((parsed, container_id, image_id))
+}
+
+fn validate_runtime_evidence(
+    bytes: &[u8],
+    row: &Value,
+    instance_id: &str,
+    validation_dir: &Path,
+    status: &Value,
+) -> Result<RuntimeEvidenceSummary, Vec<String>> {
+    let evidence: Value = serde_json::from_slice(bytes)
+        .map_err(|error| vec![format!("validation_evidence.json is malformed: {error}")])?;
+    let mut errors = Vec::new();
+    if evidence.get("schema_version").and_then(Value::as_u64) != Some(1) {
+        errors.push("validation evidence schema_version must be 1".to_string());
+    }
+    if evidence.get("instance_id").and_then(Value::as_str) != Some(instance_id) {
+        errors.push("validation evidence instance_id does not match candidate".to_string());
+    }
+
+    let expected_image_reference = match required_string(row, "docker_image") {
+        Ok(value) => value,
+        Err(error) => return Err(vec![error]),
+    };
+    if evidence.get("image_reference").and_then(Value::as_str)
+        != Some(expected_image_reference)
+    {
+        errors.push(
+            "validation evidence image_reference differs from candidate metadata".to_string(),
+        );
+    }
+
+    let baseline_expected = parse_status_map(status, "pre_patch_status")
+        .map_err(|error| vec![format!("status.json {error}")])?;
+    let gold_expected = parse_status_map(status, "post_patch_status")
+        .map_err(|error| vec![format!("status.json {error}")])?;
+    let expected_test_ids = baseline_expected.keys().cloned().collect::<BTreeSet<_>>();
+    let baseline = match evidence.get("baseline") {
+        Some(value) => value,
+        None => return Err(vec!["validation evidence has no baseline record".to_string()]),
+    };
+    let baseline_log_path = validation_dir
+        .join(instance_id)
+        .join("pre_patch_log.txt");
+    let mut run_ids = Vec::new();
+    let mut image_ids = Vec::new();
+
+    match verify_logged_run(
+        baseline,
+        expected_image_reference,
+        "baseline",
+        None,
+        &expected_test_ids,
+        &baseline_log_path,
+        false,
+    ) {
+        Ok((baseline_status, container_id, image_id)) => {
+            if baseline_status != baseline_expected {
+                errors.push(
+                    "baseline parsed statuses differ from status.json pre_patch_status".to_string(),
+                );
+            }
+            run_ids.push(container_id);
+            image_ids.push(image_id);
+        }
+        Err(error) => errors.push(format!("baseline evidence: {error}")),
+    }
+
+    let gold_runs = match evidence.get("gold_runs").and_then(Value::as_array) {
+        Some(runs) if runs.len() == 3 => runs,
+        Some(runs) => {
+            return Err(vec![format!(
+                "validation evidence has {} gold runs; exactly 3 required",
+                runs.len()
+            )]);
+        }
+        None => {
+            return Err(vec![
+                "validation evidence gold_runs missing or not an array".to_string(),
+            ]);
+        }
+    };
+    let mut parsed_gold_runs = Vec::with_capacity(3);
+    for index in 0..3 {
+        let log_path = validation_dir
+            .join(instance_id)
+            .join(format!("gold_run_{index}.log"));
+        match verify_logged_run(
+            &gold_runs[index],
+            expected_image_reference,
+            "gold",
+            Some(index),
+            &expected_test_ids,
+            &log_path,
+            true,
+        ) {
+            Ok((statuses, container_id, image_id)) => {
+                parsed_gold_runs.push(statuses);
+                run_ids.push(container_id);
+                image_ids.push(image_id);
+            }
+            Err(error) => errors.push(format!("gold run {index} evidence: {error}")),
+        }
+    }
+
+    if run_ids.len() == 4 && run_ids.iter().collect::<HashSet<_>>().len() != 4 {
+        errors.push("container IDs are not unique across baseline and gold runs".to_string());
+    }
+    if image_ids.len() == 4 && image_ids.iter().collect::<HashSet<_>>().len() != 1 {
+        errors.push("container image ID differs across baseline and gold runs".to_string());
+    }
+    if parsed_gold_runs.len() == 3 {
+        let mut all_ids = BTreeSet::new();
+        for run in &parsed_gold_runs {
+            all_ids.extend(run.keys().cloned());
+        }
+
+        let mut aggregate = BTreeMap::new();
+        for test_id in all_ids {
+            let states = parsed_gold_runs
+                .iter()
+                .map(|run| run.get(&test_id).map(String::as_str).unwrap_or("skip"))
+                .collect::<Vec<_>>();
+            let state = if states.contains(&"fail") {
+                "fail"
+            } else if states.contains(&"skip") {
+                "skip"
+            } else {
+                "pass"
+            };
+            aggregate.insert(test_id, state.to_string());
+        }
+        if aggregate != gold_expected {
+            errors.push(
+                "per-run parsed statuses do not reproduce status.json post_patch_status"
+                    .to_string(),
+            );
+        }
+    } else {
+        errors.push("one or more gold-run parsed statuses could not be validated".to_string());
+    }
+
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+    Ok(RuntimeEvidenceSummary {
+        container_image_id: image_ids[0].clone(),
+        container_ids: run_ids,
+    })
 }
 
 fn hash_field(row: &Value, field: &str) -> Result<String, String> {
@@ -488,6 +766,15 @@ fn audit_candidate(
     let status_path = task_dir.join("status.json");
     let baseline_log_path = task_dir.join("pre_patch_log.txt");
     let log_path = task_dir.join("post_patch_log.txt");
+    let runtime_evidence_path = task_dir.join("validation_evidence.json");
+    let runtime_evidence_bytes = match fs::read(&runtime_evidence_path) {
+        Ok(bytes) => Some(bytes),
+        Err(error) => {
+            unresolved = true;
+            reasons.push(format!("cannot read runtime evidence: {error}"));
+            None
+        }
+    };
     let status_bytes = match fs::read(&status_path) {
         Ok(bytes) => Some(bytes),
         Err(error) => {
@@ -524,6 +811,7 @@ fn audit_candidate(
     };
 
     let status_json_sha256 = status_bytes.as_ref().map(|bytes| sha256_bytes(bytes));
+    let runtime_evidence_sha256 = runtime_evidence_bytes.as_ref().map(|bytes| sha256_bytes(bytes));
     let baseline_log_sha256 = baseline_log_bytes.as_ref().map(|bytes| sha256_bytes(bytes));
     let log_sha256 = log_bytes.as_ref().map(|bytes| sha256_bytes(bytes));
     let mut baseline_count = 0;
@@ -532,6 +820,7 @@ fn audit_candidate(
     let mut explicit_fail_to_pass_count = 0;
     let mut gold_nonpassing_count = 0;
     let mut marker_counts = vec![0; GOLD_RUN_MARKERS.len()];
+    let mut runtime_summary: Option<RuntimeEvidenceSummary> = None;
 
     if let Some(bytes) = status_bytes.as_ref() {
         match serde_json::from_slice::<Value>(bytes) {
@@ -573,6 +862,25 @@ fn audit_candidate(
                     }
                 };
 
+                if let Some(evidence_bytes) = runtime_evidence_bytes.as_ref() {
+                    match validate_runtime_evidence(
+                        evidence_bytes,
+                        row,
+                        instance_id,
+                        validation_dir,
+                        &status,
+                    ) {
+                        Ok(summary) => runtime_summary = Some(summary),
+                        Err(evidence_errors) => {
+                            unresolved = true;
+                            reasons.extend(
+                                evidence_errors
+                                    .into_iter()
+                                    .map(|error| format!("runtime evidence audit: {error}")),
+                            );
+                        }
+                    }
+                }
                 if let (Some(baseline), Some(gold)) = (baseline.as_ref(), gold.as_ref()) {
                     baseline_count = baseline.len();
                     gold_count = gold.len();
@@ -641,6 +949,10 @@ fn audit_candidate(
         validation_status_sha256: status_json_sha256.clone(),
         baseline_validation_log_sha256: baseline_log_sha256.clone(),
         gold_validation_log_sha256: log_sha256.clone(),
+        runtime_evidence_sha256: runtime_evidence_sha256.clone(),
+        container_image_id: runtime_summary
+            .as_ref()
+            .map(|summary| summary.container_image_id.clone()),
     };
 
     let manifest_record = if eligible {
@@ -653,8 +965,21 @@ fn audit_candidate(
             gold_patch_sha256: gold_patch_sha256.expect("eligible task has gold patch"),
             test_patch_sha256: test_patch_sha256.expect("eligible task has test patch"),
             validation_status_sha256: status_json_sha256.expect("eligible task has status file"),
-            baseline_validation_log_sha256: baseline_log_sha256.expect("eligible task has baseline log"),
+            baseline_validation_log_sha256: baseline_log_sha256
+                .expect("eligible task has baseline log"),
             gold_validation_log_sha256: log_sha256.expect("eligible task has gold validation log"),
+            runtime_evidence_sha256: runtime_evidence_sha256
+                .expect("eligible task has runtime evidence"),
+            container_image_id: runtime_summary
+                .as_ref()
+                .expect("eligible task has runtime summary")
+                .container_image_id
+                .clone(),
+            container_ids: runtime_summary
+                .as_ref()
+                .expect("eligible task has runtime summary")
+                .container_ids
+                .clone(),
             fail_to_pass_count: explicit_fail_to_pass_count,
             pass_to_pass_count: baseline_pass_count,
         })
@@ -760,6 +1085,9 @@ fn run(cli: Cli) -> Result<(), String> {
                 validation_status_sha256: record.validation_status_sha256.clone(),
                 baseline_validation_log_sha256: record.baseline_validation_log_sha256.clone(),
                 gold_validation_log_sha256: record.gold_validation_log_sha256.clone(),
+                runtime_evidence_sha256: record.runtime_evidence_sha256.clone(),
+                container_image_id: record.container_image_id.clone(),
+                container_ids: record.container_ids.clone(),
                 fail_to_pass_count: record.fail_to_pass_count,
                 pass_to_pass_count: record.pass_to_pass_count,
             });
@@ -780,13 +1108,20 @@ fn run(cli: Cli) -> Result<(), String> {
     let unresolved_count = outcomes.iter().filter(|task| task.unresolved).count();
     let lockable = unresolved_count == 0 && !manifest_tasks.is_empty();
 
-    let (agent_prompt_bytes, controller_manifest_bytes, agent_prompt_projection_sha256, controller_manifest_sha256) =
+    let (
+        agent_prompt_bytes,
+        controller_manifest_bytes,
+        agent_prompt_projection_sha256,
+        controller_manifest_sha256,
+    ) =
         if lockable {
             let mut prompt_bytes = Vec::new();
             for task in &manifest_tasks {
                 let problem_statement = agent_prompts_by_id
                     .get(&task.instance_id)
-                    .ok_or_else(|| format!("missing agent prompt for eligible task {}", task.instance_id))?;
+                    .ok_or_else(|| {
+                        format!("missing agent prompt for eligible task {}", task.instance_id)
+                    })?;
                 let row = serde_json::to_vec(&AgentPromptRecord {
                     problem_statement: problem_statement.clone(),
                 })
@@ -811,10 +1146,11 @@ fn run(cli: Cli) -> Result<(), String> {
                     .map(|(run_index, task)| ControllerTaskRecord {
                         run_index,
                         instance_id: task.instance_id.clone(),
-                        docker_image: task.docker_image.clone(),
+                        docker_image_reference: task.docker_image.clone(),
+                        container_image_id: task.container_image_id.clone(),
                     })
                     .collect(),
-                visibility_warning: "EVALUATOR-ONLY: never expose this controller manifest to the coding agent. Agent-visible JSONL contains only problem_statement. The runner may use docker_image to launch the prebuilt sandbox.".to_string(),
+                visibility_warning: "EVALUATOR-ONLY: never expose this controller manifest to the coding agent. Agent-visible JSONL contains only problem_statement. Retain the configured image reference and use container_image_id as the observed immutable runtime identity when reproducing the task environment.".to_string(),
             };
             let mut controller_bytes = serde_json::to_vec_pretty(&controller)
                 .map_err(|error| format!("cannot serialize controller manifest: {error}"))?;
@@ -1010,22 +1346,96 @@ mod tests {
     ) -> Value {
         let task_dir = root.join(instance_id);
         fs::create_dir_all(&task_dir).unwrap();
+        let baseline_status = baseline
+            .iter()
+            .map(|(id, state)| ((*id).to_string(), (*state).to_string()))
+            .collect::<BTreeMap<_, _>>();
+        let gold_status = gold
+            .iter()
+            .map(|(id, state)| ((*id).to_string(), (*state).to_string()))
+            .collect::<BTreeMap<_, _>>();
         let status = serde_json::json!({
             "instance_id": instance_id,
-            "pre_patch_status": baseline.iter().map(|(id, state)| ((*id).to_string(), (*state).to_string())).collect::<BTreeMap<_, _>>(),
-            "post_patch_status": gold.iter().map(|(id, state)| ((*id).to_string(), (*state).to_string())).collect::<BTreeMap<_, _>>(),
+            "pre_patch_status": baseline_status,
+            "post_patch_status": gold_status,
             "FAIL_TO_PASS": listed_f2p,
             "PASS_TO_PASS": listed_p2p
         });
-        fs::write(task_dir.join("status.json"), serde_json::to_vec(&status).unwrap()).unwrap();
-        fs::write(task_dir.join("pre_patch_log.txt"), "baseline: complete test log\n").unwrap();
+        fs::write(
+            task_dir.join("status.json"),
+            serde_json::to_vec(&status).unwrap(),
+        )
+        .unwrap();
+
+        let baseline_log = "baseline: complete test log\n";
+        fs::write(task_dir.join("pre_patch_log.txt"), baseline_log).unwrap();
         fs::write(task_dir.join("post_patch_log.txt"), gold_log).unwrap();
+        let image_reference = "test-image@sha256:deadbeef";
+        let image_id = format!("sha256:{}", "b".repeat(64));
+        let gold_test_exit_code = if gold.iter().all(|(_, state)| *state == "pass") {
+            0
+        } else {
+            1
+        };
+
+        let mut gold_runs = Vec::new();
+        for run_index in 0..3 {
+            let run_log = format!("gold run {run_index} complete test log\n");
+            fs::write(
+                task_dir.join(format!("gold_run_{run_index}.log")),
+                &run_log,
+            )
+            .unwrap();
+            gold_runs.push(serde_json::json!({
+                "role": "gold",
+                "run_index": run_index,
+                "test_patch_applied": true,
+                "solution_patch_applied": true,
+                "rebuild_exit_code": 0,
+                "test_exit_code": gold_test_exit_code,
+                "print_exit_code": 0,
+                "container_identity": {
+                    "container_id": format!("{:064x}", run_index + 2),
+                    "configured_image": image_reference,
+                    "container_image_id": image_id,
+                    "repo_digests": []
+                },
+                "log_sha256": sha256_bytes(run_log.as_bytes()),
+                "parsed_status": gold_status
+            }));
+        }
+        let evidence = serde_json::json!({
+            "schema_version": 1,
+            "instance_id": instance_id,
+            "image_reference": image_reference,
+            "baseline": {
+                "role": "baseline",
+                "test_patch_applied": true,
+                "rebuild_exit_code": 0,
+                "test_exit_code": 1,
+                "print_exit_code": 0,
+                "container_identity": {
+                    "container_id": format!("{:064x}", 1),
+                    "configured_image": image_reference,
+                    "container_image_id": image_id,
+                    "repo_digests": []
+                },
+                "log_sha256": sha256_bytes(baseline_log.as_bytes()),
+                "parsed_status": baseline_status
+            },
+            "gold_runs": gold_runs
+        });
+        fs::write(
+            task_dir.join("validation_evidence.json"),
+            serde_json::to_vec(&evidence).unwrap(),
+        )
+        .unwrap();
 
         serde_json::json!({
             "instance_id": instance_id,
             "repo": "owner/repo",
             "base_commit": "a".repeat(40),
-            "docker_image": "test-image@sha256:deadbeef",
+            "docker_image": image_reference,
             "problem_statement": "Fix the documented bug.",
             "patch": "diff --git a/src/lib.rs b/src/lib.rs\n+fn fixed() {}",
             "test_patch": "diff --git a/tests/lib.rs b/tests/lib.rs\n+assert!(fixed());"
@@ -1063,6 +1473,11 @@ mod tests {
             record.gold_validation_log_sha256,
             sha256_bytes(b"eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n")
         );
+        assert_eq!(record.container_image_id, format!("sha256:{}", "b".repeat(64)));
+        assert_eq!(record.container_ids.len(), 4);
+        let evidence_bytes =
+            fs::read(root.path().join(instance_id).join("validation_evidence.json")).unwrap();
+        assert_eq!(record.runtime_evidence_sha256, sha256_bytes(&evidence_bytes));
     }
 
     #[test]
@@ -1138,6 +1553,131 @@ mod tests {
         assert!(result.audit.unresolved);
         assert!(result.manifest_record.is_none());
         assert!(result.audit.reasons.iter().any(|reason| reason.contains("test-ID sets differ")));
+    }
+
+    #[test]
+    fn tampered_per_run_log_invalidates_runtime_evidence() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-log-tamper";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail")],
+            &[("bug-fixed", "pass")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        fs::write(root.path().join(instance_id).join("gold_run_1.log"), "tampered log\n").unwrap();
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"tampered log row"),
+        );
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result
+            .audit
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("raw run log SHA-256 mismatch")));
+    }
+
+    #[test]
+    fn different_actual_image_ids_across_gold_runs_are_rejected() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-image-drift";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail")],
+            &[("bug-fixed", "pass")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let evidence_bytes = fs::read(&evidence_path).unwrap();
+        let mut evidence: Value = serde_json::from_slice(&evidence_bytes).unwrap();
+        evidence["gold_runs"][2]["container_identity"]["container_image_id"] =
+            Value::String(format!("sha256:{}", "c".repeat(64)));
+        fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"image drift row"),
+        );
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result.audit.reasons.iter().any(|reason| reason.contains("image ID differs")));
+    }
+
+    #[test]
+    fn baseline_timeout_cannot_be_treated_as_a_valid_oracle() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-baseline-timeout";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail")],
+            &[("bug-fixed", "pass")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let evidence_bytes = fs::read(&evidence_path).unwrap();
+        let mut evidence: Value = serde_json::from_slice(&evidence_bytes).unwrap();
+        evidence["baseline"]["test_exit_code"] = Value::from(124);
+        fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"baseline timeout row"),
+        );
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result
+            .audit
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("test command is unresolved")));
+    }
+
+    #[test]
+    fn unapplied_gold_patch_is_not_accepted_as_validation() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-patch-rejected";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail")],
+            &[("bug-fixed", "pass")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let evidence_bytes = fs::read(&evidence_path).unwrap();
+        let mut evidence: Value = serde_json::from_slice(&evidence_bytes).unwrap();
+        evidence["gold_runs"][1]["solution_patch_applied"] = Value::Bool(false);
+        fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"patch rejected row"),
+        );
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result
+            .audit
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("gold solution patch application")));
     }
 
     #[test]

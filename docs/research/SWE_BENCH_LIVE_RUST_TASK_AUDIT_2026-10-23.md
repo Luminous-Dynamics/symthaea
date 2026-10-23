@@ -25,6 +25,50 @@ For each task, it recomputes from `pre_patch_status` and `post_patch_status`:
 
 If validation evidence is missing or malformed for any candidate, the program writes a non-lockable audit report and exits nonzero without writing a task manifest. If evidence is complete, it emits a manifest of strictly eligible tasks and retains every rejected task with reasons in a separate audit report. It hashes the prompt/gold/test patch content and both baseline and gold logs into the manifest instead of copying prompt, patch or test contents.
 
+## Pinned runtime evidence overlay (required before validation)
+
+The pinned upstream task-validation and scoring entry points discard command exit codes, ignore patch-application return values, and do not preserve the actual Docker image ID for every run. PR #8513 includes an overlay against exactly SWE-bench-Live commit `62d02936a0726fbf4597b05bd07b09fb99eddae6` for both `evaluation/validation.py` and `evaluation/evaluation.py`:
+
+`docs/research/patches/swe-bench-live-validation-evidence.patch`
+
+Apply and syntax-check it in a fresh clone before running gold validation:
+
+```bash
+git clone https://github.com/microsoft/SWE-bench-Live.git /tmp/SWE-bench-Live
+git -C /tmp/SWE-bench-Live checkout --detach 62d02936a0726fbf4597b05bd07b09fb99eddae6
+git -C /tmp/SWE-bench-Live apply --check /path/to/symthaea/docs/research/patches/swe-bench-live-validation-evidence.patch
+git -C /tmp/SWE-bench-Live apply /path/to/symthaea/docs/research/patches/swe-bench-live-validation-evidence.patch
+python3 -m py_compile /tmp/SWE-bench-Live/evaluation/validation.py
+git -C /tmp/SWE-bench-Live submodule update --init launch
+```
+
+The combined overlay modifies both the task-eligibility validation path and the scored-agent-patch evaluation path. Do not treat these streams as interchangeable:
+
+- `validation_evidence.json` records baseline plus three gold-patch control runs. These establish task eligibility and the expected oracle.
+- `evaluation_evidence.json` records one **scored prediction patch** run, including patch/test-patch hashes, whether both patches applied, actual rebuild/test/log exit codes, the resolved Docker image ID, the test-log hash, and parsed test statuses. Each task has one such file under the same evaluation output directory when scored.
+
+The Rust `rust-repair-manifest` tool currently validates and locks the **task-validation** stream. The scored-evaluation sidecar is a separate artifact and is not yet independently graded by this task-manifest binary; before publishing a scored comparison, run an independent scored-receipt verifier that joins each prediction to the locked task ID, verifies the prediction patch digest and raw log, and recomputes the official test verdict from the parsed statuses. Do not imply that a valid task manifest alone proves a scored agent rollout.
+
+Run the upstream three-repeat gold validation only after the overlay is applied. It records `validation_evidence.json`, a separate `gold_run_0.log`, `gold_run_1.log`, and `gold_run_2.log` per task.
+
+Run the full candidate split through the patched gold validator (use the complete JSONL as input; do not feed its filtered output back as the candidate denominator):
+
+```bash
+cd /tmp/SWE-bench-Live
+python3 -m evaluation.validation \
+  --input_dir /path/to/rust-candidates.jsonl \
+  --platform linux \
+  --workers 4 \
+  --output_dir /path/to/validation-output \
+  --overwrite 1
+```
+
+The output directory must be the same `validation-dir` passed to `rust-repair-manifest`. The Rust auditor expects each candidate's subdirectory to contain `status.json`, `pre_patch_log.txt`, `post_patch_log.txt`, `validation_evidence.json`, and `gold_run_0.log` through `gold_run_2.log`. Evidence includes actual shell exit codes, whether the test and gold patches applied, parsed status per run, raw-log SHA-256, Docker container ID, configured image reference and the immutable Docker image ID (`sha256:...`). Missing runtime metadata is not replaced with a requested image label.
+
+The Rust auditor requires that evidence for every candidate. It verifies all three per-run logs against their SHA-256 values; checks baseline and per-run parsed maps; reconstructs the gold aggregate; rejects timeout/incomplete commands and mismatched test patch states; verifies that the four container IDs are distinct and their actual Docker image IDs agree; and binds the resolved image ID, all container IDs and the runtime evidence hash into the eligible manifest. The evaluator-only controller manifest carries both the requested image reference and the observed immutable image ID.
+
+This instrumentation still is not cryptographic host attestation: a compromised runner can fabricate these files. It does close the observable gap between “a tag was requested” and “the Docker API reported this container/image ID and these commands returned these exit codes.” Preserve the raw files and independently rerun the validator for publication.
+
 ## Invocation
 
 First export the full Rust split from the pinned dataset snapshot to JSONL without filtering rows. Keep the dataset task fields intact. Run the upstream three-run validation on that complete input; do not use its filtered output as the candidate denominator. Then run:
@@ -58,7 +102,7 @@ The auditor now emits two separate artifacts only when the full candidate set ha
 - `agent-prompts.jsonl`: one JSON object per eligible task, containing only `problem_statement`. It contains no instance ID, repository, base commit, gold patch, test patch, hint, expected test labels, or commit URL. Line order is pinned by sorted task identity through the separate controller map.
 - `controller-manifest.evaluator-only.json`: maps zero-based line number to instance ID and requested Docker image, and binds the ordered eligible-ID digest plus safe prompt projection digest. This artifact is explicitly evaluator-only and must never enter the agent's prompt, filesystem, retrieval context or tool outputs.
 
-The unit tests serialize the projection structs and assert exact allowed fields plus absence of representative prohibited fields. This prevents accidental field copying at the data-contract level; it does not enforce operating-system access controls. The runner still must mount or expose only the prompt and sandbox to the agent and keep the controller/evaluator files in a separate trust domain.
+The unit tests serialize the projection structs and assert exact allowed fields plus absence of representative prohibited fields. The runtime-evidence tests also reject tampered per-run logs and image-ID drift across baseline/gold containers. This prevents accidental field copying at the data-contract level; it does not enforce operating-system access controls. The runner still must mount or expose only the prompt and sandbox to the agent and keep the controller/evaluator files in a separate trust domain.
 
 ## Digest contract
 

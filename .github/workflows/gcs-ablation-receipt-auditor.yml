@@ -9,6 +9,7 @@ on:
       - "Cargo.toml"
       - "docs/research/RUST_REPOSITORY_REPAIR_BENCHMARK_PROTOCOL_2026-10-22.md"
       - "docs/research/SWE_BENCH_LIVE_RUST_TASK_AUDIT_2026-10-23.md"
+      - "docs/research/patches/swe-bench-live-validation-evidence.patch"
       - "examples/coding_gcs_ablation_benchmark.rs"
       - "docs/research/GCS_ABLATION_RECEIPT_AUDITOR_2026-10-22.md"
       - "docs/research/GCS_RUNTIME_ABLATION_BENCHMARK_2026-10-22.md"
@@ -33,6 +34,17 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout the exact SWE-bench-Live validator revision
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/SWE-bench-Live
+          ref: 62d02936a0726fbf4597b05bd07b09fb99eddae6
+          path: benchmark-source
+      - name: Verify and syntax-check the runtime evidence overlay
+        run: |
+          git -C benchmark-source apply --check "$GITHUB_WORKSPACE/docs/research/patches/swe-bench-live-validation-evidence.patch"
+          git -C benchmark-source apply "$GITHUB_WORKSPACE/docs/research/patches/swe-bench-live-validation-evidence.patch"
+          python3 -m py_compile benchmark-source/evaluation/validation.py benchmark-source/evaluation/evaluation.py
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
