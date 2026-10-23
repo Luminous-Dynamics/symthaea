@@ -2638,10 +2638,7 @@ mod tests {
 
             let perturbed = calibrator
                 .assess_audit_score(
-                    conformal_audit_batch_score(
-                        30_000 + index as u64,
-                        DISCREPANCY_AMPLITUDE,
-                    ),
+                    conformal_audit_batch_score(30_000 + index as u64, DISCREPANCY_AMPLITUDE),
                     true,
                 )
                 .expect("perturbed audit batch is independent of calibration");
