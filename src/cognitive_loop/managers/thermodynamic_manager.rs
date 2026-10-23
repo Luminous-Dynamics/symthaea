@@ -147,6 +147,9 @@ impl CognitiveSubsystem for ThermodynamicManager {
         if snapshot.prediction_error_valid != 0 {
             self.input.prediction_error = snapshot.prediction_error;
         }
+        // Validity is per-cycle even while the retained numeric value is held for
+        // diagnostics; downstream thermodynamic PE consumers must not replay it.
+        self.input.prediction_error_valid = snapshot.prediction_error_valid != 0;
         self.input.attention_sensitivity = snapshot.phi_attention_weight;
         self.input.metabolic_stress = snapshot.thermodynamic_load;
 
