@@ -75,7 +75,7 @@
         "note": "Synthetic contract example only; not a replayed Lean proof state."
       },
       "contract": {
-        "required_type_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "required_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "base_precondition_status": "available",
         "variant_precondition_status": "absent",
         "expected_action_policy": "move_forbidden_or_replan",
@@ -183,7 +183,7 @@
         "note": "Synthetic contract example only; not a replayed Lean proof state."
       },
       "contract": {
-        "required_type_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "required_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "base_precondition_status": "available",
         "variant_precondition_status": "available",
         "expected_action_policy": "preserve_eligibility",
@@ -291,7 +291,7 @@
         "note": "Synthetic contract example only; not a replayed Lean proof state."
       },
       "contract": {
-        "required_type_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "required_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "base_precondition_status": "available",
         "variant_precondition_status": "available",
         "expected_action_policy": "preserve_eligibility",
@@ -399,7 +399,7 @@
         "note": "Synthetic contract example only; not a replayed Lean proof state."
       },
       "contract": {
-        "required_type_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "required_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "base_precondition_status": "available",
         "variant_precondition_status": "available",
         "expected_action_policy": "preserve_eligibility",
