@@ -1,18 +1,19 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Information Geometry — the natural geometry of probability and consciousness.
+//! Information geometry for probability distributions.
 //!
-//! The Fisher information metric gives a Riemannian geometry to the space of
-//! probability distributions. Consciousness, as a probability distribution
-//! over states, lives in this geometric space.
+//! The Fisher information metric gives a Riemannian geometry to spaces of
+//! probability distributions.  These functions are general mathematical
+//! instruments: using them in consciousness research does not make them
+//! consciousness measures, and no function in this module establishes a
+//! relationship between consciousness and gravity.
 //!
 //! g_ij(θ) = E[∂ᵢ log p(x|θ) × ∂ⱼ log p(x|θ)]  (Fisher metric)
 //!
 //! References:
 //! - Amari, S. (2016). *Information Geometry and Its Applications*. Springer.
 //! - Ay, N. et al. (2017). *Information Geometry*. Springer.
-//! - Tononi, G. (2008). Consciousness as Integrated Information (geometric Φ).
 
 /// Fisher information for a single parameter: I(θ) = E[(d/dθ log p)²]
 ///
@@ -61,7 +62,7 @@ pub fn fisher_gaussian(sigma: f64) -> [f64; 4] {
 
 /// Geodesic distance on the statistical manifold (Fisher-Rao distance).
 ///
-/// For two distributions p and q on the probability simplex:
+/// For two normalized distributions p and q on the probability simplex:
 /// d(p, q) = 2 arccos(Σ √(p_i × q_i))  (Bhattacharyya angle)
 pub fn fisher_rao_distance(p: &[f64], q: &[f64]) -> f64 {
     let bc: f64 = p
@@ -82,11 +83,11 @@ pub fn kl_divergence(p: &[f64], q: &[f64]) -> f64 {
         .sum()
 }
 
-/// Scalar curvature of the Fisher metric at a point on the probability simplex.
+/// Scalar curvature of the Fisher metric for the probability simplex model
+/// used here.
 ///
 /// For a 2D probability simplex (3 states, 2 free parameters):
 /// R = 2/(n-1) where n is the number of states.
-/// This is the curvature of the sphere (positive curvature).
 pub fn simplex_scalar_curvature(n_states: usize) -> f64 {
     if n_states <= 1 {
         return 0.0;
@@ -94,21 +95,16 @@ pub fn simplex_scalar_curvature(n_states: usize) -> f64 {
     2.0 / (n_states as f64 - 1.0)
 }
 
-/// Information-geometric Phi (Φ_IG): the "consciousness curvature" of a state.
+/// Mutual-information integration of a bipartite joint distribution.
 ///
-/// Measures how much a probability distribution deviates from the product
-/// of its marginals — i.e., how integrated the information is.
+/// This computes exactly
 ///
-/// Φ_IG = D_KL(p_joint || Π p_marginal) evaluated with Fisher metric weighting.
+/// I(A;B) = D_KL(p(a,b) || p(a)p(b))
+///        = Σ p(a,b) ln[p(a,b)/(p(a)p(b))].
 ///
-/// For a bipartite system with joint distribution p(a,b) and marginals p(a), p(b):
-/// Φ = Σ_{a,b} p(a,b) ln[p(a,b) / (p(a) × p(b))]
-pub fn phi_information_geometric(
-    joint: &[f64], // p(a,b) flattened: joint[a * n_b + b]
-    n_a: usize,
-    n_b: usize,
-) -> f64 {
-    // Compute marginals
+/// It is useful as a dependence/integration statistic, but it is not IIT Φ,
+/// is not a curvature scalar, and is not by itself a consciousness measure.
+pub fn mutual_information_integration(joint: &[f64], n_a: usize, n_b: usize) -> f64 {
     let mut marginal_a = vec![0.0; n_a];
     let mut marginal_b = vec![0.0; n_b];
 
@@ -120,26 +116,34 @@ pub fn phi_information_geometric(
         }
     }
 
-    // Φ = Σ p(a,b) ln(p(a,b) / (p(a) × p(b)))
-    let mut phi = 0.0;
+    let mut mutual_information = 0.0;
     for a in 0..n_a {
         for b in 0..n_b {
             let p_joint = joint[a * n_b + b];
             let p_product = marginal_a[a] * marginal_b[b];
             if p_joint > 1e-15 && p_product > 1e-15 {
-                phi += p_joint * (p_joint / p_product).ln();
+                mutual_information += p_joint * (p_joint / p_product).ln();
             }
         }
     }
 
-    phi
+    mutual_information
+}
+
+/// Backward-compatible name for [`mutual_information_integration`].
+///
+/// The previous name implied an IIT Φ quantity.  The implementation is mutual
+/// information and is retained only to avoid an abrupt API break.
+#[deprecated(
+    since = "0.1.0",
+    note = "this computes mutual information, not IIT Phi; use mutual_information_integration"
+)]
+pub fn phi_information_geometric(joint: &[f64], n_a: usize, n_b: usize) -> f64 {
+    mutual_information_integration(joint, n_a, n_b)
 }
 
 /// Natural gradient: the gradient of a function in the Fisher metric.
 /// ∇̃f = G⁻¹ ∇f  where G is the Fisher metric and ∇f is the Euclidean gradient.
-///
-/// Natural gradient descent converges faster because it follows geodesics
-/// on the statistical manifold rather than straight lines in parameter space.
 pub fn natural_gradient(
     fisher_metric_inv: &[f64],
     euclidean_gradient: &[f64],
@@ -160,7 +164,6 @@ mod tests {
 
     #[test]
     fn test_fisher_info_uniform() {
-        // Uniform distribution: all dp/dθ = 0 → I = 0
         let probs = vec![0.25; 4];
         let dprobs = vec![0.0; 4];
         assert_eq!(fisher_information(&probs, &dprobs), 0.0);
@@ -168,7 +171,6 @@ mod tests {
 
     #[test]
     fn test_fisher_gaussian_scaling() {
-        // I_μμ = 1/σ² → larger σ = less information
         let g1 = fisher_gaussian(1.0);
         let g2 = fisher_gaussian(2.0);
         assert!(g1[0] > g2[0], "Narrower Gaussian has more Fisher info");
@@ -207,34 +209,29 @@ mod tests {
     }
 
     #[test]
-    fn test_phi_ig_independent() {
-        // Independent: p(a,b) = p(a)*p(b) → Φ = 0
-        let joint = vec![0.15, 0.35, 0.1, 0.4]; // p(a) = [0.5, 0.5], p(b) = [0.25, 0.75]
-        // Actually: [0.5*0.5, 0.5*0.5, 0.5*0.5, 0.5*0.5] for independence
+    fn test_mutual_information_zero_for_independence() {
         let independent = vec![0.25, 0.25, 0.25, 0.25];
-        let phi = phi_information_geometric(&independent, 2, 2);
+        let integration = mutual_information_integration(&independent, 2, 2);
         assert!(
-            phi.abs() < 1e-10,
-            "Independent system Φ = 0: got {:.6}",
-            phi
+            integration.abs() < 1e-10,
+            "independent variables must have zero mutual information: got {:.6}",
+            integration
         );
     }
 
     #[test]
-    fn test_phi_ig_correlated() {
-        // Maximally correlated: p(0,0) = p(1,1) = 0.5
+    fn test_mutual_information_positive_for_correlation() {
         let correlated = vec![0.5, 0.0, 0.0, 0.5];
-        let phi = phi_information_geometric(&correlated, 2, 2);
+        let integration = mutual_information_integration(&correlated, 2, 2);
         assert!(
-            phi > 0.5,
-            "Correlated system should have high Φ: {:.4}",
-            phi
+            integration > 0.5,
+            "correlated variables should have positive mutual information: {:.4}",
+            integration
         );
     }
 
     #[test]
     fn test_simplex_curvature() {
-        // 2-simplex (3 states): R = 2/2 = 1 (unit sphere)
         let r = simplex_scalar_curvature(3);
         assert!((r - 1.0).abs() < 1e-14);
     }
