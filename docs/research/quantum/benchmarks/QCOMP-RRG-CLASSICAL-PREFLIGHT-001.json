@@ -3,13 +3,21 @@
   "status": "exploratory-js-reference-not-rust-not-paper-reproduction",
   "source_workstream": {
     "rust_generator_path": "crates/domains/symthaea-quantum-comp/src/mis_random_regular.rs",
-    "rust_generator_blob_sha1": "8d14638463b08d335facd167c9055f765bb11c15",
+    "rust_generator_blob_sha1": "a51cb79f336233bf9b5e823fa05cf664402dd897",
     "generator_model": "configuration-model stub multiset; seeded Fisher-Yates shuffle; whole pairing discarded when loop or repeated undirected edge occurs; canonical edge sorting",
     "prng": "XorShift64*; deterministic pseudo-random only, not cryptographic",
     "seed_derivation": "base = 202610230000 + N*1000003 + zero_based_instance_index*7919",
     "graph_identity": "FNV-1a 64-bit over canonical ASCII DIMACS content (header plus sorted one-based edge lines); non-cryptographic checksum, not SHA-256",
     "tie_seed_derivation": "restart_seed = instance_seed XOR ((one_based_restart * 0x9e3779b97f4a7c15) modulo 2^64); restart uses same XorShift64* family and unbiased bounded sampling",
-    "implementation_boundary": "Transient JavaScript reference implementation. It is an algorithm/data preflight, not a Rust binary run; future Rust results must be separately emitted and compared."
+    "implementation_boundary": "Exploratory outcomes are from a transient independent JavaScript reference, never a Rust binary. Static review identified that the initial Rust candidate blob used a fresh stub clone per rejection and a different bounded-draw residue rule; the canonical Rust source has since been aligned to the JS seed-stream semantics. Graph-byte parity has not been run or established; regenerate and compare receipts once Rust tooling is available.",
+    "initial_candidate_rust_blob_sha1": "8d14638463b08d335facd167c9055f765bb11c15",
+    "rust_generator_commit": "3ced24ce2768f480b8b8945560eebeffcece5eaf",
+    "canonical_api": "generate_mis_random_regular(MisRandomRegularConfig)",
+    "generator_limits": {
+      "max_vertices": 100000,
+      "max_stubs": 1000000,
+      "default_max_attempts": 100000
+    }
   },
   "methodology": {
     "graph_family": "simple random 3-regular graphs",
