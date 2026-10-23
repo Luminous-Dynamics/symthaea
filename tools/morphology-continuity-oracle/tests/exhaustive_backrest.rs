@@ -1,5 +1,5 @@
 use morphology_continuity_oracle::{
-    canonical_templates, evaluate_episode, template, Disposition, TargetEvidence,
+    Disposition, TargetEvidence, canonical_templates, evaluate_episode, template,
 };
 
 /// Exhaustively enumerate the 2^4 deletion patterns for the chair's four-cell
@@ -40,21 +40,31 @@ fn every_backrest_deletion_subset_has_the_expected_identifiability_result() {
 
         if observed == *table {
             exact_table_alias_count += 1;
-            assert_eq!(mask, pattern_count - 1, "only all-backrest deletion should alias table");
+            assert_eq!(
+                mask,
+                pattern_count - 1,
+                "only all-backrest deletion should alias table"
+            );
             assert_eq!(report.current_exact_matches, vec!["table"]);
             assert_eq!(report.compatible_histories, vec!["chair", "table"]);
             assert_eq!(report.disposition, Disposition::AbstainAmbiguousHistory);
         } else if mask == 0 {
             assert_eq!(report.current_exact_matches, vec!["chair"]);
             assert_eq!(report.compatible_histories, vec!["chair"]);
-            assert_eq!(report.disposition, Disposition::AbstainInvalidTargetEvidence);
+            assert_eq!(
+                report.disposition,
+                Disposition::AbstainInvalidTargetEvidence
+            );
         } else {
             assert!(
                 report.current_exact_matches.is_empty(),
                 "partial backrest deletion mask {mask:04b} must not match an intact template"
             );
             assert_eq!(report.compatible_histories, vec!["chair"]);
-            assert_eq!(report.disposition, Disposition::AbstainInvalidTargetEvidence);
+            assert_eq!(
+                report.disposition,
+                Disposition::AbstainInvalidTargetEvidence
+            );
         }
     }
 
