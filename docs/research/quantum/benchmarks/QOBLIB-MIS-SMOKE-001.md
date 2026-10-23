@@ -1,0 +1,33 @@
+# QOBLIB-MIS-SMOKE-001: deterministic local smoke runner
+
+Status: **runner authored; Rust execution not yet confirmed**
+
+## Run locally
+
+From the Symthaea workspace root, after Rust dependencies/toolchain are available:
+
+    cargo run -p symthaea-quantum-comp --bin qoblib_mis_smoke -- /path/to/QOBLIB/07-independentset/instances/farm.gph > farm-smoke.json
+
+The command reads one DIMACS edge-format graph and writes exactly one JSON record to stdout. Errors go to stderr and use a non-zero exit status. Keep the resulting JSON as the raw inspectable artifact. The pinned source cohort is tracked in QOBLIB-MIS-COHORT-001.json.
+
+## Output contract
+
+The receipt records:
+- schema and explicit correctness-smoke track label;
+- supplied source path, byte count and FNV-1a 64-bit checksum of the exact input bytes;
+- parsed vertex/edge counts;
+- the deterministic minimum-residual-degree greedy solution, its one-based vertex list, independently recomputed objective and feasibility verdict;
+- the tiny exact reference result and feasibility verdict when the graph has at most 24 vertices, or an explicit skipped-over-limit status otherwise;
+- parser, greedy, exact-oracle and end-to-end elapsed nanoseconds;
+- a stable non-cryptographic checksum over the normalized result fields, excluding variable runtime fields;
+- limitations that prevent treating smoke timings as an SOTA result.
+
+The greedy policy recomputes each active vertex's residual degree at every selection and breaks ties by lower vertex index. It is deterministic and requires no random seed. It is a baseline/control, not a competitive replacement for dedicated MIS methods. The exact reference uses the deliberately bounded branch-and-bound oracle and must not be run on large benchmark instances.
+
+## Example correctness anchor
+
+The pinned QOBLIB farm instance has 17 vertices and 39 edges. Independent subset enumeration on the pinned source graph finds maximum independent-set cardinality 10, matching the published ParallelILS best-known objective. The Rust runner is designed to parse the same source, independently verify the greedy set, and compare with the exact reference. This repository contribution has not yet been compiled/executed in the current authoring environment, so no Rust runner output is represented as already produced.
+
+## Interpreting costs and claims
+
+FNV-1a is not cryptographic; the immutable QOBLIB source commit and file-level Git object IDs remain the source provenance. Runtime figures are local diagnostics and must not be compared across machines without a controlled protocol. Parse time plus solver time should not be added to end-to-end time; stage metrics overlap with the total. The output does not claim quantum execution, a state-of-the-art result, or quantum advantage.
