@@ -1,6 +1,6 @@
 {
-  "schema_version": "1.3",
-  "experiment": "symthaea-silicon exact HDC word-primitive correctness and popcount architecture sweep",
+  "schema_version": "1.4",
+  "experiment": "canonical BinaryHV software-oracle-driven HDC RTL correctness sweep",
   "required_tools": [
     {
       "name": "verilator",
@@ -8,15 +8,15 @@
     },
     {
       "name": "jq",
-      "purpose": "structured machine-readable receipt"
+      "purpose": "structured machine-readable receipts, generator metadata checks and per-case results"
     },
     {
       "name": "sha256sum",
-      "purpose": "hash sources, configuration and logs; runner extracts the digest using Bash builtins"
+      "purpose": "hash RTL inputs, software oracle, configuration and logs"
     },
     {
       "name": "git",
-      "purpose": "repository revision identity"
+      "purpose": "exact repository revision identity"
     },
     {
       "name": "make",
@@ -27,12 +27,20 @@
       "purpose": "Verilator generated model compilation"
     },
     {
+      "name": "cargo",
+      "purpose": "build/run canonical BinaryHV fixture generator in locked offline mode"
+    },
+    {
+      "name": "rustc",
+      "purpose": "compile canonical software-oracle generator"
+    },
+    {
       "name": "head",
-      "purpose": "read tool version banner"
+      "purpose": "read simulator version banner"
     },
     {
       "name": "grep",
-      "purpose": "require exact expected simulation PASS marker"
+      "purpose": "require exact expected simulation and software-oracle PASS markers"
     }
   ],
   "commands": {
@@ -40,7 +48,7 @@
     "simulation": "verilator --binary --timing --assert -Wall --top-module <testbench> -GDATA_W=<64|128|256|512> [-GBALANCED_TREE=<0|1>] --Mdir <output>/obj_dir <rtl> <testbench>"
   },
   "output": "target/hdl-qualification/hdc/<UTC timestamp>-pid<PID>/receipt.json and hashed logs per module/architecture/width",
-  "pass_semantics": "simulation_smoke_pass requires all 12 cases to lint, compile and execute with exit code zero and exact expected PASS marker.",
+  "pass_semantics": "simulation_smoke_pass requires all 12 cases to lint, build and execute with exit code zero, exact local PASS marker, and exact canonical-BinaryHV software-oracle PASS marker.",
   "fail_closed_semantics": [
     "missing required tool => unqualified_tool_missing and exit 2",
     "failed lint/build/simulation or absent pass marker => failed non-pass",
@@ -48,14 +56,14 @@
     "receipts never imply formal proof, synthesis/PPA, FPGA observation, physical energy or SOTA"
   ],
   "tool_versions": "Provided by root flake.lock through devShells.hdl, subject to platform and lock file",
-  "status": "specification only; all 12 RTL cases remain unexecuted because Verilator/Nix are unavailable on the authoring host",
+  "status": "source and harness prepared, not run; Rust/Verilator/Nix toolchain unavailable on authoring host",
   "widths_bits": [
     64,
     128,
     256,
     512
   ],
-  "claim_ceiling": "Word-level simulated correctness only. No vector accumulator/controller, synthesis/PPA, FPGA, ASIC, physical energy or product/SOTA qualification.",
+  "claim_ceiling": "Even a passing software-oracle RTL sweep establishes only word-level functional equivalence under the pinned simulation setup; no formal proof, PPA, FPGA, ASIC, measured energy or product/SOTA claim.",
   "architecture_cases": [
     {
       "module": "hdc_bind_xor",
@@ -75,19 +83,47 @@
   ],
   "expected_case_count": 12,
   "receipt_fields": [
-    "hashes for RTL modules, testbenches, runner, manifest, schema, expected-case matrix, validator, flake.nix and flake.lock",
+    "hashes for RTL modules/testbenches, generator, canonical BinaryHV source, package manifest, Cargo.lock, runner, manifest, schema, case matrix, validator, flake.nix and flake.lock",
+    "generated canonical-oracle receipt SHA and fixture hashes for each datapath width",
     "exact Git HEAD and Verilator version",
-    "per-case ID, module, width, architecture, lint/build/simulation exit codes, pass-marker status",
-    "hashed logs per case"
+    "per-case ID, module, architecture, width, lint/build/simulation exit codes, local PASS and software-oracle PASS flags",
+    "hashed per-case logs"
   ],
   "expected_case_matrix": "hdl_expected_case_matrix_v1.json",
   "receipt_schema": "hdl_run_receipt_v1.schema.json",
   "independent_receipt_validator": "validate_hdl_receipt.sh",
   "validation_protocol": [
-    "run run_hdl_smoke.sh from the root pinned .#hdl dev shell",
-    "validate receipt format against hdl_run_receipt_v1.schema.json",
-    "run validate_hdl_receipt.sh on the exact receipt and case matrix",
-    "the validator checks that all expected cases occur exactly once, all case results pass, and current source/configuration hashes and Git HEAD match the receipt",
-    "a changed source tree must not be used to retroactively validate a receipt from another revision"
-  ]
+    "use the root pinned .#hdl shell",
+    "generate fixtures with cargo run --locked --offline against exact Git HEAD",
+    "verify canonical source, Cargo.lock, generator metadata and generated .mem hashes",
+    "run every XOR/linear/tree architecture at all four widths with the matching generated oracle .mem file",
+    "validate the receipt schema and run validate_hdl_receipt.sh",
+    "reject any missing, duplicate, failing, stale-source or mismatched-hash case"
+  ],
+  "software_oracle": {
+    "generator": "crates/domains/symthaea-silicon/src/bin/hdc_rtl_oracle.rs",
+    "canonical_semantics": "symthaea_core::hdc::BinaryHV",
+    "output_directory": "<run-output>/oracle",
+    "output_receipt": "oracle_receipt.json",
+    "fixture_files_per_width": [
+      "hdc_oracle_xor_w{width}.mem",
+      "hdc_oracle_hamming_w{width}.mem"
+    ],
+    "scenario_count": 6,
+    "widths_bits": [
+      64,
+      128,
+      256,
+      512
+    ],
+    "byte_order": "BinaryHV byte index 0 is the most-significant byte position of each emitted word literal",
+    "required_identity": [
+      "Git HEAD",
+      "canonical BinaryHV source SHA-256",
+      "root Cargo.lock SHA-256",
+      "each generated .mem file SHA-256"
+    ],
+    "offline_build": true,
+    "fail_closed": true
+  }
 }
