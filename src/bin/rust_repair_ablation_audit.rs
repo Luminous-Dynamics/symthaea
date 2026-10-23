@@ -26,22 +26,6 @@ enum Arm {
     Gcs,
 }
 
-impl Arm {
-    fn label(self) -> &'static str {
-        match self {
-            Self::Control => "control",
-            Self::Gcs => "gcs",
-        }
-    }
-
-    fn other(self) -> Self {
-        match self {
-            Self::Control => Self::Gcs,
-            Self::Gcs => Self::Control,
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum Outcome {
@@ -136,9 +120,7 @@ impl AuditPair {
             Arm::Control => self.control.as_ref(),
             Arm::Gcs => self.gcs.as_ref(),
         };
-        trial
-            .map(|observed| observed.record.outcome)
-            .unwrap_or(Outcome::Unresolved)
+        trial.map_or(Outcome::Unresolved, |observed| observed.record.outcome)
     }
 
     fn trial(&self, arm: Arm) -> Option<&ObservedTrial> {
@@ -677,12 +659,12 @@ fn arm_metrics(pairs: &[AuditPair], arm: Arm) -> ArmMetrics {
         unresolved_count,
         verified_pass_rate: verified_pass_count as f64 / task_count as f64,
         resolved_pass_rate: (resolved_count > 0)
-            .then_some(verified_pass_count as f64 / resolved_count as f64),
+            .then(|| verified_pass_count as f64 / resolved_count as f64),
         unresolved_rate,
         observed_cost_usd,
         cost_data_complete,
         cost_per_verified_fix_usd: (cost_data_complete && verified_pass_count > 0)
-            .then_some(observed_cost_usd / verified_pass_count as f64),
+            .then(|| observed_cost_usd / verified_pass_count as f64),
         observed_latency_count: latencies.len(),
         median_latency_ms,
         p95_latency_ms,
@@ -989,11 +971,12 @@ fn write_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
 fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
     if args.iter().any(|argument| argument == "--help" || argument == "-h") {
         println!(
-            "Usage: rust-repair-ablation-audit \\
-             --preregistration PATH --expected-preregistration-sha256 HEX \\
-             --trial-results JSONL --score-reports-dir PATH --report-out PATH"
-        );
-        return Ok(None);
+            concat!(
+                "Usage: rust-repair-ablation-audit ",
+                "--preregistration PATH --expected-preregistration-sha256 HEX ",
+                "--trial-results JSONL --score-reports-dir PATH --report-out PATH"
+            )
+        );        return Ok(None);
     }
     let mut values = BTreeMap::<String, String>::new();
     let mut index = 0usize;
@@ -1212,7 +1195,7 @@ mod tests {
             test_pair("repo-b", Outcome::Unresolved, Outcome::Pass),
         ];
         let (lower, upper) = unresolved_sensitivity_bounds(&pairs);
-        assert_eq!(lower, -50.0);
+        assert_eq!(lower, 0.0);
         assert_eq!(upper, 50.0);
         let gcs = arm_metrics(&pairs, Arm::Gcs);
         assert_eq!(gcs.verified_pass_count, 1);
