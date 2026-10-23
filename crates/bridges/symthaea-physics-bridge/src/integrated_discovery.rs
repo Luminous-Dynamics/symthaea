@@ -837,17 +837,27 @@ fn run_trial_with_mode(
     let probes: Vec<Experiment> = (0..GT_SANITY_PROBES)
         .map(|_| random_experiment(&mut setup_rng))
         .collect();
-    let ground_truth = nontrivial_ground_truth(&mut setup_rng, &probes);
+
+    // The discovery design is generated before the hidden reference and without reference-based
+    // rejection. The task generator later requires the reference to be defined and sane on these
+    // predeclared points, so an undefined measurement never silently changes the selector's pool.
+    let mut exp_rng = seed ^ 0x1111_2222_3333_4444;
+    let candidate_pool: Vec<Experiment> = (0..EXPERIMENT_POOL_SIZE)
+        .map(|_| random_experiment(&mut exp_rng))
+        .collect();
+    let mut reference_sanity_points = probes.clone();
+    reference_sanity_points.extend(candidate_pool.iter().cloned());
+    let ground_truth = nontrivial_ground_truth(&mut setup_rng, &reference_sanity_points);
     let gt_vals: Vec<f64> = probes
         .iter()
-        .map(|p| eval_at(&ground_truth, p).unwrap())
+        .map(|point| eval_at(&ground_truth, point).unwrap())
         .collect();
 
     let mut hypotheses: Vec<Expr> = Vec::with_capacity(POOL_SIZE);
     if truth_absent {
         // Open-ended track: candidate generation receives the public variable units and
-        // task probes only. It must not read ground-truth values, create near-misses from truth,
-        // or use evaluator feedback to reject candidate structures.
+        // predeclared experiment design only. It must not read ground-truth values, create
+        // near-misses from truth, or use evaluator feedback to reject candidate structures.
         let mut candidate_rng = seed
             ^ if config.typed_candidates {
                 0xA11C_E55E_2026_0001
@@ -869,7 +879,7 @@ fn run_trial_with_mode(
             } else {
                 naive_untyped_expr(&mut candidate_rng, GEN_MAX_DEPTH)
             };
-            let Some(values) = probes
+            let Some(values) = candidate_pool
                 .iter()
                 .map(|point| eval_at(&candidate, point))
                 .collect::<Option<Vec<_>>>()
@@ -920,17 +930,7 @@ fn run_trial_with_mode(
     }
     let initial_hypotheses = hypotheses.clone();
 
-    // In the truth-absent track the experiment design is independent of the reference law.
-    // An undefined reference evaluation becomes an explicit failed trial at measurement time;
-    // evaluator knowledge does not remove candidate points before the selector sees them.
-    let mut exp_rng = seed ^ 0x1111_2222_3333_4444;
-    let mut candidate_pool: Vec<Experiment> = Vec::with_capacity(EXPERIMENT_POOL_SIZE);
-    while candidate_pool.len() < EXPERIMENT_POOL_SIZE {
-        let experiment = random_experiment(&mut exp_rng);
-        if truth_absent || eval_at(&ground_truth, &experiment).is_some() {
-            candidate_pool.push(experiment);
-        }
-    }
+
     // Independent evaluator-only points: never passed to the experiment selector or recovery
     // generator. Ground-truth equivalence is scored only after the adaptive policy terminates.
     let mut evaluator_rng = seed ^ 0xE7A1_0A7A_2026_0001;
