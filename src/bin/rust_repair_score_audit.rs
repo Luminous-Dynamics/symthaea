@@ -30,6 +30,7 @@ struct Cli {
 #[derive(Debug, Serialize)]
 struct TaskRecordForDigest {
     instance_id: String,
+    candidate_row_sha256: String,
     repo: String,
     base_commit: String,
     repo_head_sha: String,
@@ -72,6 +73,7 @@ fn task_record_for_digest(value: &Value) -> Result<TaskRecordForDigest, String> 
         .collect::<Result<Vec<_>, _>>()?;
     Ok(TaskRecordForDigest {
         instance_id: string("instance_id")?,
+        candidate_row_sha256: string("candidate_row_sha256")?,
         repo: string("repo")?,
         base_commit: string("base_commit")?,
         repo_head_sha: string("repo_head_sha")?,
