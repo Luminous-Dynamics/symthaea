@@ -170,3 +170,7 @@ The differentiator is a **causal, evidence-audited cognitive loop**: one observa
 - [SWE-bench Verified](https://www.swebench.com/verified): human-validated coding-agent tasks and controlled bash-only comparisons.
 - [OSWorld](https://os-world.github.io/): reproducible execution-based computer-use tasks; pin the exact version.
 - Epoch AI, [OSWorld 2.1 benchmark review](https://epoch.ai/benchmarks/osworld-2-1/review) (2026-09-28): motivation for auditing tasks and graders before treating leaderboard deltas as ground truth.
+
+## Machine-readable scenario manifest
+
+`benchmarks/cognitive-loop-evidence/scenarios.json` is the implementation-facing companion to this contract. It currently defines **30 cases across six suites (S0–S5)**: validity invariants, calibration and distribution shift, continual learning, phase causality, end-to-end benchmark adapters, and system behavior. It includes the B0–B7 baseline matrix, including B4 for calibrated uncertainty. These are proposed cases and configurations; the manifest is not yet a runnable benchmark suite and no results are implied.
