@@ -119,10 +119,10 @@ Required ablations: validity gate off/on, duplicate stateful update off/on, repl
 Use external benchmarks for the questions they actually answer:
 
 - **Continual Learning Bench (CLBench):** relevant to sequential learning because it compares stateful task performance against a stateless baseline and reports reward gain and cost.
-- **SWE-bench Verified:** use its human-validated 500-instance subset for coding-agent task resolution. Record benchmark snapshot, system/scaffold, tool configuration, test protocol, resolved rate, cost, and task-level failure analysis.
-- **OSWorld / OSWorld-Verified:** use a pinned release and its task-grading setup for computer-use workflows. Audit tasks and graders before interpreting small score differences.
+- **SWE-bench Verified:** the benchmark describes a human-validated 500-instance subset and offers a controlled bash-only comparison setting. However, Epoch AI's September 2026 benchmark-review index labels SWE-bench Verified *Flawed*. Treat its leaderboard as a diagnostic reference, audit the pinned tasks/test patches and disagreement cases, and report results both on the published set and a clearly declared audited subset. Do not quote the raw score as uncontested ground truth.
+- **OSWorld / OSWorld-Verified:** pin the exact release, environment, task set, grading logic, and budget. Epoch AI's September 28, 2026 review of OSWorld 2.1 marked it *Flawed*: its audit of 50 of 108 tasks found scoring issues in 36, with a possible impact up to 50.4% of the audited total score. Prefer a reviewed/pinned task subset and retain task-level traces rather than relying on a leaderboard delta alone.
 
-These suites measure task execution, not PE validity itself. The core suites S0–S3 are needed to show *why* a cognitive-loop change helps or harms. No cross-suite combined score should be reported without a declared weighting and justification.
+These suites measure task execution, not PE validity itself. The core suites S0–S3 are needed to show *why* a cognitive-loop change helps or harms. Benchmark audits are part of the evaluation, not optional paperwork. No cross-suite combined score should be reported without a declared weighting and justification.
 
 ### S5 — Systems efficiency and stability
 
@@ -167,9 +167,9 @@ The differentiator is a **causal, evidence-audited cognitive loop**: one observa
 - NIST, [AI measurement and evaluation](https://www.nist.gov/ai-measurement-and-evaluation): measurement science, task design, and evaluation methodology.
 - Silva Filho et al., [Classifier calibration: a survey on how to assess and improve predicted class probabilities](https://link.springer.com/article/10.1007/s10994-023-06336-7): calibration, proper scoring rules, metrics, and reliability diagnostics.
 - [Continual Learning Bench](https://continual-learning-bench.com/): sequential task learning, gain over stateless baseline, and cost.
-- [SWE-bench Verified](https://www.swebench.com/verified): human-validated coding-agent tasks and controlled bash-only comparisons.
-- [OSWorld](https://os-world.github.io/): reproducible execution-based computer-use tasks; pin the exact version.
-- Epoch AI, [OSWorld 2.1 benchmark review](https://epoch.ai/benchmarks/osworld-2-1/review) (2026-09-28): motivation for auditing tasks and graders before treating leaderboard deltas as ground truth.
+- [SWE-bench Verified](https://www.swebench.com/verified): its stated human-validated subset and controlled bash-only comparison setup; pair it with the [Epoch AI benchmark-review index](https://epoch.ai/data/benchmark-reviews-documentation/included-benchmarks), which marks SWE-bench Verified Flawed (2026-09-03).
+- [OSWorld](https://os-world.github.io/): execution-based computer-use tasks; pin the exact version and task set.
+- Epoch AI, [OSWorld 2.1 benchmark review](https://epoch.ai/benchmarks/osworld-2-1/review) (2026-09-28): review finding scoring issues in 36 of 50 audited tasks, underscoring that grader reliability must be measured.
 
 ## Machine-readable scenario manifest
 
