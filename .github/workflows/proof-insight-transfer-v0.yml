@@ -619,6 +619,8 @@ jobs:
 
           # Exercise the report schema's interval/component coupling directly.
           # This does not substitute for Rust unit tests or prospective power analysis.
+          from jsonschema import ValidationError
+
           metric_validator = Draft202012Validator(
               schema["properties"]["metrics"]["additionalProperties"],
               format_checker=FormatChecker()
@@ -651,10 +653,8 @@ jobs:
           def expect_metric_reject(value, description):
               try:
                   metric_validator.validate(value)
-              except Exception as error:
-                  if error.__class__.__name__ == "ValidationError":
-                      return
-                  raise
+              except ValidationError:
+                  return
               raise SystemExit(f"interval schema accepted an inconsistent metric: {description}")
 
           expect_metric_reject(
