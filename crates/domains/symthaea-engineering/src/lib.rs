@@ -5,6 +5,9 @@
 
 #![deny(unsafe_code)]
 
+/// Typed, evidence-bounded energy-architecture candidates and contract validation.
+pub mod energy_architecture;
+
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
 use symthaea_causal_reasoning::causal_calculus::StructuralCausalModel;
