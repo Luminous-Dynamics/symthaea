@@ -908,13 +908,14 @@ mod tests {
                 ConformalAdequacyCalibrator::new(&heavy_rms, ALPHA).unwrap();
             let heavy_max_calibrator =
                 ConformalAdequacyCalibrator::new(&heavy_max, ALPHA).unwrap();
-            let heavy_audit = score_residual_batch(&rng.student_t4_batch(BATCH_SIZE), &zeros, &ones);
-            heavy_tail_alarms[0] += usize::from(calibrated_alarm(
+            let heavy_audit =
+                score_residual_batch(&rng.student_t4_batch(BATCH_SIZE), &zeros, &ones);
+            heavy_tail_alarms[0] += calibrated_alarm(
                 &heavy_rms_calibrator,
                 heavy_audit.rms_standardized_residual,
-            ));
+            ) as usize;
             heavy_tail_alarms[1] +=
-                usize::from(calibrated_alarm(&heavy_max_calibrator, heavy_audit.maximum()));
+                calibrated_alarm(&heavy_max_calibrator, heavy_audit.maximum()) as usize;
 
             let gaussian_calibration = (0..CALIBRATION_BATCHES)
                 .map(|_| score_residual_batch(&rng.normal_batch(BATCH_SIZE), &zeros, &ones))
@@ -947,12 +948,12 @@ mod tests {
                 &scales,
             )
             .expect("known predictive scales standardize the null residuals");
-            heteroscedastic_alarms[0] += usize::from(calibrated_alarm(
+            heteroscedastic_alarms[0] += calibrated_alarm(
                 &gaussian_rms_calibrator,
                 heteroscedastic.rms_standardized_residual,
-            ));
+            ) as usize;
             heteroscedastic_alarms[1] +=
-                usize::from(calibrated_alarm(&gaussian_max_calibrator, heteroscedastic.maximum()));
+                calibrated_alarm(&gaussian_max_calibrator, heteroscedastic.maximum()) as usize;
         }
 
         for (name, counts) in [
