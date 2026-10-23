@@ -71,6 +71,8 @@ pub enum DelayedOutcomeError {
     NonSequentialObservation,
     StreamIndexOverflow,
     AlarmForUnknownObservation,
+    AlarmNotAtCurrentStreamPosition,
+    AlarmAfterOutcome,
     DuplicateAlarm,
     UnknownAlarm,
     OutcomeForUnknownObservation,
@@ -176,10 +178,22 @@ impl DelayedOutcomeMonitor {
         Ok(())
     }
 
-    /// Record an alarm at an already observed stream index.
+    /// Record an alarm at the current stream position, before consuming that
+    /// position's outcome label.
     pub fn raise_alarm(&mut self, alarm_index: u64) -> Result<(), DelayedOutcomeError> {
         if !self.observations.contains_key(&alarm_index) {
             return Err(DelayedOutcomeError::AlarmForUnknownObservation);
+        }
+        if self.last_index != Some(alarm_index) {
+            return Err(DelayedOutcomeError::AlarmNotAtCurrentStreamPosition);
+        }
+        if self
+            .observations
+            .get(&alarm_index)
+            .and_then(|observation| observation.outcome)
+            .is_some()
+        {
+            return Err(DelayedOutcomeError::AlarmAfterOutcome);
         }
         if !self.alarms.insert(alarm_index) {
             return Err(DelayedOutcomeError::DuplicateAlarm);
@@ -390,14 +404,16 @@ mod tests {
     }
 
     fn observe_through(monitor: &mut DelayedOutcomeMonitor, end_exclusive: u64) {
-        for index in 0..end_exclusive {
+        let start = monitor.last_index.map(|index| index + 1).unwrap_or(0);
+        for index in start..end_exclusive {
             monitor.observe(index).unwrap();
         }
     }
 
     fn alarm_at_five(monitor: &mut DelayedOutcomeMonitor) {
-        observe_through(monitor, 10);
+        observe_through(monitor, 6);
         monitor.raise_alarm(5).unwrap();
+        observe_through(monitor, 10);
     }
 
     #[test]
@@ -442,8 +458,9 @@ mod tests {
     #[test]
     fn incomplete_post_window_is_not_reported_as_no_change() {
         let mut monitor = monitor(OutcomeDirection::HigherIsWorse);
-        observe_through(&mut monitor, 7);
+        observe_through(&mut monitor, 6);
         monitor.raise_alarm(5).unwrap();
+        monitor.observe(6).unwrap();
         assert_eq!(
             monitor.assess(5).unwrap().association,
             OutcomeAssociation::WindowNotComplete
@@ -453,9 +470,11 @@ mod tests {
     #[test]
     fn overlapping_alarm_windows_remain_unresolved() {
         let mut monitor = monitor(OutcomeDirection::HigherIsWorse);
-        observe_through(&mut monitor, 10);
+        observe_through(&mut monitor, 5);
         monitor.raise_alarm(4).unwrap();
+        monitor.observe(5).unwrap();
         monitor.raise_alarm(5).unwrap();
+        observe_through(&mut monitor, 10);
         assert_eq!(
             monitor.assess(4).unwrap().association,
             OutcomeAssociation::ContaminatedByAnotherAlarm
@@ -465,8 +484,9 @@ mod tests {
     #[test]
     fn insufficient_history_is_not_silently_treated_as_a_baseline() {
         let mut monitor = monitor(OutcomeDirection::HigherIsWorse);
-        observe_through(&mut monitor, 8);
+        observe_through(&mut monitor, 2);
         monitor.raise_alarm(1).unwrap();
+        observe_through(&mut monitor, 8);
         assert_eq!(
             monitor.assess(1).unwrap().association,
             OutcomeAssociation::MissingBaselineHistory
@@ -495,6 +515,21 @@ mod tests {
         assert_eq!(
             monitor.record_outcome(5, 9, 2.0),
             Err(DelayedOutcomeError::DuplicateOutcome)
+        );
+    }
+
+    #[test]
+    fn alarm_must_be_current_and_precede_its_outcome() {
+        let mut monitor = monitor(OutcomeDirection::HigherIsWorse);
+        observe_through(&mut monitor, 2);
+        assert_eq!(
+            monitor.raise_alarm(0),
+            Err(DelayedOutcomeError::AlarmNotAtCurrentStreamPosition)
+        );
+        monitor.record_outcome(1, 1, 2.0).unwrap();
+        assert_eq!(
+            monitor.raise_alarm(1),
+            Err(DelayedOutcomeError::AlarmAfterOutcome)
         );
     }
 
