@@ -395,12 +395,18 @@ impl CognitiveLoopService {
         };
         let pp_learning_threshold = self.config.learning_threshold;
 
-        let cycle_reward = self.compute_reward_signal(prediction_error, pp_learning_threshold);
+        let cycle_reward = if prediction_error_valid {
+            self.compute_reward_signal(prediction_error, pp_learning_threshold)
+        } else {
+            0.0
+        };
 
         let cycle_learning_result = CycleLearningResult {
             reward: cycle_reward,
             strategy_used: selected_strategy,
-            successful: prediction_error < pp_learning_threshold && pp_in_flow,
+            successful: prediction_error_valid
+                && prediction_error < pp_learning_threshold
+                && pp_in_flow,
             prediction_error,
             coherence,
         };
@@ -428,6 +434,7 @@ impl CognitiveLoopService {
 
             let episodic_ctx = helpers::EpisodicLearningContext {
                 prediction_error,
+                prediction_error_valid,
                 in_flow: pp_in_flow,
                 input,
                 compressed_state: &perception.encoding.compressed_state,
@@ -450,7 +457,7 @@ impl CognitiveLoopService {
                         semantic_hdc,
                         &perception.encoding.compressed_state,
                         output,
-                        prediction_error,
+                        prediction_error_valid.then_some(prediction_error),
                         pp_total_cycles,
                     )
                 };
@@ -463,7 +470,7 @@ impl CognitiveLoopService {
                         fep_learning_signal,
                         closed_learning_loop,
                         &episodic_ctx,
-                        cycle_learning_result,
+                        prediction_error_valid.then_some(cycle_learning_result),
                     )
                 };
                 #[cfg(feature = "parallel")]
