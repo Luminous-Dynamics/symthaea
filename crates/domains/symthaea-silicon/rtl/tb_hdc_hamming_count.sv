@@ -28,6 +28,13 @@ module tb_hdc_hamming_count #(
     logic [DATA_W-1:0] pattern_a;
     logic [DATA_W-1:0] pattern_b;
     logic [COUNT_W-1:0] held_distance;
+    localparam int unsigned COUNT_HEX_BITS = ((COUNT_W + 3) / 4) * 4;
+    localparam int unsigned ORACLE_ROW_W = (2 * DATA_W) + COUNT_HEX_BITS;
+    localparam int unsigned MAX_ORACLE_WORDS = 4096;
+    logic [ORACLE_ROW_W-1:0] oracle_words [0:MAX_ORACLE_WORDS-1];
+    logic [ORACLE_ROW_W-1:0] oracle_row;
+    integer oracle_word_count;
+    string oracle_path;
 
     hdc_hamming_count #(.DATA_W(DATA_W), .COUNT_W(COUNT_W), .BALANCED_TREE(BALANCED_TREE)) dut (
         .clk,
@@ -45,13 +52,16 @@ module tb_hdc_hamming_count #(
         forever #5 clk = ~clk;
     end
 
-    task automatic check_count(
+    task automatic check_count_expected(
         input logic [DATA_W-1:0] a,
         input logic [DATA_W-1:0] b,
+        input logic [COUNT_W-1:0] expected_oracle,
         input string label
     );
-        logic [COUNT_W-1:0] expected;
-        expected = COUNT_W'($countones(a ^ b));
+        logic [COUNT_W-1:0] expected_local;
+        expected_local = COUNT_W'($countones(a ^ b));
+        if (expected_oracle !== expected_local)
+            $fatal(1, "%s: software oracle disagrees with $countones", label);
 
         @(negedge clk);
         if (in_ready !== 1'b1) $fatal(1, "%s: expected in_ready before request", label);
@@ -62,12 +72,21 @@ module tb_hdc_hamming_count #(
         @(posedge clk);
         @(negedge clk);
         if (out_valid !== 1'b1) $fatal(1, "%s: missing out_valid", label);
-        if (distance !== expected) $fatal(1, "%s: popcount mismatch got=%0d expected=%0d", label, distance, expected);
+        if (distance !== expected_oracle)
+            $fatal(1, "%s: popcount mismatch got=%0d expected=%0d", label, distance, expected_oracle);
 
         in_valid = 1'b0;
         @(posedge clk);
         @(negedge clk);
         if (out_valid !== 1'b0) $fatal(1, "%s: output did not retire", label);
+    endtask
+
+    task automatic check_count(
+        input logic [DATA_W-1:0] a,
+        input logic [DATA_W-1:0] b,
+        input string label
+    );
+        check_count_expected(a, b, COUNT_W'($countones(a ^ b)), label);
     endtask
 
     initial begin
@@ -101,6 +120,28 @@ module tb_hdc_hamming_count #(
                 random_b[lane +: 32] = rng_b;
             end
             check_count(random_a, random_b, "deterministic-lcg");
+        end
+
+        // Optional canonical-BinaryHV software-oracle words. The .mem row is
+        // {operand_a, operand_b, count_hex_padded}; the expected count uses only
+        // the low COUNT_W bits. The software generator checks per-word counts
+        // sum to BinaryHV::hamming_distance for each complete vector pair.
+        if ($value$plusargs("ORACLE_HAMMING=%s", oracle_path)) begin
+            if (!$value$plusargs("ORACLE_WORDS=%d", oracle_word_count))
+                $fatal(1, "ORACLE_HAMMING requires +ORACLE_WORDS=<count>");
+            if (oracle_word_count < 1 || oracle_word_count > MAX_ORACLE_WORDS)
+                $fatal(1, "ORACLE_WORDS out of range: %0d", oracle_word_count);
+            $readmemh(oracle_path, oracle_words, 0, oracle_word_count - 1);
+            for (int oracle_index = 0; oracle_index < oracle_word_count; oracle_index++) begin
+                oracle_row = oracle_words[oracle_index];
+                check_count_expected(
+                    oracle_row[ORACLE_ROW_W-1 -: DATA_W],
+                    oracle_row[ORACLE_ROW_W-DATA_W-1 -: DATA_W],
+                    oracle_row[COUNT_W-1:0],
+                    "canonical-BinaryHV-oracle"
+                );
+            end
+            $display("PASS: hdc_hamming_count software oracle words=%0d width=%0d balanced_tree=%0d", oracle_word_count, DATA_W, BALANCED_TREE);
         end
 
         // Stalled output must hold its accepted result, even if input pins move.
