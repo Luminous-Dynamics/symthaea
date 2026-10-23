@@ -143,6 +143,7 @@
           "numerator",
           "denominator",
           "estimate",
+          "independent_components",
           "confidence_interval_95"
         ],
         "properties": {
@@ -151,6 +152,10 @@
             "minimum": 0
           },
           "denominator": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "independent_components": {
             "type": "integer",
             "minimum": 0
           },
@@ -169,12 +174,20 @@
             "additionalProperties": false,
             "required": [
               "method",
+              "status",
               "lower",
               "upper"
             ],
             "properties": {
               "method": {
                 "const": "component_clustered_percentile_bootstrap"
+              },
+              "status": {
+                "enum": [
+                  "not_reported_no_observations",
+                  "suppressed_insufficient_independent_components",
+                  "reported_descriptive_interval"
+                ]
               },
               "lower": {
                 "oneOf": [
