@@ -429,9 +429,11 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
         #[cfg(feature = "safety-agents")]
         {
-            let safety_result = self.safety_supervisor.assess(
+            let safety_result = self.safety_supervisor.assess_with_evidence(
                 feedback.consciousness.consciousness_level as f32,
-                dynamics.core.prediction_error,
+                (perception.urgency.prediction_error_valid
+                    && dynamics.core.prediction_error.is_finite())
+                    .then_some(dynamics.core.prediction_error),
                 feedback.self_model.temporal_coherence_score as f32,
                 {
                     #[cfg(feature = "integrity")]
