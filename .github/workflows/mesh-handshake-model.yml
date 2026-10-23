@@ -41,15 +41,15 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Download and verify pinned TLA+ tools
+      - name: Download immutable TLA+ build and verify SHA-256
         env:
-          TLA_VERSION: v1.8.0
-          TLA_SHA256: dae639a1f51a9e13ce60c369b15f32124cf1a78017aca366b6de0ae2b5169439
+          TLA_VERSION: tla2tools-2026.08.11.125311
+          TLA_SHA256: ab323b79802aedc3203b3f9af37c6aca3ed43f4e0225b36f2aa77b26de46c05f
         run: |
           set -euo pipefail
           mkdir -p "$EVIDENCE_DIR"
           curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
-            "https://github.com/tlaplus/tlaplus/releases/download/${TLA_VERSION}/tla2tools.jar" \
+            "https://github.com/zactionsz/tla-tools/releases/download/${TLA_VERSION}/tla2tools.jar" \
             --output "$TOOL_JAR"
           printf '%s  %s\n' "$TLA_SHA256" "$TOOL_JAR" | sha256sum --check --strict
           printf 'TLA_VERSION=%s\nTLA_SHA256=%s\n' "$TLA_VERSION" "$TLA_SHA256" \
