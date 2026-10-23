@@ -261,23 +261,123 @@ fn typed_distractor(rng: &mut u64, gt_vals: &[f64], probes: &[Experiment]) -> Ex
 const MAX_TYPED_RECOVERY_RESTARTS: usize = 2;
 const RECOVERY_CANDIDATES_PER_EXPANSION: usize = 4;
 const RECOVERY_GENERATION_ATTEMPT_CAP: usize = 256;
+const RECOVERY_COMPLEXITY_PENALTY: f64 = 1.0e-4;
 
-/// Reopen archived candidates after a predictive-adequacy alarm and reseed the typed
-/// ENERGY-dimensional grammar. This function deliberately receives no observations, evaluator
-/// discrepancy value, or ground-truth handle: candidate generation is driven only by the public
-/// task signature, the existing symbolic hypotheses, and a fixed pre-generated experiment pool.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RecoveryProposalFamily {
+    AdditiveCorrection,
+    MultiplicativeCorrection,
+    InteractionCorrection,
+    GenericTyped,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct RecoveryProposalSummary {
+    accepted_count: usize,
+    structured_count: usize,
+}
+
+/// Build one dimensionally consistent correction around the rejected provisional model.
+/// Additive corrections have target ENERGY dimensions; multiplicative corrections are
+/// dimensionless factors around 1; interactions multiply a declared variable by a typed term
+/// whose units make the product ENERGY. The caller still screens finite values and novelty.
+fn structured_correction_proposal(
+    rng: &mut u64,
+    base: &Expr,
+    family: RecoveryProposalFamily,
+) -> Option<Expr> {
+    let units = demo_units();
+    let candidate = match family {
+        RecoveryProposalFamily::AdditiveCorrection => {
+            let correction = random_expr_with_dimension(
+                rng,
+                DimensionalSignature::ENERGY,
+                &units,
+                GEN_MAX_DEPTH,
+            );
+            Expr::BinOp(BinOp::Add, Box::new(base.clone()), Box::new(correction))
+        }
+        RecoveryProposalFamily::MultiplicativeCorrection => {
+            let factor = random_expr_with_dimension(
+                rng,
+                DimensionalSignature::DIMENSIONLESS,
+                &units,
+                GEN_MAX_DEPTH,
+            );
+            let one_plus_factor =
+                Expr::BinOp(BinOp::Add, Box::new(Expr::Const(1.0)), Box::new(factor));
+            Expr::BinOp(
+                BinOp::Mul,
+                Box::new(base.clone()),
+                Box::new(one_plus_factor),
+            )
+        }
+        RecoveryProposalFamily::InteractionCorrection => {
+            if VAR_NAMES.is_empty() {
+                return None;
+            }
+            let name = VAR_NAMES[rand_index(rng, VAR_NAMES.len())];
+            let variable_dimension = *units.get(name)?;
+            let correction_dimension = DimensionalSignature::ENERGY.sub(&variable_dimension);
+            let correction = random_expr_with_dimension(
+                rng,
+                correction_dimension,
+                &units,
+                GEN_MAX_DEPTH,
+            );
+            let interaction = Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var(name.to_string())),
+                Box::new(correction),
+            );
+            Expr::BinOp(BinOp::Add, Box::new(base.clone()), Box::new(interaction))
+        }
+        RecoveryProposalFamily::GenericTyped => return None,
+    };
+    matches!(
+        infer_dimensions(&candidate, &units),
+        InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
+    )
+    .then_some(candidate)
+}
+
+/// Normalized empirical loss used only to rank recovery proposals. It is not a validation
+/// metric and not an inferential guarantee; all past outcomes are reused for proposal ranking,
+/// while only previously unused experiment points are eligible for subsequent audit evidence.
+fn recovery_fit_score(candidate: &Expr, observations: &[(Experiment, f64)]) -> Option<f64> {
+    if observations.is_empty() {
+        return None;
+    }
+    let mut loss = 0.0;
+    for (point, observed) in observations {
+        if !observed.is_finite() {
+            return None;
+        }
+        let prediction = eval_at(candidate, point)?;
+        let residual = (prediction - observed) / (1.0 + observed.abs());
+        loss += residual * residual;
+    }
+    let mean_loss = loss / observations.len() as f64;
+    let score = mean_loss + RECOVERY_COMPLEXITY_PENALTY * candidate.complexity() as f64;
+    score.is_finite().then_some(score)
+}
+
+/// Reopen archived candidates after a predictive-adequacy alarm. Proposals are generated from
+/// the public ENERGY task signature and the rejected expression, then ranked using observed
+/// outcomes only. No evaluator discrepancy amplitude or ground-truth handle enters this policy.
 /// The alarmed provisional candidate is archived but excluded from the new live set.
 fn reseed_typed_candidates_after_alarm(
     rng: &mut u64,
     candidate_pool: &[Experiment],
+    observations: &[(Experiment, f64)],
     hypotheses: &mut Vec<Expr>,
     live: &mut Vec<usize>,
     rejected_candidates: &mut Vec<usize>,
     alarmed_candidate: usize,
-) -> usize {
+) -> RecoveryProposalSummary {
     let archived_count = hypotheses.len();
     if candidate_pool.is_empty() || alarmed_candidate >= archived_count {
-        return 0;
+        return RecoveryProposalSummary::default();
     }
     if !rejected_candidates.contains(&alarmed_candidate) {
         rejected_candidates.push(alarmed_candidate);
@@ -294,28 +394,36 @@ fn reseed_typed_candidates_after_alarm(
         })
         .collect();
 
-    // Recovery is a bounded model-search restart, not a claim that the alarm identifies the
-    // right replacement. Restore archived alternatives except the alarmed model, then add
-    // dimensionally-valid, functionally novel candidates. Previously rejected candidates are
-    // intentionally reconsidered because the old hard-elimination path can reject a true law
-    // after one noisy measurement.
     live.clear();
-    live.extend(
-        (0..archived_count).filter(|index| !rejected_candidates.contains(index)),
-    );
+    live.extend((0..archived_count).filter(|index| !rejected_candidates.contains(index)));
 
-    let mut accepted = 0usize;
+    let base = hypotheses[alarmed_candidate].clone();
+    let baseline_score = recovery_fit_score(&base, observations);
+    // tuple order: structured first, then normalized loss, candidate, pool predictions, family
+    let mut proposals: Vec<(u8, f64, Expr, Vec<f64>, RecoveryProposalFamily)> = Vec::new();
     let mut attempts = 0usize;
-    while accepted < RECOVERY_CANDIDATES_PER_EXPANSION
-        && attempts < RECOVERY_GENERATION_ATTEMPT_CAP
-    {
+    while attempts < RECOVERY_GENERATION_ATTEMPT_CAP {
+        let family = match attempts % 4 {
+            0 => RecoveryProposalFamily::AdditiveCorrection,
+            1 => RecoveryProposalFamily::MultiplicativeCorrection,
+            2 => RecoveryProposalFamily::InteractionCorrection,
+            _ => RecoveryProposalFamily::GenericTyped,
+        };
         attempts += 1;
-        let candidate = random_expr_with_dimension(
-            rng,
-            DimensionalSignature::ENERGY,
-            &units,
-            GEN_MAX_DEPTH,
-        );
+
+        let candidate = if family == RecoveryProposalFamily::GenericTyped {
+            random_expr_with_dimension(
+                rng,
+                DimensionalSignature::ENERGY,
+                &units,
+                GEN_MAX_DEPTH,
+            )
+        } else {
+            let Some(candidate) = structured_correction_proposal(rng, &base, family) else {
+                continue;
+            };
+            candidate
+        };
         if !matches!(
             infer_dimensions(&candidate, &units),
             InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
@@ -332,8 +440,43 @@ fn reseed_typed_candidates_after_alarm(
         };
         if !values.iter().all(|value| value.abs() < 1.0e6)
             || !values.iter().any(|value| value.abs() > 1.0e-6)
+            || known_predictions
+                .iter()
+                .any(|known| !functionally_distinct(&values, known))
+            || proposals
+                .iter()
+                .any(|(_, _, _, known, _)| !functionally_distinct(&values, known))
         {
             continue;
+        }
+
+        let score = recovery_fit_score(&candidate, observations)
+            .unwrap_or_else(|| RECOVERY_COMPLEXITY_PENALTY * candidate.complexity() as f64);
+        let is_structured = family != RecoveryProposalFamily::GenericTyped;
+        if is_structured && baseline_score.is_some_and(|baseline| score >= baseline) {
+            continue;
+        }
+        // Prefer candidates that improve observed residuals, but keep a generic typed fallback
+        // if no structured correction survives the empirical screen. Fresh measurements remain
+        // the arbiter of validity.
+        proposals.push((
+            if is_structured { 0 } else { 1 },
+            score,
+            candidate,
+            values,
+            family,
+        ));
+    }
+
+    proposals.sort_by(|left, right| {
+        left.0
+            .cmp(&right.0)
+            .then_with(|| left.1.total_cmp(&right.1))
+    });
+    let mut summary = RecoveryProposalSummary::default();
+    for (_, _, candidate, values, family) in proposals {
+        if summary.accepted_count >= RECOVERY_CANDIDATES_PER_EXPANSION {
+            break;
         }
         if known_predictions
             .iter()
@@ -341,14 +484,16 @@ fn reseed_typed_candidates_after_alarm(
         {
             continue;
         }
-
         let index = hypotheses.len();
         hypotheses.push(candidate);
         live.push(index);
         known_predictions.push(values);
-        accepted += 1;
+        summary.accepted_count += 1;
+        if family != RecoveryProposalFamily::GenericTyped {
+            summary.structured_count += 1;
+        }
     }
-    accepted
+    summary
 }
 
 /// An untyped distractor: same distinctness/sanity bar, but drawn from the naive grammar (no
@@ -421,6 +566,7 @@ struct TrialOutcome {
     prequential_pit_alarm: bool,
     monitoring_protocol_invalid: bool,
     typed_recovery_restarts: usize,
+    structured_recovery_candidates: usize,
     terminal_pit_alarm: bool,
 }
 
@@ -537,6 +683,7 @@ fn run_trial_with_discrepancy(
             prequential_pit_alarm: false,
             monitoring_protocol_invalid: true,
             typed_recovery_restarts: 0,
+            structured_recovery_candidates: 0,
             terminal_pit_alarm: false,
         };
     }
@@ -593,6 +740,7 @@ fn run_trial_with_discrepancy(
 
     let mut live: Vec<usize> = (0..hypotheses.len()).collect();
     let mut used: Vec<Experiment> = Vec::new();
+    let mut measured_observations: Vec<(Experiment, f64)> = Vec::new();
     let mut noise_rng = seed ^ 0xAAAA_BBBB_CCCC_DDDD;
     let mut dt_rng = seed ^ 0xDDDD_CCCC_BBBB_AAAA;
     let mut audit_rng = seed ^ 0xA0D1_7000_51E1_0001;
@@ -609,6 +757,7 @@ fn run_trial_with_discrepancy(
     let mut prequential_pit_alarm = false;
     let mut monitoring_protocol_invalid = false;
     let mut typed_recovery_restarts = 0usize;
+    let mut structured_recovery_candidates = 0usize;
     let mut rejected_after_alarm = Vec::<usize>::new();
     let mut terminal_pit_alarm = false;
 
@@ -842,6 +991,7 @@ fn run_trial_with_discrepancy(
             Some(pred) => (pred - observed).abs() <= ELIMINATION_TOLERANCE * (1.0 + observed.abs()),
             None => false,
         });
+        measured_observations.push((chosen.clone(), observed));
         round += 1;
         if pit_alarm_this_round {
             // An alarm is evidence against this provisional model, not evidence for any
@@ -858,18 +1008,20 @@ fn run_trial_with_discrepancy(
             };
             let mut recovery_rng =
                 seed ^ 0xF1A1_1E5E_2026_0001 ^ (typed_recovery_restarts as u64).rotate_left(19);
-            let added = reseed_typed_candidates_after_alarm(
+            let recovery = reseed_typed_candidates_after_alarm(
                 &mut recovery_rng,
                 &candidate_pool,
+                &measured_observations,
                 &mut hypotheses,
                 &mut live,
                 &mut rejected_after_alarm,
                 alarmed_index,
             );
-            if added == 0 {
+            if recovery.accepted_count == 0 {
                 terminal_pit_alarm = true;
                 break;
             }
+            structured_recovery_candidates += recovery.structured_count;
             typed_recovery_restarts += 1;
             terminal_pit_alarm = false;
             pit_monitor = Some(
@@ -897,6 +1049,7 @@ fn run_trial_with_discrepancy(
         prequential_pit_alarm,
         monitoring_protocol_invalid,
         typed_recovery_restarts,
+        structured_recovery_candidates,
         terminal_pit_alarm,
     }
 }
@@ -1341,6 +1494,105 @@ mod tests {
     }
 
     #[test]
+    fn structured_recovery_families_preserve_energy_dimensions() {
+        let base = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".to_string())),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let units = demo_units();
+        let families = [
+            RecoveryProposalFamily::AdditiveCorrection,
+            RecoveryProposalFamily::MultiplicativeCorrection,
+            RecoveryProposalFamily::InteractionCorrection,
+        ];
+        let mut rng = 0xCAFE_BABE_1234_5678_u64;
+
+        for family in families {
+            let mut candidate = None;
+            for _ in 0..128 {
+                if let Some(proposal) =
+                    structured_correction_proposal(&mut rng, &base, family)
+                {
+                    candidate = Some(proposal);
+                    break;
+                }
+            }
+            let candidate = candidate.expect(
+                "typed correction family failed to propose a valid expression",
+            );
+            assert!(matches!(
+                infer_dimensions(&candidate, &units),
+                InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
+            ));
+        }
+    }
+
+    #[test]
+    fn empirical_recovery_score_rewards_a_structured_correction_on_observed_residuals() {
+        let base = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".to_string())),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let radius_squared = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("r".to_string())),
+            Box::new(Expr::Const(2.0)),
+        );
+        let time_squared = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("t".to_string())),
+            Box::new(Expr::Const(2.0)),
+        );
+        let correction = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Const(0.5)),
+            Box::new(Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::BinOp(
+                    BinOp::Mul,
+                    Box::new(Expr::Var("m".to_string())),
+                    Box::new(radius_squared),
+                )),
+                Box::new(time_squared),
+            )),
+        );
+        let corrected = Expr::BinOp(
+            BinOp::Add,
+            Box::new(base.clone()),
+            Box::new(correction),
+        );
+        let mut rng = 0xA11C_E5ED_9876_5432_u64;
+        let observations: Vec<(Experiment, f64)> = (0..24)
+            .map(|_| {
+                let point = random_experiment(&mut rng);
+                let value = eval_at(&corrected, &point).unwrap();
+                (point, value)
+            })
+            .collect();
+
+        let baseline_score = recovery_fit_score(&base, &observations).unwrap();
+        let corrected_score = recovery_fit_score(&corrected, &observations).unwrap();
+        assert!(
+            corrected_score < baseline_score,
+            "structured correction should explain the synthetic residual: base={baseline_score}, corrected={corrected_score}"
+        );
+        assert!(matches!(
+            infer_dimensions(&corrected, &demo_units()),
+            InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
+        ));
+    }
+
+    #[test]
     fn post_alarm_recovery_reopens_archived_candidates_and_adds_typed_candidates() {
         let mut rng = 0xBADC_0FFE_E0DD_F00D_u64;
         let mut pool_rng = 0x1234_5678_9ABC_DEF0_u64;
@@ -1369,20 +1621,29 @@ mod tests {
         let mut live = vec![0];
         let mut rejected = Vec::new();
 
-        let added = reseed_typed_candidates_after_alarm(
+        let observations: Vec<(Experiment, f64)> = pool
+            .iter()
+            .take(8)
+            .map(|point| {
+                let value = eval_at(&hypotheses[0], point).unwrap();
+                (point.clone(), value)
+            })
+            .collect();
+        let summary = reseed_typed_candidates_after_alarm(
             &mut rng,
             &pool,
+            &observations,
             &mut hypotheses,
             &mut live,
             &mut rejected,
             0,
         );
 
-        assert!(added > 0, "bounded typed recovery failed to add any candidate");
-        assert!(added <= RECOVERY_CANDIDATES_PER_EXPANSION);
+        assert!(summary.accepted_count > 0, "bounded typed recovery failed to add any candidate");
+        assert!(summary.accepted_count <= RECOVERY_CANDIDATES_PER_EXPANSION);
         assert!(!live.contains(&0), "the alarmed provisional candidate stayed live");
         assert!(live.contains(&1) && live.contains(&2), "archived alternatives were not reopened");
-        assert_eq!(live.len(), archived_count - 1 + added);
+        assert_eq!(live.len(), archived_count - 1 + summary.accepted_count);
         let units = demo_units();
         for index in archived_count..hypotheses.len() {
             assert!(matches!(
@@ -1397,6 +1658,7 @@ mod tests {
         let _ = reseed_typed_candidates_after_alarm(
             &mut second_rng,
             &pool,
+            &observations,
             &mut hypotheses,
             &mut live,
             &mut rejected,
@@ -1430,6 +1692,7 @@ mod tests {
         let mut pit_audit_queries = 0usize;
         let mut protocol_failures = 0usize;
         let mut total_typed_recovery_restarts = 0usize;
+        let mut structured_recovery_candidates = 0usize;
         let mut terminal_pit_alarms = 0usize;
 
         for seed in 1..=SEEDS {
@@ -1474,6 +1737,8 @@ mod tests {
             pit_audit_queries += misspecified_pit.audit_queries + clean_pit.audit_queries;
             total_typed_recovery_restarts +=
                 clean_pit.typed_recovery_restarts + misspecified_pit.typed_recovery_restarts;
+            structured_recovery_candidates += clean_pit.structured_recovery_candidates
+                + misspecified_pit.structured_recovery_candidates;
             terminal_pit_alarms += if clean_pit.terminal_pit_alarm { 1 } else { 0 };
             terminal_pit_alarms += if misspecified_pit.terminal_pit_alarm { 1 } else { 0 };
             protocol_failures += if clean_pit.monitoring_protocol_invalid { 1 } else { 0 };
@@ -1489,6 +1754,7 @@ mod tests {
                 "misspec_pit_false_singletons={misspec_pit_false_singletons},",
                 "misspec_pit_detections={misspec_pit_detections},",
                 "pit_audit_queries={pit_audit_queries},typed_recovery_restarts={total_typed_recovery_restarts},",
+                "structured_recovery_candidates={structured_recovery_candidates},",
                 "terminal_pit_alarms={terminal_pit_alarms},protocol_failures={protocol_failures}"
             )
         );

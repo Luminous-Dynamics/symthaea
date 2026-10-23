@@ -82,6 +82,10 @@ jobs:
         run: cargo test -p symthaea-physics-bridge prequential_pit_policy_rejects_smoothed_measurements --lib
       - name: Test bounded typed recovery after PIT alarms
         run: cargo test -p symthaea-physics-bridge post_alarm_recovery_reopens_archived_candidates_and_adds_typed_candidates --lib
+      - name: Test structured recovery dimensional validity
+        run: cargo test -p symthaea-physics-bridge structured_recovery_families_preserve_energy_dimensions --lib
+      - name: Test residual-guided correction scoring
+        run: cargo test -p symthaea-physics-bridge empirical_recovery_score_rewards_a_structured_correction_on_observed_residuals --lib
       - name: Run robust noise-envelope pilot
         run: cargo test -p symthaea-physics-bridge scenario_robust_eig_vs_nominal_eig_pilot --lib -- --nocapture
       - name: Strict Clippy for the core library
