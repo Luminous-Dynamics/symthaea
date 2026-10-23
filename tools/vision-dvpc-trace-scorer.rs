@@ -60,7 +60,6 @@ struct Table {
 struct Observation {
     sample_sha256: String,
     group_id: String,
-    split: String,
     declared_latency_us: u64,
     declared_energy_uj: u64,
 }
@@ -113,7 +112,6 @@ struct Action {
     declared_energy_uj: u64,
     allocator_latency_us: u64,
     allocator_energy_uj: u64,
-    committed: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -315,7 +313,6 @@ fn read_observations(table: &Table, target_split: &str) -> Result<BTreeMap<Strin
         let observation = Observation {
             sample_sha256: row[7].clone(),
             group_id: row[5].clone(),
-            split: row[4].clone(),
             declared_latency_us,
             declared_energy_uj,
         };
@@ -386,7 +383,7 @@ fn read_outcomes(table: &Table, observations: &BTreeMap<String, Observation>) ->
 
 fn read_actions(table: &Table, observations: &BTreeMap<String, Observation>) -> Result<Vec<Action>, String> {
     let mut actions = Vec::new();
-    let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
+    let mut seen: BTreeSet<(String, String, String)> = BTreeSet::new();
     let mut per_run_indexes: BTreeMap<(String, String), BTreeSet<u64>> = BTreeMap::new();
     let mut per_run_budgets: BTreeMap<(String, String), (u64, u64)> = BTreeMap::new();
     let mut comparison_budgets: BTreeMap<String, (u64, u64)> = BTreeMap::new();
@@ -421,7 +418,7 @@ fn read_actions(table: &Table, observations: &BTreeMap<String, Observation>) -> 
         }
 
         let run_key = (row[3].clone(), row[4].clone());
-        if !seen.insert((row[4].clone(), trace_id.clone())) {
+        if !seen.insert((row[3].clone(), row[4].clone(), trace_id.clone())) {
             return Err(fail(format!("duplicate policy/trace action {} / {}", row[4], trace_id)));
         }
         let budget = (latency_budget_us, energy_budget_uj);
@@ -450,7 +447,6 @@ fn read_actions(table: &Table, observations: &BTreeMap<String, Observation>) -> 
             declared_energy_uj,
             allocator_latency_us,
             allocator_energy_uj,
-            committed: true,
         });
     }
 
@@ -498,7 +494,6 @@ fn score(
 
     let mut metrics: BTreeMap<(String, String), PolicyMetrics> = BTreeMap::new();
     let mut per_group_utility: BTreeMap<(String, String, String), Vec<f64>> = BTreeMap::new();
-    let mut per_group_loss: BTreeMap<(String, String, String), Vec<f64>> = BTreeMap::new();
     for (run_key, rows) in &runs {
         let mut m = PolicyMetrics::default();
         let mut chosen_utilities = Vec::new();
@@ -552,7 +547,6 @@ fn score(
             };
             chosen_utilities.push(utility);
             per_group_utility.entry((run_key.0.clone(), run_key.1.clone(), obs.group_id.clone())).or_default().push(utility);
-            per_group_loss.entry((run_key.0.clone(), run_key.1.clone(), obs.group_id.clone())).or_default().push(*losses.last().unwrap());
         }
 
         let group_means: Vec<f64> = per_group_utility.iter()
@@ -583,13 +577,19 @@ fn score(
         metrics.insert(run_key.clone(), m);
     }
 
-    // Paired comparisons are computed only when the same comparison ID includes all-cheap.
+    // Snapshot baseline metrics first to avoid aliasing the policy-result map.
+    let cheap_baselines: BTreeMap<String, PolicyMetrics> = metrics
+        .iter()
+        .filter(|((_, policy), _)| policy == "all_cheap")
+        .map(|((comparison, _), value)| (comparison.clone(), value.clone()))
+        .collect();
     for (run_key, m) in metrics.iter_mut() {
-        let cheap_key = (run_key.0.clone(), "all_cheap".to_owned());
-        if let Some(cheap) = metrics_snapshot(&metrics, &cheap_key) {
+        if let Some(cheap) = cheap_baselines.get(&run_key.0) {
             m.utility_delta_vs_all_cheap = Some(m.group_balanced_utility - cheap.group_balanced_utility);
             m.cvar95_delta_vs_all_cheap = Some(m.cvar95_incremental_loss - cheap.cvar95_incremental_loss);
-            m.safety_delta_vs_all_cheap = Some(m.chosen_safety_violations as i64 - cheap.chosen_safety_violations as i64);
+            m.safety_delta_vs_all_cheap = Some(
+                m.chosen_safety_violations as i64 - cheap.chosen_safety_violations as i64,
+            );
         }
     }
 
@@ -614,13 +614,6 @@ fn score(
     }
     report.push_str("META\toracle\tNOT_COMPUTED_IN_V1\n");
     Ok(report)
-}
-
-fn metrics_snapshot(
-    metrics: &BTreeMap<(String, String), PolicyMetrics>,
-    key: &(String, String),
-) -> Option<PolicyMetrics> {
-    metrics.get(key).cloned()
 }
 
 fn fmt_opt(value: Option<f64>) -> String {
