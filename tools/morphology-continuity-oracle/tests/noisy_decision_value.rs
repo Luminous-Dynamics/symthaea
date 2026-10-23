@@ -642,3 +642,97 @@ fn misspecified_policy_rejects_malformed_true_likelihoods() {
         None
     );
 }
+
+
+fn misspecification_regret(
+    assumed: Measurement,
+    actual_likelihoods: [[u16; 3]; 3],
+    alternative: Measurement,
+    weights: [u64; 3],
+    decisions: &[Decision],
+) -> Option<(f64, f64, f64)> {
+    let policy_risk =
+        expected_loss_under_assumed_policy(assumed, actual_likelihoods, weights, decisions)?;
+    let true_measurement = Measurement {
+        likelihood_per_mille: actual_likelihoods,
+        ..assumed
+    };
+    let true_model_risk = expected_loss_after_measurement(true_measurement, weights, decisions);
+    let model_regret = policy_risk - true_model_risk;
+
+    let selected_total = total_loss_with_acquisition_cost(policy_risk, assumed.cost_milliunits);
+    let true_inventory_total =
+        total_loss_with_acquisition_cost(true_model_risk, assumed.cost_milliunits);
+    let alternative_total = total_loss_with_acquisition_cost(
+        expected_loss_after_measurement(alternative, weights, decisions),
+        alternative.cost_milliunits,
+    );
+    let oracle_total = baseline_expected_loss(weights, decisions)
+        .min(true_inventory_total)
+        .min(alternative_total);
+
+    Some((policy_risk, model_regret, selected_total - oracle_total))
+}
+
+#[test]
+fn asymmetric_false_positive_drift_is_more_dangerous_than_sensitivity_drop() {
+    let candidates = measurements();
+    let inventory = candidates[1];
+    let design = candidates[2];
+    let decisions = decisions();
+
+    let cases = [
+        (
+            "sensitivity-drop",
+            [[850, 150, 0], [50, 950, 0], [50, 950, 0]],
+            3.88,
+            0.0,
+            0.095,
+        ),
+        (
+            "false-positive-shift",
+            [[950, 50, 0], [150, 850, 0], [200, 800, 0]],
+            7.96,
+            3.96,
+            4.175,
+        ),
+        (
+            "both-sides-shift",
+            [[900, 100, 0], [150, 850, 0], [200, 800, 0]],
+            8.08,
+            4.08,
+            4.295,
+        ),
+        (
+            "perfect-specificity",
+            [[900, 100, 0], [0, 1_000, 0], [0, 1_000, 0]],
+            1.84,
+            0.0,
+            0.0,
+        ),
+    ];
+
+    for (name, truth, expected_risk, expected_model_regret, expected_decision_regret) in cases {
+        let (risk, model_regret, decision_regret) = misspecification_regret(
+            inventory,
+            truth,
+            design,
+            PRIOR_WEIGHTS,
+            &decisions,
+        )
+        .expect("assumed and true likelihood tables are valid");
+
+        assert!(
+            (risk - expected_risk).abs() <= EPSILON,
+            "{name}: expected policy risk {expected_risk}, got {risk}"
+        );
+        assert!(
+            (model_regret - expected_model_regret).abs() <= EPSILON,
+            "{name}: expected model regret {expected_model_regret}, got {model_regret}"
+        );
+        assert!(
+            (decision_regret - expected_decision_regret).abs() <= EPSILON,
+            "{name}: expected decision regret {expected_decision_regret}, got {decision_regret}"
+        );
+    }
+}
