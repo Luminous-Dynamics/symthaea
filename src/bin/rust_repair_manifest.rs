@@ -435,7 +435,6 @@ fn run_marker_counts(log: &str) -> Vec<usize> {
 
 #[derive(Debug)]
 struct RuntimeEvidenceSummary {
-    sha256: String,
     container_image_id: String,
     container_ids: Vec<String>,
 }
@@ -581,7 +580,7 @@ fn validate_runtime_evidence(
         errors.push("one or more gold-run parsed statuses could not be validated".to_string());
     }
     if !errors.is_empty() { return Err(errors); }
-    Ok(RuntimeEvidenceSummary { sha256: evidence_sha, container_image_id: image_ids[0].clone(), container_ids: run_ids })
+    Ok(RuntimeEvidenceSummary { container_image_id: image_ids[0].clone(), container_ids: run_ids })
 }
 
 fn hash_field(row: &Value, field: &str) -> Result<String, String> {
@@ -1201,8 +1200,57 @@ mod tests {
             "PASS_TO_PASS": listed_p2p
         });
         fs::write(task_dir.join("status.json"), serde_json::to_vec(&status).unwrap()).unwrap();
-        fs::write(task_dir.join("pre_patch_log.txt"), "baseline: complete test log\n").unwrap();
+        let baseline_log = "baseline: complete test log\n";
+        fs::write(task_dir.join("pre_patch_log.txt"), baseline_log).unwrap();
         fs::write(task_dir.join("post_patch_log.txt"), gold_log).unwrap();
+        let image_reference = "test-image@sha256:deadbeef";
+        let image_id = format!("sha256:{}", "b".repeat(64));
+        let baseline_status = baseline.iter().map(|(id, state)| ((*id).to_string(), (*state).to_string())).collect::<BTreeMap<_, _>>();
+        let gold_status = gold.iter().map(|(id, state)| ((*id).to_string(), (*state).to_string())).collect::<BTreeMap<_, _>>();
+        let mut gold_runs = Vec::new();
+        for run_index in 0..3 {
+            let run_log = format!("gold run {run_index} complete test log\n");
+            fs::write(task_dir.join(format!("gold_run_{run_index}.log")), &run_log).unwrap();
+            gold_runs.push(serde_json::json!({
+                "role": "gold",
+                "run_index": run_index,
+                "test_patch_applied": true,
+                "solution_patch_applied": true,
+                "rebuild_exit_code": 0,
+                "test_exit_code": if gold.iter().all(|(_, state)| *state == "pass") { 0 } else { 1 },
+                "print_exit_code": 0,
+                "container_identity": {
+                    "container_id": format!("{:064x}", run_index + 2),
+                    "configured_image": image_reference,
+                    "container_image_id": image_id,
+                    "repo_digests": []
+                },
+                "log_sha256": sha256_bytes(run_log.as_bytes()),
+                "parsed_status": gold_status
+            }));
+        }
+        let evidence = serde_json::json!({
+            "schema_version": 1,
+            "instance_id": instance_id,
+            "image_reference": image_reference,
+            "baseline": {
+                "role": "baseline",
+                "test_patch_applied": true,
+                "rebuild_exit_code": 0,
+                "test_exit_code": 1,
+                "print_exit_code": 0,
+                "container_identity": {
+                    "container_id": format!("{:064x}", 1),
+                    "configured_image": image_reference,
+                    "container_image_id": image_id,
+                    "repo_digests": []
+                },
+                "log_sha256": sha256_bytes(baseline_log.as_bytes()),
+                "parsed_status": baseline_status
+            },
+            "gold_runs": gold_runs
+        });
+        fs::write(task_dir.join("validation_evidence.json"), serde_json::to_vec(&evidence).unwrap()).unwrap();
 
         serde_json::json!({
             "instance_id": instance_id,
@@ -1246,6 +1294,9 @@ mod tests {
             record.gold_validation_log_sha256,
             sha256_bytes(b"eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n")
         );
+        assert_eq!(record.container_image_id, format!("sha256:{}", "b".repeat(64)));
+        assert_eq!(record.container_ids.len(), 4);
+        assert_eq!(record.runtime_evidence_sha256, sha256_bytes(&fs::read(root.path().join(instance_id).join("validation_evidence.json")).unwrap()));
     }
 
     #[test]
@@ -1321,6 +1372,50 @@ mod tests {
         assert!(result.audit.unresolved);
         assert!(result.manifest_record.is_none());
         assert!(result.audit.reasons.iter().any(|reason| reason.contains("test-ID sets differ")));
+    }
+
+    #[test]
+    fn tampered_per_run_log_invalidates_runtime_evidence() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-log-tamper";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail")],
+            &[("bug-fixed", "pass")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        fs::write(root.path().join(instance_id).join("gold_run_1.log"), "tampered log\n").unwrap();
+        let result = audit_candidate(&row, instance_id, root.path(), sha256_bytes(b"tampered log row"));
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result.audit.reasons.iter().any(|reason| reason.contains("raw run log SHA-256 mismatch")));
+    }
+
+    #[test]
+    fn different_actual_image_ids_across_gold_runs_are_rejected() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-image-drift";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail")],
+            &[("bug-fixed", "pass")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let mut evidence: Value = serde_json::from_slice(&fs::read(&evidence_path).unwrap()).unwrap();
+        evidence["gold_runs"][2]["container_identity"]["container_image_id"] =
+            Value::String(format!("sha256:{}", "c".repeat(64)));
+        fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
+        let result = audit_candidate(&row, instance_id, root.path(), sha256_bytes(b"image drift row"));
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result.audit.reasons.iter().any(|reason| reason.contains("image ID differs")));
     }
 
     #[test]
