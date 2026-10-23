@@ -758,6 +758,37 @@ fn verify_solution_text(
     Ok((parsed, selected, report))
 }
 
+fn verification_failure_receipt_json(
+    graph_path: &str,
+    solution_path: &str,
+    reported_objective: Option<usize>,
+    error: &str,
+) -> String {
+    format!(
+        concat!(
+            "{\n",
+            "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.qoblib-solution-verification.v1\",\n",
+            "  \"benchmark_track\": \"published-solution-feasibility-audit\",\n",
+            "  \"return_status\": \"failed\",\n",
+            "  \"error_kind\": \"solution_verification_io_or_parse\",\n",
+            "  \"error\": \"{}\",\n",
+            "  \"graph_path\": \"{}\",\n",
+            "  \"solution_path\": \"{}\",\n",
+            "  \"graph_bytes\": null,\n",
+            "  \"graph_fnv1a64\": null,\n",
+            "  \"solution_bytes\": null,\n",
+            "  \"solution_fnv1a64\": null,\n",
+            "  \"reported_objective\": {},\n",
+            "  \"limitations\": [\"failure receipt could not complete graph/solution parsing\", \"FNV-1a is non-cryptographic\", \"failure does not represent an optimization result\"]\n",
+            "}"
+        ),
+        json_escape(error),
+        json_escape(graph_path),
+        json_escape(solution_path),
+        reported_objective.map(|value| value.to_string()).unwrap_or_else(|| "null".to_owned())
+    )
+}
+
 fn run_verify_solution(
     graph_path: &str,
     solution_path: &str,
@@ -837,6 +868,15 @@ fn main() -> ExitCode {
             Ok(false) => ExitCode::FAILURE,
             Err(error) => {
                 eprintln!("{error}");
+                println!(
+                    "{}",
+                    verification_failure_receipt_json(
+                        &args[2],
+                        &args[3],
+                        reported_objective,
+                        &error,
+                    )
+                );
                 ExitCode::FAILURE
             }
         };
@@ -927,6 +967,22 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn solution_verification_failure_receipt_preserves_error_and_source_paths() {
+        let receipt = verification_failure_receipt_json(
+            "graphs/one\n.gph",
+            "solutions/bad\"set.sol",
+            Some(88),
+            "bad \"solution\" token\nat line 4",
+        );
+        assert!(receipt.contains("\"return_status\": \"failed\""));
+        assert!(receipt.contains("\"error_kind\": \"solution_verification_io_or_parse\""));
+        assert!(receipt.contains("\"graph_path\": \"graphs/one\\n.gph\""));
+        assert!(receipt.contains("\"solution_path\": \"solutions/bad\\\"set.sol\""));
+        assert!(receipt.contains("\"reported_objective\": 88"));
+        assert!(receipt.contains("\"error\": \"bad \\\"solution\\\" token\\nat line 4\""));
+    }
 
     #[test]
     fn published_solution_mode_checks_feasibility_and_reported_objective() {
