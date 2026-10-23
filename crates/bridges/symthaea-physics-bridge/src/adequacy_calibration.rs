@@ -984,7 +984,13 @@ mod tests {
 
         let method_names = ["RMS", "raw-max", "min-p fusion", "sum-log fusion"];
         for scenario_index in 0..4 {
-            print!("scenario={}; ", ["clean-null", "single +6 sigma spike", "+0.4 sigma mean shift", "AR(1) rho=0.55"][scenario_index]);
+            let scenario_name = [
+                "clean-null",
+                "single +6 sigma spike",
+                "+0.4 sigma mean shift",
+                "AR(1) rho=0.55",
+            ][scenario_index];
+            print!("scenario={scenario_name}; ");
             for method_index in 0..4 {
                 let count = alarms[scenario_index][method_index];
                 let rate = count as f64 / REPLICATIONS as f64;
@@ -1003,7 +1009,9 @@ mod tests {
 
         // The clean-null gate catches major calibration mistakes; it is not a proof of validity.
         assert!(
-            alarms[0].iter().all(|count| *count as f64 / REPLICATIONS as f64 < 0.08),
+            alarms[0]
+                .iter()
+                .all(|count| (*count as f64 / REPLICATIONS as f64) < 0.08),
             "clean-null alarm rate exceeded the smoke-test envelope: {:?}",
             alarms[0]
         );
@@ -1012,24 +1020,28 @@ mod tests {
         let max_bias = alarms[2][1] as f64 / REPLICATIONS as f64;
         assert!(
             max_bias > rms_bias + 0.30,
-            "raw maximum should expose this bias alternative more often: rms={rms_bias:.4}, max={max_bias:.4}"
+            "raw maximum should expose this bias alternative more often: \
+             rms={rms_bias:.4}, max={max_bias:.4}"
         );
         let rms_ar = alarms[3][0] as f64 / REPLICATIONS as f64;
         let max_ar = alarms[3][1] as f64 / REPLICATIONS as f64;
         assert!(
             max_ar > rms_ar + 0.50,
-            "raw maximum should expose this autocorrelation alternative more often: rms={rms_ar:.4}, max={max_ar:.4}"
+            "raw maximum should expose this autocorrelation alternative more often: \
+             rms={rms_ar:.4}, max={max_ar:.4}"
         );
         let rms_spike = alarms[1][0] as f64 / REPLICATIONS as f64;
         let max_spike = alarms[1][1] as f64 / REPLICATIONS as f64;
         assert!(
             max_spike + 0.25 < rms_spike,
-            "raw maximum trade-off on the spike alternative changed: rms={rms_spike:.4}, max={max_spike:.4}"
+            "raw maximum trade-off on the spike alternative changed: \
+             rms={rms_spike:.4}, max={max_spike:.4}"
         );
         let sum_spike = alarms[1][3] as f64 / REPLICATIONS as f64;
         assert!(
             sum_spike > rms_spike + 0.05,
-            "sum-log fusion should expose this spike alternative more often: rms={rms_spike:.4}, sum-log={sum_spike:.4}"
+            "sum-log fusion should expose this spike alternative more often: \
+             rms={rms_spike:.4}, sum-log={sum_spike:.4}"
         );
     }
 }
