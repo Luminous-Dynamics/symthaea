@@ -12195,7 +12195,7 @@
       "Keep two designs distinct: same-completed-graph paired comparisons for graph-conditioned solvers; original Marino-Kirkpatrick deferred-decision comparison is unpaired at the distribution level unless identical completed-graph inputs are actually verified.",
       "Do not label an input-conditioned adaptation of Marino-Kirkpatrick as the original algorithm; if implemented, pin and evaluate it as a distinct variant.",
       "Add ordinary minimum-degree greedy as a control, including the p=1 identity control.",
-      "Keep graph-generation seeds and instance order frozen; record a raw output row per solver-instance pair.",
+      "Freeze separate seed streams for the generator-coupled Marino–Kirkpatrick procedure and fixed-graph QGreedy cohort; record one raw output row per generated graph. For graph-conditioned arms, record one row per shared graph digest and method.",
       "Pre-register N<=2000 as the primary reproduction comparison because the preprint reports statistically significant improvement through that range; report N=5000 as a separately labelled scaling result.",
       "Measure independent-set cardinality and ratio |I|/N across graph instances; do not treat an asymptotic independence-ratio bound as the exact optimum of each finite graph.",
       "Report total CPU time and every QAOA/physical-shots/circuit/queue/calibration/setup cost. Amortize reusable precomputed light-cone expectation tables across the exact number of workload instances served, and report break-even volume.",
