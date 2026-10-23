@@ -105,6 +105,46 @@ impl AuthenticatedSequenceWindow {
     }
 }
 
+/// Outcome of attempting admission into the bounded authenticated replay table.
+#[cfg(feature = "mesh")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AuthenticatedReplayAdmission {
+    Accepted,
+    ReplayedOrOutsideWindow,
+    CapacityReached,
+}
+
+/// Admit an authenticated packet without evicting live replay state.
+///
+/// The caller must verify the packet MAC and freshness before invoking this
+/// function. Capacity is fail-closed: a new stream is rejected once the table
+/// is full, while already tracked streams continue to use their current window.
+#[cfg(feature = "mesh")]
+pub(super) fn admit_authenticated_sequence(
+    windows: &mut std::collections::HashMap<
+        ([u8; 8], u8),
+        AuthenticatedSequenceWindow,
+    >,
+    key: ([u8; 8], u8),
+    sequence: u32,
+    now: std::time::Instant,
+) -> AuthenticatedReplayAdmission {
+    if !windows.contains_key(&key) && windows.len() >= MESH_REPLAY_STREAM_CAPACITY {
+        return AuthenticatedReplayAdmission::CapacityReached;
+    }
+
+    let accepted = windows
+        .entry(key)
+        .or_default()
+        .check_and_mark(sequence, now);
+
+    if accepted {
+        AuthenticatedReplayAdmission::Accepted
+    } else {
+        AuthenticatedReplayAdmission::ReplayedOrOutsideWindow
+    }
+}
+
 #[cfg(feature = "mesh")]
 #[cfg(test)]
 mod authenticated_sequence_window_tests {
@@ -206,6 +246,44 @@ mod authenticated_sequence_window_tests {
         assert!(
             !window.is_expired(reordered_at + std::time::Duration::from_secs(66)),
             "an accepted in-window packet is recent authenticated activity"
+        );
+    }
+
+
+    #[test]
+    fn replay_table_capacity_rejects_new_stream_without_evicting_live_windows() {
+        let now = std::time::Instant::now();
+        let mut windows = std::collections::HashMap::new();
+
+        for index in 0..MESH_REPLAY_STREAM_CAPACITY {
+            let value = (index as u32).to_be_bytes();
+            let key = ([value[0], value[1], value[2], value[3], 0, 0, 0, 0], 0);
+            assert_eq!(
+                admit_authenticated_sequence(&mut windows, key, 1, now),
+                AuthenticatedReplayAdmission::Accepted
+            );
+        }
+        assert_eq!(windows.len(), MESH_REPLAY_STREAM_CAPACITY);
+
+        let existing_value = 0u32.to_be_bytes();
+        let existing_key = ([existing_value[0], existing_value[1], existing_value[2], existing_value[3], 0, 0, 0, 0], 0);
+        assert_eq!(
+            admit_authenticated_sequence(&mut windows, existing_key, 2, now),
+            AuthenticatedReplayAdmission::Accepted,
+            "an existing stream remains usable when the table is full"
+        );
+
+        let new_value = (MESH_REPLAY_STREAM_CAPACITY as u32).to_be_bytes();
+        let new_key = ([new_value[0], new_value[1], new_value[2], new_value[3], 0, 0, 0, 0], 0);
+        assert_eq!(
+            admit_authenticated_sequence(&mut windows, new_key, 1, now),
+            AuthenticatedReplayAdmission::CapacityReached,
+            "an untracked stream must fail closed instead of evicting a live window"
+        );
+        assert_eq!(windows.len(), MESH_REPLAY_STREAM_CAPACITY);
+        assert!(
+            windows.contains_key(&existing_key),
+            "capacity handling must not evict an active authenticated stream"
         );
     }
 }
