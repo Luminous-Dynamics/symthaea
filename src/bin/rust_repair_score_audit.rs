@@ -1421,9 +1421,7 @@ fn run(cli: Cli) -> Result<(), String> {
         .ok_or_else(|| "task manifest missing candidate_row_count".to_string())?;
     if candidate_rows.len() as u64 != expected_candidate_rows {
         return Err(format!(
-            concat!(
-                "candidate row count differs from locked manifest: expected {}, observed {}"
-            ),
+            concat!("candidate row count differs from locked manifest: expected {}, observed {}"),
             expected_candidate_rows,
             candidate_rows.len()
         ));
