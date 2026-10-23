@@ -31,7 +31,7 @@ done
 
 The LSH parameters are explicit and recorded in the output. By default, each run sweeps three arms: `32x8`, `16x16`, and `64x4` (bands × rows). Override them with `--lsh-configs=32x8,16x16,64x4`; no arm may be duplicated and a run is limited to 16 arms. The same deterministic corpus and query vectors are reused across all arms, while each arm gets a separately built index. Do not compare arms whose source, vector corpus, query corpus or cache protocol differs.
 
-To test the approximate path with its candidate-count and empty-result fallbacks disabled, run a separate arm with `--candidate-multiplier=0 --fallback-on-empty=false`. Keep the default-fallback arm as well: disabling fallback may improve latency while degrading recall, so neither arm is sufficient by itself.
+To test the approximate path with its candidate-count and empty-result fallbacks disabled, run a separate matrix with `--candidate-multiplier=0 --fallback-on-empty=false`. Keep the default-fallback matrix as well: disabling fallback may improve latency while degrading recall, so neither matrix is sufficient by itself.
 
 The example includes ten focused source-level tests for deterministic workload replay, exact corruption count, clustered-neighborhood separation, Recall@K semantics including ties, LSH sweep parsing, and deterministic bootstrap intervals. Run them with:
 
@@ -97,7 +97,7 @@ Archive the complete CSV (including its metadata and per-query exact/approximate
 - exact command line and exit status;
 - whether each sample is warm-cache, cold-cache or mixed, and whether the store was reconstructed between repetitions.
 
-The current program reports OS, target architecture, available parallelism, workload settings, source SHA, per-arm p50/p95 latency, exact-ID and tie-aware recall, vector examinations and fallback/exhaustive fractions, plus per-query-class median speedup and deterministic bootstrap 95% intervals. A fully cold-cache test, memory/RSS accounting, energy measurements, production-scale corpus and confidence intervals are not implemented by this first slice. Record them separately rather than implying that the current CSV contains them.
+The current program reports OS, target architecture, available parallelism, workload settings, source SHA, per-arm p50/p95 latency, exact-ID and tie-aware recall, vector examinations and fallback/exhaustive fractions, plus per-query-class median speedup and deterministic bootstrap 95% intervals. A fully cold-cache test, memory/RSS accounting, energy measurements and production-scale corpus are not implemented by this first slice. The bootstrap interval covers variation across the current synthetic query sample; it does not cover hardware-to-hardware or run-to-run variation. Record those limitations rather than implying that the current CSV contains them.
 
 ## Next gates
 
