@@ -346,6 +346,40 @@ fn outcome_map(
             ));
         }
     }
+    let scored_count = required_count(report, "scored_count", label)?;
+    let expected_scored_count = counts["pass"] + counts["fail"];
+    if scored_count != expected_scored_count {
+        return Err(format!(
+            "{label}: scored_count disagrees with independently re-counted task rows"
+        ));
+    }
+    let expected_lockable = counts["unresolved"] == 0 && scored_count == rows.len();
+    if report.get("lockable").and_then(Value::as_bool) != Some(expected_lockable) {
+        return Err(format!(
+            "{label}: lockable flag disagrees with independently re-counted task rows"
+        ));
+    }
+    let completed_run_success_rate = report
+        .get("completed_run_success_rate")
+        .filter(|value| !value.is_null())
+        .and_then(Value::as_f64);
+    if scored_count > 0 {
+        let expected_rate = counts["pass"] as f64 / scored_count as f64;
+        if completed_run_success_rate
+            .is_none_or(|observed| (observed - expected_rate).abs() > 1e-12)
+        {
+            return Err(format!(
+                "{label}: completed_run_success_rate disagrees with task rows"
+            ));
+        }
+    } else if !report
+        .get("completed_run_success_rate")
+        .is_none_or(Value::is_null)
+    {
+        return Err(format!(
+            "{label}: completed_run_success_rate must be null when no task is resolved"
+        ));
+    }
     let pass_at_1 = report
         .get("pass_at_1")
         .filter(|value| !value.is_null())
@@ -880,8 +914,9 @@ mod tests {
             "format_version": 1, "protocol_id": SCORE_PROTOCOL_ID,
             "task_manifest_sha256": "a".repeat(64),
             "candidate_jsonl_sha256": "b".repeat(64),
-            "task_count": 2, "success_count": 2, "failure_count": 0,
-            "unresolved_count": 0, "pass_at_1": 1.0,
+            "task_count": 2, "scored_count": 2, "success_count": 2, "failure_count": 0,
+            "unresolved_count": 0, "lockable": true, "pass_at_1": 1.0,
+            "completed_run_success_rate": 1.0,
             "tasks": [
                 {"instance_id":"x", "outcome":"pass"},
                 {"instance_id":"x", "outcome":"pass"}
@@ -896,8 +931,9 @@ mod tests {
             "format_version": 1, "protocol_id": SCORE_PROTOCOL_ID,
             "task_manifest_sha256": "a".repeat(64),
             "candidate_jsonl_sha256": "b".repeat(64),
-            "task_count": 1, "success_count": 0, "failure_count": 0,
-            "unresolved_count": 1, "pass_at_1": null,
+            "task_count": 1, "scored_count": 0, "success_count": 0, "failure_count": 0,
+            "unresolved_count": 1, "lockable": false, "pass_at_1": null,
+            "completed_run_success_rate": null,
             "tasks": [{"instance_id":"x", "outcome":"unresolved"}]
         });
         let mut inconsistent = report.clone();
@@ -912,8 +948,9 @@ mod tests {
             "format_version": 1, "protocol_id": SCORE_PROTOCOL_ID,
             "task_manifest_sha256": "a".repeat(64),
             "candidate_jsonl_sha256": "b".repeat(64),
-            "task_count": 1, "success_count": 0, "failure_count": 0,
-            "unresolved_count": 1, "pass_at_1": 0.0,
+            "task_count": 1, "scored_count": 0, "success_count": 0, "failure_count": 0,
+            "unresolved_count": 1, "lockable": false, "pass_at_1": 0.0,
+            "completed_run_success_rate": null,
             "tasks": [{"instance_id":"x", "outcome":"unresolved"}]
         });
         assert!(outcome_map(&report, "test", &"a".repeat(64), &"b".repeat(64)).is_err());
