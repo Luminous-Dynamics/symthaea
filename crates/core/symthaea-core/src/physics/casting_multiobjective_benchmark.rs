@@ -49,6 +49,10 @@ enum ParetoMetricError {
     NonFiniteObjective,
     OutsideReferenceBox,
     InvalidHypervolumeTarget,
+    EmptyApproximationFront,
+    EmptyReferenceFront,
+    TooFewPointsForSpacing,
+    NonFiniteMetricResult,
 }
 
 impl fmt::Display for ParetoMetricError {
@@ -68,6 +72,10 @@ impl fmt::Display for ParetoMetricError {
             Self::InvalidHypervolumeTarget => {
                 f.write_str("hypervolume target must be finite and strictly positive")
             }
+            Self::EmptyApproximationFront => f.write_str("approximation front must not be empty"),
+            Self::EmptyReferenceFront => f.write_str("reference front must not be empty"),
+            Self::TooFewPointsForSpacing => f.write_str("spacing requires at least two approximation points"),
+            Self::NonFiniteMetricResult => f.write_str("front metric overflowed or produced a non-finite result"),
         }
     }
 }
@@ -253,6 +261,144 @@ fn dominates(left: [f64; 2], right: [f64; 2]) -> bool {
     left[0] <= right[0]
         && left[1] <= right[1]
         && (left[0] < right[0] || left[1] < right[1])
+}
+
+/// Validate objective vectors used by cross-front metrics.
+/// All front values must already use the same objective directions and normalization.
+fn validate_metric_front(points: &[[f64; 2]]) -> Result<(), ParetoMetricError> {
+    if points.iter().flatten().any(|value| !value.is_finite()) {
+        return Err(ParetoMetricError::NonFiniteObjective);
+    }
+    Ok(())
+}
+
+/// Additive epsilon indicator for minimization:
+/// max over each reference point z of min over approximation points a of max_i(a_i - z_i).
+/// Lower is better; a negative value means the approximation dominates every reference point.
+fn additive_epsilon_indicator(
+    approximation: &[[f64; 2]],
+    reference: &[[f64; 2]],
+) -> Result<f64, ParetoMetricError> {
+    if approximation.is_empty() {
+        return Err(ParetoMetricError::EmptyApproximationFront);
+    }
+    if reference.is_empty() {
+        return Err(ParetoMetricError::EmptyReferenceFront);
+    }
+    validate_metric_front(approximation)?;
+    validate_metric_front(reference)?;
+
+    let mut worst_reference_gap = f64::NEG_INFINITY;
+    for target in reference {
+        let mut best_approximation_gap = f64::INFINITY;
+        for candidate in approximation {
+            let delta_0 = candidate[0] - target[0];
+            let delta_1 = candidate[1] - target[1];
+            if !delta_0.is_finite() || !delta_1.is_finite() {
+                return Err(ParetoMetricError::NonFiniteMetricResult);
+            }
+            best_approximation_gap = best_approximation_gap.min(delta_0.max(delta_1));
+        }
+        worst_reference_gap = worst_reference_gap.max(best_approximation_gap);
+    }
+    if worst_reference_gap.is_finite() {
+        Ok(worst_reference_gap)
+    } else {
+        Err(ParetoMetricError::NonFiniteMetricResult)
+    }
+}
+
+/// Inverted generational distance plus (IGD+) for minimization.
+/// For each reference point z, measure only the positive, worse-than-reference
+/// components max(a_i - z_i, 0) of the nearest approximation point a; return their mean.
+/// Lower is better. This implementation is 2-D and expects normalized, comparable objectives.
+fn inverted_generational_distance_plus(
+    approximation: &[[f64; 2]],
+    reference: &[[f64; 2]],
+) -> Result<f64, ParetoMetricError> {
+    if approximation.is_empty() {
+        return Err(ParetoMetricError::EmptyApproximationFront);
+    }
+    if reference.is_empty() {
+        return Err(ParetoMetricError::EmptyReferenceFront);
+    }
+    validate_metric_front(approximation)?;
+    validate_metric_front(reference)?;
+
+    // Incremental mean avoids overflowing a sum of many finite distances.
+    let mut mean_distance = 0.0;
+    for (index, target) in reference.iter().enumerate() {
+        let mut best_distance = f64::INFINITY;
+        for candidate in approximation {
+            let raw_0 = candidate[0] - target[0];
+            let raw_1 = candidate[1] - target[1];
+            if !raw_0.is_finite() || !raw_1.is_finite() {
+                return Err(ParetoMetricError::NonFiniteMetricResult);
+            }
+            let distance = raw_0.max(0.0).hypot(raw_1.max(0.0));
+            if !distance.is_finite() {
+                return Err(ParetoMetricError::NonFiniteMetricResult);
+            }
+            best_distance = best_distance.min(distance);
+        }
+        mean_distance += (best_distance - mean_distance) / (index + 1) as f64;
+        if !mean_distance.is_finite() {
+            return Err(ParetoMetricError::NonFiniteMetricResult);
+        }
+    }
+    Ok(mean_distance)
+}
+
+/// Sample standard deviation of each point's nearest-neighbour Euclidean distance.
+/// Lower values indicate more even spacing, not a better or more complete Pareto front.
+/// Input points must be distinct or duplicate points intentionally contribute zero spacing.
+fn nearest_neighbour_spacing(
+    approximation: &[[f64; 2]],
+) -> Result<f64, ParetoMetricError> {
+    if approximation.len() < 2 {
+        return Err(ParetoMetricError::TooFewPointsForSpacing);
+    }
+    validate_metric_front(approximation)?;
+
+    let mut nearest_distances = Vec::with_capacity(approximation.len());
+    for (index, point) in approximation.iter().enumerate() {
+        let mut nearest = f64::INFINITY;
+        for (other_index, other) in approximation.iter().enumerate() {
+            if index == other_index {
+                continue;
+            }
+            let delta_0 = point[0] - other[0];
+            let delta_1 = point[1] - other[1];
+            if !delta_0.is_finite() || !delta_1.is_finite() {
+                return Err(ParetoMetricError::NonFiniteMetricResult);
+            }
+            let distance = delta_0.hypot(delta_1);
+            if !distance.is_finite() {
+                return Err(ParetoMetricError::NonFiniteMetricResult);
+            }
+            nearest = nearest.min(distance);
+        }
+        nearest_distances.push(nearest);
+    }
+
+    let mut mean = 0.0;
+    let mut sum_squared_deviations = 0.0;
+    for (index, distance) in nearest_distances.iter().enumerate() {
+        let count = (index + 1) as f64;
+        let delta = distance - mean;
+        mean += delta / count;
+        sum_squared_deviations += delta * (distance - mean);
+        if !mean.is_finite() || !sum_squared_deviations.is_finite() {
+            return Err(ParetoMetricError::NonFiniteMetricResult);
+        }
+    }
+    let sample_variance = (sum_squared_deviations / (approximation.len() - 1) as f64).max(0.0);
+    let spacing = sample_variance.sqrt();
+    if spacing.is_finite() {
+        Ok(spacing)
+    } else {
+        Err(ParetoMetricError::NonFiniteMetricResult)
+    }
 }
 
 #[cfg(test)]
@@ -441,6 +587,99 @@ mod tests {
             Err(ParetoMetricError::CostOverflow)
         );
         assert_eq!(archive, before);
+    }
+
+
+    #[test]
+    fn additive_epsilon_indicator_matches_hand_calculation() {
+        let approximation = [[2.0, 2.0], [4.0, 0.0]];
+        let reference = [[1.0, 3.0], [3.0, 1.0]];
+        assert_abs_close(
+            additive_epsilon_indicator(&approximation, &reference).unwrap(),
+            1.0,
+            1e-12,
+        );
+    }
+
+    #[test]
+    fn additive_epsilon_can_be_negative_when_approximation_dominates_reference() {
+        assert_abs_close(
+            additive_epsilon_indicator(&[[1.0, 1.0]], &[[2.0, 2.0]]).unwrap(),
+            -1.0,
+            1e-12,
+        );
+    }
+
+    #[test]
+    fn igd_plus_matches_hand_calculation_and_rewards_dominance() {
+        let approximation = [[1.0, 3.0], [3.0, 1.0]];
+        let reference = [[1.0, 2.0], [2.0, 1.0]];
+        assert_abs_close(
+            inverted_generational_distance_plus(&approximation, &reference).unwrap(),
+            1.0,
+            1e-12,
+        );
+        assert_eq!(
+            inverted_generational_distance_plus(&[[1.0, 1.0]], &[[2.0, 2.0]]).unwrap(),
+            0.0
+        );
+    }
+
+    #[test]
+    fn spacing_matches_sample_standard_deviation_of_nearest_distances() {
+        let front = [[0.0, 0.0], [3.0, 0.0], [10.0, 0.0]];
+        assert_abs_close(
+            nearest_neighbour_spacing(&front).unwrap(),
+            8.0_f64.sqrt(),
+            1e-12,
+        );
+    }
+
+    #[test]
+    fn front_metrics_are_invariant_to_input_order() {
+        let approximation = [[2.0, 2.0], [4.0, 0.0], [1.5, 2.5]];
+        let reversed_approximation = [[1.5, 2.5], [4.0, 0.0], [2.0, 2.0]];
+        let reference = [[1.0, 3.0], [3.0, 1.0], [2.5, 2.0]];
+        let reversed_reference = [[2.5, 2.0], [3.0, 1.0], [1.0, 3.0]];
+        assert_abs_close(
+            additive_epsilon_indicator(&approximation, &reference).unwrap(),
+            additive_epsilon_indicator(&reversed_approximation, &reversed_reference).unwrap(),
+            1e-12,
+        );
+        assert_abs_close(
+            inverted_generational_distance_plus(&approximation, &reference).unwrap(),
+            inverted_generational_distance_plus(&reversed_approximation, &reversed_reference).unwrap(),
+            1e-12,
+        );
+        assert_abs_close(
+            nearest_neighbour_spacing(&approximation).unwrap(),
+            nearest_neighbour_spacing(&reversed_approximation).unwrap(),
+            1e-12,
+        );
+    }
+
+    #[test]
+    fn front_metrics_reject_empty_and_non_finite_inputs() {
+        assert_eq!(
+            additive_epsilon_indicator(&[], &[[1.0, 1.0]]),
+            Err(ParetoMetricError::EmptyApproximationFront)
+        );
+        assert_eq!(
+            inverted_generational_distance_plus(&[[1.0, 1.0]], &[]),
+            Err(ParetoMetricError::EmptyReferenceFront)
+        );
+        assert_eq!(
+            nearest_neighbour_spacing(&[[1.0, 1.0]]),
+            Err(ParetoMetricError::TooFewPointsForSpacing)
+        );
+        assert_eq!(
+            additive_epsilon_indicator(&[[f64::NAN, 0.0]], &[[1.0, 1.0]]),
+            Err(ParetoMetricError::NonFiniteObjective)
+        );
+        assert_eq!(
+            inverted_generational_distance_plus(&[[f64::MAX, 0.0]], &[[-f64::MAX, 0.0]]),
+            Err(ParetoMetricError::NonFiniteMetricResult)
+        );
     }
 
     fn assert_abs_close(actual: f64, expected: f64, tolerance: f64) {
