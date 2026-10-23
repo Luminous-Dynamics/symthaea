@@ -18,7 +18,7 @@ use crate::score::{Score, ScoreNote, VoiceRole};
 use serde::{Deserialize, Serialize};
 
 /// Version of the transformation-aware motif-return measurement contract.
-pub const MOTIF_RETURN_MEASUREMENT_VERSION: &str = "motif-return-v1";
+pub const MOTIF_RETURN_MEASUREMENT_VERSION: &str = "motif-return-v2";
 
 /// Auditable evidence that one melodic region recalls another.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -41,8 +41,13 @@ pub struct MotifReturnEvidence {
     pub contour_similarity: f32,
     /// Similarity of durations after normalizing each phrase by total length.
     pub rhythmic_shape_similarity: f32,
-    /// Mean target/source duration scale when both phrases contain notes.
+    /// Geometric-mean target/source duration scale for aligned notes.
     pub duration_scale: f32,
+    /// Multiplicative consistency of the per-event duration ratios in [0, 1].
+    /// A value of 1 means every aligned note uses the same duration scale.
+    /// Defaults to zero when reading legacy evidence that did not record it.
+    #[serde(default)]
+    pub duration_scale_consistency: f32,
     /// Best contiguous interval-window match for fragment recognition.
     pub fragment_similarity: f32,
     /// Fraction of the longer phrase represented by the alignment.
@@ -53,7 +58,13 @@ pub struct MotifReturnEvidence {
 
 impl MotifReturnEvidence {
     pub fn meets_threshold(&self, threshold: f32) -> bool {
-        self.aligned_note_count >= 2 && self.overall_similarity >= threshold.clamp(0.0, 1.0)
+        let uniform_scaling_required = matches!(
+            self.expected_transformation,
+            ReturnTransformation::Augmented | ReturnTransformation::Diminished
+        );
+        self.aligned_note_count >= 2
+            && self.overall_similarity >= threshold.clamp(0.0, 1.0)
+            && (!uniform_scaling_required || self.duration_scale_consistency >= 0.85)
     }
 }
 
@@ -118,7 +129,8 @@ pub fn compare_melodic_sequences(
     );
     let fragment_similarity = best_fragment_similarity(&source_intervals, &target_intervals);
     let rhythmic_shape_similarity = normalized_rhythm_similarity(&source, &target);
-    let duration_scale = mean_duration_scale(&source, &target);
+    let (duration_scale, duration_scale_consistency) =
+        duration_scale_metrics(&source, &target);
 
     let score_for = |kind| {
         transformation_score(
@@ -130,6 +142,7 @@ pub fn compare_melodic_sequences(
             contour_similarity,
             rhythmic_shape_similarity,
             duration_scale,
+            duration_scale_consistency,
             fragment_similarity,
             coverage,
         )
@@ -170,6 +183,7 @@ pub fn compare_melodic_sequences(
         contour_similarity,
         rhythmic_shape_similarity,
         duration_scale,
+        duration_scale_consistency,
         fragment_similarity,
         coverage,
         overall_similarity,
@@ -202,6 +216,7 @@ fn transformation_score(
     contour: f32,
     rhythm: f32,
     duration_scale: f32,
+    duration_scale_consistency: f32,
     fragment: f32,
     coverage: f32,
 ) -> f32 {
@@ -221,18 +236,20 @@ fn transformation_score(
             0.65 * inverted + 0.10 * transposed + 0.15 * rhythm + 0.10 * coverage
         }
         ReturnTransformation::Augmented => {
-            0.35 * transposed
+            (0.35 * transposed
                 + 0.20 * interval
                 + 0.20 * rhythm
                 + 0.15 * ratio_similarity(2.0)
-                + 0.10 * coverage
+                + 0.10 * coverage)
+                * duration_scale_consistency
         }
         ReturnTransformation::Diminished => {
-            0.35 * transposed
+            (0.35 * transposed
                 + 0.20 * interval
                 + 0.20 * rhythm
                 + 0.15 * ratio_similarity(0.5)
-                + 0.10 * coverage
+                + 0.10 * coverage)
+                * duration_scale_consistency
         }
         ReturnTransformation::Fragmented => {
             0.55 * fragment + 0.20 * contour + 0.15 * rhythm + 0.10 * coverage
@@ -303,20 +320,35 @@ fn normalized_rhythm_similarity(source: &[ScoreNote], target: &[ScoreNote]) -> f
     (1.0 - mean_error as f32 * count as f32).clamp(0.0, 1.0)
 }
 
-fn mean_duration_scale(source: &[ScoreNote], target: &[ScoreNote]) -> f32 {
-    let ratios: Vec<f64> = source
-        .iter()
-        .zip(target)
-        .filter_map(|(left, right)| {
-            let left = left.duration.beats();
-            (left > f64::EPSILON).then_some(right.duration.beats() / left)
-        })
-        .collect();
-    if ratios.is_empty() {
-        0.0
-    } else {
-        (ratios.iter().sum::<f64>() / ratios.len() as f64) as f32
+fn duration_scale_metrics(source: &[ScoreNote], target: &[ScoreNote]) -> (f32, f32) {
+    let mut log_ratios = Vec::with_capacity(source.len().min(target.len()));
+    for (left, right) in source.iter().zip(target) {
+        let source_duration = left.duration.beats();
+        let target_duration = right.duration.beats();
+        if source_duration <= f64::EPSILON || target_duration <= f64::EPSILON {
+            // A zero/non-positive duration cannot participate in a positive
+            // multiplicative scaling claim. Fail closed rather than dropping it.
+            return (0.0, 0.0);
+        }
+        log_ratios.push((target_duration / source_duration).ln());
     }
+    if log_ratios.is_empty() {
+        return (0.0, 0.0);
+    }
+
+    // Rhythmic scaling is multiplicative: geometric means make x2 and x0.5
+    // reciprocal, unlike an arithmetic mean of their ratios.
+    let mean_log_ratio = log_ratios.iter().sum::<f64>() / log_ratios.len() as f64;
+    let scale = mean_log_ratio.exp();
+    let mean_absolute_log_deviation = log_ratios
+        .iter()
+        .map(|ratio| (ratio - mean_log_ratio).abs())
+        .sum::<f64>()
+        / log_ratios.len() as f64;
+    // 1.0 is exact uniform scaling; larger per-note scale disagreement
+    // monotonically lowers this confidence channel toward zero.
+    let consistency = (-mean_absolute_log_deviation).exp();
+    (scale as f32, consistency as f32)
 }
 
 fn best_fragment_similarity(source: &[i32], target: &[i32]) -> f32 {
@@ -416,6 +448,56 @@ mod tests {
             compare_melodic_sequences(&source, &augmented, ReturnTransformation::Augmented);
         assert!((augmentation.duration_scale - 2.0).abs() < 1e-6);
         assert!(augmentation.overall_similarity > 0.9);
+    }
+
+    #[test]
+    fn inconsistent_per_note_scaling_cannot_pass_as_augmentation() {
+        let source = vec![
+            note(60, 0, Duration::quarter()),
+            note(62, 1, Duration::quarter()),
+            note(65, 2, Duration::quarter()),
+            note(64, 3, Duration::new(16, 1)),
+        ];
+        // The first three notes are doubled; the long final note is not.
+        // Pitch/interval agreement is perfect, so a naive average-scale
+        // heuristic can overstate this as a coherent augmentation.
+        let target = vec![
+            note(60, 0, Duration::new(2, 1)),
+            note(62, 1, Duration::new(2, 1)),
+            note(65, 2, Duration::new(2, 1)),
+            note(64, 3, Duration::new(16, 1)),
+        ];
+        let evidence =
+            compare_melodic_sequences(&source, &target, ReturnTransformation::Augmented);
+
+        assert!(evidence.duration_scale_consistency < 0.85);
+        assert!(
+            !evidence.meets_threshold(0.85),
+            "a high aggregate score must not hide non-uniform per-note scaling"
+        );
+    }
+
+    #[test]
+    fn uniform_augmentation_has_perfect_scale_consistency() {
+        let source = vec![
+            note(60, 0, Duration::quarter()),
+            note(62, 1, Duration::eighth()),
+            note(65, 2, Duration::half()),
+        ];
+        let target: Vec<_> = source
+            .iter()
+            .copied()
+            .map(|mut note| {
+                note.duration = note.duration.scale(2, 1);
+                note
+            })
+            .collect();
+        let evidence =
+            compare_melodic_sequences(&source, &target, ReturnTransformation::Augmented);
+
+        assert!((evidence.duration_scale - 2.0).abs() < 1e-6);
+        assert!((evidence.duration_scale_consistency - 1.0).abs() < 1e-6);
+        assert!(evidence.meets_threshold(0.85));
     }
 
     #[test]
