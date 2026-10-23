@@ -30,9 +30,7 @@ pub enum CalibrationError {
         minimum_required: usize,
     },
     /// A calibration score is negative or non-finite.
-    InvalidCalibrationScore {
-        index: usize,
-    },
+    InvalidCalibrationScore { index: usize },
     /// The audit batch score is negative or non-finite.
     InvalidAuditScore,
     /// The audit observations were not independent of model fitting/tuning data.
@@ -261,7 +259,10 @@ mod tests {
         assert_eq!(standardized_rms_residual(&[1.0], &[], &[1.0]), None);
         assert_eq!(standardized_rms_residual(&[1.0], &[0.0], &[0.0]), None);
         assert_eq!(standardized_rms_residual(&[f64::NAN], &[0.0], &[1.0]), None);
-        assert_eq!(standardized_rms_residual(&[f64::MAX], &[-f64::MAX], &[1.0]), None);
+        assert_eq!(
+            standardized_rms_residual(&[f64::MAX], &[-f64::MAX], &[1.0]),
+            None
+        );
     }
 
     #[test]
