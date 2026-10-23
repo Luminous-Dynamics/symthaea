@@ -1,0 +1,160 @@
+{
+  "schema_version": "1.0",
+  "qualification": "hdc_rtl_correctness_sweep",
+  "status": "expected_cases_not_results",
+  "widths_bits": [
+    64,
+    128,
+    256,
+    512
+  ],
+  "architectures": [
+    "xor",
+    "linear_popcount",
+    "balanced_popcount"
+  ],
+  "expected_case_count": 12,
+  "cases": [
+    {
+      "case_id": "xor-64",
+      "module": "hdc_bind_xor",
+      "architecture": "xor",
+      "datapath_width_bits": 64,
+      "top_module": "tb_hdc_bind_xor",
+      "parameter_overrides": {
+        "DATA_W": 64
+      },
+      "expected_pass_marker": "PASS: hdc_bind_xor smoke and backpressure tests completed"
+    },
+    {
+      "case_id": "linear-popcount-64",
+      "module": "hdc_hamming_count",
+      "architecture": "linear_popcount",
+      "datapath_width_bits": 64,
+      "top_module": "tb_hdc_hamming_count",
+      "parameter_overrides": {
+        "DATA_W": 64,
+        "BALANCED_TREE": 0
+      },
+      "expected_pass_marker": "PASS: hdc_hamming_count smoke and backpressure tests completed width=64 balanced_tree=0"
+    },
+    {
+      "case_id": "balanced-popcount-64",
+      "module": "hdc_hamming_count",
+      "architecture": "balanced_popcount",
+      "datapath_width_bits": 64,
+      "top_module": "tb_hdc_hamming_count",
+      "parameter_overrides": {
+        "DATA_W": 64,
+        "BALANCED_TREE": 1
+      },
+      "expected_pass_marker": "PASS: hdc_hamming_count smoke and backpressure tests completed width=64 balanced_tree=1"
+    },
+    {
+      "case_id": "xor-128",
+      "module": "hdc_bind_xor",
+      "architecture": "xor",
+      "datapath_width_bits": 128,
+      "top_module": "tb_hdc_bind_xor",
+      "parameter_overrides": {
+        "DATA_W": 128
+      },
+      "expected_pass_marker": "PASS: hdc_bind_xor smoke and backpressure tests completed"
+    },
+    {
+      "case_id": "linear-popcount-128",
+      "module": "hdc_hamming_count",
+      "architecture": "linear_popcount",
+      "datapath_width_bits": 128,
+      "top_module": "tb_hdc_hamming_count",
+      "parameter_overrides": {
+        "DATA_W": 128,
+        "BALANCED_TREE": 0
+      },
+      "expected_pass_marker": "PASS: hdc_hamming_count smoke and backpressure tests completed width=128 balanced_tree=0"
+    },
+    {
+      "case_id": "balanced-popcount-128",
+      "module": "hdc_hamming_count",
+      "architecture": "balanced_popcount",
+      "datapath_width_bits": 128,
+      "top_module": "tb_hdc_hamming_count",
+      "parameter_overrides": {
+        "DATA_W": 128,
+        "BALANCED_TREE": 1
+      },
+      "expected_pass_marker": "PASS: hdc_hamming_count smoke and backpressure tests completed width=128 balanced_tree=1"
+    },
+    {
+      "case_id": "xor-256",
+      "module": "hdc_bind_xor",
+      "architecture": "xor",
+      "datapath_width_bits": 256,
+      "top_module": "tb_hdc_bind_xor",
+      "parameter_overrides": {
+        "DATA_W": 256
+      },
+      "expected_pass_marker": "PASS: hdc_bind_xor smoke and backpressure tests completed"
+    },
+    {
+      "case_id": "linear-popcount-256",
+      "module": "hdc_hamming_count",
+      "architecture": "linear_popcount",
+      "datapath_width_bits": 256,
+      "top_module": "tb_hdc_hamming_count",
+      "parameter_overrides": {
+        "DATA_W": 256,
+        "BALANCED_TREE": 0
+      },
+      "expected_pass_marker": "PASS: hdc_hamming_count smoke and backpressure tests completed width=256 balanced_tree=0"
+    },
+    {
+      "case_id": "balanced-popcount-256",
+      "module": "hdc_hamming_count",
+      "architecture": "balanced_popcount",
+      "datapath_width_bits": 256,
+      "top_module": "tb_hdc_hamming_count",
+      "parameter_overrides": {
+        "DATA_W": 256,
+        "BALANCED_TREE": 1
+      },
+      "expected_pass_marker": "PASS: hdc_hamming_count smoke and backpressure tests completed width=256 balanced_tree=1"
+    },
+    {
+      "case_id": "xor-512",
+      "module": "hdc_bind_xor",
+      "architecture": "xor",
+      "datapath_width_bits": 512,
+      "top_module": "tb_hdc_bind_xor",
+      "parameter_overrides": {
+        "DATA_W": 512
+      },
+      "expected_pass_marker": "PASS: hdc_bind_xor smoke and backpressure tests completed"
+    },
+    {
+      "case_id": "linear-popcount-512",
+      "module": "hdc_hamming_count",
+      "architecture": "linear_popcount",
+      "datapath_width_bits": 512,
+      "top_module": "tb_hdc_hamming_count",
+      "parameter_overrides": {
+        "DATA_W": 512,
+        "BALANCED_TREE": 0
+      },
+      "expected_pass_marker": "PASS: hdc_hamming_count smoke and backpressure tests completed width=512 balanced_tree=0"
+    },
+    {
+      "case_id": "balanced-popcount-512",
+      "module": "hdc_hamming_count",
+      "architecture": "balanced_popcount",
+      "datapath_width_bits": 512,
+      "top_module": "tb_hdc_hamming_count",
+      "parameter_overrides": {
+        "DATA_W": 512,
+        "BALANCED_TREE": 1
+      },
+      "expected_pass_marker": "PASS: hdc_hamming_count smoke and backpressure tests completed width=512 balanced_tree=1"
+    }
+  ],
+  "claim_ceiling": "This is only an expected-case matrix. It contains no test results and cannot qualify RTL."
+}
