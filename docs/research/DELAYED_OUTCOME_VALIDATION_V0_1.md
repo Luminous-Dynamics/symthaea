@@ -24,6 +24,24 @@ The monitor only reports temporal association. It does not prove that the alarm 
 
 These works motivate the benchmark dimensions; they do not establish a performance result for Symthaea.
 
+
+## Industry baseline (documentation checked 23 October 2026)
+
+The adjacent field is not empty. The fair comparison should acknowledge what production monitoring already does:
+
+| System | Publicly documented scope | Comparison implication |
+| --- | --- | --- |
+| Amazon SageMaker Model Monitor | Baseline-based data-quality checks, model-quality comparisons once ground-truth labels are ingested, bias drift and feature-attribution drift. AWS currently says the legacy Model Monitor service is no longer open to new customers and is not receiving new features. | Use as a historical/product capability reference, not as an assumed available new deployment option. Its label-merge pattern is a baseline for our delayed-outcome workflow. |
+| Arize ML Monitoring | Model drift, performance, outliers, data quality and broader observability linking validation and production. | A shift alarm alone is not competitive differentiation; root-cause and performance linkage are already industry expectations. |
+| NannyML | Monitoring documentation includes estimated accuracy/performance when labels are unavailable and later concept-shift validation using ground truth. | Compare against label-free performance estimation as well as feature-shift detection; the Rust pre/post mean monitor is not a substitute for those estimators. |
+| Evidently | Data-quality and drift tests plus task-specific classification, regression, ranking and LLM evaluations. | A benchmark should include evaluation quality, not only distribution-distance scores. |
+
+References: AWS data-quality and model-quality documentation (https://docs.aws.amazon.com/sagemaker/latest/dg/model-monitor-data-quality.html; https://docs.aws.amazon.com/sagemaker/latest/dg/model-monitor-model-quality.html), Arize ML Monitoring (https://arize.com/products/ml-monitoring/), NannyML Cloud monitoring (https://docs.nannyml.com/cloud), and Evidently's public repository overview (https://github.com/evidentlyai/evidently).
+
+### What would be a credible Symthaea advantage?
+
+Not the existence of a drift alert. A defensible advantage would have to be demonstrated by the combined protocol: (1) explicit per-probe-family coverage and visible uncovered shift families; (2) a strict event-time ledger that rejects retrospective alarms and backdated labels; (3) outcome confirmation that keeps missing/delayed labels unresolved; and (4) reproducible equal-budget comparisons across null, benign-shift, harmful-shift, OOD and delayed-label worlds. Industry systems should be benchmarked where a faithful runnable comparison exists, and otherwise kept as a capability comparison rather than assigned fabricated scores. The current implementation is only a small first step toward this target.
+
 ## Rust API contract
 
 DelayedOutcomeMonitor is a small, dependency-free first implementation in symthaea-physics-bridge.
