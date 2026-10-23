@@ -91,8 +91,8 @@ BindIdentityAndTranscript ==
      \/ ProfileAllowed(chosenProfile)
   /\ peerIdentityBound' = TRUE
   /\ transcriptBound' = TRUE
-  /\ candidateSecretPresent' = BackendUsable
-                              \/ AdmissionMode = "stub-backend"
+  /\ candidateSecretPresent' = (BackendUsable
+                               \/ AdmissionMode = "stub-backend")
   /\ phase' = "Candidate"
   /\ UNCHANGED << chosenProfile,
                   initiatorConfirmed,
