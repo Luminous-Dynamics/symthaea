@@ -357,12 +357,21 @@ impl DualLayerMesh {
         if let Some(ref transport) = self.lora {
             let mut buf = [0u8; LORA_MTU];
             if receiver.fragment_encryption_enabled() {
-                while let Ok((n, source)) = transport.recv_raw_with_source(&mut buf) {
-                    if n == 0 || n > buf.len() {
-                        break;
-                    }
-                    if let Some(packet) = receiver.receive_fragment(source, &buf[..n]) {
-                        completed.push(packet);
+                loop {
+                    match transport.recv_raw_with_source(&mut buf) {
+                        Ok((n, source)) => {
+                            if n == 0 || n > buf.len() {
+                                break;
+                            }
+                            if let Some(packet) = receiver.receive_fragment(source, &buf[..n]) {
+                                completed.push(packet);
+                            }
+                        }
+                        Err(MeshError::SecurityProfileUnavailable(_)) => {
+                            receiver.record_fragment_identity_unavailable();
+                            break;
+                        }
+                        Err(_) => break,
                     }
                 }
             } else {
@@ -744,6 +753,23 @@ mod tests {
             transport.recv_raw_with_source(&mut buffer),
             Err(MeshError::SecurityProfileUnavailable(_))
         ));
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn poll_incoming_records_missing_authenticated_source_adapter() {
+        let mesh = DualLayerMesh::new([0x42; 32])
+            .with_lora(Box::new(LoopbackTransport::lora()));
+        let mut receiver = super::super::MeshReceiver::new()
+            .with_encryption_key([0x5A; 32])
+            .with_fragment_encryption(true);
+
+        assert!(mesh.poll_incoming(&mut receiver).is_empty());
+        assert_eq!(
+            receiver.stats().packets_decrypt_failed,
+            1,
+            "the unavailable source-binding profile must be observable"
+        );
     }
 
     // -- Routing --
