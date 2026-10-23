@@ -801,6 +801,8 @@ impl CognitiveLoopService {
 
         let late_ctx = LateConsciousnessContext {
             prediction_error,
+            prediction_error_valid: perception.urgency.prediction_error_valid
+                && prediction_error.is_finite(),
             coherence,
             unified_psi,
             hv16_cached: perception.encoding.hv16_cached,
