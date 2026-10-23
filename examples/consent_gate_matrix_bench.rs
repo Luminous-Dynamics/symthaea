@@ -90,9 +90,9 @@ fn make_request(request_scope_case: usize) -> ConsentRequest<'static> {
     };
     match request_scope_case {
         0 => {}
-        1 => request.subject_id = "subject:bob",
-        2 => request.action_id = "action:publish-record",
-        3 => request.purpose_id = "purpose:advertising",
+        1 => request.subject_id = "subject:request-bob",
+        2 => request.action_id = "action:request-publish-record",
+        3 => request.purpose_id = "purpose:request-advertising",
         4 => request.action_id = "",
         _ => unreachable!("request scope case is bounded by the matrix"),
     }
