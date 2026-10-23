@@ -798,10 +798,7 @@
       "p50-p95-detection-delay",
       "post-shift-recovery-cycles",
       "throughput",
-      "peak-memory",
-      "comparison_track",
-      "detector_version",
-      "label_delay_cycles"
+      "peak-memory"
     ],
     "tuning_policy": "Use leave-one-dataset-out hyperparameter optimization and randomized Monte Carlo onset/parameters. Hold out datasets and seeds from threshold fitting; report both default and tuned configurations.",
     "source_paper": "https://doi.org/10.1145/3770855.3819070",
