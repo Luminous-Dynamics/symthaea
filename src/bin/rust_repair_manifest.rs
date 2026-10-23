@@ -1562,6 +1562,7 @@ mod tests {
         );
         assert!(result.audit.eligible, "{:?}", result.audit.reasons);
         let record = result.manifest_record.expect("eligible task has manifest");
+        assert_eq!(record.candidate_row_sha256, sha256_bytes(b"candidate row"));
         assert_eq!(record.fail_to_pass_count, 1);
         assert_eq!(record.pass_to_pass_count, 1);
         assert_eq!(
