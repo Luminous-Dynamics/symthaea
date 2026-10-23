@@ -36,11 +36,11 @@ The current workflow pins upstream `v1.8.0` with SHA-256 `dae639a1f51a9e13ce60c3
 The upstream TLA+ tools repository documents Java 11+ command-line use. For local execution, use a pinned tool artifact and record its digest:
 
 ```sh
-java -cp /path/to/tla2tools.jar tla2sany.SANY \\
+java -cp /path/to/tla2tools.jar tla2sany.SANY \
   docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla
 
 for cfg in docs/security/models/mesh_handshake_*.cfg; do
-  java -cp /path/to/tla2tools.jar tlc2.TLC \\
+  java -cp /path/to/tla2tools.jar tlc2.TLC \
     -config "$cfg" docs/security/models/MESH_HANDSHAKE_LIFECYCLE.tla
 done
 ```
