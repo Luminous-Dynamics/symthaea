@@ -55,6 +55,17 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: clippy, rustfmt
+      - name: Format comparator and export canonical source (temporary helper; remove after formatting)
+        run: |
+          rustfmt --edition 2024 src/bin/rust_repair_trial_compare.rs
+          python3 - <<'PY'
+          import base64
+          from pathlib import Path
+          source = Path("src/bin/rust_repair_trial_compare.rs").read_bytes()
+          print("CANONICAL_TRIAL_COMPARE_BEGIN")
+          print(base64.b64encode(source).decode("ascii"))
+          print("CANONICAL_TRIAL_COMPARE_END")
+          PY
       - name: Check Rust formatting
         run: rustfmt --edition 2024 --check src/bin/rust_repair_manifest.rs src/bin/rust_repair_score_audit.rs src/bin/rust_repair_trial_compare.rs
       - name: Verify committed standalone lockfile
