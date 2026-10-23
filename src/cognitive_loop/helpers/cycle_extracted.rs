@@ -468,7 +468,15 @@ impl CognitiveLoopService {
     pub(in crate::cognitive_loop) fn run_surprise_exploration(
         &mut self,
         compressed_state: &[f32],
+        prediction_error_valid: bool,
     ) -> (bool, Option<String>) {
+        // The bridge compares the previous prediction to the current observation.
+        // An empty, zero-norm, mismatched, or otherwise invalid comparison must not
+        // be reinterpreted as surprise merely because one side is missing.
+        if !prediction_error_valid || compressed_state.is_empty() {
+            return (false, None);
+        }
+
         let mut surprise_triggered = false;
         let mut exploration_action = None;
 
