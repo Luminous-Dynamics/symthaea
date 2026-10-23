@@ -206,6 +206,7 @@ struct AuditReport {
     preregistration_sha256: String,
     benchmark_manifest_sha256: String,
     trial_results_sha256: String,
+    expected_trial_results_sha256: String,
     assignment_count: usize,
     input_trial_record_count: usize,
     missing_trial_record_count: usize,
@@ -227,6 +228,7 @@ struct Cli {
     preregistration: PathBuf,
     expected_preregistration_sha256: String,
     trial_results: PathBuf,
+    expected_trial_results_sha256: String,
     score_reports_dir: PathBuf,
     report_out: PathBuf,
 }
@@ -916,6 +918,7 @@ fn make_report(
     prereg: &Preregistration,
     preregistration_sha256: String,
     trial_results_sha256: String,
+    expected_trial_results_sha256: String,
     input_trial_record_count: usize,
     pairs: Vec<AuditPair>,
 ) -> AuditReport {
@@ -1027,6 +1030,7 @@ fn make_report(
         preregistration_sha256,
         benchmark_manifest_sha256: prereg.benchmark_manifest_sha256.clone(),
         trial_results_sha256,
+        expected_trial_results_sha256,
         assignment_count: pairs.len(),
         input_trial_record_count,
         missing_trial_record_count,
@@ -1089,7 +1093,8 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         println!(concat!(
             "Usage: rust-repair-ablation-audit ",
             "--preregistration PATH --expected-preregistration-sha256 HEX ",
-            "--trial-results JSONL --score-reports-dir PATH --report-out PATH"
+            "--trial-results JSONL --expected-trial-results-sha256 HEX ",
+            "--score-reports-dir PATH --report-out PATH"
         ));
         return Ok(None);
     }
@@ -1115,6 +1120,7 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         "--preregistration",
         "--expected-preregistration-sha256",
         "--trial-results",
+        "--expected-trial-results-sha256",
         "--score-reports-dir",
         "--report-out",
     ];
@@ -1133,10 +1139,18 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
     if !is_hex(&expected_preregistration_sha256, 64) {
         return Err("--expected-preregistration-sha256 must be 64 hex characters".to_string());
     }
+    let expected_trial_results_sha256 = values
+        .get("--expected-trial-results-sha256")
+        .expect("required arg checked")
+        .to_ascii_lowercase();
+    if !is_hex(&expected_trial_results_sha256, 64) {
+        return Err("--expected-trial-results-sha256 must be 64 hex characters".to_string());
+    }
     Ok(Some(Cli {
         preregistration: PathBuf::from(values.get("--preregistration").expect("required arg")),
         expected_preregistration_sha256,
         trial_results: PathBuf::from(values.get("--trial-results").expect("required arg")),
+        expected_trial_results_sha256,
         score_reports_dir: PathBuf::from(values.get("--score-reports-dir").expect("required arg")),
         report_out: PathBuf::from(values.get("--report-out").expect("required arg")),
     }))
@@ -1159,12 +1173,19 @@ fn run(cli: Cli) -> Result<(), String> {
     let trial_bytes = fs::read(&cli.trial_results)
         .map_err(|error| format!("cannot read trial results: {error}"))?;
     let trial_results_sha256 = sha256_bytes(&trial_bytes);
+    if trial_results_sha256 != cli.expected_trial_results_sha256 {
+        return Err(format!(
+            "trial-results digest mismatch: expected {}, observed {}",
+            cli.expected_trial_results_sha256, trial_results_sha256
+        ));
+    }
     let (grouped, input_trial_record_count) =
         parse_trial_results(&trial_bytes, &prereg, &cli.score_reports_dir)?;
     let pairs = join_assignments(&prereg, grouped)?;
     let report = make_report(
         &prereg,
         preregistration_sha256,
+        trial_results_sha256.clone(),
         trial_results_sha256,
         input_trial_record_count,
         pairs,
@@ -1253,6 +1274,28 @@ mod tests {
         assert_eq!(
             sha256_bytes(b"abc"),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn cli_requires_external_trial_results_digest() {
+        let digest = "a".repeat(64);
+        let args = vec![
+            "--preregistration".to_string(),
+            "prereg.json".to_string(),
+            "--expected-preregistration-sha256".to_string(),
+            digest.clone(),
+            "--trial-results".to_string(),
+            "trials.jsonl".to_string(),
+            "--score-reports-dir".to_string(),
+            "reports".to_string(),
+            "--report-out".to_string(),
+            "report.json".to_string(),
+        ];
+        assert!(
+            parse_cli(&args)
+                .unwrap_err()
+                .contains("--expected-trial-results-sha256")
         );
     }
 
