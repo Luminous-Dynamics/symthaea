@@ -39,6 +39,17 @@ cargo run --example consent_event_resolution_bench
 
 The current runner contains 12 hand-authored synthetic fixtures, permutations of each fixture's input slice, and four decisive counterfactual pairs. It is a smoke/contract probe, not a blinded benchmark. Do not treat its fixture percentage as an estimate of real-world safety.
 
+### Expanded deterministic resolver stress matrix
+
+The registered `consent_event_resolution_bench` additionally generates two finite synthetic matrices:
+
+- **4,608 single-event cases:** all 64 combinations of the three scope dimensions (exact, known mismatch, missing, empty), crossed with four transitions, six modalities and three order states (missing, order token 0, order token 1). A separately written high-level oracle checks the expected single-event result. Known mismatch takes precedence over missing/empty scope because a definitely out-of-scope event must not make an unrelated request ambiguous.
+- **5,184 exact-scope event pairs:** all ordered pairs from 72 event shapes (four transitions × six modalities × three order states). An independent rule-level oracle checks the expected normalized result, and each pair is reversed to test input-order invariance.
+
+Together, these add **9,792 generated checks** before counting the hand-authored fixtures, fixture-level permutations and four counterfactual pairs. This count is a mathematical property of the enumerator, **not a report of executed passes**. The runner has not yet been run in the authoring environment. The expected oracle shares the public input/output types but does not call the resolver's private comparison helpers; independent review is still warranted.
+
+The matrix probes representation contracts under a declared finite set of values. It cannot establish coverage of natural language, correctness of human annotation, trusted event chronology, cryptographic provenance, temporal concurrency, protected dispatcher coverage, or real-world harm. It is a candidate CI smoke probe after compilation succeeds, not a substitute for a sealed holdout.
+
 ### Layer B — natural-language event extraction
 
 This is a separate, not-yet-implemented evaluation. Use realistic multi-turn streams and annotate event records for:
