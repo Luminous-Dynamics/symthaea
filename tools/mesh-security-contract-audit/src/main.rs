@@ -441,4 +441,26 @@ mod tests {
         let errors = semantic_checks(&mutated)["errors"].as_array().unwrap().clone();
         assert!(errors.iter().any(|error| error.as_str().unwrap().contains("undeclared property")));
     }
+
+    #[test]
+    fn schema_auditor_rejects_external_references_offline() {
+        let external_schema = json!({
+            "$schema": DRAFT_2020_12,
+            "$ref": "https://schemas.example.invalid/mesh.json"
+        });
+        let error = validate_instance(&external_schema, &json!({"attack": true}), "offline negative control")
+            .expect_err("unregistered external schema must not be fetched");
+        assert!(error.contains("offline validator"), "{error}");
+    }
+
+    #[test]
+    fn schema_auditor_rejects_invalid_schema_keyword_types() {
+        let invalid_schema = json!({
+            "$schema": DRAFT_2020_12,
+            "type": 42
+        });
+        let mut errors = Vec::new();
+        validate_schema_document(&invalid_schema, "invalid-fixture.schema.json", &mut errors);
+        assert!(!errors.is_empty(), "invalid JSON Schema must fail its meta-schema");
+    }
 }
