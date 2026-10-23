@@ -323,8 +323,7 @@ fn candidate_rows(
                 "candidate JSONL SHA-256 does not match the locked task ",
                 "manifest: expected {}, observed {}"
             ),
-            expected_sha256,
-            digest
+            expected_sha256, digest
         ));
     }
     let text = std::str::from_utf8(&bytes)
