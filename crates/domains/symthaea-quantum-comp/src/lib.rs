@@ -41,6 +41,7 @@ pub mod fixtures;
 pub mod interop;
 pub mod matrix;
 pub mod mis_dimacs;
+pub mod mis_portfolio;
 pub mod mis_random_regular;
 pub mod mis_verifier;
 pub mod migration;
@@ -114,6 +115,11 @@ pub use matrix::{
 };
 pub use migration::{MigrationGuide, MigrationRisk, MigrationStep, alpha9_to_alpha10_migration};
 pub use mis_dimacs::{MisDimacsError, MisDimacsLimits, ParsedMisDimacs, parse_dimacs_mis, parse_dimacs_mis_with_limits, parse_qoblib_solution};
+pub use mis_portfolio::{
+    MisGreedyPolicy, MisPortfolioArm, MisPortfolioConfig, MisPortfolioError,
+    MisPortfolioReport, MAX_MIS_LOCAL_SEARCH_ROUNDS, MAX_MIS_RANDOMIZED_RESTARTS,
+    run_mis_portfolio,
+};
 pub use mis_random_regular::{MisRandomRegularConfig, MisRandomRegularError, MisRandomRegularReport, generate_mis_random_regular};
 pub use noise_sweep::{NoiseSweepConfig, NoiseSweepPoint, NoiseSweepReport, NoiseSweepRunner};
 pub use phase_hdc::PhaseHypervector;
