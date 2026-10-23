@@ -200,7 +200,10 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         if index + 1 >= args.len() {
             return Err(format!("missing value for {flag}\n{}", usage()));
         }
-        if values.insert(flag.clone(), args[index + 1].clone()).is_some() {
+        if values
+            .insert(flag.clone(), args[index + 1].clone())
+            .is_some()
+        {
             return Err(format!("duplicate argument: {flag}"));
         }
         index += 2;
@@ -259,14 +262,19 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
             .expect("all output paths are required")
             .clone();
         if !output_paths.insert(output.clone()) {
-            return Err(format!("output paths must be distinct; {key} reuses {output:?}"));
+            return Err(format!(
+                "output paths must be distinct; {key} reuses {output:?}"
+            ));
         }
     }
     let source_paths = ["--candidate-jsonl", "--source-parquet"];
     for output_key in output_keys {
         let output = values.get(output_key).expect("output exists");
         for source_key in source_paths {
-            if values.get(source_key).is_some_and(|source| source == output) {
+            if values
+                .get(source_key)
+                .is_some_and(|source| source == output)
+            {
                 return Err(format!(
                     "output path {output:?} must not overwrite input {source_key}"
                 ));
@@ -297,8 +305,8 @@ fn sha256_bytes(bytes: &[u8]) -> String {
 }
 
 fn sha256_file(path: &Path) -> Result<String, String> {
-    let file = fs::File::open(path)
-        .map_err(|error| format!("cannot open {}: {error}", path.display()))?;
+    let file =
+        fs::File::open(path).map_err(|error| format!("cannot open {}: {error}", path.display()))?;
     let mut reader = BufReader::new(file);
     let mut hasher = Sha256::new();
     let mut buffer = [0_u8; 64 * 1024];
@@ -429,7 +437,10 @@ fn transition_contract_errors(
             "{regressed} baseline-passing test(s) fail or are missing after the gold patch"
         ));
     }
-    let gold_nonpassing = gold.values().filter(|state| state.as_str() != "pass").count();
+    let gold_nonpassing = gold
+        .values()
+        .filter(|state| state.as_str() != "pass")
+        .count();
     if gold_nonpassing > 0 {
         errors.push(format!(
             "{gold_nonpassing} gold-patch test status(es) are fail or skip in the three-run aggregate"
@@ -447,7 +458,6 @@ fn run_marker_counts(log: &str) -> Vec<usize> {
         .map(|marker| log.match_indices(marker).count())
         .collect()
 }
-
 
 #[derive(Debug)]
 struct RuntimeEvidenceSummary {
@@ -504,9 +514,7 @@ fn validate_container_identity(
         .ok_or_else(|| "container_identity.container_id missing".to_string())?
         .to_ascii_lowercase();
     if !is_hex(&container_id, 64) {
-        return Err(
-            "container_identity.container_id must be a 64-character Docker ID".to_string(),
-        );
+        return Err("container_identity.container_id must be a 64-character Docker ID".to_string());
     }
 
     let configured_image = identity
@@ -582,20 +590,19 @@ fn verify_logged_run(
 
     let test_exit = command_exit_code(run, "test_exit_code")?;
     if test_exit == 124 || test_exit < 0 {
-        return Err(format!("test command is unresolved (exit code {test_exit})"));
+        return Err(format!(
+            "test command is unresolved (exit code {test_exit})"
+        ));
     }
     if command_exit_code(run, "print_exit_code")? != 0 {
         return Err("print/log command did not exit zero".to_string());
     }
 
-    let (container_id, image_id) =
-        validate_container_identity(run, expected_image_reference)?;
+    let (container_id, image_id) = validate_container_identity(run, expected_image_reference)?;
     let parsed = parse_status_map(run, "parsed_status")?;
     let observed_ids = parsed.keys().cloned().collect::<BTreeSet<_>>();
     if &observed_ids != expected_test_ids {
-        return Err(
-            "per-run parsed test-ID set differs from the baseline test-ID set".to_string(),
-        );
+        return Err("per-run parsed test-ID set differs from the baseline test-ID set".to_string());
     }
     if gold && test_exit != 0 && parsed.values().all(|state| state == "pass") {
         return Err(format!(
@@ -642,12 +649,14 @@ fn validate_runtime_evidence(
     };
     let expected_base_commit = match required_string(row, "base_commit") {
         Ok(value) if is_hex(value, 40) || is_hex(value, 64) => value.to_ascii_lowercase(),
-        Ok(_) => return Err(vec!["candidate base_commit is not a valid Git SHA".to_string()]),
+        Ok(_) => {
+            return Err(vec![
+                "candidate base_commit is not a valid Git SHA".to_string(),
+            ]);
+        }
         Err(error) => return Err(vec![error]),
     };
-    if evidence.get("image_reference").and_then(Value::as_str)
-        != Some(expected_image_reference)
-    {
+    if evidence.get("image_reference").and_then(Value::as_str) != Some(expected_image_reference) {
         errors.push(
             "validation evidence image_reference differs from candidate metadata".to_string(),
         );
@@ -660,11 +669,13 @@ fn validate_runtime_evidence(
     let expected_test_ids = baseline_expected.keys().cloned().collect::<BTreeSet<_>>();
     let baseline = match evidence.get("baseline") {
         Some(value) => value,
-        None => return Err(vec!["validation evidence has no baseline record".to_string()]),
+        None => {
+            return Err(vec![
+                "validation evidence has no baseline record".to_string(),
+            ]);
+        }
     };
-    let baseline_log_path = validation_dir
-        .join(instance_id)
-        .join("pre_patch_log.txt");
+    let baseline_log_path = validation_dir.join(instance_id).join("pre_patch_log.txt");
     let mut run_ids = Vec::new();
     let mut image_ids = Vec::new();
 
@@ -885,7 +896,9 @@ fn audit_candidate(
     };
 
     let status_json_sha256 = status_bytes.as_ref().map(|bytes| sha256_bytes(bytes));
-    let runtime_evidence_sha256 = runtime_evidence_bytes.as_ref().map(|bytes| sha256_bytes(bytes));
+    let runtime_evidence_sha256 = runtime_evidence_bytes
+        .as_ref()
+        .map(|bytes| sha256_bytes(bytes));
     let baseline_log_sha256 = baseline_log_bytes.as_ref().map(|bytes| sha256_bytes(bytes));
     let log_sha256 = log_bytes.as_ref().map(|bytes| sha256_bytes(bytes));
     let mut baseline_count = 0;
@@ -978,10 +991,7 @@ fn audit_candidate(
                         (listed_f2p.as_ref(), listed_p2p.as_ref())
                     {
                         reasons.extend(transition_contract_errors(
-                            baseline,
-                            gold,
-                            listed_f2p,
-                            listed_p2p,
+                            baseline, gold, listed_f2p, listed_p2p,
                         ));
                     }
                 }
@@ -1036,7 +1046,9 @@ fn audit_candidate(
         network_mode: runtime_summary
             .as_ref()
             .map(|summary| summary.network_mode.clone()),
-        workspace_clean: runtime_summary.as_ref().map(|summary| summary.workspace_clean),
+        workspace_clean: runtime_summary
+            .as_ref()
+            .map(|summary| summary.workspace_clean),
     };
 
     let manifest_record = if eligible {
@@ -1098,7 +1110,10 @@ fn audit_candidate(
 }
 
 fn write_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
-    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
         fs::create_dir_all(parent)
             .map_err(|error| format!("cannot create {}: {error}", parent.display()))?;
     }
@@ -1138,7 +1153,10 @@ fn run(cli: Cli) -> Result<(), String> {
             return Err(format!("candidate JSONL line {} is empty", line_index + 1));
         }
         let row: Value = serde_json::from_str(raw_line).map_err(|error| {
-            format!("candidate JSONL line {} is invalid JSON: {error}", line_index + 1)
+            format!(
+                "candidate JSONL line {} is invalid JSON: {error}",
+                line_index + 1
+            )
         })?;
         let instance_id = required_string(&row, "instance_id")
             .map_err(|error| format!("candidate JSONL line {}: {error}", line_index + 1))?
@@ -1163,7 +1181,10 @@ fn run(cli: Cli) -> Result<(), String> {
         ));
     }
     candidates.sort_by(|left, right| left.0.cmp(&right.0));
-    let candidate_ids = candidates.iter().map(|(id, _, _)| id.clone()).collect::<Vec<_>>();
+    let candidate_ids = candidates
+        .iter()
+        .map(|(id, _, _)| id.clone())
+        .collect::<Vec<_>>();
     let candidate_ids_sha256 = canonical_id_digest(&candidate_ids);
 
     let mut outcomes = Vec::with_capacity(candidates.len());
@@ -1213,7 +1234,10 @@ fn run(cli: Cli) -> Result<(), String> {
     let serialized_tasks = serde_json::to_vec(&manifest_tasks)
         .map_err(|error| format!("cannot serialize task records for digest: {error}"))?;
     let task_records_sha256 = sha256_bytes(&serialized_tasks);
-    let rejected_count = outcomes.iter().filter(|task| !task.eligible && !task.unresolved).count();
+    let rejected_count = outcomes
+        .iter()
+        .filter(|task| !task.eligible && !task.unresolved)
+        .count();
     let unresolved_count = outcomes.iter().filter(|task| task.unresolved).count();
     let lockable = unresolved_count == 0 && !manifest_tasks.is_empty();
 
@@ -1222,24 +1246,25 @@ fn run(cli: Cli) -> Result<(), String> {
         controller_manifest_bytes,
         agent_prompt_projection_sha256,
         controller_manifest_sha256,
-    ) =
-        if lockable {
-            let mut prompt_bytes = Vec::new();
-            for task in &manifest_tasks {
-                let problem_statement = agent_prompts_by_id
-                    .get(&task.instance_id)
-                    .ok_or_else(|| {
-                        format!("missing agent prompt for eligible task {}", task.instance_id)
-                    })?;
-                let row = serde_json::to_vec(&AgentPromptRecord {
-                    problem_statement: problem_statement.clone(),
-                })
-                .map_err(|error| format!("cannot serialize safe agent prompt: {error}"))?;
-                prompt_bytes.extend_from_slice(&row);
-                prompt_bytes.push(b'\n');
-            }
-            let prompt_sha256 = sha256_bytes(&prompt_bytes);
-            let controller = ControllerManifest {
+    ) = if lockable {
+        let mut prompt_bytes = Vec::new();
+        for task in &manifest_tasks {
+            let problem_statement =
+                agent_prompts_by_id.get(&task.instance_id).ok_or_else(|| {
+                    format!(
+                        "missing agent prompt for eligible task {}",
+                        task.instance_id
+                    )
+                })?;
+            let row = serde_json::to_vec(&AgentPromptRecord {
+                problem_statement: problem_statement.clone(),
+            })
+            .map_err(|error| format!("cannot serialize safe agent prompt: {error}"))?;
+            prompt_bytes.extend_from_slice(&row);
+            prompt_bytes.push(b'\n');
+        }
+        let prompt_sha256 = sha256_bytes(&prompt_bytes);
+        let controller = ControllerManifest {
                 format_version: MANIFEST_VERSION,
                 protocol_id: PROTOCOL_ID.to_string(),
                 dataset_revision: cli.dataset_revision.clone(),
@@ -1265,19 +1290,19 @@ fn run(cli: Cli) -> Result<(), String> {
                     .collect(),
                 visibility_warning: "EVALUATOR-ONLY: never expose this controller manifest to the coding agent. Agent-visible JSONL contains only problem_statement. Retain the configured image reference and use container_image_id as the observed immutable runtime identity when reproducing the task environment.".to_string(),
             };
-            let mut controller_bytes = serde_json::to_vec_pretty(&controller)
-                .map_err(|error| format!("cannot serialize controller manifest: {error}"))?;
-            controller_bytes.push(b'\n');
-            let controller_sha256 = sha256_bytes(&controller_bytes);
-            (
-                Some(prompt_bytes),
-                Some(controller_bytes),
-                Some(prompt_sha256),
-                Some(controller_sha256),
-            )
-        } else {
-            (None, None, None, None)
-        };
+        let mut controller_bytes = serde_json::to_vec_pretty(&controller)
+            .map_err(|error| format!("cannot serialize controller manifest: {error}"))?;
+        controller_bytes.push(b'\n');
+        let controller_sha256 = sha256_bytes(&controller_bytes);
+        (
+            Some(prompt_bytes),
+            Some(controller_bytes),
+            Some(prompt_sha256),
+            Some(controller_sha256),
+        )
+    } else {
+        (None, None, None, None)
+    };
 
     let report = AuditReport {
         format_version: MANIFEST_VERSION,
@@ -1347,15 +1372,26 @@ fn run(cli: Cli) -> Result<(), String> {
         &cli.controller_manifest_out,
         controller_manifest_bytes.expect("lockable report has controller manifest"),
     )
-    .map_err(|error| format!("cannot write {}: {error}", cli.controller_manifest_out.display()))?;
+    .map_err(|error| {
+        format!(
+            "cannot write {}: {error}",
+            cli.controller_manifest_out.display()
+        )
+    })?;
     println!(
         "RUST REPAIR MANIFEST LOCKED: {} eligible / {} candidate tasks; task records SHA-256 {}",
         manifest.eligible_task_count, manifest.candidate_row_count, manifest.task_records_sha256
     );
     println!("Audit report: {}", cli.report_out.display());
     println!("Task manifest: {}", cli.manifest_out.display());
-    println!("Agent prompts (problem_statement only): {}", cli.agent_prompts_out.display());
-    println!("Controller manifest (evaluator-only): {}", cli.controller_manifest_out.display());
+    println!(
+        "Agent prompts (problem_statement only): {}",
+        cli.agent_prompts_out.display()
+    );
+    println!(
+        "Controller manifest (evaluator-only): {}",
+        cli.controller_manifest_out.display()
+    );
     Ok(())
 }
 
@@ -1412,14 +1448,13 @@ mod tests {
             BTreeSet::from(["must-stay-green".to_string()])
         );
         assert_eq!(explicit_f2p, BTreeSet::from(["bug".to_string()]));
-        let errors = transition_contract_errors(
-            &baseline,
-            &gold,
-            &explicit_f2p,
-            &BTreeSet::new(),
-        );
+        let errors = transition_contract_errors(&baseline, &gold, &explicit_f2p, &BTreeSet::new());
         assert!(errors.iter().any(|error| error.contains("PASS_TO_PASS")));
-        assert!(errors.iter().any(|error| error.contains("baseline-passing test")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("baseline-passing test"))
+        );
     }
 
     #[test]
@@ -1435,7 +1470,10 @@ mod tests {
     fn three_gold_run_markers_must_be_present_exactly_once() {
         let valid = "eval No.0 \npass\neval No.1 \npass\neval No.2 \npass";
         assert_eq!(run_marker_counts(valid), vec![1, 1, 1]);
-        assert_eq!(run_marker_counts("eval No.0 \neval No.1 \neval No.1"), vec![1, 2, 0]);
+        assert_eq!(
+            run_marker_counts("eval No.0 \neval No.1 \neval No.1"),
+            vec![1, 2, 0]
+        );
     }
 
     #[test]
@@ -1445,8 +1483,6 @@ mod tests {
         let ids_b = vec!["a".to_string(), "b".to_string()];
         assert_eq!(canonical_id_digest(&ids_a), canonical_id_digest(&ids_b));
     }
-
-
 
     fn write_candidate_artifacts(
         root: &Path,
@@ -1494,11 +1530,7 @@ mod tests {
         let mut gold_runs = Vec::new();
         for run_index in 0..3 {
             let run_log = format!("gold run {run_index} complete test log\n");
-            fs::write(
-                task_dir.join(format!("gold_run_{run_index}.log")),
-                &run_log,
-            )
-            .unwrap();
+            fs::write(task_dir.join(format!("gold_run_{run_index}.log")), &run_log).unwrap();
             gold_runs.push(serde_json::json!({
                 "role": "gold",
                 "run_index": run_index,
@@ -1599,11 +1631,21 @@ mod tests {
             record.gold_validation_log_sha256,
             sha256_bytes(b"eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n")
         );
-        assert_eq!(record.container_image_id, format!("sha256:{}", "b".repeat(64)));
+        assert_eq!(
+            record.container_image_id,
+            format!("sha256:{}", "b".repeat(64))
+        );
         assert_eq!(record.container_ids.len(), 4);
-        let evidence_bytes =
-            fs::read(root.path().join(instance_id).join("validation_evidence.json")).unwrap();
-        assert_eq!(record.runtime_evidence_sha256, sha256_bytes(&evidence_bytes));
+        let evidence_bytes = fs::read(
+            root.path()
+                .join(instance_id)
+                .join("validation_evidence.json"),
+        )
+        .unwrap();
+        assert_eq!(
+            record.runtime_evidence_sha256,
+            sha256_bytes(&evidence_bytes)
+        );
     }
 
     #[test]
@@ -1627,8 +1669,20 @@ mod tests {
         );
         assert!(!result.audit.eligible);
         assert!(result.manifest_record.is_none());
-        assert!(result.audit.reasons.iter().any(|reason| reason.contains("PASS_TO_PASS")));
-        assert!(result.audit.reasons.iter().any(|reason| reason.contains("baseline-passing test")));
+        assert!(
+            result
+                .audit
+                .reasons
+                .iter()
+                .any(|reason| reason.contains("PASS_TO_PASS"))
+        );
+        assert!(
+            result
+                .audit
+                .reasons
+                .iter()
+                .any(|reason| reason.contains("baseline-passing test"))
+        );
     }
 
     #[test]
@@ -1653,7 +1707,13 @@ mod tests {
         assert!(!result.audit.eligible);
         assert!(result.audit.unresolved);
         assert!(result.manifest_record.is_none());
-        assert!(result.audit.reasons.iter().any(|reason| reason.contains("eval No.2")));
+        assert!(
+            result
+                .audit
+                .reasons
+                .iter()
+                .any(|reason| reason.contains("eval No.2"))
+        );
     }
 
     #[test]
@@ -1678,7 +1738,13 @@ mod tests {
         assert!(!result.audit.eligible);
         assert!(result.audit.unresolved);
         assert!(result.manifest_record.is_none());
-        assert!(result.audit.reasons.iter().any(|reason| reason.contains("test-ID sets differ")));
+        assert!(
+            result
+                .audit
+                .reasons
+                .iter()
+                .any(|reason| reason.contains("test-ID sets differ"))
+        );
     }
 
     #[test]
@@ -1694,7 +1760,10 @@ mod tests {
             &[],
             "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
         );
-        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let evidence_path = root
+            .path()
+            .join(instance_id)
+            .join("validation_evidence.json");
         let bytes = fs::read(&evidence_path).unwrap();
         let mut evidence: Value = serde_json::from_slice(&bytes).unwrap();
         evidence["gold_runs"][0]["container_identity"]["runtime_platform"] =
@@ -1726,7 +1795,10 @@ mod tests {
             &[],
             "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
         );
-        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let evidence_path = root
+            .path()
+            .join(instance_id)
+            .join("validation_evidence.json");
         let bytes = fs::read(&evidence_path).unwrap();
         let mut evidence: Value = serde_json::from_slice(&bytes).unwrap();
         evidence["gold_runs"][1]["container_identity"]["git_metadata_sanitization_exit_code"] =
@@ -1740,9 +1812,13 @@ mod tests {
         );
         assert!(!result.audit.eligible);
         assert!(result.audit.unresolved);
-        assert!(result.audit.reasons.iter().any(|reason| {
-            reason.contains("Git metadata sanitization was not confirmed")
-        }));
+        assert!(
+            result
+                .audit
+                .reasons
+                .iter()
+                .any(|reason| { reason.contains("Git metadata sanitization was not confirmed") })
+        );
     }
 
     #[test]
@@ -1758,7 +1834,10 @@ mod tests {
             &[],
             "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
         );
-        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let evidence_path = root
+            .path()
+            .join(instance_id)
+            .join("validation_evidence.json");
         let bytes = fs::read(&evidence_path).unwrap();
         let mut evidence: Value = serde_json::from_slice(&bytes).unwrap();
         evidence["baseline"]["workspace_clean_exit_code"] = Value::from(1);
@@ -1789,7 +1868,10 @@ mod tests {
             &[],
             "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
         );
-        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let evidence_path = root
+            .path()
+            .join(instance_id)
+            .join("validation_evidence.json");
         let bytes = fs::read(&evidence_path).unwrap();
         let mut evidence: Value = serde_json::from_slice(&bytes).unwrap();
         evidence["gold_runs"][1]["repo_head_sha"] = Value::String("b".repeat(40));
@@ -1802,9 +1884,13 @@ mod tests {
         );
         assert!(!result.audit.eligible);
         assert!(result.audit.unresolved);
-        assert!(result.audit.reasons.iter().any(|reason| {
-            reason.contains("repository HEAD differs from task base_commit")
-        }));
+        assert!(
+            result
+                .audit
+                .reasons
+                .iter()
+                .any(|reason| { reason.contains("repository HEAD differs from task base_commit") })
+        );
     }
 
     #[test]
@@ -1820,7 +1906,10 @@ mod tests {
             &[],
             "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
         );
-        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let evidence_path = root
+            .path()
+            .join(instance_id)
+            .join("validation_evidence.json");
         let bytes = fs::read(&evidence_path).unwrap();
         let mut evidence: Value = serde_json::from_slice(&bytes).unwrap();
         evidence["gold_runs"][1]["container_identity"]["network_mode"] =
@@ -1834,7 +1923,13 @@ mod tests {
         );
         assert!(!result.audit.eligible);
         assert!(result.audit.unresolved);
-        assert!(result.audit.reasons.iter().any(|reason| reason.contains("network_mode must be 'none'")));
+        assert!(
+            result
+                .audit
+                .reasons
+                .iter()
+                .any(|reason| reason.contains("network_mode must be 'none'"))
+        );
     }
 
     #[test]
@@ -1850,7 +1945,11 @@ mod tests {
             &[],
             "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
         );
-        fs::write(root.path().join(instance_id).join("gold_run_1.log"), "tampered log\n").unwrap();
+        fs::write(
+            root.path().join(instance_id).join("gold_run_1.log"),
+            "tampered log\n",
+        )
+        .unwrap();
         let result = audit_candidate(
             &row,
             instance_id,
@@ -1859,11 +1958,13 @@ mod tests {
         );
         assert!(!result.audit.eligible);
         assert!(result.audit.unresolved);
-        assert!(result
-            .audit
-            .reasons
-            .iter()
-            .any(|reason| reason.contains("raw run log SHA-256 mismatch")));
+        assert!(
+            result
+                .audit
+                .reasons
+                .iter()
+                .any(|reason| reason.contains("raw run log SHA-256 mismatch"))
+        );
     }
 
     #[test]
@@ -1879,7 +1980,10 @@ mod tests {
             &[],
             "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
         );
-        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let evidence_path = root
+            .path()
+            .join(instance_id)
+            .join("validation_evidence.json");
         let evidence_bytes = fs::read(&evidence_path).unwrap();
         let mut evidence: Value = serde_json::from_slice(&evidence_bytes).unwrap();
         evidence["gold_runs"][2]["container_identity"]["container_image_id"] =
@@ -1893,7 +1997,13 @@ mod tests {
         );
         assert!(!result.audit.eligible);
         assert!(result.audit.unresolved);
-        assert!(result.audit.reasons.iter().any(|reason| reason.contains("image ID differs")));
+        assert!(
+            result
+                .audit
+                .reasons
+                .iter()
+                .any(|reason| reason.contains("image ID differs"))
+        );
     }
 
     #[test]
@@ -1909,7 +2019,10 @@ mod tests {
             &[],
             "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
         );
-        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let evidence_path = root
+            .path()
+            .join(instance_id)
+            .join("validation_evidence.json");
         let evidence_bytes = fs::read(&evidence_path).unwrap();
         let mut evidence: Value = serde_json::from_slice(&evidence_bytes).unwrap();
         evidence["baseline"]["test_exit_code"] = Value::from(124);
@@ -1922,11 +2035,13 @@ mod tests {
         );
         assert!(!result.audit.eligible);
         assert!(result.audit.unresolved);
-        assert!(result
-            .audit
-            .reasons
-            .iter()
-            .any(|reason| reason.contains("test command is unresolved")));
+        assert!(
+            result
+                .audit
+                .reasons
+                .iter()
+                .any(|reason| reason.contains("test command is unresolved"))
+        );
     }
 
     #[test]
@@ -1942,7 +2057,10 @@ mod tests {
             &[],
             "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
         );
-        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let evidence_path = root
+            .path()
+            .join(instance_id)
+            .join("validation_evidence.json");
         let evidence_bytes = fs::read(&evidence_path).unwrap();
         let mut evidence: Value = serde_json::from_slice(&evidence_bytes).unwrap();
         evidence["gold_runs"][1]["solution_patch_applied"] = Value::Bool(false);
@@ -1955,11 +2073,13 @@ mod tests {
         );
         assert!(!result.audit.eligible);
         assert!(result.audit.unresolved);
-        assert!(result
-            .audit
-            .reasons
-            .iter()
-            .any(|reason| reason.contains("gold solution patch application")));
+        assert!(
+            result
+                .audit
+                .reasons
+                .iter()
+                .any(|reason| reason.contains("gold solution patch application"))
+        );
     }
 
     #[test]
@@ -1989,7 +2109,9 @@ mod tests {
             "commit_url": "https://example.invalid/secret"
         });
         let prompt = AgentPromptRecord {
-            problem_statement: required_string(&raw_row, "problem_statement").unwrap().to_string(),
+            problem_statement: required_string(&raw_row, "problem_statement")
+                .unwrap()
+                .to_string(),
         };
         let projected = serde_json::to_value(prompt).unwrap();
         assert_eq!(
@@ -1998,8 +2120,13 @@ mod tests {
         );
         let serialized = projected.to_string();
         for forbidden in [
-            "SECRET_GOLD_PATCH", "SECRET_TEST_PATCH", "SECRET_HINT",
-            "SECRET_ALL_HINTS", "FAIL_TO_PASS", "PASS_TO_PASS", "commit_url",
+            "SECRET_GOLD_PATCH",
+            "SECRET_TEST_PATCH",
+            "SECRET_HINT",
+            "SECRET_ALL_HINTS",
+            "FAIL_TO_PASS",
+            "PASS_TO_PASS",
+            "commit_url",
             "owner__repo-issue-1",
         ] {
             assert!(!serialized.contains(forbidden), "leaked {forbidden}");
