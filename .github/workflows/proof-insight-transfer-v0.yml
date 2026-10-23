@@ -527,6 +527,7 @@ jobs:
               "decision": "apply_original_move",
               "applicability_judgment": "eligible",
               "original_move_applied": True,
+              "checked_target_statement_sha256": "d" * 64,
               "checker_result": "checked_success",
               "proof_sha256": "b" * 64,
               "run_receipt_sha256": "c" * 64,
@@ -565,7 +566,15 @@ jobs:
               pass
           else:
               raise SystemExit("executed-row schema accepted use of the original move when the insight was judged not_applicable")
-          print("PITB_PROOF_STATE_EXECUTION_SCHEMA_PASS: valid executed row accepted; 4 contradictory/incomplete execution controls rejected")
+          bad_execution = copy.deepcopy(valid_execution)
+          del bad_execution["checked_target_statement_sha256"]
+          try:
+              execution_validator.validate(bad_execution)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("executed-row schema accepted missing checked-target statement digest")
+          print("PITB_PROOF_STATE_EXECUTION_SCHEMA_PASS: valid executed row accepted; 5 contradictory/incomplete execution controls rejected")
           print(f"PITB_PROOF_STATE_OUTCOME_CONTRACT_PASS: {count} explicitly not_run state rows; {len(mutants)}/{len(mutants)} negative controls rejected")
           PY
       - name: Analyze paired proof-state outcomes with the Rust scorekeeper
