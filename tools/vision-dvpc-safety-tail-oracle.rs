@@ -381,7 +381,10 @@ mod tests {
 
         let constrained =
             select_exact_safety_tail_oracle_v1(&traces, constraints(20, 20, 0, 0.0)).unwrap();
-        assert_eq!(constrained.selected_full_trace_ids, vec!["safe-gain".to_owned()]);
+        assert_eq!(
+            constrained.selected_full_trace_ids,
+            vec!["safe-gain".to_owned()]
+        );
         assert_eq!(constrained.chosen_safety_violations, 0);
         assert!((constrained.group_balanced_utility - 0.50).abs() < 1e-12);
     }
@@ -411,7 +414,10 @@ mod tests {
         ];
         let result =
             select_exact_safety_tail_oracle_v1(&traces, constraints(2, 2, 0, 0.0)).unwrap();
-        assert_eq!(result.selected_full_trace_ids, vec!["beneficial".to_owned()]);
+        assert_eq!(
+            result.selected_full_trace_ids,
+            vec!["beneficial".to_owned()]
+        );
         assert!((result.cvar95_incremental_loss - 0.0).abs() < 1e-12);
     }
 
