@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: tla-tools-pin-contract-\${{ github.event.pull_request.number || github.ref }}
+  group: tla-tools-pin-contract-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -37,13 +37,13 @@ jobs:
       - name: Parse and model-check a one-state smoke specification
         shell: bash
         env:
-          TOOL_JAR: \${{ steps.tla.outputs.tool-path }}
+          TOOL_JAR: ${{ steps.tla.outputs.tool-path }}
           EXPECTED_VERSION: tla2tools-2026.08.11.125311
           EXPECTED_SHA256: ab323b79802aedc3203b3f9af37c6aca3ed43f4e0225b36f2aa77b26de46c05f
         run: |
           set -euo pipefail
-          test "\${{ steps.tla.outputs.version }}" = "$EXPECTED_VERSION"
-          test "\${{ steps.tla.outputs.sha256 }}" = "$EXPECTED_SHA256"
+          test "${{ steps.tla.outputs.version }}" = "$EXPECTED_VERSION"
+          test "${{ steps.tla.outputs.sha256 }}" = "$EXPECTED_SHA256"
           module="$RUNNER_TEMP/TlaPinSmoke.tla"
           config="$RUNNER_TEMP/TlaPinSmoke.cfg"
           cat > "$module" <<'TLA'
@@ -78,7 +78,7 @@ jobs:
         if: always()
         shell: bash
         env:
-          ALTERED_OUTCOME: \${{ steps.altered.outcome }}
+          ALTERED_OUTCOME: ${{ steps.altered.outcome }}
         run: |
           set -euo pipefail
           if [[ "$ALTERED_OUTCOME" != "failure" ]]; then
