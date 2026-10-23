@@ -310,7 +310,11 @@ impl CognitiveLoopService {
                 salience: self.behavior.curiosity_drive.exploration_urge as f32,
                 phi_monitor: unified_psi as f32,
             };
-            bus.update_wisdom_from_signals();
+            // The Experience Bus retains its last admitted PE for display and
+            // continuity, but must not re-learn that same PE on every invalid cycle.
+            if prediction_error.is_some_and(|value| value.is_finite()) {
+                bus.update_wisdom_from_signals();
+            }
             bus.kosmic_state.phi = unified_psi as f32;
             guiding_question = bus.current_guiding_question();
             dominant_harmonic = bus.dominant_harmonic().as_str();
