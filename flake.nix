@@ -586,7 +586,9 @@ EOF
         # signoff environment. The smoke script records missing tools/failures
         # explicitly and does not infer synthesis/PPA/FPGA qualification.
         devShells.hdl = pkgs.mkShell {
-          packages = with pkgs; [
+          # Reuse the pinned repository Rust toolchain for the canonical
+          # BinaryHV fixture generator, plus the HDL/smoke-evidence tools.
+          packages = rustBuildInputs ++ (with pkgs; [
             verilator
             iverilog
             yosys
@@ -597,7 +599,7 @@ EOF
             gcc
             gawk
             gnugrep
-          ];
+          ]);
 
           shellHook = ''
             echo ""
