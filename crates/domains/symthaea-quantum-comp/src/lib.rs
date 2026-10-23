@@ -55,6 +55,7 @@ pub mod release_manifest;
 pub mod replay;
 pub mod reporting;
 pub mod rng;
+pub mod mis_amortized_cost;
 pub mod robustness;
 pub mod schema;
 pub mod significance;
@@ -110,6 +111,11 @@ pub use matrix::{
     ExperimentMatrixCell, ExperimentMatrixConfig, ExperimentMatrixReport, ExperimentMatrixRunner,
 };
 pub use migration::{MigrationGuide, MigrationRisk, MigrationStep, alpha9_to_alpha10_migration};
+pub use mis_amortized_cost::{
+    MisAmortizedCostComparison, MisAmortizedCostEntry, MisAmortizedCostError,
+    MisAmortizedCostProfile, MisAmortizedMetric, MisAmortizedMetricResult,
+    compare_mis_amortized_costs,
+};
 pub use noise_sweep::{NoiseSweepConfig, NoiseSweepPoint, NoiseSweepReport, NoiseSweepRunner};
 pub use phase_hdc::PhaseHypervector;
 pub use preflight::{
