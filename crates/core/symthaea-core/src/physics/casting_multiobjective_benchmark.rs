@@ -74,7 +74,9 @@ impl fmt::Display for ParetoMetricError {
             }
             Self::EmptyApproximationFront => f.write_str("approximation front must not be empty"),
             Self::EmptyReferenceFront => f.write_str("reference front must not be empty"),
-            Self::TooFewPointsForSpacing => f.write_str("spacing requires at least two approximation points"),
+            Self::TooFewPointsForSpacing => {
+                f.write_str("spacing requires at least two approximation points")
+            }
             Self::NonFiniteMetricResult => f.write_str("front metric overflowed or produced a non-finite result"),
         }
     }
@@ -630,7 +632,7 @@ mod tests {
         let front = [[0.0, 0.0], [3.0, 0.0], [10.0, 0.0]];
         assert_abs_close(
             nearest_neighbour_spacing(&front).unwrap(),
-            8.0_f64.sqrt(),
+            (16.0_f64 / 3.0).sqrt(),
             1e-12,
         );
     }
@@ -648,7 +650,11 @@ mod tests {
         );
         assert_abs_close(
             inverted_generational_distance_plus(&approximation, &reference).unwrap(),
-            inverted_generational_distance_plus(&reversed_approximation, &reversed_reference).unwrap(),
+            inverted_generational_distance_plus(
+                &reversed_approximation,
+                &reversed_reference,
+            )
+            .unwrap(),
             1e-12,
         );
         assert_abs_close(
