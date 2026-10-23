@@ -19,16 +19,23 @@ struct CandidateAction {
 const HYPOTHESIS_PRIOR_WEIGHTS: [u64; 3] = [6, 3, 1];
 
 fn expected_brier_reduction(action: CandidateAction) -> f64 {
+    expected_brier_reduction_with_prior(action, HYPOTHESIS_PRIOR_WEIGHTS)
+}
+
+fn expected_brier_reduction_with_prior(
+    action: CandidateAction,
+    prior_weights: [u64; 3],
+) -> f64 {
     if !action.provenance_validated {
         return 0.0;
     }
 
-    let total_weight: u64 = HYPOTHESIS_PRIOR_WEIGHTS.iter().sum();
+    let total_weight: u64 = prior_weights.iter().sum();
     let mut group_weights: BTreeMap<&str, u64> = BTreeMap::new();
     let mut group_square_sums: BTreeMap<&str, u128> = BTreeMap::new();
     let mut prior_square_sum = 0_u128;
 
-    for (weight, outcome) in HYPOTHESIS_PRIOR_WEIGHTS
+    for (weight, outcome) in prior_weights
         .iter()
         .copied()
         .zip(action.outcomes)
@@ -53,13 +60,21 @@ fn expected_brier_reduction(action: CandidateAction) -> f64 {
 }
 
 fn choose_action(actions: &[CandidateAction]) -> Option<CandidateAction> {
+    choose_action_with_prior(actions, HYPOTHESIS_PRIOR_WEIGHTS)
+}
+
+fn choose_action_with_prior(
+    actions: &[CandidateAction],
+    prior_weights: [u64; 3],
+) -> Option<CandidateAction> {
     let mut best: Option<(CandidateAction, f64)> = None;
 
     for action in actions.iter().copied() {
         if action.cost_units == 0 {
             continue;
         }
-        let gain_per_cost = expected_brier_reduction(action) / f64::from(action.cost_units);
+        let gain_per_cost = expected_brier_reduction_with_prior(action, prior_weights)
+            / f64::from(action.cost_units);
         if gain_per_cost <= 1.0e-12 {
             continue;
         }
@@ -176,4 +191,115 @@ fn deterministic_ties_use_a_stable_id_order() {
         },
     ];
     assert_eq!(choose_action(&tied).map(|action| action.id), Some("source-a"));
+}
+
+
+fn assert_all_action_orderings(
+    actions: &mut [CandidateAction; 5],
+    start: usize,
+    checked: &mut usize,
+) {
+    if start == actions.len() {
+        assert_eq!(
+            choose_action(actions).map(|action| action.id),
+            Some("validated-inventory-family")
+        );
+        *checked += 1;
+        return;
+    }
+
+    for index in start..actions.len() {
+        actions.swap(start, index);
+        assert_all_action_orderings(actions, start + 1, checked);
+        actions.swap(start, index);
+    }
+}
+
+#[test]
+fn action_ranking_is_invariant_to_all_120_input_orders() {
+    let mut candidates = actions();
+    let mut checked = 0;
+    assert_all_action_orderings(&mut candidates, 0, &mut checked);
+    assert_eq!(checked, 120);
+}
+
+#[test]
+fn brier_reduction_and_action_choice_are_invariant_to_hypothesis_permutation() {
+    const PERMUTATIONS: [[usize; 3]; 6] = [
+        [0, 1, 2],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
+    ];
+
+    let original_actions = actions();
+    let expected_choice = choose_action(&original_actions).map(|action| action.id);
+
+    for permutation in PERMUTATIONS {
+        let permuted_prior = permutation.map(|index| HYPOTHESIS_PRIOR_WEIGHTS[index]);
+        let permuted_actions: Vec<_> = original_actions
+            .iter()
+            .copied()
+            .map(|mut action| {
+                action.outcomes = permutation.map(|index| action.outcomes[index]);
+                action
+            })
+            .collect();
+
+        for (original, permuted) in original_actions.iter().zip(&permuted_actions) {
+            let expected = expected_brier_reduction(*original);
+            let observed = expected_brier_reduction_with_prior(*permuted, permuted_prior);
+            assert!(
+                (expected - observed).abs() <= 1.0e-12,
+                "{} changed Brier reduction under a hypothesis permutation",
+                original.id
+            );
+        }
+
+        assert_eq!(
+            choose_action_with_prior(&permuted_actions, permuted_prior)
+                .map(|action| action.id),
+            expected_choice
+        );
+    }
+}
+
+fn renamed_outcome(outcome: &str) -> &'static str {
+    match outcome {
+        "chair" => "label-a",
+        "other" => "label-b",
+        "table" => "label-c",
+        "stool" => "label-d",
+        "table-shaped" => "label-e",
+        _ => panic!("unexpected fixture outcome: {outcome}"),
+    }
+}
+
+#[test]
+fn brier_reduction_depends_on_outcome_partition_not_label_spelling() {
+    let original_actions = actions();
+    let renamed_actions: Vec<_> = original_actions
+        .iter()
+        .copied()
+        .map(|mut action| {
+            action.outcomes = action.outcomes.map(renamed_outcome);
+            action
+        })
+        .collect();
+
+    for (original, renamed) in original_actions.iter().zip(&renamed_actions) {
+        assert!(
+            (expected_brier_reduction(*original) - expected_brier_reduction(*renamed)).abs()
+                <= 1.0e-12,
+            "{} changed Brier reduction under a bijective outcome rename",
+            original.id
+        );
+    }
+
+    assert_eq!(
+        choose_action(&original_actions).map(|action| action.id),
+        choose_action(&renamed_actions).map(|action| action.id)
+    );
 }
