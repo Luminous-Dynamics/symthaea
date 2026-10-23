@@ -44,7 +44,9 @@
     "verification_bias_kernel_compiled": false,
     "verification_bias_unit_tests_executed": false,
     "verification_bias_fixture_executed": false,
-    "probability_sampled_verification_audit_executed": false
+    "probability_sampled_verification_audit_executed": false,
+    "selective_risk_zero_coverage_origin_implemented": true,
+    "selective_risk_zero_coverage_regression_test_authored": true
   },
   "label_states": [
     {
@@ -122,7 +124,7 @@
         "abstention_rate",
         "per_context_calibration_and_risk_coverage"
       ],
-      "denominator_rule": "Calibration losses use measured positive/assay-defined-negative outcomes and report unknown counts; values are conditional on label ascertainment. Each risk-coverage point includes accepted coverage, observed-label coverage, accepted-label completeness, observed-label risk, and sharp unknown-label error bounds. Confidence ties enter together. Results are per preregistered context; no labels means calibration not estimable."
+      "denominator_rule": "Calibration losses use measured positive/assay-defined-negative outcomes and report unknown counts; values are conditional on label ascertainment. Each risk-coverage point includes accepted coverage, observed-label coverage, accepted-label completeness, observed-label risk, and sharp unknown-label error bounds. Confidence ties enter together. Results are per preregistered context; no labels means calibration not estimable. The curve includes an explicit zero-coverage origin; any risk/bound/completeness ratio with zero accepted cases is not estimable and must be null rather than zero."
     },
     {
       "id": "T5_shift_robustness",
