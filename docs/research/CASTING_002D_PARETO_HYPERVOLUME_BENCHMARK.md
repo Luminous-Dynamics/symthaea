@@ -125,7 +125,7 @@ The test-only module now contains decision-space objective evaluators and determ
 
 - **ZDT1:** continuous convex front, \(f_2 = 1 - \sqrt{f_1}\) on the Pareto set.
 - **ZDT2:** continuous concave front, \(f_2 = 1 - f_1^2\).
-- **ZDT3:** five disconnected front segments. The segment boundaries are frozen to published approximate values and sampled independently; no interpolation bridges gaps.
+- **ZDT3:** five disconnected front segments. The segment boundaries are frozen to published approximate values and sampled independently; no interpolation bridges gaps. The later four intervals have open lower boundaries, so the reference generator applies a fixed 1e-8 inward offset to avoid including rounded boundary points that are mathematically dominated.
 - **ZDT4:** same global front shape as ZDT1, but a multi-modal decision landscape, useful for detecting methods that find the easy front geometry but fail to reach the global Pareto set.
 
 The decision-space evaluators implement the standard \(g(x)\) penalty and validate vector length, finite values and each problem's domain. Reference-front generation includes both ends of each segment. The deterministic sample convention is uniform in \(f_1\), not Euclidean arc length; therefore generated front resolution and convention must be frozen for IGD+/epsilon comparisons. These are finite samples of continuous fronts, not the mathematical continuum itself.
