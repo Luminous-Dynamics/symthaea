@@ -23,6 +23,7 @@ mod pages;
 mod palette;
 mod playback;
 mod player_bar;
+mod review_audio;
 mod score_view;
 mod state;
 
