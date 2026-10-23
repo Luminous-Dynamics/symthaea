@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-capability-closure"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Pure deterministic capability-dependency contracts for productive-closure analysis"
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
