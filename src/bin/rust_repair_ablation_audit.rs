@@ -252,6 +252,19 @@ fn non_empty(value: &str) -> bool {
     !value.trim().is_empty()
 }
 
+fn randomized_first_arm(seed: &str, instance_id: &str) -> Arm {
+    let mut material = Vec::with_capacity(seed.len() + instance_id.len() + 1);
+    material.extend_from_slice(seed.as_bytes());
+    material.push(0);
+    material.extend_from_slice(instance_id.as_bytes());
+    let digest = Sha256::digest(material);
+    if digest[0] & 1 == 0 {
+        Arm::Control
+    } else {
+        Arm::Gcs
+    }
+}
+
 fn validate_preregistration(prereg: &Preregistration) -> Result<(), String> {
     if prereg.format_version != FORMAT_VERSION || prereg.protocol_id != PROTOCOL_ID {
         return Err("unsupported preregistration format_version or protocol_id".to_string());
@@ -299,6 +312,12 @@ fn validate_preregistration(prereg: &Preregistration) -> Result<(), String> {
         if !task_ids.insert(item.instance_id.clone()) {
             return Err(format!(
                 "duplicate preregistered instance_id {:?}",
+                item.instance_id
+            ));
+        }
+        if item.first_arm != randomized_first_arm(&prereg.randomization_seed, &item.instance_id) {
+            return Err(format!(
+                "first_arm for task {:?} does not match the preregistered hash-randomization seed",
                 item.instance_id
             ));
         }
@@ -976,7 +995,8 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
                 "--preregistration PATH --expected-preregistration-sha256 HEX ",
                 "--trial-results JSONL --score-reports-dir PATH --report-out PATH"
             )
-        );        return Ok(None);
+        );
+        return Ok(None);
     }
     let mut values = BTreeMap::<String, String>::new();
     let mut index = 0usize;
@@ -1297,7 +1317,10 @@ mod tests {
                 .map(|index| Assignment {
                     instance_id: format!("task-{index}"),
                     repository_id: format!("repo-{index}"),
-                    first_arm: if index % 2 == 0 { Arm::Gcs } else { Arm::Control },
+                    first_arm: randomized_first_arm(
+                        "seed-locked-before-results",
+                        &format!("task-{index}"),
+                    ),
                 })
                 .collect(),
         }
