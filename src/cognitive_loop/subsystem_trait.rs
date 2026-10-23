@@ -97,10 +97,6 @@ pub struct CycleSnapshot {
     /// Check `prediction_error_valid` before interpreting the numeric error.
     pub prediction_error: f32,
 
-    /// Whether prediction_error is a genuine, comparable finite observation.
-    /// Stored as u8 rather than bool to preserve repr(C) / WASM-friendly layout.
-    pub prediction_error_valid: u8,
-
     /// Conversation coherence (0.0–1.0). Smoothed EMA of semantic similarity
     /// between consecutive inputs.
     pub coherence: f32,
@@ -191,10 +187,15 @@ pub struct CycleSnapshot {
     /// Last visual prediction accuracy.
     pub vision_accuracy: f32,
 
-    // ── Padding for alignment ───────────────────────────────────────────
+    // The final three bytes were reserved for ABI stability. Reuse one byte
+    // for PE validity so all existing field offsets and the total struct size
+    // remain unchanged across the repr(C) / WASM boundary.
+    /// Whether prediction_error is a genuine, comparable finite observation.
+    pub prediction_error_valid: u8,
+
     /// Reserved for future fields. Ensures struct size is stable across
     /// versions for WASM ABI compatibility.
-    pub _reserved: [u8; 3],
+    pub _reserved: [u8; 2],
 }
 
 impl Default for CycleSnapshot {
@@ -204,7 +205,6 @@ impl Default for CycleSnapshot {
             prediction_confidence: 0.5,
             fep_lr_boost: 1.0,
             prediction_error: 0.0,
-            prediction_error_valid: 0,
             coherence: 0.5,
             unified_psi: 0.0,
             phi_attention_weight: 1.0,
@@ -228,7 +228,8 @@ impl Default for CycleSnapshot {
             vision_free_energy: 0.0,
             vision_complexity: 0.0,
             vision_accuracy: 1.0,
-            _reserved: [0; 3],
+            prediction_error_valid: 0,
+            _reserved: [0; 2],
         }
     }
 }
@@ -748,7 +749,6 @@ impl CycleSnapshot {
             prediction_confidence,
             fep_lr_boost,
             prediction_error,
-            prediction_error_valid: u8::from(prediction_error_valid),
             coherence,
             unified_psi,
             phi_attention_weight,
@@ -772,7 +772,8 @@ impl CycleSnapshot {
             vision_free_energy: quality_metrics.last_vision_free_energy,
             vision_complexity: quality_metrics.last_vision_complexity,
             vision_accuracy: quality_metrics.last_vision_accuracy,
-            _reserved: [0; 3],
+            prediction_error_valid: u8::from(prediction_error_valid),
+            _reserved: [0; 2],
         }
     }
 }
