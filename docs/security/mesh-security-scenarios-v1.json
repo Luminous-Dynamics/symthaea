@@ -420,7 +420,7 @@
       "required_replacement": "Memory remains bounded at 4,608 streams; a new stream is rejected without evicting any live window; existing tracked streams continue to reject duplicates; expired windows are reclaimed only after the freshness-safe retention interval and capacity becomes available again.",
       "model_config": null,
       "strict_config": null,
-      "implementation_target": "PR #8355: admit_authenticated_sequence; replay_table_capacity_rejects_new_stream_without_evicting_live_windows; expiry_includes_the_full_66_second_retention_boundary",
+      "implementation_target": "PR #8355: admit_authenticated_sequence; replay_table_capacity_rejects_new_stream_without_evicting_live_windows, including expiry-safe capacity recovery; expiry_includes_the_full_66_second_retention_boundary",
       "positive_control": "A previously tracked stream accepts a new in-window sequence at capacity, then a new stream can be admitted after expired state is reclaimed.",
       "status": "proposed"
     }
