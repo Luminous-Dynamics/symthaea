@@ -689,29 +689,252 @@ impl DifferentialEquationsEngine {
 /// Adaptive step-size IVP result (RK45).
 #[derive(Debug, Clone)]
 pub struct RK45Result {
-    /// Final state vector.
-    pub y_final: Vec<f64>,
-    /// Total steps taken (accepted + rejected).
+    /// Number of accepted integration steps.
     pub steps_taken: usize,
-    /// Number of rejected steps (step halved due to error).
+    /// Number of rejected steps.
     pub rejected_steps: usize,
-    /// Achieved local error estimate at termination.
+    /// Scaled local error estimate on the final attempted step.
     pub error_estimate: f64,
-    /// Whether the integration reached t_end within tolerance.
+    /// Final state vector reached by the solver.
+    pub y_final: Vec<f64>,
+    /// True only when the solver reached t_end within its error-control contract.
     pub converged: bool,
 }
 
+/// Classified cause of a failed adaptive RK45 integration.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RK45ErrorKind {
+    EmptySystem,
+    DimensionMismatch { expected: usize, actual: usize },
+    InvalidTimeSpan,
+    InvalidTolerance,
+    NonFiniteInitialState { index: usize },
+    RhsDimensionMismatch { stage: &'static str, expected: usize, actual: usize },
+    NonFiniteIntermediateState { stage: &'static str, index: usize },
+    NonFiniteRhs { stage: &'static str, index: usize },
+    InvalidErrorScale { index: usize },
+    NonFiniteErrorEstimate,
+    StepBudgetExceeded { max_attempts: usize },
+    StepSizeUnderflow { attempted_step: f64, error_norm: f64 },
+    NonProgress { attempted_step: f64 },
+}
+
+/// Failure receipt including the last accepted time/state and work performed.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RK45Error {
+    pub kind: RK45ErrorKind,
+    pub time: f64,
+    pub last_state: Vec<f64>,
+    pub accepted_steps: usize,
+    pub rejected_steps: usize,
+    pub error_estimate: f64,
+}
+
+impl RK45Error {
+    fn new(
+        kind: RK45ErrorKind,
+        time: f64,
+        last_state: &[f64],
+        accepted_steps: usize,
+        rejected_steps: usize,
+        error_estimate: f64,
+    ) -> Self {
+        Self {
+            kind,
+            time,
+            last_state: last_state.to_vec(),
+            accepted_steps,
+            rejected_steps,
+            error_estimate,
+        }
+    }
+}
+
+impl std::fmt::Display for RK45Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "adaptive RK45 failed at t={:.17e}: {:?} (accepted={}, rejected={})",
+            self.time, self.kind, self.accepted_steps, self.rejected_steps
+        )
+    }
+}
+
+impl std::error::Error for RK45Error {}
+
 impl DifferentialEquationsEngine {
-    /// Solve an IVP using the Dormand-Prince RK45 embedded pair.
+    /// Solve an IVP using Dormand-Prince RK45.
     ///
-    /// Adaptive step control: the embedded 4th/5th order pair gives a
-    /// local error estimate.  Step grows/shrinks by `(tol/err)^(1/5)`,
-    /// clamped to `[h_min, h_max]`.
+    /// Compatibility API: on failure, returns the last accepted state and
+    /// sets converged=false. New callers should use try_solve_rk45 to inspect
+    /// the typed failure receipt instead of inferring a failure cause.
+    pub fn solve_rk45(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        tol: f64,
+    ) -> RK45Result {
+        match Self::try_solve_rk45(system, t0, t_end, y0, tol) {
+            Ok(result) => result,
+            Err(error) => RK45Result {
+                steps_taken: error.accepted_steps,
+                rejected_steps: error.rejected_steps,
+                error_estimate: error.error_estimate,
+                y_final: error.last_state,
+                converged: false,
+            },
+        }
+    }
+
+    /// Fallible Dormand-Prince RK45 solve with bounded attempts and explicit
+    /// failure modes.
     ///
-    /// Dormand-Prince Butcher tableau (DOPRI5 — Hairer et al. 1993):
-    /// c2=1/5, c3=3/10, c4=4/5, c5=8/9, c6=1, c7=1
-    pub fn solve_rk45(system: &ODESystem, t0: f64, t_end: f64, y0: &[f64], tol: f64) -> RK45Result {
-        // Dormand-Prince coefficients (a-matrix, b5, b4)
+    /// Every attempted step, accepted or rejected, consumes the shared
+    /// 100,000-attempt budget. Too-small steps, non-progress, malformed RHS
+    /// output, non-finite arithmetic, invalid input, and exhausted budgets
+    /// are reported as typed errors. An adaptive local error estimate is a
+    /// controller signal, not independent proof of global accuracy.
+    pub fn try_solve_rk45(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        tol: f64,
+    ) -> Result<RK45Result, RK45Error> {
+        Self::try_solve_rk45_with_budget(system, t0, t_end, y0, tol, 100_000)
+    }
+
+    fn try_solve_rk45_with_budget(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        tol: f64,
+        max_attempts: usize,
+    ) -> Result<RK45Result, RK45Error> {
+        const MAX_STEP_GROWTH: f64 = 5.0;
+        const MIN_STEP_GROWTH: f64 = 0.2;
+        const MAX_STEP_SHRINK: f64 = 0.1;
+
+        let mut t = t0;
+        let mut y = y0.to_vec();
+        let mut accepted_steps = 0usize;
+        let mut rejected_steps = 0usize;
+        let mut error_estimate = 0.0_f64;
+
+        if system.dim == 0 {
+            return Err(RK45Error::new(
+                RK45ErrorKind::EmptySystem,
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
+            ));
+        }
+        if y0.len() != system.dim {
+            return Err(RK45Error::new(
+                RK45ErrorKind::DimensionMismatch {
+                    expected: system.dim,
+                    actual: y0.len(),
+                },
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
+            ));
+        }
+        if !t0.is_finite() || !t_end.is_finite() || t_end < t0 {
+            return Err(RK45Error::new(
+                RK45ErrorKind::InvalidTimeSpan,
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
+            ));
+        }
+        if !tol.is_finite() || tol <= 0.0 {
+            return Err(RK45Error::new(
+                RK45ErrorKind::InvalidTolerance,
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
+            ));
+        }
+        if let Some(index) = y0.iter().position(|value| !value.is_finite()) {
+            return Err(RK45Error::new(
+                RK45ErrorKind::NonFiniteInitialState { index },
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
+            ));
+        }
+
+        let span = t_end - t0;
+        if !span.is_finite() || span < 0.0 {
+            return Err(RK45Error::new(
+                RK45ErrorKind::InvalidTimeSpan,
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
+            ));
+        }
+        if span == 0.0 {
+            return Ok(RK45Result {
+                steps_taken: 0,
+                rejected_steps: 0,
+                error_estimate: 0.0,
+                y_final: y,
+                converged: true,
+            });
+        }
+
+        let h_max = span / 10.0;
+        let mut h = span / 100.0;
+        if !h_max.is_finite() || h_max <= 0.0 || !h.is_finite() || h <= 0.0 {
+            return Err(RK45Error::new(
+                RK45ErrorKind::StepSizeUnderflow {
+                    attempted_step: h,
+                    error_norm: error_estimate,
+                },
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
+            ));
+        }
+
+        // Verify state and derivative shape/finiteness at every stage.
+        let eval = |stage: &'static str, at: f64, state: &[f64]|
+            -> Result<Vec<f64>, RK45ErrorKind> {
+            if let Some(index) = state.iter().position(|value| !value.is_finite()) {
+                return Err(RK45ErrorKind::NonFiniteIntermediateState { stage, index });
+            }
+            let derivative = (system.f)(at, state);
+            if derivative.len() != system.dim {
+                return Err(RK45ErrorKind::RhsDimensionMismatch {
+                    stage,
+                    expected: system.dim,
+                    actual: derivative.len(),
+                });
+            }
+            if let Some(index) = derivative.iter().position(|value| !value.is_finite()) {
+                return Err(RK45ErrorKind::NonFiniteRhs { stage, index });
+            }
+            Ok(derivative)
+        };
+
+        // Dormand-Prince 5(4) tableau.
         let a21 = 1.0 / 5.0;
         let a31 = 3.0 / 40.0;
         let a32 = 9.0 / 40.0;
@@ -727,15 +950,11 @@ impl DifferentialEquationsEngine {
         let a63 = 46732.0 / 5247.0;
         let a64 = 49.0 / 176.0;
         let a65 = -5103.0 / 18656.0;
-
-        // 5th-order weights (b)
         let b1 = 35.0 / 384.0;
         let b3 = 500.0 / 1113.0;
         let b4 = 125.0 / 192.0;
         let b5 = -2187.0 / 6784.0;
         let b6 = 11.0 / 84.0;
-
-        // 4th-order weights (b*) for error estimate
         let e1 = 71.0 / 57600.0;
         let e3 = -71.0 / 16695.0;
         let e4 = 71.0 / 1920.0;
@@ -743,102 +962,294 @@ impl DifferentialEquationsEngine {
         let e6 = 22.0 / 525.0;
         let e7 = -1.0 / 40.0;
 
-        let dim = system.dim;
-        let mut t = t0;
-        let mut y = y0.to_vec();
-        let mut h = (t_end - t0) / 100.0; // initial step
-        let h_min = 1e-12;
-        let h_max = (t_end - t0) / 10.0;
-        let tol = tol.max(1e-12);
-
-        let mut steps_taken = 0usize;
-        let mut rejected = 0usize;
-        let mut error_estimate = 0.0;
-        let max_steps = 100_000;
-
-        while t < t_end && steps_taken < max_steps {
-            if t + h > t_end {
-                h = t_end - t;
+        let mut attempts = 0usize;
+        while t < t_end {
+            if attempts >= max_attempts {
+                return Err(RK45Error::new(
+                    RK45ErrorKind::StepBudgetExceeded { max_attempts },
+                    t,
+                    &y,
+                    accepted_steps,
+                    rejected_steps,
+                    error_estimate,
+                ));
             }
 
-            // Stage evaluations
-            let k1 = (system.f)(t, &y);
-            let y2: Vec<f64> = (0..dim).map(|i| y[i] + h * a21 * k1[i]).collect();
-            let k2 = (system.f)(t + h / 5.0, &y2);
-            let y3: Vec<f64> = (0..dim)
-                .map(|i| y[i] + h * (a31 * k1[i] + a32 * k2[i]))
-                .collect();
-            let k3 = (system.f)(t + 3.0 * h / 10.0, &y3);
-            let y4: Vec<f64> = (0..dim)
-                .map(|i| y[i] + h * (a41 * k1[i] + a42 * k2[i] + a43 * k3[i]))
-                .collect();
-            let k4 = (system.f)(t + 4.0 * h / 5.0, &y4);
-            let y5: Vec<f64> = (0..dim)
-                .map(|i| y[i] + h * (a51 * k1[i] + a52 * k2[i] + a53 * k3[i] + a54 * k4[i]))
-                .collect();
-            let k5 = (system.f)(t + 8.0 * h / 9.0, &y5);
-            let y6: Vec<f64> = (0..dim)
+            let remaining = t_end - t;
+            if !remaining.is_finite() || remaining <= 0.0 {
+                return Err(RK45Error::new(
+                    RK45ErrorKind::InvalidTimeSpan,
+                    t,
+                    &y,
+                    accepted_steps,
+                    rejected_steps,
+                    error_estimate,
+                ));
+            }
+            h = h.min(h_max).min(remaining);
+            if !h.is_finite() || h <= 0.0 {
+                return Err(RK45Error::new(
+                    RK45ErrorKind::StepSizeUnderflow {
+                        attempted_step: h,
+                        error_norm: error_estimate,
+                    },
+                    t,
+                    &y,
+                    accepted_steps,
+                    rejected_steps,
+                    error_estimate,
+                ));
+            }
+            if t + h <= t {
+                return Err(RK45Error::new(
+                    RK45ErrorKind::NonProgress { attempted_step: h },
+                    t,
+                    &y,
+                    accepted_steps,
+                    rejected_steps,
+                    error_estimate,
+                ));
+            }
+            attempts += 1;
+
+            let k1 = match eval("k1", t, &y) {
+                Ok(value) => value,
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
+            };
+            let y2: Vec<f64> = (0..system.dim).map(|i| y[i] + h * a21 * k1[i]).collect();
+            let k2 = match eval("k2", t + h / 5.0, &y2) {
+                Ok(value) => value,
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
+            };
+            let y3: Vec<f64> = (0..system.dim)
+                .map(|i| y[i] + h * (a31 * k1[i] + a32 * k2[i])).collect();
+            let k3 = match eval("k3", t + 3.0 * h / 10.0, &y3) {
+                Ok(value) => value,
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
+            };
+            let y4: Vec<f64> = (0..system.dim)
+                .map(|i| y[i] + h * (a41 * k1[i] + a42 * k2[i] + a43 * k3[i])).collect();
+            let k4 = match eval("k4", t + 4.0 * h / 5.0, &y4) {
+                Ok(value) => value,
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
+            };
+            let y5: Vec<f64> = (0..system.dim)
                 .map(|i| {
-                    y[i] + h * (a61 * k1[i] + a62 * k2[i] + a63 * k3[i] + a64 * k4[i] + a65 * k5[i])
+                    y[i] + h * (a51 * k1[i] + a52 * k2[i] + a53 * k3[i] + a54 * k4[i])
                 })
                 .collect();
-            let k6 = (system.f)(t + h, &y6);
-
-            // 5th-order solution
-            let y_new: Vec<f64> = (0..dim)
+            let k5 = match eval("k5", t + 8.0 * h / 9.0, &y5) {
+                Ok(value) => value,
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
+            };
+            let y6: Vec<f64> = (0..system.dim)
                 .map(|i| {
-                    y[i] + h * (b1 * k1[i] + b3 * k3[i] + b4 * k4[i] + b5 * k5[i] + b6 * k6[i])
+                    y[i]
+                        + h * (a61 * k1[i]
+                            + a62 * k2[i]
+                            + a63 * k3[i]
+                            + a64 * k4[i]
+                            + a65 * k5[i])
                 })
                 .collect();
-
-            // 7th stage (for error estimate only)
-            let k7 = (system.f)(t + h, &y_new);
-
-            // Error estimate (difference between 4th and 5th order)
-            let err: f64 = (0..dim)
+            let k6 = match eval("k6", t + h, &y6) {
+                Ok(value) => value,
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
+            };
+            let y_new: Vec<f64> = (0..system.dim)
                 .map(|i| {
-                    let e = h
-                        * (e1 * k1[i]
-                            + e3 * k3[i]
-                            + e4 * k4[i]
-                            + e5 * k5[i]
-                            + e6 * k6[i]
-                            + e7 * k7[i]);
-                    let sc = tol * (1.0 + y[i].abs().max(y_new[i].abs()));
-                    (e / sc).powi(2)
+                    y[i]
+                        + h * (b1 * k1[i]
+                            + b3 * k3[i]
+                            + b4 * k4[i]
+                            + b5 * k5[i]
+                            + b6 * k6[i])
                 })
-                .sum::<f64>()
-                .sqrt()
-                / (dim as f64).sqrt();
+                .collect();
+            let k7 = match eval("k7", t + h, &y_new) {
+                Ok(value) => value,
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
+            };
 
+            let mut scaled_squared_sum = 0.0_f64;
+            for i in 0..system.dim {
+                let e = h
+                    * (e1 * k1[i]
+                        + e3 * k3[i]
+                        + e4 * k4[i]
+                        + e5 * k5[i]
+                        + e6 * k6[i]
+                        + e7 * k7[i]);
+                if !e.is_finite() {
+                    return Err(RK45Error::new(
+                        RK45ErrorKind::NonFiniteErrorEstimate,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                }
+                let scale = tol * (1.0 + y[i].abs().max(y_new[i].abs()));
+                if !scale.is_finite() || scale <= 0.0 {
+                    return Err(RK45Error::new(
+                        RK45ErrorKind::InvalidErrorScale { index: i },
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                }
+                let scaled_error = e / scale;
+                scaled_squared_sum += scaled_error * scaled_error;
+                if !scaled_squared_sum.is_finite() {
+                    return Err(RK45Error::new(
+                        RK45ErrorKind::NonFiniteErrorEstimate,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                }
+            }
+            let err = scaled_squared_sum.sqrt() / (system.dim as f64).sqrt();
+            if !err.is_finite() {
+                return Err(RK45Error::new(
+                    RK45ErrorKind::NonFiniteErrorEstimate,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                ));
+            }
             error_estimate = err;
 
             if err <= 1.0 {
-                // Accept step
-                t += h;
-                y = y_new;
-                steps_taken += 1;
-                // Grow step
-                let factor = 0.9 * err.powf(-0.2);
-                h = (h * factor.min(5.0)).min(h_max);
-            } else {
-                // Reject step, shrink
-                rejected += 1;
-                let factor = 0.9 * err.powf(-0.2);
-                h = (h * factor.max(0.1)).max(h_min);
-                if h < h_min {
-                    break;
+                let next_t = if h >= remaining { t_end } else { t + h };
+                if !next_t.is_finite() || next_t <= t {
+                    return Err(RK45Error::new(
+                        RK45ErrorKind::NonProgress { attempted_step: h },
+                        t, &y, accepted_steps, rejected_steps, error_estimate
+                    ));
                 }
+                t = next_t;
+                y = y_new;
+                accepted_steps += 1;
+
+                let factor = if err == 0.0 {
+                    MAX_STEP_GROWTH
+                } else {
+                    (0.9 * err.powf(-0.2)).clamp(MIN_STEP_GROWTH, MAX_STEP_GROWTH)
+                };
+                let next_h = h * factor;
+                if !next_h.is_finite() || next_h <= 0.0 {
+                    return Err(RK45Error::new(
+                        RK45ErrorKind::StepSizeUnderflow {
+                            attempted_step: next_h,
+                            error_norm: err,
+                        },
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                }
+                h = next_h.min(h_max);
+            } else {
+                rejected_steps += 1;
+                let factor = (0.9 * err.powf(-0.2)).clamp(MAX_STEP_SHRINK, 0.9);
+                let next_h = h * factor;
+                if !next_h.is_finite() || next_h <= 0.0 || next_h >= h || t + next_h <= t {
+                    return Err(RK45Error::new(
+                        RK45ErrorKind::StepSizeUnderflow {
+                            attempted_step: next_h,
+                            error_norm: err,
+                        },
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                }
+                h = next_h;
             }
         }
 
-        RK45Result {
-            y_final: y,
-            steps_taken,
-            rejected_steps: rejected,
+        Ok(RK45Result {
+            steps_taken: accepted_steps,
+            rejected_steps,
             error_estimate,
-            converged: (t - t_end).abs() < 1e-10 || t >= t_end,
-        }
+            y_final: y,
+            converged: true,
+        })
     }
 
     /// Implicit Euler (backward Euler) for stiff ODEs via Newton iteration.
@@ -1571,6 +1982,154 @@ mod tests {
             final_y,
             expected
         );
+    }
+
+    #[test]
+    fn test_rk45_zero_duration_is_identity() {
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        let system = ODESystem { f: decay, dim: 1 };
+        let result =
+            DifferentialEquationsEngine::try_solve_rk45(&system, 2.0, 2.0, &[3.0], 1e-8)
+                .expect("zero-duration integration is the identity map");
+        assert!(result.converged);
+        assert_eq!(result.steps_taken, 0);
+        assert_eq!(result.rejected_steps, 0);
+        assert_eq!(result.y_final, vec![3.0]);
+        assert_eq!(result.error_estimate, 0.0);
+    }
+
+    #[test]
+    fn test_rk45_invalid_inputs_are_typed_failures() {
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        let system = ODESystem { f: decay, dim: 1 };
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(&system, 1.0, 0.0, &[1.0], 1e-8),
+            Err(RK45Error { kind: RK45ErrorKind::InvalidTimeSpan, .. })
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(&system, 0.0, 1.0, &[1.0], f64::NAN),
+            Err(RK45Error { kind: RK45ErrorKind::InvalidTolerance, .. })
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(&system, 0.0, 1.0, &[], 1e-8),
+            Err(RK45Error {
+                kind: RK45ErrorKind::DimensionMismatch { expected: 1, actual: 0 },
+                ..
+            })
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(&system, 0.0, 1.0, &[f64::INFINITY], 1e-8),
+            Err(RK45Error { kind: RK45ErrorKind::NonFiniteInitialState { index: 0 }, .. })
+        ));
+        let empty_system = ODESystem { f: decay, dim: 0 };
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(&empty_system, 0.0, 1.0, &[], 1e-8),
+            Err(RK45Error { kind: RK45ErrorKind::EmptySystem, .. })
+        ));
+    }
+
+    #[test]
+    fn test_rk45_rhs_shape_and_finiteness_are_checked() {
+        fn short_rhs(_t: f64, _y: &[f64]) -> Vec<f64> {
+            Vec::new()
+        }
+        fn non_finite_rhs(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![f64::NAN]
+        }
+        let short_system = ODESystem { f: short_rhs, dim: 1 };
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(&short_system, 0.0, 1.0, &[1.0], 1e-8),
+            Err(RK45Error {
+                kind: RK45ErrorKind::RhsDimensionMismatch {
+                    stage: "k1",
+                    expected: 1,
+                    actual: 0
+                },
+                ..
+            })
+        ));
+        let non_finite_system = ODESystem { f: non_finite_rhs, dim: 1 };
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(
+                &non_finite_system, 0.0, 1.0, &[1.0], 1e-8
+            ),
+            Err(RK45Error {
+                kind: RK45ErrorKind::NonFiniteRhs { stage: "k1", index: 0 },
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn test_rk45_rejection_consumes_shared_attempt_budget() {
+        // The deliberately discontinuous RHS forces an oversized first trial
+        // to be rejected. A private one-attempt budget verifies that rejected
+        // work counts toward termination without running 100k iterations.
+        fn discontinuous(t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![if t == 0.0 { 0.0 } else { 1.0e6 }]
+        }
+        let system = ODESystem { f: discontinuous, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_rk45_with_budget(
+            &system, 0.0, 1.0, &[0.0], 1e-12, 1,
+        )
+        .expect_err("oversized first trial must be rejected, then hit attempt budget");
+        assert!(matches!(
+            error.kind,
+            RK45ErrorKind::StepBudgetExceeded { max_attempts: 1 }
+        ));
+        assert_eq!(error.accepted_steps, 0);
+        assert_eq!(error.rejected_steps, 1);
+    }
+
+    #[test]
+    fn test_rk45_tighter_tolerance_reduces_exponential_global_error() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0]]
+        }
+        let system = ODESystem { f: growth, dim: 1 };
+        let loose = DifferentialEquationsEngine::try_solve_rk45(
+            &system, 0.0, 10.0, &[1.0], 1e-2,
+        )
+        .expect("looser tolerance should reach the endpoint");
+        let tight = DifferentialEquationsEngine::try_solve_rk45(
+            &system, 0.0, 10.0, &[1.0], 1e-10,
+        )
+        .expect("tighter tolerance should reach the endpoint");
+        let exact = 10.0_f64.exp();
+        let loose_relative_error = (loose.y_final[0] - exact).abs() / exact;
+        let tight_relative_error = (tight.y_final[0] - exact).abs() / exact;
+
+        assert!(loose.converged && tight.converged);
+        assert!(
+            tight_relative_error < loose_relative_error,
+            "Tighter tolerance should reduce error: loose={loose_relative_error:.3e}, tight={tight_relative_error:.3e}"
+        );
+        assert!(
+            tight_relative_error < 1e-8,
+            "Tight-tolerance relative error {:.3e} exceeds 1e-8",
+            tight_relative_error
+        );
+        assert!(
+            tight.steps_taken > loose.steps_taken,
+            "Tighter tolerance should spend more accepted steps: loose={}, tight={}",
+            loose.steps_taken,
+            tight.steps_taken
+        );
+    }
+
+    #[test]
+    fn test_rk45_legacy_wrapper_marks_invalid_solve_not_converged() {
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        let system = ODESystem { f: decay, dim: 1 };
+        let result = DifferentialEquationsEngine::solve_rk45(&system, 0.0, 1.0, &[1.0], 0.0);
+        assert!(!result.converged);
+        assert_eq!(result.y_final, vec![1.0]);
     }
 
     // ── Stiff ODE validation tests ──────────────────────────────────────
