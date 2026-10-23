@@ -235,7 +235,7 @@ fn main() {
     // Rows carry a "C1|" sigil: loop subsystems print their own study banners
     // to stdout mid-run, so the report is recovered with `grep '^C1|'`.
     println!(
-        "C1| {:<12} {:<28} {:<11} {:>10} {:>12} {:>10} {:>8} {:>9}",
+        "C1| {:<12} {:<28} {:<11} {:>10} {:>12} {:>10} {:>8} {:>9} {:>13}",
         "arm", "seed", "block", "dcos", "bits/persist", "bits/zero", "meanPE(valid)", "coverage", "PE coverage"
     );
 
@@ -296,7 +296,7 @@ fn main() {
             // with exposure.
             let growth = sl.mean_dcos_persist - se.mean_dcos_persist;
             println!(
-                "C1| {:<12} {:<28} {:<11} {:>10.5} {:>12.4} {:>10.4} {:>8.4} {:>6}/{}  (dcos early {:.5} → late {:.5}, growth {:+.5})",
+                "C1| {:<12} {:<28} {:<11} {:>10.5} {:>12.4} {:>10.4} {:>8.4} {:>6}/{} {:>6}/{} (dcos early {:.5} → late {:.5}, growth {:+.5})",
                 arm,
                 seed_short,
                 "script",
@@ -305,6 +305,8 @@ fn main() {
                 sl.mean_bits_zero,
                 sl.mean_pe,
                 sl.coverage,
+                sl.total,
+                sl.pe_coverage,
                 sl.total,
                 se.mean_dcos_persist,
                 sl.mean_dcos_persist,
