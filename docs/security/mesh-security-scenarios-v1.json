@@ -31,6 +31,10 @@
     {
       "pull_request": 8355,
       "scope": "authenticated replay windows, MAC-before-replay state mutation, 60-second timestamp freshness with 5-second future skew, 66-second idle expiry, 4,608-stream capacity and recovery, and spoofed-source rate-limit regression"
+    },
+    {
+      "pull_request": 8519,
+      "scope": "bounded crash-consistency model for replay admission versus durable application effects; effect-first duplicate and commit-first lost-effect counterexamples"
     }
   ],
   "non_claims": [
@@ -198,6 +202,12 @@
       "id": "RESTART-REPLAY-RESISTANCE",
       "claim": "A captured, still-fresh authenticated packet cannot be accepted a second time after receiver restart; replay state is durably preserved or an authenticated epoch/session transition makes the old packet ineligible.",
       "layer": "recovery",
+      "mandatory": true
+    },
+    {
+      "id": "APPLICATION-EFFECT-CRASH-CONSISTENCY",
+      "claim": "Across receiver crashes, authenticated replay admission and application effects cannot combine to produce duplicate effects or permanently lost committed effects; a real implementation must use a reviewed transaction, durable idempotency key, or inbox/outbox protocol.",
+      "layer": "application-recovery",
       "mandatory": true
     }
   ],
@@ -473,6 +483,32 @@
       "strict_config": null,
       "implementation_target": "PR #8355 documents this as a limitation; new v3 implementation must add durable replay-state or authenticated sender epoch and an exact restart trace",
       "positive_control": "After authorized epoch transition, a fresh packet in the new epoch is accepted once while the captured old-epoch packet is rejected.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-REPLAY-005",
+      "property": "APPLICATION-EFFECT-CRASH-CONSISTENCY",
+      "class": "adversarial",
+      "stimulus": "Apply a durable business effect for an authenticated message, crash before the replay identity is durably committed, restart, and deliver the same still-valid message again.",
+      "expected_legacy": "An effect-first ordering can apply the same application effect twice because the receiver's volatile in-flight marker is lost while durable replay state does not contain the packet.",
+      "required_replacement": "The effect is idempotent or transactionally bound to durable replay admission; the post-restart replay cannot apply the same effect twice.",
+      "model_config": "docs/security/models/replay_effect_before_commit_legacy.cfg",
+      "strict_config": "docs/security/models/replay_effect_atomic_strict.cfg",
+      "implementation_target": "PR #8519: EffectBeforeCommit; replay_effect_before_commit_legacy.cfg; replay_effect_atomic_strict.cfg",
+      "positive_control": "A fresh message applies exactly one effect and its durable replay identity is retained across restart.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-REPLAY-006",
+      "property": "APPLICATION-EFFECT-CRASH-CONSISTENCY",
+      "class": "adversarial",
+      "stimulus": "Persist a message's replay identity, crash before its application effect is applied, restart, and attempt to process the still-fresh packet again.",
+      "expected_legacy": "A commit-first ordering causes replay admission to reject the packet after restart although its application effect was never applied.",
+      "required_replacement": "Durable replay identity and application work are transactionally coupled, or an idempotent inbox/outbox worker ensures a committed message's effect is eventually recovered without duplicate application.",
+      "model_config": "docs/security/models/replay_commit_before_effect_legacy.cfg",
+      "strict_config": "docs/security/models/replay_effect_atomic_strict.cfg",
+      "implementation_target": "PR #8519: CommitBeforeEffect; replay_commit_before_effect_legacy.cfg; replay_effect_atomic_strict.cfg",
+      "positive_control": "After an authorized recovery, every durably admitted message has exactly one durable effect and duplicate deliveries do not reapply it.",
       "status": "proposed"
     }
   ]
