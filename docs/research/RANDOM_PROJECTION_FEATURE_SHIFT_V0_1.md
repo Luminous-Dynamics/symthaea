@@ -6,7 +6,7 @@
 
 The exact fixed-reference moment/correlation scorer in `feature_shift.rs` stores every pairwise correlation and recomputes all pairs for each audit. For (d) input features and (n) rows per batch, this is (O(nd^2)) scoring work and (O(d^2)) stored correlation values. This becomes a practical bottleneck for large sensor banks or learned feature vectors.
 
-`random_projection_shift.rs` adds a fixed-seed Rademacher sketch with (k<d) projections. It computes the same three types of summary in a frozen (k)-dimensional space: mean changes, log-scale changes, and pairwise correlation changes. Its dominant scoring cost is (O(ndk + nk^2)); the stored reference state is (O(d+k^2)), excluding the audit batch and temporary projected rows. It recomputes projection signs from a deterministic mixer instead of retaining a dense (d\times k) matrix.
+`random_projection_shift.rs` adds a fixed-seed Rademacher sketch with (k<d) projections. It computes the same three types of summary in a frozen (k)-dimensional space: mean changes, log-scale changes, and pairwise correlation changes. Its dominant scoring cost is \(O(ndk + nk^2)\); stored reference state is \(O(dk+k^2)\), excluding the audit batch and temporary projected rows. Projection coefficients are precomputed as compact one-byte signs to avoid repeated hash mixing for each audit sample; this uses much less memory than an f64 \(d\\times k\) matrix while making scoring cheaper.
 
 The first unit test uses 127 input features and 16 projected dimensions: the exact summary has 8,001 pairwise correlations while the sketch has 120. This is a complexity fixture, not a runtime benchmark. A diffuse mean-shift fixture checks that the compressed score responds to one declared alternative.
 
