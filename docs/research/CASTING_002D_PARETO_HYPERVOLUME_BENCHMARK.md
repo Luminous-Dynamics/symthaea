@@ -121,14 +121,14 @@ CASTING-002E does not add an optimizer or prove SOTA performance. It adds metric
 
 ## CASTING-002F — Analytical multi-objective reference problems
 
-The test-only module now contains decision-space objective evaluators and deterministic sampled analytical fronts for canonical two-objective **ZDT1, ZDT2, ZDT3 and ZDT4** problems:
+The test-only module now contains decision-space objective evaluators and deterministic sampled analytical fronts for canonical two-objective **ZDT1, ZDT2, ZDT3 and ZDT4** problems. Evaluators enforce the standard 30 decision variables for ZDT1/2/3 and 10 for ZDT4; ZDT4 tail variables use the canonical [-10, 10] domain, not [-5, 5].
 
 - **ZDT1:** continuous convex front, \(f_2 = 1 - \sqrt{f_1}\) on the Pareto set.
 - **ZDT2:** continuous concave front, \(f_2 = 1 - f_1^2\).
 - **ZDT3:** five disconnected front segments. The segment boundaries are frozen to published approximate values and sampled independently; no interpolation bridges gaps. The later four intervals have open lower boundaries, so the reference generator applies a fixed 1e-8 inward offset to avoid including rounded boundary points that are mathematically dominated.
 - **ZDT4:** same global front shape as ZDT1, but a multi-modal decision landscape, useful for detecting methods that find the easy front geometry but fail to reach the global Pareto set.
 
-The decision-space evaluators implement the standard \(g(x)\) penalty and validate vector length, finite values and each problem's domain. Reference-front generation includes both ends of each segment. The deterministic sample convention is uniform in \(f_1\), not Euclidean arc length; therefore generated front resolution and convention must be frozen for IGD+/epsilon comparisons. These are finite samples of continuous fronts, not the mathematical continuum itself.
+The decision-space evaluators implement the standard \(g(x)\) penalty and validate canonical vector dimension, finite values and each problem's domain. Reference-front generation includes both ends of each segment. The deterministic sample convention is uniform in \(f_1\), not Euclidean arc length; therefore generated front resolution and convention must be frozen for IGD+/epsilon comparisons. These are finite samples of continuous fronts, not the mathematical continuum itself.
 
 ### New regression tests
 
@@ -178,3 +178,30 @@ Exact-head Rust execution remains required:
     cargo test -p symthaea-core casting_multiobjective_benchmark
 
 No test execution is claimed from this authoring environment.
+
+
+## CASTING-002H — Split-conformal uncertainty calibration
+
+The gap policy's \(\beta \sigma\) scores are not probability guarantees unless predictive uncertainty is calibrated. The new test-only split-conformal utility estimates one non-negative multiplier per scalar objective from normalized absolute residuals:
+
+\[
+s_i=\frac{|y_i-\mu_i|}{\sigma_i},\qquad
+q=s_{(\lceil(n+1)(1-\alpha)\rceil)}.
+\]
+
+It fails closed if the exact finite-sample rank exceeds the available calibration sample size rather than silently clipping the quantile. A separate holdout assessment reports empirical interval coverage, mean absolute standardized residual and Gaussian negative log-likelihood; it does not refit the multiplier. Fit a separate multiplier for each objective using a calibration split that was not used to fit the predictive model. When those multipliers are used by a sequential optimizer, measure coverage on selected proposals as a separate post-selection diagnostic; ordinary exchangeable marginal coverage does not imply selection-conditional coverage.
+
+**Guarantee boundary:** under exchangeability between calibration and future observations, split conformal gives finite-sample *marginal* coverage at least \(1-\alpha\) for the constructed intervals. It does not guarantee conditional coverage for every design region or remain valid under arbitrary process drift. It does not establish that the base surrogate is physically accurate. Manufacturing distribution shift requires explicit drift monitoring, recalibration, or methods whose assumptions address the shift.
+
+Research references:
+- Deshpande, Marx & Kuleshov (AISTATS 2024), online calibration and conformal prediction in Bayesian optimization: https://proceedings.mlr.press/v238/deshpande24a.html
+- Oliveira et al. (JMLR 2024), split conformal and non-exchangeable data: https://jmlr.org/papers/v25/23-1553.html
+- Marques & Graziadei (PMLR 2026), skew-adaptive conformal prediction: https://proceedings.mlr.press/v329/c-marques-f-26a.html
+
+Five new authored tests cover exact order-statistic rank, insufficient-sample refusal, bad alpha, invalid/overflowing observations, independent holdout coverage/NLL, and the empty/overflow holdout path. Total: 35 authored test cases in this test-only module.
+
+Focused command:
+
+    cargo test -p symthaea-core casting_multiobjective_benchmark
+
+These tests have not been compiled or run in this authoring environment; exact-head execution is still mandatory.
