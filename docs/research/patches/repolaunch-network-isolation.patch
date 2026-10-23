@@ -42,6 +42,11 @@ diff --git a/launch/core/platforms/linux.py b/launch/core/platforms/linux.py
 +rm -rf .git/hooks
 +mkdir -p .git/hooks
 +rm -f .git/info/grafts
++# FETCH_HEAD/ORIG_HEAD and merge/rebase/bisect state are pseudo-refs or
++# metadata files that ordinary ref enumeration and reflog pruning do not cover.
++rm -f .git/FETCH_HEAD .git/ORIG_HEAD .git/MERGE_HEAD .git/CHERRY_PICK_HEAD \
++    .git/REVERT_HEAD .git/REBASE_HEAD .git/AUTO_MERGE .git/BISECT_*
++rm -rf .git/sequencer .git/rebase-apply .git/rebase-merge .git/rr-cache
 +head_ref="$(git symbolic-ref -q HEAD || true)"
 +git for-each-ref --format='%(refname)' | while IFS= read -r ref; do
 +    [ "$ref" = "$head_ref" ] || git update-ref -d "$ref"
