@@ -250,3 +250,25 @@ The effect is direction-normalized so positive always favors the candidate. It r
 The bootstrap fraction above zero is descriptive, not a p-value. A confidence interval above zero supports an effect only for the pinned metric, dataset set, access track, and configurations. It does not establish universal state-of-the-art superiority. The command separately sets a **coverage-only eligibility gate** for any SOTA claim: at least seven independent datasets and 50 seeds per dataset, reflecting the scale of the current KDD drift benchmark. Passing that gate would not prove superiority; it only prevents small smoke runs from being mislabeled as SOTA evidence. Compare costs, false alarms, recovery and domain-specific slices independently, publish per-dataset results and uncertainty, and pre-register the primary metric before looking at test results.
 
 A clearly labelled synthetic comparison fixture exercises the CLI in CI; its perfect candidate/reference separation is **not a measured result** and must never be added to benchmark leaderboards.
+
+
+## Counterfactual adaptation utility
+
+Drift-event F1 is not a proxy for better cognition: a detector can win on alarm timing and still trigger expensive, destabilizing or net-negative adaptation. The machine-readable `drift_protocol.adaptation_counterfactual_protocol` therefore defines a separate same-stream, three-arm replay contract:
+
+- **No adaptation** is the task-loss baseline and must have zero adaptation cost.
+- **Detector-triggered** replays the candidate detector plus the declared adaptation policy.
+- **Oracle-timed** uses the registered ground-truth change timing with the same adaptation mechanism as an unattainable timing reference; it is not a deployable detector.
+
+The Rust `xtask score-counterfactual-adaptation-utility` command compares pinned per-cycle outcomes from the same exogenous stream digest. All arms must have identical contiguous cycle indices, and each arm separately pins its version, repository head, and configuration digest. The evaluator reports cumulative/mean task loss, adaptation resource cost, loss improvement against no adaptation, task-loss regret relative to oracle timing, and whether no adaptation dominates the candidate on both loss and resource cost.
+
+```bash
+cargo run --locked -p xtask -- score-counterfactual-adaptation-utility \
+  --input path/to/counterfactual-adaptation.json \
+  --out reports/counterfactual-adaptation.json
+cargo test --locked -p xtask cognitive_adaptation_utility
+```
+
+Task loss and resource cost remain separate axes. The evaluator reports resource cost per task-loss unit reduced only when the candidate improves loss; it does not invent a universal exchange rate or hide a trade-off behind an unregistered composite score. The oracle-timed arm is an informative gap-to-reference, not a fair deployable baseline. Matching cycle indices and a shared-stream digest are necessary provenance, not proof that hidden state, random streams, environment transitions, or adaptation code were identical. Verify those properties with the runner's independent audit and retain per-cycle records.
+
+The synthetic fixture at `benchmarks/cognitive-loop-evidence/synthetic-counterfactual-adaptation.json` exists solely for CLI regression tests. Its values are synthetic, not benchmark results. This evaluator is a scoring primitive, not the replay engine; actual task runs, pinned datasets, cost instrumentation, and counterfactual state-isolation checks remain necessary before reporting efficacy.
