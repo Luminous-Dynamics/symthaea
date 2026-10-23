@@ -31,6 +31,8 @@ struct Cli {
     expected_candidate_count: usize,
     manifest_out: PathBuf,
     report_out: PathBuf,
+    agent_prompts_out: PathBuf,
+    controller_manifest_out: PathBuf,
 }
 
 #[derive(Debug, Serialize)]
@@ -71,6 +73,34 @@ struct LockedTaskManifest {
 }
 
 #[derive(Debug, Serialize)]
+struct AgentPromptRecord {
+    /// This is the only task-specific field serialized into the agent-facing input.
+    problem_statement: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ControllerTaskRecord {
+    run_index: usize,
+    instance_id: String,
+    docker_image: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ControllerManifest {
+    format_version: u32,
+    protocol_id: String,
+    dataset_revision: String,
+    upstream_evaluator_revision: String,
+    source_parquet_sha256: String,
+    candidate_jsonl_sha256: String,
+    eligible_task_ids_sha256: String,
+    agent_prompt_projection_sha256: String,
+    task_count: usize,
+    tasks: Vec<ControllerTaskRecord>,
+    visibility_warning: String,
+}
+
+#[derive(Debug, Serialize)]
 struct TaskAudit {
     instance_id: String,
     eligible: bool,
@@ -103,6 +133,8 @@ struct AuditReport {
     unresolved_task_count: usize,
     candidate_ids_sha256: String,
     task_records_sha256: Option<String>,
+    agent_prompt_projection_sha256: Option<String>,
+    controller_manifest_sha256: Option<String>,
     lockable: bool,
     limitation: String,
     tasks: Vec<TaskAudit>,
@@ -124,7 +156,9 @@ fn usage() -> &'static str {
     --upstream-code-revision <40-hex-commit> \\
     --expected-candidate-count <count> \\
     --manifest-out <eligible-task-manifest.json> \\
-    --report-out <all-task-audit.json>
+    --report-out <all-task-audit.json> \\
+    --agent-prompts-out <agent-visible-prompts.jsonl> \\
+    --controller-manifest-out <evaluator-only-controller.json>
 
 Input JSONL must be the complete candidate split, not the already-filtered
 validated_instances.jsonl. The validation directory must contain
@@ -187,6 +221,8 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         "--expected-candidate-count",
         "--manifest-out",
         "--report-out",
+        "--agent-prompts-out",
+        "--controller-manifest-out",
     ];
     if let Some(unknown) = values.keys().find(|key| !allowed.contains(&key.as_str())) {
         return Err(format!("unknown argument: {unknown}"));
@@ -201,6 +237,8 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         expected_candidate_count,
         manifest_out: PathBuf::from(take("--manifest-out")?),
         report_out: PathBuf::from(take("--report-out")?),
+        agent_prompts_out: PathBuf::from(take("--agent-prompts-out")?),
+        controller_manifest_out: PathBuf::from(take("--controller-manifest-out")?),
     }))
 }
 
@@ -674,9 +712,16 @@ fn run(cli: Cli) -> Result<(), String> {
 
     let mut outcomes = Vec::with_capacity(candidates.len());
     let mut manifest_tasks = Vec::new();
+    let mut agent_prompts_by_id = BTreeMap::<String, String>::new();
     for (instance_id, row, row_sha256) in candidates {
         let outcome = audit_candidate(&row, &instance_id, &cli.validation_dir, row_sha256);
         if let Some(record) = outcome.manifest_record.as_ref() {
+            let problem_statement = row
+                .get("problem_statement")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| format!("eligible task {instance_id} lost its problem statement"))?;
+            agent_prompts_by_id.insert(instance_id.clone(), problem_statement.to_string());
             manifest_tasks.push(TaskManifestRecord {
                 instance_id: record.instance_id.clone(),
                 repo: record.repo.clone(),
@@ -708,6 +753,56 @@ fn run(cli: Cli) -> Result<(), String> {
     let unresolved_count = outcomes.iter().filter(|task| task.unresolved).count();
     let lockable = unresolved_count == 0 && !manifest_tasks.is_empty();
 
+    let (agent_prompt_bytes, controller_manifest_bytes, agent_prompt_projection_sha256, controller_manifest_sha256) =
+        if lockable {
+            let mut prompt_bytes = Vec::new();
+            for task in &manifest_tasks {
+                let problem_statement = agent_prompts_by_id
+                    .get(&task.instance_id)
+                    .ok_or_else(|| format!("missing agent prompt for eligible task {}", task.instance_id))?;
+                let row = serde_json::to_vec(&AgentPromptRecord {
+                    problem_statement: problem_statement.clone(),
+                })
+                .map_err(|error| format!("cannot serialize safe agent prompt: {error}"))?;
+                prompt_bytes.extend_from_slice(&row);
+                prompt_bytes.push(b'\\n');
+            }
+            let prompt_sha256 = sha256_bytes(&prompt_bytes);
+            let controller = ControllerManifest {
+                format_version: MANIFEST_VERSION,
+                protocol_id: PROTOCOL_ID.to_string(),
+                dataset_revision: cli.dataset_revision.clone(),
+                upstream_evaluator_revision: cli.upstream_code_revision.clone(),
+                source_parquet_sha256: actual_parquet_sha256.clone(),
+                candidate_jsonl_sha256: candidate_jsonl_sha256.clone(),
+                eligible_task_ids_sha256: eligible_task_ids_sha256.clone(),
+                agent_prompt_projection_sha256: prompt_sha256.clone(),
+                task_count: manifest_tasks.len(),
+                tasks: manifest_tasks
+                    .iter()
+                    .enumerate()
+                    .map(|(run_index, task)| ControllerTaskRecord {
+                        run_index,
+                        instance_id: task.instance_id.clone(),
+                        docker_image: task.docker_image.clone(),
+                    })
+                    .collect(),
+                visibility_warning: "EVALUATOR-ONLY: never expose this controller manifest to the coding agent. Agent-visible JSONL contains only problem_statement. The runner may use docker_image to launch the prebuilt sandbox.".to_string(),
+            };
+            let mut controller_bytes = serde_json::to_vec_pretty(&controller)
+                .map_err(|error| format!("cannot serialize controller manifest: {error}"))?;
+            controller_bytes.push(b'\\n');
+            let controller_sha256 = sha256_bytes(&controller_bytes);
+            (
+                Some(prompt_bytes),
+                Some(controller_bytes),
+                Some(prompt_sha256),
+                Some(controller_sha256),
+            )
+        } else {
+            (None, None, None, None)
+        };
+
     let report = AuditReport {
         format_version: MANIFEST_VERSION,
         protocol_id: PROTOCOL_ID.to_string(),
@@ -726,6 +821,8 @@ fn run(cli: Cli) -> Result<(), String> {
         } else {
             None
         },
+        agent_prompt_projection_sha256: agent_prompt_projection_sha256.clone(),
+        controller_manifest_sha256: controller_manifest_sha256.clone(),
         lockable,
         limitation: "This audit recomputes label transitions and checks provenance consistency. It does not execute Docker tests, prove the candidate JSONL was derived from the pinned Parquet by a trusted loader, or authenticate the runner. Preserve source bytes and raw logs for independent replication.".to_string(),
         tasks: outcomes,
@@ -765,12 +862,24 @@ fn run(cli: Cli) -> Result<(), String> {
         tasks: manifest_tasks,
     };
     write_json(&cli.manifest_out, &manifest)?;
+    fs::write(
+        &cli.agent_prompts_out,
+        agent_prompt_bytes.expect("lockable report has safe agent prompts"),
+    )
+    .map_err(|error| format!("cannot write {}: {error}", cli.agent_prompts_out.display()))?;
+    fs::write(
+        &cli.controller_manifest_out,
+        controller_manifest_bytes.expect("lockable report has controller manifest"),
+    )
+    .map_err(|error| format!("cannot write {}: {error}", cli.controller_manifest_out.display()))?;
     println!(
         "RUST REPAIR MANIFEST LOCKED: {} eligible / {} candidate tasks; task records SHA-256 {}",
         manifest.eligible_task_count, manifest.candidate_row_count, manifest.task_records_sha256
     );
     println!("Audit report: {}", cli.report_out.display());
     println!("Task manifest: {}", cli.manifest_out.display());
+    println!("Agent prompts (problem_statement only): {}", cli.agent_prompts_out.display());
+    println!("Controller manifest (evaluator-only): {}", cli.controller_manifest_out.display());
     Ok(())
 }
 
@@ -1015,6 +1124,59 @@ mod tests {
             hash_field(&row, "problem_statement").unwrap(),
             sha256_bytes(b"exact bytes")
         );
+    }
+
+    #[test]
+    fn agent_prompt_projection_contains_only_problem_statement() {
+        let raw_row = serde_json::json!({
+            "instance_id": "owner__repo-issue-1",
+            "problem_statement": "Fix the bug.",
+            "patch": "SECRET_GOLD_PATCH",
+            "test_patch": "SECRET_TEST_PATCH",
+            "hints_text": "SECRET_HINT",
+            "all_hints_text": "SECRET_ALL_HINTS",
+            "FAIL_TO_PASS": ["secret-test"],
+            "PASS_TO_PASS": ["secret-regression"],
+            "commit_url": "https://example.invalid/secret"
+        });
+        let prompt = AgentPromptRecord {
+            problem_statement: required_string(&raw_row, "problem_statement").unwrap().to_string(),
+        };
+        let projected = serde_json::to_value(prompt).unwrap();
+        assert_eq!(
+            projected,
+            serde_json::json!({"problem_statement": "Fix the bug."})
+        );
+        let serialized = projected.to_string();
+        for forbidden in [
+            "SECRET_GOLD_PATCH", "SECRET_TEST_PATCH", "SECRET_HINT",
+            "SECRET_ALL_HINTS", "FAIL_TO_PASS", "PASS_TO_PASS", "commit_url",
+            "owner__repo-issue-1",
+        ] {
+            assert!(!serialized.contains(forbidden), "leaked {forbidden}");
+        }
+    }
+
+    #[test]
+    fn controller_projection_contains_no_patch_or_test_contents() {
+        let controller = ControllerTaskRecord {
+            run_index: 0,
+            instance_id: "owner__repo-issue-1".to_string(),
+            docker_image: "image@sha256:deadbeef".to_string(),
+        };
+        let projected = serde_json::to_value(controller).unwrap();
+        assert_eq!(
+            projected,
+            serde_json::json!({
+                "run_index": 0,
+                "instance_id": "owner__repo-issue-1",
+                "docker_image": "image@sha256:deadbeef"
+            })
+        );
+        let serialized = projected.to_string();
+        assert!(!serialized.contains("patch"));
+        assert!(!serialized.contains("FAIL_TO_PASS"));
+        assert!(!serialized.contains("PASS_TO_PASS"));
     }
 
     #[test]
