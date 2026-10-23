@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod cognitive_loop_evidence;
+mod cognitive_drift_score;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -71,6 +72,13 @@ enum Commands {
     ValidateCognitiveLoopEvidence {
         #[arg(long, default_value = "benchmarks/cognitive-loop-evidence/scenarios.json")]
         manifest: PathBuf,
+    },
+    /// Score alarm timestamps against ground-truth drift episodes.
+    ScoreCognitiveLoopDrift {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
     },
 }
 
@@ -169,6 +177,16 @@ fn main() -> anyhow::Result<()> {
                 "OK: cognitive-loop evidence manifest has {} baselines, {} suites, {} scenarios; hard-gate and provenance contracts are complete.",
                 summary.baseline_count, summary.suite_count, summary.case_count
             );
+        }
+        Commands::ScoreCognitiveLoopDrift { input, out } => {
+            let score = cognitive_drift_score::evaluate_file(&input)?;
+            let rendered = serde_json::to_string_pretty(&score)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote drift score to {}", path.display());
+            } else {
+                println!("{rendered}");
+            }
         }
     }
     Ok(())
