@@ -1,0 +1,368 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/success-cost-frontier-outcome.schema.json",
+  "title": "PITB Success-Cost Frontier Outcome v0",
+  "description": "One result row joined to exactly one frozen target, method arm, and resource-cap assignment. Structural validity is not mathematical verification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "run_id",
+    "target_id",
+    "component_id",
+    "arm_id",
+    "budget_id",
+    "input_sha256",
+    "model_id",
+    "model_version",
+    "checker_id",
+    "checker_version",
+    "config_sha256",
+    "status",
+    "checker_passed",
+    "semantic_gate_passed",
+    "successor_gate_status",
+    "checked_target_statement_sha256",
+    "model_calls_used",
+    "tokens_used",
+    "wall_ms",
+    "cost_microusd",
+    "checker_receipt_sha256",
+    "semantic_gate_receipt_sha256",
+    "successor_gate_receipt_sha256",
+    "run_receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.success-cost-frontier-outcome.v0"
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "target_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "component_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "arm_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "budget_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "input_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "checker_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "checker_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "config_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "status": {
+      "enum": [
+        "verified_success",
+        "proof_only",
+        "failed",
+        "timeout",
+        "not_attempted",
+        "tool_unavailable",
+        "out_of_scope"
+      ]
+    },
+    "checker_passed": {
+      "type": "boolean"
+    },
+    "semantic_gate_passed": {
+      "type": "boolean"
+    },
+    "successor_gate_status": {
+      "enum": [
+        "passed",
+        "not_applicable",
+        "failed",
+        "not_run"
+      ]
+    },
+    "checked_target_statement_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "model_calls_used": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tokens_used": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "wall_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cost_microusd": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "checker_receipt_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "semantic_gate_receipt_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "successor_gate_receipt_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "run_receipt_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "verified_success"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "checker_passed": {
+            "const": true
+          },
+          "semantic_gate_passed": {
+            "const": true
+          },
+          "successor_gate_status": {
+            "enum": [
+              "passed",
+              "not_applicable"
+            ]
+          },
+          "checked_target_statement_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "checker_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "semantic_gate_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "successor_gate_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "run_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "proof_only"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "checker_passed": {
+            "const": true
+          },
+          "semantic_gate_passed": {
+            "const": false
+          },
+          "checked_target_statement_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "checker_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "semantic_gate_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "successor_gate_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "run_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "failed",
+              "timeout"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "checker_passed": {
+            "const": false
+          },
+          "semantic_gate_passed": {
+            "const": false
+          },
+          "checked_target_statement_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "checker_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "semantic_gate_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "successor_gate_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "run_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "not_attempted",
+              "tool_unavailable",
+              "out_of_scope"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "checker_passed": {
+            "const": false
+          },
+          "semantic_gate_passed": {
+            "const": false
+          },
+          "successor_gate_status": {
+            "const": "not_run"
+          },
+          "checked_target_statement_sha256": {
+            "type": "null"
+          },
+          "model_calls_used": {
+            "const": 0
+          },
+          "tokens_used": {
+            "const": 0
+          },
+          "wall_ms": {
+            "const": 0
+          },
+          "cost_microusd": {
+            "const": 0
+          },
+          "checker_receipt_sha256": {
+            "type": "null"
+          },
+          "semantic_gate_receipt_sha256": {
+            "type": "null"
+          },
+          "successor_gate_receipt_sha256": {
+            "type": "null"
+          },
+          "run_receipt_sha256": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
