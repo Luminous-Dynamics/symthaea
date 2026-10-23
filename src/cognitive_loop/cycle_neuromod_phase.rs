@@ -64,6 +64,16 @@ impl CognitiveLoopService {
         prediction_error: f32,
         coherence: f32,
     ) -> NeuromodPhaseResult {
+        self.run_neuromodulator_and_psi_phase_with_evidence(Some(prediction_error), coherence)
+    }
+
+    /// Run the non-PE parts every cycle, but publish the prediction-error
+    /// signal to the Experience Bus only when the comparison is valid.
+    pub(super) fn run_neuromodulator_and_psi_phase_with_evidence(
+        &mut self,
+        prediction_error: Option<f32>,
+        coherence: f32,
+    ) -> NeuromodPhaseResult {
         // ═══════════════════════════════════════════════════════════════════════
         // NEUROMODULATOR BATH: Downstream modulation (Phase B)
         // Coherent chemical baseline that fine-grained Phase 14-21 loops adjust further.
@@ -289,8 +299,11 @@ impl CognitiveLoopService {
         let guiding_question: &str;
         let dominant_harmonic: &str;
         if let Some(ref mut bus) = self.experience_bus {
+            let admitted_prediction_error = prediction_error
+                .filter(|value| value.is_finite())
+                .unwrap_or(bus.current_signals.prediction_error);
             bus.current_signals = crate::experience::PrincipledSignals {
-                prediction_error,
+                prediction_error: admitted_prediction_error,
                 uncertainty: (1.0 - self.prediction_confidence) as f32,
                 coherence: coherence.clamp(0.0, 1.0),
                 confidence: self.prediction_confidence as f32,
