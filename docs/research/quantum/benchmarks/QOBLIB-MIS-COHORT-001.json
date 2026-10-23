@@ -852,6 +852,84 @@
         "Run a separate comparison against randomReduMIS and strong classical local-search/solver-population informers.",
         "Do not pool this graph family with the QOBLIB cohort or claim state-of-the-art from a cross-paper comparison."
       ]
+    },
+    {
+      "track_id": "QAOA-GREEDY-RRG-REPRO-001",
+      "status": "planned-literature-reproduction-no-Symthaea-result",
+      "last_source_search_utc": "2026-10-24",
+      "literature": {
+        "title": "Scalable quantum-enhanced greedy algorithm for maximum independent set problems on random regular graphs",
+        "authors": [
+          "Elisabeth Wybo",
+          "Jami Rönkkö",
+          "Olli Hirviniemi",
+          "Jernej Rudi Finžgar",
+          "Martin Leib"
+        ],
+        "accepted_paper_url": "https://journals.aps.org/prresearch/accepted/10.1103/ds1n-wsdm",
+        "doi": "10.1103/ds1n-wsdm",
+        "preprint_url": "https://arxiv.org/abs/2601.21923",
+        "accepted_date": "2026-10-19",
+        "claims_are_external": true
+      },
+      "official_implementation_search": {
+        "repositories_searched": [
+          "GitHub repository search for paper title and authors",
+          "GitHub code search for random regular graphs / QAOA-enhanced greedy MIS"
+        ],
+        "result": "No matching official source repository for this paper surfaced in the searches performed on 2026-10-24.",
+        "consequence": "Do not claim reproduction of the paper's implementation until official code or a clearly justified independent reimplementation is pinned. Any Symthaea reimplementation must have its own branch/commit, test oracle and fixed-angle source table, and must be labelled independently implemented."
+      },
+      "workload": {
+        "graph_class": "independent random 3-regular simple graphs",
+        "graph_sizes": "Pre-register a size grid; the paper's primary SOTA comparison describes 10^5 instances per size through N <= 2000; it also discusses additional p=4 performance through roughly N=5000. Match the exact per-section size grid before claiming reproduction.",
+        "statistical_unit": "graph instance; if multiple seeds/solver repetitions are run on one graph, treat them as nested repetitions",
+        "keep_separate_from": "QOBLIB's heterogeneous 50-instance named graph cohort and qReduMIS random unit-disk / Union-Jack cohort"
+      },
+      "methods": {
+        "standard_minimum_degree_greedy": "Minimum-degree selection with random choice among equal-degree candidates; retain a stable/index-tie implementation as a separate control.",
+        "classical_sota": "Marino-Kirkpatrick linear-prioritized local search for random d-regular graphs; source paper https://arxiv.org/abs/2003.12293. Reproduce its virtual-node/contraction rules, tie handling and stopping conditions exactly before calling it the SOTA baseline.",
+        "quantum_informed": "Precomputed fixed-angle QAOA local expectation values guide choices among eligible minimum-degree vertices; the paper uses tree-derived angles and studies depths p=1..4.",
+        "negative_control": "Randomized tie breaking with matched candidate sets and the same number of classical greedy decisions",
+        "source_paper_claimed_hardware": "20-qubit IQM superconducting processor",
+        "source_paper_simulation": "Tensor-network simulations; keep approximate simulation evidence separately labelled from physical QPU data"
+      },
+      "required_metrics": [
+        "mean independent-set ratio |I|/|V| by graph size, with raw per-instance outcomes",
+        "paired delta against both plain minimum-degree greedy and Marino-Kirkpatrick linear-prioritized search",
+        "feasibility rate and run failures; never drop invalid sets",
+        "uncertainty intervals and multiplicity handling for the preregistered size/depth family",
+        "end-to-end wall time, classical runtime, QPU runtime, shots, candidate expectations, circuit batches, recalculation/cache counts, and all-in cost under explicit boundaries",
+        "target-hit probability and time-to-target if a fixed cardinality/ratio target is preregistered"
+      ],
+      "execution_gates": [
+        "Pin exact graph generator source, version, degree, random seeds and byte-level graph digests; verify every generated graph is simple, connectedness policy is declared, and every vertex has degree 3.",
+        "Reproduce fixed QAOA angle tables from a pinned paper appendix/reference and record the exact depth-angle mapping; don't tune angles on the confirmatory test instances.",
+        "Implement the classical linear-prioritized baseline independently and cross-check its contraction sequence/outputs against the paper's description or author's code if found.",
+        "Run the standard greedy, randomized tie, linear-prioritized and QAOA-informed arms on the exact same graph instances and instance-level seeds.",
+        "Keep physical hardware, ideal circuit simulation, tensor-network simulation, and emulated/replayed observations as separate evidence classes.",
+        "For the main confirmatory claim, freeze metrics and multiplicity handling before generating or evaluating the test graphs.",
+        "Do not pool results with QOBLIB or qReduMIS random unit-disk instances; do not infer general MIS SOTA from random 3-regular graph evidence."
+      ],
+      "current_gaps": [
+        "Official code repository for the October 2026 accepted paper was not found in the GitHub searches performed; reproduction is not yet possible from a verified official implementation.",
+        "The source paper claims statistically significant improvement over its classical prioritized search for considered sizes up to N <= 2000, and reports results up to about N≈5000 for p=4; those are paper results, not Symthaea results.",
+        "Full hardware cost boundary, QPU queue/compilation conventions and raw trial artifacts must be frozen before cross-method operational-cost comparisons."
+      ],
+      "sources": [
+        {
+          "title": "Accepted paper",
+          "url": "https://journals.aps.org/prresearch/accepted/10.1103/ds1n-wsdm"
+        },
+        {
+          "title": "Preprint",
+          "url": "https://arxiv.org/abs/2601.21923"
+        },
+        {
+          "title": "Marino and Kirkpatrick classical baseline",
+          "url": "https://arxiv.org/abs/2003.12293"
+        }
+      ]
     }
   ],
   "complete_baseline_inventory": {
@@ -869,5 +947,7 @@
     "maximum_instance_mean_runtime_seconds": 120.05,
     "maximum_runtime_instance": "brock800-1",
     "caveat": "Published external records only; not a Symthaea run or controlled cross-hardware comparison."
-  }
+  },
+  "last_research_update_utc": "2026-10-24",
+  "last_research_note": "Added a separate random-3-regular QAOA-enhanced greedy reproduction track. Bare minimum-degree greedy is not the sufficient classical SOTA comparison on regular graphs: include Marino-Kirkpatrick linear-prioritized search. No official repository surfaced in the source search, so reproduction remains planned and no paper result is claimed."
 }
