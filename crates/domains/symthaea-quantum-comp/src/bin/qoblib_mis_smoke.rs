@@ -152,16 +152,16 @@ fn improve_one_for_two(
             for left_index in 0..candidates.len() {
                 let left = candidates[left_index];
                 for &right in &candidates[(left_index + 1)..] {
-                    pair_checks += 1;
-                    if pair_checks > pair_check_budget {
+                    if pair_checks >= pair_check_budget {
                         let vertices = selected.iter().enumerate()
                             .filter_map(|(vertex, &keep)| keep.then_some(vertex))
                             .collect();
                         return LocalImprovementResult {
-                            vertices, exchanges, pair_checks: pair_check_budget,
+                            vertices, exchanges, pair_checks,
                             locally_optimal: false,
                         };
                     }
+                    pair_checks += 1;
                     if adjacency[left].binary_search(&right).is_err() {
                         found_move = Some((removed, left, right));
                         break 'removed;
