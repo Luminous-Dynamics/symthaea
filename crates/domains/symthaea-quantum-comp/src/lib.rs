@@ -135,9 +135,9 @@ pub use schema::{
 };
 pub use significance::{PairedDifferenceSummary, exact_two_sided_sign_test_p_value};
 pub use mis_paired_inference::{
-    MisInferenceError, MisMedianInterval, MisSignFlipConfig, MisSignFlipMethod,
-    MisSignFlipResult, MAX_EXACT_SIGN_FLIP_PAIRS, median_order_statistic_interval,
-    paired_sign_flip_test,
+    MisClusterBootstrapConfig, MisClusterBootstrapResult, MisInferenceError, MisMedianInterval,
+    MisSignFlipConfig, MisSignFlipMethod, MisSignFlipResult, MAX_EXACT_SIGN_FLIP_PAIRS,
+    hierarchical_cluster_bootstrap_mean, median_order_statistic_interval, paired_sign_flip_test,
 };
 pub use stability::{
     AlphaStability, StabilityRecord, catalog_has_no_deprecated_surfaces, stability_catalog,
