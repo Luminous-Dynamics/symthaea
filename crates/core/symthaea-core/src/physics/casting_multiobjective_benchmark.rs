@@ -65,6 +65,14 @@ enum ParetoMetricError {
     InvalidPredictionUncertainty,
     NoEpsilonFeasibleCandidate,
     InvalidParetoFront,
+    EmptyCalibrationSet,
+    EmptyAssessmentSet,
+    InvalidMiscoverage,
+    InsufficientCalibrationSamples,
+    InvalidCalibrationObservation,
+    InvalidPredictiveScale,
+    InvalidConformalMultiplier,
+    NonFiniteCalibrationMetric,
 }
 
 impl fmt::Display for ParetoMetricError {
@@ -122,6 +130,14 @@ impl fmt::Display for ParetoMetricError {
             Self::InvalidParetoFront => {
                 f.write_str("front must contain only mutually non-dominated objective points")
             }
+            Self::EmptyCalibrationSet => f.write_str("conformal calibration set must not be empty"),
+            Self::EmptyAssessmentSet => f.write_str("holdout assessment set must not be empty"),
+            Self::InvalidMiscoverage => f.write_str("conformal miscoverage alpha must be finite and in (0, 1)"),
+            Self::InsufficientCalibrationSamples => f.write_str("calibration set is too small for the requested finite-sample quantile"),
+            Self::InvalidCalibrationObservation => f.write_str("calibration predictions and observed values must be finite"),
+            Self::InvalidPredictiveScale => f.write_str("predictive standard deviation must be finite and strictly positive"),
+            Self::InvalidConformalMultiplier => f.write_str("conformal multiplier must be finite and non-negative"),
+            Self::NonFiniteCalibrationMetric => f.write_str("conformal calibration score or assessment metric is non-finite"),
         }
     }
 }
@@ -448,6 +464,154 @@ fn nearest_neighbour_spacing(
 }
 
 
+
+
+/// One scalar prediction/outcome pair for uncertainty calibration.
+/// Fit one multiplier per objective from calibration data not used to fit the predictor.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct PredictionCalibrationSample {
+    predicted_mean: f64,
+    predictive_std_dev: f64,
+    observed_value: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct SplitConformalMultiplier {
+    /// Target marginal miscoverage alpha (e.g. 0.1 targets 90% coverage).
+    alpha: f64,
+    /// Quantile of absolute standardized residuals from the held-out calibration split.
+    multiplier: f64,
+    calibration_count: usize,
+    /// 1-based order-statistic rank ceil((n + 1) * (1 - alpha)).
+    order_statistic_rank: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ConformalHoldoutAssessment {
+    sample_count: usize,
+    covered_count: usize,
+    empirical_coverage: f64,
+    mean_absolute_standardized_residual: f64,
+    mean_gaussian_negative_log_likelihood: f64,
+}
+
+/// Compute a normalized absolute residual |observed - mean| / predictive_std_dev.
+fn standardized_absolute_residual(
+    sample: PredictionCalibrationSample,
+) -> Result<f64, ParetoMetricError> {
+    if !sample.predicted_mean.is_finite() || !sample.observed_value.is_finite() {
+        return Err(ParetoMetricError::InvalidCalibrationObservation);
+    }
+    if !sample.predictive_std_dev.is_finite() || sample.predictive_std_dev <= 0.0 {
+        return Err(ParetoMetricError::InvalidPredictiveScale);
+    }
+    let residual = sample.observed_value - sample.predicted_mean;
+    if !residual.is_finite() {
+        return Err(ParetoMetricError::NonFiniteCalibrationMetric);
+    }
+    let score = residual.abs() / sample.predictive_std_dev;
+    if score.is_finite() {
+        Ok(score)
+    } else {
+        Err(ParetoMetricError::NonFiniteCalibrationMetric)
+    }
+}
+
+/// Fit split-conformal scale multiplier from normalized absolute residuals.
+///
+/// Under exchangeability between calibration and future cases, the order statistic
+/// gives finite-sample *marginal* coverage at least 1-alpha. It does not guarantee
+/// conditional coverage or validity under arbitrary manufacturing distribution shift.
+fn fit_split_conformal_multiplier(
+    calibration: &[PredictionCalibrationSample],
+    alpha: f64,
+) -> Result<SplitConformalMultiplier, ParetoMetricError> {
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
+        return Err(ParetoMetricError::InvalidMiscoverage);
+    }
+    if calibration.is_empty() {
+        return Err(ParetoMetricError::EmptyCalibrationSet);
+    }
+
+    let mut scores = Vec::with_capacity(calibration.len());
+    for sample in calibration {
+        scores.push(standardized_absolute_residual(*sample)?);
+    }
+    scores.sort_by(f64::total_cmp);
+
+    let rank_value = ((calibration.len() as f64 + 1.0) * (1.0 - alpha)).ceil();
+    if !rank_value.is_finite()
+        || rank_value < 1.0
+        || rank_value > calibration.len() as f64
+    {
+        return Err(ParetoMetricError::InsufficientCalibrationSamples);
+    }
+    let order_statistic_rank = rank_value as usize;
+    let multiplier = scores[order_statistic_rank - 1];
+    if !multiplier.is_finite() || multiplier < 0.0 {
+        return Err(ParetoMetricError::NonFiniteCalibrationMetric);
+    }
+
+    Ok(SplitConformalMultiplier {
+        alpha,
+        multiplier,
+        calibration_count: calibration.len(),
+        order_statistic_rank,
+    })
+}
+
+/// Evaluate a frozen conformal multiplier on a distinct holdout set.
+/// The function never changes/refits the multiplier. The caller must enforce data separation.
+fn assess_conformal_holdout(
+    multiplier: SplitConformalMultiplier,
+    holdout: &[PredictionCalibrationSample],
+) -> Result<ConformalHoldoutAssessment, ParetoMetricError> {
+    if !multiplier.alpha.is_finite() || multiplier.alpha <= 0.0 || multiplier.alpha >= 1.0 {
+        return Err(ParetoMetricError::InvalidMiscoverage);
+    }
+    if !multiplier.multiplier.is_finite() || multiplier.multiplier < 0.0 {
+        return Err(ParetoMetricError::InvalidConformalMultiplier);
+    }
+    if holdout.is_empty() {
+        return Err(ParetoMetricError::EmptyAssessmentSet);
+    }
+
+    let mut covered_count = 0usize;
+    let mut mean_absolute_standardized_residual = 0.0;
+    let mut mean_gaussian_negative_log_likelihood = 0.0;
+    let log_sqrt_two_pi = 0.5 * (2.0 * std::f64::consts::PI).ln();
+
+    for (index, sample) in holdout.iter().enumerate() {
+        let score = standardized_absolute_residual(*sample)?;
+        if score <= multiplier.multiplier {
+            covered_count += 1;
+        }
+        let squared_score = score * score;
+        let nll = log_sqrt_two_pi + sample.predictive_std_dev.ln() + 0.5 * squared_score;
+        if !squared_score.is_finite() || !nll.is_finite() {
+            return Err(ParetoMetricError::NonFiniteCalibrationMetric);
+        }
+
+        let count = (index + 1) as f64;
+        mean_absolute_standardized_residual +=
+            (score - mean_absolute_standardized_residual) / count;
+        mean_gaussian_negative_log_likelihood +=
+            (nll - mean_gaussian_negative_log_likelihood) / count;
+        if !mean_absolute_standardized_residual.is_finite()
+            || !mean_gaussian_negative_log_likelihood.is_finite()
+        {
+            return Err(ParetoMetricError::NonFiniteCalibrationMetric);
+        }
+    }
+
+    Ok(ConformalHoldoutAssessment {
+        sample_count: holdout.len(),
+        covered_count,
+        empirical_coverage: covered_count as f64 / holdout.len() as f64,
+        mean_absolute_standardized_residual,
+        mean_gaussian_negative_log_likelihood,
+    })
+}
 
 /// Only surrogate outputs are accepted by the proposal policy. This type intentionally
 /// has no evaluator truth, feasibility oracle, or hidden-optimum field.
@@ -1296,6 +1460,112 @@ mod tests {
         assert_eq!(
             propose_largest_gap_epsilon(&duplicate_ids, &gap_candidates(), [1.0, 2.0], 1.0),
             Err(ParetoMetricError::DuplicateTrialId)
+        );
+    }
+
+
+    fn calibration_samples(scores: &[f64]) -> Vec<PredictionCalibrationSample> {
+        scores.iter().map(|score| PredictionCalibrationSample {
+            predicted_mean: 0.0,
+            predictive_std_dev: 1.0,
+            observed_value: *score,
+        }).collect()
+    }
+
+    #[test]
+    fn split_conformal_uses_exact_one_based_finite_sample_rank() {
+        let calibration = calibration_samples(&[4.0, 0.5, 2.0, 1.0]);
+        let multiplier = fit_split_conformal_multiplier(&calibration, 0.4).unwrap();
+        assert_eq!(multiplier.calibration_count, 4);
+        assert_eq!(multiplier.order_statistic_rank, 3);
+        assert_abs_close(multiplier.multiplier, 2.0, 1e-12);
+    }
+
+    #[test]
+    fn split_conformal_rejects_too_small_calibration_sets_and_bad_alpha() {
+        assert_eq!(
+            fit_split_conformal_multiplier(&calibration_samples(&[1.0, 2.0, 3.0]), 0.1),
+            Err(ParetoMetricError::InsufficientCalibrationSamples)
+        );
+        assert_eq!(
+            fit_split_conformal_multiplier(&calibration_samples(&[1.0, 2.0]), 0.0),
+            Err(ParetoMetricError::InvalidMiscoverage)
+        );
+        assert_eq!(
+            fit_split_conformal_multiplier(&[], 0.1),
+            Err(ParetoMetricError::EmptyCalibrationSet)
+        );
+    }
+
+    #[test]
+    fn split_conformal_rejects_invalid_observations_and_uncertainty_scales() {
+        assert_eq!(
+            fit_split_conformal_multiplier(
+                &[PredictionCalibrationSample {
+                    predicted_mean: 0.0,
+                    predictive_std_dev: 0.0,
+                    observed_value: 1.0,
+                }],
+                0.5
+            ),
+            Err(ParetoMetricError::InvalidPredictiveScale)
+        );
+        assert_eq!(
+            fit_split_conformal_multiplier(
+                &[PredictionCalibrationSample {
+                    predicted_mean: f64::NAN,
+                    predictive_std_dev: 1.0,
+                    observed_value: 1.0,
+                }],
+                0.5
+            ),
+            Err(ParetoMetricError::InvalidCalibrationObservation)
+        );
+        assert_eq!(
+            fit_split_conformal_multiplier(
+                &[PredictionCalibrationSample {
+                    predicted_mean: -f64::MAX,
+                    predictive_std_dev: 1.0,
+                    observed_value: f64::MAX,
+                }],
+                0.5
+            ),
+            Err(ParetoMetricError::NonFiniteCalibrationMetric)
+        );
+    }
+
+    #[test]
+    fn conformal_holdout_reports_coverage_and_gaussian_nll_without_refitting() {
+        let calibration = fit_split_conformal_multiplier(&calibration_samples(&[0.5, 1.0, 2.0, 4.0]), 0.4).unwrap();
+        let before = calibration;
+        let holdout = calibration_samples(&[1.0, 2.0, 3.0]);
+        let assessment = assess_conformal_holdout(calibration, &holdout).unwrap();
+        assert_eq!(assessment.sample_count, 3);
+        assert_eq!(assessment.covered_count, 2);
+        assert_abs_close(assessment.empirical_coverage, 2.0 / 3.0, 1e-12);
+        assert_abs_close(assessment.mean_absolute_standardized_residual, 2.0, 1e-12);
+        let expected_nll = 0.5 * (2.0 * std::f64::consts::PI).ln() + 7.0 / 3.0;
+        assert_abs_close(assessment.mean_gaussian_negative_log_likelihood, expected_nll, 1e-12);
+        assert_eq!(calibration, before);
+    }
+
+    #[test]
+    fn conformal_holdout_fails_closed_on_empty_set_or_non_finite_metrics() {
+        let calibration = fit_split_conformal_multiplier(&calibration_samples(&[0.5, 1.0, 2.0, 4.0]), 0.4).unwrap();
+        assert_eq!(
+            assess_conformal_holdout(calibration, &[]),
+            Err(ParetoMetricError::EmptyAssessmentSet)
+        );
+        assert_eq!(
+            assess_conformal_holdout(
+                calibration,
+                &[PredictionCalibrationSample {
+                    predicted_mean: 0.0,
+                    predictive_std_dev: 1e-300,
+                    observed_value: 1.0,
+                }]
+            ),
+            Err(ParetoMetricError::NonFiniteCalibrationMetric)
         );
     }
 
