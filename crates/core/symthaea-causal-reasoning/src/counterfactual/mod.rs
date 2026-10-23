@@ -35,6 +35,11 @@ pub use identification::{
     CausalReferenceHarness,
     CounterfactualReasoner,
     EffectEstimator,
+    EstimationFamily,
+    EstimationPreflightFailure,
+    EstimationPreflightOutcome,
+    EstimationPreflightReport,
+    EstimationPreflightWarning,
     GrangerResult,
     HarnessResult,
     IDAlgorithm,
@@ -49,6 +54,7 @@ pub use identification::{
     MediationResult,
     // Effect estimation
     ObservationalData,
+    preflight_estimation,
     // Causal Discovery
     PCAlgorithm,
     PCResult,
