@@ -441,8 +441,7 @@ impl CalibratedDecisionValueRouterV1 {
             input_digest: input.input_digest,
             cheap_path_safe: input.cheap_path_safe,
             value_estimate,
-            escalation_cost_upper_bound: input.escalation_cost_upper_bound
-                .map(|cost| cost.latency_us),
+            escalation_cost_upper_bound: input.escalation_cost_upper_bound,
         };
         let allocation = self
             .allocator
