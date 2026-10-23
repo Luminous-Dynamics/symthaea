@@ -164,6 +164,10 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
             pair.scenario_id
         );
         let delta = (pair.candidate_value - pair.baseline_value) * orientation;
+        ensure!(
+            delta.is_finite(),
+            "pairs[{index}] oriented paired difference overflowed to a non-finite value"
+        );
         if delta > 0.0 {
             wins += 1.0;
         } else if delta == 0.0 {
@@ -225,9 +229,9 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
             DatasetSummary {
                 dataset_id: dataset_id.clone(),
                 paired_records: records.len(),
-                candidate_mean: records.iter().map(|x| x.2).sum::<f64>() / n,
-                baseline_mean: records.iter().map(|x| x.3).sum::<f64>() / n,
-                oriented_mean_delta: records.iter().map(|x| x.4).sum::<f64>() / n,
+                candidate_mean: mean_values(records.iter().map(|x| x.2), records.len()),
+                baseline_mean: mean_values(records.iter().map(|x| x.3), records.len()),
+                oriented_mean_delta: mean_values(records.iter().map(|x| x.4), records.len()),
             }
         })
         .collect();
@@ -243,11 +247,11 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
         )
     };
     let candidate_dataset_macro_mean =
-        per_dataset.iter().map(|item| item.candidate_mean).sum::<f64>() / dataset_count as f64;
+        mean_values(per_dataset.iter().map(|item| item.candidate_mean), dataset_count);
     let baseline_dataset_macro_mean =
-        per_dataset.iter().map(|item| item.baseline_mean).sum::<f64>() / dataset_count as f64;
+        mean_values(per_dataset.iter().map(|item| item.baseline_mean), dataset_count);
     let dataset_macro_paired_effect =
-        per_dataset.iter().map(|item| item.oriented_mean_delta).sum::<f64>() / dataset_count as f64;
+        mean_values(per_dataset.iter().map(|item| item.oriented_mean_delta), dataset_count);
 
     let mut sorted_deltas = all_oriented_deltas;
     sorted_deltas.sort_by(f64::total_cmp);
@@ -272,8 +276,10 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
             for _ in 0..seed_ids.len() {
                 let sampled_seed = seed_ids[rng.index(seed_ids.len())];
                 let scenario_deltas = &seeds[&sampled_seed];
-                let seed_mean = scenario_deltas.iter().map(|(_, delta)| *delta).sum::<f64>()
-                    / scenario_deltas.len() as f64;
+                let seed_mean = mean_values(
+                    scenario_deltas.iter().map(|(_, delta)| *delta),
+                    scenario_deltas.len(),
+                );
                 dataset_seed_mean_sum += seed_mean;
             }
             sample_effect_sum += dataset_seed_mean_sum / seed_ids.len() as f64;
@@ -363,8 +369,13 @@ fn quantile_sorted(sorted: &[f64], probability: f64) -> f64 {
         sorted[lower]
     } else {
         let fraction = position - lower as f64;
-        sorted[lower] + (sorted[upper] - sorted[lower]) * fraction
+        sorted[lower] * (1.0 - fraction) + sorted[upper] * fraction
     }
+}
+
+fn mean_values(values: impl Iterator<Item = f64>, count: usize) -> f64 {
+    let divisor = count as f64;
+    values.map(|value| value / divisor).sum()
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -518,6 +529,14 @@ mod tests {
         input.pairs.retain(|pair| {
             !(pair.dataset_id == "dataset-a" && pair.scenario_id == "gradual")
         });
+        assert!(compare(input).is_err());
+    }
+
+    #[test]
+    fn rejects_difference_that_overflows_even_when_inputs_are_finite() {
+        let mut input = fixture(true);
+        input.pairs[0].candidate_value = f64::MAX;
+        input.pairs[0].baseline_value = -f64::MAX;
         assert!(compare(input).is_err());
     }
 
