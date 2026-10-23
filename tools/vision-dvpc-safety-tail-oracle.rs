@@ -381,7 +381,7 @@ mod tests {
 
         let constrained =
             select_exact_safety_tail_oracle_v1(&traces, constraints(20, 20, 0, 0.0)).unwrap();
-        assert_eq!(constrained.selected_full_trace_ids, vec!["safe-gain"]);
+        assert_eq!(constrained.selected_full_trace_ids, vec!["safe-gain".to_owned()]);
         assert_eq!(constrained.chosen_safety_violations, 0);
         assert!((constrained.group_balanced_utility - 0.50).abs() < 1e-12);
     }
@@ -411,7 +411,7 @@ mod tests {
         ];
         let result =
             select_exact_safety_tail_oracle_v1(&traces, constraints(2, 2, 0, 0.0)).unwrap();
-        assert_eq!(result.selected_full_trace_ids, vec!["beneficial"]);
+        assert_eq!(result.selected_full_trace_ids, vec!["beneficial".to_owned()]);
         assert!((result.cvar95_incremental_loss - 0.0).abs() < 1e-12);
     }
 
@@ -424,7 +424,7 @@ mod tests {
         ];
         let result =
             select_exact_safety_tail_oracle_v1(&traces, constraints(1, 1, 0, 0.0)).unwrap();
-        assert_eq!(result.selected_full_trace_ids, vec!["rare"]);
+        assert_eq!(result.selected_full_trace_ids, vec!["rare".to_owned()]);
         assert!((result.group_balanced_utility - 0.15).abs() < 1e-12);
         assert!((result.record_mean_utility - 0.10).abs() < 1e-12);
     }
@@ -485,6 +485,50 @@ mod tests {
         assert_eq!(
             select_exact_safety_tail_oracle_v1(&invalid, constraints(10, 10, 0, 1.0)),
             Err(OracleErrorV1::InvalidUtility("bad".to_owned()))
+        );
+    }
+
+    #[test]
+    fn aggregate_resource_cost_overflow_is_rejected() {
+        let traces = vec![
+            trace("large", "g1", 0.1, 0.2, 0, 0, u64::MAX, 1),
+            trace("overflow", "g2", 0.1, 0.2, 0, 0, 1, 1),
+        ];
+        assert_eq!(
+            select_exact_safety_tail_oracle_v1(
+                &traces,
+                constraints(u64::MAX, u64::MAX, u64::MAX, 1.0),
+            ),
+            Err(OracleErrorV1::AggregateCostOverflow)
+        );
+    }
+
+    #[test]
+    fn aggregate_safety_count_overflow_is_rejected() {
+        let traces = vec![
+            trace("large", "g1", 0.1, 0.2, u64::MAX, 0, 1, 1),
+            trace("overflow", "g2", 0.1, 0.2, 1, 0, 1, 1),
+        ];
+        assert_eq!(
+            select_exact_safety_tail_oracle_v1(
+                &traces,
+                constraints(u64::MAX, u64::MAX, u64::MAX, 1.0),
+            ),
+            Err(OracleErrorV1::AggregateSafetyCountOverflow)
+        );
+    }
+
+    #[test]
+    fn invalid_identifier_and_constraint_are_rejected() {
+        let invalid_id = vec![trace("bad,id", "g", 0.1, 0.2, 0, 0, 1, 1)];
+        assert_eq!(
+            select_exact_safety_tail_oracle_v1(&invalid_id, constraints(10, 10, 0, 1.0)),
+            Err(OracleErrorV1::InvalidTraceId("bad,id".to_owned()))
+        );
+        let valid = vec![trace("ok", "g", 0.1, 0.2, 0, 0, 1, 1)];
+        assert_eq!(
+            select_exact_safety_tail_oracle_v1(&valid, constraints(10, 10, 0, f64::NAN)),
+            Err(OracleErrorV1::InvalidConstraints)
         );
     }
 
