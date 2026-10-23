@@ -43,6 +43,16 @@ The files crates/domains/symthaea-quantum-comp/src/mis_cost_risk.rs and mis_pare
 
 This module scores caller-supplied run records. It does not measure hardware, independently verify solutions, choose an appropriate normalized-loss function, establish provenance, or certify the validity of a selected weight vector. The caller must keep the configuration and outcome normalization fixed and preserve raw records.
 
+### Pareto-frontier stability across graph resamples
+
+The new module `mis_pareto_stability` complements the point-estimate frontier with a graph-cluster bootstrap. Inputs must contain exactly one pre-aggregated `MisParetoPoint` per policy per graph cluster, with a shared policy set, cohort identity, normalization and homogeneous evidence class for every policy. The function resamples graph clusters with replacement, recomputes equal-graph-weighted policy aggregates and frontier membership, and reports each policy's membership count and frequency next to the original-cohort point estimate.
+
+Frontier membership frequency is a **stability diagnostic**, not a posterior probability or confidence that a policy is truly Pareto-optimal. Aggregate repeated trials within each graph using a frozen rule before supplying the per-graph point. If the graph set contains strong within-family dependence, graph-level resampling may still overstate independence; use family-level clusters or a hierarchical model when the sampling design warrants it. A frontier of point estimates is not itself a confidence region.
+
+The helper fails closed on missing/duplicate policy rows, inconsistent policy sets, empty cluster/cohort IDs, mixed evidence classes, invalid point/cost records, cross-cluster currency changes and zero bootstrap replicates. It does not correct multiple comparisons or select normalization scales.
+
+
+
 ## Study design
 
 ### Arm set
@@ -97,7 +107,7 @@ Target at least a 2x reduction in end-to-end cost to a fixed, preregistered solu
 
 ## Validation boundary
 
-Twelve unit tests are authored in the cost-risk module and four in the Pareto module. At the time of this commit they have not been confirmed compiled or executed. The existing paired-difference helper uses a compact normal-approximation interval; its output is a local diagnostic, not publication-grade statistical inference. Publication-grade reports should include appropriate paired bootstrap/randomization methods and multiple-comparison handling. The cost module does not contain or claim any measurements.
+Twelve unit tests are authored in the cost-risk module and four in the Pareto module. At the time of this commit they have not been confirmed compiled or executed. The existing paired-difference helper uses a compact normal-approximation interval; its output is a local diagnostic, not publication-grade statistical inference. Publication-grade reports should include appropriate paired bootstrap/randomization methods and multiple-comparison handling. The cost and frontier-stability modules do not contain or claim any measurements. Pareto stability has three authored tests for deterministic replay, stable dominated-policy exclusion, mismatched/duplicate policy rows, mixed evidence and cross-cluster currency; these remain uncompiled and unexecuted in this environment.
 
 ## Related prior art
 
