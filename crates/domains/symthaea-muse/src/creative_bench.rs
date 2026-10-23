@@ -1137,6 +1137,118 @@ mod tests {
             .collect()
     }
 
+    fn contract_notes(frequencies: &[f32]) -> Vec<Note> {
+        frequencies
+            .iter()
+            .enumerate()
+            .map(|(i, &frequency)| Note {
+                frequency,
+                start_time: i as f32 * 0.25,
+                duration: 0.2,
+                velocity: 0.8,
+            })
+            .collect()
+    }
+
+    fn drone_contract() -> MelodicIntentContract {
+        MelodicIntentContract {
+            minimum_note_count: 4,
+            minimum_pitch_range_semitones: None,
+            maximum_pitch_range_semitones: Some(0.25),
+            minimum_moving_interval_ratio: None,
+            maximum_moving_interval_ratio: Some(0.0),
+            moving_interval_threshold_semitones: 0.5,
+        }
+    }
+
+    fn lead_melody_contract() -> MelodicIntentContract {
+        MelodicIntentContract {
+            minimum_note_count: 4,
+            minimum_pitch_range_semitones: Some(3.0),
+            maximum_pitch_range_semitones: None,
+            minimum_moving_interval_ratio: Some(0.5),
+            maximum_moving_interval_ratio: None,
+            moving_interval_threshold_semitones: 0.5,
+        }
+    }
+
+    #[test]
+    fn same_drone_is_valid_for_drone_intent_but_not_lead_melody_intent() {
+        let drone = contract_notes(&[440.0; 8]);
+        let drone_result = evaluate_melodic_intent_contract(&drone, &drone_contract());
+        let melody_result =
+            evaluate_melodic_intent_contract(&drone, &lead_melody_contract());
+
+        assert!(drone_result.satisfied, "{drone_result:?}");
+        assert_eq!(drone_result.pitch_range_semitones, Some(0.0));
+        assert_eq!(drone_result.moving_interval_ratio, Some(0.0));
+        assert!(!melody_result.satisfied, "{melody_result:?}");
+        assert!(
+            melody_result
+                .violations
+                .contains(&MelodicIntentViolation::PitchRangeBelowMinimum)
+        );
+        assert!(
+            melody_result
+                .violations
+                .contains(&MelodicIntentViolation::MovingIntervalRatioBelowMinimum)
+        );
+    }
+
+    #[test]
+    fn melodic_observables_are_invariant_to_octave_transposition() {
+        let melody = ascending_scale_notes();
+        let octave_up: Vec<Note> = melody
+            .iter()
+            .map(|note| Note {
+                frequency: note.frequency * 2.0,
+                ..*note
+            })
+            .collect();
+        let contract = lead_melody_contract();
+        let base = evaluate_melodic_intent_contract(&melody, &contract);
+        let shifted = evaluate_melodic_intent_contract(&octave_up, &contract);
+
+        let base_range = base.pitch_range_semitones.expect("scale has a pitch range");
+        let shifted_range = shifted
+            .pitch_range_semitones
+            .expect("transposed scale has a pitch range");
+        assert!((base_range - shifted_range).abs() < 1.0e-3);
+        assert_eq!(base.moving_interval_ratio, shifted.moving_interval_ratio);
+        assert_eq!(base.satisfied, shifted.satisfied);
+    }
+
+    #[test]
+    fn invalid_pitch_observations_remain_visible_and_fail_closed() {
+        let notes = contract_notes(&[440.0, f32::NAN, 440.0, 440.0]);
+        let result = evaluate_melodic_intent_contract(&notes, &drone_contract());
+
+        assert_eq!(result.input_note_count, 4);
+        assert_eq!(result.usable_note_count, 3);
+        assert_eq!(result.invalid_note_count, 1);
+        assert!(!result.satisfied);
+        assert!(
+            result
+                .violations
+                .contains(&MelodicIntentViolation::InvalidNoteObservation)
+        );
+    }
+
+    #[test]
+    fn contradictory_melodic_contract_is_rejected() {
+        let notes = contract_notes(&[440.0; 8]);
+        let mut contract = drone_contract();
+        contract.minimum_pitch_range_semitones = Some(2.0);
+        contract.maximum_pitch_range_semitones = Some(0.5);
+
+        let result = evaluate_melodic_intent_contract(&notes, &contract);
+        assert!(!result.satisfied);
+        assert_eq!(
+            result.violations,
+            vec![MelodicIntentViolation::InvalidContract]
+        );
+    }
+
     // ─── Melodic coherence ────────────────────────────────────────────────────
 
     #[test]
