@@ -4,18 +4,22 @@
   "research_track": "QCOMP-RRG-COHORT-001",
   "generator": {
     "algorithm": "configuration-pair-reject-v1",
-    "crate_api": "generate_random_regular_mis_graph",
+    "crate_api": "generate_mis_random_regular(MisRandomRegularConfig)",
     "source_prng": "Symthaea XorShift64* (deterministic, non-cryptographic)",
     "construction": "Create degree copies (stubs) for each labeled vertex; Fisher-Yates shuffle with rejection-sampled bounded integers; pair consecutive stubs; reject any self-loop or repeated undirected edge; sort/canonicalize accepted edges; validate every vertex has exact requested degree.",
     "output_format": "DIMACS edge format, one-based vertices, canonical sorted edges",
-    "retry_policy": "maximum 100000 pairings per instance; exhaustions are explicit failures and must not be silently retried with a new seed",
+    "retry_policy": "default maximum 100000 pairings per instance; the cap may be configured lower per run; exhaustions are explicit failures and must not be silently retried with a new seed",
     "caveat": "Deterministic generation is not itself evidence that a sample is independent or distributionally representative. Test generator statistics before confirmatory use.",
     "resource_limits": {
       "max_stubs_per_call": 1000000,
-      "source_constant": "MAX_RANDOM_REGULAR_MIS_STUBS",
+      "source_constant": "MAX_MIS_RANDOM_REGULAR_STUBS",
       "rationale": "The largest planned paper-shaped case is 5,000 vertices at degree 3 (15,000 stubs). The ceiling prevents accidental huge allocations through the public generator API.",
-      "raising_policy": "Any increase requires explicit review and documented memory/throughput evidence."
-    }
+      "raising_policy": "Any increase requires explicit review and documented memory/throughput evidence.",
+      "max_vertices_per_call": 100000,
+      "vertex_source_constant": "MAX_MIS_RANDOM_REGULAR_VERTICES"
+    },
+    "canonical_implementation_pr": "[Luminous-Dynamics/symthaea#8324](https://github.com/Luminous-Dynamics/symthaea/pull/8324)",
+    "generator_version": "symthaea-qcomp-random-regular-v1"
   },
   "motivation": {
     "primary_reference": "Wybo et al., Scalable quantum-enhanced greedy algorithm for maximum independent set problems, accepted by Physical Review Research on 2026-10-19",
@@ -12322,6 +12326,9 @@
       "Deterministic PRNG streams and fixed seed selection do not constitute independent true random draws",
       "Small-N sanity checks do not certify larger-size random graph distributions",
       "The authored 5,000-seed Rust distribution regression test has not been compiled or executed"
-    ]
+    ],
+    "limit_constant": "MAX_MIS_RANDOM_REGULAR_STUBS",
+    "rust_regression_test_source": "crates/domains/symthaea-quantum-comp/src/mis_random_regular.rs in PR #8324",
+    "seed_stream_note": "Canonical PR #8324 implementation was aligned to the preflight seed stream: same XorShift64* generator, rejection-sampled Fisher-Yates bounded draws, and in-place re-shuffle of the stub vector between rejected attempts. Byte parity must still be verified by compiling/running Rust."
   }
 }
