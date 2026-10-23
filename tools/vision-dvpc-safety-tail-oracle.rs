@@ -216,7 +216,7 @@ fn valid_identifier(value: &str) -> bool {
     !value.trim().is_empty()
         && !value
             .chars()
-            .any(|ch| matches!(ch, '\\t' | '\\r' | '\\n' | ','))
+            .any(|ch| matches!(ch, '\t' | '\r' | '\n' | ','))
 }
 
 fn group_sizes(traces: &[PairedTraceOutcomeV1]) -> BTreeMap<&str, usize> {
