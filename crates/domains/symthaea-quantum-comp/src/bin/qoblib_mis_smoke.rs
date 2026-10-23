@@ -430,7 +430,7 @@ struct RunFailure {
     elapsed_ns: u128,
 }
 
-fn failure_receipt_json(path: &str, failure: &RunFailure, seed_base: u64) -> String {
+fn failure_receipt_json(path: &str, failure: &RunFailure, seed_base: u64, target_objective: Option<usize>) -> String {
     let source_bytes = failure.source_bytes
         .map(|bytes| bytes.to_string())
         .unwrap_or_else(|| "null".to_owned());
@@ -450,6 +450,7 @@ fn failure_receipt_json(path: &str, failure: &RunFailure, seed_base: u64) -> Str
             "  \"error\": \"{}\",\n",
             "  \"software\": {{\"package_version\": \"{}\", \"target_os\": \"{}\", \"target_arch\": \"{}\", \"rustc_version\": \"{}\"}},\n",
             "  \"determinism\": \"not-attested: failed run; inspect error_kind and source identity\",\n",
+            "  \"target_objective\": {},\n",
             "  \"randomness\": {{\"seed_base\": \"{}\", \"restarts\": {}, \"policy\": \"XorShift64 seeded tie-breaks\"}},\n",
             "  \"resource_limits\": {{\"time_limit_ns\": null, \"memory_limit_bytes\": null, \"max_input_bytes\": {}, \"max_vertices\": {}, \"max_edges\": {}}},\n",
             "  \"timing_ns\": {{\"end_to_end\": {}}},\n",
@@ -465,6 +466,7 @@ fn failure_receipt_json(path: &str, failure: &RunFailure, seed_base: u64) -> Str
         env::consts::OS,
         env::consts::ARCH,
         option_env!("RUSTC_VERSION").unwrap_or("not-recorded-at-build"),
+        target_objective.map(|value| value.to_string()).unwrap_or_else(|| "null".to_owned()),
         seed_base.to_string(),
         MULTISTART_GREEDY_RUNS,
         MisDimacsLimits::default().max_input_bytes,
@@ -738,12 +740,13 @@ fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     let mut path: Option<String> = None;
     let mut seed_base = MULTISTART_GREEDY_SEED_BASE;
+    let mut target_objective: Option<usize> = None;
     let mut index = 1usize;
 
     while index < args.len() {
         match args[index].as_str() {
             "--help" | "-h" => {
-                eprintln!("Usage: qoblib-mis-smoke [--seed-base <u64>] <path-to-DIMACS-edge-graph>");
+                eprintln!("Usage: qoblib-mis-smoke [--seed-base <u64>] [--target-objective <usize>] <path-to-DIMACS-edge-graph>");
                 eprintln!("Runs one deterministic greedy control, 16 seeded randomized greedy trials, bounded local improvement, and the tiny exact reference when within its vertex limit.");
                 return ExitCode::SUCCESS;
             }
@@ -761,9 +764,23 @@ fn main() -> ExitCode {
                 }
                 index += 2;
             }
+            "--target-objective" => {
+                if index + 1 >= args.len() {
+                    eprintln!("--target-objective requires a nonnegative integer");
+                    return ExitCode::from(2);
+                }
+                match args[index + 1].parse::<usize>() {
+                    Ok(target) => target_objective = Some(target),
+                    Err(_) => {
+                        eprintln!("invalid --target-objective value: {:?}", args[index + 1]);
+                        return ExitCode::from(2);
+                    }
+                }
+                index += 2;
+            }
             argument if argument.starts_with("--") => {
                 eprintln!("unknown option: {argument}");
-                eprintln!("Usage: qoblib-mis-smoke [--seed-base <u64>] <path-to-DIMACS-edge-graph>");
+                eprintln!("Usage: qoblib-mis-smoke [--seed-base <u64>] [--target-objective <usize>] <path-to-DIMACS-edge-graph>");
                 return ExitCode::from(2);
             }
             argument => {
@@ -778,15 +795,15 @@ fn main() -> ExitCode {
     }
 
     let Some(path) = path else {
-        eprintln!("Usage: qoblib-mis-smoke [--seed-base <u64>] <path-to-DIMACS-edge-graph>");
+        eprintln!("Usage: qoblib-mis-smoke [--seed-base <u64>] [--target-objective <usize>] <path-to-DIMACS-edge-graph>");
         return ExitCode::from(2);
     };
 
-    match run(&path, seed_base) {
+    match run(&path, seed_base, target_objective) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("{}", error.message);
-            println!("{}", failure_receipt_json(&path, &error, seed_base));
+            println!("{}", failure_receipt_json(&path, &error, seed_base, target_objective));
             ExitCode::FAILURE
         }
     }
@@ -881,7 +898,7 @@ mod tests {
             source_fnv1a64: Some(0x0123_4567_89ab_cdef),
             elapsed_ns: 17,
         };
-        let receipt = failure_receipt_json("graphs/farm\n.gph", &failure, 991);
+        let receipt = failure_receipt_json("graphs/farm\n.gph", &failure, 991, Some(10));
         assert!(receipt.contains("\"return_status\": \"failed\""));
         assert!(receipt.contains("\"error_kind\": \"dimacs_parse\""));
         assert!(receipt.contains("\"source_bytes\": 42"));
@@ -890,6 +907,7 @@ mod tests {
         assert!(receipt.contains("\"source_path\": \"graphs/farm\\n.gph\""));
         assert!(receipt.contains("\"time_limit_ns\": null"));
         assert!(receipt.contains("\"seed_base\": \"991\""));
+        assert!(receipt.contains("\"target_objective\": 10"));
         assert!(receipt.contains("\"restarts\": 16"));
         assert!(receipt.contains("\"determinism\": \"not-attested: failed run; inspect error_kind and source identity\""));
     }
