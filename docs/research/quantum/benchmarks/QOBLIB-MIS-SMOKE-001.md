@@ -31,6 +31,12 @@ The receipt records:
 
 The greedy policy recomputes each active vertex's residual degree at every selection and breaks ties by lower vertex index. It is deterministic and requires no random seed. The local improvement is deterministic, only runs on graphs up to 250 vertices, and returns a feasible solution even if its pair-check budget is exhausted. A locally-optimal label means only that no improving one-selected-for-two-unselected exchange remains in the searched neighborhood; it is not a global-optimality claim. It is a baseline/control, not a competitive replacement for dedicated MIS methods. The exact reference uses the deliberately bounded branch-and-bound oracle and must not be run on large benchmark instances.
 
+## Classical baseline arms emitted
+
+Each receipt now preserves three distinct solution tracks: (1) deterministic minimum-residual-degree greedy with lowest-index tie-breaking; (2) a reproducible 16-start minimum-residual-degree greedy portfolio with seeded tie-breaking, recording each run's objective, distinct returned solutions, winning seed and best feasible set; and (3) deterministic one-for-two local improvement applied to the first greedy result, with explicit pair-check-budget status. The tiny exact oracle is run only up to the declared 24-vertex limit.
+
+The residual-degree greedy implementation uses a lazy min-heap and updates degrees only across edges incident to removed vertices, avoiding full adjacency rescans at every selection. The multi-start portfolio is intentionally a modest classical control, not a replacement for strong methods such as the published QOBLIB ParallelILS record. All 16 starts count toward its reported runtime. The smoke runner is not a portfolio router and does not claim that selecting the best of these heuristics beats industry solvers.
+
 ## Example correctness anchor
 
 The pinned QOBLIB farm instance has 17 vertices and 39 edges. Independent subset enumeration on the pinned source graph finds maximum independent-set cardinality 10, matching the published ParallelILS best-known objective. The Rust runner is designed to parse the same source, independently verify the greedy set, and compare with the exact reference. This repository contribution has not yet been compiled/executed in the current authoring environment, so no Rust runner output is represented as already produced.
