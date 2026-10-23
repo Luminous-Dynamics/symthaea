@@ -234,6 +234,7 @@ impl CognitiveLoopService {
         Ok(CycleResult {
             output,
             prediction_error,
+            prediction_error_valid: prediction_error_evidence.is_some(),
             peak_attention: 0.0, // No text-based attention for embedding input
             detected_primitives: Vec::new(), // No text primitives for embedding input
             learning_occurred,
@@ -429,7 +430,8 @@ impl CognitiveLoopService {
         // For the HV path, unified_psi is derived from temporal coherence since
         // we don't run the full consciousness subsystems.
         let urgency = self.carryover.urgency.urgency;
-        if self.config.enable_psi_attestation
+        if prediction_error_evidence.is_some()
+            && self.config.enable_psi_attestation
             && self.config.agent_did.is_some()
             && (self.stats.total_cycles % 10 == 0)
         {
@@ -450,6 +452,7 @@ impl CognitiveLoopService {
         super::CycleResult {
             output,
             prediction_error,
+            prediction_error_valid: prediction_error_evidence.is_some(),
             peak_attention: 0.0,
             detected_primitives: Vec::new(),
             learning_occurred,
