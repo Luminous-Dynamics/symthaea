@@ -1,14 +1,30 @@
 # Symthaea Honest Status
 
-**Updated**: February 5, 2026
-**Methodology**: Deep codebase audit against documentation claims
-**Version**: 0.5.0
+**Historical snapshot date**: February 5, 2026
+**Snapshot methodology**: Codebase audit against documentation claims as observed then
+**Snapshot version**: 0.5.0
+**Evidence reconciliation note**: October 9, 2026
+
+> **Important status boundary:** This file preserves a February 2026 inventory. It has not been re-audited end-to-end against the current repository HEAD, so its old counts, test totals, benchmark timings, and maturity labels are historical observations—not current qualification evidence. In particular, the former heading “Production Ready (100%)” was too broad to support a current production-readiness claim. Use the root README's Evidence Table for the current claim ceilings and follow each cited artifact to verify its exact revision. A passing unit test, implementation stub, model smoke, and production-qualified system are different evidence classes.
+
+## Current evidence ceiling (reconciled October 9, 2026)
+
+The current root README makes these boundaries explicit:
+
+- **Consciousness-related work:** Symthaea does not claim to prove consciousness. The internal construct-validity re-check reports that 4 of 12 Butlin-indicator probe rows survive; one has evidence scoped to internal causal wiring, not functional capacity or consciousness.
+- **Moral reasoning:** the canonical held-out Hendrycks Ethics rerun reports 56.2% overall and 76.5% in the virtue category. Earlier higher results are explicitly retracted as leakage-inflated and must not be repeated as current results.
+- **Zero-knowledge:** reproduced circuit/primitive benchmarks are evidence about the measured computations and workloads. They are not a third-party audit, security certification, or HIPAA/eIDAS/regulatory compliance finding.
+- **Performance:** the README's approximately 31 Hz cognitive-loop measurement is scoped to one reference machine and is not a real-time guarantee.
+- **Maturity:** code presence, passing tests, an in-memory protocol model, and a reproducible benchmark do not independently establish production readiness. Current readiness must be stated per component, revision, environment, and required assurance gate.
+
+Current source: [README.md Evidence Table](../README.md#evidence-table). This section is a scoped summary, not an independent rerun of those experiments.
 
 ---
 
-## Production Ready (100%)
 
-These work, are tested, and match documentation:
+## Historical component-status claims (February 5, 2026; not current qualification)
+
+The February 2026 snapshot recorded these as tested and consistent with the documentation at that time. These labels do not assert current production readiness:
 
 | Component | Location | Tests | Evidence |
 |-----------|----------|-------|----------|
@@ -231,10 +247,10 @@ Features in vision docs with no implementation:
 
 ---
 
-## The Bottom Line
+## Historical summary of the February 2026 snapshot
 
-**What We Have**: A substantial research system (~320K lines Rust) with:
-- Working consciousness infrastructure (Φ, GWT, Active Inference)
+**What the snapshot reported at the time**: a substantial research system (~320K lines Rust) with:
+- Implemented consciousness-related measurement and architecture components (Φ, GWT, Active Inference); implementation is not evidence that the system is conscious
 - 175K+ lines of capable but underdocumented code
 - Real neuroscience validation examples
 - 35 topology generators
@@ -244,16 +260,16 @@ Features in vision docs with no implementation:
 - 3,388 passing tests
 - 0 compiler warnings
 
-**What Was Overclaimed**:
+**What the February 2026 snapshot identified as overclaimed:**
 - Partnership module was listed as "Not Started" - actually fully implemented
 
-**What Was Underclaimed**:
+**What the February 2026 snapshot identified as underclaimed:**
 - 35 topologies (not 19)
 - 145 HDC files (not 139)
 - 77 consciousness files (not 70)
 - 63 integration tests (not "unknown")
 
-**Build Status**: Clean compilation with 0 warnings
+**Build status reported by the February 2026 snapshot**: clean compilation with 0 warnings. This is not a current exact-HEAD build result.
 
 ---
 
