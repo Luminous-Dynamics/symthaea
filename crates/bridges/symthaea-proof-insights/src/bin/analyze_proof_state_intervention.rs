@@ -203,6 +203,119 @@ fn key_for_target(state_key: &str) -> &str {
     state_key
 }
 
+fn validate_intervention_contract(case: &Value, context: &str) -> Result<()> {
+    let intervention = field(case, "intervention", context)?;
+    let contract = field(case, "contract", context)?;
+    let kind = string(intervention, "kind", context)?;
+    let operation = string(intervention, "operation", context)?;
+    let expected_operation = match kind {
+        "required_hypothesis_cleared" => "clear_local_decl",
+        "hypothesis_alpha_renamed" => "rename_local_decl",
+        "irrelevant_declaration_removed" => "remove_irrelevant_decl",
+        "independent_declarations_reordered" => "reorder_independent_decls",
+        _ => bail!("{context}: unsupported intervention kind {kind:?}"),
+    };
+    if operation != expected_operation {
+        bail!("{context}: operation {operation:?} does not match intervention kind {kind:?}");
+    }
+    if field(intervention, "single_factor", context)?.as_bool() != Some(true) {
+        bail!("{context}: confirmatory intervention must declare single_factor=true");
+    }
+
+    let before = field(intervention, "before_declaration", context)?;
+    let after = field(intervention, "after_declaration", context)?;
+    let before_key = string(before, "stable_key", context)?;
+    let after_key = string(after, "stable_key", context)?;
+    let before_role = string(before, "role", context)?;
+    let after_role = string(after, "role", context)?;
+    if before_key != after_key || before_role != after_role {
+        bail!("{context}: before/after declarations do not identify the same declaration and role");
+    }
+    let before_present = field(before, "present", context)?
+        .as_bool()
+        .context("before_declaration.present must be boolean")?;
+    let after_present = field(after, "present", context)?
+        .as_bool()
+        .context("after_declaration.present must be boolean")?;
+    let before_type = field(before, "type_sha256", context)?.as_str();
+    let after_type = field(after, "type_sha256", context)?.as_str();
+    let before_position = field(before, "position", context)?.as_u64();
+    let after_position = field(after, "position", context)?.as_u64();
+    let before_name = field(before, "user_name", context)?.as_str();
+    let after_name = field(after, "user_name", context)?.as_str();
+
+    if before_present != before_type.is_some() || before_present != before_position.is_some() {
+        bail!("{context}: before declaration presence, type digest, and position disagree");
+    }
+    if after_present != after_type.is_some() || after_present != after_position.is_some() {
+        bail!("{context}: after declaration presence, type digest, and position disagree");
+    }
+    if !before_present {
+        bail!("{context}: intervention source declaration must be present before the operation");
+    }
+
+    let base_status = string(contract, "base_precondition_status", context)?;
+    let variant_status = string(contract, "variant_precondition_status", context)?;
+    let action_policy = string(contract, "expected_action_policy", context)?;
+    match kind {
+        "required_hypothesis_cleared" => {
+            if before_role != "required_precondition"
+                || after_present
+                || after_name.is_some()
+                || before_type != Some(string(contract, "required_type_sha256", context)?)
+                || base_status != "available"
+                || variant_status != "absent"
+                || action_policy != "move_forbidden_or_replan"
+            {
+                bail!("{context}: cleared required hypothesis contradicts its declaration or precondition contract");
+            }
+        }
+        "hypothesis_alpha_renamed" => {
+            if before_role != "required_precondition"
+                || !after_present
+                || before_type != after_type
+                || before_type != Some(string(contract, "required_type_sha256", context)?)
+                || before_name.is_none()
+                || after_name.is_none()
+                || before_name == after_name
+                || before_position != after_position
+                || base_status != "available"
+                || variant_status != "available"
+                || action_policy != "preserve_eligibility"
+            {
+                bail!("{context}: alpha-renaming contradicts its declaration or precondition contract");
+            }
+        }
+        "irrelevant_declaration_removed" => {
+            if before_role != "irrelevant"
+                || after_present
+                || after_name.is_some()
+                || base_status != "available"
+                || variant_status != "available"
+                || action_policy != "preserve_eligibility"
+            {
+                bail!("{context}: irrelevant-declaration removal contradicts its declaration or precondition contract");
+            }
+        }
+        "independent_declarations_reordered" => {
+            if !after_present
+                || before_type != after_type
+                || before_position.is_none()
+                || after_position.is_none()
+                || before_position == after_position
+                || before_name != after_name
+                || base_status != "available"
+                || variant_status != "available"
+                || action_policy != "preserve_eligibility"
+            {
+                bail!("{context}: declaration reordering contradicts its declaration or precondition contract");
+            }
+        }
+        _ => unreachable!("intervention kind was checked above"),
+    }
+    Ok(())
+}
+
 fn analyze(
     suite: &Value,
     bundle: &Value,
@@ -264,6 +377,7 @@ fn analyze(
             bail!("{context}: unsupported intervention kind {kind:?}");
         }
         validate_case_state_contract(case, &context)?;
+        validate_intervention_contract(case, &context)?;
         let links = field(case, "outcome_links", &context)?;
         for role in ["base", "variant"] {
             let outcome_id = string(links, &format!("{role}_outcome_id"), &context)?.to_owned();
@@ -1281,6 +1395,52 @@ mod tests {
         let error = validate_case_state_contract(&changed_goal_count, "test-mutant")
             .expect_err("pair with changed goal count must fail closed");
         assert!(error.to_string().contains("changed goal_count"));
+    }
+
+    #[test]
+    fn intervention_kind_operation_and_precondition_contract_must_agree() {
+        let (suite, _) = checked_in_synthetic_inputs();
+        let original = suite["cases"][0].clone();
+        validate_intervention_contract(&original, "test-case")
+            .expect("fixture intervention contract should be internally consistent");
+
+        let mut wrong_operation = original.clone();
+        wrong_operation["intervention"]["operation"] = Value::String("rename_local_decl".into());
+        let error = validate_intervention_contract(&wrong_operation, "test-mutant")
+            .expect_err("operation/kind mismatch must fail closed");
+        assert!(error.to_string().contains("does not match intervention kind"));
+
+        let mut wrong_required_type = original.clone();
+        wrong_required_type["contract"]["required_type_sha256"] =
+            Value::String("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into());
+        let error = validate_intervention_contract(&wrong_required_type, "test-mutant")
+            .expect_err("required type mismatch must fail closed");
+        assert!(error.to_string().contains("contradicts its declaration or precondition contract"));
+
+        let mut false_clear = original.clone();
+        false_clear["intervention"]["after_declaration"]["present"] = Value::Bool(true);
+        let error = validate_intervention_contract(&false_clear, "test-mutant")
+            .expect_err("cleared premise falsely marked present must fail closed");
+        assert!(
+            error.to_string().contains("after declaration presence")
+                || error.to_string().contains("contradicts its declaration or precondition contract")
+        );
+    }
+
+    #[test]
+    fn analyzer_rejects_a_pair_with_a_mismatched_intervention_receipt() {
+        let (mut suite, outcomes) = checked_in_synthetic_inputs();
+        suite["cases"][0]["intervention"]["operation"] = Value::String("rename_local_decl".into());
+        let error = analyze(
+            &suite,
+            &outcomes,
+            "test",
+            &"a".repeat(64),
+            &"b".repeat(64),
+            1000,
+            17,
+        ).expect_err("internally inconsistent intervention must fail before scoring");
+        assert!(error.to_string().contains("does not match intervention kind"));
     }
 
     #[test]
