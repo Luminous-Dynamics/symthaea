@@ -420,3 +420,72 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
 fn join_ids(ids: &[u64]) -> String {
     ids.iter().map(u64::to_string).collect::<Vec<_>>().join(";")
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bounded_noise_flips_exactly_the_requested_number_of_distinct_bits() {
+        let original = BinaryHV::random(123);
+        let mut mutated = original;
+        flip_distinct_bits(&mut mutated, 128, 16_000);
+        let changed_bits: usize = original
+            .0
+            .iter()
+            .zip(mutated.0.iter())
+            .map(|(left, right)| (left ^ right).count_ones() as usize)
+            .sum();
+        assert_eq!(changed_bits, 128);
+    }
+
+    #[test]
+    fn full_dimension_noise_flips_each_bit_once() {
+        let original = BinaryHV::random(456);
+        let mut mutated = original;
+        flip_distinct_bits(&mut mutated, BinaryHV::DIM, 7_777);
+        let changed_bits: usize = original
+            .0
+            .iter()
+            .zip(mutated.0.iter())
+            .map(|(left, right)| (left ^ right).count_ones() as usize)
+            .sum();
+        assert_eq!(changed_bits, BinaryHV::DIM);
+    }
+
+    #[test]
+    fn recall_uses_exact_result_count_as_denominator() {
+        assert_eq!(recall_at_k(&[], &[7]), 1.0);
+        assert!((recall_at_k(&[1, 2, 3], &[2, 3, 9]) - (2.0 / 3.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn nearest_rank_percentiles_are_deterministic() {
+        assert_eq!(percentile(&[40, 10, 30, 20], 0.50), 20);
+        assert_eq!(percentile(&[40, 10, 30, 20], 0.95), 40);
+        assert_eq!(percentile(&[], 0.95), 0);
+    }
+
+    #[test]
+    fn synthetic_query_workload_replays_for_the_same_seed() {
+        let config = Config {
+            source_sha: "0123456789abcdef0123456789abcdef01234567".into(),
+            size: 128,
+            queries: 20,
+            rounds: 1,
+            top_k: 5,
+            noise_bits: 128,
+            seed: 42,
+            candidate_multiplier: 4,
+            fallback_on_empty: true,
+        };
+        let left = build_queries(&config);
+        let right = build_queries(&config);
+        assert_eq!(left.len(), right.len());
+        for (left, right) in left.iter().zip(right.iter()) {
+            assert_eq!(left.kind, right.kind);
+            assert_eq!(left.vector, right.vector);
+        }
+    }
+}
