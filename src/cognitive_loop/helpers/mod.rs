@@ -171,24 +171,21 @@ impl CognitiveLoopService {
         // 7. Feed prediction back to encoder: deferred to after last &prediction use
 
         // 8. Compute prediction error against previous prediction
-        let prediction_error = if let Some(ref prev) = self.last_prediction {
-            let n = compressed_state.len().min(prev.len());
-            if n == 0 {
-                0.0
-            } else {
-                compressed_state[..n]
-                    .iter()
-                    .zip(prev[..n].iter())
-                    .map(|(a, b)| (a - b).powi(2))
-                    .sum::<f32>()
-                    / n as f32
-            }
-        } else {
-            0.0
-        };
+        // Keep the legacy numeric fallback for CycleResult compatibility, but
+        // preserve validity separately so missing/mismatched/non-finite evidence
+        // is excluded from learning statistics and replay.
+        let prediction_error_evidence = Self::compute_prediction_error_evidence(
+            &compressed_state,
+            self.last_prediction.as_deref(),
+        );
+        let prediction_error = prediction_error_evidence.unwrap_or(0.0);
 
         // 9. Store experience
-        self.create_experience(&compressed_state, &prediction, prediction_error);
+        self.create_experience_with_evidence(
+            &compressed_state,
+            &prediction,
+            prediction_error_evidence,
+        );
 
         // 7 (deferred). Move prediction to encoder (no clone needed)
         self.encoder.set_prediction(prediction);
@@ -210,13 +207,16 @@ impl CognitiveLoopService {
             }
         }
 
-        // 11. Update error history — capacity bound: 100 elements, evict before push
-        if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
-            self.error_history.pop_front();
+        // 11. Update error history only for valid finite comparisons. A fallback
+        // numeric value of 0.0 is retained only for the legacy CycleResult field.
+        if let Some(valid_error) = prediction_error_evidence {
+            if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
+                self.error_history.pop_front();
+            }
+            self.error_history.push_back(valid_error);
+            self.stats.avg_prediction_error =
+                self.error_history.iter().sum::<f32>() / self.error_history.len().max(1) as f32;
         }
-        self.error_history.push_back(prediction_error);
-        self.stats.avg_prediction_error =
-            self.error_history.iter().sum::<f32>() / self.error_history.len().max(1) as f32;
 
         // Pre-compute identity fields before moving output
         #[cfg(feature = "identity")]
@@ -323,24 +323,21 @@ impl CognitiveLoopService {
         // 5. Feed prediction back to encoder: deferred to after last &prediction use
 
         // 6. Compute prediction error against previous prediction
-        let prediction_error = if let Some(ref prev) = self.last_prediction {
-            let n = compressed_state.len().min(prev.len());
-            if n == 0 {
-                0.0
-            } else {
-                compressed_state[..n]
-                    .iter()
-                    .zip(prev[..n].iter())
-                    .map(|(a, b)| (a - b).powi(2))
-                    .sum::<f32>()
-                    / n as f32
-            }
-        } else {
-            0.0
-        };
+        // Keep the legacy numeric fallback for CycleResult compatibility, but
+        // preserve validity separately so missing/mismatched/non-finite evidence
+        // is excluded from learning statistics and replay.
+        let prediction_error_evidence = Self::compute_prediction_error_evidence(
+            &compressed_state,
+            self.last_prediction.as_deref(),
+        );
+        let prediction_error = prediction_error_evidence.unwrap_or(0.0);
 
         // 7. Store experience
-        self.create_experience(&compressed_state, &prediction, prediction_error);
+        self.create_experience_with_evidence(
+            &compressed_state,
+            &prediction,
+            prediction_error_evidence,
+        );
 
         // 5 (deferred). Move prediction to encoder (no clone needed)
         self.encoder.set_prediction(prediction);
@@ -360,7 +357,9 @@ impl CognitiveLoopService {
             * self.carryover.learning.adaptive_threshold_scale as f32;
 
         // 9. Learn if error is significant
-        let (learning_occurred, training_loss) = if prediction_error > effective_threshold {
+        let (learning_occurred, training_loss) = if prediction_error_evidence.is_some()
+            && prediction_error > effective_threshold
+        {
             self.stats.learning_cycles += 1;
             if let Some(ref prev_state) = self.last_state {
                 // Build arrays from iterators — avoids 3 unnecessary Vec clones
@@ -389,8 +388,11 @@ impl CognitiveLoopService {
             (false, None)
         };
 
-        // 10. Update statistics
-        self.update_stats(prediction_error, cycle_start.elapsed());
+        // 10. Update prediction-error statistics only for valid evidence. Other
+        // cycle metrics continue to update independently of the PE comparison.
+        if let Some(valid_error) = prediction_error_evidence {
+            self.update_stats(valid_error, cycle_start.elapsed());
+        }
         self.stats.temporal_coherence = coherence;
 
         // 10b. Modality-agnostic consciousness computation.
@@ -551,6 +553,34 @@ impl CognitiveLoopService {
         {
             self.scale_confidence("high_pred_error", 0.95);
         }
+    }
+
+    /// Return a comparable finite MSE only when both embedding states are present
+    /// and share the same non-empty dimension. A missing or incompatible state is
+    /// absence of evidence, not a zero-error prediction.
+    fn compute_prediction_error_evidence(
+        current: &[f32],
+        previous: Option<&[f32]>,
+    ) -> Option<f32> {
+        let previous = previous?;
+        if current.is_empty() || current.len() != previous.len() {
+            return None;
+        }
+        if current
+            .iter()
+            .chain(previous.iter())
+            .any(|value| !value.is_finite())
+        {
+            return None;
+        }
+
+        let error = current
+            .iter()
+            .zip(previous.iter())
+            .map(|(current, previous)| (current - previous).powi(2))
+            .sum::<f32>()
+            / current.len() as f32;
+        error.is_finite().then_some(error)
     }
 
     pub(super) fn create_experience(&mut self, state: &[f32], prediction: &[f32], error: f32) {
@@ -1024,6 +1054,27 @@ mod prediction_evidence_replay_tests {
         assert_eq!(service.buffer.len(), 1);
         assert_eq!(service.buffer.front().map(|item| item.error), Some(0.25));
         assert_eq!(service.last_state.as_deref(), Some(&[0.3, 0.4][..]));
+    }
+
+    #[test]
+    fn embedding_prediction_error_requires_compatible_finite_states() {
+        assert_eq!(CognitiveLoopService::compute_prediction_error_evidence(&[0.1], None), None);
+        assert_eq!(
+            CognitiveLoopService::compute_prediction_error_evidence(&[0.1, 0.2], Some(&[0.1])),
+            None
+        );
+        assert_eq!(
+            CognitiveLoopService::compute_prediction_error_evidence(&[f32::NAN], Some(&[0.0])),
+            None
+        );
+        assert_eq!(
+            CognitiveLoopService::compute_prediction_error_evidence(&[0.1, 0.2], Some(&[0.1, 0.2])),
+            Some(0.0)
+        );
+        assert_eq!(
+            CognitiveLoopService::compute_prediction_error_evidence(&[0.1, 0.2], Some(&[0.2, 0.3])),
+            Some(0.01)
+        );
     }
 
     #[test]
