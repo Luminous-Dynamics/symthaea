@@ -157,7 +157,7 @@ struct ScoreReport {
 }
 
 fn usage() -> &'static str {
-    "Usage:
+    r#"Usage:
   cargo run --locked --bin rust-repair-score-audit --features rust-repair-manifest -- \\
     --task-manifest <locked-task-manifest.json> \\
     --expected-task-manifest-sha256 <64-hex-pinned-externally> \\
@@ -171,7 +171,7 @@ Predictions may be an ID-keyed JSON object, standard JSONL records, or a JSON ar
 of records. Record objects use the fields "instance_id" and "model_patch".
 The scored evaluation directory must contain <instance_id>/evaluation_evidence.json,
 status.json, and post_patch_log.txt. Missing or unresolved runs stay in the
-assigned denominator and prevent a lockable pass@1 result."
+assigned denominator and prevent a lockable pass@1 result."#
 }
 
 fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
