@@ -56,6 +56,24 @@ At minimum measure exact-target checked solve rate, Pass@1, success by shared bu
 
 Public Lean repositories may have appeared in model pretraining; a repository-family split cannot prove training-data independence. Keep a temporal or post-cutoff external challenge set, identify exact snapshots, group all companion/alternative proofs into connected components, and avoid tuning on test outcomes. Independently review statement correspondence; retain unresolved cases as unknown, not as easy negatives or silently removed rows.
 
+### 6. Evolve the benchmark adversarially—but keep the evaluator independent
+
+A promising next frontier is a generator–prover–auditor loop rather than a static bag of counterfactuals. GAR (ICLR 2026) jointly trains a task composer and prover in an adversarial curriculum; the paper reports average relative Pass@32 improvement of 4.20% across two evaluated prover configurations on MiniF2F, and a DeepSeek-Prover-V2 ProofNet-Test change from 22.58% to 25.81%. This is evidence that adaptive task generation is worth evaluating, not evidence that an equivalent PITB mechanism already exists. [GAR paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/39ca8893ea38905a9d2ffe786e85af0f-Abstract-Conference.html).
+
+For PITB, the generator should propose *minimal proof-state interventions near an insight's applicability boundary*: remove a premise, change a type or inequality direction, alter quantifier scope, reorder independent declarations, or remove one of several redundant routes. A separate checker/reviewer must classify the mutation and establish whether the target statement stayed fixed and whether the intervention preserves or breaks the precondition. Do not let the same generator that creates a mutation certify its label.
+
+Track a development-only **boundary-finding yield** (independently qualified new failure modes per 100 attempted mutations), distinct from model accuracy. Deduplicate by mutation family, audit false mutation labels, then freeze an independently held-out external challenge set. Otherwise, a powerful generator can simply overfit the evaluator to recognizable adversarial patterns.
+
+The key architectural separation is:
+
+- **Generator:** proposes context changes or nearby counterexamples, with source and seed receipts.
+- **Independent semantic auditor:** determines which target and preconditions changed, and leaves uncertain cases unlabelled.
+- **Candidate system:** predicts reuse, adaptation, replan, or abstention and attempts the proof.
+- **Kernel / exact-target verifier:** checks the resulting Lean proof and any declared axiom policy.
+- **Scorekeeper:** joins hashes, reports the paired outcomes, and cannot modify eligibility or labels after seeing predictions.
+
+This structure could make the challenge set grow where systems fail while keeping evaluation claims fail-closed. It is a proposed architecture; no generator loop or boundary-finding score is implemented or measured by this PR yet.
+
 ## A staged scoreboard
 
 These are **proposed gates**, not measured PITB achievements or universal definitions of intelligence.
