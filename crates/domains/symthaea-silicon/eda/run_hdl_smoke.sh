@@ -78,6 +78,7 @@ fi
 if (("${#missing[@]}" > 0)); then
   jq -n \
     --arg status "unqualified_tool_missing" \
+    --arg out_dir "${out_dir}" \
     --arg timestamp_utc "${stamp}" \
     --arg git_head "${git_head}" \
     --arg verilator_version "${verilator_version}" \
@@ -90,7 +91,7 @@ if (("${#missing[@]}" > 0)); then
     --arg manifest_sha256 "${manifest_sha}" \
     --arg flake_sha256 "${flake_sha}" \
     --arg flake_lock_sha256 "${flake_lock_sha}" \
-    '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, missing_tools:$missing_tools, source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, widths_tested:[], case_results:[], claim_ceiling:"No RTL simulation, formal proof, synthesis/PPA, FPGA observation, physical energy or SOTA claim."}' \
+    '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, missing_tools:$missing_tools, source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, widths_tested:[], architectures:["xor","linear_popcount","balanced_popcount"], case_results:[], output_directory:$out_dir, claim_ceiling:"No RTL simulation, formal proof, synthesis/PPA, FPGA observation, physical energy or SOTA claim."}' \
     > "${out_dir}/receipt.json"
   printf 'UNQUALIFIED: missing tools: %s\nReceipt: %s/receipt.json\n' "${missing[*]}" "${out_dir}" >&2
   exit 2
@@ -108,6 +109,7 @@ for width in 64 128 256 512; do
     esac
 
     if [[ "${arch}" == "balanced_popcount" ]]; then balanced=1; else balanced=0; fi
+    case_id="${arch//_/-}-${width}"
     case_dir="${out_dir}/width-${width}/${arch}"
     mkdir -p "${case_dir}" || { overall_status="failed"; continue; }
 
@@ -149,6 +151,7 @@ for width in 64 128 256 512; do
     done
 
     case_result="$(jq -n \
+      --arg case_id "${case_id}" \
       --arg module "${module}" \
       --arg architecture "${arch}" \
       --arg width "${width}" \
@@ -157,7 +160,7 @@ for width in 64 128 256 512; do
       --arg build_rc "${build_rc}" \
       --arg simulation_rc "${simulation_rc}" \
       --argjson simulation_marker "${simulation_marker}" \
-      '{module:$module, architecture:$architecture, datapath_width_bits:($width|tonumber), status:$status, lint_exit_code:($lint_rc|tonumber), build_exit_code:($build_rc|tonumber), simulation_exit_code:($simulation_rc|tonumber), expected_pass_marker_seen:$simulation_marker}')"
+      '{case_id:$case_id, module:$module, architecture:$architecture, datapath_width_bits:($width|tonumber), status:$status, lint_exit_code:($lint_rc|tonumber), build_exit_code:($build_rc|tonumber), simulation_exit_code:($simulation_rc|tonumber), expected_pass_marker_seen:$simulation_marker}')"
     case_results="$(jq -cn --argjson existing "${case_results}" --argjson next "${case_result}" '$existing + [$next]')"
     printf 'width=%s architecture=%s status=%s lint=%s build=%s sim=%s\n' "${width}" "${arch}" "${case_status}" "${lint_rc}" "${build_rc}" "${simulation_rc}"
   done
