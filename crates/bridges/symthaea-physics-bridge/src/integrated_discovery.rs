@@ -642,6 +642,64 @@ impl PipelineConfig {
     };
 }
 
+
+/// Generate the initial truth-absent candidate pool from public task inputs only.
+/// Deliberately accepts no reference expression, truth values, or evaluator holdout, making
+/// oracle-conditioned candidate filtering impossible through this interface.
+fn generate_truth_absent_candidates(
+    seed: u64,
+    config: PipelineConfig,
+    design: &[Experiment],
+) -> Vec<Expr> {
+    let mut hypotheses: Vec<Expr> = Vec::with_capacity(POOL_SIZE);
+    let mut candidate_rng = seed
+        ^ if config.typed_candidates {
+            0xA11C_E55E_2026_0001
+        } else {
+            0xA11C_E55E_2026_0002
+        };
+    let mut candidate_values: Vec<Vec<f64>> = Vec::new();
+    let mut attempts = 0usize;
+    let attempt_cap = GEN_ATTEMPT_CAP * POOL_SIZE;
+    while hypotheses.len() < POOL_SIZE && attempts < attempt_cap {
+        attempts += 1;
+        let candidate = if config.typed_candidates {
+            random_expr_with_dimension(
+                &mut candidate_rng,
+                DimensionalSignature::ENERGY,
+                &demo_units(),
+                GEN_MAX_DEPTH,
+            )
+        } else {
+            naive_untyped_expr(&mut candidate_rng, GEN_MAX_DEPTH)
+        };
+        let Some(values) = design
+            .iter()
+            .map(|point| eval_at(&candidate, point))
+            .collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        if !values
+            .iter()
+            .all(|value| value.abs() > 1.0e-6 && value.abs() < 1.0e6)
+            || candidate_values
+                .iter()
+                .any(|known| !functionally_distinct(&values, known))
+        {
+            continue;
+        }
+        candidate_values.push(values);
+        hypotheses.push(candidate);
+    }
+    assert_eq!(
+        hypotheses.len(),
+        POOL_SIZE,
+        "truth-absent candidate generator exhausted its predeclared attempt budget"
+    );
+    hypotheses
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ActiveSelector {
     RawVariance,
@@ -855,66 +913,18 @@ fn run_trial_with_mode(
         .map(|point| eval_at(&ground_truth, point).unwrap())
         .collect();
 
-    let mut hypotheses: Vec<Expr> = Vec::with_capacity(POOL_SIZE);
-    if truth_absent {
-        // Open-ended track: candidate generation receives the public variable units and
-        // predeclared experiment design only. It must not read ground-truth values, create
-        // near-misses from truth, or use evaluator feedback to reject candidate structures.
-        let mut candidate_rng = seed
-            ^ if config.typed_candidates {
-                0xA11C_E55E_2026_0001
-            } else {
-                0xA11C_E55E_2026_0002
-            };
-        let mut candidate_probe_values: Vec<Vec<f64>> = Vec::new();
-        let mut attempts = 0usize;
-        let attempt_cap = GEN_ATTEMPT_CAP * POOL_SIZE;
-        while hypotheses.len() < POOL_SIZE && attempts < attempt_cap {
-            attempts += 1;
-            let candidate = if config.typed_candidates {
-                random_expr_with_dimension(
-                    &mut candidate_rng,
-                    DimensionalSignature::ENERGY,
-                    &demo_units(),
-                    GEN_MAX_DEPTH,
-                )
-            } else {
-                naive_untyped_expr(&mut candidate_rng, GEN_MAX_DEPTH)
-            };
-            let Some(values) = candidate_pool
-                .iter()
-                .map(|point| eval_at(&candidate, point))
-                .collect::<Option<Vec<_>>>()
-            else {
-                continue;
-            };
-            if !values.iter().all(|value| value.abs() > 1.0e-6 && value.abs() < 1.0e6)
-                || candidate_probe_values
-                    .iter()
-                    .any(|known| !functionally_distinct(&values, known))
-            {
-                continue;
-            }
-            candidate_probe_values.push(values);
-            hypotheses.push(candidate);
-        }
-        assert_eq!(
-            hypotheses.len(),
-            POOL_SIZE,
-            "truth-absent candidate generator exhausted its predeclared attempt budget"
-        );
+    let mut hypotheses: Vec<Expr> = if truth_absent {
+        generate_truth_absent_candidates(seed, config, &candidate_pool)
     } else {
         // Oracle-present discrimination track: the reference is deliberately included, and
-        // near-miss candidates are derived from it. Results from this track are not open-ended
-        // discovery results and are always reported separately from the truth-absent track.
+        // near-miss candidates are derived from it. These results are reported separately.
+        let mut hypotheses = vec![ground_truth.clone()];
         let mut near_miss_rng = seed ^ 0x2026_0716_0000_0003;
-        hypotheses.push(ground_truth.clone());
         hypotheses.extend(near_miss_distractors(
             &mut near_miss_rng,
             &ground_truth,
             NEAR_MISS_COUNT,
         ));
-
         let mut gen_rng = seed
             ^ if config.typed_candidates {
                 0x7A3F_9B21_0000_0001
@@ -929,7 +939,8 @@ fn run_trial_with_mode(
             };
             hypotheses.push(distractor);
         }
-    }
+        hypotheses
+    };
     let initial_hypotheses = hypotheses.clone();
 
 
