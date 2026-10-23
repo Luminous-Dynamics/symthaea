@@ -80,6 +80,8 @@ jobs:
         run: cargo test -p symthaea-physics-bridge prequential_pit_audits_are_wired_into_adaptive_discovery --lib -- --nocapture
       - name: Reject invalid PIT smoothing protocol
         run: cargo test -p symthaea-physics-bridge prequential_pit_policy_rejects_smoothed_measurements --lib
+      - name: Test bounded typed recovery after PIT alarms
+        run: cargo test -p symthaea-physics-bridge post_alarm_recovery_reopens_archived_candidates_and_adds_typed_candidates --lib
       - name: Run robust noise-envelope pilot
         run: cargo test -p symthaea-physics-bridge scenario_robust_eig_vs_nominal_eig_pilot --lib -- --nocapture
       - name: Strict Clippy for the core library
