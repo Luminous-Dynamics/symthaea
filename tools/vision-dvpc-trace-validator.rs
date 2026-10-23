@@ -119,7 +119,7 @@ fn parse_table(
 
         if !found_header {
             let actual: Vec<&str> = fields.iter().map(String::as_str).collect();
-            if actual != expected_header {
+            if actual.as_slice() != expected_header {
                 return Err(invalid(format!(
                     "line {line_number}: header mismatch; unknown or reordered columns fail closed"
                 )));
@@ -540,10 +540,9 @@ mod tests {
 
     #[test]
     fn sample_digest_mismatch_fails_closed() {
-        let broken = EVAL.replace(
-            "EVAL\ttrace-train-000\t",
-            "EVAL\ttrace-train-000\tffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\t",
-        );
+        let original_prefix = format!("EVAL\ttrace-train-000\t{}\t", "e".repeat(64));
+        let changed_prefix = format!("EVAL\ttrace-train-000\t{}\t", "f".repeat(64));
+        let broken = EVAL.replace(&original_prefix, &changed_prefix);
         assert!(admit(OBS, &broken).unwrap_err().contains("sample digest mismatch"));
     }
 
