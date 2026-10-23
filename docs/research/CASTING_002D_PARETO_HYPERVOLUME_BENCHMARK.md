@@ -162,7 +162,7 @@ The policy:
 6. Requires the upper confidence bound \(\mu_2 + \beta\sigma_2\) to satisfy epsilon, then minimizes \(\mu_1-\beta\sigma_1\), with stable candidate-ID tie-breaking.
 7. Returns a receipt containing the gap endpoint trial IDs, epsilon, normalized gap, beta, selected ID and predictive bounds.
 
-This is a deterministic surrogate-output selector. It does **not** fit a surrogate, calculate constrained expected improvement, optimize hypervolume, reproduce STAGE-BO, or guarantee Pareto-front improvement. It must be compared against straightforward epsilon grids, random/grid/LHS baselines, GP-LCB and stronger external methods under identical objective scales and evaluation budgets before any quality claim.
+This is a deterministic surrogate-output selector. The confidence multiplier is only a score parameter; the code does not calibrate predictive intervals, so satisfying an upper confidence bound is not a calibrated probability guarantee. It does **not** fit a surrogate, calculate constrained expected improvement, optimize hypervolume, reproduce STAGE-BO, or guarantee Pareto-front improvement. It must be compared against straightforward epsilon grids, random/grid/LHS baselines, GP-LCB and stronger external methods under identical objective scales and evaluation budgets before any quality claim.
 
 ### Added tests and validation limits
 
