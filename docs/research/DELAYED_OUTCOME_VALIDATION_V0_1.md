@@ -6,7 +6,7 @@ Status: exploratory research protocol and first Rust monitor; not an empirical r
 
 A feature-distribution alarm and a harmful outcome are different events. A detector can be statistically sensitive to benign covariate movement, while a consequential concept change can occur with weak marginal feature movement. Labels may also arrive late, be sampled selectively, or never arrive. Treating an unlabeled event as harmless creates optimistic bias; treating every feature alarm as harmful creates unnecessary intervention.
 
-This work adds an explicit outcome-validation layer after the self-probe detector panel. It asks:
+This work adds a standalone downstream outcome-validation layer that can consume an alarm receipt. This PR does not integrate a self-probe detector panel or a production prediction pipeline. It asks:
 
 1. What changed in the observed stream?
 2. Did a predeclared operational outcome deteriorate in a predeclared window after the alarm?
