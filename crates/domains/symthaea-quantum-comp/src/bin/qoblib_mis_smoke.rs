@@ -741,6 +741,8 @@ fn main() -> ExitCode {
     let mut path: Option<String> = None;
     let mut seed_base = MULTISTART_GREEDY_SEED_BASE;
     let mut target_objective: Option<usize> = None;
+    let mut seed_base_seen = false;
+    let mut target_objective_seen = false;
     let mut index = 1usize;
 
     while index < args.len() {
@@ -751,6 +753,11 @@ fn main() -> ExitCode {
                 return ExitCode::SUCCESS;
             }
             "--seed-base" => {
+                if seed_base_seen {
+                    eprintln!("--seed-base may be supplied only once");
+                    return ExitCode::from(2);
+                }
+                seed_base_seen = true;
                 if index + 1 >= args.len() {
                     eprintln!("--seed-base requires an unsigned 64-bit integer");
                     return ExitCode::from(2);
@@ -765,6 +772,11 @@ fn main() -> ExitCode {
                 index += 2;
             }
             "--target-objective" => {
+                if target_objective_seen {
+                    eprintln!("--target-objective may be supplied only once");
+                    return ExitCode::from(2);
+                }
+                target_objective_seen = true;
                 if index + 1 >= args.len() {
                     eprintln!("--target-objective requires a nonnegative integer");
                     return ExitCode::from(2);
