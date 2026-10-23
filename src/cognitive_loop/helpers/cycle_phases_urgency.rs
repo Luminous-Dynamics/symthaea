@@ -5,6 +5,7 @@
 
 use super::super::CognitiveLoopService;
 use super::cycle_phases::{ParameterOptimizationResult, UrgencyResult};
+use super::super::types::PredictionErrorEvidence;
 
 impl CognitiveLoopService {
     /// Autonomous Hyper-Parameter Optimization (The Meta-Forge).
@@ -76,11 +77,18 @@ impl CognitiveLoopService {
     /// `self.neuromod.bath`.
     pub(in crate::cognitive_loop) fn compute_urgency_and_error_pattern(
         &mut self,
-        prediction_error: f32,
-        prediction_error_valid: bool,
+        prediction_evidence: &PredictionErrorEvidence,
+        observation_cycle: u64,
         surprise_triggered: bool,
         effective_threshold: f32,
     ) -> UrgencyResult {
+        let prediction_error_sample =
+            prediction_evidence.value_for_observation(observation_cycle);
+        let prediction_error_valid = prediction_error_sample.is_some();
+        // Invalid evidence contributes no fresh number. When an independent
+        // surprise channel is active, use the last valid aggregate as context.
+        let prediction_error =
+            prediction_error_sample.unwrap_or(self.stats.avg_prediction_error);
         // Missing/corrupted comparisons are not low- or high-error observations.
         // In particular, do not reset or advance the low-error streak without evidence.
         if prediction_error_valid {
