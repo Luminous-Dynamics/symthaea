@@ -853,5 +853,21 @@
         "Do not pool this graph family with the QOBLIB cohort or claim state-of-the-art from a cross-paper comparison."
       ]
     }
-  ]
+  ],
+  "complete_baseline_inventory": {
+    "path": "docs/research/quantum/benchmarks/QOBLIB-MIS-BASELINES-001.json",
+    "companion_report": "docs/research/quantum/benchmarks/QOBLIB-MIS-BASELINES-001.md",
+    "schema": "org.luminousdynamics.symthaea.qcomp.qoblib-mis-baseline-snapshot.v1",
+    "qoblib_commit": "1e0e7c523cd9707dd541cc9e5a3086125d4da3c7",
+    "instance_count": 50,
+    "graph_blobs_unchanged_from_cohort_commit": 50,
+    "parallelils_output_matches_official_current_bkv": 50,
+    "official_optimal_count": 38,
+    "official_best_known_count": 12,
+    "reported_parallelils_successes_across_500_trials": 487,
+    "median_instance_mean_runtime_seconds": 0.0009,
+    "maximum_instance_mean_runtime_seconds": 120.05,
+    "maximum_runtime_instance": "brock800-1",
+    "caveat": "Published external records only; not a Symthaea run or controlled cross-hardware comparison."
+  }
 }
