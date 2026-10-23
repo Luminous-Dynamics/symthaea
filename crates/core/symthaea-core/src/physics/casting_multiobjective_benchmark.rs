@@ -1347,7 +1347,7 @@ mod tests {
 
     #[test]
     fn epsilon_gap_policy_targets_largest_normalized_gap_and_respects_ucb() {
-        let proposal = propose_largest_gap_epsilon(&gap_front(), &gap_candidates(), [1.0, 2.0], [1.0, 1.0]).unwrap();
+        let proposal = propose_largest_gap_epsilon(&gap_front(), &gap_candidates(), [1.0, 2.0], [1.0, 2.0]).unwrap();
         assert_eq!(proposal.lower_gap_endpoint_trial_id, 3);
         assert_eq!(proposal.upper_gap_endpoint_trial_id, 4);
         assert_abs_close(proposal.normalized_gap, 2.692582403567252, 1e-12);
@@ -1355,6 +1355,7 @@ mod tests {
         assert_eq!(proposal.selected_candidate_id, 10);
         assert!(proposal.objective_1_upper_confidence_bound <= proposal.epsilon);
         assert_abs_close(proposal.objective_0_lower_confidence_bound, 1.9, 1e-12);
+        assert_abs_close(proposal.objective_1_upper_confidence_bound, 3.5, 1e-12);
     }
 
     #[test]
