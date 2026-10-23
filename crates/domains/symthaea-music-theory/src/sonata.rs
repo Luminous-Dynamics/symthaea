@@ -938,6 +938,7 @@ mod tests {
             contour_similarity: 1.0,
             rhythmic_shape_similarity: 1.0,
             duration_scale: 1.0,
+            duration_scale_consistency: 1.0,
             fragment_similarity: 1.0,
             coverage: 1.0,
             overall_similarity: 1.0,
