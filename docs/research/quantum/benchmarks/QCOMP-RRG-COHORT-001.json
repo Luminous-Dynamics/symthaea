@@ -1,0 +1,942 @@
+{
+  "schema": "org.luminousdynamics.symthaea.qcomp.random-regular-mis-cohort.v1",
+  "status": "cohort-specification-only-graphs-not-generated",
+  "research_track": "QCOMP-RRG-COHORT-001",
+  "generator": {
+    "algorithm": "configuration-pair-reject-v1",
+    "crate_api": "generate_random_regular_mis_graph",
+    "source_prng": "Symthaea XorShift64* (deterministic, non-cryptographic)",
+    "construction": "Create degree copies (stubs) for each labeled vertex; Fisher-Yates shuffle with rejection-sampled bounded integers; pair consecutive stubs; reject any self-loop or repeated undirected edge; sort/canonicalize accepted edges; validate every vertex has exact requested degree.",
+    "output_format": "DIMACS edge format, one-based vertices, canonical sorted edges",
+    "retry_policy": "maximum 100000 pairings per instance; exhaustions are explicit failures and must not be silently retried with a new seed",
+    "caveat": "Deterministic generation is not itself evidence that a sample is independent or distributionally representative. Test generator statistics before confirmatory use."
+  },
+  "motivation": {
+    "primary_reference": "Wybo et al., Scalable quantum-enhanced greedy algorithm for maximum independent set problems, accepted by Physical Review Research on 2026-10-19",
+    "doi": "10.1103/ds1n-wsdm",
+    "reference_url": "https://doi.org/10.1103/ds1n-wsdm",
+    "scope": "Independent random-regular graph benchmark track; not a reproduction claim until the accepted paper's complete methods and parameter files are captured."
+  },
+  "split_design": {
+    "train_sizes": [
+      128,
+      256,
+      512
+    ],
+    "validation_sizes": [
+      1024
+    ],
+    "test_sizes": [
+      2048,
+      4096
+    ],
+    "degrees": [
+      3,
+      4
+    ],
+    "replicates_per_size_degree": 8,
+    "size_holdout": "Validation and test sizes are never used for selector tuning. Test sizes 2048/4096 target graph-size generalization beyond train sizes.",
+    "counts": {
+      "train": 48,
+      "validation": 16,
+      "test": 32,
+      "total": 96
+    },
+    "leakage_caveat": "All instances share a random-regular generator family; this measures size generalization within the chosen graph family, not out-of-distribution generalization to other graph distributions."
+  },
+  "seed_derivation": {
+    "base_seed_hex": "0x51524d4953000000",
+    "formula": "seed = base_seed + vertex_count * 100000 + degree * 1000 + (replicate_index - 1)",
+    "purpose": "Stable, non-overlapping deterministic workload seeds; seed values are recorded explicitly per workload below."
+  },
+  "workload_manifest": [
+    {
+      "workload_id": "rrg-n128-d3-r01",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 3,
+      "replicate_index": 1,
+      "seed_hex": "0x51524d4953c35bb8",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d3-r02",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 3,
+      "replicate_index": 2,
+      "seed_hex": "0x51524d4953c35bb9",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d3-r03",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 3,
+      "replicate_index": 3,
+      "seed_hex": "0x51524d4953c35bba",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d3-r04",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 3,
+      "replicate_index": 4,
+      "seed_hex": "0x51524d4953c35bbb",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d3-r05",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 3,
+      "replicate_index": 5,
+      "seed_hex": "0x51524d4953c35bbc",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d3-r06",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 3,
+      "replicate_index": 6,
+      "seed_hex": "0x51524d4953c35bbd",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d3-r07",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 3,
+      "replicate_index": 7,
+      "seed_hex": "0x51524d4953c35bbe",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d3-r08",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 3,
+      "replicate_index": 8,
+      "seed_hex": "0x51524d4953c35bbf",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d4-r01",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 4,
+      "replicate_index": 1,
+      "seed_hex": "0x51524d4953c35fa0",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d4-r02",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 4,
+      "replicate_index": 2,
+      "seed_hex": "0x51524d4953c35fa1",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d4-r03",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 4,
+      "replicate_index": 3,
+      "seed_hex": "0x51524d4953c35fa2",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d4-r04",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 4,
+      "replicate_index": 4,
+      "seed_hex": "0x51524d4953c35fa3",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d4-r05",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 4,
+      "replicate_index": 5,
+      "seed_hex": "0x51524d4953c35fa4",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d4-r06",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 4,
+      "replicate_index": 6,
+      "seed_hex": "0x51524d4953c35fa5",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d4-r07",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 4,
+      "replicate_index": 7,
+      "seed_hex": "0x51524d4953c35fa6",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n128-d4-r08",
+      "split": "train",
+      "vertex_count": 128,
+      "degree": 4,
+      "replicate_index": 8,
+      "seed_hex": "0x51524d4953c35fa7",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d3-r01",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 3,
+      "replicate_index": 1,
+      "seed_hex": "0x51524d495486abb8",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d3-r02",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 3,
+      "replicate_index": 2,
+      "seed_hex": "0x51524d495486abb9",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d3-r03",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 3,
+      "replicate_index": 3,
+      "seed_hex": "0x51524d495486abba",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d3-r04",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 3,
+      "replicate_index": 4,
+      "seed_hex": "0x51524d495486abbb",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d3-r05",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 3,
+      "replicate_index": 5,
+      "seed_hex": "0x51524d495486abbc",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d3-r06",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 3,
+      "replicate_index": 6,
+      "seed_hex": "0x51524d495486abbd",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d3-r07",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 3,
+      "replicate_index": 7,
+      "seed_hex": "0x51524d495486abbe",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d3-r08",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 3,
+      "replicate_index": 8,
+      "seed_hex": "0x51524d495486abbf",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d4-r01",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 4,
+      "replicate_index": 1,
+      "seed_hex": "0x51524d495486afa0",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d4-r02",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 4,
+      "replicate_index": 2,
+      "seed_hex": "0x51524d495486afa1",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d4-r03",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 4,
+      "replicate_index": 3,
+      "seed_hex": "0x51524d495486afa2",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d4-r04",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 4,
+      "replicate_index": 4,
+      "seed_hex": "0x51524d495486afa3",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d4-r05",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 4,
+      "replicate_index": 5,
+      "seed_hex": "0x51524d495486afa4",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d4-r06",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 4,
+      "replicate_index": 6,
+      "seed_hex": "0x51524d495486afa5",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d4-r07",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 4,
+      "replicate_index": 7,
+      "seed_hex": "0x51524d495486afa6",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n256-d4-r08",
+      "split": "train",
+      "vertex_count": 256,
+      "degree": 4,
+      "replicate_index": 8,
+      "seed_hex": "0x51524d495486afa7",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d3-r01",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 3,
+      "replicate_index": 1,
+      "seed_hex": "0x51524d49560d4bb8",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d3-r02",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 3,
+      "replicate_index": 2,
+      "seed_hex": "0x51524d49560d4bb9",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d3-r03",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 3,
+      "replicate_index": 3,
+      "seed_hex": "0x51524d49560d4bba",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d3-r04",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 3,
+      "replicate_index": 4,
+      "seed_hex": "0x51524d49560d4bbb",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d3-r05",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 3,
+      "replicate_index": 5,
+      "seed_hex": "0x51524d49560d4bbc",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d3-r06",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 3,
+      "replicate_index": 6,
+      "seed_hex": "0x51524d49560d4bbd",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d3-r07",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 3,
+      "replicate_index": 7,
+      "seed_hex": "0x51524d49560d4bbe",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d3-r08",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 3,
+      "replicate_index": 8,
+      "seed_hex": "0x51524d49560d4bbf",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d4-r01",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 4,
+      "replicate_index": 1,
+      "seed_hex": "0x51524d49560d4fa0",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d4-r02",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 4,
+      "replicate_index": 2,
+      "seed_hex": "0x51524d49560d4fa1",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d4-r03",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 4,
+      "replicate_index": 3,
+      "seed_hex": "0x51524d49560d4fa2",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d4-r04",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 4,
+      "replicate_index": 4,
+      "seed_hex": "0x51524d49560d4fa3",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d4-r05",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 4,
+      "replicate_index": 5,
+      "seed_hex": "0x51524d49560d4fa4",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d4-r06",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 4,
+      "replicate_index": 6,
+      "seed_hex": "0x51524d49560d4fa5",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d4-r07",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 4,
+      "replicate_index": 7,
+      "seed_hex": "0x51524d49560d4fa6",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n512-d4-r08",
+      "split": "train",
+      "vertex_count": 512,
+      "degree": 4,
+      "replicate_index": 8,
+      "seed_hex": "0x51524d49560d4fa7",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d3-r01",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 3,
+      "replicate_index": 1,
+      "seed_hex": "0x51524d49591a8bb8",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d3-r02",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 3,
+      "replicate_index": 2,
+      "seed_hex": "0x51524d49591a8bb9",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d3-r03",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 3,
+      "replicate_index": 3,
+      "seed_hex": "0x51524d49591a8bba",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d3-r04",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 3,
+      "replicate_index": 4,
+      "seed_hex": "0x51524d49591a8bbb",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d3-r05",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 3,
+      "replicate_index": 5,
+      "seed_hex": "0x51524d49591a8bbc",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d3-r06",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 3,
+      "replicate_index": 6,
+      "seed_hex": "0x51524d49591a8bbd",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d3-r07",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 3,
+      "replicate_index": 7,
+      "seed_hex": "0x51524d49591a8bbe",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d3-r08",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 3,
+      "replicate_index": 8,
+      "seed_hex": "0x51524d49591a8bbf",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d4-r01",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 4,
+      "replicate_index": 1,
+      "seed_hex": "0x51524d49591a8fa0",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d4-r02",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 4,
+      "replicate_index": 2,
+      "seed_hex": "0x51524d49591a8fa1",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d4-r03",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 4,
+      "replicate_index": 3,
+      "seed_hex": "0x51524d49591a8fa2",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d4-r04",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 4,
+      "replicate_index": 4,
+      "seed_hex": "0x51524d49591a8fa3",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d4-r05",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 4,
+      "replicate_index": 5,
+      "seed_hex": "0x51524d49591a8fa4",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d4-r06",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 4,
+      "replicate_index": 6,
+      "seed_hex": "0x51524d49591a8fa5",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d4-r07",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 4,
+      "replicate_index": 7,
+      "seed_hex": "0x51524d49591a8fa6",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n1024-d4-r08",
+      "split": "validation",
+      "vertex_count": 1024,
+      "degree": 4,
+      "replicate_index": 8,
+      "seed_hex": "0x51524d49591a8fa7",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d3-r01",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 3,
+      "replicate_index": 1,
+      "seed_hex": "0x51524d495f350bb8",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d3-r02",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 3,
+      "replicate_index": 2,
+      "seed_hex": "0x51524d495f350bb9",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d3-r03",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 3,
+      "replicate_index": 3,
+      "seed_hex": "0x51524d495f350bba",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d3-r04",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 3,
+      "replicate_index": 4,
+      "seed_hex": "0x51524d495f350bbb",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d3-r05",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 3,
+      "replicate_index": 5,
+      "seed_hex": "0x51524d495f350bbc",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d3-r06",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 3,
+      "replicate_index": 6,
+      "seed_hex": "0x51524d495f350bbd",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d3-r07",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 3,
+      "replicate_index": 7,
+      "seed_hex": "0x51524d495f350bbe",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d3-r08",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 3,
+      "replicate_index": 8,
+      "seed_hex": "0x51524d495f350bbf",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d4-r01",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 4,
+      "replicate_index": 1,
+      "seed_hex": "0x51524d495f350fa0",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d4-r02",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 4,
+      "replicate_index": 2,
+      "seed_hex": "0x51524d495f350fa1",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d4-r03",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 4,
+      "replicate_index": 3,
+      "seed_hex": "0x51524d495f350fa2",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d4-r04",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 4,
+      "replicate_index": 4,
+      "seed_hex": "0x51524d495f350fa3",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d4-r05",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 4,
+      "replicate_index": 5,
+      "seed_hex": "0x51524d495f350fa4",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d4-r06",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 4,
+      "replicate_index": 6,
+      "seed_hex": "0x51524d495f350fa5",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d4-r07",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 4,
+      "replicate_index": 7,
+      "seed_hex": "0x51524d495f350fa6",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n2048-d4-r08",
+      "split": "test",
+      "vertex_count": 2048,
+      "degree": 4,
+      "replicate_index": 8,
+      "seed_hex": "0x51524d495f350fa7",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d3-r01",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 3,
+      "replicate_index": 1,
+      "seed_hex": "0x51524d496b6a0bb8",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d3-r02",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 3,
+      "replicate_index": 2,
+      "seed_hex": "0x51524d496b6a0bb9",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d3-r03",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 3,
+      "replicate_index": 3,
+      "seed_hex": "0x51524d496b6a0bba",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d3-r04",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 3,
+      "replicate_index": 4,
+      "seed_hex": "0x51524d496b6a0bbb",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d3-r05",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 3,
+      "replicate_index": 5,
+      "seed_hex": "0x51524d496b6a0bbc",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d3-r06",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 3,
+      "replicate_index": 6,
+      "seed_hex": "0x51524d496b6a0bbd",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d3-r07",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 3,
+      "replicate_index": 7,
+      "seed_hex": "0x51524d496b6a0bbe",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d3-r08",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 3,
+      "replicate_index": 8,
+      "seed_hex": "0x51524d496b6a0bbf",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d4-r01",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 4,
+      "replicate_index": 1,
+      "seed_hex": "0x51524d496b6a0fa0",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d4-r02",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 4,
+      "replicate_index": 2,
+      "seed_hex": "0x51524d496b6a0fa1",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d4-r03",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 4,
+      "replicate_index": 3,
+      "seed_hex": "0x51524d496b6a0fa2",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d4-r04",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 4,
+      "replicate_index": 4,
+      "seed_hex": "0x51524d496b6a0fa3",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d4-r05",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 4,
+      "replicate_index": 5,
+      "seed_hex": "0x51524d496b6a0fa4",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d4-r06",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 4,
+      "replicate_index": 6,
+      "seed_hex": "0x51524d496b6a0fa5",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d4-r07",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 4,
+      "replicate_index": 7,
+      "seed_hex": "0x51524d496b6a0fa6",
+      "max_attempts": 100000
+    },
+    {
+      "workload_id": "rrg-n4096-d4-r08",
+      "split": "test",
+      "vertex_count": 4096,
+      "degree": 4,
+      "replicate_index": 8,
+      "seed_hex": "0x51524d496b6a0fa7",
+      "max_attempts": 100000
+    }
+  ],
+  "pre_registered_arms": [
+    "minimum-residual-degree greedy with deterministic tie-break",
+    "strong classical local-search / iterated-local-search baseline with per-run and aggregate budget disclosed",
+    "the published QAOA-informed minimum-degree greedy configuration, after its angle source, QAOA depth, marginal estimator and hardware settings are independently captured",
+    "randomized classical greedy/local-improvement negative controls with the exact seed schedule",
+    "quantum-informed-reduction policy as a separate algorithm track rather than silently merged into QAOA-informed greedy",
+    "physical-QPU, ideal-circuit, tensor-network simulation and replay evidence stored as distinct arms"
+  ],
+  "preregistered_metrics": [
+    "independently verified feasibility rate",
+    "MIS cardinality and relative/absolute gap to a proven optimum when available",
+    "objective distribution across graph and replicate, not only the best run",
+    "fixed-budget quality curves and time-to-target",
+    "shots, batches, circuits, preprocessing, compile/transpile, calibration, queue, classical compute, QPU time and end-to-end wall time",
+    "graph generation overhead reported separately from solve-time metrics, with generation included only when the deployment use-case requires on-demand generation"
+  ],
+  "release_gates": [
+    "Compile and run generator unit tests locally; preserve compiler/toolchain version.",
+    "Generate each workload once, validate exact degree/simplicity, and pin raw DIMACS SHA-256 and byte length.",
+    "Validate generation seed replay byte-identically and record attempts_used.",
+    "Run a generator-quality audit over graph isomorphism-insensitive and degree/triangle/connectivity statistics before confirmatory comparisons.",
+    "Freeze all method configurations and test-size outcomes before selector tuning.",
+    "Record failures, timeouts, rejected-generation exhaustion and infeasible outputs rather than dropping rows."
+  ]
+}
