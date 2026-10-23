@@ -504,13 +504,11 @@ fn propose_largest_gap_epsilon(
         }
         match best_gap {
             None => best_gap = Some((index, gap)),
-            Some((best_index, best_value)) => {
+            Some((_, best_value)) => {
                 if gap > best_value {
                     best_gap = Some((index, gap));
-                } else if gap == best_value {
-                    // Ordered front + first-match policy makes exact ties deterministic.
-                    let _ = best_index;
                 }
+                // Ordered front + first-match policy makes exact ties deterministic.
             }
         }
     }
@@ -526,7 +524,7 @@ fn propose_largest_gap_epsilon(
     }
 
     let mut seen_ids = std::collections::HashSet::with_capacity(candidates.len());
-    let mut best: Option<(PredictedObjectiveCandidate, f64, f64, f64)> = None;
+    let mut best: Option<(PredictedObjectiveCandidate, f64, f64)> = None;
     for candidate in candidates {
         if !seen_ids.insert(candidate.candidate_id) {
             return Err(ParetoMetricError::DuplicateCandidateId);
@@ -555,7 +553,7 @@ fn propose_largest_gap_epsilon(
 
         let should_replace = match best {
             None => true,
-            Some((current, current_lcb, current_ucb, _)) => {
+            Some((current, current_lcb, current_ucb)) => {
                 lcb_0 < current_lcb
                     || (lcb_0 == current_lcb
                         && (ucb_1 < current_ucb
@@ -564,11 +562,11 @@ fn propose_largest_gap_epsilon(
             }
         };
         if should_replace {
-            best = Some(( *candidate, lcb_0, ucb_1, candidate.predicted_mean[0]));
+            best = Some((*candidate, lcb_0, ucb_1));
         }
     }
 
-    let (selected, lcb_0, ucb_1, _) =
+    let (selected, lcb_0, ucb_1) =
         best.ok_or(ParetoMetricError::NoEpsilonFeasibleCandidate)?;
     Ok(EpsilonGapProposal {
         selected_candidate_id: selected.candidate_id,
