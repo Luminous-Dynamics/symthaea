@@ -10,7 +10,7 @@ From the repository root:
 cargo test --manifest-path research/broca-risk-bounded/Cargo.toml
 ```
 
-The tests cover the exact zero-failure binomial bound, a known nonzero-failure case, monotonicity, invalid counts/configurations, an empty accepted set, minimum evidence, and a fail-closed risk decision.
+The tests cover the exact zero-failure binomial bound, a known nonzero-failure case, monotonicity, invalid counts/configurations, an empty accepted set, minimum evidence, a fail-closed risk decision, tie-preserving risk-coverage curves, partial-label bounds, and fixed-sequence threshold stopping.
 
 The source is committed but has not been compiled or executed in the authoring environment. Do not treat authored tests as passing until this exact source SHA is built and tested.
 
@@ -51,5 +51,19 @@ For temporal dependence, distribution shift, selective label observation, or rep
 4. Evaluate only once on a locked test set, reporting accepted/unsafe numerators and denominators per query stratum.
 5. Report task utility, coverage/acceptance rate, latency, exact-fallback rate, and integrity failures in addition to the risk bound.
 6. Keep each important stratum separate. Do not let a high volume of easy queries conceal poor reliability on temporal updates, unanswerable queries, or privacy-sensitive scopes.
+
+## Risk–coverage curve and fixed-sequence certification
+
+The crate also exposes a descriptive development-set risk–coverage curve:
+
+- Add one RiskObservation per unique query, with a finite acceptance score (higher means more eligible for approximate retrieval) and an evaluator-assigned unsafe label.
+- The curve starts at zero coverage, then applies every unique observed score from highest to lowest.
+- Equal scores enter together; the implementation never splits ties according to row order.
+- Each point reports total coverage, labelled coverage, accepted-label completeness, observed risk among labelled cases, and optimistic/pessimistic empirical risk bounds when outcomes are unknown.
+- The optimistic/pessimistic values are deterministic partial-label bounds, not confidence intervals. Unknown accepted outcomes prevent certification; they are never silently treated as safe.
+
+For statistical certification, use a fixed, strictly descending threshold sequence through `certify_fixed_threshold_sequence`. Select this sequence before viewing evaluation labels. The procedure tests from the most selective threshold toward greater coverage, continues only while each eligible threshold passes, and stops at the first unknown-label or risk-budget failure. Subsequent thresholds are marked not tested. Thresholds with too few accepted cases are marked insufficient evidence and are not treated as passes.
+
+The curve generated from observed score values is intended for policy exploration on development data. Do not choose a favorable point using the same labels and then claim that its unadjusted confidence bound is an independent test guarantee. Keep policy development, threshold selection/calibration, and final evaluation separate. The fixed-sequence guarantee also depends on the stated binomial sampling assumptions; it is not a distribution-free guarantee under arbitrary drift or correlated query lineages.
 
 The crate is a qualification primitive for PR #8520, not a replacement for PR #8494's exact-vs-approximate benchmark, MIRE memory-integrity fixtures, or end-to-end memory task evaluation.
