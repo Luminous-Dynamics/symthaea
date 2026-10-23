@@ -459,8 +459,20 @@ jobs:
                   reject(row["split"] != case["split"], f"{oid}: split does not match suite")
                   reject(row["source_insight_record_id"] != case["source_insight"]["record_id"], f"{oid}: insight record does not match suite")
                   reject(row["source_insight_sha256"] != case["source_insight"]["insight_sha256"], f"{oid}: insight digest does not match suite")
-                  reject(row["expected_action_policy"] != case["contract"]["expected_action_policy"], f"{oid}: expected action policy drift")
                   role = row["state_role"]
+                  intervention_kind = case["intervention"]["kind"]
+                  expected_applicability = (
+                      "not_applicable"
+                      if role == "variant" and intervention_kind == "required_hypothesis_cleared"
+                      else "eligible"
+                  )
+                  expected_policy = (
+                      "move_forbidden_or_replan"
+                      if expected_applicability == "not_applicable"
+                      else "preserve_eligibility"
+                  )
+                  reject(row["expected_applicability"] != expected_applicability, f"{oid}: expected applicability is inconsistent with the paired intervention and state role")
+                  reject(row["expected_action_policy"] != expected_policy, f"{oid}: expected action policy is inconsistent with the paired intervention and state role")
                   reject(oid != case["outcome_links"][f"{role}_outcome_id"], f"{oid}: outcome ID does not match its base/variant role")
                   state, paired = (case["base_state"], case["variant_state"]) if role == "base" else (case["variant_state"], case["base_state"])
                   proof_state = row["proof_state"]
@@ -496,6 +508,8 @@ jobs:
           m = copy.deepcopy(bundle); m["outcomes"][0]["state_role"] = "variant"; mutants.append((m, "base/variant role mismatch"))
           m = copy.deepcopy(bundle); m["outcomes"][0]["proof_state"]["snapshot_sha256"] = "0" * 64; mutants.append((m, "snapshot receipt drift"))
           m = copy.deepcopy(bundle); m["outcomes"][0]["expected_action_policy"] = "preserve_eligibility" if m["outcomes"][0]["expected_action_policy"] == "move_forbidden_or_replan" else "move_forbidden_or_replan"; mutants.append((m, "policy mismatch"))
+          m = copy.deepcopy(bundle); m["outcomes"][1]["expected_applicability"] = "eligible"; m["outcomes"][1]["expected_action_policy"] = "preserve_eligibility"; mutants.append((m, "removed-premise variant mislabeled eligible"))
+          m = copy.deepcopy(bundle); m["outcomes"][0]["expected_applicability"] = "not_applicable"; m["outcomes"][0]["expected_action_policy"] = "move_forbidden_or_replan"; mutants.append((m, "base state mislabeled ineligible"))
           m = copy.deepcopy(bundle); m["outcomes"] = m["outcomes"][:-1]; mutants.append((m, "missing paired side"))
           m = copy.deepcopy(bundle); m["outcomes"][0]["execution"]["status"] = "executed"; mutants.append((m, "synthetic outcome falsely marked executed"))
           m = copy.deepcopy(bundle); m["outcomes"][0]["execution"]["checker_result"] = "checked_success"; mutants.append((m, "checker success without execution"))
@@ -511,6 +525,7 @@ jobs:
               "status": "executed",
               "model": {"model_id": "schema-control-only", "model_version": "0", "config_sha256": "a" * 64},
               "decision": "apply_original_move",
+              "applicability_judgment": "eligible",
               "original_move_applied": True,
               "checker_result": "checked_success",
               "proof_sha256": "b" * 64,
@@ -542,7 +557,15 @@ jobs:
               pass
           else:
               raise SystemExit("executed-row schema accepted missing measured resource usage")
-          print("PITB_PROOF_STATE_EXECUTION_SCHEMA_PASS: valid executed row accepted; 3 contradictory/incomplete execution controls rejected")
+          bad_execution = copy.deepcopy(valid_execution)
+          bad_execution["applicability_judgment"] = "not_applicable"
+          try:
+              execution_validator.validate(bad_execution)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("executed-row schema accepted use of the original move when the insight was judged not_applicable")
+          print("PITB_PROOF_STATE_EXECUTION_SCHEMA_PASS: valid executed row accepted; 4 contradictory/incomplete execution controls rejected")
           print(f"PITB_PROOF_STATE_OUTCOME_CONTRACT_PASS: {count} explicitly not_run state rows; {len(mutants)}/{len(mutants)} negative controls rejected")
           PY
       - name: Validate insight schema and synthetic positive/negative controls
