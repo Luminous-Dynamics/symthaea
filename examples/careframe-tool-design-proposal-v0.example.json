@@ -105,7 +105,7 @@
       "cart_baseline",
       "fixed_base_manipulator_baseline"
     ],
-    "scenario_set_sha256": "7616c91c80c907704c66a6d0e54bca281fd9d562712f3a824827a0553ade5dd2",
+    "scenario_set_sha256": "a83f0e0b67f405870146e5df874efd769fd5f87fcea668974daa2f0cf34b4470",
     "metric_ids": [
       "synthetic_handoff_completion_rate",
       "intervention_count",
