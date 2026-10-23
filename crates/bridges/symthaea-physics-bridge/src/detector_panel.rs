@@ -297,7 +297,7 @@ fn auc_perturbed_higher(clean: &[f64], perturbed: &[f64]) -> f64 {
         let average_rank = ((start + 1) as f64 + end as f64) / 2.0;
         let positives_in_group = labelled[start..end]
             .iter()
-            .filter(|(_, positive)| *positive)
+            .filter(|entry| entry.1)
             .count();
         positive_rank_sum += average_rank * positives_in_group as f64;
         start = end;
