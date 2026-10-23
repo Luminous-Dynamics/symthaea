@@ -168,3 +168,10 @@ The new analyzer deliberately emits no curves, paired effects, or frontier point
 A consistency audit found that the proof-state analyzer could emit percentile-bootstrap intervals with only two independent components, even though the evaluation protocol calls for at least 20 independent pair-graph components per primary class and a prospective power analysis. The analyzer now keeps a descriptive point estimate and exposes `independent_components`, but suppresses the interval below 20 clusters with an explicit status. At or above the floor, intervals remain descriptive and do not independently establish adequate power or validate reviewer labels.
 
 This is a conservative reporting guardrail only. No experiment was run, no model result changed, and current-head compilation/CI remains unverified until an exact-head run completes.
+
+
+### 2026-10-24 update: enforce paired resource budgets
+
+The proof-state outcome contract now requires declared caps for model calls, input/output tokens, wall time and micro-USD cost on every executed row. The Rust analyzer rejects any reported usage above a cap and rejects paired base/variant rows that use different cap vectors. Synthetic `not_run` rows must carry a null cap field; they do not fabricate an execution budget. This closes a loophole where a paired intervention could be described as matched while one side had a larger declared resource ceiling.
+
+The cap checks validate declared metadata and reported counters; they do not independently attest the underlying provider logs or receipt content. The primary experiment still needs matched receipts, exact model/prompt/checker configuration, and prospective power analysis. Rust execution and independent Draft 2020-12 validation remain unclaimed pending the exact-head workflow.
