@@ -1064,6 +1064,7 @@ mod tests {
         // but it must not enter stateful histories or replay as an observation.
         let first = svc.cycle("invalid PE bootstrap regression");
         assert_eq!(first.prediction_error, 1.0);
+        assert!(!first.prediction_error_valid);
         assert!(svc.carryover.history.error_history.is_empty());
         assert!(svc.error_history.is_empty());
         assert_eq!(svc.stats.avg_prediction_error, 0.0);
@@ -1074,6 +1075,7 @@ mod tests {
             .set_prediction(vec![0.0; svc.config.cfc_config.input_dim]);
         let second = svc.cycle("invalid PE zero norm regression");
         assert_eq!(second.prediction_error, 1.0);
+        assert!(!second.prediction_error_valid);
         assert!(svc.carryover.history.error_history.is_empty());
         assert!(svc.error_history.is_empty());
         assert_eq!(svc.stats.avg_prediction_error, 0.0);
