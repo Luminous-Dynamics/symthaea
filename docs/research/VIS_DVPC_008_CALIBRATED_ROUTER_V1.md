@@ -46,6 +46,7 @@ The fitted profile retains:
 - unique sorted calibration sample IDs;
 - calibration split ID and externally supplied calibration-manifest digest;
 - estimator ID and artifact digest;
+- domain-assessor ID and artifact digest, so a changed shift detector invalidates the profile;
 - loss-profile ID and domain/condition ID;
 - alpha, quantile, quantile rank, and calibration count.
 
@@ -70,8 +71,9 @@ The authored tests cover:
 - known-answer finite-sample quantile rank and input-order invariance;
 - unsupported finite-sample rank, duplicate calibration samples, wrong split/model binding and invalid scale;
 - a positive lower bound successfully reserving both latency and energy, then settling actual costs;
-- a lower bound below threshold taking the cheap path without reservation;
+- a lower bound below threshold taking the cheap path without reservation, including a zero-mean benefit prediction;
 - shift detection and unknown-domain abstention, including a deliberately huge raw point estimate;
+- stale domain-assessor identity and artifact digest blocked before escalation;
 - stale estimator artifact, mismatched domain/loss profile, non-finite predictions and non-positive inference scale;
 - deterministic receipts carrying the gate reason, profile, calibration count, nominal marginal coverage and bound.
 
