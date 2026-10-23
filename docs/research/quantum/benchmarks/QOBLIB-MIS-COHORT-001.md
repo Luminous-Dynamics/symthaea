@@ -84,13 +84,19 @@ The companion JSON now assigns every pinned instance to a deterministic, family-
 
 This is a *provisional source-name family grouping*, not proof that each group is an independent graph-generation distribution. It is also not a blinded test set: QOBLIB graphs and best-known values are public and prior research may already have influenced development. Use the partition to prevent obvious within-family leakage during selector tuning; claims of out-of-distribution generalization still need newly generated or independently held-out graph families. A changed split must use a new partition ID rather than silently rewriting this one.
 
+## Separate qReduMIS reproduction track
+
+QOBLIB gives Symthaea broad heterogeneous graphs and published solver records. The qReduMIS paper answers a different question on hardware-native random unit-disk instances with Union-Jack connectivity. The pinned open-source results README specifies radius sqrt(2), density 0.8, varied grid length/seed, QAA, qReduMIS and randomReduMIS; it says backend runs use 1,000 shots and the same annealing schedule, with common postprocessing plus loading-error correction for hardware. The published paper also discusses classical simulated annealing. Capture exact graph bytes/coordinates, seeds, reducer rules, policy configuration, raw shots/results, cost boundaries and software environment before replication.
+
+The public qReduMIS tree is Apache-2.0 and pinned in the companion JSON, along with blob IDs for its two result notebooks and README. It is suitable as a paper-reproduction reference, not as an automatic dependency for Symthaea's Rust production path. One reproducibility gap is recorded explicitly: the pinned result README mentions generator/generate.py, but that path is absent from the pinned tree inspected for this manifest. No generator reconstruction or paper result is claimed here.
+
 ## Next executable gates
 
 1. Add a strict DIMACS parser test suite for comments, duplicate edges, self-loops, malformed headers, count mismatch, out-of-range vertices, and the large C4000 file.
 2. Independently validate graph and solution parsing against QOBLIB fixtures and the pinned checker behavior.
 3. Establish a deterministic baseline report on tiny exact instances and then on a frozen small subset; record content IDs and resource counters.
 4. Run the complete 50-instance cohort only after the parser/verifier and cost accounting are validated.
-5. Compare the same arms on separate random unit-disk cohorts for a qReduMIS-style reduction study; don't pool that evidence with QOBLIB as if the graph distributions were identical.
+5. Run a separate **QREDUMIS-UJ-REPRO-001** track against the paper's random unit-disk workload with Union-Jack connectivity (radius sqrt(2), density 0.8), pinned to the open-source [qReduMIS repository at commit 43feb7502ca4c90e10bde24e077c1d54427f8fef](https://github.com/jpmorganchase/qReduMIS/tree/43feb7502ca4c90e10bde24e077c1d54427f8fef). Use its QAA, qReduMIS and randomReduMIS arms as references, then add matched classical structural and solver-population informers. Upstream describes 20 classical shots for the qReduMIS policy and 1,000 backend shots per execution, with a shared annealing schedule; pin exact configs and raw graph artifacts before claiming reproduction. The upstream instructions include Python 3.9 and a custom simulator branch, so isolate paper reproduction from the Rust-first Symthaea production path. The pinned results README refers to generator/generate.py, but that file was not present in the inspected pinned tree; locate its exact source or freeze graph-coordinate bytes and seeds independently before regeneration. Keep this track completely separate from QOBLIB's heterogeneous graph cohort.
 
 ## Validation boundary
 
