@@ -693,8 +693,8 @@
       "family": "performance-stream-detector",
       "comparison_track": "observed-outcome",
       "labels_required": true,
-      "input_contract": "Monitors valid per-instance performance/error derived from observed targets; unavailable labels stay missing.",
-      "implementation_status": "planned-baseline",
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; share the same observed per-instance correctness/error stream across error-based detectors and record label delay/update order.",
+      "implementation_status": "external-adapter-required",
       "source": "https://doi.org/10.1145/3770855.3819070"
     },
     {
@@ -703,8 +703,8 @@
       "family": "statistical-test-on-performance",
       "comparison_track": "observed-outcome",
       "labels_required": true,
-      "input_contract": "Standard classifier-performance mode requires observed target/correctness; label delays must be reported.",
-      "implementation_status": "planned-baseline",
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; share the same observed per-instance correctness/error stream across error-based detectors and record label delay/update order.",
+      "implementation_status": "external-adapter-required",
       "source": "https://doi.org/10.1145/3770855.3819070"
     },
     {
@@ -713,7 +713,7 @@
       "family": "adaptive-bernstein-high-dimensional",
       "comparison_track": "feature-only-unsupervised",
       "labels_required": false,
-      "input_contract": "Monitors multivariate features without labels; cannot identify pure target-only changes with unchanged feature distribution.",
+      "input_contract": "Reproduce KDD 2026 ABCD(X): input-feature access without target labels. It should not detect a pure label/target mapping shift when the feature distribution is unchanged.",
       "implementation_status": "external-adapter-required",
       "source": "https://doi.org/10.1145/3770855.3819070"
     },
@@ -723,7 +723,7 @@
       "family": "adaptive-bernstein-high-dimensional",
       "comparison_track": "observed-outcome",
       "labels_required": true,
-      "input_contract": "Consumes outcome-derived error/performance; label availability and delay must be held comparable.",
+      "input_contract": "Reproduce the KDD 2026 ABCD classifier-error-stream setting with observed per-instance error; pin classifier and prequential protocol and declare label delay.",
       "implementation_status": "external-adapter-required",
       "source": "https://doi.org/10.1145/3770855.3819070"
     },
@@ -733,9 +733,9 @@
       "family": "student-teacher-compression-loss",
       "comparison_track": "auxiliary-loss-unsupervised",
       "labels_required": false,
-      "input_contract": "Consumes a pinned unsupervised student-teacher compression-loss stream; report its compute cost.",
+      "input_contract": "Reproduce the KDD 2026 STUDD meta-detector coupled with ADWIN on a pinned unsupervised auxiliary compression-loss stream; do not feed class labels; report auxiliary-model compute/memory overhead.",
       "implementation_status": "external-adapter-required",
-      "source": "https://doi.org/10.1007/s41060-024-00620-y"
+      "source": "https://doi.org/10.1145/3770855.3819070"
     },
     {
       "id": "dynamic-threshold-dtd",
@@ -746,6 +746,106 @@
       "input_contract": "Evaluate in settings with observed outcome-derived segment performance; forbid future-outcome leakage.",
       "implementation_status": "external-adapter-required",
       "source": "https://doi.org/10.1609/aaai.v40i29.39586"
+    },
+    {
+      "id": "kdd26-adwin-error-stream",
+      "name": "ADWIN in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-cusum-error-stream",
+      "name": "CUSUM in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-ddm-error-stream",
+      "name": "Drift Detection Method (DDM) in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-eddm-error-stream",
+      "name": "Early Drift Detection Method (EDDM) in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-ewma-error-stream",
+      "name": "EWMA in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-gma-error-stream",
+      "name": "GMA in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-hddma-error-stream",
+      "name": "HDDMA in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-hddmw-error-stream",
+      "name": "HDDMW in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-page-hinkley-error-stream",
+      "name": "Page–Hinkley (PH) in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-rddm-error-stream",
+      "name": "RDDM in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
     }
   ],
   "drift_detector_comparison_protocol": "Pin each detector implementation/version and hyperparameters; tune only on a disjoint calibration stream; use identical valid observations and no label access for the label-free track; never remap invalid/missing PE to zero or maximal surprise; report false alarms per 1,000 valid observations, missed-drift rate, detection-delay distribution, precision/recall by abrupt/gradual/recurring drift, invalid-sample coverage, throughput, and peak memory. Publish per-seed event traces. These detector candidates are planned, not yet implemented or measured.",
@@ -837,6 +937,35 @@
         "minimum_seeds_per_dataset": 50,
         "meaning": "Coverage eligibility only, not a performance result and not evidence of superiority. A scientific claim still requires matched protocols, actual comparator runs, per-dataset reporting, costs, and uncertainty."
       }
+    },
+    "kdd26_reference_protocol": {
+      "paper_doi": "10.1145/3770855.3819070",
+      "detector_family_count": 14,
+      "datasets_count": 7,
+      "dataset_names_to_pin": [
+        "Asfault",
+        "Electricity",
+        "Covertype",
+        "GasSensorArray",
+        "NOAA",
+        "Posture",
+        "Rialto"
+      ],
+      "monitored_classifier": "Hoeffding Tree",
+      "stream_protocol": "Prequential test-then-train; create a per-instance correctness/error stream from observed target and prediction; publish exact label timing and update order.",
+      "hyperparameter_protocol": "Leave one dataset out; tune only on the remaining datasets; pin random-search budget and seeds; evaluate the held-out dataset once per fold.",
+      "drift_types": [
+        "class-prior",
+        "label-swap",
+        "feature-permutation",
+        "feature-filtering"
+      ],
+      "transitions": [
+        "abrupt",
+        "gradual"
+      ],
+      "important_limit": "ABCD(X) and other feature-only methods cannot detect pure target-only changes without feature distribution change; do not use labels as hidden inputs.",
+      "status": "reference protocol declared; adapters and datasets are not yet implemented/pinned"
     }
   }
 }
