@@ -189,21 +189,25 @@ impl CognitiveSubsystem for LearningManager {
 
         // ── 1. Surprise tracking ──────────────────────────────────────────
         let surprise = snapshot.prediction_error;
-        self.push_surprise(surprise);
+        let prediction_error_valid = snapshot.prediction_error_valid != 0;
+        if prediction_error_valid {
+            self.push_surprise(surprise);
+        }
         let mean_surprise = self.mean_surprise();
 
         // ── 2. Plasticity dynamics (BCM metaplasticity) ───────────────────
-        // High surprise → increase plasticity (learn more)
-        // Low surprise → decrease plasticity (stabilize)
-        let plasticity_drive = if mean_surprise > thresholds::LEARNING_PLASTICITY_HIGH_SURPRISE {
-            Self::PLASTICITY_RATE // increase plasticity
-        } else if mean_surprise < thresholds::LEARNING_PLASTICITY_LOW_SURPRISE {
-            -Self::PLASTICITY_RATE * 0.5 // decrease plasticity (slower)
-        } else {
-            0.0 // neutral zone
-        };
-        self.plasticity = (self.plasticity + plasticity_drive)
-            .clamp(Self::MIN_PLASTICITY, Self::MAX_PLASTICITY_VAL);
+        // A missing comparison must not be recorded as maximum or zero surprise.
+        if prediction_error_valid {
+            let plasticity_drive = if mean_surprise > thresholds::LEARNING_PLASTICITY_HIGH_SURPRISE {
+                Self::PLASTICITY_RATE
+            } else if mean_surprise < thresholds::LEARNING_PLASTICITY_LOW_SURPRISE {
+                -Self::PLASTICITY_RATE * 0.5
+            } else {
+                0.0
+            };
+            self.plasticity = (self.plasticity + plasticity_drive)
+                .clamp(Self::MIN_PLASTICITY, Self::MAX_PLASTICITY_VAL);
+        }
 
         // Plasticity → LR modulation
         // High plasticity = higher learning rate
@@ -235,16 +239,15 @@ impl CognitiveSubsystem for LearningManager {
         }
 
         // ── 4. Error trend → adaptive response ───────────────────────────
-        if self.error_trend > 0.05 {
-            // Errors increasing → need more exploration
-            output.exploration_delta +=
-                self.error_trend as f64 * thresholds::LEARNING_ERROR_TREND_EXPLORATION;
-            // Also boost plasticity to learn from errors
-            output.lr_modulation *= thresholds::LEARNING_ERROR_TREND_LR_BOOST;
-        } else if self.error_trend < -0.05 {
-            // Errors decreasing → stabilize (things are working)
-            output.confidence_delta +=
-                (-self.error_trend) as f64 * thresholds::LEARNING_ERROR_TREND_CONFIDENCE;
+        if prediction_error_valid {
+            if self.error_trend > 0.05 {
+                output.exploration_delta +=
+                    self.error_trend as f64 * thresholds::LEARNING_ERROR_TREND_EXPLORATION;
+                output.lr_modulation *= thresholds::LEARNING_ERROR_TREND_LR_BOOST;
+            } else if self.error_trend < -0.05 {
+                output.confidence_delta +=
+                    (-self.error_trend) as f64 * thresholds::LEARNING_ERROR_TREND_CONFIDENCE;
+            }
         }
 
         // ── 5. Dissipative health → learning gate ─────────────────────────
