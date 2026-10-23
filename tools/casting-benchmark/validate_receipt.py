@@ -38,7 +38,12 @@ def _is_int(value: Any) -> bool:
 
 
 def _is_finite_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value))
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except (OverflowError, ValueError):
+        return False
 
 
 def _closed_object(value: Any, required: set[str], allowed: set[str], path: str, errors: list[str]) -> bool:
@@ -181,6 +186,11 @@ def validate_receipt(receipt: Any, for_publication: bool = False) -> list[str]:
             if not isinstance(fidelity_costs, dict) or not fidelity_costs:
                 errors.append("$.accounting.fidelity_cost_units_by_level: expected non-empty object")
             if isinstance(fidelity_counts, dict) and isinstance(fidelity_costs, dict):
+                key_pattern = re.compile(r"^[a-z][a-z0-9_-]*$")
+                if any(not isinstance(k, str) or not key_pattern.fullmatch(k) for k in fidelity_counts):
+                    errors.append("$.accounting.fidelity_evaluations: invalid fidelity level identifier")
+                if any(not isinstance(k, str) or not key_pattern.fullmatch(k) for k in fidelity_costs):
+                    errors.append("$.accounting.fidelity_cost_units_by_level: invalid fidelity level identifier")
                 if set(fidelity_counts) != set(fidelity_costs):
                     errors.append("$.accounting: fidelity count and cost level keys must match exactly")
                 valid_counts = all(_is_int(v) and v >= 0 for v in fidelity_counts.values())
