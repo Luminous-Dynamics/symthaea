@@ -102,6 +102,21 @@ For B queries and N candidates, both software paths still compute B×N exact sim
 
 The next system-level extension is a measured adaptive policy that chooses direct CPU execution vs batched corpus-major execution vs an accelerator based on corpus size, query batch size, data residency, latency SLO and transfer cost. Train/tune this policy only on calibration traces, and evaluate the selected rule on held-out corpus sizes, query correlations and device classes. Do not assume GPU wins: FAISS's published guidance explicitly notes that a small index / small batch frequently favors CPU, whereas large indices and batches are more likely to amortize GPU overhead.
 
+### Phase A5 — candidate broadcast across query lanes (conditional hardware branch)
+
+If Phase A4 shows a repeatable batch-size benefit, the next architecture question is *query lanes versus candidate lanes*. A compute tile could keep B query hypervectors resident, stream each candidate vector once into a broadcast path, and update B independent exact Hamming/argmax states. The arithmetic remains B×N comparisons, but a hardware dataflow could amortize external-corpus reads across B queries; this is not automatically true for the CPU loop-order benchmark, which still performs B×N software similarities.
+
+Proposed staged extension after the single-query RTL is formally/simulator qualified:
+1. Select one best-supported datapath width from Phase B's area/timing/cycle Pareto frontier instead of sweeping width again.
+2. Sweep query lanes B ∈ {1, 2, 4, 8} while holding candidate lanes at 1. Preserve a single shared candidate input port / broadcast boundary where feasible.
+3. Keep candidate lanes fixed initially, then test candidate lanes {1, 2} only if query broadcasting is not the dominant area/fan-out/timing cost.
+4. Compare query-resident and streaming-query modes, corpus transfer bytes per batch, per-query energy, end-to-end batch throughput and p95 latency at batch sizes {1, 4, 8, 16}.
+5. Require exact top-1 equality for every query, independent argmax state, deterministic tie policy, and no cross-query state leakage. Formally assert candidate handshake accounting, valid/ready backpressure, lane-ID isolation and that every accepted query produces exactly one result.
+
+Do not jump to a 180-configuration factorial sweep. Use Phase A4 and Phase B evidence to select widths and narrow the query-lane matrix. Vortex v3.0's documented global-to-local transfer acceleration and asynchronous scheduler are reminders that transfer/control interfaces are architecture features in their own right; Symthaea's RTL must measure them, not borrow Vortex's performance claims.
+
+Decision gate: if batch-aware data reuse does not improve directly measured bytes read per query or joules/query at equal results, retain the simple single-query tile and focus on CPU SIMD / memory-layout improvements.
+
 ### Phase B — qualified RTL architecture sweep
 
 Prerequisite: the software-oracle generator and all 12 cases in #8463 compile and simulate at its exact head. Once that gate is met, add a distinct fused similarity-to-argmax primitive; do not treat word-level XOR/popcount success as qualification of the full search datapath.
