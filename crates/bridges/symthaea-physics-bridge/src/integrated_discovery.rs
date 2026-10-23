@@ -1907,8 +1907,7 @@ mod tests {
             recovery_measurements += recovered.rounds_used;
             unresolved_without_recovery += if baseline.final_live != 1 { 1 } else { 0 };
             unresolved_after_recovery += if recovered.final_live != 1 { 1 } else { 0 };
-            selection_failures_after_recovery +=
-                if recovered.selection_failed { 1 } else { 0 };
+            selection_failures_after_recovery += if recovered.selection_failed { 1 } else { 0 };
             false_singletons_without_recovery += if baseline.final_live == 1 && !baseline.success {
                 1
             } else {
@@ -1945,14 +1944,13 @@ mod tests {
                 0
             };
             full_recovery_successes += if recovered.success { 1 } else { 0 };
-            runs_with_post_recovery_validation +=
-                if recovered.post_recovery_validation_measurements
-                    >= MIN_POST_RECOVERY_VALIDATION_MEASUREMENTS
-                {
-                    1
-                } else {
-                    0
-                };
+            runs_with_post_recovery_validation += if recovered.post_recovery_validation_measurements
+                >= MIN_POST_RECOVERY_VALIDATION_MEASUREMENTS
+            {
+                1
+            } else {
+                0
+            };
             total_post_recovery_validation_measurements +=
                 recovered.post_recovery_validation_measurements;
             assert!(
