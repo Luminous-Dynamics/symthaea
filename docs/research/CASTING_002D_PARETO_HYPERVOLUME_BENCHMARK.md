@@ -166,7 +166,7 @@ This is a deterministic surrogate-output selector. The confidence multiplier is 
 
 ### Added tests and validation limits
 
-The module now has 29 authored test cases (24 existing archive/metric/ZDT tests plus 5 proposal-policy tests). New cases cover known largest-gap selection, uncertainty-aware epsilon filtering, input-order invariance, deterministic ID tie-breaking, invalid data, duplicate IDs and the no-candidate-feasible path.
+The module now has 30 authored test cases (24 existing archive/metric/ZDT tests plus 6 proposal-policy tests). New cases cover known largest-gap selection, uncertainty-aware epsilon filtering, input-order invariance, deterministic ID tie-breaking, invalid data, duplicate candidate IDs, dominated/duplicate front inputs, and the no-candidate-feasible path.
 
 Research context:
 - STAGE-BO (ICML 2026) adapts epsilon constraints to target uncovered surrogate-front regions and uses constrained expected improvement: https://proceedings.mlr.press/v306/yang26af.html
