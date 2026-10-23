@@ -1071,10 +1071,12 @@ mod prediction_evidence_replay_tests {
             CognitiveLoopService::compute_prediction_error_evidence(&[0.1, 0.2], Some(&[0.1, 0.2])),
             Some(0.0)
         );
-        assert_eq!(
-            CognitiveLoopService::compute_prediction_error_evidence(&[0.1, 0.2], Some(&[0.2, 0.3])),
-            Some(0.01)
-        );
+        let error = CognitiveLoopService::compute_prediction_error_evidence(
+            &[0.1, 0.2],
+            Some(&[0.2, 0.3]),
+        )
+        .expect("finite, equal-dimensional states should yield comparable evidence");
+        assert!((error - 0.01).abs() < 1e-6, "unexpected MSE: {error}");
     }
 
     #[test]
