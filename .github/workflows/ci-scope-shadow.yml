@@ -1,0 +1,102 @@
+name: CI Scope Shadow Advisor
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ci_scope_shadow.py"
+      - "scripts/test_ci_scope_shadow.py"
+      - "tests/fixtures/ci_scope_shadow/**"
+      - ".github/workflows/ci-scope-shadow.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-scope-shadow-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shadow-scope:
+    name: CI Scope Shadow Advisor
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Assert exact candidate and clean preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test -z "$(git status --porcelain --untracked-files=no)"
+          printf 'subject_sha=%s\n' "$actual"
+
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile classifier and tests
+        run: |
+          python -m py_compile \
+            scripts/ci_scope_shadow.py \
+            scripts/test_ci_scope_shadow.py
+
+      - name: Run deterministic unit tests
+        run: python scripts/test_ci_scope_shadow.py -v
+
+      - name: Exercise frozen recommendation fixtures
+        run: |
+          set -euo pipefail
+          python scripts/ci_scope_shadow.py recommend \
+            tests/fixtures/ci_scope_shadow/docs_only.txt --pretty > /tmp/docs.json
+          python scripts/ci_scope_shadow.py recommend \
+            tests/fixtures/ci_scope_shadow/muse_only.txt --pretty > /tmp/muse.json
+          python scripts/ci_scope_shadow.py recommend \
+            tests/fixtures/ci_scope_shadow/cross_cutting.txt --pretty > /tmp/cross.json
+          python - <<'PY'
+          import json
+          docs=json.load(open('/tmp/docs.json'))
+          muse=json.load(open('/tmp/muse.json'))
+          cross=json.load(open('/tmp/cross.json'))
+          assert docs['recommendation_class'] == 'docs_only'
+          assert docs['full_matrix_recommended'] is False
+          assert muse['recommendation_class'] == 'muse_isolated'
+          assert muse['full_matrix_recommended'] is False
+          assert cross['full_matrix_recommended'] is True
+          assert docs['enforcement_allowed'] is False
+          assert muse['enforcement_allowed'] is False
+          assert cross['enforcement_allowed'] is False
+          PY
+
+      - name: Produce observational prediction for this PR
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha }}"
+          git diff --name-only "$base...HEAD" > /tmp/changed-files.txt
+          python scripts/ci_scope_shadow.py recommend /tmp/changed-files.txt --pretty \
+            | tee /tmp/ci-scope-shadow.json
+          {
+            echo '## CI scope shadow prediction'
+            echo
+            echo '```json'
+            cat /tmp/ci-scope-shadow.json
+            echo '```'
+            echo
+            echo '**Shadow only:** this prediction does not skip or qualify any job.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Assert tracked-checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=no)"

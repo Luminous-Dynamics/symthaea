@@ -1,0 +1,2 @@
+crates/core/symthaea-core/src/hdc_encoding.rs
+Cargo.toml
