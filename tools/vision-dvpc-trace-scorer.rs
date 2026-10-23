@@ -408,12 +408,13 @@ fn read_outcomes(
             actual_latency_us,
             actual_energy_uj,
         };
-        if output.insert(row[1].clone(), outcome).is_some() {
+        if output.contains_key(&row[1]) {
             return Err(fail(format!(
                 "duplicate evaluation trace {}",
                 row[1]
             )));
         }
+        output.insert(row[1].clone(), outcome);
     }
     if output.len() != observations.len() {
         return Err(fail("evaluation rows do not join one-to-one with observations"));
@@ -445,6 +446,12 @@ fn read_actions(
             return Err(fail(format!("action sample digest mismatch for {trace_id}")));
         }
         let choice = Choice::parse(&row[5])?;
+        if row[4] == "all_cheap" && choice != Choice::Cheap {
+            return Err(fail("policy all_cheap contains a full-fidelity choice"));
+        }
+        if row[4] == "all_full" && choice != Choice::Full {
+            return Err(fail("policy all_full contains a cheap choice"));
+        }
         let commitment_index = parse_u64(&row[6], "commitment_index")?;
         let latency_budget_us = parse_u64(&row[7], "latency_budget_us")?;
         let energy_budget_uj = parse_u64(&row[8], "energy_budget_uj")?;
@@ -1017,6 +1024,29 @@ mod tests {
         assert_eq!(router_fields[16], "15000");
         assert_eq!(router_fields[20], "false");
         assert_eq!(router_fields[23], "true");
+    }
+
+    #[test]
+    fn rejects_duplicate_evaluation_trace_ids() {
+        let row = EVAL.lines().last().unwrap();
+        let broken = format!("{EVAL}{row}\n");
+        let (obs, _, _) = tables();
+        let observations = read_observations(&obs, "test").unwrap();
+        let eval_table = parse_table(&broken, EVAL_HEADER, "EVAL").unwrap();
+        assert!(read_outcomes(&eval_table, &observations)
+            .unwrap_err()
+            .contains("duplicate evaluation trace"));
+    }
+
+    #[test]
+    fn baseline_policy_names_must_match_committed_choices() {
+        let broken = ACTIONS.replace("\tcheap\t2\t", "\tfull\t2\t");
+        let (obs, _, _) = tables();
+        let observations = read_observations(&obs, "test").unwrap();
+        let action_table = parse_table(&broken, ACTION_HEADER, "ACTION").unwrap();
+        assert!(read_actions(&action_table, &observations)
+            .unwrap_err()
+            .contains("policy all_cheap contains a full-fidelity choice"));
     }
 
     #[test]
