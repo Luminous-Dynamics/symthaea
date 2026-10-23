@@ -193,7 +193,6 @@ fn deterministic_ties_use_a_stable_id_order() {
     assert_eq!(choose_action(&tied).map(|action| action.id), Some("source-a"));
 }
 
-
 fn assert_all_action_orderings(
     actions: &mut [CandidateAction; 5],
     start: usize,
