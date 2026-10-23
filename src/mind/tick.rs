@@ -916,31 +916,30 @@ impl ContinuousMind {
                 }
 
                 let replay_key = (packet.source_id, packet.payload_type as u8);
-                if !self.mesh_replay_windows.contains_key(&replay_key)
-                    && self.mesh_replay_windows.len()
-                        >= super::mesh::MESH_REPLAY_STREAM_CAPACITY
-                {
-                    // Never evict active authenticated sequence state just to
-                    // admit a new stream: fail closed when the bounded table is full.
-                    self.mesh_stats.packets_replay_rejected += 1;
-                    tracing::warn!(
-                        target: "symthaea::mind::mesh",
-                        source = ?packet.source_id,
-                        payload = ?packet.payload_type,
-                        "Authenticated replay-window capacity reached; dropping new stream"
-                    );
-                    continue;
-                }
-
                 let replay_now = std::time::Instant::now();
-                let accepted = self
-                    .mesh_replay_windows
-                    .entry(replay_key)
-                    .or_default()
-                    .check_and_mark(packet.sequence, replay_now);
-                if !accepted {
-                    self.mesh_stats.packets_replay_rejected += 1;
-                    continue;
+                match super::mesh::admit_authenticated_sequence(
+                    &mut self.mesh_replay_windows,
+                    replay_key,
+                    packet.sequence,
+                    replay_now,
+                ) {
+                    super::mesh::AuthenticatedReplayAdmission::Accepted => {}
+                    super::mesh::AuthenticatedReplayAdmission::ReplayedOrOutsideWindow => {
+                        self.mesh_stats.packets_replay_rejected += 1;
+                        continue;
+                    }
+                    super::mesh::AuthenticatedReplayAdmission::CapacityReached => {
+                        // Never evict active authenticated sequence state just
+                        // to admit a new stream: fail closed when full.
+                        self.mesh_stats.packets_replay_rejected += 1;
+                        tracing::warn!(
+                            target: "symthaea::mind::mesh",
+                            source = ?packet.source_id,
+                            payload = ?packet.payload_type,
+                            "Authenticated replay-window capacity reached; dropping new stream"
+                        );
+                        continue;
+                    }
                 }
             } else {
                 // Unauthenticated telemetry retains a bounded best-effort
