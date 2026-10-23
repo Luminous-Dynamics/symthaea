@@ -4,12 +4,10 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - "crates/domains/symthaea-rea-evidence-verifier/**"
-      - ".github/workflows/rea-evidence-receipt.yml"
   push:
     branches: [main]
     paths:
       - "crates/domains/symthaea-rea-evidence-verifier/**"
-      - ".github/workflows/rea-evidence-receipt.yml"
   workflow_dispatch:
 
 permissions:
