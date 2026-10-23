@@ -1,0 +1,55 @@
+# Broca risk-bounded retrieval reference
+
+This is a small, standalone Rust reference crate for evaluating a frozen selective-retrieval policy against a preregistered unsafe-result label. It is deliberately separate from production Symthaea crates and has no third-party dependencies.
+
+## Run the focused tests
+
+From the repository root:
+
+```sh
+cargo test --manifest-path research/broca-risk-bounded/Cargo.toml
+```
+
+The tests cover the exact zero-failure binomial bound, a known nonzero-failure case, monotonicity, invalid counts/configurations, an empty accepted set, minimum evidence, and a fail-closed risk decision.
+
+The source is committed but has not been compiled or executed in the authoring environment. Do not treat authored tests as passing until this exact source SHA is built and tested.
+
+## Meaning of the risk gate
+
+The evaluator defines unsafe before the locked test run, for example: a query selected by the frozen approximate policy has strict exact-ID Recall@K below a preregistered threshold, returns a stale fact, or fails a required-evidence check. The exact failure label and denominator must be written in the experiment protocol.
+
+`RiskBudget::assess(unsafe_count, accepted_count)` reports:
+- the observed unsafe rate;
+- the one-sided exact Clopper-Pearson upper confidence bound;
+- a final decision: `Eligible`, `InsufficientEvidence`, or `RiskBudgetExceeded`.
+
+There is no positive decision when zero cases were accepted or when fewer than the configured minimum independent accepted cases exist.
+
+## Why 299 matters
+
+For zero unsafe outcomes in (n) independent accepted cases, the one-sided exact upper bound at confidence level (1-\alpha) is:
+
+```text
+p_upper = 1 - alpha^(1/n)
+```
+
+At 95% confidence, 299 independent accepted cases with zero observed failures are needed for the bound to fall to at most 1%. With 298, it remains just above 1%. A thousand repeated timing rounds on the same ten queries do not create ten thousand independent reliability observations.
+
+## Statistical limits
+
+This is a simple binomial reference, not a conformal or distribution-free guarantee under arbitrary distribution shift. Its interpretation requires the evaluated query units to be independent or exchangeable under a declared sampling design, with a frozen policy and frozen unsafe-label definition. Split by user/session/conversation or memory lineage where appropriate; repeated queries from the same lineage can be correlated.
+
+The bound concerns the held-out accepted population. It does not estimate risk for each individual query, does not calibrate features by itself, and does not prevent selection leakage if the policy or thresholds are tuned on the final test set. It also does not excuse any cross-scope leakage, deleted-memory resurrection, stale-index acceptance, or other zero-tolerance integrity failure.
+
+For temporal dependence, distribution shift, selective label observation, or repeated monitoring over time, compare with suitable risk-control/conformal methods and prospectively designed audits rather than reusing the simple binomial interval outside its assumptions.
+
+## Recommended evaluation sequence
+
+1. Define the unsafe event and sampling unit before examining test labels.
+2. Train/tune the routing policy on development data and select thresholds on a separate calibration partition.
+3. Freeze policy, index contract, data processing, and unsafe event.
+4. Evaluate only once on a locked test set, reporting accepted/unsafe numerators and denominators per query stratum.
+5. Report task utility, coverage/acceptance rate, latency, exact-fallback rate, and integrity failures in addition to the risk bound.
+6. Keep each important stratum separate. Do not let a high volume of easy queries conceal poor reliability on temporal updates, unanswerable queries, or privacy-sensitive scopes.
+
+The crate is a qualification primitive for PR #8520, not a replacement for PR #8494's exact-vs-approximate benchmark, MIRE memory-integrity fixtures, or end-to-end memory task evaluation.
