@@ -643,7 +643,6 @@ fn misspecified_policy_rejects_malformed_true_likelihoods() {
     );
 }
 
-
 fn misspecification_regret(
     assumed: Measurement,
     actual_likelihoods: [[u16; 3]; 3],
