@@ -587,7 +587,7 @@ mod tests {
 
         let _ = manager.process(&snapshot);
 
-        assert!(manager.error_history.is_empty());
+        assert_eq!(manager.error_count, 0);
         assert_eq!(manager.low_error_streak, 0);
         assert_eq!(manager.flow_streak, 0);
         assert_eq!(manager.exploration_threshold, initial_threshold);
