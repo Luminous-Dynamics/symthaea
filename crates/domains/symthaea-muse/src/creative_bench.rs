@@ -31,6 +31,252 @@ use symthaea_aesthetic::ValenceArousal;
 
 use crate::{Composition, MuseConfig, MusicalState, Note};
 
+// ─── Intent-conditioned melodic contract diagnostics ─────────────────────────
+
+/// Caller-authored mechanical constraints for a monophonic melodic trace.
+///
+/// These bounds are not universal definitions of good music. They encode what
+/// a particular brief requires; for example, a melody brief may require a
+/// minimum pitch range while a drone brief may cap that range. The evaluator
+/// reports observables and violated constraints separately and never turns
+/// them into a universal aesthetic score.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MelodicIntentContract {
+    /// Minimum number of usable, chronologically ordered notes.
+    pub minimum_note_count: usize,
+    /// Optional minimum absolute pitch span, measured in semitones.
+    pub minimum_pitch_range_semitones: Option<f32>,
+    /// Optional maximum absolute pitch span, measured in semitones.
+    pub maximum_pitch_range_semitones: Option<f32>,
+    /// Optional minimum fraction of adjacent intervals exceeding the movement
+    /// threshold.
+    pub minimum_moving_interval_ratio: Option<f32>,
+    /// Optional maximum fraction of adjacent intervals exceeding the movement
+    /// threshold.
+    pub maximum_moving_interval_ratio: Option<f32>,
+    /// An adjacent interval counts as movement only when its absolute size is
+    /// strictly greater than this many semitones.
+    pub moving_interval_threshold_semitones: f32,
+}
+
+/// Mechanical violations of a caller-authored melodic contract.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MelodicIntentViolation {
+    InvalidContract,
+    InvalidNoteObservation,
+    TooFewUsableNotes,
+    PitchRangeUnavailable,
+    PitchRangeBelowMinimum,
+    PitchRangeAboveMaximum,
+    MovingIntervalRatioUnavailable,
+    MovingIntervalRatioBelowMinimum,
+    MovingIntervalRatioAboveMaximum,
+}
+
+/// Observable facts and contract outcome for a monophonic melodic trace.
+///
+/// satisfied means only that the trace met the stated mechanical contract;
+/// it is not a prediction of human preference, authenticity, or musical quality.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MelodicIntentResult {
+    pub input_note_count: usize,
+    pub usable_note_count: usize,
+    pub invalid_note_count: usize,
+    pub pitch_range_semitones: Option<f32>,
+    pub moving_interval_ratio: Option<f32>,
+    pub satisfied: bool,
+    pub violations: Vec<MelodicIntentViolation>,
+}
+
+fn valid_melodic_contract(contract: &MelodicIntentContract) -> bool {
+    let nonnegative_finite = |value: f32| value.is_finite() && value >= 0.0;
+    let unit_interval = |value: f32| value.is_finite() && (0.0..=1.0).contains(&value);
+
+    if contract.minimum_note_count == 0
+        || !nonnegative_finite(contract.moving_interval_threshold_semitones)
+    {
+        return false;
+    }
+
+    for value in [
+        contract.minimum_pitch_range_semitones,
+        contract.maximum_pitch_range_semitones,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if !nonnegative_finite(value) {
+            return false;
+        }
+    }
+
+    for value in [
+        contract.minimum_moving_interval_ratio,
+        contract.maximum_moving_interval_ratio,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if !unit_interval(value) {
+            return false;
+        }
+    }
+
+    if let (Some(minimum), Some(maximum)) = (
+        contract.minimum_pitch_range_semitones,
+        contract.maximum_pitch_range_semitones,
+    ) {
+        if minimum > maximum {
+            return false;
+        }
+    }
+
+    if let (Some(minimum), Some(maximum)) = (
+        contract.minimum_moving_interval_ratio,
+        contract.maximum_moving_interval_ratio,
+    ) {
+        if minimum > maximum {
+            return false;
+        }
+    }
+
+    contract.minimum_pitch_range_semitones.is_some()
+        || contract.maximum_pitch_range_semitones.is_some()
+        || contract.minimum_moving_interval_ratio.is_some()
+        || contract.maximum_moving_interval_ratio.is_some()
+}
+
+#[inline]
+fn violates_lower_bound(value: f32, minimum: f32) -> bool {
+    value < minimum
+}
+
+#[inline]
+fn violates_upper_bound(value: f32, maximum: f32) -> bool {
+    value > maximum
+}
+
+/// Evaluate an explicitly supplied contract against a monophonic note trace.
+///
+/// Invalid/non-positive pitches and non-finite onset times are excluded from
+/// the numerical observables and counted. Any such observation still causes a
+/// contract violation, so bad input cannot disappear and improve a score.
+/// Frequencies are converted to continuous MIDI-semitone coordinates; range
+/// and interval statistics are therefore invariant to exact transposition.
+pub fn evaluate_melodic_intent_contract(
+    notes: &[Note],
+    contract: &MelodicIntentContract,
+) -> MelodicIntentResult {
+    let mut ordered: Vec<(f32, f32)> = notes
+        .iter()
+        .filter_map(|note| {
+            if note.frequency.is_finite()
+                && note.frequency > 0.0
+                && note.start_time.is_finite()
+            {
+                Some((note.start_time, 69.0 + 12.0 * (note.frequency / 440.0).log2()))
+            } else {
+                None
+            }
+        })
+        .collect();
+    let invalid_note_count = notes.len() - ordered.len();
+    ordered.sort_by(|a, b| {
+        a.0.partial_cmp(&b.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let pitches: Vec<f32> = ordered.iter().map(|(_, pitch)| *pitch).collect();
+
+    let pitch_range_semitones = if pitches.is_empty() {
+        None
+    } else {
+        let minimum = pitches.iter().copied().fold(f32::INFINITY, f32::min);
+        let maximum = pitches.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        Some((maximum - minimum).max(0.0))
+    };
+
+    let moving_interval_ratio = if pitches.len() < 2 {
+        None
+    } else {
+        let interval_count = (pitches.len() - 1) as f32;
+        let moving_count = pitches
+            .windows(2)
+            .filter(|pair| {
+                (pair[1] - pair[0]).abs() > contract.moving_interval_threshold_semitones
+            })
+            .count() as f32;
+        Some(moving_count / interval_count)
+    };
+
+    let mut violations = Vec::new();
+    if !valid_melodic_contract(contract) {
+        violations.push(MelodicIntentViolation::InvalidContract);
+    } else {
+        if invalid_note_count > 0 {
+            violations.push(MelodicIntentViolation::InvalidNoteObservation);
+        }
+        if pitches.len() < contract.minimum_note_count {
+            violations.push(MelodicIntentViolation::TooFewUsableNotes);
+        }
+
+        if let Some(minimum) = contract.minimum_pitch_range_semitones {
+            match pitch_range_semitones {
+                Some(range) if violates_lower_bound(range, minimum) => {
+                    violations.push(MelodicIntentViolation::PitchRangeBelowMinimum);
+                }
+                None => violations.push(MelodicIntentViolation::PitchRangeUnavailable),
+                _ => {}
+            }
+        }
+        if let Some(maximum) = contract.maximum_pitch_range_semitones {
+            match pitch_range_semitones {
+                Some(range) if violates_upper_bound(range, maximum) => {
+                    violations.push(MelodicIntentViolation::PitchRangeAboveMaximum);
+                }
+                None => {
+                    if !violations.contains(&MelodicIntentViolation::PitchRangeUnavailable) {
+                        violations.push(MelodicIntentViolation::PitchRangeUnavailable);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(minimum) = contract.minimum_moving_interval_ratio {
+            match moving_interval_ratio {
+                Some(ratio) if violates_lower_bound(ratio, minimum) => {
+                    violations.push(MelodicIntentViolation::MovingIntervalRatioBelowMinimum);
+                }
+                None => violations.push(MelodicIntentViolation::MovingIntervalRatioUnavailable),
+                _ => {}
+            }
+        }
+        if let Some(maximum) = contract.maximum_moving_interval_ratio {
+            match moving_interval_ratio {
+                Some(ratio) if violates_upper_bound(ratio, maximum) => {
+                    violations.push(MelodicIntentViolation::MovingIntervalRatioAboveMaximum);
+                }
+                None => {
+                    if !violations.contains(&MelodicIntentViolation::MovingIntervalRatioUnavailable) {
+                        violations.push(MelodicIntentViolation::MovingIntervalRatioUnavailable);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    MelodicIntentResult {
+        input_note_count: notes.len(),
+        usable_note_count: pitches.len(),
+        invalid_note_count,
+        pitch_range_semitones,
+        moving_interval_ratio,
+        satisfied: violations.is_empty(),
+        violations,
+    }
+}
+
 // ─── Melodic Coherence ───────────────────────────────────────────────────────
 
 /// Evaluate melodic coherence: how well do interval transitions match a
