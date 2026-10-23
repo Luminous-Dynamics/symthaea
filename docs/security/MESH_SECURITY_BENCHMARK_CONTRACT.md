@@ -97,9 +97,23 @@ The hard security gate is lexicographic: first satisfy every mandatory property 
 - Do not call a bounded result "formally secure"; say which property held, under which bounds and assumptions.
 - Do not claim that Symthaea exceeds SOTA until a published, held-out, matched-budget evaluation demonstrates a statistically credible advantage in independently accepted findings, false positives, cost, or review latency.
 
+## Run the contract audit
+
+The isolated Rust checker is intentionally outside the monorepo workspace:
+
+```sh
+cargo fmt --manifest-path tools/mesh-security-contract-audit/Cargo.toml -- --check
+cargo test --manifest-path tools/mesh-security-contract-audit/Cargo.toml
+cargo run --manifest-path tools/mesh-security-contract-audit/Cargo.toml -- \
+  --root . \
+  --out /tmp/mesh-security-contract-audit.json
+```
+
+The emitted receipt includes the exact Git revision and SHA-256 digests for the suite, all three schemas, validator source/manifest and resolved Cargo lockfile. It labels the result `schema_and_registry_integrity_only`; it is not a security qualification. The checker explicitly disables external reference resolution and includes negative tests for remote schema references, invalid schema keywords, duplicate IDs, and undeclared property references.
+
 ## Next executable phase
 
-1. Validate both JSON files against a JSON Schema Draft 2020-12 implementation in CI.
+1. Confirm the exact-head workflow runs the Rust checker and all Draft 2020-12 meta-schema/instance checks successfully.
 2. Emit the evidence receipt from each model/runner invocation and hash raw logs, configs and counterexample traces.
 3. Map all registry entries to actual test functions or mark them explicitly `not_implemented`; no unimplemented scenario may count in the denominator as passed.
 4. Run the nonce and handshake model suites separately, then add trace-conformance tests at the real Rust boundary.
