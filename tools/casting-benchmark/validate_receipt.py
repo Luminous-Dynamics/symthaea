@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -81,7 +82,7 @@ def validate_receipt(receipt: Any, for_publication: bool = False) -> list[str]:
         r"^[A-Za-z0-9][A-Za-z0-9._-]+$", receipt["run_id"]
     ):
         errors.append("$.run_id: malformed run identifier")
-    if receipt["status"] not in STATUSES:
+    if not isinstance(receipt["status"], str) or receipt["status"] not in STATUSES:
         errors.append("$.status: queued/skipped/pending is not a terminal receipt status")
     if not isinstance(receipt["synthetic_fixture_only"], bool):
         errors.append("$.synthetic_fixture_only: expected boolean")
@@ -109,7 +110,7 @@ def validate_receipt(receipt: Any, for_publication: bool = False) -> list[str]:
         for key in ("dimension", "objective_count"):
             if not _is_int(receipt["suite"][key]) or receipt["suite"][key] < (1 if key == "dimension" else 2):
                 errors.append(f"$.suite.{key}: invalid positive integer")
-        if receipt["suite"]["objective_direction"] not in {
+        if not isinstance(receipt["suite"]["objective_direction"], str) or receipt["suite"]["objective_direction"] not in {
             "minimize_all", "maximize_all", "mixed_explicit"
         }:
             errors.append("$.suite.objective_direction: invalid direction convention")
@@ -169,7 +170,7 @@ def validate_receipt(receipt: Any, for_publication: bool = False) -> list[str]:
             if _is_int(receipt["budget"].get("initial_design_evaluations")) and receipt["budget"]["initial_design_evaluations"] > accounting["objective_evaluations"]:
                 errors.append("$.budget.initial_design_evaluations: exceeds actual objective evaluations")
 
-    if receipt["termination_reason"] not in TERMINATIONS:
+    if not isinstance(receipt["termination_reason"], str) or receipt["termination_reason"] not in TERMINATIONS:
         errors.append("$.termination_reason: unknown or non-terminal reason")
     if receipt["status"] == "success":
         if receipt["termination_reason"] not in {"budget_exhausted", "predeclared_target_reached"}:
