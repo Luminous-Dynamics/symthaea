@@ -1,0 +1,6 @@
+timestamp_ns,channel_id,raw_value,sample_status,sequence
+1000000000,gnss.speed_mps,0.0,VALID,0
+1000000000,dc_bus.voltage_v,0.0,VALID,1
+1010000000,gnss.speed_mps,1.25,VALID,2
+1020000000,dc_bus.current_a,,INVALID,3
+1030000000,gnss.speed_mps,1.5,VALID,4

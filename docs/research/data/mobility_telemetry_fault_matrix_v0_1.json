@@ -1,0 +1,411 @@
+{
+  "schema_version": "0.1.0",
+  "suite_id": "MOBILITY-TELEMETRY-CONFORMANCE-001",
+  "status": "frozen_proposed_matrix_v0_1_with_per_channel_gap_ledger_control_not_yet_executed",
+  "claim_ceiling": "Software conformance only. No demonstrated hardware reliability, measurement accuracy, vehicle performance, tire qualification, or roadworthiness.",
+  "interpretation": {
+    "positive_controls_required": true,
+    "false_accept_definition": "An invalid fixture is accepted or required diagnostic/claim-blocking reason is absent.",
+    "false_reject_definition": "A documented positive control is rejected without an applicable contract violation.",
+    "allowed_policy": "Cases can change only with a reviewed rationale and a new matrix version; never delete a failing case to improve the score."
+  },
+  "cases": [
+    {
+      "id": "TRACE-001",
+      "category": "trace",
+      "mutation": "known_valid_multi_rate_fixture",
+      "expected": "accept",
+      "diagnostic": "row counts and SHA-256 are reported",
+      "rust_test": "synthetic_trace_parses_without_claiming_physical_validity",
+      "required_detail_tokens": [
+        "expected counters match"
+      ]
+    },
+    {
+      "id": "TRACE-002",
+      "category": "trace",
+      "mutation": "header_only_empty_trace",
+      "expected": "reject",
+      "diagnostic": "raw telemetry trace contains no rows",
+      "rust_test": "empty_trace_is_rejected",
+      "required_detail_tokens": [
+        "contains no rows"
+      ]
+    },
+    {
+      "id": "TRACE-003",
+      "category": "trace",
+      "mutation": "reordered_header",
+      "expected": "reject",
+      "diagnostic": "header mismatch",
+      "rust_test": "wrong_header_is_rejected",
+      "required_detail_tokens": [
+        "header does not match"
+      ]
+    },
+    {
+      "id": "TRACE-004",
+      "category": "trace",
+      "mutation": "undeclared_channel",
+      "expected": "reject",
+      "diagnostic": "undeclared channel",
+      "rust_test": "unknown_channel_is_rejected",
+      "required_detail_tokens": [
+        "undeclared channel"
+      ]
+    },
+    {
+      "id": "TRACE-005",
+      "category": "trace",
+      "mutation": "valid_status_with_empty_raw_value",
+      "expected": "reject",
+      "diagnostic": "VALID sample may not be empty",
+      "rust_test": "valid_sample_may_not_have_an_empty_value",
+      "required_detail_tokens": [
+        "empty raw_value"
+      ]
+    },
+    {
+      "id": "TRACE-006",
+      "category": "trace",
+      "mutation": "NaN_or_infinity_raw_value",
+      "expected": "reject",
+      "diagnostic": "non-finite raw value",
+      "rust_test": "non_finite_raw_value_is_rejected",
+      "required_detail_tokens": [
+        "NaN rejected",
+        "infinity rejected"
+      ]
+    },
+    {
+      "id": "TRACE-007",
+      "category": "trace",
+      "mutation": "unknown_sample_status",
+      "expected": "reject",
+      "diagnostic": "unsupported status",
+      "rust_test": "unsupported_sample_status_is_rejected",
+      "required_detail_tokens": [
+        "unsupported sample_status"
+      ]
+    },
+    {
+      "id": "TRACE-008",
+      "category": "trace",
+      "mutation": "global_sequence_gap",
+      "expected": "reject",
+      "diagnostic": "sequence mismatch",
+      "rust_test": "sequence_gap_is_rejected_instead_of_hidden",
+      "required_detail_tokens": [
+        "contiguous sequence"
+      ]
+    },
+    {
+      "id": "TRACE-009",
+      "category": "trace",
+      "mutation": "logger_timestamp_regression",
+      "expected": "reject",
+      "diagnostic": "logger-monotonic regression",
+      "rust_test": "timestamp_regression_is_rejected",
+      "required_detail_tokens": [
+        "timestamp regressed"
+      ]
+    },
+    {
+      "id": "TRACE-010",
+      "category": "trace",
+      "mutation": "repeated_timestamp_same_channel",
+      "expected": "reject",
+      "diagnostic": "per-channel timestamps must increase",
+      "rust_test": "repeated_timestamp_for_same_channel_is_rejected",
+      "required_detail_tokens": [
+        "repeats or regresses the timestamp for channel"
+      ]
+    },
+    {
+      "id": "TRACE-011",
+      "category": "trace",
+      "mutation": "same_timestamp_on_distinct_channels",
+      "expected": "accept",
+      "diagnostic": "simultaneous multi-channel observations remain valid",
+      "rust_test": "equal_timestamps_across_distinct_channels_are_accepted",
+      "required_detail_tokens": [
+        "simultaneous observations"
+      ]
+    },
+    {
+      "id": "TRACE-012",
+      "category": "trace",
+      "mutation": "sensor_fault_with_missing_value",
+      "expected": "accept_with_diagnostic",
+      "diagnostic": "row retained and both invalid and missing counters increment",
+      "rust_test": "fault_rows_remain_explicit_and_missing",
+      "required_detail_tokens": [
+        "fault row and missing-value counters preserved"
+      ]
+    },
+    {
+      "id": "TRACE-013",
+      "category": "trace",
+      "mutation": "inter_sample_gap_above_diagnostic_threshold",
+      "expected": "accept_with_diagnostic",
+      "diagnostic": "rows remain intact and suspected gap counter increments",
+      "rust_test": "large_gap_is_reported_without_filling",
+      "required_detail_tokens": [
+        "suspected gap reported"
+      ]
+    },
+    {
+      "id": "MANIFEST-001",
+      "category": "manifest",
+      "mutation": "duplicate_sensor_id",
+      "expected": "reject",
+      "diagnostic": "duplicate sensor IDs",
+      "rust_test": "duplicate_sensor_ids_are_rejected",
+      "required_detail_tokens": [
+        "duplicate sensor ID"
+      ]
+    },
+    {
+      "id": "MANIFEST-002",
+      "category": "manifest",
+      "mutation": "duplicate_channel_id",
+      "expected": "reject",
+      "diagnostic": "duplicate channel IDs",
+      "rust_test": "duplicate_channel_ids_are_rejected",
+      "required_detail_tokens": [
+        "duplicate channel ID"
+      ]
+    },
+    {
+      "id": "MANIFEST-003",
+      "category": "manifest",
+      "mutation": "unresolved_sensor_reference",
+      "expected": "reject",
+      "diagnostic": "unknown sensor ref",
+      "rust_test": "unknown_channel_sensor_reference_is_rejected",
+      "required_detail_tokens": [
+        "references unknown sensor"
+      ]
+    },
+    {
+      "id": "MANIFEST-004",
+      "category": "manifest",
+      "mutation": "zero_negative_or_nonfinite_sample_rate",
+      "expected": "reject",
+      "diagnostic": "rate must be finite and positive",
+      "rust_test": "non_finite_or_nonpositive_sample_rate_is_rejected",
+      "required_detail_tokens": [
+        "zero, negative and NaN sample rates all rejected"
+      ]
+    },
+    {
+      "id": "MANIFEST-005",
+      "category": "manifest",
+      "mutation": "calibrated_sensor_without_receipt",
+      "expected": "reject",
+      "diagnostic": "calibration receipt required",
+      "rust_test": "calibrated_sensor_requires_a_receipt",
+      "required_detail_tokens": [
+        "claims calibrated without a calibration receipt"
+      ]
+    },
+    {
+      "id": "MANIFEST-006",
+      "category": "manifest",
+      "mutation": "absolute_or_traversal_artifact_path",
+      "expected": "reject",
+      "diagnostic": "all artifact paths remain within session root",
+      "rust_test": "artifact_paths_must_not_escape_the_manifest_directory",
+      "required_detail_tokens": [
+        "absolute and traversal paths rejected"
+      ]
+    },
+    {
+      "id": "MANIFEST-007",
+      "category": "manifest",
+      "mutation": "malformed_or_unprefixed_sha256",
+      "expected": "reject",
+      "diagnostic": "strict SHA-256 syntax",
+      "rust_test": "artifact_digest_must_be_sha256_prefixed_and_well_formed",
+      "required_detail_tokens": [
+        "unprefixed and invalid-hex digests rejected"
+      ]
+    },
+    {
+      "id": "CLAIM-001",
+      "category": "claim_gate",
+      "mutation": "claim_required_channel_removed",
+      "expected": "structurally_valid_but_ineligible",
+      "diagnostic": "claim_required_channels_missing",
+      "rust_test": "missing_claim_channels_make_only_that_claim_ineligible",
+      "required_detail_tokens": [
+        "missing required channel"
+      ]
+    },
+    {
+      "id": "CLAIM-002",
+      "category": "claim_gate",
+      "mutation": "physical_claim_with_uncalibrated_sensor",
+      "expected": "ineligible",
+      "diagnostic": "sensor_not_calibrated reason emitted",
+      "rust_test": "uncalibrated_sensor_blocks_physical_claim_eligibility",
+      "required_detail_tokens": [
+        "both uncalibrated electrical sensors block"
+      ]
+    },
+    {
+      "id": "CLAIM-003",
+      "category": "claim_gate",
+      "mutation": "planned_or_synthetic_fixture_claimed_as_physical",
+      "expected": "ineligible",
+      "diagnostic": "structural validity does not promote evidence class",
+      "rust_test": "planned_fixture_is_structurally_valid_but_not_physical_evidence",
+      "required_detail_tokens": [
+        "planned DesignOnly fixture cannot support physical claims"
+      ]
+    },
+    {
+      "id": "CLAIM-004",
+      "category": "clock_gate",
+      "mutation": "unrecognized_sync_method_with_verified_word",
+      "expected": "ineligible",
+      "diagnostic": "clock_sync_method_not_verified",
+      "rust_test": "unrecognized_sync_method_blocks_physical_claim",
+      "required_detail_tokens": [
+        "free-form verified-looking text does not pass"
+      ]
+    },
+    {
+      "id": "CLAIM-005",
+      "category": "uncertainty_gate",
+      "mutation": "physical_claim_without_claim_specific_uncertainty_budget",
+      "expected": "ineligible",
+      "diagnostic": "missing_claim_uncertainty_budget",
+      "rust_test": "missing_claim_uncertainty_budget_blocks_physical_claim",
+      "required_detail_tokens": [
+        "uncertainty budget is absent"
+      ]
+    },
+    {
+      "id": "CLAIM-006",
+      "category": "uncertainty_gate",
+      "mutation": "expanded_uncertainty_exceeds_acceptance_tolerance",
+      "expected": "ineligible",
+      "diagnostic": "uncertainty_budget_exceeds_tolerance",
+      "rust_test": "budget_above_tolerance_blocks_physical_claim",
+      "required_detail_tokens": [
+        "expanded uncertainty exceeds pre-registered tolerance"
+      ]
+    },
+    {
+      "id": "CLAIM-007",
+      "category": "uncertainty_gate",
+      "mutation": "calculated_but_unverified_uncertainty_budget",
+      "expected": "ineligible",
+      "diagnostic": "uncertainty_budget_not_verified",
+      "rust_test": "calculated_uncertainty_budget_is_not_physical_evidence",
+      "required_detail_tokens": [
+        "calculated-only uncertainty remains below the evidence threshold"
+      ]
+    },
+    {
+      "id": "CLAIM-008",
+      "category": "uncertainty_gate",
+      "mutation": "single_budget_does_not_cover_all_claim_measurands",
+      "expected": "ineligible",
+      "diagnostic": "missing uncertainty budget for dc_bus_voltage",
+      "rust_test": "single_budget_does_not_cover_all_claim_measurands",
+      "required_detail_tokens": [
+        "missing_uncertainty_budget:dc_bus_voltage"
+      ]
+    },
+    {
+      "id": "MANIFEST-008",
+      "category": "manifest",
+      "mutation": "calibration_receipt_not_backed_by_artifact",
+      "expected": "reject",
+      "diagnostic": "calibration receipt must reference declared artifact",
+      "rust_test": "calibration_receipt_must_reference_declared_artifact",
+      "required_detail_tokens": [
+        "does not reference a declared calibration_record artifact"
+      ]
+    },
+    {
+      "id": "CLAIM-009",
+      "category": "rights_gate",
+      "mutation": "rights_receipt_id_not_backed_by_artifact",
+      "expected": "ineligible",
+      "diagnostic": "rights receipt ID must refer to the matching artifact",
+      "rust_test": "rights_receipt_id_must_be_backed_by_matching_artifact",
+      "required_detail_tokens": [
+        "rights_receipt_id_not_backed_by_artifact"
+      ]
+    },
+    {
+      "id": "MANIFEST-009",
+      "category": "uncertainty_gate",
+      "mutation": "zero_width_uncertainty_budget",
+      "expected": "reject",
+      "diagnostic": "standard and expanded uncertainty must be positive",
+      "rust_test": "zero_uncertainty_is_rejected_as_unphysical_overconfidence",
+      "required_detail_tokens": [
+        "standard and expanded uncertainty must be positive"
+      ]
+    },
+    {
+      "id": "MANIFEST-010",
+      "category": "provenance_gate",
+      "mutation": "uncertainty_record_contents_disagree_with_manifest",
+      "expected": "reject",
+      "diagnostic": "uncertainty budget receipt content must exactly match manifest budget",
+      "rust_test": "uncertainty_budget_receipt_must_match_manifest_content",
+      "required_detail_tokens": [
+        "does not match manifest budget"
+      ]
+    },
+    {
+      "id": "TRACE-014",
+      "category": "trace_loss_ledger",
+      "mutation": "gap_event_reports_estimated_missing_samples",
+      "expected": "accept_with_diagnostic",
+      "diagnostic": "gap ledger preserves both timestamps and records a clearly labelled missing-sample estimate",
+      "rust_test": "gap_event_reports_estimated_missing_samples",
+      "required_detail_tokens": [
+        "estimated_missing_samples=4",
+        "exact_gap_ns=500000000"
+      ]
+    }
+  ],
+  "hardware_targets": [
+    {
+      "id": "HW-001",
+      "metric": "capture_completeness",
+      "target": "at least 99.99% per channel over a one-hour controlled bench run; every loss reconciled",
+      "status": "proposed_not_measured"
+    },
+    {
+      "id": "HW-002",
+      "metric": "voltage_current_time_alignment",
+      "target": "p99 <= 1 ms and maximum <= 2 ms during calibrated 100 Hz reference campaign",
+      "status": "proposed_not_measured"
+    },
+    {
+      "id": "HW-003",
+      "metric": "integrated_electrical_energy",
+      "target": "relative error <= 1% vs calibrated reference on pre-registered steady and stepped-load profiles, with uncertainty reported",
+      "status": "proposed_not_measured"
+    },
+    {
+      "id": "HW-004",
+      "metric": "power_loss_recovery",
+      "target": "committed records preserved byte-identically; session not marked complete without clean close; lost tail bounded",
+      "status": "proposed_not_measured"
+    },
+    {
+      "id": "HW-005",
+      "metric": "replay_determinism",
+      "target": "100/100 identical fixture replays produce the same canonical report digest on the same recorded build",
+      "status": "proposed_not_measured"
+    }
+  ]
+}

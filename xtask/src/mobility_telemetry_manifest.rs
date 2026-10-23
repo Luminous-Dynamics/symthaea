@@ -1,0 +1,2554 @@
+//! Cross-vehicle measurement manifest contract and fail-closed claim eligibility.
+//!
+//! A valid manifest describes how observations are collected. It does not
+//! establish sensor accuracy or physical qualification. Recorded/closed
+//! sessions additionally verify every artifact's relative path, byte length
+//! and SHA-256 before emitting a report.
+
+use anyhow::{bail, Context, Result};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
+use std::fs;
+use std::path::{Component, Path};
+
+const SCHEMA_VERSION: &str = "0.1.0";
+const EVIDENCE_CLASSES: &[&str] = &[
+    "DesignOnly",
+    "Synthetic",
+    "Simulated",
+    "InstrumentedPhysical",
+    "FieldObserved",
+];
+const PHYSICAL_EVIDENCE: &[&str] = &["InstrumentedPhysical", "FieldObserved"];
+// Do not infer synchronization verification from a free-form label containing "verified".
+const VERIFIED_SYNC_METHODS: &[&str] = &[
+    "gnss_pps_verified",
+    "hardware_timestamp_verified",
+    "ptp_verified",
+    "shared_clock_verified",
+];
+const MAX_PHYSICAL_ALIGNMENT_UNCERTAINTY_NS: u64 = 2_000_000;
+const SESSION_STATES: &[&str] = &["planned", "recorded", "closed"];
+const CALIBRATION_STATES: &[&str] = &[
+    "planned",
+    "uncalibrated",
+    "calibrated",
+    "expired",
+    "not_applicable",
+    "unknown",
+];
+const RIGHTS_STATES: &[&str] = &[
+    "not_applicable_design_only",
+    "pending",
+    "project_owned",
+    "explicit_permission",
+    "cc_by_4_0",
+    "other_documented_license",
+];
+const KNOWN_UNITS: &[&str] = &[
+    "m/s", "m", "deg", "rad", "rad/s", "m/s^2", "N", "N*m", "V", "A",
+    "W", "J", "Wh", "kg", "kg/s", "s", "ns", "degC", "kPa", "Pa", "1",
+];
+const ARTIFACT_KINDS: &[&str] = &[
+    "raw_sensor_log",
+    "raw_bus_capture",
+    "measurement_protocol",
+    "calibration_record",
+    "rights_receipt",
+    "collection_authorization",
+    "event_log",
+    "metadata",
+];
+
+const CLAIM_REQUIREMENTS: &[(&str, &[&str])] = &[
+    (
+        "ride_energy",
+        &[
+            "dc_bus.voltage_v",
+            "dc_bus.current_a",
+            "gnss.speed_mps",
+            "gnss.latitude_deg",
+            "gnss.longitude_deg",
+        ],
+    ),
+    (
+        "longitudinal_dynamics",
+        &[
+            "gnss.speed_mps",
+            "imu.accel_x_mps2",
+            "wheel.front_speed_rads",
+            "wheel.rear_speed_rads",
+        ],
+    ),
+    (
+        "tire_health",
+        &[
+            "tire.front_pressure_kpa",
+            "tire.rear_pressure_kpa",
+            "tire.front_temperature_c",
+            "tire.rear_temperature_c",
+        ],
+    ),
+    (
+        "motor_map",
+        &[
+            "dyno.motor_torque_nm",
+            "dyno.motor_speed_rads",
+            "dc_bus.voltage_v",
+            "dc_bus.current_a",
+            "motor.temperature_c",
+            "inverter.temperature_c",
+        ],
+    ),
+    (
+        "tire_force_characterization",
+        &[
+            "rig.normal_load_n",
+            "rig.longitudinal_force_n",
+            "rig.lateral_force_n",
+            "rig.slip_ratio",
+            "rig.slip_angle_rad",
+            "rig.camber_angle_rad",
+        ],
+    ),
+    (
+        "ice_fuel_energy",
+        &[
+            "ice.fuel_mass_flow_kg_s",
+            "ice.engine_speed_rads",
+            "dyno.wheel_torque_nm",
+            "dyno.wheel_speed_rads",
+        ],
+    ),
+];
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct Vehicle {
+    vehicle_id: String,
+    vehicle_class: String,
+    propulsion: String,
+    configuration_digest: String,
+    mass_kg: Option<f64>,
+    payload_kg: Option<f64>,
+    tire_front: Option<TireContext>,
+    tire_rear: Option<TireContext>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct TireContext {
+    make_model: String,
+    size: String,
+    pressure_kpa: Option<f64>,
+    tread_state: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct Timebase {
+    master_clock: String,
+    sync_method: String,
+    max_alignment_uncertainty_ns: u64,
+    gnss_utc_anchor_required: bool,
+    gap_policy: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct DataRights {
+    rights_state: String,
+    owner_or_rightsholder: String,
+    permission_receipt_id: Option<String>,
+    source_reference: Option<String>,
+    redistribution_status: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct Sensor {
+    sensor_id: String,
+    sensor_kind: String,
+    model: String,
+    calibration_state: String,
+    calibration_receipt_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct Channel {
+    channel_id: String,
+    sensor_id: String,
+    quantity: String,
+    unit: String,
+    sample_rate_hz: f64,
+    clock_domain: String,
+    sign_convention: String,
+    axis_or_frame: String,
+    source_mode: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct Artifact {
+    relative_path: String,
+    kind: String,
+    byte_len: u64,
+    sha256: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+struct ClaimUncertaintyBudget {
+    claim_target: String,
+    measurand: String,
+    unit: String,
+    standard_uncertainty: f64,
+    expanded_uncertainty: f64,
+    coverage_factor: f64,
+    acceptance_tolerance: f64,
+    evidence_state: String,
+    artifact_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct Manifest {
+    manifest_id: String,
+    schema_version: String,
+    session_state: String,
+    evidence_class: String,
+    claim_ceiling: String,
+    vehicle: Vehicle,
+    timebase: Timebase,
+    data_rights: DataRights,
+    sensors: Vec<Sensor>,
+    channels: Vec<Channel>,
+    claim_targets: Vec<String>,
+    artifacts: Vec<Artifact>,
+    #[serde(default)]
+    uncertainty_budgets: Vec<ClaimUncertaintyBudget>,
+    limitations: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ClaimEligibility {
+    claim_target: String,
+    physical_eligible: bool,
+    reasons: Vec<String>,
+    missing_channels: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct Report {
+    report_version: String,
+    manifest_id: String,
+    manifest_sha256: String,
+    session_state: String,
+    evidence_class: String,
+    structural_validation_pass: bool,
+    artifact_verification: String,
+    requested_claim_count: usize,
+    physically_eligible_claim_count: usize,
+    claims: Vec<ClaimEligibility>,
+    claim_ceiling: String,
+}
+
+fn valid_sha256(value: &str) -> bool {
+    let Some(hex) = value.strip_prefix("sha256:") else {
+        return false;
+    };
+    hex.len() == 64 && hex.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn known_claim(claim: &str) -> bool {
+    CLAIM_REQUIREMENTS.iter().any(|(name, _)| *name == claim)
+}
+
+
+const RIDE_ENERGY_UNCERTAINTY_REQUIREMENTS: &[(&str, &[&str])] = &[
+    ("dc_bus_voltage", &["V"]),
+    ("dc_bus_current", &["A"]),
+    ("net_dc_bus_energy", &["J", "Wh"]),
+    ("ground_speed", &["m/s"]),
+];
+const LONGITUDINAL_UNCERTAINTY_REQUIREMENTS: &[(&str, &[&str])] = &[
+    ("ground_speed", &["m/s"]),
+    ("longitudinal_acceleration", &["m/s^2"]),
+    ("front_wheel_angular_speed", &["rad/s"]),
+    ("rear_wheel_angular_speed", &["rad/s"]),
+    ("stopping_distance", &["m"]),
+];
+const TIRE_HEALTH_UNCERTAINTY_REQUIREMENTS: &[(&str, &[&str])] = &[
+    ("front_tire_pressure", &["Pa", "kPa"]),
+    ("rear_tire_pressure", &["Pa", "kPa"]),
+    ("front_tire_temperature", &["degC"]),
+    ("rear_tire_temperature", &["degC"]),
+];
+const MOTOR_MAP_UNCERTAINTY_REQUIREMENTS: &[(&str, &[&str])] = &[
+    ("motor_torque", &["N*m"]),
+    ("motor_angular_speed", &["rad/s"]),
+    ("dc_bus_voltage", &["V"]),
+    ("dc_bus_current", &["A"]),
+    ("motor_temperature", &["degC"]),
+    ("inverter_temperature", &["degC"]),
+    ("motor_efficiency", &["1"]),
+];
+const TIRE_FORCE_UNCERTAINTY_REQUIREMENTS: &[(&str, &[&str])] = &[
+    ("normal_load", &["N"]),
+    ("longitudinal_force", &["N"]),
+    ("lateral_force", &["N"]),
+    ("slip_ratio", &["1"]),
+    ("slip_angle", &["rad"]),
+    ("camber_angle", &["rad"]),
+];
+const ICE_ENERGY_UNCERTAINTY_REQUIREMENTS: &[(&str, &[&str])] = &[
+    ("fuel_mass_flow", &["kg/s"]),
+    ("engine_angular_speed", &["rad/s"]),
+    ("wheel_torque", &["N*m"]),
+    ("wheel_angular_speed", &["rad/s"]),
+    ("fuel_energy", &["J", "Wh"]),
+];
+
+fn claim_uncertainty_requirements(claim: &str) -> Option<&'static [(&'static str, &'static [&'static str])]> {
+    match claim {
+        "ride_energy" => Some(RIDE_ENERGY_UNCERTAINTY_REQUIREMENTS),
+        "longitudinal_dynamics" => Some(LONGITUDINAL_UNCERTAINTY_REQUIREMENTS),
+        "tire_health" => Some(TIRE_HEALTH_UNCERTAINTY_REQUIREMENTS),
+        "motor_map" => Some(MOTOR_MAP_UNCERTAINTY_REQUIREMENTS),
+        "tire_force_characterization" => Some(TIRE_FORCE_UNCERTAINTY_REQUIREMENTS),
+        "ice_fuel_energy" => Some(ICE_ENERGY_UNCERTAINTY_REQUIREMENTS),
+        _ => None,
+    }
+}
+
+fn known_uncertainty_pair(claim: &str, measurand: &str, unit: &str) -> bool {
+    claim_uncertainty_requirements(claim).is_some_and(|requirements| {
+        requirements.iter().any(|(required_measurand, allowed_units)| {
+            *required_measurand == measurand && allowed_units.contains(&unit)
+        })
+    })
+}
+
+fn required_channels(claim: &str) -> Option<&'static [&'static str]> {
+    CLAIM_REQUIREMENTS
+        .iter()
+        .find_map(|(name, channels)| (*name == claim).then_some(*channels))
+}
+
+fn valid_relative_path(path: &str) -> bool {
+    // Reject both separators when interpreting the manifest on any host OS.
+    // Otherwise a Windows-style path could look like a single filename on Unix.
+    if path.trim().is_empty() || path.contains('\\') {
+        return false;
+    }
+    let parsed = Path::new(path);
+    !parsed.is_absolute()
+        && parsed.components().all(|component| matches!(component, Component::Normal(_)))
+}
+
+fn validate_structure(manifest: &Manifest) -> Result<()> {
+    if manifest.schema_version != SCHEMA_VERSION {
+        bail!("unsupported mobility telemetry schema version: {}", manifest.schema_version);
+    }
+    if !SESSION_STATES.contains(&manifest.session_state.as_str()) {
+        bail!("unsupported session_state: {}", manifest.session_state);
+    }
+    if !EVIDENCE_CLASSES.contains(&manifest.evidence_class.as_str()) {
+        bail!("unsupported evidence_class: {}", manifest.evidence_class);
+    }
+    if manifest.manifest_id.trim().is_empty() || manifest.claim_ceiling.trim().is_empty() {
+        bail!("manifest ID and claim ceiling are required");
+    }
+    if manifest.vehicle.vehicle_id.trim().is_empty()
+        || manifest.vehicle.vehicle_class.trim().is_empty()
+        || manifest.vehicle.propulsion.trim().is_empty()
+    {
+        bail!("vehicle ID, class and propulsion are required");
+    }
+    if !valid_sha256(&manifest.vehicle.configuration_digest) {
+        bail!("vehicle configuration_digest must be a sha256-prefixed 64-hex digest");
+    }
+    for (name, value) in [("vehicle mass", manifest.vehicle.mass_kg), ("payload", manifest.vehicle.payload_kg)] {
+        if value.is_some_and(|v| !v.is_finite() || v < 0.0) {
+            bail!("{name} must be finite and non-negative when present");
+        }
+    }
+    for tire in [manifest.vehicle.tire_front.as_ref(), manifest.vehicle.tire_rear.as_ref()]
+        .into_iter()
+        .flatten()
+    {
+        if tire.make_model.trim().is_empty() || tire.size.trim().is_empty() || tire.tread_state.trim().is_empty() {
+            bail!("tire identity and state fields may not be empty");
+        }
+        if tire.pressure_kpa.is_some_and(|v| !v.is_finite() || v <= 0.0) {
+            bail!("tire pressure must be finite and positive when present");
+        }
+    }
+    if manifest.timebase.master_clock != "logger_monotonic_ns" {
+        bail!("v0.1 requires logger_monotonic_ns as the master timebase");
+    }
+    if manifest.timebase.sync_method.trim().is_empty()
+        || manifest.timebase.gap_policy.trim().is_empty()
+        || manifest.timebase.max_alignment_uncertainty_ns == 0
+    {
+        bail!("clock synchronization method, nonzero uncertainty and explicit gap policy are required");
+    }
+    if !RIGHTS_STATES.contains(&manifest.data_rights.rights_state.as_str()) {
+        bail!("unsupported rights_state: {}", manifest.data_rights.rights_state);
+    }
+    if manifest.data_rights.owner_or_rightsholder.trim().is_empty()
+        || manifest.data_rights.redistribution_status.trim().is_empty()
+    {
+        bail!("rights holder and redistribution status are required");
+    }
+    if manifest.sensors.is_empty() || manifest.channels.is_empty() {
+        bail!("manifest requires at least one sensor and one channel");
+    }
+
+    let mut sensor_ids = BTreeSet::new();
+    for sensor in &manifest.sensors {
+        if sensor.sensor_id.trim().is_empty() || !sensor_ids.insert(sensor.sensor_id.as_str()) {
+            bail!("empty or duplicate sensor ID: {}", sensor.sensor_id);
+        }
+        if sensor.sensor_kind.trim().is_empty() || sensor.model.trim().is_empty() {
+            bail!("sensor {} needs kind and model", sensor.sensor_id);
+        }
+        if !CALIBRATION_STATES.contains(&sensor.calibration_state.as_str()) {
+            bail!("sensor {} has unsupported calibration state", sensor.sensor_id);
+        }
+        if sensor.calibration_state == "calibrated"
+            && sensor.calibration_receipt_id.as_deref().is_none_or(str::is_empty)
+        {
+            bail!("sensor {} claims calibrated without a calibration receipt", sensor.sensor_id);
+        }
+        if sensor.calibration_state == "calibrated" {
+            let receipt_path = sensor.calibration_receipt_id.as_deref().unwrap_or_default();
+            if !manifest.artifacts.iter().any(|artifact| {
+                artifact.relative_path == receipt_path && artifact.kind == "calibration_record"
+            }) {
+                bail!(
+                    "sensor {} calibration receipt {} does not reference a declared calibration_record artifact",
+                    sensor.sensor_id,
+                    receipt_path
+                );
+            }
+        }
+    }
+
+    let mut channel_ids = BTreeSet::new();
+    for channel in &manifest.channels {
+        if channel.channel_id.trim().is_empty() || !channel_ids.insert(channel.channel_id.as_str()) {
+            bail!("empty or duplicate channel ID: {}", channel.channel_id);
+        }
+        if !sensor_ids.contains(channel.sensor_id.as_str()) {
+            bail!("channel {} references unknown sensor {}", channel.channel_id, channel.sensor_id);
+        }
+        if channel.quantity.trim().is_empty()
+            || channel.unit.trim().is_empty()
+            || !KNOWN_UNITS.contains(&channel.unit.as_str())
+            || channel.sign_convention.trim().is_empty()
+            || channel.axis_or_frame.trim().is_empty()
+            || channel.source_mode.trim().is_empty()
+        {
+            bail!("channel {} needs quantity, unit, sign, frame and source mode", channel.channel_id);
+        }
+        if !channel.sample_rate_hz.is_finite() || channel.sample_rate_hz <= 0.0 {
+            bail!("channel {} sample_rate_hz must be finite and positive", channel.channel_id);
+        }
+        if !["logger_monotonic_ns", "sensor_ticks", "gnss_utc"].contains(&channel.clock_domain.as_str()) {
+            bail!("channel {} has unsupported clock domain", channel.channel_id);
+        }
+    }
+
+    if manifest.claim_targets.is_empty() {
+        bail!("at least one claim target must be declared");
+    }
+    let mut claims = BTreeSet::new();
+    for claim in &manifest.claim_targets {
+        if !known_claim(claim) {
+            bail!("unknown claim target: {claim}");
+        }
+        if !claims.insert(claim.as_str()) {
+            bail!("duplicate claim target: {claim}");
+        }
+    }
+
+    let mut artifact_paths = BTreeSet::new();
+    for artifact in &manifest.artifacts {
+        if !valid_relative_path(&artifact.relative_path) {
+            bail!("artifact path must be a safe relative path: {}", artifact.relative_path);
+        }
+        if !artifact_paths.insert(artifact.relative_path.as_str()) {
+            bail!("duplicate artifact path: {}", artifact.relative_path);
+        }
+        if !ARTIFACT_KINDS.contains(&artifact.kind.as_str()) {
+            bail!("unsupported artifact kind {} for {}", artifact.kind, artifact.relative_path);
+        }
+        if artifact.byte_len == 0 || !valid_sha256(&artifact.sha256) {
+            bail!("artifact {} needs nonzero byte_len and sha256-prefixed digest", artifact.relative_path);
+        }
+    }
+
+    let mut budget_keys = BTreeSet::new();
+    for budget in &manifest.uncertainty_budgets {
+        if !known_claim(&budget.claim_target)
+            || !manifest.claim_targets.iter().any(|claim| claim == &budget.claim_target)
+        {
+            bail!("uncertainty budget references undeclared claim target: {}", budget.claim_target);
+        }
+        if !budget_keys.insert((budget.claim_target.as_str(), budget.measurand.as_str())) {
+            bail!("duplicate uncertainty budget for claim/measurand: {}/{}", budget.claim_target, budget.measurand);
+        }
+        if budget.measurand.trim().is_empty()
+            || !KNOWN_UNITS.contains(&budget.unit.as_str())
+            || !["planned", "calculated", "bench_characterized", "independently_reviewed"]
+                .contains(&budget.evidence_state.as_str())
+            || !valid_relative_path(&budget.artifact_path)
+        {
+            bail!("uncertainty budget for {} has invalid measurand, unit, state or artifact path", budget.claim_target);
+        }
+        if !known_uncertainty_pair(&budget.claim_target, &budget.measurand, &budget.unit) {
+            bail!(
+                "uncertainty budget has unsupported claim/measurand/unit combination: {}/{}/{}",
+                budget.claim_target, budget.measurand, budget.unit
+            );
+        }
+        if !budget.standard_uncertainty.is_finite() || budget.standard_uncertainty <= 0.0
+            || !budget.expanded_uncertainty.is_finite() || budget.expanded_uncertainty <= 0.0
+            || !budget.coverage_factor.is_finite() || budget.coverage_factor < 1.0
+            || !budget.acceptance_tolerance.is_finite() || budget.acceptance_tolerance <= 0.0
+        {
+            bail!("uncertainty budget for {} has invalid numeric values; standard and expanded uncertainty must be positive", budget.claim_target);
+        }
+        let expected_expanded = budget.standard_uncertainty * budget.coverage_factor;
+        let rounding_allowance = expected_expanded.abs().max(budget.expanded_uncertainty.abs()).max(1e-12) * 0.02;
+        if (budget.expanded_uncertainty - expected_expanded).abs() > rounding_allowance {
+            bail!("uncertainty budget for {} does not satisfy expanded uncertainty ≈ coverage factor × standard uncertainty", budget.claim_target);
+        }
+        let receipt_exists = manifest.artifacts.iter().any(|artifact| {
+            artifact.relative_path == budget.artifact_path && artifact.kind == "uncertainty_budget_record"
+        });
+        if !receipt_exists {
+            bail!("uncertainty budget for {} must reference a declared uncertainty_budget_record artifact", budget.claim_target);
+        }
+    }
+
+    if manifest.session_state != "planned" && manifest.artifacts.is_empty() {
+        bail!("recorded or closed sessions require at least one content-addressed artifact");
+    }
+    if manifest.session_state != "planned" && manifest.evidence_class == "DesignOnly" {
+        bail!("recorded sessions cannot use DesignOnly evidence class");
+    }
+    Ok(())
+}
+
+
+fn verify_uncertainty_budget_receipt_bytes(
+    raw: &[u8],
+    declared_budget: &ClaimUncertaintyBudget,
+) -> Result<()> {
+    let receipt: ClaimUncertaintyBudget = serde_json::from_slice(raw)
+        .context("parsing uncertainty-budget receipt as the declared v0.1 budget schema")?;
+    if &receipt != declared_budget {
+        bail!("uncertainty budget receipt content does not match manifest budget");
+    }
+    Ok(())
+}
+
+fn verify_uncertainty_budget_artifacts(manifest_path: &Path, manifest: &Manifest) -> Result<()> {
+    let root = manifest_path.parent().context("manifest has no parent directory")?
+        .canonicalize()
+        .with_context(|| format!("canonicalizing manifest directory for {}", manifest_path.display()))?;
+    for budget in &manifest.uncertainty_budgets {
+        let artifact = manifest.artifacts.iter().find(|artifact| {
+            artifact.relative_path == budget.artifact_path && artifact.kind == "uncertainty_budget_record"
+        }).context("validated uncertainty budget lost its declared artifact")?;
+        if !valid_relative_path(&artifact.relative_path) {
+            bail!("unsafe uncertainty budget artifact path: {}", artifact.relative_path);
+        }
+        let candidate = root.join(&artifact.relative_path).canonicalize()
+            .with_context(|| format!("resolving uncertainty budget receipt {}", artifact.relative_path))?;
+        if !candidate.starts_with(&root) {
+            bail!("uncertainty budget receipt escapes manifest root: {}", artifact.relative_path);
+        }
+        let raw = fs::read(&candidate)
+            .with_context(|| format!("reading uncertainty budget receipt {}", artifact.relative_path))?;
+        verify_uncertainty_budget_receipt_bytes(&raw, budget)
+            .with_context(|| format!("verifying uncertainty budget receipt {}", artifact.relative_path))?;
+    }
+    Ok(())
+}
+
+fn verify_artifacts(manifest_path: &Path, artifacts: &[Artifact]) -> Result<()> {
+    let manifest_dir = manifest_path
+        .parent()
+        .context("manifest path has no parent directory")?
+        .canonicalize()
+        .with_context(|| format!("canonicalizing manifest directory for {}", manifest_path.display()))?;
+
+    if artifacts.is_empty() {
+        bail!("no artifacts to verify");
+    }
+    for artifact in artifacts {
+        if !valid_relative_path(&artifact.relative_path) {
+            bail!("unsafe artifact path: {}", artifact.relative_path);
+        }
+        let candidate = manifest_dir.join(&artifact.relative_path);
+        let canonical = candidate
+            .canonicalize()
+            .with_context(|| format!("resolving artifact {}", artifact.relative_path))?;
+        if !canonical.starts_with(&manifest_dir) {
+            bail!("artifact escapes manifest directory: {}", artifact.relative_path);
+        }
+        let raw = fs::read(&canonical)
+            .with_context(|| format!("reading artifact {}", artifact.relative_path))?;
+        if raw.len() as u64 != artifact.byte_len {
+            bail!("artifact byte length mismatch for {}", artifact.relative_path);
+        }
+        let digest = format!("sha256:{:x}", Sha256::digest(&raw));
+        if digest != artifact.sha256 {
+            bail!("artifact SHA-256 mismatch for {}", artifact.relative_path);
+        }
+    }
+    Ok(())
+}
+
+fn claim_eligibility(manifest: &Manifest, claim: &str) -> ClaimEligibility {
+    let mut reasons = Vec::new();
+    let required = required_channels(claim).unwrap_or(&[]);
+    let known_channels: BTreeSet<&str> = manifest.channels.iter().map(|channel| channel.channel_id.as_str()).collect();
+    let missing_channels: Vec<String> = required
+        .iter()
+        .filter(|channel_id| !known_channels.contains(**channel_id))
+        .map(|channel_id| (*channel_id).to_owned())
+        .collect();
+
+    if !PHYSICAL_EVIDENCE.contains(&manifest.evidence_class.as_str()) {
+        reasons.push("evidence_not_physical_measurement".into());
+    }
+    if manifest.session_state != "closed" {
+        reasons.push("session_not_closed".into());
+    }
+    if !["project_owned", "explicit_permission", "cc_by_4_0", "other_documented_license"]
+        .contains(&manifest.data_rights.rights_state.as_str())
+    {
+        reasons.push("data_rights_not_cleared_for_physical_claim".into());
+    }
+    if manifest.data_rights.permission_receipt_id.as_deref().is_none_or(str::is_empty) {
+        reasons.push("missing_rights_or_collection_receipt".into());
+    }
+    if let Some(receipt_path) = manifest.data_rights.permission_receipt_id.as_deref() {
+        let expected_kind = if manifest.data_rights.rights_state == "project_owned" {
+            "collection_authorization"
+        } else if ["explicit_permission", "cc_by_4_0", "other_documented_license"]
+            .contains(&manifest.data_rights.rights_state.as_str())
+        {
+            "rights_receipt"
+        } else {
+            ""
+        };
+        if !expected_kind.is_empty() && !manifest.artifacts.iter().any(|artifact| {
+            artifact.relative_path == receipt_path && artifact.kind == expected_kind
+        }) {
+            reasons.push("rights_receipt_id_not_backed_by_artifact".into());
+        }
+    }
+    if !VERIFIED_SYNC_METHODS.contains(&manifest.timebase.sync_method.as_str()) {
+        reasons.push("clock_sync_method_not_verified".into());
+    }
+    if !manifest.artifacts.iter().any(|artifact| artifact.kind == "clock_sync_record") {
+        reasons.push("missing_clock_sync_record_artifact".into());
+    }
+    if manifest.timebase.max_alignment_uncertainty_ns > MAX_PHYSICAL_ALIGNMENT_UNCERTAINTY_NS {
+        reasons.push("clock_alignment_uncertainty_exceeds_v0_1_limit".into());
+    }
+    if !manifest.artifacts.iter().any(|artifact| artifact.kind == "raw_sensor_log") {
+        reasons.push("missing_raw_sensor_log_artifact".into());
+    }
+    if manifest.vehicle.mass_kg.is_none_or(|mass| !mass.is_finite() || mass <= 0.0) {
+        reasons.push("missing_measured_vehicle_mass".into());
+    }
+    if manifest.vehicle.payload_kg.is_none_or(|payload| !payload.is_finite() || payload < 0.0) {
+        reasons.push("missing_declared_payload".into());
+    }
+    if manifest.vehicle.configuration_digest == format!("sha256:{}", "0".repeat(64)) {
+        reasons.push("placeholder_vehicle_configuration_digest".into());
+    }
+    for (position, tire) in [
+        ("front", manifest.vehicle.tire_front.as_ref()),
+        ("rear", manifest.vehicle.tire_rear.as_ref()),
+    ] {
+        match tire {
+            Some(tire)
+                if !["", "TBD", "not_recorded"].contains(&tire.make_model.as_str())
+                    && !["", "TBD", "not_recorded"].contains(&tire.size.as_str())
+                    && tire.pressure_kpa.is_some_and(|pressure| pressure.is_finite() && pressure > 0.0)
+                    && !["", "not_recorded"].contains(&tire.tread_state.as_str()) => {}
+            _ => reasons.push(format!("incomplete_{position}_tire_setup")),
+        }
+    }
+    if !manifest.artifacts.iter().any(|artifact| artifact.kind == "measurement_protocol") {
+        reasons.push("missing_measurement_protocol_artifact".into());
+    }
+    if !manifest.artifacts.iter().any(|artifact| artifact.kind == "calibration_record") {
+        reasons.push("missing_calibration_record_artifact".into());
+    }
+    if ["explicit_permission", "cc_by_4_0", "other_documented_license"]
+        .contains(&manifest.data_rights.rights_state.as_str())
+        && !manifest.artifacts.iter().any(|artifact| artifact.kind == "rights_receipt")
+    {
+        reasons.push("missing_rights_receipt_artifact".into());
+    }
+    if manifest.data_rights.rights_state == "project_owned"
+        && !manifest.artifacts.iter().any(|artifact| artifact.kind == "collection_authorization")
+    {
+        reasons.push("missing_collection_authorization_artifact".into());
+    }
+    if !missing_channels.is_empty() {
+        reasons.push("claim_required_channels_missing".into());
+    }
+
+    let required_uncertainties = claim_uncertainty_requirements(claim).unwrap_or(&[]);
+    let mut missing_uncertainty_budget = false;
+    for (measurand, _) in required_uncertainties {
+        match manifest.uncertainty_budgets.iter().find(|budget| {
+            budget.claim_target == claim && budget.measurand == *measurand
+        }) {
+            None => {
+                missing_uncertainty_budget = true;
+                reasons.push(format!("missing_uncertainty_budget:{measurand}"));
+            }
+            Some(budget) => {
+                if !["bench_characterized", "independently_reviewed"].contains(&budget.evidence_state.as_str()) {
+                    reasons.push("uncertainty_budget_not_verified".into());
+                }
+                if budget.expanded_uncertainty > budget.acceptance_tolerance {
+                    reasons.push("uncertainty_budget_exceeds_tolerance".into());
+                }
+            }
+        }
+    }
+    if missing_uncertainty_budget {
+        reasons.push("missing_claim_uncertainty_budget".into());
+    }
+
+    let sensors: std::collections::BTreeMap<&str, &Sensor> = manifest
+        .sensors
+        .iter()
+        .map(|sensor| (sensor.sensor_id.as_str(), sensor))
+        .collect();
+    for channel_id in required.iter().filter(|channel_id| known_channels.contains(**channel_id)) {
+        if let Some(channel) = manifest.channels.iter().find(|channel| channel.channel_id == **channel_id) {
+            match sensors.get(channel.sensor_id.as_str()) {
+                Some(sensor)
+                    if sensor.calibration_state == "calibrated"
+                        && sensor.calibration_receipt_id.as_deref().is_some_and(|id| !id.is_empty()) => {}
+                Some(sensor) => reasons.push(format!("sensor_not_calibrated:{}", sensor.sensor_id)),
+                None => reasons.push(format!("channel_sensor_missing:{}", channel.channel_id)),
+            }
+        }
+    }
+
+    reasons.sort();
+    reasons.dedup();
+    ClaimEligibility {
+        claim_target: claim.to_owned(),
+        physical_eligible: reasons.is_empty(),
+        reasons,
+        missing_channels,
+    }
+}
+
+pub fn run(input_path: &Path, output_path: Option<&Path>) -> Result<()> {
+    let raw = fs::read(input_path)
+        .with_context(|| format!("reading mobility telemetry manifest {}", input_path.display()))?;
+    let manifest_sha256 = format!("sha256:{:x}", Sha256::digest(&raw));
+    let manifest: Manifest = serde_json::from_slice(&raw)
+        .with_context(|| format!("parsing mobility telemetry manifest {}", input_path.display()))?;
+    validate_structure(&manifest)?;
+
+    let artifact_verification = if manifest.session_state == "planned" {
+        "not_applicable_planned_session".to_owned()
+    } else {
+        verify_artifacts(input_path, &manifest.artifacts)?;
+        verify_uncertainty_budget_artifacts(input_path, &manifest)?;
+        "all_declared_artifacts_and_uncertainty_receipts_verified".to_owned()
+    };
+
+    let claims: Vec<ClaimEligibility> = manifest
+        .claim_targets
+        .iter()
+        .map(|claim| claim_eligibility(&manifest, claim))
+        .collect();
+    let physically_eligible_claim_count = claims.iter().filter(|claim| claim.physical_eligible).count();
+    let report = Report {
+        report_version: SCHEMA_VERSION.to_owned(),
+        manifest_id: manifest.manifest_id,
+        manifest_sha256,
+        session_state: manifest.session_state,
+        evidence_class: manifest.evidence_class,
+        structural_validation_pass: true,
+        artifact_verification,
+        requested_claim_count: claims.len(),
+        physically_eligible_claim_count,
+        claims,
+        claim_ceiling: "Manifest structure and optional file integrity only. Physical eligibility is a gate, not proof of accuracy or a safety/roadworthiness/approval claim. Planned/synthetic manifests cannot establish vehicle or tire performance.".to_owned(),
+    };
+    let encoded = serde_json::to_string_pretty(&report)?;
+    if let Some(path) = output_path {
+        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("creating report directory {}", parent.display()))?;
+        }
+        fs::write(path, format!("{encoded}\n"))
+            .with_context(|| format!("writing mobility telemetry report {}", path.display()))?;
+    }
+    println!("{encoded}");
+    Ok(())
+}
+
+
+#[derive(Debug, Deserialize)]
+struct RawTraceRow {
+    timestamp_ns: u64,
+    channel_id: String,
+    raw_value: String,
+    sample_status: String,
+    sequence: u64,
+}
+
+#[derive(Debug, Serialize)]
+struct TraceChannelSummary {
+    channel_id: String,
+    declared_sample_rate_hz: f64,
+    expected_period_ns: Option<u64>,
+    first_timestamp_ns: Option<u64>,
+    last_timestamp_ns: Option<u64>,
+    observed_span_ns: Option<u64>,
+    sample_count: usize,
+    valid_count: usize,
+    invalid_or_saturated_count: usize,
+    missing_value_count: usize,
+    suspected_gap_count: usize,
+    maximum_inter_sample_gap_ns: Option<u64>,
+    estimated_expected_sample_count: Option<u64>,
+    estimated_missing_sample_count: Option<u64>,
+    loss_estimate_basis: String,
+}
+
+#[derive(Debug, Serialize)]
+struct TraceGapEvent {
+    channel_id: String,
+    previous_timestamp_ns: u64,
+    current_timestamp_ns: u64,
+    observed_gap_ns: u64,
+    expected_period_ns: u64,
+    estimated_missing_samples: u64,
+    detection_rule: String,
+}
+
+#[derive(Debug, Serialize)]
+struct TraceReport {
+    report_version: String,
+    trace_sha256: String,
+    trace_byte_len: usize,
+    row_count: usize,
+    valid_sample_count: usize,
+    invalid_or_saturated_sample_count: usize,
+    missing_value_count: usize,
+    suspected_gap_count: usize,
+    channels: Vec<TraceChannelSummary>,
+    gaps: Vec<TraceGapEvent>,
+    loss_ledger_claim_ceiling: String,
+    claim_ceiling: String,
+}
+
+#[derive(Debug, Default)]
+struct MutableChannelSummary {
+    sample_count: usize,
+    valid_count: usize,
+    invalid_or_saturated_count: usize,
+    missing_value_count: usize,
+    suspected_gap_count: usize,
+    maximum_inter_sample_gap_ns: Option<u64>,
+    first_timestamp_ns: Option<u64>,
+    last_timestamp_ns: Option<u64>,
+}
+
+fn validate_trace_bytes(raw: &[u8], manifest: &Manifest) -> Result<TraceReport> {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .flexible(false)
+        .from_reader(std::io::Cursor::new(raw));
+    const HEADER: &[&str] = &[
+        "timestamp_ns",
+        "channel_id",
+        "raw_value",
+        "sample_status",
+        "sequence",
+    ];
+    let headers = reader.headers().context("reading raw telemetry trace header")?;
+    if headers.len() != HEADER.len()
+        || !headers.iter().zip(HEADER.iter()).all(|(actual, expected)| actual == *expected)
+    {
+        bail!("raw telemetry trace header does not match v0.1 contract");
+    }
+
+    let channels_by_id: std::collections::BTreeMap<&str, &Channel> = manifest
+        .channels
+        .iter()
+        .map(|channel| (channel.channel_id.as_str(), channel))
+        .collect();
+    // Include every declared channel, including channels absent from the trace.
+    // Absence is a coverage finding, not a missing numeric sample and never zero.
+    let mut channel_stats = std::collections::BTreeMap::<String, MutableChannelSummary>::new();
+    for channel in &manifest.channels {
+        channel_stats.entry(channel.channel_id.clone()).or_default();
+    }
+    let mut gap_events = Vec::<TraceGapEvent>::new();
+    let mut previous_global_timestamp: Option<u64> = None;
+    let mut row_count = 0usize;
+    let mut valid_sample_count = 0usize;
+    let mut invalid_or_saturated_sample_count = 0usize;
+    let mut missing_value_count = 0usize;
+    let mut suspected_gap_count = 0usize;
+
+    for (index, result) in reader.deserialize::<RawTraceRow>().enumerate() {
+        let row_number = index + 2;
+        let row = result.with_context(|| format!("parsing raw telemetry row {row_number}"))?;
+        if row.sequence != row_count as u64 {
+            bail!(
+                "row {row_number} sequence {} is not the expected contiguous sequence {}",
+                row.sequence,
+                row_count
+            );
+        }
+        if previous_global_timestamp.is_some_and(|last| row.timestamp_ns < last) {
+            bail!("row {row_number} timestamp regressed in logger-monotonic order");
+        }
+        previous_global_timestamp = Some(row.timestamp_ns);
+
+        let channel = channels_by_id
+            .get(row.channel_id.as_str())
+            .with_context(|| format!("row {row_number} references undeclared channel {}", row.channel_id))?;
+        if !["VALID", "INVALID", "SATURATED", "SENSOR_FAULT"].contains(&row.sample_status.as_str()) {
+            bail!("row {row_number} has unsupported sample_status {}", row.sample_status);
+        }
+        let value = if row.raw_value.trim().is_empty() {
+            None
+        } else {
+            let parsed = row.raw_value.trim().parse::<f64>()
+                .with_context(|| format!("row {row_number} has nonnumeric raw_value"))?;
+            if !parsed.is_finite() {
+                bail!("row {row_number} has non-finite raw_value");
+            }
+            Some(parsed)
+        };
+        if row.sample_status == "VALID" && value.is_none() {
+            bail!("row {row_number} marked VALID with an empty raw_value");
+        }
+
+        let summary = channel_stats.entry(row.channel_id.clone()).or_default();
+        if summary.last_timestamp_ns.is_some_and(|last| row.timestamp_ns <= last) {
+            bail!("row {row_number} repeats or regresses the timestamp for channel {}", row.channel_id);
+        }
+        if summary.first_timestamp_ns.is_none() {
+            summary.first_timestamp_ns = Some(row.timestamp_ns);
+        }
+        if let Some(last) = summary.last_timestamp_ns {
+            let gap_ns = row.timestamp_ns - last;
+            summary.maximum_inter_sample_gap_ns = Some(
+                summary.maximum_inter_sample_gap_ns.map_or(gap_ns, |prior| prior.max(gap_ns))
+            );
+            let expected_period_ns = (1_000_000_000.0 / channel.sample_rate_hz).round() as u64;
+            // Diagnostic only. The ledger preserves the exact adjacent timestamps;
+            // the count of presumed missing samples is explicitly an estimate.
+            if expected_period_ns > 0 && gap_ns as f64 > expected_period_ns as f64 * 2.5 {
+                let estimated_periods = (gap_ns as f64 / expected_period_ns as f64).round() as u64;
+                gap_events.push(TraceGapEvent {
+                    channel_id: row.channel_id.clone(),
+                    previous_timestamp_ns: last,
+                    current_timestamp_ns: row.timestamp_ns,
+                    observed_gap_ns: gap_ns,
+                    expected_period_ns,
+                    estimated_missing_samples: estimated_periods.saturating_sub(1),
+                    detection_rule: "gap > 2.5 × declared nominal sample period; estimate is not an independent loss counter".to_owned(),
+                });
+                summary.suspected_gap_count += 1;
+                suspected_gap_count += 1;
+            }
+        }
+        summary.last_timestamp_ns = Some(row.timestamp_ns);
+        summary.sample_count += 1;
+        if row.sample_status == "VALID" {
+            summary.valid_count += 1;
+            valid_sample_count += 1;
+        } else {
+            summary.invalid_or_saturated_count += 1;
+            invalid_or_saturated_sample_count += 1;
+        }
+        if value.is_none() {
+            summary.missing_value_count += 1;
+            missing_value_count += 1;
+        }
+        row_count += 1;
+    }
+    if row_count == 0 {
+        bail!("raw telemetry trace contains no rows");
+    }
+
+    let channels_by_id: std::collections::BTreeMap<&str, &Channel> = manifest.channels.iter()
+        .map(|channel| (channel.channel_id.as_str(), channel))
+        .collect();
+    let channels = channel_stats.into_iter().map(|(channel_id, summary)| {
+        let channel = channels_by_id.get(channel_id.as_str())
+            .expect("summary was initialized only from a declared channel");
+        let expected_period_ns = (1_000_000_000.0 / channel.sample_rate_hz).round() as u64;
+        let observed_span_ns = match (summary.first_timestamp_ns, summary.last_timestamp_ns) {
+            (Some(first), Some(last)) => Some(last - first),
+            _ => None,
+        };
+        // This estimates the periodic sample count over the observed span only;
+        // it does not know the logger's intended start/stop trigger or hardware counters.
+        let estimated_expected_sample_count = if expected_period_ns > 0 {
+            observed_span_ns.map(|span| span / expected_period_ns + 1)
+        } else {
+            None
+        };
+        let estimated_missing_sample_count = estimated_expected_sample_count
+            .map(|expected| expected.saturating_sub(summary.sample_count as u64));
+        TraceChannelSummary {
+            channel_id,
+            declared_sample_rate_hz: channel.sample_rate_hz,
+            expected_period_ns: (expected_period_ns > 0).then_some(expected_period_ns),
+            first_timestamp_ns: summary.first_timestamp_ns,
+            last_timestamp_ns: summary.last_timestamp_ns,
+            observed_span_ns,
+            sample_count: summary.sample_count,
+            valid_count: summary.valid_count,
+            invalid_or_saturated_count: summary.invalid_or_saturated_count,
+            missing_value_count: summary.missing_value_count,
+            suspected_gap_count: summary.suspected_gap_count,
+            maximum_inter_sample_gap_ns: summary.maximum_inter_sample_gap_ns,
+            estimated_expected_sample_count,
+            estimated_missing_sample_count,
+            loss_estimate_basis: "nominal declared sample rate over first-to-last observed timestamp span; estimate only, not hardware counter or proof of logger loss".to_owned(),
+        }
+    }).collect();
+
+    Ok(TraceReport {
+        report_version: SCHEMA_VERSION.to_owned(),
+        trace_sha256: format!("sha256:{:x}", Sha256::digest(raw)),
+        trace_byte_len: raw.len(),
+        row_count,
+        valid_sample_count,
+        invalid_or_saturated_sample_count,
+        missing_value_count,
+        suspected_gap_count,
+        channels,
+        gaps: gap_events,
+        loss_ledger_claim_ceiling: "Gap and missing-sample counts are diagnostics estimated from declared rate and adjacent timestamps. Only an independently collected hardware sample/overflow counter can establish actual logger capture loss.".into(),
+        claim_ceiling: "CSV structure, declared channel membership, monotonic timestamps, raw-value validity and likely sample-gap diagnostics only. No physical accuracy, energy-efficiency, tire-grip, safety, roadworthiness or approval claim.".into(),
+    })
+}
+
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct FaultMatrixCaseReport {
+    case_id: String,
+    mutation: String,
+    expected: String,
+    observed: String,
+    required_detail_tokens: Vec<String>,
+    missing_detail_tokens: Vec<String>,
+    passed: bool,
+    detail: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct FaultMatrixReport {
+    report_version: String,
+    suite_id: String,
+    status: String,
+    source_commit: String,
+    toolchain_id: String,
+    build_identity: String,
+    matrix_sha256: String,
+    canonical_report_sha256: String,
+    manifest_sha256: String,
+    case_count: usize,
+    passed_count: usize,
+    failed_count: usize,
+    cases: Vec<FaultMatrixCaseReport>,
+    claim_ceiling: String,
+}
+
+
+fn canonical_benchmark_report_sha256(report: &FaultMatrixReport) -> Result<String> {
+    let mut canonical = report.clone();
+    canonical.canonical_report_sha256.clear();
+    let bytes = serde_json::to_vec(&canonical)
+        .context("serializing canonical telemetry benchmark report")?;
+    Ok(format!("sha256:{:x}", Sha256::digest(bytes)))
+}
+
+fn verify_canonical_benchmark_report(report: &FaultMatrixReport) -> Result<()> {
+    if report.case_count == 0 || report.case_count != report.cases.len() {
+        bail!("benchmark report case_count is empty or does not match cases array");
+    }
+    if report.suite_id.trim().is_empty() || report.toolchain_id.trim().is_empty() {
+        bail!("benchmark report is missing suite or toolchain identity");
+    }
+    if !(report.source_commit.len() == 40 || report.source_commit.len() == 64)
+        || !report.source_commit.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        bail!("benchmark report source_commit is not a full hexadecimal Git ID");
+    }
+    if !valid_sha256(&report.matrix_sha256)
+        || !valid_sha256(&report.manifest_sha256)
+        || !valid_sha256(&report.canonical_report_sha256)
+    {
+        bail!("benchmark report contains malformed content digests");
+    }
+    const ALLOWED_OUTCOMES: &[&str] = &[
+        "accept", "reject", "accept_with_diagnostic",
+        "structurally_valid_but_ineligible", "ineligible",
+    ];
+    for case in &report.cases {
+        if !ALLOWED_OUTCOMES.contains(&case.expected.as_str())
+            || !ALLOWED_OUTCOMES.contains(&case.observed.as_str())
+        {
+            bail!("benchmark report case {} has an unsupported outcome", case.case_id);
+        }
+        if case.required_detail_tokens.is_empty() {
+            bail!("benchmark report case {} contains no required diagnostic tokens", case.case_id);
+        }
+        let detail_lower = case.detail.to_lowercase();
+        let recomputed_missing: Vec<String> = case.required_detail_tokens.iter()
+            .filter(|token| !detail_lower.contains(&token.to_lowercase()))
+            .cloned()
+            .collect();
+        if recomputed_missing != case.missing_detail_tokens {
+            bail!("benchmark report case {} has inconsistent diagnostic-token accounting", case.case_id);
+        }
+    }
+    let actual_passed = report.cases.iter()
+        .filter(|case| case.observed == case.expected && case.missing_detail_tokens.is_empty())
+        .count();
+    if actual_passed != report.passed_count || report.case_count - actual_passed != report.failed_count {
+        bail!("benchmark report aggregate pass/fail counts disagree with per-case results");
+    }
+    let expected_status = if report.failed_count == 0 { "pass" } else { "fail" };
+    if report.status != expected_status {
+        bail!("benchmark report status disagrees with pass/fail counts");
+    }
+    for case in &report.cases {
+        let internally_passed = case.observed == case.expected && case.missing_detail_tokens.is_empty();
+        if case.passed != internally_passed {
+            bail!("benchmark report case {} has inconsistent passed flag", case.case_id);
+        }
+    }
+    let computed_digest = canonical_benchmark_report_sha256(report)?;
+    if report.canonical_report_sha256 != computed_digest {
+        bail!(
+            "canonical report SHA-256 mismatch: recorded {}, recomputed {}",
+            report.canonical_report_sha256,
+            computed_digest
+        );
+    }
+    Ok(())
+}
+
+pub fn run_verify_report(report_path: &Path) -> Result<()> {
+    let raw = fs::read(report_path)
+        .with_context(|| format!("reading telemetry benchmark report {}", report_path.display()))?;
+    let report: FaultMatrixReport = serde_json::from_slice(&raw)
+        .with_context(|| format!("parsing telemetry benchmark report {}", report_path.display()))?;
+    verify_canonical_benchmark_report(&report)?;
+    println!(
+        "{{\"verification\":\"pass\",\"canonical_report_sha256\":\"{}\",\"source_commit\":\"{}\",\"case_count\":{},\"passed_count\":{},\"failed_count\":{}}}",
+        report.canonical_report_sha256,
+        report.source_commit,
+        report.case_count,
+        report.passed_count,
+        report.failed_count
+    );
+    Ok(())
+}
+
+
+fn trace_case_outcome(raw: &[u8], manifest: &Manifest) -> (String, String) {
+    match validate_trace_bytes(raw, manifest) {
+        Ok(report) => (
+            "accept".to_owned(),
+            format!(
+                "rows={}, valid={}, invalid_or_saturated={}, missing={}, suspected_gaps={}",
+                report.row_count,
+                report.valid_sample_count,
+                report.invalid_or_saturated_sample_count,
+                report.missing_value_count,
+                report.suspected_gap_count,
+            ),
+        ),
+        Err(error) => ("reject".to_owned(), error.to_string()),
+    }
+}
+
+fn structure_case_outcome(manifest: &Manifest) -> (String, String) {
+    match validate_structure(manifest) {
+        Ok(()) => ("accept".to_owned(), "manifest structure accepted".to_owned()),
+        Err(error) => ("reject".to_owned(), error.to_string()),
+    }
+}
+
+fn evaluate_fault_case(mutation: &str, manifest: &Manifest) -> (String, String) {
+    match mutation {
+        "known_valid_multi_rate_fixture" => {
+            let raw = include_bytes!("../../docs/research/data/mobility_telemetry_trace_v0_1.csv");
+            match validate_trace_bytes(raw, manifest) {
+                Ok(report)
+                    if report.row_count == 5
+                        && report.valid_sample_count == 4
+                        && report.invalid_or_saturated_sample_count == 1
+                        && report.missing_value_count == 1 =>
+                {
+                    ("accept".to_owned(), "fixture accepted and expected counters match".to_owned())
+                }
+                Ok(report) => (
+                    "accept_with_wrong_summary".to_owned(),
+                    format!("unexpected baseline counters: rows={}, valid={}, invalid={}, missing={}",
+                        report.row_count, report.valid_sample_count,
+                        report.invalid_or_saturated_sample_count, report.missing_value_count),
+                ),
+                Err(error) => ("reject".to_owned(), error.to_string()),
+            }
+        }
+        "gap_event_reports_estimated_missing_samples" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,0,VALID,0\n100000001,gnss.speed_mps,1,VALID,1\n600000001,gnss.speed_mps,2,VALID,2\n";
+            match validate_trace_bytes(raw, manifest) {
+                Ok(report)
+                    if report.row_count == 3
+                        && report.gaps.len() == 1
+                        && report.gaps[0].previous_timestamp_ns == 100_000_001
+                        && report.gaps[0].current_timestamp_ns == 600_000_001
+                        && report.gaps[0].estimated_missing_samples == 4 =>
+                {
+                    (
+                        "accept_with_diagnostic".to_owned(),
+                        "all three rows retained; estimated_missing_samples=4; exact_gap_ns=500000000".to_owned()
+                    )
+                }
+                Ok(report) => (
+                    "accept_without_required_diagnostic".to_owned(),
+                    format!("rows={}, gap_events={}, estimated_missing={:?}",
+                        report.row_count, report.gaps.len(),
+                        report.gaps.iter().map(|gap| gap.estimated_missing_samples).collect::<Vec<_>>())
+                ),
+                Err(error) => ("reject".to_owned(), error.to_string()),
+            }
+        }
+        "header_only_empty_trace" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "reordered_header" => {
+            let raw = b"timestamp_ns,raw_value,channel_id,sample_status,sequence\n1,1,gnss.speed_mps,VALID,0\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "undeclared_channel" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,not.declared,1,VALID,0\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "valid_status_with_empty_raw_value" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,,VALID,0\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "NaN_or_infinity_raw_value" => {
+            let nan = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,NaN,VALID,0\n";
+            let infinity = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,inf,VALID,0\n";
+            let a = validate_trace_bytes(nan, manifest);
+            let b = validate_trace_bytes(infinity, manifest);
+            match (a, b) {
+                (Err(a), Err(b)) => ("reject".to_owned(), format!("NaN rejected ({a}); infinity rejected ({b})")),
+                (a, b) => ("accept".to_owned(), format!("non-finite input incorrectly accepted: NaN={}, infinity={}",
+                    a.is_ok(), b.is_ok())),
+            }
+        }
+        "unknown_sample_status" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,1,UNKNOWN,0\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "global_sequence_gap" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,1,VALID,0\n2,gnss.speed_mps,2,VALID,2\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "logger_timestamp_regression" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n3,gnss.speed_mps,1,VALID,0\n2,dc_bus.voltage_v,48,VALID,1\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "repeated_timestamp_same_channel" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n3,gnss.speed_mps,1,VALID,0\n3,gnss.speed_mps,2,VALID,1\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "same_timestamp_on_distinct_channels" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n100,gnss.speed_mps,1,VALID,0\n100,dc_bus.voltage_v,48,VALID,1\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "sensor_fault_with_missing_value" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,dc_bus.current_a,,SENSOR_FAULT,0\n";
+            match validate_trace_bytes(raw, manifest) {
+                Ok(report)
+                    if report.row_count == 1
+                        && report.valid_sample_count == 0
+                        && report.invalid_or_saturated_sample_count == 1
+                        && report.missing_value_count == 1 =>
+                {
+                    ("accept_with_diagnostic".to_owned(), "fault row and missing-value counters preserved".to_owned())
+                }
+                Ok(report) => (
+                    "accept_without_required_diagnostic".to_owned(),
+                    format!("fault-row counters mismatch: rows={}, invalid={}, missing={}",
+                        report.row_count, report.invalid_or_saturated_sample_count, report.missing_value_count),
+                ),
+                Err(error) => ("reject".to_owned(), error.to_string()),
+            }
+        }
+        "inter_sample_gap_above_diagnostic_threshold" => {
+            let channel = match manifest.channels.iter().find(|channel| channel.channel_id == "gnss.speed_mps") {
+                Some(channel) => channel,
+                None => return ("reject".to_owned(), "fixture lacks gnss.speed_mps".to_owned()),
+            };
+            let period_ns = (1_000_000_000.0 / channel.sample_rate_hz).round() as u64;
+            if period_ns == 0 {
+                return ("reject".to_owned(), "GNSS sample period rounded to zero".to_owned());
+            }
+            let raw = format!(
+                "timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,0,VALID,0\n{},gnss.speed_mps,1,VALID,1\n{},gnss.speed_mps,2,VALID,2\n",
+                1 + period_ns,
+                1 + period_ns * 6
+            );
+            match validate_trace_bytes(raw.as_bytes(), manifest) {
+                Ok(report) if report.row_count == 3 && report.suspected_gap_count == 1 =>
+                    ("accept_with_diagnostic".to_owned(), "all three rows retained; one suspected gap reported".to_owned()),
+                Ok(report) => ("accept_without_required_diagnostic".to_owned(),
+                    format!("rows={}, suspected_gaps={}", report.row_count, report.suspected_gap_count)),
+                Err(error) => ("reject".to_owned(), error.to_string()),
+            }
+        }
+        "uncertainty_record_contents_disagree_with_manifest" => {
+            let declared = ClaimUncertaintyBudget {
+                claim_target: "ride_energy".to_owned(),
+                measurand: "net_dc_bus_energy".to_owned(),
+                unit: "Wh".to_owned(),
+                standard_uncertainty: 0.05,
+                expanded_uncertainty: 0.1,
+                coverage_factor: 2.0,
+                acceptance_tolerance: 0.5,
+                evidence_state: "bench_characterized".to_owned(),
+                artifact_path: "uncertainty/ride-energy.json".to_owned(),
+            };
+            let mut tampered = declared.clone();
+            tampered.acceptance_tolerance = 50.0;
+            let raw = match serde_json::to_vec(&tampered) {
+                Ok(raw) => raw,
+                Err(error) => return ("reject".to_owned(), error.to_string()),
+            };
+            match verify_uncertainty_budget_receipt_bytes(&raw, &declared) {
+                Ok(()) => ("accept".to_owned(), "mismatched receipt unexpectedly matched".to_owned()),
+                Err(error) => ("reject".to_owned(), error.to_string()),
+            }
+        }
+        "zero_width_uncertainty_budget" => {
+            let mut candidate = manifest.clone();
+            let artifact_path = "uncertainty/zero.json".to_owned();
+            candidate.artifacts.push(Artifact {
+                relative_path: artifact_path.clone(),
+                kind: "uncertainty_budget_record".to_owned(),
+                byte_len: 1,
+                sha256: format!("sha256:{}", "2".repeat(64)),
+            });
+            candidate.uncertainty_budgets.push(ClaimUncertaintyBudget {
+                claim_target: "ride_energy".to_owned(),
+                measurand: "net_dc_bus_energy".to_owned(),
+                unit: "Wh".to_owned(),
+                standard_uncertainty: 0.0,
+                expanded_uncertainty: 0.0,
+                coverage_factor: 2.0,
+                acceptance_tolerance: 0.5,
+                evidence_state: "bench_characterized".to_owned(),
+                artifact_path,
+            });
+            structure_case_outcome(&candidate)
+        }
+        "calibration_receipt_not_backed_by_artifact" => {
+            let mut candidate = manifest.clone();
+            candidate.sensors[0].calibration_state = "calibrated".to_owned();
+            candidate.sensors[0].calibration_receipt_id = Some("calibration/gnss.json".to_owned());
+            candidate.artifacts.push(Artifact {
+                relative_path: "calibration/other.json".to_owned(),
+                kind: "calibration_record".to_owned(),
+                byte_len: 1,
+                sha256: format!("sha256:{}", "f".repeat(64)),
+            });
+            structure_case_outcome(&candidate)
+        }
+        "rights_receipt_id_not_backed_by_artifact" => {
+            let mut candidate = manifest.clone();
+            candidate.data_rights.rights_state = "project_owned".to_owned();
+            candidate.data_rights.permission_receipt_id = Some("collection/approval.json".to_owned());
+            candidate.artifacts.push(Artifact {
+                relative_path: "collection/other.json".to_owned(),
+                kind: "collection_authorization".to_owned(),
+                byte_len: 1,
+                sha256: format!("sha256:{}", "1".repeat(64)),
+            });
+            let claim = claim_eligibility(&candidate, "ride_energy");
+            if !claim.physical_eligible
+                && claim.reasons.iter().any(|reason| reason == "rights_receipt_id_not_backed_by_artifact") {
+                ("ineligible".to_owned(), "rights_receipt_id_not_backed_by_artifact".to_owned())
+            } else {
+                ("eligible_or_unexplained".to_owned(), format!("rights receipt reference was not checked: {claim:?}"))
+            }
+        }
+        "duplicate_sensor_id" => {
+            let mut candidate = manifest.clone();
+            candidate.sensors.push(candidate.sensors[0].clone());
+            structure_case_outcome(&candidate)
+        }
+        "duplicate_channel_id" => {
+            let mut candidate = manifest.clone();
+            candidate.channels.push(candidate.channels[0].clone());
+            structure_case_outcome(&candidate)
+        }
+        "unresolved_sensor_reference" => {
+            let mut candidate = manifest.clone();
+            candidate.channels[0].sensor_id = "sensor-does-not-exist".to_owned();
+            structure_case_outcome(&candidate)
+        }
+        "zero_negative_or_nonfinite_sample_rate" => {
+            let mut outcomes = Vec::new();
+            for rate in [0.0, -1.0, f64::NAN] {
+                let mut candidate = manifest.clone();
+                candidate.channels[0].sample_rate_hz = rate;
+                outcomes.push(validate_structure(&candidate).is_err());
+            }
+            if outcomes.iter().all(|rejected| *rejected) {
+                ("reject".to_owned(), "zero, negative and NaN sample rates all rejected".to_owned())
+            } else {
+                ("accept".to_owned(), format!("sample-rate rejection outcomes: {outcomes:?}"))
+            }
+        }
+        "calibrated_sensor_without_receipt" => {
+            let mut candidate = manifest.clone();
+            candidate.sensors[0].calibration_state = "calibrated".to_owned();
+            candidate.sensors[0].calibration_receipt_id = None;
+            structure_case_outcome(&candidate)
+        }
+        "absolute_or_traversal_artifact_path" => {
+            let paths = ["../secrets.txt", "/tmp/raw.csv", "data/../../secret", r"raw\..\secret.csv"];
+            if paths.iter().all(|path| !valid_relative_path(path)) {
+                ("reject".to_owned(), "absolute and traversal paths rejected".to_owned())
+            } else {
+                ("accept".to_owned(), "at least one unsafe path was accepted".to_owned())
+            }
+        }
+        "malformed_or_unprefixed_sha256" => {
+            let unprefixed = "a".repeat(64);
+            let invalid_hex = format!("sha256:{}", "g".repeat(64));
+            if !valid_sha256(&unprefixed) && !valid_sha256(&invalid_hex) {
+                ("reject".to_owned(), "unprefixed and invalid-hex digests rejected".to_owned())
+            } else {
+                ("accept".to_owned(), "at least one malformed digest was accepted".to_owned())
+            }
+        }
+        "claim_required_channel_removed" => {
+            let mut candidate = manifest.clone();
+            candidate.channels.retain(|channel| channel.channel_id != "dc_bus.current_a");
+            match validate_structure(&candidate) {
+                Err(error) => ("reject".to_owned(), error.to_string()),
+                Ok(()) => {
+                    let claim = claim_eligibility(&candidate, "ride_energy");
+                    if !claim.physical_eligible
+                        && claim.missing_channels.iter().any(|channel| channel == "dc_bus.current_a")
+                        && claim.reasons.iter().any(|reason| reason == "claim_required_channels_missing") {
+                        ("structurally_valid_but_ineligible".to_owned(),
+                         "only ride_energy is blocked by its missing required channel".to_owned())
+                    } else {
+                        ("eligible_or_unexplained".to_owned(), format!("eligibility report: {claim:?}"))
+                    }
+                }
+            }
+        }
+        "physical_claim_with_uncalibrated_sensor" => {
+            let mut candidate = manifest.clone();
+            candidate.session_state = "closed".to_owned();
+            candidate.evidence_class = "InstrumentedPhysical".to_owned();
+            candidate.data_rights.rights_state = "project_owned".to_owned();
+            candidate.data_rights.permission_receipt_id = Some("collection-approval-001".to_owned());
+            candidate.timebase.sync_method = "gnss_pps_verified".to_owned();
+            candidate.artifacts = vec![
+                Artifact { relative_path:"raw/session.csv".into(),kind:"raw_sensor_log".into(),byte_len:1,sha256:format!("sha256:{}", "a".repeat(64)) },
+                Artifact { relative_path:"protocol/test.json".into(),kind:"measurement_protocol".into(),byte_len:1,sha256:format!("sha256:{}", "b".repeat(64)) },
+                Artifact { relative_path:"calibration/cal.json".into(),kind:"calibration_record".into(),byte_len:1,sha256:format!("sha256:{}", "c".repeat(64)) },
+                Artifact { relative_path:"authorization/collection.json".into(),kind:"collection_authorization".into(),byte_len:1,sha256:format!("sha256:{}", "d".repeat(64)) },
+            ];
+            let claim = claim_eligibility(&candidate, "ride_energy");
+            if !claim.physical_eligible
+                && claim.reasons.iter().any(|reason| reason == "sensor_not_calibrated:dc-voltage-01")
+                && claim.reasons.iter().any(|reason| reason == "sensor_not_calibrated:dc-current-01") {
+                ("ineligible".to_owned(), "both uncalibrated electrical sensors block physical energy claim".to_owned())
+            } else {
+                ("eligible_or_unexplained".to_owned(), format!("eligibility report: {claim:?}"))
+            }
+        }
+        "single_budget_does_not_cover_all_claim_measurands" => {
+            let mut candidate = manifest.clone();
+            let artifact_path = "uncertainty/energy-only.json".to_owned();
+            candidate.artifacts.push(Artifact {
+                relative_path: artifact_path.clone(),
+                kind: "uncertainty_budget_record".to_owned(),
+                byte_len: 1,
+                sha256: format!("sha256:{}", "d".repeat(64)),
+            });
+            candidate.uncertainty_budgets.push(ClaimUncertaintyBudget {
+                claim_target: "ride_energy".to_owned(),
+                measurand: "net_dc_bus_energy".to_owned(),
+                unit: "Wh".to_owned(),
+                standard_uncertainty: 0.05,
+                expanded_uncertainty: 0.1,
+                coverage_factor: 2.0,
+                acceptance_tolerance: 0.5,
+                evidence_state: "bench_characterized".to_owned(),
+                artifact_path,
+            });
+            match validate_structure(&candidate) {
+                Err(error) => ("reject".to_owned(), error.to_string()),
+                Ok(()) => {
+                    let claim = claim_eligibility(&candidate, "ride_energy");
+                    let missing_voltage = claim.reasons.iter()
+                        .any(|reason| reason == "missing_uncertainty_budget:dc_bus_voltage");
+                    if !claim.physical_eligible && missing_voltage {
+                        ("ineligible".to_owned(),
+                         "missing_uncertainty_budget:dc_bus_voltage; total-energy-only budget is insufficient".to_owned())
+                    } else {
+                        ("eligible_or_unexplained".to_owned(), format!("claim accepted without all measurand budgets: {claim:?}"))
+                    }
+                }
+            }
+        }
+        "calculated_but_unverified_uncertainty_budget" => {
+            let mut candidate = manifest.clone();
+            let artifact_path = "uncertainty/ride-energy.json".to_owned();
+            candidate.artifacts.push(Artifact {
+                relative_path: artifact_path.clone(),
+                kind: "uncertainty_budget_record".to_owned(),
+                byte_len: 1,
+                sha256: format!("sha256:{}", "b".repeat(64)),
+            });
+            candidate.uncertainty_budgets.push(ClaimUncertaintyBudget {
+                claim_target: "ride_energy".to_owned(),
+                measurand: "net_dc_bus_energy".to_owned(),
+                unit: "Wh".to_owned(),
+                standard_uncertainty: 0.05,
+                expanded_uncertainty: 0.1,
+                coverage_factor: 2.0,
+                acceptance_tolerance: 0.5,
+                evidence_state: "calculated".to_owned(),
+                artifact_path,
+            });
+            match validate_structure(&candidate) {
+                Err(error) => ("reject".to_owned(), error.to_string()),
+                Ok(()) => {
+                    let claim = claim_eligibility(&candidate, "ride_energy");
+                    if !claim.physical_eligible
+                        && claim.reasons.iter().any(|reason| reason == "uncertainty_budget_not_verified") {
+                        ("ineligible".to_owned(), "calculated-only uncertainty remains below the evidence threshold".to_owned())
+                    } else {
+                        ("eligible_or_unexplained".to_owned(), format!("uncertainty evidence-state gate failed open: {claim:?}"))
+                    }
+                }
+            }
+        }
+        "physical_claim_without_claim_specific_uncertainty_budget" => {
+            let claim = claim_eligibility(manifest, "ride_energy");
+            if !claim.physical_eligible
+                && claim.reasons.iter().any(|reason| reason == "missing_claim_uncertainty_budget") {
+                ("ineligible".to_owned(), "claim-specific uncertainty budget is absent".to_owned())
+            } else {
+                ("eligible_or_unexplained".to_owned(), format!("uncertainty budget gate failed open: {claim:?}"))
+            }
+        }
+        "expanded_uncertainty_exceeds_acceptance_tolerance" => {
+            let mut candidate = manifest.clone();
+            let artifact_path = "uncertainty/ride-energy.json".to_owned();
+            candidate.artifacts.push(Artifact {
+                relative_path: artifact_path.clone(),
+                kind: "uncertainty_budget_record".to_owned(),
+                byte_len: 1,
+                sha256: format!("sha256:{}", "a".repeat(64)),
+            });
+            candidate.uncertainty_budgets.push(ClaimUncertaintyBudget {
+                claim_target: "ride_energy".to_owned(),
+                measurand: "net_dc_bus_energy".to_owned(),
+                unit: "Wh".to_owned(),
+                standard_uncertainty: 0.5,
+                expanded_uncertainty: 1.0,
+                coverage_factor: 2.0,
+                acceptance_tolerance: 0.75,
+                evidence_state: "bench_characterized".to_owned(),
+                artifact_path,
+            });
+            match validate_structure(&candidate) {
+                Err(error) => ("reject".to_owned(), error.to_string()),
+                Ok(()) => {
+                    let claim = claim_eligibility(&candidate, "ride_energy");
+                    if !claim.physical_eligible
+                        && claim.reasons.iter().any(|reason| reason == "uncertainty_budget_exceeds_tolerance") {
+                        ("ineligible".to_owned(), "expanded uncertainty exceeds pre-registered tolerance".to_owned())
+                    } else {
+                        ("eligible_or_unexplained".to_owned(), format!("uncertainty tolerance gate failed open: {claim:?}"))
+                    }
+                }
+            }
+        }
+        "unrecognized_sync_method_with_verified_word" => {
+            let mut candidate = manifest.clone();
+            candidate.timebase.sync_method = "operator_claims_verified".to_owned();
+            let claim = claim_eligibility(&candidate, "ride_energy");
+            if !claim.physical_eligible
+                && claim.reasons.iter().any(|reason| reason == "clock_sync_method_not_verified") {
+                ("ineligible".to_owned(), "free-form verified-looking text does not pass the sync allow-list".to_owned())
+            } else {
+                ("eligible_or_unexplained".to_owned(), format!("clock gate failed open: {claim:?}"))
+            }
+        }
+        "planned_or_synthetic_fixture_claimed_as_physical" => {
+            if manifest.claim_targets.iter().all(|claim| !claim_eligibility(manifest, claim).physical_eligible) {
+                ("ineligible".to_owned(), "planned DesignOnly fixture cannot support physical claims".to_owned())
+            } else {
+                ("eligible".to_owned(), "a planned fixture unexpectedly supports a physical claim".to_owned())
+            }
+        }
+        _ => ("unimplemented".to_owned(), format!("unknown fault-matrix mutation: {mutation}")),
+    }
+}
+
+fn validate_fault_matrix_fixture_manifest(manifest: &Manifest) -> Result<()> {
+    if manifest.session_state != "planned" {
+        bail!("fault-matrix benchmark accepts only a planned fixture manifest, never recorded/closed sessions");
+    }
+    if manifest.evidence_class != "DesignOnly" {
+        bail!("fault-matrix benchmark accepts only DesignOnly fixtures, never physical/synthetic session claims");
+    }
+    validate_structure(manifest)
+}
+
+pub fn run_benchmark(
+    manifest_path: &Path,
+    matrix_path: &Path,
+    source_commit: &str,
+    toolchain_id: &str,
+    output_path: Option<&Path>,
+) -> Result<()> {
+    let valid_commit_length = source_commit.len() == 40 || source_commit.len() == 64;
+    if !valid_commit_length || !source_commit.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        bail!("--source-commit must be a full 40- or 64-character hexadecimal commit ID");
+    }
+    if toolchain_id.trim().is_empty() {
+        bail!("--toolchain-id must contain the exact rustc/cargo toolchain identity");
+    }
+    let manifest_raw = fs::read(manifest_path)
+        .with_context(|| format!("reading telemetry manifest {}", manifest_path.display()))?;
+    let manifest: Manifest = serde_json::from_slice(&manifest_raw)
+        .with_context(|| format!("parsing telemetry manifest {}", manifest_path.display()))?;
+    validate_fault_matrix_fixture_manifest(&manifest)?;
+
+    let matrix_raw = fs::read(matrix_path)
+        .with_context(|| format!("reading telemetry fault matrix {}", matrix_path.display()))?;
+    let matrix: serde_json::Value = serde_json::from_slice(&matrix_raw)
+        .with_context(|| format!("parsing telemetry fault matrix {}", matrix_path.display()))?;
+    let matrix_version = matrix.get("schema_version").and_then(serde_json::Value::as_str)
+        .context("fault matrix has no string schema_version")?;
+    if matrix_version != SCHEMA_VERSION {
+        bail!("unsupported telemetry fault matrix schema version: {matrix_version}");
+    }
+    if matrix.get("interpretation")
+        .and_then(|value| value.get("positive_controls_required"))
+        .and_then(serde_json::Value::as_bool) != Some(true) {
+        bail!("fault matrix must explicitly require positive controls");
+    }
+    let suite_id = matrix.get("suite_id").and_then(serde_json::Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .context("fault matrix has no non-empty string suite_id")?.to_owned();
+    let cases = matrix.get("cases").and_then(serde_json::Value::as_array)
+        .context("fault matrix has no cases array")?;
+    if cases.is_empty() {
+        bail!("fault matrix contains no cases");
+    }
+    const EXPECTED_OUTCOMES: &[&str] = &[
+        "accept", "reject", "accept_with_diagnostic",
+        "structurally_valid_but_ineligible", "ineligible",
+    ];
+
+    let mut seen_ids = BTreeSet::<String>::new();
+    let mut results = Vec::with_capacity(cases.len());
+    let mut expected_positive_control = false;
+    let mut expected_diagnostic_control = false;
+    let mut expected_negative_control = false;
+    for case in cases {
+        let case_id = case.get("id").and_then(serde_json::Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .context("fault-matrix case has no non-empty string id")?.to_owned();
+        let mutation = case.get("mutation").and_then(serde_json::Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .context("fault-matrix case has no non-empty string mutation")?.to_owned();
+        let expected = case.get("expected").and_then(serde_json::Value::as_str)
+            .filter(|value| EXPECTED_OUTCOMES.contains(value))
+            .context("fault-matrix case has an unsupported expected outcome")?.to_owned();
+        expected_positive_control |= expected == "accept";
+        expected_diagnostic_control |= expected == "accept_with_diagnostic";
+        expected_negative_control |= ["reject", "structurally_valid_but_ineligible", "ineligible"].contains(&expected.as_str());
+        let required_detail_tokens = case.get("required_detail_tokens")
+            .and_then(serde_json::Value::as_array)
+            .context("fault-matrix case has no required_detail_tokens array")?
+            .iter()
+            .map(|token| token.as_str()
+                .map(str::to_owned)
+                .context("required detail token must be a string"))
+            .collect::<Result<Vec<_>>>()?;
+        if required_detail_tokens.is_empty() {
+            bail!("fault-matrix case {case_id} must require at least one diagnostic token");
+        }
+        if !seen_ids.insert(case_id.clone()) {
+            bail!("duplicate fault-matrix case ID {case_id}");
+        }
+
+        let (observed, detail) = evaluate_fault_case(&mutation, &manifest);
+        if observed == "unimplemented" {
+            bail!("fault-matrix case {case_id} uses an unimplemented mutation {mutation}: {detail}");
+        }
+        let detail_lower = detail.to_lowercase();
+        let missing_detail_tokens: Vec<String> = required_detail_tokens.iter()
+            .filter(|token| !detail_lower.contains(&token.to_lowercase()))
+            .cloned()
+            .collect();
+        let passed = observed == expected && missing_detail_tokens.is_empty();
+        results.push(FaultMatrixCaseReport {
+            case_id,
+            mutation,
+            expected,
+            observed,
+            required_detail_tokens,
+            missing_detail_tokens,
+            passed,
+            detail,
+        });
+    }
+    if !expected_positive_control || !expected_diagnostic_control || !expected_negative_control {
+        bail!("fault matrix must include positive, diagnostic-positive and negative controls");
+    }
+
+    let case_count = results.len();
+    let passed_count = results.iter().filter(|case| case.passed).count();
+    let failed_count = case_count - passed_count;
+    let mut report = FaultMatrixReport {
+        report_version: SCHEMA_VERSION.to_owned(),
+        suite_id,
+        status: if failed_count == 0 { "pass" } else { "fail" }.to_owned(),
+        source_commit: source_commit.to_owned(),
+        toolchain_id: toolchain_id.trim().to_owned(),
+        build_identity: format!(
+            "xtask_package_version={};target={}-{}",
+            env!("CARGO_PKG_VERSION"),
+            std::env::consts::ARCH,
+            std::env::consts::OS
+        ),
+        matrix_sha256: format!("sha256:{:x}", Sha256::digest(&matrix_raw)),
+        canonical_report_sha256: String::new(),
+        manifest_sha256: format!("sha256:{:x}", Sha256::digest(&manifest_raw)),
+        case_count,
+        passed_count,
+        failed_count,
+        cases: results,
+        claim_ceiling: "The suite checks declared software-contract behavior against synthetic fixtures only. A passing report does not establish hardware reliability, metrological accuracy, physical vehicle/tire performance, roadworthiness or approval.".to_owned(),
+    };
+    report.canonical_report_sha256 = canonical_benchmark_report_sha256(&report)?;
+    let encoded = serde_json::to_string_pretty(&report)?;
+    if let Some(path) = output_path {
+        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("creating benchmark report directory {}", parent.display()))?;
+        }
+        fs::write(path, format!("{encoded}\n"))
+            .with_context(|| format!("writing telemetry benchmark report {}", path.display()))?;
+    }
+    println!("{encoded}");
+    if failed_count != 0 {
+        bail!("mobility telemetry fault matrix failed {failed_count} of {case_count} cases");
+    }
+    Ok(())
+}
+
+pub fn run_trace(
+    manifest_path: &Path,
+    trace_path: &Path,
+    output_path: Option<&Path>,
+) -> Result<()> {
+    let manifest_raw = fs::read(manifest_path)
+        .with_context(|| format!("reading telemetry manifest {}", manifest_path.display()))?;
+    let manifest: Manifest = serde_json::from_slice(&manifest_raw)
+        .with_context(|| format!("parsing telemetry manifest {}", manifest_path.display()))?;
+    validate_structure(&manifest)?;
+
+    let trace_raw = fs::read(trace_path)
+        .with_context(|| format!("reading telemetry trace {}", trace_path.display()))?;
+    if manifest.session_state != "planned" {
+        verify_artifacts(manifest_path, &manifest.artifacts)?;
+        let root = manifest_path.parent().context("manifest has no parent")?.canonicalize()?;
+        let canonical_trace = trace_path.canonicalize()
+            .with_context(|| format!("resolving telemetry trace {}", trace_path.display()))?;
+        if !canonical_trace.starts_with(&root) {
+            bail!("recorded telemetry trace must remain inside the manifest directory");
+        }
+        let relative = canonical_trace.strip_prefix(&root)
+            .context("computing trace path relative to manifest directory")?
+            .to_string_lossy()
+            .replace('\\', "/");
+        let declared = manifest.artifacts.iter().any(|artifact| {
+            artifact.relative_path == relative && artifact.kind == "raw_sensor_log"
+        });
+        if !declared {
+            bail!("trace path must match a declared raw_sensor_log artifact for recorded/closed sessions");
+        }
+    }
+
+    let report = validate_trace_bytes(&trace_raw, &manifest)?;
+    let encoded = serde_json::to_string_pretty(&report)?;
+    if let Some(path) = output_path {
+        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("creating report directory {}", parent.display()))?;
+        }
+        fs::write(path, format!("{encoded}\n"))
+            .with_context(|| format!("writing telemetry trace report {}", path.display()))?;
+    }
+    println!("{encoded}");
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FIXTURE: &str =
+        include_str!("../../docs/research/data/mobility_telemetry_manifest_v0_1.json");
+
+    fn manifest() -> Manifest {
+        serde_json::from_str(FIXTURE).expect("planned manifest fixture parses")
+    }
+
+    #[test]
+    fn planned_fixture_is_structurally_valid_but_not_physical_evidence() {
+        let fixture = manifest();
+        validate_structure(&fixture).expect("planned fixture must be structurally valid");
+        assert_eq!(fixture.sensors.len(), 12);
+        assert_eq!(fixture.channels.len(), 20);
+        assert!(fixture.claim_targets.iter().all(|claim| !claim_eligibility(&fixture, claim).physical_eligible));
+    }
+
+    #[test]
+    fn duplicate_sensor_ids_are_rejected() {
+        let mut fixture = manifest();
+        fixture.sensors.push(fixture.sensors[0].clone());
+        assert!(validate_structure(&fixture).is_err());
+    }
+
+    #[test]
+    fn duplicate_channel_ids_are_rejected() {
+        let mut fixture = manifest();
+        fixture.channels.push(fixture.channels[0].clone());
+        assert!(validate_structure(&fixture).is_err());
+    }
+
+    #[test]
+    fn unknown_channel_sensor_reference_is_rejected() {
+        let mut fixture = manifest();
+        fixture.channels[0].sensor_id = "sensor-does-not-exist".into();
+        assert!(validate_structure(&fixture).is_err());
+    }
+
+    #[test]
+    fn non_finite_or_nonpositive_sample_rate_is_rejected() {
+        let mut fixture = manifest();
+        fixture.channels[0].sample_rate_hz = 0.0;
+        assert!(validate_structure(&fixture).is_err());
+        fixture.channels[0].sample_rate_hz = f64::NAN;
+        assert!(validate_structure(&fixture).is_err());
+    }
+
+    #[test]
+    fn missing_claim_channels_make_only_that_claim_ineligible() {
+        let mut fixture = manifest();
+        fixture.channels.retain(|channel| channel.channel_id != "dc_bus.current_a");
+        validate_structure(&fixture).expect("missing data coverage is not a malformed schema");
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.missing_channels.contains(&"dc_bus.current_a".to_owned()));
+        assert!(claim.reasons.contains(&"claim_required_channels_missing".to_owned()));
+    }
+
+    #[test]
+    fn calibrated_sensor_requires_a_receipt() {
+        let mut fixture = manifest();
+        fixture.sensors[0].calibration_state = "calibrated".into();
+        fixture.sensors[0].calibration_receipt_id = None;
+        assert!(validate_structure(&fixture).is_err());
+    }
+
+    #[test]
+    fn artifact_paths_must_not_escape_the_manifest_directory() {
+        assert!(!valid_relative_path("../secrets.txt"));
+        assert!(!valid_relative_path("/tmp/raw.csv"));
+        assert!(!valid_relative_path("data/../../secret"));
+        assert!(!valid_relative_path(r"raw\..\secret.csv"));
+        assert!(valid_relative_path("raw/session.csv"));
+    }
+
+    #[test]
+    fn artifact_digest_must_be_sha256_prefixed_and_well_formed() {
+        assert!(valid_sha256(&format!("sha256:{}", "a".repeat(64))));
+        assert!(!valid_sha256("a".repeat(64).as_str()));
+        assert!(!valid_sha256(&format!("sha256:{}", "g".repeat(64))));
+    }
+
+    #[test]
+    fn uncalibrated_sensor_blocks_physical_claim_eligibility() {
+        let mut fixture = manifest();
+        fixture.session_state = "closed".into();
+        fixture.evidence_class = "InstrumentedPhysical".into();
+        fixture.data_rights.rights_state = "project_owned".into();
+        fixture.data_rights.permission_receipt_id = Some("collection-approval-001".into());
+        fixture.timebase.sync_method = "gnss_pps_verified".into();
+        fixture.artifacts = vec![
+            Artifact { relative_path:"raw/session.csv".into(),kind:"raw_sensor_log".into(),byte_len:1,sha256:format!("sha256:{}", "a".repeat(64)) },
+            Artifact { relative_path:"protocol/test.json".into(),kind:"measurement_protocol".into(),byte_len:1,sha256:format!("sha256:{}", "b".repeat(64)) },
+            Artifact { relative_path:"calibration/cal.json".into(),kind:"calibration_record".into(),byte_len:1,sha256:format!("sha256:{}", "c".repeat(64)) },
+            Artifact { relative_path:"authorization/collection.json".into(),kind:"collection_authorization".into(),byte_len:1,sha256:format!("sha256:{}", "d".repeat(64)) },
+        ];
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.reasons.iter().any(|reason| reason == "sensor_not_calibrated:dc-voltage-01"));
+        assert!(claim.reasons.iter().any(|reason| reason == "sensor_not_calibrated:dc-current-01"));
+    }
+
+    #[test]
+    fn synthetic_trace_parses_without_claiming_physical_validity() {
+        let fixture = manifest();
+        let raw = include_bytes!("../../docs/research/data/mobility_telemetry_trace_v0_1.csv");
+        let report = validate_trace_bytes(raw, &fixture).expect("synthetic trace parses");
+        assert_eq!(report.row_count, 5);
+        assert_eq!(report.valid_sample_count, 4);
+        assert_eq!(report.invalid_or_saturated_sample_count, 1);
+        assert_eq!(report.missing_value_count, 1);
+        assert_eq!(report.trace_sha256.len(), 71);
+    }
+
+    #[test]
+    fn valid_sample_may_not_have_an_empty_value() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,,VALID,0\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn unknown_channel_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,unknown.speed,1,VALID,0\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn sequence_gap_is_rejected_instead_of_hidden() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,1,VALID,0\n2,gnss.speed_mps,2,VALID,2\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn timestamp_regression_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n3,gnss.speed_mps,1,VALID,0\n2,dc_bus.voltage_v,2,VALID,1\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn repeated_timestamp_for_same_channel_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n3,gnss.speed_mps,1,VALID,0\n3,gnss.speed_mps,2,VALID,1\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn wrong_master_clock_is_rejected() {
+        let mut fixture = manifest();
+        fixture.timebase.master_clock = "wall_clock_guess".into();
+        assert!(validate_structure(&fixture).is_err());
+    }
+
+    #[test]
+    fn empty_trace_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn wrong_header_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,raw_value,channel_id,sample_status,sequence\n1,1,gnss.speed_mps,VALID,0\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn non_finite_raw_value_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,NaN,VALID,0\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+        let raw_inf = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,inf,VALID,0\n";
+        assert!(validate_trace_bytes(raw_inf, &fixture).is_err());
+    }
+
+    #[test]
+    fn unsupported_sample_status_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,1,UNKNOWN,0\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn equal_timestamps_across_distinct_channels_are_accepted() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n100,gnss.speed_mps,1,VALID,0\n100,dc_bus.voltage_v,48,VALID,1\n";
+        let report = validate_trace_bytes(raw, &fixture)
+            .expect("same-clock simultaneous observations from different channels are valid");
+        assert_eq!(report.row_count, 2);
+        assert_eq!(report.valid_sample_count, 2);
+        assert_eq!(report.suspected_gap_count, 0);
+    }
+
+    #[test]
+    fn fault_rows_remain_explicit_and_missing() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,dc_bus.current_a,,SENSOR_FAULT,0\n";
+        let report = validate_trace_bytes(raw, &fixture)
+            .expect("an explicit sensor fault is a valid trace row, not a valid measurement");
+        assert_eq!(report.row_count, 1);
+        assert_eq!(report.valid_sample_count, 0);
+        assert_eq!(report.invalid_or_saturated_sample_count, 1);
+        assert_eq!(report.missing_value_count, 1);
+        let current = report.channels.iter()
+            .find(|channel| channel.channel_id == "dc_bus.current_a")
+            .expect("current channel is included in the per-channel ledger");
+        assert_eq!(current.sample_count, 1);
+        assert_eq!(current.missing_value_count, 1);
+        assert_eq!(current.estimated_expected_sample_count, Some(1));
+        assert_eq!(current.estimated_missing_sample_count, Some(0));
+    }
+
+    #[test]
+    fn large_gap_is_reported_without_filling() {
+        let fixture = manifest();
+        let channel = fixture.channels.iter()
+            .find(|channel| channel.channel_id == "gnss.speed_mps")
+            .expect("fixture declares GNSS speed");
+        let period_ns = (1_000_000_000.0 / channel.sample_rate_hz).round() as u64;
+        assert!(period_ns > 0);
+        let raw = format!(
+            "timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,0,VALID,0\n{},gnss.speed_mps,1,VALID,1\n{},gnss.speed_mps,2,VALID,2\n",
+            1 + period_ns,
+            1 + period_ns * 6
+        );
+        let report = validate_trace_bytes(raw.as_bytes(), &fixture)
+            .expect("gaps are diagnosed rather than causing row deletion");
+        assert_eq!(report.row_count, 3);
+        assert_eq!(report.valid_sample_count, 3);
+        assert_eq!(report.suspected_gap_count, 1);
+        let speed = report.channels.iter()
+            .find(|channel| channel.channel_id == "gnss.speed_mps")
+            .expect("GNSS speed summary is present");
+        assert_eq!(speed.sample_count, 3);
+        assert_eq!(speed.suspected_gap_count, 1);
+        assert_eq!(speed.estimated_expected_sample_count, Some(7));
+        assert_eq!(speed.estimated_missing_sample_count, Some(4));
+        assert_eq!(report.gaps.len(), 1);
+        assert_eq!(report.gaps[0].channel_id, "gnss.speed_mps");
+        assert_eq!(report.gaps[0].previous_timestamp_ns, 100_000_001);
+        assert_eq!(report.gaps[0].current_timestamp_ns, 600_000_001);
+        assert_eq!(report.gaps[0].estimated_missing_samples, 4);
+        assert!(report.loss_ledger_claim_ceiling.contains("independent loss counter"));
+    }
+
+    #[test]
+    fn frozen_fault_matrix_cases_match_expected_outcomes() {
+        let fixture = manifest();
+        let matrix: serde_json::Value = serde_json::from_str(include_str!(
+            "../../docs/research/data/mobility_telemetry_fault_matrix_v0_1.json"
+        )).expect("frozen telemetry fault matrix parses");
+        let cases = matrix.get("cases").and_then(serde_json::Value::as_array)
+            .expect("fault matrix has a case array");
+        assert_eq!(cases.len(), 33, "matrix size changes require deliberate review");
+        assert_eq!(
+            matrix.get("schema_version").and_then(serde_json::Value::as_str),
+            Some(SCHEMA_VERSION),
+            "fault matrix schema version must match validator"
+        );
+        assert_eq!(
+            matrix.get("interpretation")
+                .and_then(|value| value.get("positive_controls_required"))
+                .and_then(serde_json::Value::as_bool),
+            Some(true),
+            "fault matrix must explicitly require positive controls"
+        );
+        let mut saw_accept = false;
+        let mut saw_diagnostic_accept = false;
+        let mut saw_negative = false;
+        let mut ids = BTreeSet::new();
+        for case in cases {
+            let id = case.get("id").and_then(serde_json::Value::as_str)
+                .expect("case has ID");
+            let mutation = case.get("mutation").and_then(serde_json::Value::as_str)
+                .expect("case has mutation");
+            let expected = case.get("expected").and_then(serde_json::Value::as_str)
+                .expect("case has expected outcome");
+            assert!(ids.insert(id), "duplicate case ID {id}");
+            saw_accept |= expected == "accept";
+            saw_diagnostic_accept |= expected == "accept_with_diagnostic";
+            saw_negative |= ["reject", "structurally_valid_but_ineligible", "ineligible"].contains(&expected);
+            let (observed, detail) = evaluate_fault_case(mutation, &fixture);
+            assert_eq!(observed, expected, "fault case {id} ({mutation}): {detail}");
+            let tokens = case.get("required_detail_tokens").and_then(serde_json::Value::as_array)
+                .expect("case has required diagnostic tokens");
+            assert!(!tokens.is_empty(), "fault case {id} must assert a diagnostic, not only an exit class");
+            for token in tokens {
+                let token = token.as_str().expect("diagnostic token is a string");
+                assert!(
+                    detail.to_lowercase().contains(&token.to_lowercase()),
+                    "fault case {id} missing required diagnostic token {token:?}; observed detail: {detail}"
+                );
+            }
+        }
+        assert!(saw_accept, "matrix must include a valid positive control");
+        assert!(saw_diagnostic_accept, "matrix must include a positive control that requires diagnostics");
+        assert!(saw_negative, "matrix must include negative controls");
+    }
+
+    #[test]
+    fn unrecognized_sync_method_blocks_physical_claim() {
+        let mut fixture = manifest();
+        fixture.timebase.sync_method = "operator_claims_verified".to_owned();
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.reasons.iter().any(|reason| reason == "clock_sync_method_not_verified"));
+    }
+
+    #[test]
+    fn verified_sync_method_requires_a_content_addressed_sync_record() {
+        let mut fixture = manifest();
+        fixture.timebase.sync_method = "gnss_pps_verified".to_owned();
+        fixture.artifacts.push(Artifact {
+            relative_path: "clock/sync-record.json".into(),
+            kind: "clock_sync_record".into(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "a".repeat(64)),
+        });
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.reasons.iter().any(|reason| reason == "clock_sync_method_not_verified"));
+        assert!(!claim.reasons.iter().any(|reason| reason == "missing_clock_sync_record_artifact"));
+
+        fixture.artifacts.retain(|artifact| artifact.kind != "clock_sync_record");
+        let claim_without_receipt = claim_eligibility(&fixture, "ride_energy");
+        assert!(claim_without_receipt.reasons.iter().any(|reason| reason == "missing_clock_sync_record_artifact"));
+    }
+
+    #[test]
+    fn alignment_uncertainty_over_two_milliseconds_blocks_physical_claim() {
+        let mut fixture = manifest();
+        fixture.timebase.max_alignment_uncertainty_ns = 2_000_001;
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.reasons.iter().any(|reason| reason == "clock_alignment_uncertainty_exceeds_v0_1_limit"));
+    }
+
+    #[test]
+    fn missing_claim_uncertainty_budget_blocks_physical_claim() {
+        let fixture = manifest();
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.reasons.iter().any(|reason| reason == "missing_claim_uncertainty_budget"));
+    }
+
+    #[test]
+    fn budget_above_tolerance_blocks_physical_claim() {
+        let mut fixture = manifest();
+        let artifact_path = "uncertainty/ride-energy.json".to_owned();
+        fixture.artifacts.push(Artifact {
+            relative_path: artifact_path.clone(),
+            kind: "uncertainty_budget_record".to_owned(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "a".repeat(64)),
+        });
+        fixture.uncertainty_budgets.push(ClaimUncertaintyBudget {
+            claim_target: "ride_energy".to_owned(),
+            measurand: "net_dc_bus_energy".to_owned(),
+            unit: "Wh".to_owned(),
+            standard_uncertainty: 0.5,
+            expanded_uncertainty: 1.0,
+            coverage_factor: 2.0,
+            acceptance_tolerance: 0.75,
+            evidence_state: "bench_characterized".to_owned(),
+            artifact_path,
+        });
+        validate_structure(&fixture).expect("well-formed over-tolerance budget remains structurally valid");
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.reasons.iter().any(|reason| reason == "uncertainty_budget_exceeds_tolerance"));
+    }
+
+    #[test]
+    fn calculated_uncertainty_budget_is_not_physical_evidence() {
+        let mut fixture = manifest();
+        let artifact_path = "uncertainty/ride-energy.json".to_owned();
+        fixture.artifacts.push(Artifact {
+            relative_path: artifact_path.clone(),
+            kind: "uncertainty_budget_record".to_owned(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "b".repeat(64)),
+        });
+        fixture.uncertainty_budgets.push(ClaimUncertaintyBudget {
+            claim_target: "ride_energy".to_owned(),
+            measurand: "net_dc_bus_energy".to_owned(),
+            unit: "Wh".to_owned(),
+            standard_uncertainty: 0.05,
+            expanded_uncertainty: 0.1,
+            coverage_factor: 2.0,
+            acceptance_tolerance: 0.5,
+            evidence_state: "calculated".to_owned(),
+            artifact_path,
+        });
+        validate_structure(&fixture).expect("calculated budget may be structurally well formed");
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.reasons.iter().any(|reason| reason == "uncertainty_budget_not_verified"));
+    }
+
+    #[test]
+    fn canonical_benchmark_digest_is_stable_and_content_sensitive() {
+        let mut report = FaultMatrixReport {
+            report_version: SCHEMA_VERSION.to_owned(),
+            suite_id: "test-suite".to_owned(),
+            status: "pass".to_owned(),
+            source_commit: "a".repeat(40),
+            toolchain_id: "rustc test; cargo test".to_owned(),
+            build_identity: "xtask_package_version=test;target=x86_64-linux".to_owned(),
+            matrix_sha256: format!("sha256:{}", "b".repeat(64)),
+            canonical_report_sha256: String::new(),
+            manifest_sha256: format!("sha256:{}", "c".repeat(64)),
+            case_count: 1,
+            passed_count: 1,
+            failed_count: 0,
+            cases: vec![FaultMatrixCaseReport {
+                case_id: "TEST-001".to_owned(),
+                mutation: "positive_control".to_owned(),
+                expected: "accept".to_owned(),
+                observed: "accept".to_owned(),
+                required_detail_tokens: vec!["expected counters match".to_owned()],
+                missing_detail_tokens: Vec::new(),
+                passed: true,
+                detail: "expected counters match".to_owned(),
+            }],
+            claim_ceiling: "synthetic software conformance only".to_owned(),
+        };
+        let digest_one = canonical_benchmark_report_sha256(&report).expect("digest computes");
+        for _ in 0..100 {
+            assert_eq!(
+                canonical_benchmark_report_sha256(&report).expect("digest recomputes"),
+                digest_one,
+                "identical canonical report inputs must always produce the same digest"
+            );
+        }
+        report.canonical_report_sha256 = digest_one.clone();
+        verify_canonical_benchmark_report(&report).expect("unchanged report verifies");
+        report.cases[0].detail.push_str("; tampered");
+        assert!(
+            verify_canonical_benchmark_report(&report).is_err(),
+            "tampering with report content must be detected"
+        );
+        report.cases[0].detail = "expected counters match".to_owned();
+
+        report.cases[0].passed = false;
+        let changed = canonical_benchmark_report_sha256(&report).expect("changed digest computes");
+        assert_ne!(digest_one, changed, "a changed benchmark result must change its digest");
+    }
+
+    #[test]
+    fn single_budget_does_not_cover_all_claim_measurands() {
+        let mut fixture = manifest();
+        let artifact_path = "uncertainty/energy-only.json".to_owned();
+        fixture.artifacts.push(Artifact {
+            relative_path: artifact_path.clone(),
+            kind: "uncertainty_budget_record".to_owned(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "d".repeat(64)),
+        });
+        fixture.uncertainty_budgets.push(ClaimUncertaintyBudget {
+            claim_target: "ride_energy".to_owned(),
+            measurand: "net_dc_bus_energy".to_owned(),
+            unit: "Wh".to_owned(),
+            standard_uncertainty: 0.05,
+            expanded_uncertainty: 0.1,
+            coverage_factor: 2.0,
+            acceptance_tolerance: 0.5,
+            evidence_state: "bench_characterized".to_owned(),
+            artifact_path,
+        });
+        validate_structure(&fixture).expect("single valid measurand budget is structurally sound");
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.reasons.iter().any(|reason| reason == "missing_uncertainty_budget:dc_bus_voltage"));
+        assert!(claim.reasons.iter().any(|reason| reason == "missing_uncertainty_budget:dc_bus_current"));
+    }
+
+    #[test]
+    fn uncertainty_budget_rejects_wrong_measurand_unit_pair() {
+        let mut fixture = manifest();
+        let artifact_path = "uncertainty/bad-unit.json".to_owned();
+        fixture.artifacts.push(Artifact {
+            relative_path: artifact_path.clone(),
+            kind: "uncertainty_budget_record".to_owned(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "e".repeat(64)),
+        });
+        fixture.uncertainty_budgets.push(ClaimUncertaintyBudget {
+            claim_target: "ride_energy".to_owned(),
+            measurand: "net_dc_bus_energy".to_owned(),
+            unit: "kPa".to_owned(),
+            standard_uncertainty: 0.05,
+            expanded_uncertainty: 0.1,
+            coverage_factor: 2.0,
+            acceptance_tolerance: 0.5,
+            evidence_state: "bench_characterized".to_owned(),
+            artifact_path,
+        });
+        assert!(validate_structure(&fixture).is_err());
+    }
+
+    #[test]
+    fn calibration_receipt_must_reference_declared_artifact() {
+        let mut fixture = manifest();
+        fixture.sensors[0].calibration_state = "calibrated".into();
+        fixture.sensors[0].calibration_receipt_id = Some("calibration/gnss.json".into());
+        fixture.artifacts.push(Artifact {
+            relative_path: "calibration/other.json".into(),
+            kind: "calibration_record".into(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "f".repeat(64)),
+        });
+        let error = validate_structure(&fixture).expect_err("an unrelated calibration file must not back this sensor");
+        assert!(error.to_string().contains("does not reference a declared calibration_record artifact"));
+    }
+
+    #[test]
+    fn rights_receipt_id_must_be_backed_by_matching_artifact() {
+        let mut fixture = manifest();
+        fixture.data_rights.rights_state = "project_owned".into();
+        fixture.data_rights.permission_receipt_id = Some("collection/approval.json".into());
+        fixture.artifacts.push(Artifact {
+            relative_path: "collection/other.json".into(),
+            kind: "collection_authorization".into(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "1".repeat(64)),
+        });
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(claim.reasons.iter().any(|reason| reason == "rights_receipt_id_not_backed_by_artifact"));
+    }
+
+    #[test]
+    fn zero_uncertainty_is_rejected_as_unphysical_overconfidence() {
+        let mut fixture = manifest();
+        let artifact_path = "uncertainty/zero.json".to_owned();
+        fixture.artifacts.push(Artifact {
+            relative_path: artifact_path.clone(),
+            kind: "uncertainty_budget_record".to_owned(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "2".repeat(64)),
+        });
+        fixture.uncertainty_budgets.push(ClaimUncertaintyBudget {
+            claim_target: "ride_energy".to_owned(),
+            measurand: "net_dc_bus_energy".to_owned(),
+            unit: "Wh".to_owned(),
+            standard_uncertainty: 0.0,
+            expanded_uncertainty: 0.0,
+            coverage_factor: 2.0,
+            acceptance_tolerance: 0.5,
+            evidence_state: "bench_characterized".to_owned(),
+            artifact_path,
+        });
+        let error = validate_structure(&fixture).expect_err("zero uncertainty must not manufacture perfect confidence");
+        assert!(error.to_string().contains("standard and expanded uncertainty must be positive"));
+    }
+
+    #[test]
+    fn uncertainty_budget_receipt_must_match_manifest_content() {
+        let budget = ClaimUncertaintyBudget {
+            claim_target: "ride_energy".to_owned(),
+            measurand: "net_dc_bus_energy".to_owned(),
+            unit: "Wh".to_owned(),
+            standard_uncertainty: 0.05,
+            expanded_uncertainty: 0.1,
+            coverage_factor: 2.0,
+            acceptance_tolerance: 0.5,
+            evidence_state: "bench_characterized".to_owned(),
+            artifact_path: "uncertainty/ride-energy.json".to_owned(),
+        };
+        let exact = serde_json::to_vec(&budget).expect("budget serializes");
+        verify_uncertainty_budget_receipt_bytes(&exact, &budget)
+            .expect("exact receipt matches the declared budget");
+
+        let mut tampered = budget.clone();
+        tampered.acceptance_tolerance = 50.0;
+        let tampered_bytes = serde_json::to_vec(&tampered).expect("tampered budget serializes");
+        let error = verify_uncertainty_budget_receipt_bytes(&tampered_bytes, &budget)
+            .expect_err("a receipt that disagrees with the manifest must fail");
+        assert!(error.to_string().contains("does not match manifest budget"));
+    }
+
+    #[test]
+    fn every_uncertainty_requirement_uses_a_known_unit() {
+        for (claim, requirements) in [
+            ("ride_energy", RIDE_ENERGY_UNCERTAINTY_REQUIREMENTS),
+            ("longitudinal_dynamics", LONGITUDINAL_UNCERTAINTY_REQUIREMENTS),
+            ("tire_health", TIRE_HEALTH_UNCERTAINTY_REQUIREMENTS),
+            ("motor_map", MOTOR_MAP_UNCERTAINTY_REQUIREMENTS),
+            ("tire_force_characterization", TIRE_FORCE_UNCERTAINTY_REQUIREMENTS),
+            ("ice_fuel_energy", ICE_ENERGY_UNCERTAINTY_REQUIREMENTS),
+        ] {
+            assert!(known_claim(claim), "missing claim registry entry: {claim}");
+            for (measurand, allowed_units) in requirements {
+                assert!(!measurand.trim().is_empty());
+                for unit in *allowed_units {
+                    assert!(
+                        KNOWN_UNITS.contains(unit),
+                        "uncertainty requirement {claim}/{measurand} uses unknown unit {unit}"
+                    );
+                    assert!(known_uncertainty_pair(claim, measurand, unit));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn timestamp_offset_invariance_holds_for_65_generated_offsets() {
+        let fixture = manifest();
+        let mut offsets: Vec<u64> = (0..64).map(|n| n * 1_000_003).collect();
+        offsets.push(u64::MAX - 300_000_001);
+        let mut baseline: Option<TraceReport> = None;
+        for offset in offsets {
+            let t0 = offset + 1;
+            let t1 = offset + 100_000_001;
+            let t2 = offset + 200_000_001;
+            let raw = format!(
+                "timestamp_ns,channel_id,raw_value,sample_status,sequence\n{},gnss.speed_mps,0,VALID,0\n{},gnss.speed_mps,1,VALID,1\n{},gnss.speed_mps,2,VALID,2\n",
+                t0, t1, t2
+            );
+            let report = validate_trace_bytes(raw.as_bytes(), &fixture)
+                .expect("translation of valid monotonic timestamps must preserve acceptance");
+            assert_eq!(report.row_count, 3);
+            assert_eq!(report.valid_sample_count, 3);
+            assert_eq!(report.invalid_or_saturated_sample_count, 0);
+            assert_eq!(report.missing_value_count, 0);
+            assert_eq!(report.suspected_gap_count, 0);
+            if let Some(prior) = &baseline {
+                assert_eq!(report.row_count, prior.row_count);
+                assert_eq!(report.valid_sample_count, prior.valid_sample_count);
+                assert_eq!(report.suspected_gap_count, prior.suspected_gap_count);
+                assert_ne!(report.trace_sha256, prior.trace_sha256,
+                    "a changed raw timestamp trace must produce a different content digest");
+            } else {
+                baseline = Some(report);
+            }
+        }
+    }
+
+    #[test]
+    fn fault_matrix_runner_only_accepts_planned_design_fixtures() {
+        let fixture = manifest();
+        validate_fault_matrix_fixture_manifest(&fixture)
+            .expect("planned DesignOnly fixture is the proper input");
+
+        let mut recorded = fixture.clone();
+        recorded.session_state = "recorded".to_owned();
+        let error = validate_fault_matrix_fixture_manifest(&recorded)
+            .expect_err("recorded sessions must use the artifact-verifying manifest command");
+        assert!(error.to_string().contains("only a planned fixture manifest"));
+
+        let mut simulated = fixture;
+        simulated.evidence_class = "Synthetic".to_owned();
+        let error = validate_fault_matrix_fixture_manifest(&simulated)
+            .expect_err("the mutation suite itself must remain DesignOnly");
+        assert!(error.to_string().contains("only DesignOnly fixtures"));
+    }
+
+    #[test]
+    fn declared_but_unobserved_channels_are_visible_in_loss_ledger() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,1,VALID,0\n";
+        let report = validate_trace_bytes(raw, &fixture)
+            .expect("one valid channel is enough for a structurally valid trace");
+        assert_eq!(report.channels.len(), fixture.channels.len());
+        let absent = report.channels.iter()
+            .find(|channel| channel.channel_id == "dc_bus.current_a")
+            .expect("declared current channel is not dropped from the report");
+        assert_eq!(absent.sample_count, 0);
+        assert_eq!(absent.first_timestamp_ns, None);
+        assert_eq!(absent.last_timestamp_ns, None);
+        assert_eq!(absent.estimated_expected_sample_count, None);
+        assert_eq!(absent.estimated_missing_sample_count, None);
+        assert!(absent.loss_estimate_basis.contains("estimate only"));
+    }
+
+    #[test]
+    fn gap_ledger_never_changes_or_fills_raw_rows() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,0,VALID,0\n100000001,gnss.speed_mps,1,VALID,1\n600000001,gnss.speed_mps,2,VALID,2\n";
+        let report = validate_trace_bytes(raw, &fixture).expect("gapped trace is diagnosable");
+        assert_eq!(report.row_count, 3);
+        assert_eq!(report.valid_sample_count, 3);
+        assert_eq!(report.gaps.len(), 1);
+        assert_eq!(report.gaps[0].observed_gap_ns, 500_000_000);
+        assert_eq!(report.gaps[0].estimated_missing_samples, 4);
+        assert_eq!(report.channels.iter().map(|c| c.sample_count).sum::<usize>(), 3);
+    }
+
+    #[test]
+    fn gap_event_reports_estimated_missing_samples() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,0,VALID,0\n100000001,gnss.speed_mps,1,VALID,1\n600000001,gnss.speed_mps,2,VALID,2\n";
+        let report = validate_trace_bytes(raw, &fixture).expect("gap is a diagnostic not a parse failure");
+        assert_eq!(report.row_count, 3);
+        assert_eq!(report.gaps.len(), 1);
+        assert_eq!(report.gaps[0].previous_timestamp_ns, 100_000_001);
+        assert_eq!(report.gaps[0].current_timestamp_ns, 600_000_001);
+        assert_eq!(report.gaps[0].estimated_missing_samples, 4);
+        assert_eq!(report.channels.iter().map(|channel| channel.sample_count).sum::<usize>(), 3);
+    }
+
+    #[test]
+    fn sub_nanosecond_nominal_period_yields_unknown_estimate_not_panic() {
+        let mut fixture = manifest();
+        let channel = fixture.channels.iter_mut()
+            .find(|channel| channel.channel_id == "gnss.speed_mps")
+            .expect("fixture declares GNSS speed");
+        channel.sample_rate_hz = 3_000_000_000.0;
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,1,VALID,0\n2,gnss.speed_mps,2,VALID,1\n";
+        let report = validate_trace_bytes(raw, &fixture)
+            .expect("sub-nanosecond nominal period cannot be represented but must not panic");
+        let speed = report.channels.iter().find(|channel| channel.channel_id == "gnss.speed_mps")
+            .expect("speed channel present");
+        assert_eq!(speed.expected_period_ns, None);
+        assert_eq!(speed.estimated_expected_sample_count, None);
+        assert_eq!(speed.estimated_missing_sample_count, None);
+    }
+}

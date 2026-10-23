@@ -5,6 +5,8 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
+mod tire_monitoring_intake;
+mod mobility_telemetry_manifest;
 
 #[derive(Parser)]
 struct Cli {
@@ -62,6 +64,50 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Validate the vendored CC BY 4.0 tire-monitoring CSV shards; no tire performance is qualified.
+    TireMonitoringIntake {
+        #[arg(long, default_value = "data/third_party/tire-monitoring-dataset")]
+        input_dir: PathBuf,
+        /// Optional path for a JSON report; otherwise report to stdout.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Validate cross-vehicle telemetry manifest structure, artifact digests and claim eligibility.
+    MobilityTelemetryManifest {
+        #[arg(long, default_value = "docs/research/data/mobility_telemetry_manifest_v0_1.json")]
+        input: PathBuf,
+        /// Optional path for a JSON report; otherwise report to stdout.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Run the frozen mobility telemetry fault matrix; exits non-zero on any false accept/reject.
+    MobilityTelemetryBenchmark {
+        #[arg(long, default_value = "docs/research/data/mobility_telemetry_manifest_v0_1.json")]
+        manifest: PathBuf,
+        #[arg(long, default_value = "docs/research/data/mobility_telemetry_fault_matrix_v0_1.json")]
+        matrix: PathBuf,
+        /// Exact full Git commit ID for the code being benchmarked (40 or 64 hex characters).
+        #[arg(long)]
+        source_commit: String,
+        /// Optional path for a JSON report; otherwise report to stdout.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Verify canonical digest and internal consistency of a saved mobility telemetry benchmark report.
+    MobilityTelemetryVerifyReport {
+        #[arg(long, default_value = "reports/mobility_telemetry_benchmark.json")]
+        input: PathBuf,
+    },
+    /// Validate an append-only multi-rate raw telemetry CSV against the declared manifest channels.
+    MobilityTelemetryTrace {
+        #[arg(long, default_value = "docs/research/data/mobility_telemetry_manifest_v0_1.json")]
+        manifest: PathBuf,
+        #[arg(long, default_value = "docs/research/data/mobility_telemetry_trace_v0_1.csv")]
+        input: PathBuf,
+        /// Optional path for a JSON report; otherwise report to stdout.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +151,117 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::TireMonitoringIntake { input_dir, out } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let input_dir = if input_dir.is_absolute() { input_dir } else { root.join(input_dir) };
+            let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
+            tire_monitoring_intake::run(&input_dir, out.as_deref())?;
+        }
+        Commands::MobilityTelemetryManifest { input, out } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let input = if input.is_absolute() { input } else { root.join(input) };
+            let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
+            mobility_telemetry_manifest::run(&input, out.as_deref())?;
+        }
+        Commands::MobilityTelemetryBenchmark { manifest, matrix, source_commit, out } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
+            let git_head = std::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .current_dir(&root)
+                .output()?;
+            if !git_head.status.success() {
+                anyhow::bail!("could not verify checkout HEAD via git rev-parse HEAD");
+            }
+            let actual_head = String::from_utf8(git_head.stdout)?.trim().to_owned();
+            if actual_head != source_commit {
+                anyhow::bail!(
+                    "--source-commit {} does not match current checkout HEAD {}",
+                    source_commit,
+                    actual_head
+                );
+            }
+            let tracked_diff = std::process::Command::new("git")
+                .args(["diff", "--quiet", "HEAD", "--"])
+                .current_dir(&root)
+                .status()?;
+            if !tracked_diff.success() {
+                anyhow::bail!(
+                    "refusing benchmark on a dirty tracked worktree/index; commit the source and rerun"
+                );
+            }
+            let status = std::process::Command::new("git")
+                .args(["status", "--porcelain", "--untracked-files=all"])
+                .current_dir(&root)
+                .output()?;
+            if !status.status.success() {
+                anyhow::bail!("could not verify the benchmark checkout status");
+            }
+            let status_text = String::from_utf8(status.stdout)?;
+            for line in status_text.lines() {
+                let changed_path = line.get(3..).unwrap_or_default().trim();
+                let is_requested_report = out.as_ref().is_some_and(|output_path| {
+                    output_path.strip_prefix(&root).is_ok_and(|relative| {
+                        relative.to_string_lossy().replace('\\', "/") == changed_path
+                    })
+                });
+                if !is_requested_report {
+                    anyhow::bail!(
+                        "refusing benchmark on a checkout with untracked or changed files: {}; commit source files first",
+                        line
+                    );
+                }
+            }
+
+            // Capture the executing environment rather than trusting a caller-supplied
+            // string that could falsely label the toolchain used for this report.
+            let rustc = std::process::Command::new("rustc").arg("-Vv").output()?;
+            if !rustc.status.success() {
+                anyhow::bail!("rustc -Vv failed; cannot attest runtime toolchain");
+            }
+            let cargo = std::process::Command::new("cargo").arg("--version").output()?;
+            if !cargo.status.success() {
+                anyhow::bail!("cargo --version failed; cannot attest runtime toolchain");
+            }
+            let toolchain_id = format!(
+                "{}\n{}",
+                String::from_utf8(rustc.stdout)?.trim(),
+                String::from_utf8(cargo.stdout)?.trim()
+            );
+
+            let manifest = if manifest.is_absolute() { manifest } else { root.join(manifest) };
+            let matrix = if matrix.is_absolute() { matrix } else { root.join(matrix) };
+            mobility_telemetry_manifest::run_benchmark(
+                &manifest, &matrix, &source_commit, &toolchain_id, out.as_deref()
+            )?;
+        }
+        Commands::MobilityTelemetryVerifyReport { input } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let input = if input.is_absolute() { input } else { root.join(input) };
+            mobility_telemetry_manifest::run_verify_report(&input)?;
+        }
+        Commands::MobilityTelemetryTrace { manifest, input, out } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let manifest = if manifest.is_absolute() { manifest } else { root.join(manifest) };
+            let input = if input.is_absolute() { input } else { root.join(input) };
+            let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
+            mobility_telemetry_manifest::run_trace(&manifest, &input, out.as_deref())?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];

@@ -1,0 +1,245 @@
+{
+  "manifest_id": "motorcycle_utility_tire_test_matrix_v0_1",
+  "schema_version": "0.1.0",
+  "status": "research_design_only_no_test_results",
+  "results_present": false,
+  "vehicle_profile": "South-African motorcycle commuter/utility; cargo variant must be separately parameterized and qualified",
+  "tire_baseline_rule": "Use at least one named, legally appropriate commercial control tire of the same approved size, load/speed rating, rim and declared duty cycle. Do not compare unmatched sizes or tire states.",
+  "evidence_gate": "No candidate is promotable on simulation/optimization alone. Mandatory physical and legal qualification is a hard gate before road use.",
+  "cases": [
+    {
+      "test_id": "TYRE-BASE-001",
+      "purpose": "Specimen/configuration identity and as-received characterization",
+      "variables": [
+        "tire manufacturer/model/size",
+        "DOT or production batch where available",
+        "load/speed rating",
+        "rim specification",
+        "mass",
+        "tread depth",
+        "inflation pressure",
+        "age/storage history",
+        "wear/repair state"
+      ],
+      "outputs": [
+        "immutable specimen ID",
+        "configuration digest",
+        "measurement uncertainty",
+        "photo/inspection receipt"
+      ],
+      "promotion_gate": "Every subsequent result joins to exact specimen, rim, pressure, condition and configuration.",
+      "claim_ceiling": "identity and as-received condition only"
+    },
+    {
+      "test_id": "TYRE-ROLL-002",
+      "purpose": "Rolling resistance and thermal conditioning",
+      "method_reference": "ISO 18164:2026; verify current applicable method and licensed standard text",
+      "variables": [
+        "speed",
+        "load",
+        "inflation pressure",
+        "ambient and tire temperature",
+        "rim",
+        "warm-up and conditioning",
+        "machine parasitic-loss correction"
+      ],
+      "outputs": [
+        "rolling-resistance force/coefficient under declared definition",
+        "raw torque/speed/temp trace",
+        "repeatability and uncertainty"
+      ],
+      "target": "Research stretch: at least 10% lower measured rolling resistance vs matched control, while wet/dry force envelopes remain within a pre-registered non-inferiority margin.",
+      "promotion_gate": "Matched tire state and test method; repeatability and parasitic losses quantified.",
+      "claim_ceiling": "controlled lab point/range only; not whole-vehicle fuel economy or road safety"
+    },
+    {
+      "test_id": "TYRE-LONG-003",
+      "purpose": "Longitudinal force and slip",
+      "variables": [
+        "normal load",
+        "longitudinal slip ratio",
+        "speed",
+        "inflation",
+        "tire temperature",
+        "dry/wet surface and water depth",
+        "surface roughness"
+      ],
+      "outputs": [
+        "longitudinal force vs slip",
+        "peak and stable force regions",
+        "hysteresis/repeatability",
+        "uncertainty"
+      ],
+      "target": "No performance ranking unless load, surface, temperature and tire state are matched.",
+      "promotion_gate": "Safety fixture and instrumented test method approved; all runs and censored points retained.",
+      "claim_ceiling": "measured test-rig force envelope only"
+    },
+    {
+      "test_id": "TYRE-LAT-004",
+      "purpose": "Lateral force, slip angle and camber",
+      "variables": [
+        "normal load",
+        "slip angle",
+        "camber",
+        "speed",
+        "inflation",
+        "temperature",
+        "surface"
+      ],
+      "outputs": [
+        "lateral force and aligning moment if instrumented",
+        "force envelope and transition behavior",
+        "uncertainty by condition"
+      ],
+      "target": "No candidate is described as handling-superior from strain/TPMS data alone.",
+      "promotion_gate": "Controlled test rig or specialist closed-course protocol and independent safety review.",
+      "claim_ceiling": "measured conditions only; no roadworthiness implication"
+    },
+    {
+      "test_id": "TYRE-WET-005",
+      "purpose": "Wet braking and cornering capability",
+      "method_reference": "ISO 10231:2025 for applicable motorcycle tyre capability methods; add a reviewed wet-surface protocol because a generic tire capability test is not a complete wet-grip rating",
+      "variables": [
+        "surface and water depth",
+        "temperature",
+        "speed",
+        "load",
+        "tire pressure",
+        "tread depth/wear",
+        "brake hardware and control"
+      ],
+      "outputs": [
+        "stopping distance",
+        "longitudinal/lateral deceleration",
+        "wheel slip",
+        "water/surface/tire temperature"
+      ],
+      "target": "Research stretch: 10% shorter wet stopping distance than matched control in a pre-defined repeatable test, with no regression beyond the pre-registered measurement-based non-inferiority margin in other mandatory safety measures.",
+      "promotion_gate": "Closed course/test facility, matched controls, repeats, uncertainty and independent test approval; no public-road experimentation.",
+      "claim_ceiling": "exact tire/vehicle/test conditions only"
+    },
+    {
+      "test_id": "TYRE-DUR-006",
+      "purpose": "Casing, bead, high-speed and endurance qualification",
+      "method_reference": "ISO 10231:2025 and applicable current tire approval requirements",
+      "variables": [
+        "rated loads/speeds",
+        "rim",
+        "pressure",
+        "temperature",
+        "duration",
+        "manufacturing batch"
+      ],
+      "outputs": [
+        "pass/fail against applicable requirements",
+        "damage/temperature records",
+        "batch/specimen traceability"
+      ],
+      "target": "All mandatory capability and approval requirements pass. Optimization cannot trade away this gate.",
+      "promotion_gate": "Qualified independent laboratory and applicable approval authority where required.",
+      "claim_ceiling": "only exact test and approval scope"
+    },
+    {
+      "test_id": "TYRE-IMP-007",
+      "purpose": "Puncture, impact and rough-road damage",
+      "variables": [
+        "obstacle geometry",
+        "impact energy",
+        "load",
+        "speed",
+        "inflation",
+        "tire/casing construction"
+      ],
+      "outputs": [
+        "damage threshold and mode",
+        "pressure loss",
+        "casing/bead inspection",
+        "post-test integrity"
+      ],
+      "target": "Research stretch: 20% improvement on one pre-declared puncture or impact metric without worsening other mandatory safety requirements.",
+      "promotion_gate": "Controlled fixtures and specialist review; post-damage continued-use decisions follow the applicable safety policy.",
+      "claim_ceiling": "specified obstacle/load/test protocol only"
+    },
+    {
+      "test_id": "TYRE-WEAR-008",
+      "purpose": "Wear life and degradation",
+      "variables": [
+        "controlled mileage/duty cycle",
+        "load",
+        "surface",
+        "pressure",
+        "temperature",
+        "rotation/slip behavior",
+        "initial tread state"
+      ],
+      "outputs": [
+        "tread depth/mass loss",
+        "wear uniformity",
+        "force/rolling-resistance trend",
+        "failure modes",
+        "km per declared wear limit"
+      ],
+      "target": "Research stretch: 20% increase in measured service life against matched baseline; publish specimen spread and confidence interval, not just the best tire.",
+      "promotion_gate": "Repeatable duty cycle and definition of end-of-life fixed before testing.",
+      "claim_ceiling": "life under stated duty cycle only"
+    },
+    {
+      "test_id": "TYRE-HEALTH-009",
+      "purpose": "Pressure retention and tire-health monitoring",
+      "data_reference": "CC BY 4.0 passenger-car tire monitoring data may be used only for pressure/temp/speed telemetry methods; it is not a motorcycle performance reference.",
+      "variables": [
+        "pressure",
+        "temperature",
+        "speed",
+        "time/segment ID",
+        "controlled leak profile",
+        "sensor calibration"
+      ],
+      "outputs": [
+        "detection lead time",
+        "false alarms/missed gradual leaks",
+        "calibration/uncertainty",
+        "segment-level holdout metrics"
+      ],
+      "target": "Zero segment leakage across train/test; zero claims of puncture/blowout detection unless tested for those events.",
+      "promotion_gate": "Whole runs stay within one split; sensor smoothing and missingness documented.",
+      "claim_ceiling": "pressure anomaly detection within represented event classes"
+    },
+    {
+      "test_id": "TYRE-LIFE-010",
+      "purpose": "Lifecycle economics and serviceability",
+      "variables": [
+        "purchase/manufacture cost",
+        "wear-life",
+        "repairability",
+        "downtime",
+        "availability",
+        "transport",
+        "materials",
+        "end-of-life"
+      ],
+      "outputs": [
+        "cost per completed tire-km",
+        "parts lead time",
+        "repair time",
+        "waste/mass balance",
+        "sensitivity to assumptions"
+      ],
+      "target": "Research stretch: 15% lower life-cycle cost per tire-km against matched baseline at equivalent approved safety capability.",
+      "promotion_gate": "Quote/measurement-backed costs; safety not reduced to improve scalar score.",
+      "claim_ceiling": "declared region, usage and cost assumptions only"
+    }
+  ],
+  "required_run_record": [
+    "test_id and protocol revision",
+    "tire specimen and tire/compound/casing/tread revision",
+    "vehicle, wheel/rim, brake and load configuration",
+    "sensor IDs/calibration and sampled raw signals",
+    "surface/wetness/water depth/temperature/pressure and ambient conditions",
+    "units, frames, sampling rate, uncertainty and missingness",
+    "source rights, raw hash, transformation hash and evidence class",
+    "all runs, failed tests, censored values and pre-registered exclusion reasons",
+    "independent review and approval records"
+  ],
+  "no_test_result_warning": "This file specifies the experimental design and provisional R&D targets. It contains no measured tire performance data, no tire design that has passed qualification, and no road-use approval."
+}
