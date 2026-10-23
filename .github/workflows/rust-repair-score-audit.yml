@@ -48,7 +48,7 @@ jobs:
         run: |
           git -C benchmark-source/launch apply --check "$GITHUB_WORKSPACE/docs/research/patches/repolaunch-network-isolation.patch"
           git -C benchmark-source/launch apply "$GITHUB_WORKSPACE/docs/research/patches/repolaunch-network-isolation.patch"
-          python3 -m py_compile benchmark-source/evaluation/validation.py benchmark-source/evaluation/evaluation.py benchmark-source/launch/core/platforms/linux.py
+          python3 -m py_compile benchmark-source/evaluation/validation.py benchmark-source/evaluation/evaluation.py benchmark-source/launch/launch/core/platforms/linux.py
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
