@@ -12,6 +12,7 @@
     "split",
     "suite_sha256",
     "outcomes_sha256",
+    "analyzer_source_sha256",
     "bootstrap",
     "counts",
     "metrics",
@@ -302,6 +303,10 @@
         "not_evaluated_incomplete_execution_coverage",
         "not_evaluated_requires_preregistered_protocol_independent_receipts_and_review"
       ]
+    },
+    "analyzer_source_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   }
 }
