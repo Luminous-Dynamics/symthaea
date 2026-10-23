@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:mesh-security-scenarios:v1",
+  "title": "Symthaea Mesh Security Scenario Registry v1",
+  "description": "Preregistered security properties and scenarios. This schema validates shape; a separate semantic check must enforce unique IDs and property references.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "suite_id",
+    "status",
+    "purpose",
+    "source_reviews",
+    "non_claims",
+    "scoring_rules",
+    "properties",
+    "scenarios"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea.mesh-security-scenarios/v1"
+    },
+    "suite_id": {
+      "type": "string",
+      "pattern": "^symthaea-[a-z0-9-]+-[0-9]{4}-[0-9]{2}$"
+    },
+    "status": {
+      "const": "research-only-proposed"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_reviews": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pull_request",
+          "scope"
+        ],
+        "properties": {
+          "pull_request": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "non_claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "scoring_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted_finding_requires",
+        "separate_scoreboards",
+        "reject_as_security_success"
+      ],
+      "properties": {
+        "accepted_finding_requires": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "separate_scoreboards": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reject_as_security_success": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "properties": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "claim",
+          "layer",
+          "mandatory"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]+$"
+          },
+          "claim": {
+            "type": "string",
+            "minLength": 1
+          },
+          "layer": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mandatory": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "property",
+          "class",
+          "stimulus",
+          "expected_legacy",
+          "required_replacement",
+          "model_config",
+          "strict_config",
+          "implementation_target",
+          "positive_control",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^MESH-[A-Z0-9]+-[0-9]{3}$"
+          },
+          "property": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]+$"
+          },
+          "class": {
+            "enum": [
+              "known-break",
+              "adversarial",
+              "qualification"
+            ]
+          },
+          "stimulus": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_legacy": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required_replacement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model_config": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "strict_config": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "implementation_target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "positive_control": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "proposed",
+              "implemented",
+              "not_implemented",
+              "qualified"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+[package]
+name = "mesh-security-contract-audit"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Isolated schema and semantic audit for Symthaea mesh security benchmark contracts"
+
+# Standalone workspace: keep this audit independent of unrelated workspace
+# members and fail-closed workspace integrity gates.
+[workspace]
+resolver = "2"
+
+[dependencies]
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+jsonschema = { version = "=0.59.0", default-features = false }

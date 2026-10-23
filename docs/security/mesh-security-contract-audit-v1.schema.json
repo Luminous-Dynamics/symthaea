@@ -1,0 +1,284 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:mesh-security-contract-audit:v1",
+  "title": "Mesh Security Contract Audit Receipt v1",
+  "description": "Receipt emitted by the isolated registry/schema auditor. PASS means schema shape and declared registry consistency only; it does not assert protocol security.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "source_revision",
+    "suite_id",
+    "claim_ceiling",
+    "evidence_class",
+    "artifacts",
+    "validator",
+    "counts",
+    "checks",
+    "errors",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea.mesh-security-contract-audit/v1"
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "suite_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "claim_ceiling": {
+      "const": "schema_and_registry_integrity_only"
+    },
+    "evidence_class": {
+      "const": "contract_validation"
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_suite",
+        "scenario_schema",
+        "evidence_receipt_schema",
+        "audit_receipt_schema",
+        "validator_manifest",
+        "validator_lockfile",
+        "validator_source"
+      ],
+      "properties": {
+        "scenario_suite": {
+          "$ref": "#/$defs/hashed_artifact"
+        },
+        "scenario_schema": {
+          "$ref": "#/$defs/schema_artifact"
+        },
+        "evidence_receipt_schema": {
+          "$ref": "#/$defs/schema_artifact"
+        },
+        "audit_receipt_schema": {
+          "$ref": "#/$defs/schema_artifact"
+        },
+        "validator_manifest": {
+          "$ref": "#/$defs/hashed_artifact"
+        },
+        "validator_lockfile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "validator_source": {
+          "$ref": "#/$defs/hashed_artifact"
+        }
+      }
+    },
+    "validator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "crate",
+        "version",
+        "external_reference_resolution",
+        "format_validation",
+        "default_features"
+      ],
+      "properties": {
+        "crate": {
+          "const": "jsonschema"
+        },
+        "version": {
+          "const": "0.59.0"
+        },
+        "external_reference_resolution": {
+          "const": "offline"
+        },
+        "format_validation": {
+          "type": "boolean"
+        },
+        "default_features": {
+          "type": "boolean"
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "properties",
+        "scenarios",
+        "proposed_scenarios"
+      ],
+      "properties": {
+        "properties": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scenarios": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "proposed_scenarios": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_schema_meta_schema",
+        "receipt_schema_meta_schema",
+        "audit_receipt_schema_meta_schema",
+        "scenario_instance_validation",
+        "audit_receipt_instance_validation",
+        "semantic_consistency",
+        "unique_property_ids",
+        "unique_scenario_ids",
+        "scenario_property_references_resolve",
+        "source_revision_recorded"
+      ],
+      "properties": {
+        "scenario_schema_meta_schema": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "receipt_schema_meta_schema": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "audit_receipt_schema_meta_schema": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "scenario_instance_validation": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "audit_receipt_instance_validation": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "semantic_consistency": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "unique_property_ids": {
+          "type": "boolean"
+        },
+        "unique_scenario_ids": {
+          "type": "boolean"
+        },
+        "scenario_property_references_resolve": {
+          "type": "boolean"
+        },
+        "source_revision_recorded": {
+          "const": true
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "hashed_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "schema_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "meta_schema_validation"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "meta_schema_validation": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,539 @@
+{
+  "schema_version": "symthaea.mesh-security-scenarios/v1",
+  "suite_id": "symthaea-mesh-protocol-assurance-2026-10",
+  "status": "research-only-proposed",
+  "purpose": "Pre-register mesh protocol failure scenarios, the security property each scenario targets, and the independent evidence required before a finding is accepted.",
+  "source_reviews": [
+    {
+      "pull_request": 8376,
+      "scope": "AEAD nonce namespace, fragment nonce reuse, MTU framing"
+    },
+    {
+      "pull_request": 8412,
+      "scope": "key-agreement claims, peer binding, backend fail-closed behavior, confirmation and downgrade"
+    },
+    {
+      "pull_request": 8365,
+      "scope": "known-break calibration runner and provenance receipts"
+    },
+    {
+      "pull_request": 8471,
+      "scope": "bounded packet/fragment nonce lifecycle model, deterministic restart reset, counter wrap, truncated sender prefix collision, and nondeterministic 8-bit restart-epoch collision"
+    },
+    {
+      "pull_request": 8491,
+      "scope": "bounded handshake-admission TLA+ model"
+    },
+    {
+      "pull_request": 8508,
+      "scope": "LoRa fragment-AEAD fail-closed behavior, transport-authenticated source binding, and preflight against actual MTU"
+    },
+    {
+      "pull_request": 8355,
+      "scope": "authenticated replay windows, MAC-before-replay state mutation, 60-second timestamp freshness with 5-second future skew, 66-second idle expiry, 4,608-stream capacity and recovery, and spoofed-source rate-limit regression"
+    },
+    {
+      "pull_request": 8519,
+      "scope": "bounded crash-consistency model for replay admission versus durable application effects; effect-first duplicate and commit-first lost-effect counterexamples"
+    },
+    {
+      "pull_request": 8558,
+      "scope": "Runtime nonce-pair oracle and deterministic packet/fragment cross-API collision witness; shared-key condition is explicit."
+    }
+  ],
+  "non_claims": [
+    "These scenarios are a proposed corpus, not an executed benchmark.",
+    "The presence of a test name or model configuration is not evidence that the test passed.",
+    "Known legacy defects are calibration tasks, not novel cryptographic discoveries.",
+    "A bounded model result does not establish Rust implementation conformance or cryptographic security.",
+    "Source tests do not establish deployment exposure or exploitation.",
+    "Performance cannot compensate for a violated mandatory security property.",
+    "The cross-API nonce witness is conditional on both entry points using the same effective key; it does not assert every deployment has that configuration or that the Rust witness has executed until exact-head CI confirms it."
+  ],
+  "scoring_rules": {
+    "accepted_finding_requires": [
+      "Exact source revision and test/model/config digest are recorded.",
+      "The violated property and attacker preconditions are specified before execution.",
+      "A deterministic witness or invariant counterexample is independently reproduced.",
+      "The output demonstrates the intended property violation rather than a parser, build, timeout, or infrastructure failure.",
+      "Relevant positive controls pass and remain attached to the same exact revision.",
+      "The claimed evidence class does not exceed the executed mechanism."
+    ],
+    "separate_scoreboards": [
+      "known_break_calibration",
+      "held_out_fault_detection",
+      "novel_findings_pending_review",
+      "implementation_conformance",
+      "operational_performance"
+    ],
+    "reject_as_security_success": [
+      "nonzero exit code without an expected invariant violation or test assertion",
+      "agent narrative without a reproducer",
+      "model pass without exact bounded configuration",
+      "unavailable tool reported as pass",
+      "positive controls omitted or failing",
+      "finding caused only by malformed benchmark metadata",
+      "duplicate report of an already registered defect counted as novel"
+    ]
+  },
+  "properties": [
+    {
+      "id": "NONCE-UNIQUENESS",
+      "claim": "No identical (effective_key, nonce) pair is used for two AEAD invocations.",
+      "layer": "record-protection",
+      "mandatory": true
+    },
+    {
+      "id": "SENDER-NAMESPACE",
+      "claim": "Distinct senders using one effective key cannot collide in nonce allocation.",
+      "layer": "record-protection",
+      "mandatory": true
+    },
+    {
+      "id": "RESTART-NONREUSE",
+      "claim": "Crash, restart, snapshot restore, or rollback cannot reuse a nonce under the same effective key.",
+      "layer": "lifecycle",
+      "mandatory": true
+    },
+    {
+      "id": "COUNTER-NONWRAP",
+      "claim": "A counter cannot wrap within a live effective-key namespace.",
+      "layer": "lifecycle",
+      "mandatory": true
+    },
+    {
+      "id": "FRAGMENT-NONREUSE",
+      "claim": "Fragment-level protection cannot reuse nonce values when sequence projections wrap or fragments are retransmitted.",
+      "layer": "fragmentation",
+      "mandatory": true
+    },
+    {
+      "id": "MTU-BOUNDS",
+      "claim": "Every transmitted frame fits the declared transport MTU and corresponding receive/reassembly bounds.",
+      "layer": "transport",
+      "mandatory": true
+    },
+    {
+      "id": "PEER-BINDING",
+      "claim": "A key and accepted peer identity are bound by the selected authenticated protocol transcript.",
+      "layer": "handshake",
+      "mandatory": true
+    },
+    {
+      "id": "TRANSCRIPT-BINDING",
+      "claim": "Changes in identity, version, suite, roles, or security-relevant handshake fields invalidate confirmation.",
+      "layer": "handshake",
+      "mandatory": true
+    },
+    {
+      "id": "MUTUAL-CONFIRMATION",
+      "claim": "An application session cannot be established until the selected protocol's required peer/key confirmation completes.",
+      "layer": "handshake",
+      "mandatory": true
+    },
+    {
+      "id": "BACKEND-REALNESS",
+      "claim": "A missing, placeholder, or compile-only cryptographic backend cannot create an established session.",
+      "layer": "backend",
+      "mandatory": true
+    },
+    {
+      "id": "DOWNGRADE-POLICY",
+      "claim": "A profile forbidden by authenticated policy cannot be selected or accepted.",
+      "layer": "negotiation",
+      "mandatory": true
+    },
+    {
+      "id": "FORWARD-SECRECY-CLAIM",
+      "claim": "Forward secrecy is claimed only when the selected protocol uses suitable ephemeral key establishment and satisfies its assumptions.",
+      "layer": "key-establishment",
+      "mandatory": true
+    },
+    {
+      "id": "REPLAY-RESISTANCE",
+      "claim": "Replay and reordering cannot cause duplicate protected application effects outside the specified policy.",
+      "layer": "record-layer",
+      "mandatory": true
+    },
+    {
+      "id": "RESOURCE-BOUNDS",
+      "claim": "Malformed or repeated handshake/fragment inputs remain within per-peer state, allocation, and computational limits.",
+      "layer": "availability",
+      "mandatory": true
+    },
+    {
+      "id": "INTEROPERABILITY",
+      "claim": "Independent implementations agree on canonical encoding, protocol transcript, key schedule, and frozen known-answer vectors.",
+      "layer": "interoperability",
+      "mandatory": true
+    },
+    {
+      "id": "CLONE-SAFETY",
+      "claim": "Restored or cloned sender state cannot create multiple active senders that reuse an effective key and nonce namespace.",
+      "layer": "lifecycle",
+      "mandatory": true
+    },
+    {
+      "id": "KEY-ROTATION-BOUNDARY",
+      "claim": "Key rotation creates a genuinely new effective traffic-key namespace and cannot rely on unauthenticated epoch metadata alone.",
+      "layer": "key-management",
+      "mandatory": true
+    },
+    {
+      "id": "TRANSPORT-SOURCE-BINDING",
+      "claim": "Fragment-level AEAD identity is compared against a source identity authenticated by the transport/session, not a constant placeholder or sender-controlled nonce bytes.",
+      "layer": "transport-identity",
+      "mandatory": true
+    },
+    {
+      "id": "NO-CLEARTEXT-FALLBACK",
+      "claim": "A security mode configured to require AEAD rejects traffic when the required key or security provider is unavailable; it never silently admits plaintext.",
+      "layer": "security-mode",
+      "mandatory": true
+    },
+    {
+      "id": "AUTHENTICATED-RATE-LIMIT",
+      "claim": "Packet-controlled source identifiers on unauthenticated inputs cannot consume the rate-limit budget of an authenticated peer.",
+      "layer": "ingress-rate-limit",
+      "mandatory": true
+    },
+    {
+      "id": "TIMESTAMP-FRESHNESS",
+      "claim": "Authenticated packet timestamps are present and fall inside the declared age and future-skew bounds before replay state is mutated or application delivery occurs.",
+      "layer": "freshness",
+      "mandatory": true
+    },
+    {
+      "id": "RESTART-REPLAY-RESISTANCE",
+      "claim": "A captured, still-fresh authenticated packet cannot be accepted a second time after receiver restart; replay state is durably preserved or an authenticated epoch/session transition makes the old packet ineligible.",
+      "layer": "recovery",
+      "mandatory": true
+    },
+    {
+      "id": "APPLICATION-EFFECT-CRASH-CONSISTENCY",
+      "claim": "Across receiver crashes, authenticated replay admission and application effects cannot combine to produce duplicate effects or permanently lost committed effects; a real implementation must use a reviewed transaction, durable idempotency key, or inbox/outbox protocol.",
+      "layer": "application-recovery",
+      "mandatory": true
+    },
+    {
+      "id": "GLOBAL-NONCE-NAMESPACE",
+      "claim": "Every AEAD invocation using the same effective key has a globally unique nonce, across packet, fragment, and other API domains.",
+      "layer": "cross-api-key-lifecycle",
+      "mandatory": true
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "MESH-NONCE-001",
+      "property": "SENDER-NAMESPACE",
+      "class": "known-break",
+      "stimulus": "Two distinct full sender IDs share the legacy 48-bit prefix and encrypt with the same effective group key, payload type, epoch, and sequence.",
+      "expected_legacy": "Duplicate nonce; a deterministic AEAD reuse witness may expose plaintext XOR under the required same-key precondition.",
+      "required_replacement": "Zero duplicate effective-key/nonce tuples; reject the identity/key-sharing model if it cannot enforce separation.",
+      "model_config": "docs/security/models/packet_shared_key_collision_legacy.cfg",
+      "strict_config": "docs/security/models/packet_shared_key_collision_strict.cfg",
+      "implementation_target": "legacy_nonce_source_id_truncation_reveals_plaintext_xor",
+      "positive_control": "Valid packet round-trip under the frozen packet vector.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-NONCE-002",
+      "property": "RESTART-NONREUSE",
+      "class": "known-break",
+      "stimulus": "Send one packet, restart the sender with the same key and default counter/epoch state, then send an equivalent packet.",
+      "expected_legacy": "Same nonce can recur under the same effective key.",
+      "required_replacement": "New authenticated key namespace or durable anti-reuse allocator; otherwise refuse encrypted sending.",
+      "model_config": "docs/security/models/packet_restart_legacy.cfg",
+      "strict_config": "docs/security/models/packet_restart_strict.cfg",
+      "implementation_target": "restart-with-reused-key integration test",
+      "positive_control": "Fresh authorized key epoch permits valid traffic.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-NONCE-003",
+      "property": "FRAGMENT-NONREUSE",
+      "class": "known-break",
+      "stimulus": "Send fragment indices at sequence values whose low-16-bit thought identifier is equal, under the same effective key.",
+      "expected_legacy": "Repeated fragment nonce for the same source and fragment index.",
+      "required_replacement": "No duplicate pair across sequence wrap; rotate to genuinely new traffic keys or fail closed.",
+      "model_config": "docs/security/models/fragment_wrap_legacy.cfg",
+      "strict_config": "docs/security/models/fragment_wrap_strict.cfg",
+      "implementation_target": "legacy_fragment_nonce_reuses_after_16_bit_sequence_wrap",
+      "positive_control": "Fragment reassembly under distinct valid sequence identifiers.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-MTU-001",
+      "property": "MTU-BOUNDS",
+      "class": "known-break",
+      "stimulus": "Wrap a serialized 222-byte LoRa frame with a 12-byte nonce and 16-byte tag.",
+      "expected_legacy": "250-byte wrapped frame violates the declared 222-byte MTU contract.",
+      "required_replacement": "Remove unjustified nested encryption or define versioned MTU-aware fragmentation/FEC/reassembly.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "legacy_fragment_encryption_exceeds_lora_mtu",
+      "positive_control": "Maximum permitted encrypted frame is accepted by transport and fixed-size receiver.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-HS-001",
+      "property": "MUTUAL-CONFIRMATION",
+      "class": "known-break",
+      "stimulus": "Allow a mutant session gate to establish after initiator confirmation without responder confirmation.",
+      "expected_legacy": "EstablishedSound invariant violated.",
+      "required_replacement": "Application session unavailable until selected protocol confirmation requirements are met.",
+      "model_config": "docs/security/models/mesh_handshake_one_sided_legacy.cfg",
+      "strict_config": "docs/security/models/mesh_handshake_strict.cfg",
+      "implementation_target": "bidirectional confirmation state-transition test",
+      "positive_control": "Valid bidirectionally confirmed session reaches established state.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-HS-002",
+      "property": "BACKEND-REALNESS",
+      "class": "known-break",
+      "stimulus": "Allow a missing/all-zero compile stub backend to publish an active session.",
+      "expected_legacy": "EstablishedSound and/or UnavailableBackendNeverEstablishes invariant violated.",
+      "required_replacement": "Zero established sessions when a required backend is missing or marked as a stub.",
+      "model_config": "docs/security/models/mesh_handshake_stub_backend_legacy.cfg",
+      "strict_config": "docs/security/models/mesh_handshake_strict_missing_backend.cfg",
+      "implementation_target": "PQC stub backend fail-closed tests",
+      "positive_control": "Real backend known-answer and round-trip vectors pass.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-HS-003",
+      "property": "DOWNGRADE-POLICY",
+      "class": "known-break",
+      "stimulus": "Select and establish a classical-only profile while hybrid is mandatory and no authenticated downgrade exception exists.",
+      "expected_legacy": "EstablishedSound invariant violated.",
+      "required_replacement": "Reject the forbidden profile; bind selected profile to the authenticated transcript.",
+      "model_config": "docs/security/models/mesh_handshake_downgrade_legacy.cfg",
+      "strict_config": "docs/security/models/mesh_handshake_strict.cfg",
+      "implementation_target": "required-hybrid downgrade integration test",
+      "positive_control": "Allowed, explicitly configured profiles negotiate as expected.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-HS-004",
+      "property": "PEER-BINDING",
+      "class": "adversarial",
+      "stimulus": "Replace the asserted peer identity while preserving the candidate key material or reuse a public key without authenticated ownership.",
+      "expected_legacy": "Peer identity/key association fails the protocol's authenticated transcript contract.",
+      "required_replacement": "No established session under a different peer identity; bind canonical identity and role to the selected protocol transcript.",
+      "model_config": "docs/security/models/mesh_handshake_identity_unbound_legacy.cfg",
+      "strict_config": "docs/security/models/mesh_handshake_strict.cfg",
+      "implementation_target": "peer-ID substitution regression plus independent handshake vectors",
+      "positive_control": "Correctly bound peer identity succeeds.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-HS-005",
+      "property": "TRANSCRIPT-BINDING",
+      "class": "adversarial",
+      "stimulus": "Mutate protocol version, role, suite, KEM ciphertext/share, ephemeral share, or key-confirmation transcript bytes.",
+      "expected_legacy": "Handshake must reject changed transcript or fail confirmation.",
+      "required_replacement": "All security-relevant transcript differences are authenticated and result in no established session.",
+      "model_config": "docs/security/models/mesh_handshake_transcript_unbound_legacy.cfg",
+      "strict_config": "docs/security/models/mesh_handshake_strict.cfg",
+      "implementation_target": "one-field-at-a-time transcript mutation corpus",
+      "positive_control": "Canonical unchanged transcript succeeds.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-RECOVERY-001",
+      "property": "REPLAY-RESISTANCE",
+      "class": "adversarial",
+      "stimulus": "Deliver duplicate, stale-epoch, reordered, replayed, and post-revocation traffic across reconnect; also inject an invalid-MAC packet sharing the tuple of a later valid packet.",
+      "expected_legacy": "Duplicate packets can be delivered again on the whole-packet path; unauthenticated duplicates may poison dedup state before MAC verification; behavior across receiver restart is not protected by in-memory windows.",
+      "required_replacement": "Reject duplicate/stale authenticated sequences while permitting bounded out-of-order traffic, mutate authenticated replay state only after valid MAC verification, and explicitly declare cross-restart limits unless epoch/persistence support is present.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "PR #8355: AuthenticatedSequenceWindow::check_and_mark; admit_authenticated_sequence; authenticated_mesh_replay_is_rejected_without_second_delivery; unauthenticated_duplicate_cannot_poison_authenticated_replay_state",
+      "positive_control": "Allowed reordering and one-time valid message delivery succeeds.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-RESOURCE-001",
+      "property": "RESOURCE-BOUNDS",
+      "class": "adversarial",
+      "stimulus": "Send malformed sizes, unknown IDs/epochs, fragment duplicates and excess pending peers to the handshake and reassembly state machine.",
+      "expected_legacy": "Unbounded state or allocation is a failure; bounded reject is acceptable.",
+      "required_replacement": "Explicit per-peer/global caps and no state growth beyond configured limits.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "fuzz/property tests with allocation/state counters",
+      "positive_control": "At-limit valid handshake and reassembly still succeed.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-INTEROP-001",
+      "property": "INTEROPERABILITY",
+      "class": "qualification",
+      "stimulus": "Run frozen KAT/transcript/framing vectors through two independently maintained implementations.",
+      "expected_legacy": "Any disagreement indicates implementation/config/vector drift; do not accept as a security finding until resolved.",
+      "required_replacement": "100% agreement on frozen canonical vectors and exact profile negotiation.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "cross-implementation differential harness",
+      "positive_control": "Known-good vector corpus passes on each supported implementation.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-NONCE-004",
+      "property": "CLONE-SAFETY",
+      "class": "adversarial",
+      "stimulus": "Snapshot a sender after nonce reservation, clone the snapshot into two active instances with the same effective key and identity, then send from both instances.",
+      "expected_legacy": "If both clones can use the same reserved counter/key namespace, their emitted nonce pairs collide. Persisted counters alone do not prevent cloning a snapshot taken after reservation.",
+      "required_replacement": "Prevent concurrent clones through a reviewed uniqueness/anti-rollback authority, obtain independently authorized fresh session keys/epochs before use, or fail closed. State explicitly which assumption provides uniqueness.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "clone-and-rollback integration trace with emitted nonce capture and effective-key test labels",
+      "positive_control": "Independent authorized sessions or instances use distinct effective key namespaces and both carry valid traffic.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-ROTATE-001",
+      "property": "KEY-ROTATION-BOUNDARY",
+      "class": "adversarial",
+      "stimulus": "Change only the claimed epoch field while retaining the same effective traffic key, then repeat a nonce counter value.",
+      "expected_legacy": "Metadata changes alone do not guarantee a distinct key/nonce pair; fragment paths that omit the epoch are unaffected by it.",
+      "required_replacement": "Receiver authenticates the transition and the sender proves a new effective key namespace or stops before nonce reuse.",
+      "model_config": "docs/security/models/packet_restart_legacy.cfg",
+      "strict_config": "docs/security/models/packet_restart_strict.cfg",
+      "implementation_target": "key-rotation boundary test captures actual key-domain labels and nonce outputs",
+      "positive_control": "Authorized traffic under newly derived key material decrypts; stale epoch traffic follows explicit receive policy.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-FRAG-001",
+      "property": "TRANSPORT-SOURCE-BINDING",
+      "class": "adversarial",
+      "stimulus": "Enable fragment AEAD while the receive loop obtains only raw bytes and no authenticated source identity; legacy high-level code passes a constant zero source ID.",
+      "expected_legacy": "The receiver cannot validate a nonzero peer's authenticated source binding; substituting a nonce prefix or trusting an unauthenticated address would not satisfy the property.",
+      "required_replacement": "No encrypted fragment is admitted without a transport-authenticated mapping between the peer identity and the mesh source ID; unsupported adapters fail closed and produce an observable rejection.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "recv_raw_with_source default refusal; poll_incoming_records_missing_authenticated_source_adapter",
+      "positive_control": "An adapter with a tested authenticated peer-to-mesh-ID binding delivers valid AEAD fragments and preserves reassembly.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-FRAG-002",
+      "property": "NO-CLEARTEXT-FALLBACK",
+      "class": "known-break",
+      "stimulus": "Set fragment_encryption=true while the sender or receiver has no encryption key, then submit a valid cleartext LoRaFragment.",
+      "expected_legacy": "The sender silently emits plaintext fragments and/or the receiver parses the cleartext frame despite the requested encryption mode.",
+      "required_replacement": "Sender emits zero frames and receiver rejects cleartext; both outcomes are independently asserted while the valid packet-envelope AEAD path remains available when configured.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "fragment_aead_without_a_key_fails_closed_before_emitting_any_frame; fragment_encryption_rejects_plaintext_when_key_is_missing",
+      "positive_control": "packet_envelope_aead_remains_available_with_mtu_safe_fragments",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-RATE-001",
+      "property": "AUTHENTICATED-RATE-LIMIT",
+      "class": "known-break",
+      "stimulus": "Establish one authenticated peer, then send more than 100 invalid-MAC packets claiming that peer's source ID inside the same 10-second rate-limit window, followed by a fresh valid packet.",
+      "expected_legacy": "Invalid-MAC inputs consume the claimed peer's rate budget and cause subsequent valid traffic to be dropped.",
+      "required_replacement": "Perform authenticated peer rate-limit accounting only after MAC verification and replay admission; a forged claimed source ID must not consume the authenticated peer's quota.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "PR #8355: spoofed_source_id_cannot_exhaust_authenticated_peer_rate_limit",
+      "positive_control": "A correctly signed, fresh packet from the tracked peer is still accepted after the invalid-MAC injection.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-RESOURCE-002",
+      "property": "RESOURCE-BOUNDS",
+      "class": "qualification",
+      "stimulus": "Fill the authenticated replay table to its declared 4,608-stream cap using valid, fresh packets; then send a new authenticated stream and continue traffic on an already tracked stream, followed by advancing the fake clock beyond the 66-second idle expiry boundary.",
+      "expected_legacy": "An unbounded table can grow without limit; an implementation that evicts a live replay window to make space can re-admit a duplicate from the evicted stream. A permanently full table without correct expiry also prevents recovery.",
+      "required_replacement": "Memory remains bounded at 4,608 streams; a new stream is rejected without evicting any live window; existing tracked streams continue to reject duplicates; expired windows are reclaimed only after the freshness-safe retention interval and capacity becomes available again.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "PR #8355: admit_authenticated_sequence; replay_table_capacity_rejects_new_stream_without_evicting_live_windows, including expiry-safe capacity recovery; expiry_includes_the_full_66_second_retention_boundary",
+      "positive_control": "A previously tracked stream accepts a new in-window sequence at capacity, then a new stream can be admitted after expired state is reclaimed.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-REPLAY-003",
+      "property": "TIMESTAMP-FRESHNESS",
+      "class": "adversarial",
+      "stimulus": "Send validly MAC-signed packets with timestamp zero, age greater than 60 seconds, and timestamp more than 5 seconds in the future.",
+      "expected_legacy": "Timestamp zero bypassed the previous conditional freshness check, and a timestamp far in the future did not have an explicit rejection rule.",
+      "required_replacement": "Authenticated timestamp-free packets are rejected; stale and excessively future-dated packets are rejected; rejected packets do not mutate the authenticated replay window or reach consumers.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "PR #8355: authenticated_mesh_packet_without_timestamp_fails_closed; authenticated_mesh_packets_outside_timestamp_freshness_window_are_rejected",
+      "positive_control": "A validly authenticated packet with a current timestamp and fresh sequence is accepted once.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-NONCE-005",
+      "property": "RESTART-NONREUSE",
+      "class": "adversarial",
+      "stimulus": "Send under one effective key and epoch, restart with the sequence counter reset, nondeterministically choose an epoch from the finite epoch domain, and send again.",
+      "expected_legacy": "A restart can select a previously used 8-bit epoch; when sender/type/sequence also repeat under the same effective key, the complete nonce pair repeats.",
+      "required_replacement": "A complete effective-key/nonce pair is never emitted twice. On restart, obtain a genuinely new authorized traffic key namespace, preserve durable counter reservations, or refuse encryption when uniqueness cannot be established.",
+      "model_config": "docs/security/models/packet_restart_epoch_collision_legacy.cfg",
+      "strict_config": "docs/security/models/packet_restart_epoch_collision_strict.cfg",
+      "implementation_target": "PR #8471: RestartWithEpoch(sender, epoch); packet_restart_epoch_collision_legacy.cfg; packet_restart_epoch_collision_strict.cfg",
+      "positive_control": "An authorized fresh key namespace or unseen nonce is accepted after restart without colliding with any prior pair.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-REPLAY-004",
+      "property": "RESTART-REPLAY-RESISTANCE",
+      "class": "adversarial",
+      "stimulus": "Deliver a validly MAC-authenticated packet, restart the receiver while the packet timestamp remains within the 60-second freshness window, then replay the exact captured packet to the restarted receiver.",
+      "expected_legacy": "In-memory replay windows are lost on process restart, so a still-fresh captured packet can be admitted again unless another durable mechanism excludes it.",
+      "required_replacement": "Persist replay high-water/bitmap state safely across restart, or require an authenticated sender/session epoch that makes traffic from the previous epoch ineligible; recovery must not silently reset the replay namespace.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "PR #8355 documents this as a limitation; new v3 implementation must add durable replay-state or authenticated sender epoch and an exact restart trace",
+      "positive_control": "After authorized epoch transition, a fresh packet in the new epoch is accepted once while the captured old-epoch packet is rejected.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-REPLAY-005",
+      "property": "APPLICATION-EFFECT-CRASH-CONSISTENCY",
+      "class": "adversarial",
+      "stimulus": "Apply a durable business effect for an authenticated message, crash before the replay identity is durably committed, restart, and deliver the same still-valid message again.",
+      "expected_legacy": "An effect-first ordering can apply the same application effect twice because the receiver's volatile in-flight marker is lost while durable replay state does not contain the packet.",
+      "required_replacement": "The effect is idempotent or transactionally bound to durable replay admission; the post-restart replay cannot apply the same effect twice.",
+      "model_config": "docs/security/models/replay_effect_before_commit_legacy.cfg",
+      "strict_config": "docs/security/models/replay_effect_atomic_strict.cfg",
+      "implementation_target": "PR #8519: EffectBeforeCommit; replay_effect_before_commit_legacy.cfg; replay_effect_atomic_strict.cfg",
+      "positive_control": "A fresh message applies exactly one effect and its durable replay identity is retained across restart.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-REPLAY-006",
+      "property": "APPLICATION-EFFECT-CRASH-CONSISTENCY",
+      "class": "adversarial",
+      "stimulus": "Persist a message's replay identity, crash before its application effect is applied, restart, and attempt to process the still-fresh packet again.",
+      "expected_legacy": "A commit-first ordering causes replay admission to reject the packet after restart although its application effect was never applied.",
+      "required_replacement": "Durable replay identity and application work are transactionally coupled, or an idempotent inbox/outbox worker ensures a committed message's effect is eventually recovered without duplicate application.",
+      "model_config": "docs/security/models/replay_commit_before_effect_legacy.cfg",
+      "strict_config": "docs/security/models/replay_effect_atomic_strict.cfg",
+      "implementation_target": "PR #8519: CommitBeforeEffect; replay_commit_before_effect_legacy.cfg; replay_effect_atomic_strict.cfg",
+      "positive_control": "After an authorized recovery, every durably admitted message has exactly one durable effect and duplicate deliveries do not reapply it.",
+      "status": "proposed"
+    },
+    {
+      "id": "MESH-NONCE-006",
+      "property": "GLOBAL-NONCE-NAMESPACE",
+      "class": "adversarial",
+      "stimulus": "Under one test effective key, invoke both packet encryption and fragment encryption with a source/type/epoch/sequence/thought-id/index tuple chosen so their distinct nonce layouts emit identical 12-byte values; observe outputs from the actual helpers.",
+      "expected_legacy": "Packet and fragment helpers can emit nonce 112233445566008801020300 for source 1122334455660088, valid WisdomVector type 0x00, epoch 0x88, packet sequence 0x00030201 and fragment thought ID 0x0201/index 3. If the effective key is shared, the (key, nonce) pair repeats and equal-length ciphertexts expose plaintext XOR.",
+      "required_replacement": "Enforce reviewed purpose-specific effective keys across packet/fragment/control APIs, or prove globally disjoint nonce allocation under a shared key. Test the actual selected key material and emitted wire nonce; function names, route labels, or different layout descriptions are not evidence of key-domain separation. Fail closed where the configured key namespace cannot be established.",
+      "model_config": null,
+      "strict_config": null,
+      "implementation_target": "PR #8558: RuntimeNoncePairOracle::observe and legacy_packet_and_fragment_apis_can_reuse_nonce_under_shared_key; add strict-path opposite-expectation tests after versioned key-domain remediation.",
+      "positive_control": "The same nonce bytes under genuinely distinct effective keys are not classified as a repeated (key, nonce) pair; fresh authorized sessions transfer valid traffic.",
+      "status": "proposed"
+    }
+  ]
+}

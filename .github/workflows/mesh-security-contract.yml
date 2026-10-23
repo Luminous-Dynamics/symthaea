@@ -1,0 +1,109 @@
+name: Mesh Security Contract Audit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docs/security/mesh-security-*.json"
+      - "docs/security/MESH_SECURITY_BENCHMARK_CONTRACT.md"
+      - "tools/mesh-security-contract-audit/**"
+      - ".github/workflows/mesh-security-contract.yml"
+  push:
+    branches: ["**"]
+    paths:
+      - "docs/security/mesh-security-*.json"
+      - "docs/security/MESH_SECURITY_BENCHMARK_CONTRACT.md"
+      - "tools/mesh-security-contract-audit/**"
+      - ".github/workflows/mesh-security-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mesh-security-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  schema-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MANIFEST: tools/mesh-security-contract-audit/Cargo.toml
+      EVIDENCE_DIR: target/mesh-security-contract-audit
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@d86e0fa8f147d6539442c26a61ebba8becc19489 # 1.96.0
+        with:
+          components: rustfmt
+
+      - name: Record exact input hashes
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          sha256sum \
+            docs/security/mesh-security-scenarios-v1.json \
+            docs/security/mesh-security-scenarios-v1.schema.json \
+            docs/security/mesh-security-evidence-v1.schema.json \
+            docs/security/mesh-security-contract-audit-v1.schema.json \
+            tools/mesh-security-contract-audit/Cargo.toml \
+            tools/mesh-security-contract-audit/src/main.rs \
+            > "$EVIDENCE_DIR/input-sha256.txt"
+          rustc --version --verbose > "$EVIDENCE_DIR/rustc-version.txt"
+          cargo --version > "$EVIDENCE_DIR/cargo-version.txt"
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path "$MANIFEST" -- --check
+
+      - name: Test schema and semantic auditor
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path "$MANIFEST" 2>&1 \
+            | tee "$EVIDENCE_DIR/cargo-test.log"
+
+      - name: Validate schemas and registry at exact HEAD
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path "$MANIFEST" -- \
+            --root . \
+            --out "$EVIDENCE_DIR/mesh-security-contract-audit.json" \
+            2>&1 | tee "$EVIDENCE_DIR/cargo-run.log"
+          grep -Fq '"status": "PASS"' "$EVIDENCE_DIR/mesh-security-contract-audit.json"
+          grep -Fq '"claim_ceiling": "schema_and_registry_integrity_only"' \
+            "$EVIDENCE_DIR/mesh-security-contract-audit.json"
+
+      - name: Finalize provenance manifest
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          {
+            printf 'event=%s\n' "$GITHUB_EVENT_NAME"
+            printf 'checkout_sha=%s\n' "$(git rev-parse HEAD)"
+            printf 'working_tree_status_sha256=%s\n' \
+              "$(git status --porcelain | sha256sum | cut -d' ' -f1)"
+            if [ -f "$MANIFEST" ]; then
+              sha256sum "$MANIFEST"
+            fi
+            if [ -f tools/mesh-security-contract-audit/Cargo.lock ]; then
+              cp tools/mesh-security-contract-audit/Cargo.lock "$EVIDENCE_DIR/Cargo.lock"
+              sha256sum "$EVIDENCE_DIR/Cargo.lock"
+            fi
+            if [ -f "$EVIDENCE_DIR/mesh-security-contract-audit.json" ]; then
+              sha256sum "$EVIDENCE_DIR/mesh-security-contract-audit.json"
+            fi
+          } > "$EVIDENCE_DIR/run-manifest.txt"
+
+      - name: Upload exact-head contract evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mesh-security-contract-${{ github.sha }}
+          path: target/mesh-security-contract-audit/
+          if-no-files-found: error
+          retention-days: 30
