@@ -856,11 +856,21 @@ fn audit_candidate(
                 };
 
                 if let Some(evidence_bytes) = runtime_evidence_bytes.as_ref() {
-                    match validate_runtime_evidence(evidence_bytes, row, instance_id, validation_dir, &status) {
+                    match validate_runtime_evidence(
+                        evidence_bytes,
+                        row,
+                        instance_id,
+                        validation_dir,
+                        &status,
+                    ) {
                         Ok(summary) => runtime_summary = Some(summary),
                         Err(evidence_errors) => {
                             unresolved = true;
-                            reasons.extend(evidence_errors.into_iter().map(|error| format!("runtime evidence audit: {error}")));
+                            reasons.extend(
+                                evidence_errors
+                                    .into_iter()
+                                    .map(|error| format!("runtime evidence audit: {error}")),
+                            );
                         }
                     }
                 }
@@ -933,7 +943,9 @@ fn audit_candidate(
         baseline_validation_log_sha256: baseline_log_sha256.clone(),
         gold_validation_log_sha256: log_sha256.clone(),
         runtime_evidence_sha256: runtime_evidence_sha256.clone(),
-        container_image_id: runtime_summary.as_ref().map(|summary| summary.container_image_id.clone()),
+        container_image_id: runtime_summary
+            .as_ref()
+            .map(|summary| summary.container_image_id.clone()),
     };
 
     let manifest_record = if eligible {
@@ -946,11 +958,21 @@ fn audit_candidate(
             gold_patch_sha256: gold_patch_sha256.expect("eligible task has gold patch"),
             test_patch_sha256: test_patch_sha256.expect("eligible task has test patch"),
             validation_status_sha256: status_json_sha256.expect("eligible task has status file"),
-            baseline_validation_log_sha256: baseline_log_sha256.expect("eligible task has baseline log"),
+            baseline_validation_log_sha256: baseline_log_sha256
+                .expect("eligible task has baseline log"),
             gold_validation_log_sha256: log_sha256.expect("eligible task has gold validation log"),
-            runtime_evidence_sha256: runtime_evidence_sha256.expect("eligible task has runtime evidence"),
-            container_image_id: runtime_summary.as_ref().expect("eligible task has runtime summary").container_image_id.clone(),
-            container_ids: runtime_summary.as_ref().expect("eligible task has runtime summary").container_ids.clone(),
+            runtime_evidence_sha256: runtime_evidence_sha256
+                .expect("eligible task has runtime evidence"),
+            container_image_id: runtime_summary
+                .as_ref()
+                .expect("eligible task has runtime summary")
+                .container_image_id
+                .clone(),
+            container_ids: runtime_summary
+                .as_ref()
+                .expect("eligible task has runtime summary")
+                .container_ids
+                .clone(),
             fail_to_pass_count: explicit_fail_to_pass_count,
             pass_to_pass_count: baseline_pass_count,
         })
@@ -1079,13 +1101,20 @@ fn run(cli: Cli) -> Result<(), String> {
     let unresolved_count = outcomes.iter().filter(|task| task.unresolved).count();
     let lockable = unresolved_count == 0 && !manifest_tasks.is_empty();
 
-    let (agent_prompt_bytes, controller_manifest_bytes, agent_prompt_projection_sha256, controller_manifest_sha256) =
+    let (
+        agent_prompt_bytes,
+        controller_manifest_bytes,
+        agent_prompt_projection_sha256,
+        controller_manifest_sha256,
+    ) =
         if lockable {
             let mut prompt_bytes = Vec::new();
             for task in &manifest_tasks {
                 let problem_statement = agent_prompts_by_id
                     .get(&task.instance_id)
-                    .ok_or_else(|| format!("missing agent prompt for eligible task {}", task.instance_id))?;
+                    .ok_or_else(|| {
+                        format!("missing agent prompt for eligible task {}", task.instance_id)
+                    })?;
                 let row = serde_json::to_vec(&AgentPromptRecord {
                     problem_statement: problem_statement.clone(),
                 })
@@ -1310,32 +1339,53 @@ mod tests {
     ) -> Value {
         let task_dir = root.join(instance_id);
         fs::create_dir_all(&task_dir).unwrap();
+        let baseline_status = baseline
+            .iter()
+            .map(|(id, state)| ((*id).to_string(), (*state).to_string()))
+            .collect::<BTreeMap<_, _>>();
+        let gold_status = gold
+            .iter()
+            .map(|(id, state)| ((*id).to_string(), (*state).to_string()))
+            .collect::<BTreeMap<_, _>>();
         let status = serde_json::json!({
             "instance_id": instance_id,
-            "pre_patch_status": baseline.iter().map(|(id, state)| ((*id).to_string(), (*state).to_string())).collect::<BTreeMap<_, _>>(),
-            "post_patch_status": gold.iter().map(|(id, state)| ((*id).to_string(), (*state).to_string())).collect::<BTreeMap<_, _>>(),
+            "pre_patch_status": baseline_status,
+            "post_patch_status": gold_status,
             "FAIL_TO_PASS": listed_f2p,
             "PASS_TO_PASS": listed_p2p
         });
-        fs::write(task_dir.join("status.json"), serde_json::to_vec(&status).unwrap()).unwrap();
+        fs::write(
+            task_dir.join("status.json"),
+            serde_json::to_vec(&status).unwrap(),
+        )
+        .unwrap();
+
         let baseline_log = "baseline: complete test log\n";
         fs::write(task_dir.join("pre_patch_log.txt"), baseline_log).unwrap();
         fs::write(task_dir.join("post_patch_log.txt"), gold_log).unwrap();
         let image_reference = "test-image@sha256:deadbeef";
         let image_id = format!("sha256:{}", "b".repeat(64));
-        let baseline_status = baseline.iter().map(|(id, state)| ((*id).to_string(), (*state).to_string())).collect::<BTreeMap<_, _>>();
-        let gold_status = gold.iter().map(|(id, state)| ((*id).to_string(), (*state).to_string())).collect::<BTreeMap<_, _>>();
+        let gold_test_exit_code = if gold.iter().all(|(_, state)| *state == "pass") {
+            0
+        } else {
+            1
+        };
+
         let mut gold_runs = Vec::new();
         for run_index in 0..3 {
             let run_log = format!("gold run {run_index} complete test log\n");
-            fs::write(task_dir.join(format!("gold_run_{run_index}.log")), &run_log).unwrap();
+            fs::write(
+                task_dir.join(format!("gold_run_{run_index}.log")),
+                &run_log,
+            )
+            .unwrap();
             gold_runs.push(serde_json::json!({
                 "role": "gold",
                 "run_index": run_index,
                 "test_patch_applied": true,
                 "solution_patch_applied": true,
                 "rebuild_exit_code": 0,
-                "test_exit_code": if gold.iter().all(|(_, state)| *state == "pass") { 0 } else { 1 },
+                "test_exit_code": gold_test_exit_code,
                 "print_exit_code": 0,
                 "container_identity": {
                     "container_id": format!("{:064x}", run_index + 2),
@@ -1368,13 +1418,17 @@ mod tests {
             },
             "gold_runs": gold_runs
         });
-        fs::write(task_dir.join("validation_evidence.json"), serde_json::to_vec(&evidence).unwrap()).unwrap();
+        fs::write(
+            task_dir.join("validation_evidence.json"),
+            serde_json::to_vec(&evidence).unwrap(),
+        )
+        .unwrap();
 
         serde_json::json!({
             "instance_id": instance_id,
             "repo": "owner/repo",
             "base_commit": "a".repeat(40),
-            "docker_image": "test-image@sha256:deadbeef",
+            "docker_image": image_reference,
             "problem_statement": "Fix the documented bug.",
             "patch": "diff --git a/src/lib.rs b/src/lib.rs\n+fn fixed() {}",
             "test_patch": "diff --git a/tests/lib.rs b/tests/lib.rs\n+assert!(fixed());"
@@ -1414,7 +1468,9 @@ mod tests {
         );
         assert_eq!(record.container_image_id, format!("sha256:{}", "b".repeat(64)));
         assert_eq!(record.container_ids.len(), 4);
-        assert_eq!(record.runtime_evidence_sha256, sha256_bytes(&fs::read(root.path().join(instance_id).join("validation_evidence.json")).unwrap()));
+        let evidence_bytes =
+            fs::read(root.path().join(instance_id).join("validation_evidence.json")).unwrap();
+        assert_eq!(record.runtime_evidence_sha256, sha256_bytes(&evidence_bytes));
     }
 
     #[test]
@@ -1506,10 +1562,19 @@ mod tests {
             "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
         );
         fs::write(root.path().join(instance_id).join("gold_run_1.log"), "tampered log\n").unwrap();
-        let result = audit_candidate(&row, instance_id, root.path(), sha256_bytes(b"tampered log row"));
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"tampered log row"),
+        );
         assert!(!result.audit.eligible);
         assert!(result.audit.unresolved);
-        assert!(result.audit.reasons.iter().any(|reason| reason.contains("raw run log SHA-256 mismatch")));
+        assert!(result
+            .audit
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("raw run log SHA-256 mismatch")));
     }
 
     #[test]
@@ -1530,7 +1595,12 @@ mod tests {
         evidence["gold_runs"][2]["container_identity"]["container_image_id"] =
             Value::String(format!("sha256:{}", "c".repeat(64)));
         fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
-        let result = audit_candidate(&row, instance_id, root.path(), sha256_bytes(b"image drift row"));
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"image drift row"),
+        );
         assert!(!result.audit.eligible);
         assert!(result.audit.unresolved);
         assert!(result.audit.reasons.iter().any(|reason| reason.contains("image ID differs")));
@@ -1553,10 +1623,19 @@ mod tests {
         let mut evidence: Value = serde_json::from_slice(&fs::read(&evidence_path).unwrap()).unwrap();
         evidence["baseline"]["test_exit_code"] = Value::from(124);
         fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
-        let result = audit_candidate(&row, instance_id, root.path(), sha256_bytes(b"baseline timeout row"));
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"baseline timeout row"),
+        );
         assert!(!result.audit.eligible);
         assert!(result.audit.unresolved);
-        assert!(result.audit.reasons.iter().any(|reason| reason.contains("test command is unresolved")));
+        assert!(result
+            .audit
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("test command is unresolved")));
     }
 
     #[test]
@@ -1576,10 +1655,19 @@ mod tests {
         let mut evidence: Value = serde_json::from_slice(&fs::read(&evidence_path).unwrap()).unwrap();
         evidence["gold_runs"][1]["solution_patch_applied"] = Value::Bool(false);
         fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
-        let result = audit_candidate(&row, instance_id, root.path(), sha256_bytes(b"patch rejected row"));
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"patch rejected row"),
+        );
         assert!(!result.audit.eligible);
         assert!(result.audit.unresolved);
-        assert!(result.audit.reasons.iter().any(|reason| reason.contains("gold solution patch application")));
+        assert!(result
+            .audit
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("gold solution patch application")));
     }
 
     #[test]
