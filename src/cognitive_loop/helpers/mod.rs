@@ -244,6 +244,7 @@ impl CognitiveLoopService {
         Ok(CycleResult {
             output,
             prediction_error,
+            prediction_error_valid,
             peak_attention: 0.0, // No text-based attention for embedding input
             detected_primitives: Vec::new(), // No text primitives for embedding input
             learning_occurred,
@@ -470,6 +471,7 @@ impl CognitiveLoopService {
         super::CycleResult {
             output,
             prediction_error,
+            prediction_error_valid,
             peak_attention: 0.0,
             detected_primitives: Vec::new(),
             learning_occurred,
