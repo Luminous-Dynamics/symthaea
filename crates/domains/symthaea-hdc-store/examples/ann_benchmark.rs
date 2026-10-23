@@ -504,9 +504,7 @@ fn mean(values: impl Iterator<Item = f64>) -> f64 {
 fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
     println!("# protocol={PROTOCOL}");
     println!("# source_sha={}", config.source_sha);
-    println!(
-        "# workload=clustered BinaryHV memories; 80% known-memory probes; 20% random OOD probes"
-    );
+    println!("# workload=clustered BinaryHV memories; 80% known-memory probes; 20% random OOD probes");
     println!("# store_size={}", config.size);
     println!("# clusters={}", config.clusters);
     println!("# cluster_noise_bits={}", config.cluster_noise_bits);
@@ -517,24 +515,25 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
     println!("# seed={}", config.seed);
     println!("# candidate_multiplier={}", config.candidate_multiplier);
     println!("# fallback_on_empty={}", config.fallback_on_empty);
-    println!("# lsh_bands={}", config.lsh_bands);
-    println!("# lsh_rows={}", config.lsh_rows);
+    println!("# lsh_configs={}", config.lsh_configs.iter().map(|arm| arm.label()).collect::<Vec<_>>().join(";"));
     println!("# target_os={}", env::consts::OS);
     println!("# target_arch={}", env::consts::ARCH);
     let available_parallelism = std::thread::available_parallelism()
         .map(|count| count.get())
         .unwrap_or(1);
     println!("# available_parallelism={available_parallelism}");
-    println!("# quality metrics below are computed over unique queries in round 0");
+    println!("# quality metrics are computed from unique queries (round 0); latencies pool repeated rounds");
     println!(
-            "query_index,round,kind,exact_ns,approximate_ns,recall_at_k,tie_aware_recall_at_k,examined,total_live,candidate_fraction,approximate_exact,fell_back_to_exact,exact_ids,approximate_ids"
+        "query_index,round,kind,lsh_bands,lsh_rows,exact_ns,approximate_ns,recall_at_k,tie_aware_recall_at_k,examined,total_live,candidate_fraction,approximate_exact,fell_back_to_exact,exact_ids,approximate_ids"
     );
     for sample in samples {
         println!(
-            "{},{},{},{},{},{:.9},{:.9},{},{},{:.9},{},{},\"{}\",\"{}\"",
+            "{},{},{},{},{},{},{},{:.9},{:.9},{},{},{:.9},{},{},\\"{}\\",\\"{}\\"",
             sample.query_index,
             sample.round,
             sample.kind,
+            sample.lsh_bands,
+            sample.lsh_rows,
             sample.exact_ns,
             sample.approximate_ns,
             sample.recall_at_k,
@@ -549,54 +548,89 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
         );
     }
 
-    let exact_ns: Vec<u128> = samples.iter().map(|sample| sample.exact_ns).collect();
-    let approximate_ns: Vec<u128> = samples.iter().map(|sample| sample.approximate_ns).collect();
-    let exact_p50 = percentile(&exact_ns, 0.50);
-    let exact_p95 = percentile(&exact_ns, 0.95);
-    let approximate_p50 = percentile(&approximate_ns, 0.50);
-    let approximate_p95 = percentile(&approximate_ns, 0.95);
-    let p95_ratio = if approximate_p95 == 0 {
-        0.0
-    } else {
-        exact_p95 as f64 / approximate_p95 as f64
-    };
-
-    println!("# summary_all_unique_queries={}", quality.len());
-    println!("# summary_latency_samples={}", samples.len());
-    println!("# summary_all_mean_recall_at_k={:.9}", mean(quality.iter().map(|q| q.recall_at_k)));
-    println!(
-        "# summary_all_mean_tie_aware_recall_at_k={:.9}",
-        mean(quality.iter().map(|q| q.tie_aware_recall_at_k))
-    );
-    println!(
-        "# summary_all_worst_recall_at_k={:.9}",
-        quality.iter().map(|q| q.recall_at_k).fold(1.0, f64::min)
-    );
-    println!(
-        "# summary_all_mean_candidate_fraction={:.9}",
-        mean(quality.iter().map(|q| q.candidate_fraction))
-    );
-    println!(
-        "# summary_all_mean_examined_vectors={:.3}",
-        mean(quality.iter().map(|q| q.examined as f64))
-    );
-    println!(
-        "# summary_all_exhaustive_query_fraction={:.9}",
-        fraction(quality.iter().filter(|q| q.approximate_exact).count(), quality.len())
-    );
-    println!(
-        "# summary_all_fallback_query_fraction={:.9}",
-        fraction(quality.iter().filter(|q| q.fell_back_to_exact).count(), quality.len())
-    );
-    println!("# summary_all_exact_p50_ns={exact_p50}");
-    println!("# summary_all_exact_p95_ns={exact_p95}");
-    println!("# summary_all_approximate_p50_ns={approximate_p50}");
-    println!("# summary_all_approximate_p95_ns={approximate_p95}");
-    println!("# summary_all_ratio_exact_p95_over_approximate_p95={p95_ratio:.6}");
-    emit_quality_summary("near_neighbor", quality);
-    emit_quality_summary("novel", quality);
-    emit_latency_summary("near_neighbor", samples);
-    emit_latency_summary("novel", samples);
+    for arm in config.lsh_configs.iter().copied() {
+        let label = arm.label();
+        let arm_samples: Vec<&Sample> = samples
+            .iter()
+            .filter(|sample| sample.lsh_bands == arm.bands && sample.lsh_rows == arm.rows)
+            .collect();
+        let arm_quality: Vec<&Quality> = quality
+            .iter()
+            .filter(|query| query.lsh_bands == arm.bands && query.lsh_rows == arm.rows)
+            .collect();
+        let exact_ns: Vec<u128> = arm_samples.iter().map(|sample| sample.exact_ns).collect();
+        let approximate_ns: Vec<u128> =
+            arm_samples.iter().map(|sample| sample.approximate_ns).collect();
+        let exact_p50 = percentile(&exact_ns, 0.50);
+        let exact_p95 = percentile(&exact_ns, 0.95);
+        let approximate_p50 = percentile(&approximate_ns, 0.50);
+        let approximate_p95 = percentile(&approximate_ns, 0.95);
+        let p95_ratio = if approximate_p95 == 0 {
+            0.0
+        } else {
+            exact_p95 as f64 / approximate_p95 as f64
+        };
+        println!("# arm_{label}_unique_queries={}", arm_quality.len());
+        println!("# arm_{label}_latency_samples={}", arm_samples.len());
+        println!(
+            "# arm_{label}_all_mean_recall_at_k={:.9}",
+            mean(arm_quality.iter().map(|query| query.recall_at_k))
+        );
+        println!(
+            "# arm_{label}_all_mean_tie_aware_recall_at_k={:.9}",
+            mean(arm_quality.iter().map(|query| query.tie_aware_recall_at_k))
+        );
+        println!(
+            "# arm_{label}_all_worst_recall_at_k={:.9}",
+            arm_quality.iter().map(|query| query.recall_at_k).fold(1.0, f64::min)
+        );
+        println!(
+            "# arm_{label}_all_mean_candidate_fraction={:.9}",
+            mean(arm_quality.iter().map(|query| query.candidate_fraction))
+        );
+        println!(
+            "# arm_{label}_all_mean_examined_vectors={:.3}",
+            mean(arm_quality.iter().map(|query| query.examined as f64))
+        );
+        println!(
+            "# arm_{label}_all_exhaustive_query_fraction={:.9}",
+            fraction(
+                arm_quality.iter().filter(|query| query.approximate_exact).count(),
+                arm_quality.len()
+            )
+        );
+        println!(
+            "# arm_{label}_all_fallback_query_fraction={:.9}",
+            fraction(
+                arm_quality.iter().filter(|query| query.fell_back_to_exact).count(),
+                arm_quality.len()
+            )
+        );
+        println!("# arm_{label}_exact_p50_ns={exact_p50}");
+        println!("# arm_{label}_exact_p95_ns={exact_p95}");
+        println!("# arm_{label}_approximate_p50_ns={approximate_p50}");
+        println!("# arm_{label}_approximate_p95_ns={approximate_p95}");
+        println!("# arm_{label}_ratio_exact_p95_over_approximate_p95={p95_ratio:.6}");
+        for kind in ["near_neighbor", "novel"] {
+            emit_quality_summary(kind, arm, quality);
+            emit_latency_summary(kind, arm, samples);
+            let speedups = paired_query_speedups(kind, arm, samples);
+            let (lower, upper) = bootstrap_median_ci(
+                &speedups,
+                config.seed ^ (u64::from(arm.bands) << 32) ^ u64::from(arm.rows) ^ kind_seed(kind),
+            );
+            println!(
+                "# arm_{label}_{kind}_median_per_query_speedup={:.6}",
+                median_f64(&speedups)
+            );
+            println!("# arm_{label}_{kind}_median_speedup_bootstrap_95ci_low={lower:.6}");
+            println!("# arm_{label}_{kind}_median_speedup_bootstrap_95ci_high={upper:.6}");
+            println!(
+                "# arm_{label}_{kind}_bootstrap_resamples={}",
+                if speedups.is_empty() { 0 } else { BOOTSTRAP_RESAMPLES }
+            );
+        }
+    }
     println!(
         "# interpretation={}",
         concat!(
