@@ -1488,6 +1488,103 @@ mod tests {
     }
 
     #[test]
+    fn structured_recovery_families_preserve_energy_dimensions() {
+        let base = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".to_string())),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let units = demo_units();
+        let families = [
+            RecoveryProposalFamily::AdditiveCorrection,
+            RecoveryProposalFamily::MultiplicativeCorrection,
+            RecoveryProposalFamily::InteractionCorrection,
+        ];
+        let mut rng = 0xCAFE_BABE_1234_5678_u64;
+
+        for family in families {
+            let mut candidate = None;
+            for _ in 0..128 {
+                if let Some(proposal) =
+                    structured_correction_proposal(&mut rng, &base, family)
+                {
+                    candidate = Some(proposal);
+                    break;
+                }
+            }
+            let candidate = candidate.expect("typed correction family failed to propose a valid expression");
+            assert!(matches!(
+                infer_dimensions(&candidate, &units),
+                InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
+            ));
+        }
+    }
+
+    #[test]
+    fn empirical_recovery_score_rewards_a_structured_correction_on_observed_residuals() {
+        let base = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".to_string())),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let radius_squared = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("r".to_string())),
+            Box::new(Expr::Const(2.0)),
+        );
+        let time_squared = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("t".to_string())),
+            Box::new(Expr::Const(2.0)),
+        );
+        let correction = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Const(0.5)),
+            Box::new(Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::BinOp(
+                    BinOp::Mul,
+                    Box::new(Expr::Var("m".to_string())),
+                    Box::new(radius_squared),
+                )),
+                Box::new(time_squared),
+            )),
+        );
+        let corrected = Expr::BinOp(
+            BinOp::Add,
+            Box::new(base.clone()),
+            Box::new(correction),
+        );
+        let mut rng = 0xA11C_E5ED_9876_5432_u64;
+        let observations: Vec<(Experiment, f64)> = (0..24)
+            .map(|_| {
+                let point = random_experiment(&mut rng);
+                let value = eval_at(&corrected, &point).unwrap();
+                (point, value)
+            })
+            .collect();
+
+        let baseline_score = recovery_fit_score(&base, &observations).unwrap();
+        let corrected_score = recovery_fit_score(&corrected, &observations).unwrap();
+        assert!(
+            corrected_score < baseline_score,
+            "structured correction should explain the synthetic residual: base={baseline_score}, corrected={corrected_score}"
+        );
+        assert!(matches!(
+            infer_dimensions(&corrected, &demo_units()),
+            InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
+        ));
+    }
+
+    #[test]
     fn post_alarm_recovery_reopens_archived_candidates_and_adds_typed_candidates() {
         let mut rng = 0xBADC_0FFE_E0DD_F00D_u64;
         let mut pool_rng = 0x1234_5678_9ABC_DEF0_u64;
@@ -1538,7 +1635,7 @@ mod tests {
         assert!(summary.accepted_count <= RECOVERY_CANDIDATES_PER_EXPANSION);
         assert!(!live.contains(&0), "the alarmed provisional candidate stayed live");
         assert!(live.contains(&1) && live.contains(&2), "archived alternatives were not reopened");
-        assert_eq!(live.len(), archived_count - 1 + added);
+        assert_eq!(live.len(), archived_count - 1 + summary.accepted_count);
         let units = demo_units();
         for index in archived_count..hypotheses.len() {
             assert!(matches!(
