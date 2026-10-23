@@ -471,10 +471,7 @@ fn expected_loss_under_assumed_policy(
     let mut actual = assumed;
     actual.likelihood_per_mille = actual_likelihoods;
 
-    if !assumed.provenance_validated
-        || !valid_likelihoods(assumed)
-        || !valid_likelihoods(actual)
-    {
+    if !assumed.provenance_validated || !valid_likelihoods(assumed) || !valid_likelihoods(actual) {
         return None;
     }
 
@@ -526,11 +523,7 @@ fn model_misspecification_can_make_a_nominally_best_sensor_worse_than_baseline()
     let decisions = decisions();
     let inventory = candidates[1];
     let design = candidates[2];
-    let true_inventory_likelihood = [
-        [900, 100, 0],
-        [100, 900, 0],
-        [100, 900, 0],
-    ];
+    let true_inventory_likelihood = [[900, 100, 0], [100, 900, 0], [100, 900, 0]];
 
     // The selector sees the assumed model and prefers the inventory sensor.
     assert_eq!(
@@ -563,7 +556,9 @@ fn model_misspecification_can_make_a_nominally_best_sensor_worse_than_baseline()
         expected_loss_after_measurement(design, PRIOR_WEIGHTS, &decisions),
         design.cost_milliunits,
     );
-    let oracle_total = baseline_total.min(oracle_inventory_total).min(oracle_design_total);
+    let oracle_total = baseline_total
+        .min(oracle_inventory_total)
+        .min(oracle_design_total);
     let decision_regret = selected_total - oracle_total;
     let model_regret = selected_actual_risk
         - expected_loss_after_measurement(true_inventory, PRIOR_WEIGHTS, &decisions);
@@ -607,13 +602,9 @@ fn decision_regret_shrinks_as_true_reliability_approaches_the_assumed_model() {
             [error, reliability, 0],
             [error, reliability, 0],
         ];
-        let selected_risk = expected_loss_under_assumed_policy(
-            inventory,
-            truth,
-            PRIOR_WEIGHTS,
-            &decisions,
-        )
-        .expect("valid likelihoods");
+        let selected_risk =
+            expected_loss_under_assumed_policy(inventory, truth, PRIOR_WEIGHTS, &decisions)
+                .expect("valid likelihoods");
         let selected_total =
             total_loss_with_acquisition_cost(selected_risk, inventory.cost_milliunits);
         let true_inventory = Measurement {
