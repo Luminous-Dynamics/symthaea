@@ -4,12 +4,15 @@
 //! not a competitive solver benchmark and not a quantum backend. Redirect stdout to a
 //! file to preserve the raw receipt.
 
+use std::cmp::Reverse;
+use std::collections::{BTreeSet, BinaryHeap};
 use std::env;
 use std::fs;
 use std::process::ExitCode;
 use std::time::Instant;
 
 use symthaea_quantum_comp::mis_verifier::{MisGraph, EXACT_ORACLE_MAX_VERTICES};
+use symthaea_quantum_comp::rng::XorShift64;
 use symthaea_quantum_comp::{MisDimacsLimits, parse_dimacs_mis_with_limits};
 
 fn fnv1a64(bytes: &[u8]) -> u64 {
@@ -45,8 +48,21 @@ fn json_vertices(vertices: &[usize]) -> String {
     format!("[{body}]")
 }
 
+const MULTISTART_GREEDY_RUNS: usize = 16;
+const MULTISTART_GREEDY_SEED_BASE: u64 = 0x5143_4f4d_505f_3031;
+
+/// Build an independent set with minimum residual degree and a deterministic vertex tie break.
 fn greedy_min_residual_degree(graph: &MisGraph) -> Vec<usize> {
-    let mut adjacency = vec![Vec::new(); graph.vertex_count()];
+    greedy_min_residual_degree_with_seed(graph, None)
+}
+
+/// Build an independent set with minimum residual degree. With a seed, ties among
+/// equal residual degrees are selected using a reproducible local RNG. A lazy min-heap
+/// keeps the heuristic O((V+E) log(V+E)) instead of rescanning every adjacency list
+/// on each selected vertex, making the smoke baseline usable on dense QOBLIB instances.
+fn greedy_min_residual_degree_with_seed(graph: &MisGraph, seed: Option<u64>) -> Vec<usize> {
+    let vertex_count = graph.vertex_count();
+    let mut adjacency = vec![Vec::new(); vertex_count];
     for &(u, v) in graph.edges() {
         adjacency[u].push(v);
         adjacency[v].push(u);
@@ -55,29 +71,117 @@ fn greedy_min_residual_degree(graph: &MisGraph) -> Vec<usize> {
         neighbors.sort_unstable();
     }
 
-    let mut active = vec![true; graph.vertex_count()];
+    let mut active = vec![true; vertex_count];
+    let mut residual_degree: Vec<usize> = adjacency.iter().map(Vec::len).collect();
+    let mut heap: BinaryHeap<Reverse<(usize, usize)>> = BinaryHeap::new();
+    for (vertex, &degree) in residual_degree.iter().enumerate() {
+        heap.push(Reverse((degree, vertex)));
+    }
+    let mut rng = seed.map(XorShift64::new);
     let mut selected = Vec::new();
+
     loop {
-        let next = (0..graph.vertex_count())
-            .filter(|&vertex| active[vertex])
-            .min_by_key(|&vertex| {
-                let residual_degree = adjacency[vertex]
-                    .iter()
-                    .filter(|&&neighbor| active[neighbor])
-                    .count();
-                (residual_degree, vertex)
-            });
-        let Some(vertex) = next else {
+        // Discard stale degree entries left behind by neighbor removals.
+        while let Some(Reverse((degree, vertex))) = heap.peek().copied() {
+            if !active[vertex] || degree != residual_degree[vertex] {
+                heap.pop();
+            } else {
+                break;
+            }
+        }
+
+        let Some(Reverse((minimum_degree, _))) = heap.peek().copied() else {
             break;
         };
-        active[vertex] = false;
-        selected.push(vertex);
-        for &neighbor in &adjacency[vertex] {
-            active[neighbor] = false;
+
+        // Gather every currently valid vertex tied at the minimum degree. Reinsert
+        // unchosen ties so their heap entries remain live in later iterations.
+        let mut ties = Vec::new();
+        while let Some(Reverse((degree, vertex))) = heap.peek().copied() {
+            if degree != minimum_degree {
+                break;
+            }
+            heap.pop();
+            if active[vertex] && degree == residual_degree[vertex] {
+                ties.push(vertex);
+            }
         }
+        if ties.is_empty() {
+            continue;
+        }
+        let tie_index = rng
+            .as_mut()
+            .and_then(|state| state.next_usize(ties.len()))
+            .unwrap_or(0);
+        let chosen = ties[tie_index];
+        for &vertex in &ties {
+            if vertex != chosen {
+                heap.push(Reverse((residual_degree[vertex], vertex)));
+            }
+        }
+
+        // The chosen vertex enters the independent set; its closed neighborhood is
+        // removed. Then decrement residual degrees only for still-active neighbors.
+        let mut removed = Vec::with_capacity(adjacency[chosen].len() + 1);
+        active[chosen] = false;
+        removed.push(chosen);
+        for &neighbor in &adjacency[chosen] {
+            if active[neighbor] {
+                active[neighbor] = false;
+                removed.push(neighbor);
+            }
+        }
+        for &gone in &removed {
+            for &neighbor in &adjacency[gone] {
+                if active[neighbor] {
+                    residual_degree[neighbor] -= 1;
+                    heap.push(Reverse((residual_degree[neighbor], neighbor)));
+                }
+            }
+        }
+        selected.push(chosen);
     }
+
     selected.sort_unstable();
     selected
+}
+
+/// A bounded, reproducible multi-start classical baseline. It selects the best
+/// feasible greedy result; equal-size results use lexicographically smaller vertices.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MultiStartGreedyResult {
+    best_vertices: Vec<usize>,
+    best_seed: u64,
+    objectives: Vec<usize>,
+    distinct_solutions: usize,
+}
+
+fn multi_start_greedy(graph: &MisGraph, repeats: usize) -> MultiStartGreedyResult {
+    let repeats = repeats.max(1);
+    let mut best_vertices = Vec::new();
+    let mut best_seed = MULTISTART_GREEDY_SEED_BASE;
+    let mut objectives = Vec::with_capacity(repeats);
+    let mut unique_solutions = BTreeSet::new();
+
+    for run_index in 0..repeats {
+        let seed = MULTISTART_GREEDY_SEED_BASE.wrapping_add(run_index as u64);
+        let vertices = greedy_min_residual_degree_with_seed(graph, Some(seed));
+        objectives.push(vertices.len());
+        unique_solutions.insert(vertices.clone());
+        if vertices.len() > best_vertices.len()
+            || (vertices.len() == best_vertices.len() && vertices < best_vertices)
+        {
+            best_vertices = vertices;
+            best_seed = seed;
+        }
+    }
+
+    MultiStartGreedyResult {
+        best_vertices,
+        best_seed,
+        objectives,
+        distinct_solutions: unique_solutions.len(),
+    }
 }
 
 
