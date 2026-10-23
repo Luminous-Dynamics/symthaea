@@ -469,4 +469,25 @@ mod tests {
         validate_schema_document(&invalid_schema, "invalid-fixture.schema.json", &mut errors);
         assert!(!errors.is_empty(), "invalid JSON Schema must fail its meta-schema");
     }
+
+    #[test]
+    fn receipt_write_failure_is_not_reported_as_success() {
+        let blocker = env::temp_dir().join(format!(
+            "mesh-security-audit-output-blocker-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system clock follows Unix epoch")
+                .as_nanos()
+        ));
+        fs::write(&blocker, b"not a directory").expect("create a file to block directory creation");
+        let output = blocker.join("receipt.json");
+
+        assert!(
+            !emit(&json!({"status": "PASS"}), Some(&output)),
+            "a passing audit whose receipt cannot be written must have a non-success emission result"
+        );
+
+        fs::remove_file(blocker).expect("remove output blocker");
+    }
 }
