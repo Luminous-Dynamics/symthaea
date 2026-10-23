@@ -44,7 +44,7 @@ jobs:
         run: |
           git -C benchmark-source apply --check "$GITHUB_WORKSPACE/docs/research/patches/swe-bench-live-validation-evidence.patch"
           git -C benchmark-source apply "$GITHUB_WORKSPACE/docs/research/patches/swe-bench-live-validation-evidence.patch"
-          python3 -m py_compile benchmark-source/evaluation/validation.py
+          python3 -m py_compile benchmark-source/evaluation/validation.py benchmark-source/evaluation/evaluation.py
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
