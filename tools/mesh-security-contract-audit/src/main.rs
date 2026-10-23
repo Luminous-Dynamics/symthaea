@@ -101,6 +101,7 @@ fn audit(root: &Path) -> Result<Value, String> {
 
     let source_revision = git_head(root)?;
     let tool_manifest = root.join("tools/mesh-security-contract-audit/Cargo.toml");
+    let tool_source = root.join("tools/mesh-security-contract-audit/src/main.rs");
     let lock_path = root.join("tools/mesh-security-contract-audit/Cargo.lock");
 
     let schema_checks_pass = !errors.iter().any(|message| {
@@ -145,6 +146,10 @@ fn audit(root: &Path) -> Result<Value, String> {
             "validator_manifest": {
                 "path": "tools/mesh-security-contract-audit/Cargo.toml",
                 "sha256": sha256_file(&tool_manifest)?
+            },
+            "validator_source": {
+                "path": "tools/mesh-security-contract-audit/src/main.rs",
+                "sha256": sha256_file(&tool_source)?
             },
             "validator_lockfile": {
                 "path": "tools/mesh-security-contract-audit/Cargo.lock",
