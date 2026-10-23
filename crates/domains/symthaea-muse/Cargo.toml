@@ -165,3 +165,7 @@ required-features = ["theory"]
 [[example]]
 name = "rhythm_gate_calibration"
 required-features = ["theory"]
+
+[[example]]
+name = "capability_frontier"
+required-features = ["theory"]
