@@ -18,7 +18,7 @@
 //! the history of ranks, not arbitrary information about raw scores. Callers pass tie breakers
 //! explicitly so their source and provenance can be recorded. This implementation validates their
 //! numeric range but cannot prove randomness, independence, or exchangeability.
-//! 
+//!
 //! In an adaptive experiment, query choices can make raw residual scores non-identically
 //! distributed even when the physical law is correct. Do not feed such residuals directly into
 //! this PRM unless a predeclared transformation and the actual data protocol justify the required
@@ -232,7 +232,9 @@ impl PredictiveRankMartingale {
             if compare_keys(&sorted_reference[index - 1], &sorted_reference[index])
                 == Ordering::Equal
             {
-                return Err(PredictiveRankError::DuplicateCalibrationKey { sorted_index: index });
+                return Err(PredictiveRankError::DuplicateCalibrationKey {
+                    sorted_index: index,
+                });
             }
         }
 
@@ -297,8 +299,7 @@ impl PredictiveRankMartingale {
         let dispersion_stats =
             feature_stats(&self.rank_counts, n, audit_index, RankFeature::Dispersion)?;
         let order_z = RankFeature::Order.value(rank_category, n) - order_stats.mean;
-        let dispersion_z =
-            RankFeature::Dispersion.value(rank_category, n) - dispersion_stats.mean;
+        let dispersion_z = RankFeature::Dispersion.value(rank_category, n) - dispersion_stats.mean;
 
         let order_observation = feature_observation(self.order, order_z, order_stats.bet_bound)?;
         let dispersion_observation =
@@ -486,10 +487,7 @@ fn feature_observation(
     let log_wealth = state.log_wealth + factor.ln();
     let gradient = z / factor;
     let squared_gradient_sum = state.squared_gradient_sum + gradient * gradient;
-    if !log_wealth.is_finite()
-        || !gradient.is_finite()
-        || !squared_gradient_sum.is_finite()
-    {
+    if !log_wealth.is_finite() || !gradient.is_finite() || !squared_gradient_sum.is_finite() {
         return Err(PredictiveRankError::NumericalFailure);
     }
 
