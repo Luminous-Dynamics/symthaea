@@ -168,6 +168,7 @@ impl CognitiveLoopService {
         Some(CycleResult {
             output: vec![0.0; self.config.cfc_config.num_neurons],
             prediction_error: 0.0,
+            prediction_error_valid: false,
             peak_attention: 0.0,
             detected_primitives: vec![],
             learning_occurred: false,
