@@ -77,6 +77,12 @@ enum ParetoMetricError {
     ZeroTotalCalibrationWeight,
     InsufficientWeightedCalibrationSupport,
     NonFiniteWeightedConformalMetric,
+    EmptyCoverageAuditSet,
+    InvalidCoverageAuditParameter,
+    InvalidResidualScore,
+    MissingSelectedCoverage,
+    MissingUnselectedCoverage,
+    InsufficientCoverageGroupSample,
 }
 
 impl fmt::Display for ParetoMetricError {
@@ -146,6 +152,12 @@ impl fmt::Display for ParetoMetricError {
             Self::ZeroTotalCalibrationWeight => f.write_str("weighted calibration requires positive total calibration weight"),
             Self::InsufficientWeightedCalibrationSupport => f.write_str("test-point weight leaves insufficient finite calibration mass for the requested weighted conformal quantile"),
             Self::NonFiniteWeightedConformalMetric => f.write_str("weighted conformal normalization, effective sample size, or quantile mass is non-finite"),
+            Self::EmptyCoverageAuditSet => f.write_str("post-selection coverage audit requires held-out observations"),
+            Self::InvalidCoverageAuditParameter => f.write_str("coverage multiplier and nominal level must be valid and minimum group size positive"),
+            Self::InvalidResidualScore => f.write_str("standardized residual scores must be finite and non-negative"),
+            Self::MissingSelectedCoverage => f.write_str("post-selection audit requires at least one optimizer-selected observation"),
+            Self::MissingUnselectedCoverage => f.write_str("post-selection audit requires at least one unselected observation"),
+            Self::InsufficientCoverageGroupSample => f.write_str("at least one regional group has fewer samples than the frozen minimum"),
         }
     }
 }
@@ -621,6 +633,173 @@ fn assess_conformal_holdout(
     })
 }
 
+
+
+/// Held-out residual score annotated with the region and whether the optimizer selected it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct PostSelectionCoverageSample {
+    region_id: u32,
+    optimizer_selected: bool,
+    standardized_residual_score: f64,
+}
+
+/// Per-region empirical coverage summary. Regions are returned in ascending region ID order.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct RegionCoverageSummary {
+    region_id: u32,
+    sample_count: usize,
+    covered_count: usize,
+    empirical_coverage: f64,
+}
+
+/// Offline audit that compares aggregate coverage with coverage of points chosen by an optimizer.
+/// This diagnostic does not refit, adjust, or certify the supplied conformal multiplier.
+#[derive(Debug, Clone, PartialEq)]
+struct PostSelectionCoverageAudit {
+    nominal_coverage: f64,
+    multiplier: f64,
+    total_count: usize,
+    covered_count: usize,
+    overall_coverage: f64,
+    selected_count: usize,
+    selected_covered_count: usize,
+    selected_coverage: f64,
+    unselected_count: usize,
+    unselected_covered_count: usize,
+    unselected_coverage: f64,
+    selected_minus_unselected_coverage: f64,
+    worst_region_id: u32,
+    worst_region_coverage: f64,
+    regions: Vec<RegionCoverageSummary>,
+}
+
+/// Audit a fixed multiplier on labeled held-out residuals, with per-region minimum sample gates.
+///
+/// A selected/unselected gap or low regional coverage is evidence of a possible reliability
+/// problem, not proof of conditional miscoverage in the population. Use a separate holdout;
+/// never tune the multiplier on the same observations used for this audit.
+fn audit_post_selection_coverage(
+    samples: &[PostSelectionCoverageSample],
+    multiplier: f64,
+    nominal_coverage: f64,
+    minimum_region_samples: usize,
+) -> Result<PostSelectionCoverageAudit, ParetoMetricError> {
+    if !multiplier.is_finite()
+        || multiplier < 0.0
+        || !nominal_coverage.is_finite()
+        || nominal_coverage <= 0.0
+        || nominal_coverage >= 1.0
+        || minimum_region_samples == 0
+    {
+        return Err(ParetoMetricError::InvalidCoverageAuditParameter);
+    }
+    if samples.is_empty() {
+        return Err(ParetoMetricError::EmptyCoverageAuditSet);
+    }
+
+    let mut selected_count = 0usize;
+    let mut selected_covered_count = 0usize;
+    let mut unselected_count = 0usize;
+    let mut unselected_covered_count = 0usize;
+    let mut total_covered_count = 0usize;
+    let mut region_counts: std::collections::BTreeMap<u32, (usize, usize)> =
+        std::collections::BTreeMap::new();
+
+    for sample in samples {
+        if !sample.standardized_residual_score.is_finite()
+            || sample.standardized_residual_score < 0.0
+        {
+            return Err(ParetoMetricError::InvalidResidualScore);
+        }
+        let covered = sample.standardized_residual_score <= multiplier;
+        let entry = region_counts.entry(sample.region_id).or_insert((0, 0));
+        entry.0 += 1;
+        if covered {
+            entry.1 += 1;
+            total_covered_count += 1;
+        }
+
+        if sample.optimizer_selected {
+            selected_count += 1;
+            if covered {
+                selected_covered_count += 1;
+            }
+        } else {
+            unselected_count += 1;
+            if covered {
+                unselected_covered_count += 1;
+            }
+        }
+    }
+
+    if selected_count == 0 {
+        return Err(ParetoMetricError::MissingSelectedCoverage);
+    }
+    if unselected_count == 0 {
+        return Err(ParetoMetricError::MissingUnselectedCoverage);
+    }
+    if region_counts
+        .values()
+        .any(|(count, _)| *count < minimum_region_samples)
+    {
+        return Err(ParetoMetricError::InsufficientCoverageGroupSample);
+    }
+
+    let mut regions = Vec::with_capacity(region_counts.len());
+    let mut worst_region: Option<(u32, f64)> = None;
+    for (region_id, (sample_count, covered_count)) in region_counts {
+        let coverage = covered_count as f64 / sample_count as f64;
+        if !coverage.is_finite() {
+            return Err(ParetoMetricError::NonFiniteCalibrationMetric);
+        }
+        match worst_region {
+            None => worst_region = Some((region_id, coverage)),
+            Some((_, current_worst)) if coverage < current_worst => {
+                worst_region = Some((region_id, coverage));
+            }
+            _ => {}
+        }
+        regions.push(RegionCoverageSummary {
+            region_id,
+            sample_count,
+            covered_count,
+            empirical_coverage: coverage,
+        });
+    }
+
+    let total_count = samples.len();
+    let overall_coverage = total_covered_count as f64 / total_count as f64;
+    let selected_coverage = selected_covered_count as f64 / selected_count as f64;
+    let unselected_coverage = unselected_covered_count as f64 / unselected_count as f64;
+    let selected_minus_unselected_coverage = selected_coverage - unselected_coverage;
+    let (worst_region_id, worst_region_coverage) =
+        worst_region.ok_or(ParetoMetricError::EmptyCoverageAuditSet)?;
+    if !overall_coverage.is_finite()
+        || !selected_coverage.is_finite()
+        || !unselected_coverage.is_finite()
+        || !selected_minus_unselected_coverage.is_finite()
+    {
+        return Err(ParetoMetricError::NonFiniteCalibrationMetric);
+    }
+
+    Ok(PostSelectionCoverageAudit {
+        nominal_coverage,
+        multiplier,
+        total_count,
+        covered_count: total_covered_count,
+        overall_coverage,
+        selected_count,
+        selected_covered_count,
+        selected_coverage,
+        unselected_count,
+        unselected_covered_count,
+        unselected_coverage,
+        selected_minus_unselected_coverage,
+        worst_region_id,
+        worst_region_coverage,
+        regions,
+    })
+}
 
 /// One normalized-residual calibration observation with an importance weight
 /// proportional to target/source covariate-density ratio.
@@ -1896,6 +2075,127 @@ mod tests {
         assert_abs_close(proposal.objective_0_lower_confidence_bound, 0.8, 1e-12);
         assert_abs_close(proposal.objective_1_upper_confidence_bound, 3.4, 1e-12);
         assert!(proposal.objective_1_upper_confidence_bound <= proposal.epsilon);
+    }
+
+
+    fn post_selection_coverage_samples() -> Vec<PostSelectionCoverageSample> {
+        let mut samples = Vec::new();
+        // Region 0: selected proposals cover 50%, while unselected observations cover 100%.
+        for score in [1.0, 3.0] {
+            samples.push(PostSelectionCoverageSample {
+                region_id: 0,
+                optimizer_selected: true,
+                standardized_residual_score: score,
+            });
+        }
+        for _ in 0..4 {
+            samples.push(PostSelectionCoverageSample {
+                region_id: 0,
+                optimizer_selected: false,
+                standardized_residual_score: 1.0,
+            });
+        }
+        // Region 1 has the same selection-conditional failure pattern but more easy samples.
+        for score in [1.0, 3.0] {
+            samples.push(PostSelectionCoverageSample {
+                region_id: 1,
+                optimizer_selected: true,
+                standardized_residual_score: score,
+            });
+        }
+        for _ in 0..6 {
+            samples.push(PostSelectionCoverageSample {
+                region_id: 1,
+                optimizer_selected: false,
+                standardized_residual_score: 1.0,
+            });
+        }
+        samples
+    }
+
+    #[test]
+    fn post_selection_audit_exposes_undercoverage_hidden_by_aggregate_coverage() {
+        let audit = audit_post_selection_coverage(&post_selection_coverage_samples(), 2.0, 0.8, 2).unwrap();
+        assert_abs_close(audit.overall_coverage, 12.0 / 14.0, 1e-12);
+        assert!(audit.overall_coverage > audit.nominal_coverage);
+        assert_abs_close(audit.selected_coverage, 0.5, 1e-12);
+        assert_abs_close(audit.unselected_coverage, 1.0, 1e-12);
+        assert_abs_close(audit.selected_minus_unselected_coverage, -0.5, 1e-12);
+        assert_eq!(audit.worst_region_id, 0);
+        assert_abs_close(audit.worst_region_coverage, 5.0 / 6.0, 1e-12);
+        assert_eq!(audit.regions.iter().map(|r| r.region_id).collect::<Vec<_>>(), vec![0, 1]);
+    }
+
+    #[test]
+    fn post_selection_audit_is_invariant_to_input_order() {
+        let samples = post_selection_coverage_samples();
+        let forward = audit_post_selection_coverage(&samples, 2.0, 0.8, 2).unwrap();
+        let reverse_samples: Vec<_> = samples.into_iter().rev().collect();
+        let reverse = audit_post_selection_coverage(&reverse_samples, 2.0, 0.8, 2).unwrap();
+        assert_eq!(forward, reverse);
+    }
+
+    #[test]
+    fn post_selection_audit_fails_closed_on_small_regions_and_missing_strata() {
+        let small_regions = [
+            PostSelectionCoverageSample {
+                region_id: 0,
+                optimizer_selected: true,
+                standardized_residual_score: 1.0,
+            },
+            PostSelectionCoverageSample {
+                region_id: 1,
+                optimizer_selected: false,
+                standardized_residual_score: 1.0,
+            },
+        ];
+        assert_eq!(
+            audit_post_selection_coverage(&small_regions, 2.0, 0.8, 2),
+            Err(ParetoMetricError::InsufficientCoverageGroupSample)
+        );
+        let selected_only = [PostSelectionCoverageSample {
+            region_id: 0,
+            optimizer_selected: true,
+            standardized_residual_score: 1.0,
+        }];
+        assert_eq!(
+            audit_post_selection_coverage(&selected_only, 2.0, 0.8, 1),
+            Err(ParetoMetricError::MissingUnselectedCoverage)
+        );
+        assert_eq!(
+            audit_post_selection_coverage(&[], 2.0, 0.8, 1),
+            Err(ParetoMetricError::EmptyCoverageAuditSet)
+        );
+    }
+
+    #[test]
+    fn post_selection_audit_rejects_invalid_parameters_and_scores() {
+        let samples = post_selection_coverage_samples();
+        assert_eq!(
+            audit_post_selection_coverage(&samples, f64::NAN, 0.8, 2),
+            Err(ParetoMetricError::InvalidCoverageAuditParameter)
+        );
+        assert_eq!(
+            audit_post_selection_coverage(&samples, 2.0, 1.0, 2),
+            Err(ParetoMetricError::InvalidCoverageAuditParameter)
+        );
+        assert_eq!(
+            audit_post_selection_coverage(&samples, 2.0, 0.8, 0),
+            Err(ParetoMetricError::InvalidCoverageAuditParameter)
+        );
+        let invalid = [PostSelectionCoverageSample {
+            region_id: 0,
+            optimizer_selected: true,
+            standardized_residual_score: -1.0,
+        }, PostSelectionCoverageSample {
+            region_id: 0,
+            optimizer_selected: false,
+            standardized_residual_score: 1.0,
+        }];
+        assert_eq!(
+            audit_post_selection_coverage(&invalid, 2.0, 0.8, 1),
+            Err(ParetoMetricError::InvalidResidualScore)
+        );
     }
 
     fn assert_abs_close(actual: f64, expected: f64, tolerance: f64) {
