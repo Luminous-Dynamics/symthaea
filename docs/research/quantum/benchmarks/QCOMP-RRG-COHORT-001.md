@@ -65,6 +65,12 @@ Report quality distributions and feasibility rates across each graph/seed cohort
 
 Graph-generation overhead should be reported separately from solve time. Include it in the deployment objective only when the application genuinely requires on-demand graph generation.
 
+## Generator smoke result
+
+A bounded independent JavaScript preflight created the first 20 recorded seeds at each of the seven paper-shaped sizes (140 graphs total). All were simple degree-3 graphs with exactly 3N/2 edges, all connected, all unique by exact canonical edge-list comparison within each size, and all generated in 1–31 attempts (mean 6.686). Full per-seed records and component/triangle summaries are in [QCOMP-RRG-PREFLIGHT-001.json](QCOMP-RRG-PREFLIGHT-001.json), with interpretation in [QCOMP-RRG-PREFLIGHT-001.md](QCOMP-RRG-PREFLIGHT-001.md).
+
+This was a JavaScript translation, not execution of the Rust generator. It establishes that this small set of seeds does not approach the retry cap and that the algorithm sketch yields exact regularity, but not RNG quality, absence of subtle sampling bias, Rust byte parity, or replication of the paper's samples. Before release, the Rust implementation must regenerate these seeds and compare exact outputs/metadata; then record SHA-256 for each serialized DIMACS file.
+
 ## Release gates before confirmatory results
 
 1. Compile and execute the generator unit tests under a recorded Rust toolchain.
@@ -79,4 +85,4 @@ Graph-generation overhead should be reported separately from solve time. Include
 
 ## Validation boundary
 
-This contribution defines a generator API, a 96-workload extension, a 1,400-workload paper-shaped seed manifest, and a 700,000-instance streaming SOTA campaign specification. It has not generated/stored any cohort graph files, run a solver, called a simulator, or executed physical hardware. The Rust tests are authored but not compiled or executed in the authoring environment. The paper-shaped seeds use new workload identities rather than authors' original graphs, so this is not graph-for-graph reproduction. It provides no SOTA, quantum-utility or quantum-advantage result.
+This contribution defines a generator API, a 96-workload extension, a 1,400-workload paper-shaped seed manifest, and a 700,000-instance streaming SOTA campaign specification. No complete cohort graph files have been materialized or checked in; a separate 140-graph JavaScript smoke preflight was run and recorded, but the Rust generator has not been compiled/executed. No solver was run, no simulator was called, and no physical hardware was executed. The Rust tests are authored but not compiled or executed in the authoring environment. The paper-shaped seeds use new workload identities rather than authors' original graphs, so this is not graph-for-graph reproduction. It provides no SOTA, quantum-utility or quantum-advantage result.
