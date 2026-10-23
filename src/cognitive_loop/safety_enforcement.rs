@@ -58,6 +58,8 @@ pub struct SafetyEnforcementResult {
     pub motor_readonly: bool,
     /// Reasons from the safety assessment.
     pub reasons: Vec<String>,
+    /// Whether the PE supplied to this assessment was a current finite observation.
+    pub prediction_error_valid: bool,
 }
 
 /// Assess current state and compute enforcement gates.
@@ -76,6 +78,39 @@ pub fn compute_enforcement(
     >,
     #[cfg(not(feature = "sentinel"))] _collective_immune: Option<&()>,
 ) -> SafetyEnforcementResult {
+    compute_enforcement_with_evidence(
+        agent,
+        consciousness_level,
+        Some(prediction_error),
+        temporal_coherence,
+        integrity_critical,
+        cycle,
+        #[cfg(feature = "sentinel")]
+        collective_immune,
+        #[cfg(not(feature = "sentinel"))]
+        _collective_immune,
+    )
+}
+
+/// Compute safety gates without promoting an unavailable PE sentinel into a
+/// measured model-world failure. Independent safety and integrity signals remain active.
+pub fn compute_enforcement_with_evidence(
+    agent: &mut SafetyAgent,
+    consciousness_level: f32,
+    prediction_error_evidence: Option<f32>,
+    temporal_coherence: f32,
+    integrity_critical: bool,
+    cycle: usize,
+    #[cfg(feature = "sentinel")] collective_immune: Option<
+        &super::collective_immunity::CollectiveImmuneState,
+    >,
+    #[cfg(not(feature = "sentinel"))] _collective_immune: Option<&()>,
+) -> SafetyEnforcementResult {
+    let prediction_error_valid =
+        prediction_error_evidence.is_some_and(|value| value.is_finite());
+    let prediction_error = prediction_error_evidence
+        .filter(|value| value.is_finite())
+        .unwrap_or(1.0);
     let metrics = SafetyMetrics {
         cycle,
         consciousness_level,
@@ -83,7 +118,7 @@ pub fn compute_enforcement(
         temporal_coherence,
         integrity_critical,
     };
-    let assessment = agent.assess(metrics);
+    let assessment = agent.assess_with_evidence(metrics, prediction_error_valid);
     #[allow(unused_mut)]
     let mut level = assessment.level;
 
@@ -139,6 +174,7 @@ pub fn compute_enforcement(
         motor_halt: level == SafetyLevel::Red,
         motor_readonly: level == SafetyLevel::Orange,
         reasons: assessment.reasons,
+        prediction_error_valid: assessment.prediction_error_valid,
     }
 }
 
@@ -266,6 +302,39 @@ mod tests {
             SafetyLevel::Orange,
             "High collective threat should escalate to Orange"
         );
+    }
+
+    #[test]
+    fn invalid_pe_does_not_escalate_safety_by_itself() {
+        let mut agent = SafetyAgent::new();
+        let result = compute_enforcement_with_evidence(
+            &mut agent,
+            0.8,
+            None,
+            0.9,
+            false,
+            100,
+            None,
+        );
+        assert_eq!(result.level, SafetyLevel::Green);
+        assert!(!result.prediction_error_valid);
+        assert!(!result.motor_halt);
+    }
+
+    #[test]
+    fn invalid_pe_does_not_mask_independent_low_coherence_escalation() {
+        let mut agent = SafetyAgent::new();
+        let result = compute_enforcement_with_evidence(
+            &mut agent,
+            0.8,
+            None,
+            0.1,
+            false,
+            100,
+            None,
+        );
+        assert!(result.level >= SafetyLevel::Yellow);
+        assert!(!result.prediction_error_valid);
     }
 
     #[test]
