@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/math-normalization-receipt-v1.schema.json",
+  "title": "Symthaea Mathematical Normalization Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "receipt_id",
+    "normalizer_id",
+    "authority",
+    "source_digest",
+    "source_fragment",
+    "source_provenance_refs",
+    "source_preserved",
+    "numeric_domain",
+    "outcome",
+    "validation_state",
+    "side_conditions",
+    "validation_evidence_refs"
+  ],
+  "properties": {
+    "version": { "const": "math-normalization-receipt-v1" },
+    "receipt_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "normalizer_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "authority": { "const": "RetrievalOnly" },
+    "source_digest": { "$ref": "#/$defs/sha256" },
+    "source_fragment": {
+      "enum": [
+        "ExactPolynomialTerm",
+        "ExactPolynomialEquality",
+        "UnsupportedFragment"
+      ]
+    },
+    "source_provenance_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
+    },
+    "source_preserved": { "const": true },
+    "numeric_domain": { "enum": ["Int", "Nat", "Real"] },
+    "outcome": { "enum": ["Normalized", "Unsupported", "Rejected"] },
+    "normal_form_digest": { "$ref": "#/$defs/sha256" },
+    "canonical_serialization": { "type": "string", "minLength": 1, "maxLength": 1048576 },
+    "transformations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "AlphaNormalizeVariables",
+          "ReduceRationalCoefficients",
+          "FlattenAssociativeAdd",
+          "FlattenAssociativeMul",
+          "SortCommutativeTerms",
+          "CollectLikeTerms",
+          "ExpandNonnegativeIntegerPower",
+          "DistributeMultiplication",
+          "NormalizeSigns",
+          "CancelNonzeroFactor"
+        ]
+      }
+    },
+    "validation_state": {
+      "enum": [
+        "NotApplicable",
+        "StructuralRewriteChecked",
+        "ExactPolynomialCanonicalization",
+        "SolverCrossChecked",
+        "FormalEquivalenceReceipt"
+      ]
+    },
+    "side_conditions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/sideCondition" }
+    },
+    "validation_evidence_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
+    },
+    "rejection_reason": {
+      "enum": [
+        "VariableDenominator",
+        "NonPolynomialDivision",
+        "NegativeExponent",
+        "FractionalExponent",
+        "Transcendental",
+        "OrderSensitiveRewrite",
+        "MissingSideCondition",
+        "DomainAmbiguity",
+        "UnsupportedOperator",
+        "ResourceLimit",
+        "OtherUnsupported"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "const": "Normalized" } }, "required": ["outcome"] },
+      "then": {
+        "required": ["normal_form_digest", "canonical_serialization", "transformations"],
+        "properties": {
+          "source_fragment": { "enum": ["ExactPolynomialTerm", "ExactPolynomialEquality"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "enum": ["Unsupported", "Rejected"] } }, "required": ["outcome"] },
+      "then": {
+        "required": ["rejection_reason"],
+        "properties": {
+          "validation_state": { "const": "NotApplicable" }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["normal_form_digest"] },
+            { "required": ["canonical_serialization"] },
+            { "required": ["transformations"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validation_state": { "enum": ["SolverCrossChecked", "FormalEquivalenceReceipt"] }
+        },
+        "required": ["validation_state"]
+      },
+      "then": {
+        "properties": {
+          "validation_evidence_refs": { "minItems": 1 }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sideCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "expression_digest", "status"],
+      "properties": {
+        "kind": {
+          "enum": ["NonZero", "NonNegative", "Positive", "Negative", "DomainConstraint", "Other"]
+        },
+        "expression_digest": { "$ref": "#/$defs/sha256" },
+        "status": { "enum": ["Assumed", "Derived", "FormallyVerified"] },
+        "evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "FormallyVerified" } }, "required": ["status"] },
+          "then": {
+            "required": ["evidence_refs"],
+            "properties": { "evidence_refs": { "minItems": 1 } }
+          }
+        }
+      ]
+    }
+  }
+}
