@@ -106,6 +106,8 @@ jobs:
             run_strict docs/security/models/MESH_NONCE_LIFECYCLE.tla \
               docs/security/models/packet_restart_strict.cfg
             run_strict docs/security/models/MESH_NONCE_LIFECYCLE.tla \
+              docs/security/models/packet_restart_epoch_collision_strict.cfg
+            run_strict docs/security/models/MESH_NONCE_LIFECYCLE.tla \
               docs/security/models/fragment_wrap_strict.cfg
           fi
 
@@ -157,6 +159,8 @@ jobs:
               docs/security/models/packet_shared_key_collision_legacy.cfg NoNonceReuse
             check_mutant docs/security/models/MESH_NONCE_LIFECYCLE.tla \
               docs/security/models/packet_restart_legacy.cfg NoNonceReuse
+            check_mutant docs/security/models/MESH_NONCE_LIFECYCLE.tla \
+              docs/security/models/packet_restart_epoch_collision_legacy.cfg NoNonceReuse
             check_mutant docs/security/models/MESH_NONCE_LIFECYCLE.tla \
               docs/security/models/fragment_wrap_legacy.cfg NoNonceReuse
           fi
