@@ -56,11 +56,7 @@ fn is_resolved(association: OutcomeAssociation) -> bool {
 /// Replays event-time label delivery without exposing outcome values before
 /// their arrival index. The current index's alarm is raised before that index's
 /// label can be consumed by the monitor.
-fn replay(
-    world: World,
-    label_delay: u64,
-    missing_per_ten: u8,
-) -> ReplayResult {
+fn replay(world: World, label_delay: u64, missing_per_ten: u8) -> ReplayResult {
     let mut monitor = DelayedOutcomeMonitor::new(DelayedOutcomeConfig {
         window_size: WINDOW_SIZE,
         min_labeled_per_window: MIN_LABELED,
@@ -145,8 +141,7 @@ fn paired_benign_and_harmful_worlds_separate_alarm_from_outcome_confirmation() {
             let missing_leading_post_label = if missing_per_ten == 1 { 1 } else { 0 };
             let last_required_label_index =
                 ALARM_INDEX + MIN_LABELED as u64 - 1 + delay + missing_leading_post_label;
-            let expected_confirmation =
-                Some(window_complete_index.max(last_required_label_index));
+            let expected_confirmation = Some(window_complete_index.max(last_required_label_index));
             match (missing_per_ten, benign.final_assessment.association) {
                 (0 | 1, OutcomeAssociation::NoMaterialChange) => {
                     benign_confirmed_no_change += 1;
