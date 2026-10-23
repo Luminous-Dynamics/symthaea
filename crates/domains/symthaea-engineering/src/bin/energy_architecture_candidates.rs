@@ -141,7 +141,9 @@ fn write_design_space_candidates(
     search: &DesignSpaceSearchResult,
     output_dir: &PathBuf,
 ) -> Result<(), Box<dyn Error>> {
-    if !search.rejected_candidates.is_empty() || search.candidates.len() != search.requested_candidate_count {
+    if !search.rejected_candidates.is_empty()
+        || search.candidates.len() != search.requested_candidate_count
+    {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
             format!(
@@ -273,7 +275,8 @@ mod tests {
         for candidate in candidates {
             let parsed: EnergySystemCandidate = serde_json::from_value(candidate.clone())
                 .expect("candidate has the interchange DTO shape");
-            validate_candidate(&parsed).expect("exported candidate must pass structural validation");
+            validate_candidate(&parsed)
+                .expect("exported candidate must pass structural validation");
         }
     }
 
@@ -326,7 +329,8 @@ mod tests {
         if output_dir.exists() {
             fs::remove_dir_all(&output_dir).expect("remove stale test output");
         }
-        write_design_space_candidates(&search, &output_dir).expect("complete design space materializes");
+        write_design_space_candidates(&search, &output_dir)
+            .expect("complete design space materializes");
         for candidate in &search.candidates {
             let bytes = fs::read(output_dir.join(&candidate.candidate_id).join("candidate.json"))
                 .expect("exported candidate file exists");
