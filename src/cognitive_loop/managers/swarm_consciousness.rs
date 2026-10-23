@@ -1,11 +1,14 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Swarm Consciousness — collective Φ and authority delegation.
+//! Swarm Consciousness — collective Φ as cognition-only context.
 //!
 //! When robots form coalitions with high mutual information, the collective
-//! has a measurable Φ_swarm. A robot with low individual Φ can inherit
-//! authority from a high-Φ_swarm coalition, allowing swarm-level decisions
-//! that transcend individual capability.
+//! may expose a measurable Φ_swarm. This value may modulate cognition such as
+//! attention, learning, epistemic caution, or coordination confidence.
+//!
+//! **Collective Φ never grants capabilities, authorization, safety approval,
+//! or execution authority.** Those remain the responsibility of explicit
+//! authority and safety systems outside this cognitive model.
 //!
 //! Science: Tononi (2004) IIT applied to multi-agent systems,
 //! Friston (2013) Markov blanket formation in collectives.
@@ -23,28 +26,43 @@ pub struct SwarmConsciousness {
     pub conscious_collective_count: usize,
     /// Total robots in any coalition.
     pub total_coalition_members: usize,
-    /// Authority delegation state for this robot.
-    pub delegation: AuthorityDelegation,
+    /// Cognition-only collective influence for this robot.
+    ///
+    /// The `delegation` field name is retained temporarily for source compatibility.
+    /// This value does not delegate or confer execution authority.
+    pub delegation: CollectiveCognitiveInfluence,
 }
 
-/// Authority delegation from swarm to individual.
+/// Cognition-only influence from a conscious collective.
 ///
-/// A robot with low individual Φ can operate at a higher effective Φ
-/// when part of a conscious collective. The delegation ratio controls
-/// how much authority flows from swarm → individual.
+/// A collective may provide epistemic/cognitive context to an individual agent.
+/// This type deliberately carries no capability, permit, lease, safety admission,
+/// or other authority-bearing state.
 #[derive(Debug, Clone)]
-pub struct AuthorityDelegation {
+pub struct CollectiveCognitiveInfluence {
     /// This robot's individual Phi.
     pub individual_phi: f64,
-    /// Phi inherited from the strongest coalition.
-    pub inherited_phi: f64,
-    /// Effective Phi = max(individual, blended).
+    /// Phi measured for the strongest relevant collective.
+    pub collective_phi: f64,
+    /// Cognition-only Phi used by cognitive modulation.
+    ///
+    /// This is not an authority level and must not be used as authorization evidence.
     pub effective_phi: f64,
-    /// Ratio of authority from swarm (0.0 = all individual, 1.0 = all swarm).
-    pub delegation_ratio: f64,
-    /// Whether this robot is part of a conscious collective.
+    /// Fraction of the cognition-only blend contributed by the collective.
+    /// Zero means the collective did not raise the effective cognitive Phi.
+    pub influence_ratio: f64,
+    /// Whether this robot is part of the strongest conscious collective.
     pub in_conscious_collective: bool,
 }
+
+/// Legacy type name retained for source compatibility.
+///
+/// This alias does not imply or carry execution authority. New code should use
+/// [`CollectiveCognitiveInfluence`] and explicit authority types at effect boundaries.
+#[deprecated(
+    note = "use CollectiveCognitiveInfluence; collective Phi does not delegate authority"
+)]
+pub type AuthorityDelegation = CollectiveCognitiveInfluence;
 
 impl SwarmConsciousness {
     /// Compute swarm consciousness from current coalitions and this robot's Phi.
@@ -63,11 +81,11 @@ impl SwarmConsciousness {
                 member_phis: Vec::new(),
                 conscious_collective_count: 0,
                 total_coalition_members: 0,
-                delegation: AuthorityDelegation::no_delegation(individual_phi),
+                delegation: CollectiveCognitiveInfluence::individual_only(individual_phi),
             };
         }
 
-        // Find strongest coalition by collective_phi
+        // Find strongest coalition by collective_phi.
         let strongest = coalitions
             .iter()
             .max_by(|a, b| a.collective_phi().total_cmp(&b.collective_phi()))
@@ -80,29 +98,19 @@ impl SwarmConsciousness {
             .count();
         let total_members: usize = coalitions.iter().map(|c| c.size()).sum();
 
-        // Check if this robot is in the strongest coalition
+        // Check if this robot is in the strongest coalition.
         let in_strongest = self_id
             .map(|id| strongest.members.contains(&id.to_string()))
             .unwrap_or(false);
 
         let in_conscious = in_strongest && strongest.is_conscious_collective();
 
-        // Authority delegation
-        let delegation = if in_conscious && phi_swarm > individual_phi {
-            // Blend: 30% swarm + 70% individual (conservative delegation)
-            let alpha = 0.3;
-            let blended = alpha * phi_swarm + (1.0 - alpha) * individual_phi;
-            let effective = blended.max(individual_phi);
-            AuthorityDelegation {
-                individual_phi,
-                inherited_phi: phi_swarm,
-                effective_phi: effective,
-                delegation_ratio: alpha,
-                in_conscious_collective: true,
-            }
-        } else {
-            AuthorityDelegation::no_delegation(individual_phi)
-        };
+        // Cognitive influence only. This calculation does not grant authority.
+        let delegation = CollectiveCognitiveInfluence::from_collective(
+            individual_phi,
+            phi_swarm,
+            in_conscious,
+        );
 
         Self {
             phi_swarm,
@@ -114,15 +122,46 @@ impl SwarmConsciousness {
     }
 }
 
-impl AuthorityDelegation {
-    /// No delegation — individual Phi only.
-    pub fn no_delegation(individual_phi: f64) -> Self {
+impl CollectiveCognitiveInfluence {
+    const COLLECTIVE_BLEND_RATIO: f64 = 0.3;
+
+    /// Individual cognition with no collective influence.
+    pub fn individual_only(individual_phi: f64) -> Self {
         Self {
             individual_phi,
-            inherited_phi: 0.0,
+            collective_phi: 0.0,
             effective_phi: individual_phi,
-            delegation_ratio: 0.0,
+            influence_ratio: 0.0,
             in_conscious_collective: false,
+        }
+    }
+
+    fn from_collective(
+        individual_phi: f64,
+        collective_phi: f64,
+        in_conscious_collective: bool,
+    ) -> Self {
+        if !in_conscious_collective {
+            return Self::individual_only(individual_phi);
+        }
+
+        // Collective context may make cognition more conservative/informed, but it
+        // never becomes an authority grant. Preserve membership even when the
+        // collective does not raise the individual's effective cognitive Phi.
+        let (effective_phi, influence_ratio) = if collective_phi > individual_phi {
+            let alpha = Self::COLLECTIVE_BLEND_RATIO;
+            let blended = alpha * collective_phi + (1.0 - alpha) * individual_phi;
+            (blended.max(individual_phi), alpha)
+        } else {
+            (individual_phi, 0.0)
+        };
+
+        Self {
+            individual_phi,
+            collective_phi,
+            effective_phi,
+            influence_ratio,
+            in_conscious_collective: true,
         }
     }
 }
@@ -134,7 +173,7 @@ impl Default for SwarmConsciousness {
             member_phis: Vec::new(),
             conscious_collective_count: 0,
             total_coalition_members: 0,
-            delegation: AuthorityDelegation::no_delegation(0.0),
+            delegation: CollectiveCognitiveInfluence::individual_only(0.0),
         }
     }
 }
@@ -159,42 +198,48 @@ mod tests {
         let sc = SwarmConsciousness::compute(&[], 0.5, Some("self"));
         assert_eq!(sc.phi_swarm, 0.0);
         assert_eq!(sc.delegation.effective_phi, 0.5);
+        assert_eq!(sc.delegation.collective_phi, 0.0);
+        assert_eq!(sc.delegation.influence_ratio, 0.0);
         assert!(!sc.delegation.in_conscious_collective);
     }
 
     #[test]
-    fn test_conscious_collective_delegates_authority() {
+    fn test_conscious_collective_provides_cognitive_influence() {
         let coalition = make_coalition(vec!["self", "peer1", "peer2"], 0.8, 0.9);
         let sc = SwarmConsciousness::compute(&[coalition], 0.3, Some("self"));
 
         assert!(sc.delegation.in_conscious_collective);
+        assert_eq!(sc.delegation.collective_phi, sc.phi_swarm);
         assert!(
             sc.delegation.effective_phi > 0.3,
-            "Should inherit from swarm"
+            "Collective context may raise cognition-only effective Phi"
         );
         assert!(
             sc.delegation.effective_phi < 0.8,
-            "Should not fully equal swarm"
+            "Cognitive blend should not fully equal collective Phi"
         );
-        assert!(sc.delegation.delegation_ratio > 0.0);
+        assert!(sc.delegation.influence_ratio > 0.0);
     }
 
     #[test]
-    fn test_not_in_coalition_no_delegation() {
+    fn test_not_in_coalition_has_no_collective_influence() {
         let coalition = make_coalition(vec!["peer1", "peer2", "peer3"], 0.8, 0.9);
         let sc = SwarmConsciousness::compute(&[coalition], 0.3, Some("outsider"));
 
         assert!(!sc.delegation.in_conscious_collective);
         assert_eq!(sc.delegation.effective_phi, 0.3);
+        assert_eq!(sc.delegation.influence_ratio, 0.0);
     }
 
     #[test]
-    fn test_high_individual_phi_not_downgraded() {
+    fn test_high_individual_phi_not_downgraded_by_collective() {
         let coalition = make_coalition(vec!["self", "peer1", "peer2"], 0.4, 0.9);
         let sc = SwarmConsciousness::compute(&[coalition], 0.9, Some("self"));
 
-        // Individual Phi > swarm Phi — effective should stay at individual
-        assert!(sc.delegation.effective_phi >= 0.9);
+        assert!(sc.delegation.in_conscious_collective);
+        assert_eq!(sc.delegation.effective_phi, 0.9);
+        assert_eq!(sc.delegation.influence_ratio, 0.0);
+        assert_eq!(sc.delegation.collective_phi, sc.phi_swarm);
     }
 
     #[test]
@@ -205,5 +250,6 @@ mod tests {
 
         assert!(sc.phi_swarm > 0.8, "Should pick strongest coalition");
         assert!(sc.delegation.in_conscious_collective);
+        assert_eq!(sc.delegation.collective_phi, sc.phi_swarm);
     }
 }
