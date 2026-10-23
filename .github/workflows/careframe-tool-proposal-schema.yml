@@ -60,12 +60,12 @@ jobs:
           model=examples/careframe-wheeled-upper-body-morphology-v0.example.json
           check-jsonschema --schemafile schemas/careframe-morphology-v0.schema.json "$model"
           jq -e '
-            .schema_version == "careframe-morphology-v0" and
-            .links | length == 16
+            (.schema_version == "careframe-morphology-v0") and
+            ((.links | length) == 16)
           ' "$model"
           jq -e '
-            .joints | length == 15 and
-            all(.[]; .command_enabled == false)
+            ((.joints | length) == 15) and
+            all(.joints[]; .command_enabled == false)
           ' "$model"
           jq -e '
             .authority.simulation_only == true and
