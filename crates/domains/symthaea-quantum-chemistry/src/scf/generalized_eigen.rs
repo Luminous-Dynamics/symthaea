@@ -126,6 +126,473 @@ pub fn solve_generalized_eigen(
 
 // ── Internal linear algebra (pure f64, no HDC overhead for inner loops) ─────
 
+/// Relative off-diagonal tolerance used by the checked Jacobi path.
+pub const CHECKED_JACOBI_RELATIVE_TOLERANCE: f64 = 1e-14;
+/// Maximum normalized eigenpair residual accepted by the checked path.
+pub const CHECKED_EIGENPAIR_RESIDUAL_LIMIT: f64 = 1e-10;
+/// Maximum eigenvector orthogonality residual accepted by the checked path.
+pub const CHECKED_EIGENVECTOR_ORTHOGONALITY_LIMIT: f64 = 1e-10;
+/// Maximum element-wise residual in Xᵀ S X - I accepted by checked orthogonalization.
+pub const CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT: f64 = 1e-8;
+/// Relative tolerance for checking that a supplied matrix is symmetric.
+pub const CHECKED_SYMMETRY_RELATIVE_TOLERANCE: f64 = 1e-12;
+
+/// Why the checked Jacobi path stopped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EigenStoppingReason {
+    /// Off-diagonal and independently measured residual contracts passed.
+    Converged,
+    /// The configured rotation budget was exhausted before the off-diagonal criterion passed.
+    IterationLimit,
+    /// Off-diagonal convergence was reached, but a residual contract failed.
+    ResidualContractFailed,
+}
+
+/// Diagnostics from a checked symmetric eigendecomposition.
+///
+/// Eigenvectors are row-major with eigenvectors in columns:
+/// `eigenvectors[row * n + column]`. Eigenvalues use the same column index.
+/// A non-converged result is diagnostic only and must not be used as a valid
+/// eigensolution by SCF or other numerical callers.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CheckedSymmetricEigenResult {
+    pub eigenvalues: Vec<f64>,
+    pub eigenvectors: Vec<f64>,
+    pub converged: bool,
+    pub iterations: usize,
+    pub stopping_reason: EigenStoppingReason,
+    pub max_off_diagonal: f64,
+    pub max_relative_eigenpair_residual: f64,
+    pub max_orthogonality_residual: f64,
+}
+
+/// Input or intermediate failure from the checked symmetric eigensolver.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SymmetricEigenError {
+    ZeroDimension,
+    DimensionOverflow,
+    MatrixLengthMismatch { expected: usize, actual: usize },
+    NonFiniteInput { index: usize },
+    NonFiniteIntermediate,
+    NonsymmetricInput {
+        row: usize,
+        column: usize,
+        normalized_difference: f64,
+    },
+}
+
+impl std::fmt::Display for SymmetricEigenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ZeroDimension => write!(f, "symmetric eigensolver dimension must be positive"),
+            Self::DimensionOverflow => {
+                write!(f, "symmetric eigensolver matrix dimension overflowed")
+            }
+            Self::MatrixLengthMismatch { expected, actual } => write!(
+                f,
+                "symmetric eigensolver expected {expected} matrix entries, received {actual}"
+            ),
+            Self::NonFiniteInput { index } => {
+                write!(f, "symmetric eigensolver input entry {index} is non-finite")
+            }
+            Self::NonFiniteIntermediate => {
+                write!(f, "symmetric eigensolver produced a non-finite intermediate")
+            }
+            Self::NonsymmetricInput {
+                row,
+                column,
+                normalized_difference,
+            } => write!(
+                f,
+                "matrix is not symmetric at ({row}, {column}); normalized difference is {normalized_difference}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SymmetricEigenError {}
+
+/// Checked Jacobi eigendecomposition for a finite symmetric row-major matrix.
+///
+/// The function validates dimensions, finiteness, and symmetry before rotating.
+/// It reports a non-converged result when the rotation budget is exhausted or
+/// the independently calculated eigenpair/orthogonality residuals exceed their
+/// fixed contracts. A returned `Ok` is not synonymous with convergence:
+/// callers must require `result.converged`.
+///
+/// `max_iterations` is a count of Jacobi rotations. Zero is accepted for
+/// deterministic exhaustion tests and returns a non-converged result when
+/// the matrix has material off-diagonal terms.
+pub fn symmetric_eigen_checked(
+    matrix: &[f64],
+    n: usize,
+    max_iterations: usize,
+) -> Result<CheckedSymmetricEigenResult, SymmetricEigenError> {
+    if n == 0 {
+        return Err(SymmetricEigenError::ZeroDimension);
+    }
+    let expected = n.checked_mul(n).ok_or(SymmetricEigenError::DimensionOverflow)?;
+    if matrix.len() != expected {
+        return Err(SymmetricEigenError::MatrixLengthMismatch {
+            expected,
+            actual: matrix.len(),
+        });
+    }
+    if matrix.iter().any(|value| !value.is_finite()) {
+        let index = matrix.iter().position(|value| !value.is_finite()).unwrap_or(0);
+        return Err(SymmetricEigenError::NonFiniteInput { index });
+    }
+
+    let matrix_scale = matrix
+        .iter()
+        .fold(0.0_f64, |scale, value| scale.max(value.abs()));
+    // Keep relative checks meaningful for tiny matrices while avoiding division
+    // by zero for an exactly-zero matrix.
+    let matrix_scale = if matrix_scale == 0.0 { 1.0 } else { matrix_scale };
+    for row in 0..n {
+        for column in (row + 1)..n {
+            let normalized_difference =
+                (matrix[row * n + column] / matrix_scale
+                    - matrix[column * n + row] / matrix_scale)
+                    .abs();
+            if normalized_difference > CHECKED_SYMMETRY_RELATIVE_TOLERANCE {
+                return Err(SymmetricEigenError::NonsymmetricInput {
+                    row,
+                    column,
+                    normalized_difference,
+                });
+            }
+        }
+    }
+
+    let mut a = matrix.to_vec();
+    let mut eigenvectors = vec![0.0; expected];
+    for i in 0..n {
+        eigenvectors[i * n + i] = 1.0;
+    }
+
+    let mut iterations = 0;
+    let (mut max_off_diagonal, mut p, mut q) = max_off_diagonal_entry(&a, n);
+    while max_off_diagonal / matrix_scale > CHECKED_JACOBI_RELATIVE_TOLERANCE
+        && iterations < max_iterations
+    {
+        // A scaled atan2 avoids the quadrant loss of atan(y / x) and keeps
+        // 2*apq/app-aqq intermediate arithmetic bounded for large finite inputs.
+        let app = a[p * n + p];
+        let aqq = a[q * n + q];
+        let apq = a[p * n + q];
+        // apq is nonzero in this loop, so the scale remains positive even
+        // for subnormal matrices; flooring at MIN_POSITIVE would distort them.
+        let rotation_scale = app.abs().max(aqq.abs()).max(apq.abs());
+        let theta = 0.5
+            * (2.0 * (apq / rotation_scale)).atan2(
+                app / rotation_scale - aqq / rotation_scale,
+            );
+        let cosine = theta.cos();
+        let sine = theta.sin();
+
+        let mut next = a.clone();
+        for i in 0..n {
+            if i != p && i != q {
+                let aip = a[i * n + p];
+                let aiq = a[i * n + q];
+                next[i * n + p] = cosine * aip + sine * aiq;
+                next[p * n + i] = next[i * n + p];
+                next[i * n + q] = -sine * aip + cosine * aiq;
+                next[q * n + i] = next[i * n + q];
+            }
+        }
+        next[p * n + p] =
+            cosine * cosine * app + 2.0 * cosine * sine * apq + sine * sine * aqq;
+        next[q * n + q] =
+            sine * sine * app - 2.0 * cosine * sine * apq + cosine * cosine * aqq;
+        next[p * n + q] = 0.0;
+        next[q * n + p] = 0.0;
+
+        for i in 0..n {
+            let vip = eigenvectors[i * n + p];
+            let viq = eigenvectors[i * n + q];
+            eigenvectors[i * n + p] = cosine * vip + sine * viq;
+            eigenvectors[i * n + q] = -sine * vip + cosine * viq;
+        }
+        if next.iter().any(|value| !value.is_finite())
+            || eigenvectors.iter().any(|value| !value.is_finite())
+        {
+            return Err(SymmetricEigenError::NonFiniteIntermediate);
+        }
+        a = next;
+        iterations += 1;
+        (max_off_diagonal, p, q) = max_off_diagonal_entry(&a, n);
+    }
+
+    let eigenvalues: Vec<f64> = (0..n).map(|i| a[i * n + i]).collect();
+    if eigenvalues.iter().any(|value| !value.is_finite()) {
+        return Err(SymmetricEigenError::NonFiniteIntermediate);
+    }
+
+    let max_relative_eigenpair_residual =
+        max_relative_eigenpair_residual(matrix, &eigenvalues, &eigenvectors, n, matrix_scale);
+    let max_orthogonality_residual = max_eigenvector_orthogonality_residual(&eigenvectors, n);
+    if !max_relative_eigenpair_residual.is_finite() || !max_orthogonality_residual.is_finite() {
+        return Err(SymmetricEigenError::NonFiniteIntermediate);
+    }
+
+    let off_diagonal_converged =
+        max_off_diagonal / matrix_scale <= CHECKED_JACOBI_RELATIVE_TOLERANCE;
+    let residuals_converged = max_relative_eigenpair_residual <= CHECKED_EIGENPAIR_RESIDUAL_LIMIT
+        && max_orthogonality_residual <= CHECKED_EIGENVECTOR_ORTHOGONALITY_LIMIT;
+    let stopping_reason = if !off_diagonal_converged {
+        EigenStoppingReason::IterationLimit
+    } else if !residuals_converged {
+        EigenStoppingReason::ResidualContractFailed
+    } else {
+        EigenStoppingReason::Converged
+    };
+
+    Ok(CheckedSymmetricEigenResult {
+        eigenvalues,
+        eigenvectors,
+        converged: stopping_reason == EigenStoppingReason::Converged,
+        iterations,
+        stopping_reason,
+        max_off_diagonal,
+        max_relative_eigenpair_residual,
+        max_orthogonality_residual,
+    })
+}
+
+fn max_off_diagonal_entry(matrix: &[f64], n: usize) -> (f64, usize, usize) {
+    let mut maximum = 0.0_f64;
+    let mut p = 0;
+    let mut q = 0;
+    for row in 0..n {
+        for column in (row + 1)..n {
+            let value = matrix[row * n + column].abs();
+            if value > maximum {
+                maximum = value;
+                p = row;
+                q = column;
+            }
+        }
+    }
+    (maximum, p, q)
+}
+
+fn max_relative_eigenpair_residual(
+    matrix: &[f64],
+    eigenvalues: &[f64],
+    eigenvectors: &[f64],
+    n: usize,
+    matrix_scale: f64,
+) -> f64 {
+    let mut maximum = 0.0_f64;
+    for column in 0..n {
+        let eigenvalue = eigenvalues[column] / matrix_scale;
+        for row in 0..n {
+            let mut product = 0.0;
+            for k in 0..n {
+                product += (matrix[row * n + k] / matrix_scale)
+                    * eigenvectors[k * n + column];
+            }
+            let residual = (product - eigenvalue * eigenvectors[row * n + column]).abs();
+            maximum = maximum.max(residual);
+        }
+    }
+    maximum
+}
+
+fn max_eigenvector_orthogonality_residual(eigenvectors: &[f64], n: usize) -> f64 {
+    let mut maximum = 0.0_f64;
+    for i in 0..n {
+        for j in 0..n {
+            let mut dot = 0.0;
+            for row in 0..n {
+                dot += eigenvectors[row * n + i] * eigenvectors[row * n + j];
+            }
+            let expected = if i == j { 1.0 } else { 0.0 };
+            maximum = maximum.max((dot - expected).abs());
+        }
+    }
+    maximum
+}
+
+/// Checked result of canonical orthogonalization of an overlap matrix.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CheckedCanonicalOrthogonalization {
+    /// Row-major transformation X (n_basis × n_independent).
+    pub transformation: Vec<f64>,
+    pub n_independent: usize,
+    pub n_discarded: usize,
+    pub orthogonality_residual: f64,
+    /// Eigensolver diagnostics for the original overlap matrix.
+    pub eigensolver: CheckedSymmetricEigenResult,
+}
+
+/// Failure while validating a checked canonical-orthogonalization result.
+#[derive(Debug, Clone, PartialEq)]
+pub enum CanonicalOrthogonalizationError {
+    InvalidThreshold,
+    Eigen(SymmetricEigenError),
+    EigensolverNotConverged(CheckedSymmetricEigenResult),
+    NegativeOverlapEigenvalue {
+        index: usize,
+        eigenvalue: f64,
+        threshold: f64,
+    },
+    NoIndependentBasisFunctions,
+    NonFiniteTransform,
+    OrthogonalityResidualExceeded { residual: f64, limit: f64 },
+}
+
+impl std::fmt::Display for CanonicalOrthogonalizationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidThreshold => write!(
+                f,
+                "canonical-orthogonalization threshold must be finite and positive"
+            ),
+            Self::Eigen(error) => write!(f, "overlap eigensolver rejected the matrix: {error}"),
+            Self::EigensolverNotConverged(result) => write!(
+                f,
+                "overlap eigensolver did not satisfy convergence contracts: {:?}",
+                result.stopping_reason
+            ),
+            Self::NegativeOverlapEigenvalue {
+                index,
+                eigenvalue,
+                threshold,
+            } => write!(
+                f,
+                "overlap eigenvalue {index} is materially negative ({eigenvalue}); \
+                 minimum accepted is -{threshold}"
+            ),
+            Self::NoIndependentBasisFunctions => {
+                write!(f, "overlap matrix has no independent basis functions")
+            }
+            Self::NonFiniteTransform => {
+                write!(f, "canonical orthogonalization produced non-finite values")
+            }
+            Self::OrthogonalityResidualExceeded { residual, limit } => write!(
+                f,
+                "Xᵀ S X residual {residual} exceeds the accepted limit {limit}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CanonicalOrthogonalizationError {}
+
+/// Checked canonical orthogonalization that refuses an unqualified eigensolve.
+///
+/// The legacy `canonical_orthogonalization` wrapper is retained for compatibility,
+/// but this path requires a converged overlap eigensolve and independently checks
+/// `Xᵀ S X ≈ I` before returning a transformation.
+pub fn canonical_orthogonalization_checked(
+    s_matrix: &[f64],
+    n: usize,
+    threshold: f64,
+    max_iterations: usize,
+) -> Result<CheckedCanonicalOrthogonalization, CanonicalOrthogonalizationError> {
+    if !threshold.is_finite() || threshold <= 0.0 {
+        return Err(CanonicalOrthogonalizationError::InvalidThreshold);
+    }
+    let eigensolver = symmetric_eigen_checked(s_matrix, n, max_iterations)
+        .map_err(CanonicalOrthogonalizationError::Eigen)?;
+    if !eigensolver.converged {
+        return Err(CanonicalOrthogonalizationError::EigensolverNotConverged(eigensolver));
+    }
+
+    // Tiny negative modes within the configured rank threshold can arise from
+    // floating-point roundoff in an almost-dependent basis. A materially
+    // negative overlap eigenvalue, however, is evidence of an invalid S matrix
+    // or failed integral construction and must not be silently discarded.
+    if let Some((index, &eigenvalue)) = eigensolver
+        .eigenvalues
+        .iter()
+        .enumerate()
+        .find(|(_, value)| **value < -threshold)
+    {
+        return Err(CanonicalOrthogonalizationError::NegativeOverlapEigenvalue {
+            index,
+            eigenvalue,
+            threshold,
+        });
+    }
+
+    let survivors: Vec<usize> = eigensolver
+        .eigenvalues
+        .iter()
+        .enumerate()
+        .filter_map(|(index, &value)| (value >= threshold).then_some(index))
+        .collect();
+    let n_independent = survivors.len();
+    if n_independent == 0 {
+        return Err(CanonicalOrthogonalizationError::NoIndependentBasisFunctions);
+    }
+    let n_discarded = n - n_independent;
+    let mut transformation = vec![0.0; n * n_independent];
+    for (target_column, &source_column) in survivors.iter().enumerate() {
+        let inverse_sqrt = 1.0 / eigensolver.eigenvalues[source_column].sqrt();
+        for row in 0..n {
+            transformation[row * n_independent + target_column] =
+                eigensolver.eigenvectors[row * n + source_column] * inverse_sqrt;
+        }
+    }
+    if transformation.iter().any(|value| !value.is_finite()) {
+        return Err(CanonicalOrthogonalizationError::NonFiniteTransform);
+    }
+    let residual = max_overlap_orthogonality_residual(
+        s_matrix,
+        &transformation,
+        n,
+        n_independent,
+    );
+    if !residual.is_finite() {
+        return Err(CanonicalOrthogonalizationError::NonFiniteTransform);
+    }
+    if residual > CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT {
+        return Err(CanonicalOrthogonalizationError::OrthogonalityResidualExceeded {
+            residual,
+            limit: CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT,
+        });
+    }
+
+    Ok(CheckedCanonicalOrthogonalization {
+        transformation,
+        n_independent,
+        n_discarded,
+        orthogonality_residual: residual,
+        eigensolver,
+    })
+}
+
+fn max_overlap_orthogonality_residual(
+    overlap: &[f64],
+    transformation: &[f64],
+    n_basis: usize,
+    n_independent: usize,
+) -> f64 {
+    let mut maximum = 0.0_f64;
+    for i in 0..n_independent {
+        for j in 0..n_independent {
+            let mut value = 0.0;
+            for mu in 0..n_basis {
+                for nu in 0..n_basis {
+                    value += transformation[mu * n_independent + i]
+                        * overlap[mu * n_basis + nu]
+                        * transformation[nu * n_independent + j];
+                }
+            }
+            if !value.is_finite() {
+                return f64::INFINITY;
+            }
+            let expected = if i == j { 1.0 } else { 0.0 };
+            maximum = maximum.max((value - expected).abs());
+        }
+    }
+    maximum
+}
+
 /// Symmetric eigendecomposition via Jacobi rotations.
 /// Returns (eigenvalues, eigenvectors) where eigenvectors are column-major.
 /// Eigenvalues are returned in the order the Jacobi sweep converges them
@@ -324,6 +791,135 @@ mod tests {
             (evals[1] - 3.0).abs() < 1e-8,
             "Second eigenvalue: {}, expected 3.0",
             evals[1]
+        );
+    }
+
+    #[test]
+    fn checked_eigensolver_accepts_one_by_one_diagonal_and_degenerate_matrices() {
+        let one = symmetric_eigen_checked(&[3.25], 1, 0).unwrap();
+        assert!(one.converged);
+        assert_eq!(one.eigenvalues, vec![3.25]);
+        assert_eq!(one.iterations, 0);
+
+        let diagonal = symmetric_eigen_checked(&[3.0, 0.0, 0.0, 1.0], 2, 0).unwrap();
+        assert!(diagonal.converged);
+        assert_eq!(diagonal.stopping_reason, EigenStoppingReason::Converged);
+        assert_eq!(diagonal.max_off_diagonal, 0.0);
+
+        let degenerate = symmetric_eigen_checked(
+            &[2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0],
+            3,
+            0,
+        )
+        .unwrap();
+        assert!(degenerate.converged);
+        assert_eq!(degenerate.eigenvalues, vec![2.0, 2.0, 2.0]);
+        assert!(degenerate.max_orthogonality_residual <= CHECKED_EIGENVECTOR_ORTHOGONALITY_LIMIT);
+    }
+
+    #[test]
+    fn checked_eigensolver_reports_rotation_limit_without_false_convergence() {
+        let matrix = [2.0, 0.5, 0.5, 2.0];
+        let result = symmetric_eigen_checked(&matrix, 2, 0).unwrap();
+        assert!(!result.converged);
+        assert_eq!(result.iterations, 0);
+        assert_eq!(result.stopping_reason, EigenStoppingReason::IterationLimit);
+
+        let converged = symmetric_eigen_checked(&matrix, 2, 10).unwrap();
+        assert!(converged.converged, "{converged:?}");
+        let mut eigenvalues = converged.eigenvalues.clone();
+        eigenvalues.sort_by(f64::total_cmp);
+        assert!((eigenvalues[0] - 1.5).abs() < 1e-12);
+        assert!((eigenvalues[1] - 2.5).abs() < 1e-12);
+        assert!(converged.max_relative_eigenpair_residual <= CHECKED_EIGENPAIR_RESIDUAL_LIMIT);
+        assert!(
+            converged.max_orthogonality_residual
+                <= CHECKED_EIGENVECTOR_ORTHOGONALITY_LIMIT
+        );
+
+        // Relative scaling must remain correct below f64::MIN_POSITIVE.
+        let subnormal = [1e-310, 0.5e-310, 0.5e-310, 1e-310];
+        let tiny = symmetric_eigen_checked(&subnormal, 2, 10).unwrap();
+        assert!(tiny.converged, "{tiny:?}");
+        let mut tiny_values = tiny.eigenvalues.clone();
+        tiny_values.sort_by(f64::total_cmp);
+        assert!((tiny_values[0] / 1e-310 - 0.5).abs() < 1e-10);
+        assert!((tiny_values[1] / 1e-310 - 1.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn checked_eigensolver_rejects_malformed_matrices() {
+        assert_eq!(
+            symmetric_eigen_checked(&[], 0, 10).unwrap_err(),
+            SymmetricEigenError::ZeroDimension
+        );
+        assert!(matches!(
+            symmetric_eigen_checked(&[1.0, 0.0, 0.0], 2, 10),
+            Err(SymmetricEigenError::MatrixLengthMismatch { .. })
+        ));
+        assert_eq!(
+            symmetric_eigen_checked(&[1.0, f64::NAN, f64::NAN, 1.0], 2, 10).unwrap_err(),
+            SymmetricEigenError::NonFiniteInput { index: 1 }
+        );
+        assert!(matches!(
+            symmetric_eigen_checked(&[1.0, 0.5, 0.1, 1.0], 2, 10),
+            Err(SymmetricEigenError::NonsymmetricInput { .. })
+        ));
+    }
+
+    #[test]
+    fn checked_canonical_orthogonalization_enforces_overlap_identity() {
+        let identity = [1.0, 0.0, 0.0, 1.0];
+        let result = canonical_orthogonalization_checked(&identity, 2, 1e-6, 0).unwrap();
+        assert_eq!(result.n_independent, 2);
+        assert_eq!(result.n_discarded, 0);
+        assert!(result.eigensolver.converged);
+        assert!(result.orthogonality_residual <= CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT);
+
+        let near_dependent = [1.0, 0.9999999, 0.9999999, 1.0];
+        let reduced =
+            canonical_orthogonalization_checked(&near_dependent, 2, 1e-6, 100).unwrap();
+        assert_eq!(reduced.n_independent, 1);
+        assert_eq!(reduced.n_discarded, 1);
+        assert!(reduced.orthogonality_residual <= CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT);
+    }
+
+    #[test]
+    fn checked_canonical_orthogonalization_rejects_materially_negative_overlap_modes() {
+        let indefinite = [1.0, 0.0, 0.0, -1e-3];
+        assert!(matches!(
+            canonical_orthogonalization_checked(&indefinite, 2, 1e-6, 0),
+            Err(CanonicalOrthogonalizationError::NegativeOverlapEigenvalue {
+                index: 1,
+                eigenvalue,
+                threshold,
+            }) if (eigenvalue + 1e-3).abs() < 1e-15 && (threshold - 1e-6).abs() < 1e-15
+        ));
+
+        // A small negative mode within the configured cutoff is numerical-rank
+        // noise and is discarded, provided the retained transform satisfies Xᵀ S X ≈ I.
+        let tiny_negative = [1.0, 0.0, 0.0, -1e-8];
+        let result = canonical_orthogonalization_checked(&tiny_negative, 2, 1e-6, 0).unwrap();
+        assert_eq!(result.n_independent, 1);
+        assert_eq!(result.n_discarded, 1);
+    }
+
+    #[test]
+    fn checked_canonical_orthogonalization_rejects_unconverged_or_malformed_inputs() {
+        let difficult = [2.0, 0.5, 0.5, 2.0];
+        assert!(matches!(
+            canonical_orthogonalization_checked(&difficult, 2, 1e-6, 0),
+            Err(CanonicalOrthogonalizationError::EigensolverNotConverged(_))
+        ));
+        assert!(matches!(
+            canonical_orthogonalization_checked(&[1.0, 0.5, 0.1, 1.0], 2, 1e-6, 10),
+            Err(CanonicalOrthogonalizationError::Eigen(
+                SymmetricEigenError::NonsymmetricInput { .. }
+            ))
+        ));
+        assert_eq!(
+            canonical_orthogonalization_checked(&[1.0], 1, 0.0, 10).unwrap_err(),
+            CanonicalOrthogonalizationError::InvalidThreshold
         );
     }
 
