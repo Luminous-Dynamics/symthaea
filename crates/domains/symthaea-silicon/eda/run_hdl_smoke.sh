@@ -255,9 +255,9 @@ overall_status="simulation_smoke_pass"
 for width in 64 128 256 512; do
   for arch in xor linear_popcount balanced_popcount; do
     case "${arch}" in
-      xor) module="hdc_bind_xor"; top="tb_hdc_bind_xor"; rtl="${rtl_xor}"; tb="${tb_xor}"; pass_marker="PASS: hdc_bind_xor smoke and backpressure tests completed";;
-      linear_popcount) module="hdc_hamming_count"; top="tb_hdc_hamming_count"; rtl="${rtl_hamming}"; tb="${tb_hamming}"; pass_marker="PASS: hdc_hamming_count smoke and backpressure tests completed width=${width} balanced_tree=0";;
-      balanced_popcount) module="hdc_hamming_count"; top="tb_hdc_hamming_count"; rtl="${rtl_hamming}"; tb="${tb_hamming}"; pass_marker="PASS: hdc_hamming_count smoke and backpressure tests completed width=${width} balanced_tree=1";;
+      xor) module="hdc_bind_xor"; top="tb_hdc_bind_xor"; rtl="${rtl_xor}"; tb="${tb_xor}"; pass_marker="PASS: hdc_bind_xor smoke and backpressure tests completed"; oracle_pass_marker="PASS: hdc_bind_xor software oracle words=${oracle_word_counts["$width"]}"; oracle_args=("+ORACLE_XOR=${oracle_xor_files["$width"]}" "+ORACLE_WORDS=${oracle_word_counts["$width"]}");;
+      linear_popcount) module="hdc_hamming_count"; top="tb_hdc_hamming_count"; rtl="${rtl_hamming}"; tb="${tb_hamming}"; pass_marker="PASS: hdc_hamming_count smoke and backpressure tests completed width=${width} balanced_tree=0"; oracle_pass_marker="PASS: hdc_hamming_count software oracle words=${oracle_word_counts["$width"]} width=${width} balanced_tree=0"; oracle_args=("+ORACLE_HAMMING=${oracle_hamming_files["$width"]}" "+ORACLE_WORDS=${oracle_word_counts["$width"]}");;
+      balanced_popcount) module="hdc_hamming_count"; top="tb_hdc_hamming_count"; rtl="${rtl_hamming}"; tb="${tb_hamming}"; pass_marker="PASS: hdc_hamming_count smoke and backpressure tests completed width=${width} balanced_tree=1"; oracle_pass_marker="PASS: hdc_hamming_count software oracle words=${oracle_word_counts["$width"]} width=${width} balanced_tree=1"; oracle_args=("+ORACLE_HAMMING=${oracle_hamming_files["$width"]}" "+ORACLE_WORDS=${oracle_word_counts["$width"]}");;
       *) overall_status="failed"; continue;;
     esac
 
@@ -273,6 +273,7 @@ for width in 64 128 256 512; do
     build_rc=125
     simulation_rc=125
     simulation_marker="false"
+    software_oracle_marker="false"
 
     verilator --lint-only --timing -Wall --top-module "${top}" "${params[@]}" \
       "${rtl}" "${tb}" > "${case_dir}/lint.log" 2>&1
@@ -283,16 +284,19 @@ for width in 64 128 256 512; do
         --Mdir "${case_dir}/obj_dir" "${rtl}" "${tb}" > "${case_dir}/build.log" 2>&1
       build_rc=$?
       if [[ "${build_rc}" -eq 0 ]]; then
-        "${case_dir}/obj_dir/V${top}" > "${case_dir}/simulation.log" 2>&1
+        "${case_dir}/obj_dir/V${top}" "${oracle_args[@]}" > "${case_dir}/simulation.log" 2>&1
         simulation_rc=$?
         if [[ "${simulation_rc}" -eq 0 ]] && grep -Fq "${pass_marker}" "${case_dir}/simulation.log"; then
           simulation_marker="true"
+        if [[ "${simulation_rc}" -eq 0 ]] && grep -Fq "${oracle_pass_marker}" "${case_dir}/simulation.log"; then
+          software_oracle_marker="true"
+        fi
         fi
       fi
     fi
 
     case_status="failed"
-    if [[ "${lint_rc}" -eq 0 && "${build_rc}" -eq 0 && "${simulation_rc}" -eq 0 && "${simulation_marker}" == "true" ]]; then
+    if [[ "${lint_rc}" -eq 0 && "${build_rc}" -eq 0 && "${simulation_rc}" -eq 0 && "${simulation_marker}" == "true" && "${software_oracle_marker}" == "true" ]]; then
       case_status="simulation_smoke_pass"
     else
       overall_status="failed"
@@ -313,7 +317,8 @@ for width in 64 128 256 512; do
       --arg build_rc "${build_rc}" \
       --arg simulation_rc "${simulation_rc}" \
       --argjson simulation_marker "${simulation_marker}" \
-      '{case_id:$case_id, module:$module, architecture:$architecture, datapath_width_bits:($width|tonumber), status:$status, lint_exit_code:($lint_rc|tonumber), build_exit_code:($build_rc|tonumber), simulation_exit_code:($simulation_rc|tonumber), expected_pass_marker_seen:$simulation_marker}')"
+      --argjson software_oracle_marker "${software_oracle_marker}" \
+      '{case_id:$case_id, module:$module, architecture:$architecture, datapath_width_bits:($width|tonumber), status:$status, lint_exit_code:($lint_rc|tonumber), build_exit_code:($build_rc|tonumber), simulation_exit_code:($simulation_rc|tonumber), expected_pass_marker_seen:$simulation_marker, software_oracle_marker_seen:$software_oracle_marker}')"
     case_results="$(jq -cn --argjson existing "${case_results}" --argjson next "${case_result}" '$existing + [$next]')"
     printf 'width=%s architecture=%s status=%s lint=%s build=%s sim=%s\n' "${width}" "${arch}" "${case_status}" "${lint_rc}" "${build_rc}" "${simulation_rc}"
   done
