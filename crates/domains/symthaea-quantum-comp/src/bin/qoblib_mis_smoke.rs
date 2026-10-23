@@ -10,7 +10,7 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use symthaea_quantum_comp::mis_verifier::{MisGraph, EXACT_ORACLE_MAX_VERTICES};
-use symthaea_quantum_comp::parse_dimacs_mis;
+use symthaea_quantum_comp::{MisDimacsLimits, parse_dimacs_mis_with_limits};
 
 fn fnv1a64(bytes: &[u8]) -> u64 {
     let mut hash = 0xcbf2_9ce4_8422_2325_u64;
@@ -215,7 +215,7 @@ fn failure_receipt_json(path: &str, failure: &RunFailure) -> String {
             "  \"error\": \"{}\",\n",
             "  \"software\": {{\"package_version\": \"{}\", \"target_os\": \"{}\", \"target_arch\": \"{}\", \"rustc_version\": \"{}\"}},\n",
             "  \"determinism\": \"deterministic-no-random-seed\",\n",
-            "  \"resource_limits\": {{\"time_limit_ns\": null, \"memory_limit_bytes\": null}},\n",
+            "  \"resource_limits\": {{\"time_limit_ns\": null, \"memory_limit_bytes\": null, \"max_input_bytes\": {}, \"max_vertices\": {}, \"max_edges\": {}}},\n",
             "  \"timing_ns\": {{\"end_to_end\": {}}},\n",
             "  \"limitations\": [\"FNV-1a is a non-cryptographic integrity checksum\", \"no runtime limit or memory limit was configured\", \"failure receipt records a read or parse failure rather than silently dropping the run\", \"this run does not execute a quantum backend\"]\n",
             "}}"
@@ -229,12 +229,36 @@ fn failure_receipt_json(path: &str, failure: &RunFailure) -> String {
         env::consts::OS,
         env::consts::ARCH,
         option_env!("RUSTC_VERSION").unwrap_or("not-recorded-at-build"),
+        MisDimacsLimits::default().max_input_bytes,
+        MisDimacsLimits::default().max_vertices,
+        MisDimacsLimits::default().max_edges,
         failure.elapsed_ns
     )
 }
 
 fn run(path: &str) -> Result<(), RunFailure> {
     let end_to_end_start = Instant::now();
+    let limits = MisDimacsLimits::default();
+    let metadata = fs::metadata(path).map_err(|error| RunFailure {
+        kind: "source_read",
+        message: format!("failed to stat {path:?}: {error}"),
+        source_bytes: None,
+        source_fnv1a64: None,
+        elapsed_ns: end_to_end_start.elapsed().as_nanos(),
+    })?;
+    if metadata.len() > limits.max_input_bytes as u64 {
+        let actual = usize::try_from(metadata.len()).unwrap_or(usize::MAX);
+        return Err(RunFailure {
+            kind: "source_size_limit",
+            message: format!(
+                "source is {actual} bytes, exceeding the configured {}-byte limit",
+                limits.max_input_bytes
+            ),
+            source_bytes: Some(actual),
+            source_fnv1a64: None,
+            elapsed_ns: end_to_end_start.elapsed().as_nanos(),
+        });
+    }
     let source = fs::read_to_string(path).map_err(|error| RunFailure {
         kind: "source_read",
         message: format!("failed to read {path:?}: {error}"),
@@ -245,7 +269,7 @@ fn run(path: &str) -> Result<(), RunFailure> {
     let source_hash = fnv1a64(source.as_bytes());
 
     let parse_start = Instant::now();
-    let parsed = parse_dimacs_mis(&source).map_err(|error| RunFailure {
+    let parsed = parse_dimacs_mis_with_limits(&source, limits).map_err(|error| RunFailure {
         kind: "dimacs_parse",
         message: format!("failed to parse {path:?}: {error}"),
         source_bytes: Some(source.len()),
@@ -359,7 +383,7 @@ fn run(path: &str) -> Result<(), RunFailure> {
             "  \"timing_ns\": {{\"parse\": {}, \"end_to_end\": {}}},\n",
             "  \"software\": {{\"package_version\": \"{}\", \"target_os\": \"{}\", \"target_arch\": \"{}\", \"rustc_version\": \"{}\"}},\n",
             "  \"determinism\": \"deterministic-no-random-seed\",\n",
-            "  \"resource_limits\": {{\"time_limit_ns\": null, \"memory_limit_bytes\": null}},\n",
+            "  \"resource_limits\": {{\"time_limit_ns\": null, \"memory_limit_bytes\": null, \"max_input_bytes\": {}, \"max_vertices\": {}, \"max_edges\": {}}},\n",
             "  \"normalized_result_fnv1a64\": \"{:016x}\",\n",
             "  \"limitations\": [\"FNV-1a is a non-cryptographic integrity checksum\", \"wall-clock timings are local diagnostics and are not comparable across machines without a controlled protocol\", \"the bounded exact oracle is a correctness reference, not a competitive solver\", \"this run does not execute a quantum backend\"]\n",
             "}}"
@@ -391,6 +415,9 @@ fn run(path: &str) -> Result<(), RunFailure> {
         env::consts::OS,
         env::consts::ARCH,
         option_env!("RUSTC_VERSION").unwrap_or("not-recorded-at-build"),
+        limits.max_input_bytes,
+        limits.max_vertices,
+        limits.max_edges,
         normalized_hash
     );
     Ok(())
