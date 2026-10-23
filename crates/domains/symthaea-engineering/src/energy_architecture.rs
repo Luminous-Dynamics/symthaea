@@ -1145,6 +1145,192 @@ pub fn reference_service_hub_candidates() -> Vec<EnergySystemCandidate> {
     vec![grid_only, pv_grid, pv_battery_grid]
 }
 
+
+/// A deterministic rejection record. Invalid candidates are retained as data,
+/// rather than silently removed from the search statistics.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CandidateRejection {
+    pub candidate_id: String,
+    pub violations: Vec<String>,
+}
+
+/// Output of the first explicit bounded design-space sweep. Each candidate is
+/// still only a synthetic hypothesis; this manifest is not an optimizer result.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DesignSpaceSearchResult {
+    pub search_schema_version: String,
+    pub generator_version: String,
+    pub requested_candidate_count: usize,
+    pub axis_values: BTreeMap<String, Vec<f64>>,
+    pub candidates: Vec<EnergySystemCandidate>,
+    pub rejected_candidates: Vec<CandidateRejection>,
+    pub claim_ceiling: String,
+}
+
+const PARAMETRIC_PV_POWER_KW: [f64; 3] = [1.0, 2.0, 3.0];
+const PARAMETRIC_BATTERY_CAPACITY_KWH: [f64; 3] = [1.0, 2.0, 3.0];
+const PARAMETRIC_BATTERY_POWER_KW: [f64; 2] = [1.0, 2.0];
+const PARAMETRIC_GRID_POWER_KW: [f64; 2] = [1.0, 2.0];
+
+fn update_numeric_claim(
+    candidate: &mut EnergySystemCandidate,
+    component_id: &str,
+    parameter_id: &str,
+    value: f64,
+) -> Result<(), String> {
+    if !value.is_finite() || value < 0.0 {
+        return Err(format!(
+            "parameter {component_id}.{parameter_id} must be finite and non-negative"
+        ));
+    }
+    let component = candidate
+        .components
+        .iter_mut()
+        .find(|component| component.component_id == component_id)
+        .ok_or_else(|| format!("missing component {component_id}"))?;
+    let claim = component
+        .parameter_claims
+        .iter_mut()
+        .find(|claim| claim.parameter_id == parameter_id)
+        .ok_or_else(|| format!("missing parameter claim {component_id}.{parameter_id}"))?;
+
+    claim.value = json!(value);
+    claim.applicability =
+        "Bounded synthetic design-space value; not a vendor specification or field measurement."
+            .to_owned();
+    claim.uncertainty.notes = format!(
+        "Synthetic sweep input: {} {}. No real-site uncertainty is implied.",
+        value, claim.unit
+    );
+    Ok(())
+}
+
+/// Enumerate a small, declared Cartesian design space over PV power, battery
+/// energy capacity, battery charge/discharge power, and grid import power.
+///
+/// This is deliberately a transparent baseline search, not a learned or
+/// open-ended topology invention algorithm. The same source-to-load topology
+/// is retained so improvements can first be attributed to sizing variables.
+pub fn bounded_parametric_design_space() -> DesignSpaceSearchResult {
+    let base = reference_service_hub_candidates()
+        .into_iter()
+        .find(|candidate| candidate.candidate_id == "synthetic-pv-battery-grid")
+        .expect("the frozen reference set includes the PV+battery+grid topology");
+
+    let requested_candidate_count = PARAMETRIC_PV_POWER_KW.len()
+        * PARAMETRIC_BATTERY_CAPACITY_KWH.len()
+        * PARAMETRIC_BATTERY_POWER_KW.len()
+        * PARAMETRIC_GRID_POWER_KW.len();
+    let mut axis_values = BTreeMap::new();
+    axis_values.insert(
+        "pv_rated_power_kw".to_owned(),
+        PARAMETRIC_PV_POWER_KW.to_vec(),
+    );
+    axis_values.insert(
+        "battery_capacity_kwh".to_owned(),
+        PARAMETRIC_BATTERY_CAPACITY_KWH.to_vec(),
+    );
+    axis_values.insert(
+        "battery_charge_discharge_power_kw".to_owned(),
+        PARAMETRIC_BATTERY_POWER_KW.to_vec(),
+    );
+    axis_values.insert(
+        "grid_import_power_kw".to_owned(),
+        PARAMETRIC_GRID_POWER_KW.to_vec(),
+    );
+
+    let mut candidates = Vec::with_capacity(requested_candidate_count);
+    let mut rejected_candidates = Vec::new();
+
+    for pv_power_kw in PARAMETRIC_PV_POWER_KW {
+        for battery_capacity_kwh in PARAMETRIC_BATTERY_CAPACITY_KWH {
+            for battery_power_kw in PARAMETRIC_BATTERY_POWER_KW {
+                for grid_power_kw in PARAMETRIC_GRID_POWER_KW {
+                    let candidate_id = format!(
+                        "synthetic-parametric-pv-{pv_power_kw:.0}kw-battery-{battery_capacity_kwh:.0}kwh-battery-power-{battery_power_kw:.0}kw-grid-{grid_power_kw:.0}kw"
+                    );
+                    let mut candidate = base.clone();
+                    candidate.candidate_id = candidate_id.clone();
+                    candidate.generator = GeneratorIdentity {
+                        name: "symthaea-energy-architecture-bounded-grid-search".to_owned(),
+                        version: GENERATOR_VERSION.to_owned(),
+                    };
+
+                    let parameter_updates = [
+                        ("pv", "rated_power_kw", pv_power_kw),
+                        ("pv", "interval_available_energy_cap_kwh", pv_power_kw),
+                        ("grid", "grid_import_power_cap_kw", grid_power_kw),
+                        ("grid", "interval_import_energy_cap_kwh", grid_power_kw),
+                        ("battery", "capacity_kwh", battery_capacity_kwh),
+                        ("battery", "max_charge_power_kw", battery_power_kw),
+                        ("battery", "max_discharge_power_kw", battery_power_kw),
+                    ];
+                    let mut mutation_error = None;
+                    for (component_id, parameter_id, value) in parameter_updates {
+                        if let Err(error) = update_numeric_claim(
+                            &mut candidate,
+                            component_id,
+                            parameter_id,
+                            value,
+                        ) {
+                            mutation_error = Some(error);
+                            break;
+                        }
+                    }
+
+                    if mutation_error.is_none() {
+                        for scenario in &mut candidate.scenarios {
+                            for interval in &mut scenario.intervals {
+                                let interval_hours =
+                                    interval.duration_seconds as f64 / 3600.0;
+                                for resource in &mut interval.resource_available_kwh {
+                                    resource.available_kwh = match resource.component_id.as_str() {
+                                        "pv" if interval.interval_id == "pv-surplus" => {
+                                            pv_power_kw * interval_hours
+                                        }
+                                        "grid" if !interval.grid_outage => {
+                                            grid_power_kw * interval_hours
+                                        }
+                                        _ => 0.0,
+                                    };
+                                }
+                            }
+                        }
+                    }
+
+                    if let Some(error) = mutation_error {
+                        rejected_candidates.push(CandidateRejection {
+                            candidate_id,
+                            violations: vec![error],
+                        });
+                        continue;
+                    }
+
+                    match validate_candidate(&candidate) {
+                        Ok(()) => candidates.push(candidate),
+                        Err(error) => rejected_candidates.push(CandidateRejection {
+                            candidate_id,
+                            violations: error.violations,
+                        }),
+                    }
+                }
+            }
+        }
+    }
+
+    DesignSpaceSearchResult {
+        search_schema_version: "energy-architecture-search-v0.1".to_owned(),
+        generator_version: GENERATOR_VERSION.to_owned(),
+        requested_candidate_count,
+        axis_values,
+        candidates,
+        rejected_candidates,
+        claim_ceiling: "Deterministic synthetic sizing sweep only; no real-site optimization, dynamic-simulation, lifecycle-cost, physical-safety or field-performance claim.".to_owned(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
