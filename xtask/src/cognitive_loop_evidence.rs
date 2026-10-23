@@ -470,6 +470,20 @@ mod tests {
                         "inject": "Run one perception cycle.",
                         "assertions": ["History advances at most once."]
                     }]
+                },
+                {
+                    "id": "S1-calibration-and-shift",
+                    "hard_gate": false,
+                    "cases": [
+                        {"id":"class-prior-abrupt","inject":"Abrupt class-prior drift.","metrics":["event-f1"]},
+                        {"id":"class-prior-gradual","inject":"Gradual class-prior drift.","metrics":["event-f1"]},
+                        {"id":"label-swap-abrupt","inject":"Abrupt label-swap drift.","metrics":["event-f1"]},
+                        {"id":"label-swap-gradual","inject":"Gradual label-swap drift.","metrics":["event-f1"]},
+                        {"id":"feature-permutation-abrupt","inject":"Abrupt feature-permutation drift.","metrics":["event-f1"]},
+                        {"id":"feature-permutation-gradual","inject":"Gradual feature-permutation drift.","metrics":["event-f1"]},
+                        {"id":"feature-filtering-abrupt","inject":"Abrupt feature-filtering drift.","metrics":["event-f1"]},
+                        {"id":"feature-filtering-gradual","inject":"Gradual feature-filtering drift.","metrics":["event-f1"]}
+                    ]
                 }
             ],
             "result_contract": {
@@ -489,8 +503,8 @@ mod tests {
     fn accepts_valid_manifest_and_counts_scenarios() {
         let summary = validate_value(&valid_manifest()).expect("fixture is valid");
         assert_eq!(summary.baseline_count, 8);
-        assert_eq!(summary.suite_count, 2);
-        assert_eq!(summary.case_count, 4);
+        assert_eq!(summary.suite_count, 3);
+        assert_eq!(summary.case_count, 12);
     }
 
     #[test]
