@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.2",
+  "schema_version": "1.3",
   "experiment": "symthaea-silicon exact HDC word-primitive correctness and popcount architecture sweep",
   "required_tools": [
     {
@@ -48,7 +48,7 @@
     "receipts never imply formal proof, synthesis/PPA, FPGA observation, physical energy or SOTA"
   ],
   "tool_versions": "Provided by root flake.lock through devShells.hdl, subject to platform and lock file",
-  "status": "specification only; the 12 RTL cases have not run because Verilator is unavailable on the authoring host",
+  "status": "specification only; all 12 RTL cases remain unexecuted because Verilator/Nix are unavailable on the authoring host",
   "widths_bits": [
     64,
     128,
@@ -75,20 +75,19 @@
   ],
   "expected_case_count": 12,
   "receipt_fields": [
-    "source hashes for both RTL modules and testbenches",
-    "hashes for runner, manifest, receipt schema, expected-case matrix, independent validator, flake.nix and flake.lock",
-    "repository HEAD and Verilator version",
-    "per-case ID, module, width, architecture, lint/build/simulation exit codes and pass-marker status",
-    "hashed per-case logs"
+    "hashes for RTL modules, testbenches, runner, manifest, schema, expected-case matrix, validator, flake.nix and flake.lock",
+    "exact Git HEAD and Verilator version",
+    "per-case ID, module, width, architecture, lint/build/simulation exit codes, pass-marker status",
+    "hashed logs per case"
   ],
   "expected_case_matrix": "hdl_expected_case_matrix_v1.json",
   "receipt_schema": "hdl_run_receipt_v1.schema.json",
   "independent_receipt_validator": "validate_hdl_receipt.sh",
   "validation_protocol": [
-    "run the smoke sweep only in the pinned .#hdl shell",
-    "parse the receipt with the versioned JSON schema",
-    "run validate_hdl_receipt.sh against the exact current case matrix",
-    "reject a receipt if its git HEAD or source/configuration hashes differ",
-    "preserve non-pass receipts; do not repair them in place or infer missing results"
+    "run run_hdl_smoke.sh from the root pinned .#hdl dev shell",
+    "validate receipt format against hdl_run_receipt_v1.schema.json",
+    "run validate_hdl_receipt.sh on the exact receipt and case matrix",
+    "the validator checks that all expected cases occur exactly once, all case results pass, and current source/configuration hashes and Git HEAD match the receipt",
+    "a changed source tree must not be used to retroactively validate a receipt from another revision"
   ]
 }
