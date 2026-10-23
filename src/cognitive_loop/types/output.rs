@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::prediction_evidence::PredictionErrorEvidence;
 use super::scheduling::CycleUrgency;
 use super::telemetry::CycleMetadata;
 
@@ -27,6 +28,21 @@ pub struct PsiAttestationRecord {
 }
 
 impl PsiAttestationRecord {
+    /// Adapt the legacy payload into typed evidence. The observation cycle is
+    /// taken from the signed record; callers must provide prediction provenance
+    /// when known rather than inferring it from the numeric payload.
+    pub fn prediction_evidence(
+        &self,
+        prediction_cycle: Option<u64>,
+    ) -> PredictionErrorEvidence {
+        PredictionErrorEvidence::from_compatibility_fields(
+            self.prediction_error,
+            self.prediction_error_valid,
+            prediction_cycle,
+            self.cycle_id,
+        )
+    }
+
     /// Canonical signing payload, versioned because PE provenance is now signed.
     pub fn sign_message(&self, agent_did: &str) -> Vec<u8> {
         format!(
@@ -89,7 +105,27 @@ pub struct CycleResult {
     #[cfg(feature = "identity")]
     pub assurance_level: crate::identity::AssuranceLevel,
 
-    /// Mental movie generated from geodesic mental simulation, if requested.
+    impl CycleResult {
+    /// Adapt compatibility PE fields into typed, observation-bound evidence.
+    ///
+    /// Cycle identifiers are explicit inputs because legacy CycleResult does
+    /// not own authoritative prediction provenance. Use the actual source
+    /// cycle when known; do not synthesize one from the current number.
+    pub fn prediction_evidence_at(
+        &self,
+        prediction_cycle: Option<u64>,
+        observation_cycle: u64,
+    ) -> PredictionErrorEvidence {
+        PredictionErrorEvidence::from_compatibility_fields(
+            self.prediction_error,
+            self.prediction_error_valid,
+            prediction_cycle,
+            observation_cycle,
+        )
+    }
+}
+
+/// Mental movie generated from geodesic mental simulation, if requested.
     #[cfg(feature = "vision-manifold")]
     pub mental_movie: Option<MentalMovie>,
 }
