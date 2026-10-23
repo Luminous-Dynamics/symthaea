@@ -20,6 +20,16 @@ pub struct ManifestSummary {
 }
 
 const REQUIRED_BASELINES: [&str; 8] = ["B0", "B1", "B2", "B3", "B4", "B5", "B6", "B7"];
+const REQUIRED_DRIFT_DETECTORS: [&str; 8] = [
+    "fixed-threshold",
+    "ewma-control-chart",
+    "page-hinkley",
+    "adwin",
+    "kswin",
+    "discriminative-drift-detector",
+    "image-based-drift-detector",
+    "semi-parametric-log-likelihood",
+];
 const REQUIRED_RESULT_FIELDS: [&str; 12] = [
     "repository_head_sha",
     "configuration_digest",
@@ -72,6 +82,57 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
         ensure!(
             baseline_ids.contains(expected),
             "baseline matrix is missing required baseline {expected}"
+        );
+    }
+
+    let drift_detectors = array_field(root, "external_drift_detectors", "manifest")?;
+    ensure!(
+        !drift_detectors.is_empty(),
+        "external_drift_detectors must not be empty"
+    );
+    let mut detector_ids = BTreeSet::new();
+    for (index, detector) in drift_detectors.iter().enumerate() {
+        let context = format!("external_drift_detectors[{index}]");
+        let id = string_field(detector, "id", &context)?;
+        ensure!(
+            detector_ids.insert(id.to_owned()),
+            "duplicate external drift detector id: {id}"
+        );
+        nonempty_string_field(detector, "name", &context)?;
+        nonempty_string_field(detector, "family", &context)?;
+        nonempty_string_field(detector, "input_contract", &context)?;
+        nonempty_string_field(detector, "implementation_status", &context)?;
+        let source = nonempty_string_field(detector, "source", &context)?;
+        ensure!(
+            source.starts_with("https://"),
+            "{context}.source must be an HTTPS reference"
+        );
+        detector
+            .get("labels_required")
+            .and_then(Value::as_bool)
+            .with_context(|| format!("{context}.labels_required must be boolean"))?;
+    }
+    for expected in REQUIRED_DRIFT_DETECTORS {
+        ensure!(
+            detector_ids.contains(expected),
+            "external drift detector track is missing required comparator {expected}"
+        );
+    }
+    let detector_protocol = nonempty_string_field(
+        root,
+        "drift_detector_comparison_protocol",
+        "manifest",
+    )?;
+    for required_phrase in [
+        "disjoint calibration stream",
+        "invalid/missing PE",
+        "false alarms",
+        "detection-delay",
+        "not yet implemented or measured",
+    ] {
+        ensure!(
+            detector_protocol.contains(required_phrase),
+            "drift_detector_comparison_protocol must state: {required_phrase}"
         );
     }
 
@@ -289,6 +350,16 @@ mod tests {
             "status": "proposal-not-measured",
             "notes": ["A hard invariant cannot be averaged away."],
             "baselines": baselines,
+            "external_drift_detectors": REQUIRED_DRIFT_DETECTORS.iter().map(|id| json!({
+                "id": id,
+                "name": format!("detector-{id}"),
+                "family": "fixture-family",
+                "labels_required": false,
+                "input_contract": "Valid numeric observations only.",
+                "implementation_status": "planned-baseline",
+                "source": "https://example.com/reference"
+            })).collect::<Vec<_>>(),
+            "drift_detector_comparison_protocol": "Pin versions; tune on a disjoint calibration stream; never remap invalid/missing PE; report false alarms and detection-delay; candidates are not yet implemented or measured.",
             "scenario_groups": [
                 {
                     "id": "S0-validity",
@@ -349,6 +420,22 @@ mod tests {
         assert_eq!(summary.baseline_count, 8);
         assert_eq!(summary.suite_count, 2);
         assert_eq!(summary.case_count, 4);
+    }
+
+    #[test]
+    fn rejects_duplicate_external_detector_ids() {
+        let mut manifest = valid_manifest();
+        manifest["external_drift_detectors"][1]["id"] = json!("fixed-threshold");
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("duplicate external drift detector id"));
+    }
+
+    #[test]
+    fn rejects_missing_external_drift_comparator() {
+        let mut manifest = valid_manifest();
+        manifest["external_drift_detectors"].as_array_mut().unwrap().pop();
+        let error = validate_value(&manifest).unwrap_err().to_string();
+        assert!(error.contains("missing required comparator"));
     }
 
     #[test]
