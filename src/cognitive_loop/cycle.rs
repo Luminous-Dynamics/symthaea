@@ -556,6 +556,8 @@ impl CognitiveLoopService {
             // Produces CivicCrisisEvent for the Mycelix emergency-incidents zome.
             let crisis_input = super::civic_crisis_detector::CrisisDetectorInput {
                 prediction_error: dynamics.core.prediction_error as f64,
+                prediction_error_valid: perception.urgency.prediction_error_valid
+                    && dynamics.core.prediction_error.is_finite(),
                 safety_level_ordinal: match safety_result.level {
                     crate::safety::SafetyLevel::Green => 0,
                     crate::safety::SafetyLevel::Yellow => 1,
@@ -732,25 +734,25 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
         #[cfg(feature = "scientific_method")]
         {
-            // Observation: prediction error encodes how surprising the current
-            // input is relative to the system's internal model.
-            let pe = dynamics.core.prediction_error as f64;
-            let phi = feedback.consciousness.consciousness_level;
-            self.scientific_method_engine
-                .observe(vec![pe, phi], "prediction_error_and_consciousness");
+            // A missing comparison is not a scientific observation. Keep existing
+            // hypotheses intact on an invalid cycle; independent safety/feedback
+            // pathways continue to operate normally.
+            if perception.urgency.prediction_error_valid
+                && dynamics.core.prediction_error.is_finite()
+            {
+                let pe = dynamics.core.prediction_error as f64;
+                let phi = feedback.consciousness.consciousness_level;
+                self.scientific_method_engine
+                    .observe(vec![pe, phi], "prediction_error_and_consciousness");
 
-            // Predict what the standing hypothesis (id 0) expects.
-            let predicted = self.scientific_method_engine.predict(0);
+                let predicted = self.scientific_method_engine.predict(0);
+                let observed_coherence = (1.0 - pe).clamp(0.0, 1.0);
+                self.scientific_method_engine
+                    .test_hypothesis(0, observed_coherence, predicted);
+            }
 
-            // The "observed value" for coherence is 1 − prediction_error (clipped
-            // to [0, 1]): low PE means high coherence, confirming the hypothesis.
-            let observed_coherence = (1.0 - pe).clamp(0.0, 1.0);
-
-            // Test and update Bayesian posterior.
-            self.scientific_method_engine
-                .test_hypothesis(0, observed_coherence, predicted);
-
-            // Batch-recompute lifecycle status for all hypotheses.
+            // Recompute status from accumulated evidence without inventing a new
+            // observation for this cycle.
             self.scientific_method_engine.update_beliefs();
         }
 
