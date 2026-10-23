@@ -1,30 +1,26 @@
-# HDC XOR RTL slice (prototype)
+# Exact HDC word-level primitives
 
-This directory begins the #5808 hardware-equivalence path with one synthesizable word-level primitive.
+## `hdc_bind_xor.sv`
 
-## Semantics
+A parameterized word-level XOR bind/unbind primitive, with default width 256 and a single-entry ready/valid output register.
 
-- Each accepted input word produces exactly `operand_a XOR operand_b`.
-- It is parameterized by datapath width; default is 256 bits.
-- The canonical Symthaea hypervector is 16,384 bits / 2,048 bytes, so a 256-bit implementation requires 64 ordered word operations per vector. This module has no vector-address/controller logic and does not itself implement permutation, Hamming distance, bundling, DMA or local memory.
-- One output register supplies a ready/valid contract. While output is blocked, `out_valid` and `result` must remain stable.
+## `hdc_hamming_count.sv`
 
-## Intended first simulation
+A parameterized word-level Hamming count primitive: count set bits in `operand_a XOR operand_b`. The default result width is `$clog2(DATA_W + 1)`. For a canonical 16,384-bit BinaryHV, a 256-bit datapath produces a partial count for each of 64 word operations; a separate vector controller/accumulator is still required.
 
-With a compatible Verilator installation:
+The first popcount implementation is deliberately a straightforward combinational loop. It is a functional baseline, **not** an optimized tree, timing-closed design or proven low-power implementation. Next architecture sweep should compare balanced/grouped popcount and pipelined variants at identical semantics.
+
+## Intended simulation
+
+With the pinned HDL environment:
 
 ```sh
-verilator --binary --timing -Wall \
-  --top-module tb_hdc_bind_xor \
-  crates/domains/symthaea-silicon/rtl/hdc_bind_xor.sv \
-  crates/domains/symthaea-silicon/rtl/tb_hdc_bind_xor.sv
-./obj_dir/Vtb_hdc_bind_xor
+nix develop .#hdl
+bash crates/domains/symthaea-silicon/eda/run_hdc_smoke.sh
 ```
 
-Tool availability and command syntax must be rechecked against the pinned tool version before treating this as a run receipt. The testbench has not been executed during authoring: Verilator/Yosys/iverilog and Rust tools are not installed in the available execution environment.
+The HDC smoke runner should produce independent per-width receipts and logs. No simulation should be claimed until the pinned tool actually runs and the expected PASS marker is observed.
 
 ## Qualification boundary
 
-RTL source presence != parsed/elaborated RTL != passing simulation != formal proof != synthesis/PPA != FPGA hardware observed != ASIC qualification.
-
-This is a starter artifact only. It does not prove CPU/GPU performance, area, frequency, power/energy efficiency, timing closure, or product readiness.
+RTL source presence != elaborated RTL != passing differential simulation != formal proof != synthesis/PPA != FPGA hardware observation != ASIC qualification. These modules do not yet implement vector DMA, memory control, CPU/GPU, runtime integration or a complete accelerator.
