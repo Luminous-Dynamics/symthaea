@@ -203,7 +203,7 @@ fn generate_width(
             // most-significant byte position.
             hamming_mem.push_str(&word_hex(a_word));
             hamming_mem.push_str(&word_hex(b_word));
-            hamming_mem.push_str(&format!("{word_distance:0count_hex_digits$x}"));
+            hamming_mem.push_str(&format!("{:0width$x}", word_distance, width = count_hex_digits));
             hamming_mem.push('\n');
             word_cases += 1;
         }
