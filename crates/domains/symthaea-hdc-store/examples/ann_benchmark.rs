@@ -564,7 +564,7 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
     );
     for sample in samples {
         println!(
-            "{},{},{},{},{},{},{},{:.9},{:.9},{},{},{:.9},{},{},\\"{}\\",\\"{}\\"",
+            "{},{},{},{},{},{},{},{:.9},{:.9},{},{},{:.9},{},{},{},{}",
             sample.query_index,
             sample.round,
             sample.kind,
@@ -683,36 +683,50 @@ fn emit_quality_summary(kind: &str, arm: LshConfig, quality: &[Quality]) {
             query.kind == kind && query.lsh_bands == arm.bands && query.lsh_rows == arm.rows
         })
         .collect();
-    println!("# {kind}_query_count={}", selected.len());
+    println!("# arm_{}_{}_query_count={}", arm.label(), kind, selected.len());
     println!(
-        "# {kind}_mean_recall_at_k={:.9}",
+        "# arm_{}_{}_mean_recall_at_k={:.9}",
+        arm.label(),
+        kind,
         mean(selected.iter().map(|query| query.recall_at_k))
     );
     println!(
-        "# {kind}_mean_tie_aware_recall_at_k={:.9}",
+        "# arm_{}_{}_mean_tie_aware_recall_at_k={:.9}",
+        arm.label(),
+        kind,
         mean(selected.iter().map(|query| query.tie_aware_recall_at_k))
     );
     println!(
-        "# {kind}_worst_recall_at_k={:.9}",
+        "# arm_{}_{}_worst_recall_at_k={:.9}",
+        arm.label(),
+        kind,
         selected.iter().map(|query| query.recall_at_k).fold(1.0, f64::min)
     );
     println!(
-        "# {kind}_mean_candidate_fraction={:.9}",
+        "# arm_{}_{}_mean_candidate_fraction={:.9}",
+        arm.label(),
+        kind,
         mean(selected.iter().map(|query| query.candidate_fraction))
     );
     println!(
-        "# {kind}_mean_examined_vectors={:.3}",
+        "# arm_{}_{}_mean_examined_vectors={:.3}",
+        arm.label(),
+        kind,
         mean(selected.iter().map(|query| query.examined as f64))
     );
     println!(
-        "# {kind}_exhaustive_query_fraction={:.9}",
+        "# arm_{}_{}_exhaustive_query_fraction={:.9}",
+        arm.label(),
+        kind,
         fraction(
             selected.iter().filter(|query| query.approximate_exact).count(),
             selected.len()
         )
     );
     println!(
-        "# {kind}_fallback_query_fraction={:.9}",
+        "# arm_{}_{}_fallback_query_fraction={:.9}",
+        arm.label(),
+        kind,
         fraction(
             selected.iter().filter(|query| query.fell_back_to_exact).count(),
             selected.len()
@@ -744,11 +758,15 @@ fn emit_latency_summary(kind: &str, arm: LshConfig, samples: &[Sample]) {
     } else {
         exact_p95 as f64 / approximate_p95 as f64
     };
-    println!("# {kind}_exact_p50_ns={exact_p50}");
-    println!("# {kind}_exact_p95_ns={exact_p95}");
-    println!("# {kind}_approximate_p50_ns={approximate_p50}");
-    println!("# {kind}_approximate_p95_ns={approximate_p95}");
-    println!("# {kind}_ratio_exact_p95_over_approximate_p95={ratio:.6}");
+    println!("# arm_{}_{}_exact_p50_ns={exact_p50}", arm.label(), kind);
+    println!("# arm_{}_{}_exact_p95_ns={exact_p95}", arm.label(), kind);
+    println!("# arm_{}_{}_approximate_p50_ns={approximate_p50}", arm.label(), kind);
+    println!("# arm_{}_{}_approximate_p95_ns={approximate_p95}", arm.label(), kind);
+    println!(
+        "# arm_{}_{}_ratio_exact_p95_over_approximate_p95={ratio:.6}",
+        arm.label(),
+        kind
+    );
 }
 
 fn paired_query_speedups(kind: &str, arm: LshConfig, samples: &[Sample]) -> Vec<f64> {
