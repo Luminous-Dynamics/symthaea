@@ -82,4 +82,4 @@ The distinguishing slice here is retrieval-oriented fixed-sequence certification
 
 The fixture normalizes an evaluator-specific event into `failure=true|false|null`. That is only a metric adapter: CRISPR classification error and unsafe memory retrieval are different events, and their policies, calibration meaning, contexts, sampling units, and authority boundaries must remain domain-specific. Both adapters must preserve unknown labels, treat score ties atomically, and report an explicit zero-coverage origin with undefined rates as `null`.
 
-The fixture is synthetic. Its JSON and arithmetic require independent checking; it is not a Rust test result, a benchmark result, a safety certificate, or evidence of improved retrieval quality.
+The fixture is synthetic. Its JSON syntax and four expected operating points were independently checked outside Rust, including row-order invariance; this is not adapter parity, a Rust test result, a benchmark result, a safety certificate, or evidence of improved retrieval quality.
