@@ -61,11 +61,30 @@ fn greedy_min_residual_degree(graph: &MisGraph) -> Vec<usize> {
     greedy_min_residual_degree_with_seed(graph, None)
 }
 
-/// Build an independent set with minimum residual degree. With a seed, ties among
-/// equal residual degrees are selected using a reproducible local RNG. A lazy min-heap
-/// keeps the heuristic O((V+E) log(V+E)) instead of rescanning every adjacency list
-/// on each selected vertex, making the smoke baseline usable on dense QOBLIB instances.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GreedyRunResult {
+    vertices: Vec<usize>,
+    /// Incumbent objective observations in nanoseconds from the start of this run.
+    objective_time_series: Vec<(u128, usize)>,
+    elapsed_nanos: u128,
+}
+
+/// Compatibility wrapper for callers that only need the final candidate set.
 fn greedy_min_residual_degree_with_seed(graph: &MisGraph, seed: Option<u64>) -> Vec<usize> {
+    greedy_min_residual_degree_with_seed_trace(graph, seed).vertices
+}
+
+/// Build an independent set with minimum residual degree and preserve every incumbent.
+///
+/// With a seed, ties among equal residual degrees are selected using a reproducible
+/// local RNG. A lazy min-heap avoids rescanning all adjacency lists after every
+/// selection. Each selected prefix is a feasible independent set, so cardinality
+/// monotonically increases and can be emitted as a QOBLIB incumbent time series.
+fn greedy_min_residual_degree_with_seed_trace(
+    graph: &MisGraph,
+    seed: Option<u64>,
+) -> GreedyRunResult {
+    let run_start = Instant::now();
     let vertex_count = graph.vertex_count();
     let mut adjacency = vec![Vec::new(); vertex_count];
     for &(u, v) in graph.edges() {
@@ -84,6 +103,7 @@ fn greedy_min_residual_degree_with_seed(graph: &MisGraph, seed: Option<u64>) -> 
     }
     let mut rng = seed.map(XorShift64::new);
     let mut selected = Vec::new();
+    let mut objective_time_series = vec![(0_u128, 0_usize)];
 
     loop {
         // Discard stale degree entries left behind by neighbor removals.
@@ -145,10 +165,18 @@ fn greedy_min_residual_degree_with_seed(graph: &MisGraph, seed: Option<u64>) -> 
             }
         }
         selected.push(chosen);
+        objective_time_series.push((run_start.elapsed().as_nanos(), selected.len()));
     }
 
     selected.sort_unstable();
-    selected
+    let elapsed_nanos = run_start.elapsed().as_nanos();
+    let last_time = objective_time_series.last().map(|point| point.0).unwrap_or(0);
+    objective_time_series.push((elapsed_nanos.max(last_time), selected.len()));
+    GreedyRunResult {
+        vertices: selected,
+        objective_time_series,
+        elapsed_nanos,
+    }
 }
 
 /// A bounded, reproducible multi-start classical baseline. It selects the best
