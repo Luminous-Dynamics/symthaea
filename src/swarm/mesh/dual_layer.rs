@@ -310,25 +310,27 @@ impl DualLayerMesh {
             MeshRoute::LoRa => {
                 let transport = self.lora.as_ref().ok_or(MeshError::NoTransport)?;
                 let frags = fragment(packet.thought_id(), &envelope);
+
+                // Serialize and validate every frame before the first send.
+                // This prevents a smaller physical adapter MTU from causing a
+                // partially transmitted packet followed by an oversize failure.
+                let mut frames = Vec::with_capacity(frags.len());
                 let mut buf = [0u8; LORA_MTU];
                 for frag in &frags {
                     let len = frag.to_bytes(&mut buf);
-                    // Optionally encrypt each fragment individually
-                    #[cfg(feature = "mesh-encryption")]
-                    if self.fragment_encryption {
-                        if let Some(ref key) = self.encryption_key {
-                            let encrypted = super::encrypt_fragment(
-                                &buf[..len],
-                                key,
-                                &packet.source_id,
-                                packet.thought_id(),
-                                frag.fragment_index,
-                            );
-                            transport.send_raw(&encrypted)?;
-                            continue;
-                        }
-                    }
-                    transport.send_raw(&buf[..len])?;
+                    frames.push(buf[..len].to_vec());
+                }
+
+                let mtu = transport.mtu();
+                if let Some(frame) = frames.iter().find(|frame| frame.len() > mtu) {
+                    return Err(MeshError::TransportMtuExceeded {
+                        frame_len: frame.len(),
+                        mtu,
+                    });
+                }
+
+                for frame in &frames {
+                    transport.send_raw(frame)?;
                 }
             }
             MeshRoute::Batman => {
