@@ -25,12 +25,16 @@ const DEFAULT_QUERIES: usize = 200;
 const DEFAULT_ROUNDS: usize = 5;
 const DEFAULT_TOP_K: usize = 10;
 const DEFAULT_NOISE_BITS: usize = 128;
+const DEFAULT_CLUSTERS: usize = 64;
+const DEFAULT_CLUSTER_NOISE_BITS: usize = 1_024;
 const DEFAULT_SEED: u64 = 42;
 
 #[derive(Debug)]
 struct Config {
     source_sha: String,
     size: usize,
+    clusters: usize,
+    cluster_noise_bits: usize,
     queries: usize,
     rounds: usize,
     top_k: usize,
@@ -65,6 +69,7 @@ struct Sample {
 }
 
 struct Quality {
+    kind: &'static str,
     recall_at_k: f64,
     examined: usize,
     candidate_fraction: f64,
@@ -87,10 +92,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut store = HdcStore::create(&path, store_config)?;
 
     for id in 0..config.size {
-        store.append(id as u64, &BinaryHV::random(memory_seed(config.seed, id as u64)))?;
+        store.append(id as u64, &corpus_vector(&config, id))?;
     }
 
-    let queries = build_queries(&config);
+    let queries = build_queries(&config, &store);
     let options = ApproximateSearchOptions {
         candidate_multiplier: config.candidate_multiplier,
         fallback_on_empty: config.fallback_on_empty,
@@ -130,6 +135,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             if round == 0 {
                 first_round_quality.push(Quality {
+                    kind: query.kind,
                     recall_at_k,
                     examined: approximate.examined,
                     candidate_fraction,
@@ -195,6 +201,8 @@ fn parse_args() -> Result<Config, String> {
     let allowed = [
         "source-sha",
         "size",
+        "clusters",
+        "cluster-noise-bits",
         "queries",
         "rounds",
         "top-k",
@@ -230,6 +238,9 @@ fn parse_args() -> Result<Config, String> {
     }
 
     let size = parse_value(&values, "size", DEFAULT_SIZE)?;
+    let clusters = parse_value(&values, "clusters", DEFAULT_CLUSTERS.min(size))?;
+    let cluster_noise_bits =
+        parse_value(&values, "cluster-noise-bits", DEFAULT_CLUSTER_NOISE_BITS)?;
     let queries = parse_value(&values, "queries", DEFAULT_QUERIES)?;
     let rounds = parse_value(&values, "rounds", DEFAULT_ROUNDS)?;
     let top_k = parse_value(&values, "top-k", DEFAULT_TOP_K)?;
@@ -252,8 +263,14 @@ fn parse_args() -> Result<Config, String> {
     if size == 0 || queries == 0 || rounds == 0 || top_k == 0 {
         return Err("--size, --queries, --rounds and --top-k must all be positive".into());
     }
-    if noise_bits > BinaryHV::DIM {
-        return Err(format!("--noise-bits must be <= {}", BinaryHV::DIM));
+    if clusters == 0 || clusters > size {
+        return Err("--clusters must be positive and no greater than --size".into());
+    }
+    if noise_bits > BinaryHV::DIM || cluster_noise_bits > BinaryHV::DIM {
+        return Err(format!(
+            "--noise-bits and --cluster-noise-bits must be <= {}",
+            BinaryHV::DIM
+        ));
     }
     if u64::try_from(size).is_err() {
         return Err("--size exceeds the store's u64 ID range".into());
@@ -262,6 +279,8 @@ fn parse_args() -> Result<Config, String> {
     Ok(Config {
         source_sha,
         size,
+        clusters,
+        cluster_noise_bits,
         queries,
         rounds,
         top_k,
@@ -293,7 +312,7 @@ where
         .unwrap_or(Ok(default))
 }
 
-fn build_queries(config: &Config) -> Vec<Query> {
+fn build_queries(config: &Config, store: &HdcStore) -> Vec<Query> {
     let mut queries = Vec::with_capacity(config.queries);
     for query_index in 0..config.queries {
         // One in five queries deliberately has no stored source vector. The
@@ -311,7 +330,9 @@ fn build_queries(config: &Config) -> Vec<Query> {
                 .wrapping_mul(997)
                 .wrapping_add((config.seed % config.size as u64) as usize)
                 % config.size;
-            let mut vector = BinaryHV::random(memory_seed(config.seed, anchor as u64));
+            let mut vector = *store
+                .get(anchor as u64)
+                .expect("generated corpus must contain the selected anchor ID");
             let start_bit = mix64(config.seed ^ query_index as u64) as usize % BinaryHV::DIM;
             flip_distinct_bits(&mut vector, config.noise_bits, start_bit);
             queries.push(Query {
@@ -323,8 +344,16 @@ fn build_queries(config: &Config) -> Vec<Query> {
     queries
 }
 
-fn memory_seed(seed: u64, id: u64) -> u64 {
-    mix64(seed ^ id.wrapping_mul(0x9E37_79B9_7F4A_7C15))
+fn corpus_vector(config: &Config, id: usize) -> BinaryHV {
+    let cluster_id = id % config.clusters;
+    let mut vector = BinaryHV::random(cluster_seed(config.seed, cluster_id as u64));
+    let noise_seed = config.seed ^ (id as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93);
+    flip_seeded_bits(&mut vector, config.cluster_noise_bits, noise_seed);
+    vector
+}
+
+fn cluster_seed(seed: u64, cluster_id: u64) -> u64 {
+    mix64(seed ^ 0x434C_5553_5445_5200 ^ cluster_id.wrapping_mul(0x9E37_79B9_7F4A_7C15))
 }
 
 fn mix64(mut value: u64) -> u64 {
@@ -332,6 +361,15 @@ fn mix64(mut value: u64) -> u64 {
     value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
     value ^ (value >> 31)
+}
+
+fn flip_seeded_bits(vector: &mut BinaryHV, count: usize, seed: u64) {
+    let start_bit = mix64(seed) as usize % BinaryHV::DIM;
+    let stride = (mix64(seed ^ 0xA5A5_5A5A_DEAD_BEEF) as usize % BinaryHV::DIM) | 1;
+    for offset in 0..count {
+        let bit_index = (start_bit + offset * stride) % BinaryHV::DIM;
+        vector.0[bit_index / 8] ^= 1u8 << (bit_index % 8);
+    }
 }
 
 fn flip_distinct_bits(vector: &mut BinaryHV, count: usize, start_bit: usize) {
@@ -404,8 +442,12 @@ fn mean(values: impl Iterator<Item = f64>) -> f64 {
 fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
     println!("# protocol={PROTOCOL}");
     println!("# source_sha={}", config.source_sha);
-    println!("# workload=80% bounded-noise stored-memory probes; 20% novel probes");
+    println!(
+        "# workload=clustered BinaryHV memories; 80% known-memory probes; 20% random OOD probes"
+    );
     println!("# store_size={}", config.size);
+    println!("# clusters={}", config.clusters);
+    println!("# cluster_noise_bits={}", config.cluster_noise_bits);
     println!("# unique_queries={}", config.queries);
     println!("# rounds={}", config.rounds);
     println!("# top_k={}", config.top_k);
@@ -548,6 +590,8 @@ mod tests {
         let config = Config {
             source_sha: "0123456789abcdef0123456789abcdef01234567".into(),
             size: 128,
+            clusters: 16,
+            cluster_noise_bits: 1_024,
             queries: 20,
             rounds: 1,
             top_k: 5,
@@ -558,8 +602,15 @@ mod tests {
             lsh_bands: 32,
             lsh_rows: 8,
         };
-        let left = build_queries(&config);
-        let right = build_queries(&config);
+        let dir = tempdir().unwrap();
+        let mut store_config = StoreConfig::default();
+        store_config.initial_capacity = config.size as u64;
+        let mut store = HdcStore::create(dir.path().join("query-fixture.hdc"), store_config).unwrap();
+        for id in 0..config.size {
+            store.append(id as u64, &corpus_vector(&config, id)).unwrap();
+        }
+        let left = build_queries(&config, &store);
+        let right = build_queries(&config, &store);
         assert_eq!(left.len(), right.len());
         for (left, right) in left.iter().zip(right.iter()) {
             assert_eq!(left.kind, right.kind);
