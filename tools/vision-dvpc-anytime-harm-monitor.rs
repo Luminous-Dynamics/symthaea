@@ -297,7 +297,7 @@ impl AnytimeHarmMonitorV1 {
 
     pub fn to_tsv(&self) -> String {
         let mut out = format!(
-            "DVPC011\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{:.9}\\t{:.9}\\t{}\\t{:.9}\\n",
+            "DVPC011\t{}\t{}\t{}\t{}\t{}\t{}\t{:.9}\t{:.9}\t{}\t{:.9}\n",
             self.status().label(),
             self.config.policy_id,
             digest_hex(&self.config.policy_digest),
@@ -311,7 +311,7 @@ impl AnytimeHarmMonitorV1 {
         );
         for snapshot in self.group_snapshots() {
             out.push_str(&format!(
-                "GROUP\\t{}\\t{}\\t{}\\t{}\\t{:.12}\\t{:.12}\\n",
+                "GROUP\t{}\t{}\t{}\t{}\t{:.12}\t{:.12}\n",
                 snapshot.group_id,
                 snapshot.status.label(),
                 snapshot.escalation_count,
@@ -390,7 +390,7 @@ fn valid_identifier(value: &str) -> bool {
     !value.trim().is_empty()
         && !value
             .chars()
-            .any(|ch| matches!(ch, '\\t' | '\\r' | '\\n'))
+            .any(|ch| matches!(ch, '\t' | '\r' | '\n'))
 }
 
 fn digest_hex(digest: &EvidenceDigest) -> String {
