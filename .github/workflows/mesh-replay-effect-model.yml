@@ -1,0 +1,134 @@
+name: Replay Effect Lifecycle Model
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docs/security/models/MESH_REPLAY_EFFECT_LIFECYCLE.tla"
+      - "docs/security/models/replay_effect_*.cfg"
+      - "docs/security/models/replay_commit_*.cfg"
+      - ".github/workflows/mesh-replay-effect-model.yml"
+  push:
+    branches: ["**"]
+    paths:
+      - "docs/security/models/MESH_REPLAY_EFFECT_LIFECYCLE.tla"
+      - "docs/security/models/replay_effect_*.cfg"
+      - "docs/security/models/replay_commit_*.cfg"
+      - ".github/workflows/mesh-replay-effect-model.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: replay-effect-lifecycle-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  replay-effect-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TOOL_JAR: /tmp/tla2tools.jar
+      EVIDENCE_DIR: target/mesh-replay-effect-model
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Download and verify pinned TLA+ tools
+        shell: bash
+        env:
+          TLA_VERSION: v1.8.0
+          TLA_SHA256: dae639a1f51a9e13ce60c369b15f32124cf1a78017aca366b6de0ae2b5169439
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
+            "https://github.com/tlaplus/tlaplus/releases/download/${TLA_VERSION}/tla2tools.jar" \
+            --output "$TOOL_JAR"
+          printf '%s  %s\n' "$TLA_SHA256" "$TOOL_JAR" | sha256sum --check --strict
+          java -version 2> "$EVIDENCE_DIR/java-version.txt"
+          printf 'TLA_VERSION=%s\nTLA_SHA256=%s\n' "$TLA_VERSION" "$TLA_SHA256" \
+            > "$EVIDENCE_DIR/tla-tools.txt"
+
+      - name: Parse model
+        shell: bash
+        run: |
+          set -euo pipefail
+          model=docs/security/models/MESH_REPLAY_EFFECT_LIFECYCLE.tla
+          java -cp "$TOOL_JAR" tla2sany.SANY "$model" 2>&1 \
+            | tee "$EVIDENCE_DIR/sany.log"
+          sha256sum "$model" docs/security/models/replay_effect_atomic_strict.cfg \
+            docs/security/models/replay_effect_before_commit_legacy.cfg \
+            docs/security/models/replay_commit_before_effect_legacy.cfg \
+            > "$EVIDENCE_DIR/input-sha256.txt"
+
+      - name: Require atomic reference model to preserve both invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          model=docs/security/models/MESH_REPLAY_EFFECT_LIFECYCLE.tla
+          cfg=docs/security/models/replay_effect_atomic_strict.cfg
+          log="$EVIDENCE_DIR/replay_effect_atomic_strict.log"
+          java -cp "$TOOL_JAR" tlc2.TLC -workers 1 -config "$cfg" "$model" 2>&1 \
+            | tee "$log"
+          grep -Fq "Model checking completed. No error has been found." "$log"
+          grep -Eq '[0-9]+ distinct states found' "$log"
+
+      - name: Require crash-window mutants to violate the intended invariant
+        shell: bash
+        run: |
+          set -euo pipefail
+          model=docs/security/models/MESH_REPLAY_EFFECT_LIFECYCLE.tla
+          check_mutant() {
+            local cfg="$1"
+            local expected="$2"
+            local log="$EVIDENCE_DIR/$(basename "$cfg").log"
+            local rc=0
+            set +e
+            java -cp "$TOOL_JAR" tlc2.TLC -workers 1 -config "$cfg" "$model" \
+              > "$log" 2>&1
+            rc=$?
+            set -e
+            cat "$log"
+            if [[ "$rc" -eq 0 ]]; then
+              echo "::error::Crash-window mutant unexpectedly passed: $cfg"
+              exit 1
+            fi
+            if ! grep -Fq "Invariant ${expected} is violated" "$log"; then
+              echo "::error::TLC did not report the intended invariant ${expected} for $cfg (exit=$rc)"
+              exit 1
+            fi
+            printf 'EXPECTED_COUNTEREXAMPLE config=%s invariant=%s exit=%s\n' \
+              "$cfg" "$expected" "$rc" \
+              | tee -a "$EVIDENCE_DIR/expected-counterexamples.txt"
+          }
+          check_mutant docs/security/models/replay_effect_before_commit_legacy.cfg NoDuplicateEffect
+          check_mutant docs/security/models/replay_commit_before_effect_legacy.cfg NoLostCommittedEffect
+
+      - name: Finalize exact-head evidence manifest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          {
+            printf 'git_head=%s\n' "$(git rev-parse HEAD)"
+            printf 'working_tree_status_sha256=%s\n' \
+              "$(git status --porcelain | sha256sum | cut -d' ' -f1)"
+            find docs/security/models -maxdepth 1 -type f \
+              \( -name 'MESH_REPLAY_EFFECT_LIFECYCLE.tla' -o -name 'replay_effect_*.cfg' -o -name 'replay_commit_*.cfg' \) \
+              -print0 | sort -z | xargs -0 sha256sum
+            if [ -f "$TOOL_JAR" ]; then sha256sum "$TOOL_JAR"; fi
+          } > "$EVIDENCE_DIR/run-manifest.txt"
+
+      - name: Upload model-check evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: replay-effect-lifecycle-${{ github.sha }}
+          path: target/mesh-replay-effect-model/
+          if-no-files-found: error
+          retention-days: 30
