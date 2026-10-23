@@ -174,8 +174,7 @@ impl FeatureShiftScorer {
             let mean_shift = difference / reference_scale * n.sqrt();
             let audit_log_scale = scales[index].max(self.scale_floor).ln();
             let reference_log_scale = self.reference_scales[index].max(self.scale_floor).ln();
-            let scale_shift =
-                (audit_log_scale - reference_log_scale).abs() * (n / 2.0).sqrt();
+            let scale_shift = (audit_log_scale - reference_log_scale).abs() * (n / 2.0).sqrt();
             if !mean_shift.is_finite() || !scale_shift.is_finite() {
                 return None;
             }
@@ -184,11 +183,7 @@ impl FeatureShiftScorer {
         }
 
         let mut normalized_correlation_shift = 0.0_f64;
-        for (reference, audit) in self
-            .reference_correlations
-            .iter()
-            .zip(correlations.iter())
-        {
+        for (reference, audit) in self.reference_correlations.iter().zip(correlations.iter()) {
             let shift = (audit - reference).abs() * n.sqrt();
             if !shift.is_finite() {
                 return None;
@@ -253,7 +248,10 @@ fn column_means(rows: &[Vec<f64>], feature_count: usize) -> Option<Vec<f64>> {
         }
     }
     let denominator = rows.len() as f64;
-    let means = sums.into_iter().map(|sum| sum / denominator).collect::<Vec<_>>();
+    let means = sums
+        .into_iter()
+        .map(|sum| sum / denominator)
+        .collect::<Vec<_>>();
     means.iter().all(|value| value.is_finite()).then_some(means)
 }
 
@@ -277,7 +275,10 @@ fn column_scales(rows: &[Vec<f64>], means: &[f64], feature_count: usize) -> Opti
         .into_iter()
         .map(|sum| (sum / denominator).sqrt())
         .collect::<Vec<_>>();
-    scales.iter().all(|value| value.is_finite()).then_some(scales)
+    scales
+        .iter()
+        .all(|value| value.is_finite())
+        .then_some(scales)
 }
 
 fn pairwise_correlations(
@@ -286,8 +287,7 @@ fn pairwise_correlations(
     scales: &[f64],
     feature_count: usize,
 ) -> Option<Vec<f64>> {
-    let correlation_count =
-        feature_count.saturating_mul(feature_count.saturating_sub(1)) / 2;
+    let correlation_count = feature_count.saturating_mul(feature_count.saturating_sub(1)) / 2;
     let mut correlations = Vec::with_capacity(correlation_count);
     for left in 0..feature_count {
         for right in (left + 1)..feature_count {
@@ -428,10 +428,7 @@ mod tests {
             ShiftTriageDecision::EvidenceInsufficient
         );
         assert_eq!(
-            classify_shift_evidence(
-                alarm(AdequacyDiagnostic::QueryDistributionShift),
-                clear()
-            ),
+            classify_shift_evidence(alarm(AdequacyDiagnostic::QueryDistributionShift), clear()),
             ShiftTriageDecision::EvidenceInsufficient
         );
         assert_eq!(
@@ -458,6 +455,10 @@ mod tests {
         let scorer = FeatureShiftScorer::fit(&[vec![0.0, 1.0], vec![1.0, 0.0]], 1e-9).unwrap();
         assert!(scorer.score(&[]).is_none());
         assert!(scorer.score(&[vec![0.0]]).is_none());
-        assert!(scorer.score(&[vec![f64::INFINITY, 1.0], vec![0.0, 1.0]]).is_none());
+        assert!(
+            scorer
+                .score(&[vec![f64::INFINITY, 1.0], vec![0.0, 1.0]])
+                .is_none()
+        );
     }
 }
