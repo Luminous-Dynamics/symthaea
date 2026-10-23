@@ -14,6 +14,8 @@ The target loop is: generate physically admissible hypotheses; choose an experim
 |---|---|---|
 | [PySR / SymbolicRegression.jl](https://github.com/MilesCranmer/PySR) | Practical configurable evolutionary symbolic regression, custom operators and complexity penalties | Primary regression baseline on matched data, grammar and compute budgets |
 | [AI Feynman](https://doi.org/10.1126/sciadv.aay2631) and [AI Feynman 2.0](https://proceedings.neurips.cc/paper/2020/hash/33a854e247155d590883b93bca53848a-Paper.html) | Physics-informed symmetry, separability, modularity and recursive decomposition | Physics-informed baseline where assumptions and operators align |
+| [GenSR (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/8fd1a81c882cd45f64958da6284f4a3f-Abstract-Conference.html) | Learned latent equation space, coarse localization, then evolutionary fine search | Comparator for using continuous latent neighborhoods rather than directly mutating discrete ASTs |
+| [EGG-SR (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/1704fe7aaff33a54802b83a016050ab8-Abstract-Conference.html) | Equality-graph symbolic equivalence to reduce duplicate search and aggregate equivalent expressions | Comparator for equivalence-aware canonicalization and search-efficiency gains |
 | [Exhaustive Symbolic Regression with MDL](https://doi.org/10.1098/rsta.2024.0584) | Bounded search over a declared operator basis, parameter fitting, and minimum-description-length model selection | Strong small-grammar reference; tests whether stochastic search is necessary |
 | [SRBench](https://github.com/cavalab/srbench) and [SRBench++](https://doi.org/10.1109/TEVC.2024.3423681) | Broad regression comparison plus task-specific tests: exact form, feature selection, deceptive shortcuts, extrapolation, noise, interpretability | Standard retrospective regression track and robustness suite |
 | [SciLaws-Bench](https://yiyihum.github.io/SciLaws-Bench/) | Separates prediction, scientific validity and structural recovery, including active-query tasks | Science-specific endpoint taxonomy and active-discovery track |
@@ -112,6 +114,8 @@ Every run should record benchmark/version and world family; exact commit and sou
 
 - Udrescu and Tegmark, AI Feynman, Science Advances (2020): https://doi.org/10.1126/sciadv.aay2631
 - AI Feynman 2.0, NeurIPS (2020): https://proceedings.neurips.cc/paper/2020/hash/33a854e247155d590883b93bca53848a-Paper.html
+- Li et al., GenSR, ICLR 2026: https://proceedings.iclr.cc/paper_files/paper/2026/hash/8fd1a81c882cd45f64958da6284f4a3f-Abstract-Conference.html
+- Jiang et al., EGG-SR, ICLR 2026: https://proceedings.iclr.cc/paper_files/paper/2026/hash/1704fe7aaff33a54802b83a016050ab8-Abstract-Conference.html
 - SRBench: https://github.com/cavalab/srbench
 - SRBench++, IEEE TEVC: https://doi.org/10.1109/TEVC.2024.3423681
 - 2026 symbolic-regression survey, published 20 August 2026: https://doi.org/10.1007/s11831-026-10681-w
