@@ -289,6 +289,10 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
         "paired comparison must require at least three independent datasets"
     );
     ensure!(
+        comparison_contract.get("minimum_unique_seeds").and_then(Value::as_u64) == Some(2),
+        "paired comparison must require at least two distinct seeds"
+    );
+    ensure!(
         comparison_contract.get("bootstrap_replicates_min").and_then(Value::as_u64) == Some(1000)
             && comparison_contract.get("bootstrap_replicates_max").and_then(Value::as_u64) == Some(100000),
         "paired bootstrap replicate bounds must be [1000, 100000]"
@@ -296,8 +300,24 @@ fn validate_value(root: &Value) -> anyhow::Result<ManifestSummary> {
     for field in ["matching_key", "required_outputs"] {
         nonempty_string_array(comparison_contract, field, "paired_comparison_contract")?;
     }
-    nonempty_string_field(comparison_contract, "resampling", "paired_comparison_contract")?;
-    nonempty_string_field(comparison_contract, "claim_policy", "paired_comparison_contract")?;
+    let resampling = nonempty_string_field(comparison_contract, "resampling", "paired_comparison_contract")?;
+    for phrase in ["dataset clusters", "seeds", "complete paired scenario block", "identical scenario panel"] {
+        ensure!(resampling.contains(phrase), "paired comparison resampling contract must state: {phrase}");
+    }
+    let required_outputs = nonempty_string_array(comparison_contract, "required_outputs", "paired_comparison_contract")?;
+    for expected in [
+        "candidate_dataset_macro_mean",
+        "baseline_dataset_macro_mean",
+        "dataset_macro_paired_effect",
+        "percentile_95_ci_oriented_effect",
+        "per_dataset",
+        "canonical_input_sha256",
+        "result_sha256",
+    ] {
+        ensure!(required_outputs.iter().any(|field| field == expected), "paired comparison contract is missing output {expected}");
+    }
+    let claim_policy = nonempty_string_field(comparison_contract, "claim_policy", "paired_comparison_contract")?;
+    ensure!(claim_policy.contains("not a universal SOTA claim"), "paired comparison claim policy must forbid universal SOTA conclusions");
 
     Ok(ManifestSummary {
         baseline_count: baselines.len(),
