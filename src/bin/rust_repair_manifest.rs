@@ -300,7 +300,7 @@ fn transition_sets(
     let explicit_fail_to_pass = baseline
         .iter()
         .filter(|(test_id, status)| {
-            status.as_str() == "fail" && gold.get(*test_id).is_some_and(|post| post == "pass")
+            status.as_str() == "fail" && gold.get(*test_id).is_some_and(|post| post.as_str() == "pass")
         })
         .map(|(test_id, _)| test_id.clone())
         .collect::<BTreeSet<_>>();
@@ -756,11 +756,15 @@ mod tests {
 
     #[test]
     fn fail_to_pass_requires_explicit_baseline_failure() {
-        let baseline = status_map(&[("existing", "pass"), ("new-test", "skip")]);
-        let gold = status_map(&[("existing", "pass"), ("new-test", "pass")]);
+        let baseline = status_map(&[("existing", "pass")]);
+        let gold = status_map(&[("existing", "pass"), ("appeared-after", "pass")]);
         let (baseline_pass, explicit_f2p) = transition_sets(&baseline, &gold);
         assert_eq!(baseline_pass, BTreeSet::from(["existing".to_string()]));
         assert!(explicit_f2p.is_empty());
+        assert_ne!(
+            baseline.keys().collect::<BTreeSet<_>>(),
+            gold.keys().collect::<BTreeSet<_>>()
+        );
     }
 
     #[test]
