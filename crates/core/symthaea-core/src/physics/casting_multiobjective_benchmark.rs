@@ -472,10 +472,11 @@ fn evaluate_zdt(problem: ZdtProblem, decision: &[f64]) -> Result<[f64; 2], Paret
 }
 
 /// Generate a deterministic sampled approximation to the analytical Pareto front.
-/// points_per_segment includes both endpoints of each segment and must be >= 2.
+/// points_per_segment includes both endpoints of each sampled interval and must be >= 2.
 /// ZDT3's five separated intervals are sampled independently; gaps are never bridged.
-/// Sampling is uniform in f1 parameter, not Euclidean arc length. Freeze this convention
-/// before using epsilon/IGD+ to compare optimizer runs.
+/// Its later four intervals have open lower boundaries; approximate published bounds are
+/// offset inward by 1e-8 to avoid a rounded, dominated boundary point. Sampling is uniform
+/// in f1 parameter, not Euclidean arc length. Freeze this convention for epsilon/IGD+.
 fn zdt_reference_front(
     problem: ZdtProblem,
     points_per_segment: usize,
@@ -496,10 +497,15 @@ fn zdt_reference_front(
     };
 
     let mut front = Vec::with_capacity(intervals.len() * points_per_segment);
-    for &(start, end) in intervals {
+    for (segment_index, &(start, end)) in intervals.iter().enumerate() {
+        let sampled_start = if problem == ZdtProblem::Zdt3 && segment_index > 0 {
+            start + 1e-8
+        } else {
+            start
+        };
         for sample_index in 0..points_per_segment {
             let fraction = sample_index as f64 / (points_per_segment - 1) as f64;
-            let f1 = start + (end - start) * fraction;
+            let f1 = sampled_start + (end - sampled_start) * fraction;
             let f2 = match problem {
                 ZdtProblem::Zdt1 | ZdtProblem::Zdt4 => 1.0 - f1.sqrt(),
                 ZdtProblem::Zdt2 => 1.0 - f1 * f1,
