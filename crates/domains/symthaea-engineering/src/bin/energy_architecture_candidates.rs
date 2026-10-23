@@ -30,8 +30,16 @@ struct Args {
 }
 
 fn parse_args() -> Result<Args, Box<dyn Error>> {
+    parse_args_from(env::args().skip(1))
+}
+
+fn parse_args_from<I, S>(values: I) -> Result<Args, Box<dyn Error>>
+where
+    I: IntoIterator<Item = S>,
+    S: Into<String>,
+{
     let mut parsed = Args::default();
-    let mut args = env::args().skip(1);
+    let mut args = values.into_iter().map(Into::into);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--candidate-id" => {
@@ -73,7 +81,7 @@ fn parse_args() -> Result<Args, Box<dyn Error>> {
             }
             "-h" | "--help" => {
                 println!(
-                    "usage: energy_architecture_candidates [--candidate-id ID] [--design-space] [--output PATH]\n\nDefault: export the three reference templates as a JSON array. --design-space: export the bounded parametric sweep manifest (36 declared candidates plus rejection records). --candidate-id: export one reference or parametric candidate object. Writes JSON to stdout unless --output is given."
+                    "usage: energy_architecture_candidates [--candidate-id ID] [--design-space] [--output PATH]\\n\\nDefault: export the three reference templates as a JSON array. --design-space: export the bounded parametric sweep manifest (36 declared candidates plus rejection records). --candidate-id: export one reference or parametric candidate object. Writes JSON to stdout unless --output is given."
                 );
                 std::process::exit(0);
             }
@@ -141,17 +149,11 @@ fn build_output(args: &Args) -> Result<Vec<u8>, Box<dyn Error>> {
             return export_value(candidate);
         }
 
+        let search = bounded_parametric_design_space();
         let valid_ids = reference_candidates
             .iter()
             .map(|candidate| candidate.candidate_id.as_str())
-            .chain(
-                bounded_parametric_design_space()
-                    .candidates
-                    .iter()
-                    .map(|candidate| candidate.candidate_id.as_str())
-                    .collect::<Vec<_>>()
-                    .into_iter(),
-            )
+            .chain(search.candidates.iter().map(|candidate| candidate.candidate_id.as_str()))
             .collect::<Vec<_>>();
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
@@ -260,29 +262,4 @@ mod tests {
         assert!(parse_args_from(["--design-space", "--candidate-id", "synthetic-grid-only"]).is_err());
     }
 
-    fn parse_args_from<I, S>(args: I) -> Result<Args, Box<dyn Error>>
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<String>,
-    {
-        // Keep CLI tests deterministic by exercising the same validation
-        // behavior through an explicitly supplied iterator.
-        let mut parsed = Args::default();
-        let mut args = args.into_iter().map(Into::into);
-        while let Some(arg) = args.next() {
-            match arg.as_str() {
-                "--design-space" => parsed.design_space = true,
-                "--candidate-id" => parsed.candidate_id = args.next(),
-                "--output" => parsed.output = args.next().map(PathBuf::from),
-                _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "unknown argument").into()),
-            }
-        }
-        if parsed.design_space && parsed.candidate_id.is_some() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "--design-space cannot be combined with --candidate-id",
-            ).into());
-        }
-        Ok(parsed)
-    }
 }
