@@ -34,6 +34,8 @@ pub enum RiskGateError {
     NoTrials,
     /// The minimum evidence count must be positive.
     ZeroMinimumAccepted,
+    /// The requested minimum sample count exceeds the platform range.
+    SampleSizeOverflow,
 }
 
 impl fmt::Display for RiskGateError {
@@ -51,6 +53,9 @@ impl fmt::Display for RiskGateError {
             Self::NoTrials => write!(formatter, "at least one evaluated trial is required"),
             Self::ZeroMinimumAccepted => {
                 write!(formatter, "minimum accepted sample count must be positive")
+            }
+            Self::SampleSizeOverflow => {
+                write!(formatter, "required sample size exceeds the platform range")
             }
         }
     }
@@ -98,11 +103,11 @@ pub struct RiskGateReport {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RiskBudget {
     /// Maximum allowed one-sided upper confidence bound on unsafe rate.
-    pub maximum_unsafe_rate: f64,
+    maximum_unsafe_rate: f64,
     /// Confidence level for the one-sided exact binomial bound.
-    pub confidence_level: f64,
+    confidence_level: f64,
     /// Minimum accepted test units required before a pass can be reported.
-    pub minimum_accepted: usize,
+    minimum_accepted: usize,
 }
 
 impl RiskBudget {
@@ -249,6 +254,9 @@ pub fn minimum_zero_failure_trials(
     let required = alpha.ln() / (1.0 - maximum_unsafe_rate).ln();
     if !required.is_finite() || required <= 0.0 {
         return Err(RiskGateError::InvalidMaximumUnsafeRate);
+    }
+    if required > usize::MAX as f64 {
+        return Err(RiskGateError::SampleSizeOverflow);
     }
     Ok(required.ceil() as usize)
 }
