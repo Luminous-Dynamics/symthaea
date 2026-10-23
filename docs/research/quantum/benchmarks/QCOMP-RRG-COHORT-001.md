@@ -20,11 +20,23 @@ The larger SOTA campaign is specified separately as 100,000 3-regular instances 
 
 - **p = 1 control:** the paper derives the p=1 selection rule as equivalent to classical minimum-degree greedy (with randomized tie handling). Require an identity test on a common graph fixture before interpreting p > 1.
 - **Fixed angles:** pin the exact regular-tree angle values, depth, mixer/cost conventions and implementation artifact. Merely setting p=4 is not a reproduction.
-- **Same instances across arms:** for each generated graph, compare p=4 hybrid, Marino–Kirkpatrick, minimum-degree greedy and randomized classical controls under paired graph identity and explicit budgets.
+- **Fixed-instance paired panel:** for each *completed graph byte artifact*, compare p=4 hybrid, the p=1 identity control, minimum-degree greedy, seeded multi-start greedy, and a fixed-instance classical local-search/ILS baseline under identical graph identity and preregistered resource budgets. These are methods that actually consume a completed graph.
+- **Marino–Kirkpatrick compatibility:** the original prioritized method is a deferred-decision process. It reveals/pairs graph stubs while constructing the random d-regular graph and makes virtual-node decisions from the partial graph. Its native output is therefore a graph-plus-independent-set sample from the declared distribution, not a result on an arbitrary already-frozen graph. Compare the original method with QGreedy at the **distribution level** using independent samples, matching N, d, graph-distribution/acceptance rules and reporting unpaired uncertainty. Do not assign the same graph-pair key or use paired inference unless identical completed-graph bytes are genuinely supplied to both methods. An input-conditioned adaptation is a separate algorithm, not an exact reproduction of the original.
 - **Hardware vs simulation:** the paper uses tensor-network simulation for larger circuits and notes that some p=3 light cones exceed a 20-qubit device's capacity, so noiseless simulated expectations were substituted for those cases. Such rows must be labelled mixed hardware/simulator, never hardware-only.
 - **Generalization:** new sizes and degree-4 workloads test extensions; they do not replace the paper-shaped degree-3 comparison.
 
-### Reusable setup cost changes the economic question
+### Comparison compatibility: paired solvers versus generator-coupled procedures
+
+The original Marino–Kirkpatrick algorithm (arXiv:2003.12293, Sections 2–3) uses deferred decisions: it generates a uniformly sampled simple d-regular graph while choosing labels/virtual nodes and completing edge pairings. Its state includes partially revealed graph structure, so the algorithm is not natively a function that maps an arbitrary completed graph file to an independent set. This is not just a statistical detail: demanding byte-identical graph inputs for that original procedure silently changes the algorithm being tested.
+
+Accordingly, maintain two separate designs:
+
+1. **Fixed-instance solver panel (paired):** freeze each graph's bytes and digest; run QGreedy p=1/p=4, ordinary and multi-start greedy, and a suitable classical local-search/ILS baseline on those same graphs. Pair by graph digest and replicate seed; bootstrap/cluster by graph. This estimates the value of each decision policy conditional on the same instance.
+2. **Generator-coupled distribution panel (unpaired):** run the original Marino–Kirkpatrick deferred-decision procedure as specified, preserving its edge-generation/acceptance rules, and compare its independence-ratio distribution against QGreedy over separately sampled graphs from the same claimed random simple d-regular distribution. Match N/d cohorts, verify every emitted graph is simple and d-regular, report unpaired confidence intervals and distribution quantiles, and audit distributional compatibility. The published asymptotic reference r_infinity approximately 0.445330 is a theory/lower-bound line, not a same-instance result.
+
+Do not pair by seed label when the output graphs differ; a shared integer seed is not a shared workload identity. If a completed-graph variant of the prioritized method is implemented, give it a distinct algorithm ID and report that it is a new input-conditioned variant. This separation follows the paper's own deferred-pairing description and protects the comparison from false precision.
+
+## Reusable setup cost changes the economic question
 
 The paper builds reusable local-QAOA expectation information for subgraph topologies and reuses it across graph instances. Our comparison must consequently separate (1) one-time or cohort-fixed table/circuit acquisition cost, (2) amortized per-instance inference cost and (3) total end-to-end deployment cost.
 
@@ -80,7 +92,7 @@ This was a JavaScript translation, not execution of the Rust generator. It estab
 5. Pin the paper's full methods and angle/configuration artifacts before naming a run a reproduction.
 6. For the extension manifest, tune only on its train partition, select policy settings on validation, and keep the 2,048/4,096-vertex test outcomes out of tuning and selector feedback.
 7. For the 1,400 paper-shaped workload manifest, reuse each graph ID across p=1/2/3/4 arms; do not call these graph-for-graph paper reproduction until the authors' graph instances/seed list and exact settings are pinned.
-8. For the 700,000-instance classical SOTA campaign, stream reproducible graph identities through the same pinned generator into both arms, preserve graph-level paired results and pre-register stopping/statistical procedures. Record the campaign seed range and failures so interrupted execution can resume without resampling earlier cases.
+8. For the 700,000-instance classical reference campaign, retain the method-specific generator/seed stream for the original deferred-decision Marino–Kirkpatrick algorithm and compare its distribution-level results against the separately generated fixed-graph QGreedy cohort. Do not call these outcomes paired unless graph-byte equality is actually established. For the fixed-instance solver panel, stream the exact same pinned graph digests through all completed-graph arms and preserve paired outcomes. In both panels, pre-register stopping/statistical procedures and record seed ranges/failures so interrupted execution can resume without resampling earlier cases.
 9. Preserve exhausted attempts, invalid output, timeout, abstention and infeasible solution outcomes in all reports.
 
 ## Validation boundary
