@@ -251,7 +251,7 @@ mod tests {
             })
         );
         assert_eq!(
-            generate_mis_random_regular(MisRandomRegularConfig::new(400_000, 3, 17)),
+            generate_mis_random_regular(MisRandomRegularConfig::new(100_000, 12, 17)),
             Err(MisRandomRegularError::StubCountLimitExceeded {
                 actual: 1_200_000,
                 maximum: MAX_MIS_RANDOM_REGULAR_STUBS,
