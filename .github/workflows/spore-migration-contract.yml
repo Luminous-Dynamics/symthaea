@@ -1,0 +1,54 @@
+name: Spore Migration Contract
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spore-migration-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Authority and provenance contract
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assert exact clean source head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          echo "source_head=$(git rev-parse HEAD)"
+          echo "source_tree=$(git rev-parse 'HEAD^{tree}')"
+          echo "runner_image=${ImageOS:-unknown}/${ImageVersion:-unknown}"
+          python3 --version
+
+      - name: Parse machine-readable contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m json.tool docs/architecture/spore-migration-manifest-v1.schema.json >/dev/null
+          python3 -m json.tool docs/architecture/spore-migration-manifest-v1.json >/dev/null
+
+      - name: Enforce migration invariants
+        run: python3 scripts/check_spore_migration_manifest.py
+
+      - name: Regression tests
+        run: python3 -m unittest tests/test_spore_migration_manifest.py
+
+      - name: Verify checks left source unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=all)"
