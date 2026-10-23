@@ -1205,21 +1205,41 @@ impl MoralParser {
             "possibly gave consent",
             "allegedly gave consent",
             "the claim that she gave consent is unverified",
-            "unverified",
+            "the consent record is unverified",
+            "the consent record is not verified",
+            "the consent claim is unverified",
+            "the consent claim is not verified",
+            "affirmative consent is unverified",
         ];
-        if let Some(cue) = UNCERTAINTY_CUES
-            .iter()
-            .filter(|cue| evidence_text.contains(**cue))
-            .max_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)))
-        {
-            return ConsentTextAssessment {
-                state: ConsentState::Unknown,
-                basis: ConsentEvidenceBasis::UncertaintySuppressed,
-                matched_phrase: Some((*cue).to_string()),
-                conflicting_phrases: Vec::new(),
-                question_suppressed: false,
-                quoted_text_suppressed,
-            };
+
+        // Only apply uncertainty suppression when a consent-related cue is
+        // actually present. General uncertainty in unrelated text should not
+        // change the evidence-basis classification or suppress an affirmative
+        // consent statement elsewhere in the document.
+        let has_consent_cue = [
+            &self.consent_denied_words,
+            &self.consent_absent_words,
+            &self.consent_implied_words,
+            &self.consent_given_words,
+        ]
+        .iter()
+        .any(|cues| cues.iter().any(|candidate| evidence_text.contains(candidate.as_str())));
+
+        if has_consent_cue {
+            if let Some(cue) = UNCERTAINTY_CUES
+                .iter()
+                .filter(|cue| evidence_text.contains(**cue))
+                .max_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)))
+            {
+                return ConsentTextAssessment {
+                    state: ConsentState::Unknown,
+                    basis: ConsentEvidenceBasis::UncertaintySuppressed,
+                    matched_phrase: Some((*cue).to_string()),
+                    conflicting_phrases: Vec::new(),
+                    question_suppressed: false,
+                    quoted_text_suppressed,
+                };
+            }
         }
 
         fn longest_matching_cue(cues: &HashSet<String>, text: &str) -> Option<String> {
@@ -2135,6 +2155,21 @@ mod tests {
             parser.assess_consent_evidence("I did not give consent.").state,
             ConsentState::Absent
         );
+
+        // Uncertainty unrelated to consent must not change the evidence basis,
+        // and an unrelated unverified sentence must not suppress an explicit grant.
+        let unrelated_uncertainty =
+            parser.assess_consent_evidence("I am not sure whether it will rain.");
+        assert_eq!(unrelated_uncertainty.state, ConsentState::Unknown);
+        assert_eq!(
+            unrelated_uncertainty.basis,
+            ConsentEvidenceBasis::NoAssertedEvidence
+        );
+        let unrelated_unverified = parser.assess_consent_evidence(
+            "She gave consent to share the report. The weather report is unverified.",
+        );
+        assert_eq!(unrelated_unverified.state, ConsentState::Given);
+        assert!(unrelated_unverified.has_affirmative_cue());
     }
 
     #[test]
