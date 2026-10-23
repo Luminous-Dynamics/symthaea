@@ -1296,6 +1296,7 @@ fn run_trial_with_mode(
             rejected_after_alarm.extend(0..hypotheses.len());
             let mut recovery_rng =
                 seed ^ 0x0DD0_5EED_2026_0001 ^ (typed_recovery_restarts as u64).rotate_left(23);
+            recovery_triggered_on_empty_pool = true;
             let recovery = reseed_typed_candidates_after_alarm(
                 &mut recovery_rng,
                 &candidate_pool,
@@ -1309,7 +1310,6 @@ fn run_trial_with_mode(
                 terminal_pit_alarm = true;
                 break;
             }
-            recovery_triggered_on_empty_pool = true;
             structured_recovery_candidates += recovery.structured_count;
             typed_recovery_restarts += 1;
         }
@@ -1800,6 +1800,85 @@ mod tests {
         assert!(round_ci_low.is_finite() && round_ci_high.is_finite());
         assert!((0.0..=1.0).contains(&(raw_successes as f64 / SEEDS as f64)));
         assert!((0.0..=1.0).contains(&(eig_successes as f64 / SEEDS as f64)));
+    }
+
+    /// This is a separate open-ended-recovery benchmark: the initial candidate pool is
+    /// generated without the ground-truth expression or any ground-truth-derived near misses.
+    /// Oracle-present discrimination scores are intentionally not reused here.
+    #[test]
+    fn truth_absent_recovery_is_reported_separately_from_oracle_present_discrimination() {
+        const SEEDS: u64 = 12;
+        const ROUND_BUDGET: usize = 16;
+        let config = PipelineConfig {
+            typed_candidates: true,
+            active_selection: true,
+            smoothing: false,
+        };
+        let mut initial_reference_hits = 0usize;
+        let mut unresolved_without_recovery = 0usize;
+        let mut empty_pool_recovery_attempts = 0usize;
+        let mut accepted_recovery_candidates = 0usize;
+        let mut same_domain_recovered = 0usize;
+        let mut ood_recovered = 0usize;
+        let mut full_recovery_successes = 0usize;
+
+        for seed in 1..=SEEDS {
+            let baseline = run_truth_absent_trial(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::InformationGainWithAudits,
+                false,
+            );
+            let recovered = run_truth_absent_trial(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::InformationGainWithAudits,
+                true,
+            );
+            initial_reference_hits += if recovered.initial_pool_contains_reference {
+                1
+            } else {
+                0
+            };
+            unresolved_without_recovery +=
+                if baseline.final_live != 1 || !baseline.success { 1 } else { 0 };
+            empty_pool_recovery_attempts +=
+                if recovered.recovery_triggered_on_empty_pool { 1 } else { 0 };
+            accepted_recovery_candidates += recovered.structured_recovery_candidates;
+            same_domain_recovered += if recovered.ground_truth_equivalent { 1 } else { 0 };
+            ood_recovered += if recovered.ground_truth_extrapolation_equivalent {
+                1
+            } else {
+                0
+            };
+            full_recovery_successes += if recovered.success { 1 } else { 0 };
+        }
+
+        println!(
+            concat!(
+                "truth_absent_recovery,seeds={SEEDS},budget={ROUND_BUDGET},",
+                "initial_reference_hits={initial_reference_hits},",
+                "unresolved_without_recovery={unresolved_without_recovery},",
+                "empty_pool_recovery_attempts={empty_pool_recovery_attempts},",
+                "accepted_recovery_candidates={accepted_recovery_candidates},",
+                "same_domain_recovered={same_domain_recovered},",
+                "ood_recovered={ood_recovered},full_recovery_successes={full_recovery_successes}"
+            )
+        );
+        assert_eq!(
+            initial_reference_hits, 0,
+            "truth-absent initial pool unexpectedly contains a reference-equivalent candidate"
+        );
+        assert!(
+            empty_pool_recovery_attempts > 0,
+            "truth-absent pilot never exercised recovery after a pool-collapse alarm"
+        );
+        assert!(empty_pool_recovery_attempts <= SEEDS as usize);
+        assert!(same_domain_recovered <= SEEDS as usize);
+        assert!(ood_recovered <= same_domain_recovered);
+        assert!(full_recovery_successes <= ood_recovered);
     }
 
     #[test]
