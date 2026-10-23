@@ -15,7 +15,7 @@
 
 use std::collections::HashSet;
 
-use crate::{RiskBudget, one_sided_clopper_pearson_upper};
+use crate::{RiskBudget, RiskGateError, one_sided_clopper_pearson_upper};
 
 /// One scored query for selective retrieval evaluation.
 ///
