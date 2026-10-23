@@ -116,7 +116,9 @@ impl CognitiveSubsystem for MemoryManager {
         // ── 1. Update consolidation pressure ──────────────────────────────
         // Prediction error generates encoding demand → pressure builds
         let pe = snapshot.prediction_error;
-        self.consolidation_pressure += pe * Self::PRESSURE_BUILD_RATE;
+        if snapshot.prediction_error_valid != 0 {
+            self.consolidation_pressure += pe * Self::PRESSURE_BUILD_RATE;
+        }
         // Natural decay (forgetting curve integration)
         self.consolidation_pressure *= Self::PRESSURE_DECAY;
         self.consolidation_pressure = self.consolidation_pressure.clamp(0.0, 1.0);
