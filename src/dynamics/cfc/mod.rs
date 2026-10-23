@@ -21,6 +21,7 @@
 pub(crate) mod cell;
 mod gradients;
 pub(crate) mod network;
+mod observational;
 mod phi_gated;
 pub(crate) mod types;
 
