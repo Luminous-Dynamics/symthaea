@@ -1856,6 +1856,10 @@ mod tests {
         let mut same_domain_recovered = 0usize;
         let mut ood_recovered = 0usize;
         let mut full_recovery_successes = 0usize;
+        let mut baseline_measurements = 0usize;
+        let mut recovery_measurements = 0usize;
+        let mut unresolved_after_recovery = 0usize;
+        let mut selection_failures_after_recovery = 0usize;
 
         for seed in 1..=SEEDS {
             let baseline = run_truth_absent_trial(
@@ -1877,7 +1881,12 @@ mod tests {
             } else {
                 0
             };
+            baseline_measurements += baseline.rounds_used;
+            recovery_measurements += recovered.rounds_used;
             unresolved_without_recovery += if baseline.final_live != 1 { 1 } else { 0 };
+            unresolved_after_recovery += if recovered.final_live != 1 { 1 } else { 0 };
+            selection_failures_after_recovery +=
+                if recovered.selection_failed { 1 } else { 0 };
             false_singletons_without_recovery += if baseline.final_live == 1 && !baseline.success {
                 1
             } else {
@@ -1921,6 +1930,10 @@ mod tests {
             "initial_reference_hits={initial_reference_hits},",
             "unresolved_without_recovery={unresolved_without_recovery},",
             "false_singletons_without_recovery={false_singletons_without_recovery},",
+            "unresolved_after_recovery={unresolved_after_recovery},",
+            "selection_failures_after_recovery={selection_failures_after_recovery},",
+            "baseline_measurements={baseline_measurements},",
+            "recovery_measurements={recovery_measurements},",
             "empty_pool_recovery_attempts={empty_pool_recovery_attempts},",
             "failed_recovery_attempts={failed_recovery_attempts},",
             "accepted_recovery_candidates={accepted_recovery_candidates},",
