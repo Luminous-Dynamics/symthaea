@@ -49,18 +49,18 @@
 //!
 //! ## Production Integration
 //!
-//! To connect to a real Holochain conductor:
+//! A real conductor integration must use the client version synchronized with
+//! the supported Holochain release. Holochain 0.7.0 is currently the
+//! recommended general-use release, and its compatibility table lists Rust
+//! client 0.9.0. Do not copy a historical 0.6-era dependency declaration into
+//! a production integration.
 //!
-//! ```rust,ignore
-//! // Add to Cargo.toml:
-//! // holochain_client = "0.6"
-//! // holochain_zome_types = "0.4"
+//! This module currently keeps the conductor boundary abstract and uses a
+//! local/mock Cortex implementation. The core workspace therefore does not
+//! acquire Holochain runtime dependencies merely to compile this module.
 //!
-//! use holochain_client::{AppWebsocket, InstalledAppInfo};
-//!
-//! let mut ws = AppWebsocket::connect("ws://localhost:8888").await?;
-//! let info = ws.app_info("symthaea-trust".into()).await?;
-//! ```
+//! Consult the upstream Holochain compatibility table before adding a real
+//! conductor client integration.
 
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
