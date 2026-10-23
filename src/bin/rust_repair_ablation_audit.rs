@@ -176,6 +176,7 @@ struct DecisionGates {
     overall_unresolved_rate_below_2_percent: bool,
     arm_unresolved_rate_difference_below_1_percentage_point: bool,
     at_least_10_resolved_repositories: bool,
+    full_assignment_sensitivity_lower_bound_above_zero: bool,
     gcs_superiority_gate_met: bool,
     cost_efficiency_noninferiority_gate_met: bool,
     gcs_superiority_target_percentage_points: f64,
@@ -861,10 +862,13 @@ fn make_report(
         resolved_effect_percentage_points.is_some_and(|effect| effect >= 5.0);
     let superiority_ci_satisfied = cluster_bootstrap_ci95
         .is_some_and(|interval| interval.lower_percentage_points > 0.0);
+    let full_assignment_sensitivity_lower_bound_above_zero =
+        unresolved_sensitivity_lower_percentage_points > 0.0;
     let unresolved_gates_satisfied = overall_unresolved_rate_below_2_percent
         && arm_unresolved_rate_difference_below_1_percentage_point;
     let gcs_superiority_gate_met = superiority_effect_satisfied
         && superiority_ci_satisfied
+        && full_assignment_sensitivity_lower_bound_above_zero
         && at_least_10_resolved_repositories
         && unresolved_gates_satisfied;
     let cost_reduction_satisfied = match (
@@ -877,7 +881,8 @@ fn make_report(
         _ => false,
     };
     let noninferiority_satisfied = cluster_bootstrap_ci95
-        .is_some_and(|interval| interval.lower_percentage_points >= -1.5);
+        .is_some_and(|interval| interval.lower_percentage_points >= -1.5)
+        && unresolved_sensitivity_lower_percentage_points >= -1.5;
     let cost_efficiency_noninferiority_gate_met = cost_reduction_satisfied
         && noninferiority_satisfied
         && at_least_10_resolved_repositories
@@ -962,6 +967,7 @@ fn make_report(
             overall_unresolved_rate_below_2_percent,
             arm_unresolved_rate_difference_below_1_percentage_point,
             at_least_10_resolved_repositories,
+            full_assignment_sensitivity_lower_bound_above_zero,
             gcs_superiority_gate_met,
             cost_efficiency_noninferiority_gate_met,
             gcs_superiority_target_percentage_points: 5.0,
