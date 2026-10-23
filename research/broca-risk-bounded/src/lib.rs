@@ -21,6 +21,13 @@
 use std::error::Error;
 use std::fmt;
 
+mod risk_coverage;
+pub use risk_coverage::{
+    FixedSequenceRiskReport, RiskCoverageError, RiskCoveragePoint, RiskObservation,
+    ThresholdCertificationPoint, ThresholdCertificationStatus,
+    certify_fixed_threshold_sequence, risk_coverage_curve,
+};
+
 /// Errors in risk-bound or policy configuration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RiskGateError {
@@ -127,6 +134,21 @@ impl RiskBudget {
             confidence_level,
             minimum_accepted,
         })
+    }
+
+    /// Maximum one-sided upper confidence bound permitted by this budget.
+    pub const fn maximum_unsafe_rate(self) -> f64 {
+        self.maximum_unsafe_rate
+    }
+
+    /// Confidence level requested for the one-sided bound.
+    pub const fn confidence_level(self) -> f64 {
+        self.confidence_level
+    }
+
+    /// Minimum accepted cases required before a threshold can be tested.
+    pub const fn minimum_accepted(self) -> usize {
+        self.minimum_accepted
     }
 
     /// Score the observed accepted cases for a frozen policy on held-out data.
