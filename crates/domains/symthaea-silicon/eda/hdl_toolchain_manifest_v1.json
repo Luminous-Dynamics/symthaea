@@ -12,7 +12,7 @@
     },
     {
       "name": "sha256sum",
-      "purpose": "hash sources, configuration and logs"
+      "purpose": "hash sources, configuration and logs; runner extracts the digest using Bash builtins"
     },
     {
       "name": "git",
@@ -25,10 +25,6 @@
     {
       "name": "c++",
       "purpose": "Verilator generated model compilation"
-    },
-    {
-      "name": "awk",
-      "purpose": "extract content hash from sha256sum"
     },
     {
       "name": "head",
