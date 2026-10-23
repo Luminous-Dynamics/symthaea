@@ -142,7 +142,11 @@ impl CognitiveSubsystem for ThermodynamicManager {
         // Populate core snapshot fields into input
         self.input.unified_psi = snapshot.unified_psi;
         self.input.coherence = snapshot.coherence;
-        self.input.prediction_error = snapshot.prediction_error;
+        // Hold the last admitted PE rather than converting a missing comparison
+        // into either a maximum-energy event or an invented zero observation.
+        if snapshot.prediction_error_valid != 0 {
+            self.input.prediction_error = snapshot.prediction_error;
+        }
         self.input.attention_sensitivity = snapshot.phi_attention_weight;
         self.input.metabolic_stress = snapshot.thermodynamic_load;
 
@@ -216,6 +220,7 @@ mod tests {
         snapshot.unified_psi = 0.7;
         snapshot.coherence = 0.8;
         snapshot.prediction_error = 0.2;
+        snapshot.prediction_error_valid = 1;
 
         let output = mgr.process(&snapshot);
         assert!(output.lr_modulation.is_finite());
@@ -252,6 +257,7 @@ mod tests {
 
         let mut snapshot = CycleSnapshot::default();
         snapshot.prediction_error = 10.0; // Huge error → lots of bits to consolidate
+        snapshot.prediction_error_valid = 1;
         snapshot.unified_psi = 0.5;
 
         let output = mgr.process(&snapshot);
