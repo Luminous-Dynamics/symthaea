@@ -12,6 +12,7 @@
 //! seeded generator. Neither helper establishes quantum advantage by itself.
 
 use core::fmt;
+use crate::rng::XorShift64;
 
 /// Highest exact sign-flip enumeration size accepted by the default implementation.
 pub const MAX_EXACT_SIGN_FLIP_PAIRS: usize = 20;
@@ -83,6 +84,38 @@ pub struct MisMedianInterval {
     pub achieved_coverage: Option<f64>,
 }
 
+/// Settings for hierarchical, graph-clustered bootstrap of a paired mean difference.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MisClusterBootstrapConfig {
+    /// Number of hierarchical bootstrap replicates; must be positive.
+    pub replicates: usize,
+    /// Percentile interval confidence, strictly between zero and one.
+    pub confidence: f64,
+    /// Seed for deterministic cluster and within-cluster resampling.
+    pub seed: u64,
+}
+
+/// Percentile interval from a graph-clustered paired bootstrap.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MisClusterBootstrapResult {
+    /// Number of independent graph/instance clusters.
+    pub cluster_count: usize,
+    /// Total paired observations across clusters.
+    pub observation_count: usize,
+    /// Number of bootstrap draws used.
+    pub replicates: usize,
+    /// Requested interval confidence.
+    pub confidence: f64,
+    /// Equal-cluster-weighted point estimate of the mean paired difference.
+    pub point_estimate: f64,
+    /// Lower percentile bound from the bootstrap distribution.
+    pub lower: f64,
+    /// Upper percentile bound from the bootstrap distribution.
+    pub upper: f64,
+    /// Seed used for deterministic resampling.
+    pub seed: u64,
+}
+
 /// Invalid inference input or configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MisInferenceError {
@@ -96,6 +129,14 @@ pub enum MisInferenceError {
     InvalidExactLimit,
     /// Monte Carlo mode requires a positive draw count.
     ZeroMonteCarloDraws,
+    /// A cluster bootstrap needs at least two independent clusters.
+    InsufficientClusters { cluster_count: usize },
+    /// A graph cluster has no paired observations.
+    EmptyCluster { cluster_index: usize },
+    /// A clustered observation is NaN or infinity.
+    NonFiniteClusterObservation { cluster_index: usize, observation_index: usize },
+    /// Cluster bootstrap requires a positive replicate count.
+    ZeroBootstrapReplicates,
 }
 
 impl fmt::Display for MisInferenceError {
@@ -112,6 +153,10 @@ impl fmt::Display for MisInferenceError {
                 write!(f, "exact limit must be in 1..={MAX_EXACT_SIGN_FLIP_PAIRS}")
             }
             Self::ZeroMonteCarloDraws => write!(f, "Monte Carlo draw count must be positive"),
+            Self::InsufficientClusters { cluster_count } => write!(f, "cluster bootstrap needs at least two clusters, got {cluster_count}"),
+            Self::EmptyCluster { cluster_index } => write!(f, "cluster {cluster_index} has no paired observations"),
+            Self::NonFiniteClusterObservation { cluster_index, observation_index } => write!(f, "cluster {cluster_index} observation {observation_index} is not finite"),
+            Self::ZeroBootstrapReplicates => write!(f, "cluster bootstrap replicate count must be positive"),
         }
     }
 }
@@ -298,6 +343,112 @@ pub fn median_order_statistic_interval(
     })
 }
 
+/// Compute an equal-cluster-weighted mean without summing unscaled extreme values.
+fn stable_mean(values: &[f64]) -> f64 {
+    let scale = values.iter().map(|value| value.abs()).fold(0.0_f64, f64::max);
+    if scale == 0.0 {
+        return 0.0;
+    }
+    let normalized_mean = (values.iter().map(|value| value / scale).sum::<f64>()
+        / values.len() as f64)
+        .clamp(-1.0, 1.0);
+    scale * normalized_mean
+}
+
+/// Linear-interpolated percentile from an ascending sample. Weighted interpolation avoids
+/// subtracting opposite-sign extreme finite values, which could overflow.
+fn percentile(sorted: &[f64], probability: f64) -> f64 {
+    let position = probability.clamp(0.0, 1.0) * (sorted.len() - 1) as f64;
+    let lower_index = position.floor() as usize;
+    let upper_index = position.ceil() as usize;
+    let fraction = position - lower_index as f64;
+    sorted[lower_index] * (1.0 - fraction) + sorted[upper_index] * fraction
+}
+
+/// Estimate an equal-graph-weighted mean paired effect with a hierarchical bootstrap.
+///
+/// The outer stage samples independent graph clusters with replacement. For each sampled
+/// graph, the inner stage samples that graph's paired repetition-level differences with
+/// replacement, preserving the original number of repetitions for that graph. Cluster
+/// means are weighted equally in each bootstrap replicate, so a graph with many seeds
+/// does not count as many independent graphs.
+///
+/// This is an approximate percentile bootstrap, not an exact finite-sample confidence
+/// procedure. It assumes graphs are independent sampling units and that within-graph
+/// paired repetitions represent the intended resampling population. Pre-register the
+/// graph-level estimand and use enough graphs/replicates for the scientific question.
+/// It does not adjust for multiple comparisons and cannot repair leakage between graph
+/// families.
+pub fn hierarchical_cluster_bootstrap_mean(
+    clusters: &[Vec<f64>],
+    config: MisClusterBootstrapConfig,
+) -> Result<MisClusterBootstrapResult, MisInferenceError> {
+    if clusters.is_empty() {
+        return Err(MisInferenceError::EmptySample);
+    }
+    if clusters.len() < 2 {
+        return Err(MisInferenceError::InsufficientClusters {
+            cluster_count: clusters.len(),
+        });
+    }
+    if config.replicates == 0 {
+        return Err(MisInferenceError::ZeroBootstrapReplicates);
+    }
+    if !config.confidence.is_finite() || config.confidence <= 0.0 || config.confidence >= 1.0 {
+        return Err(MisInferenceError::InvalidConfidence);
+    }
+
+    let mut observation_count = 0usize;
+    let mut cluster_means = Vec::with_capacity(clusters.len());
+    for (cluster_index, cluster) in clusters.iter().enumerate() {
+        if cluster.is_empty() {
+            return Err(MisInferenceError::EmptyCluster { cluster_index });
+        }
+        for (observation_index, value) in cluster.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(MisInferenceError::NonFiniteClusterObservation {
+                    cluster_index,
+                    observation_index,
+                });
+            }
+        }
+        observation_count += cluster.len();
+        cluster_means.push(stable_mean(cluster));
+    }
+    let point_estimate = stable_mean(&cluster_means);
+
+    let mut rng = XorShift64::new(config.seed);
+    let mut bootstrap_estimates = Vec::with_capacity(config.replicates);
+    let mut resampled_cluster_means = Vec::with_capacity(clusters.len());
+    for _ in 0..config.replicates {
+        resampled_cluster_means.clear();
+        for _ in 0..clusters.len() {
+            let cluster_index = rng.next_usize(clusters.len()).unwrap_or(0);
+            let cluster = &clusters[cluster_index];
+            let mut within_sample = Vec::with_capacity(cluster.len());
+            for _ in 0..cluster.len() {
+                let observation_index = rng.next_usize(cluster.len()).unwrap_or(0);
+                within_sample.push(cluster[observation_index]);
+            }
+            resampled_cluster_means.push(stable_mean(&within_sample));
+        }
+        bootstrap_estimates.push(stable_mean(&resampled_cluster_means));
+    }
+    bootstrap_estimates.sort_by(f64::total_cmp);
+
+    let alpha = (1.0 - config.confidence) / 2.0;
+    Ok(MisClusterBootstrapResult {
+        cluster_count: clusters.len(),
+        observation_count,
+        replicates: config.replicates,
+        confidence: config.confidence,
+        point_estimate,
+        lower: percentile(&bootstrap_estimates, alpha),
+        upper: percentile(&bootstrap_estimates, 1.0 - alpha),
+        seed: config.seed,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -404,6 +555,61 @@ mod tests {
         assert_eq!(
             median_order_statistic_interval(&[1.0, f64::INFINITY], 0.95),
             Err(MisInferenceError::NonFiniteObservation { index: 1 })
+        );
+    }
+
+    #[test]
+    fn hierarchical_cluster_bootstrap_is_deterministic_and_graph_weighted() {
+        let clusters = vec![vec![10.0; 16], vec![0.0]];
+        let config = MisClusterBootstrapConfig {
+            replicates: 2_000,
+            confidence: 0.95,
+            seed: 991,
+        };
+        let first = hierarchical_cluster_bootstrap_mean(&clusters, config).unwrap();
+        let second = hierarchical_cluster_bootstrap_mean(&clusters, config).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.cluster_count, 2);
+        assert_eq!(first.observation_count, 17);
+        assert_eq!(first.replicates, 2_000);
+        assert_eq!(first.point_estimate, 5.0);
+        assert_ne!(first.point_estimate, clusters.iter().flatten().sum::<f64>() / 17.0);
+        assert!(first.lower <= first.point_estimate);
+        assert!(first.point_estimate <= first.upper);
+    }
+
+    #[test]
+    fn hierarchical_cluster_bootstrap_rejects_pseudoreplication_and_bad_rows() {
+        let config = MisClusterBootstrapConfig {
+            replicates: 50,
+            confidence: 0.95,
+            seed: 7,
+        };
+        assert_eq!(
+            hierarchical_cluster_bootstrap_mean(&[], config),
+            Err(MisInferenceError::EmptySample)
+        );
+        assert_eq!(
+            hierarchical_cluster_bootstrap_mean(&[vec![1.0, 2.0]], config),
+            Err(MisInferenceError::InsufficientClusters { cluster_count: 1 })
+        );
+        assert_eq!(
+            hierarchical_cluster_bootstrap_mean(&[vec![1.0], vec![]], config),
+            Err(MisInferenceError::EmptyCluster { cluster_index: 1 })
+        );
+        assert_eq!(
+            hierarchical_cluster_bootstrap_mean(&[vec![1.0], vec![f64::NAN]], config),
+            Err(MisInferenceError::NonFiniteClusterObservation {
+                cluster_index: 1,
+                observation_index: 0,
+            })
+        );
+        assert_eq!(
+            hierarchical_cluster_bootstrap_mean(
+                &[vec![1.0], vec![2.0]],
+                MisClusterBootstrapConfig { replicates: 0, ..config },
+            ),
+            Err(MisInferenceError::ZeroBootstrapReplicates)
         );
     }
 
