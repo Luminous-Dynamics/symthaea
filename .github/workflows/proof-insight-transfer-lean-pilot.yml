@@ -353,6 +353,11 @@ jobs:
               if not receipt_errors(invalid_receipt):
                   raise SystemExit(f"receipt negative control unexpectedly accepted: {name}")
           print(f"PITB_RECEIPT_NEGATIVE_CONTROLS_PASS: {len(negative_controls)}/{len(negative_controls)} rejected")
+          expected_schema_digest = hashlib.sha256(schema_path.read_bytes()).hexdigest()
+          actual_receipt_sha = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+          recorded_receipt_sha = digest_path.read_text().split()[0]
+          if actual_receipt_sha != recorded_receipt_sha:
+              raise SystemExit("receipt SHA-256 sidecar does not match receipt.json")
           print("PITB_RECEIPT_SCHEMA_AND_BINDINGS_PASS")
           print(f"receipt_sha256={actual_receipt_sha}")
           print(f"receipt_schema_sha256={expected_schema_digest}")
