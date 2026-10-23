@@ -118,7 +118,14 @@ impl MotifSignature {
         if self.duration_fractions.is_empty() {
             return 0.0;
         }
-        let contour_mismatch = if self.contour.is_empty() {
+        // Missing contour transitions must count as mismatches too. A motif
+        // can keep the same event count and duration fractions while replacing
+        // a pitched event with a rest; contour() deliberately skips rests, so
+        // the contour vectors can differ in length. Treating zip()'s overlap
+        // as the whole comparison made distance asymmetric and could even
+        // report zero distance when the right-hand contour was a strict prefix.
+        let contour_len = self.contour.len().max(other.contour.len());
+        let contour_mismatch = if contour_len == 0 {
             0.0
         } else {
             let wrong = self
@@ -127,7 +134,8 @@ impl MotifSignature {
                 .zip(other.contour.iter())
                 .filter(|(a, b)| a != b)
                 .count();
-            wrong as f32 / self.contour.len() as f32
+            let missing = self.contour.len().abs_diff(other.contour.len());
+            (wrong + missing) as f32 / contour_len as f32
         };
         let rhythm_mismatch: f32 = self
             .duration_fractions
@@ -463,6 +471,44 @@ mod tests {
             f.recognizes(&varied),
             IdentityVerdict::RecognizableDevelopment
         );
+    }
+
+    #[test]
+    fn signature_distance_penalizes_missing_contour_transitions() {
+        let complete = lament();
+        let truncated_by_rest = Motif::new(vec![
+            MotifNote::new(1, Duration::eighth()),
+            MotifNote::new(3, Duration::eighth()),
+            MotifNote::new(1, Duration::eighth()),
+            MotifNote::rest(Duration::half()),
+        ]);
+        let complete_signature = structural_signature(&complete);
+        let rest_signature = structural_signature(&truncated_by_rest);
+
+        // Event count and normalized event durations match; only the final
+        // pitched transition is absent. That absence must not vanish in zip().
+        assert_eq!(
+            complete_signature.duration_fractions,
+            rest_signature.duration_fractions
+        );
+        let forward = complete_signature.distance(&rest_signature);
+        let reverse = rest_signature.distance(&complete_signature);
+        assert!((forward - 0.2).abs() < 1.0e-6, "distance={forward}");
+        assert!((reverse - 0.2).abs() < 1.0e-6, "distance={reverse}");
+    }
+
+    #[test]
+    fn signature_distance_is_symmetric_for_different_contour_lengths() {
+        let a = structural_signature(&lament());
+        let b = structural_signature(&Motif::new(vec![
+            MotifNote::new(1, Duration::eighth()),
+            MotifNote::new(3, Duration::eighth()),
+            MotifNote::new(1, Duration::eighth()),
+            MotifNote::rest(Duration::half()),
+        ]));
+
+        assert!((a.distance(&b) - b.distance(&a)).abs() < 1.0e-6);
+        assert!(a.distance(&b) > 0.0);
     }
 
     #[test]
