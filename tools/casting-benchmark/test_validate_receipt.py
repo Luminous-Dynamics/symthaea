@@ -15,6 +15,24 @@ class ReceiptValidatorTests(unittest.TestCase):
     def setUp(self) -> None:
         self.receipt = json.loads(FIXTURE.read_text(encoding="utf-8"))
 
+    def test_multifidelity_counts_and_costs_must_match_budget(self) -> None:
+        invalid = copy.deepcopy(self.receipt)
+        invalid["evaluation_mode"] = "multi_fidelity"
+        invalid["accounting"]["fidelity_evaluations"] = {"low": 48, "high": 16}
+        invalid["accounting"]["fidelity_cost_units_by_level"] = {"low": 48.0, "high": 160.0}
+        self.assertEqual(validate_receipt(invalid), [])
+        invalid["accounting"]["fidelity_evaluations"]["high"] = 15
+        self.assertTrue(any("must sum exactly" in error for error in validate_receipt(invalid)))
+
+    def test_multifidelity_requires_both_count_and_cost_maps_with_matching_keys(self) -> None:
+        invalid = copy.deepcopy(self.receipt)
+        invalid["evaluation_mode"] = "multi_fidelity"
+        invalid["accounting"]["fidelity_evaluations"] = {"low": 48, "high": 16}
+        self.assertTrue(any("must be provided together" in error or "require counts and cost units" in error for error in validate_receipt(invalid)))
+        invalid["accounting"]["fidelity_cost_units_by_level"] = {"low": 48.0, "other": 160.0}
+        errors = validate_receipt(invalid)
+        self.assertTrue(any("keys must match exactly" in error for error in errors))
+
     def test_fixture_success_has_valid_structure_but_is_not_publishable(self) -> None:
         self.assertEqual(validate_receipt(self.receipt), [])
         errors = validate_receipt(self.receipt, for_publication=True)
