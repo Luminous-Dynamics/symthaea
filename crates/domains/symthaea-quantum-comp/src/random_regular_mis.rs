@@ -14,6 +14,16 @@ use crate::rng::XorShift64;
 /// Version tag for this deterministic generator's externally visible semantics.
 pub const RANDOM_REGULAR_MIS_GENERATOR_VERSION: &str = "configuration-pair-reject-v1";
 
+/**
+ * Safety ceiling for the total number of stubs allocated by one generator call.
+ *
+ * This comfortably exceeds the largest planned paper-shaped workload (5,000
+ * vertices, degree 3 => 15,000 stubs) while preventing accidental multi-gigabyte
+ * allocations from untrusted dimensions. Raising it should be an explicit reviewed
+ * change accompanied by memory/throughput evidence.
+ */
+pub const MAX_RANDOM_REGULAR_MIS_STUBS: usize = 1_000_000;
+
 /// A simple undirected d-regular graph generated with explicit provenance metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RandomRegularMisGraph {
@@ -144,6 +154,13 @@ pub enum RandomRegularMisError {
         /// Degree.
         degree: usize,
     },
+    /// Requested stub storage exceeds the explicit per-call allocation ceiling.
+    StubCountLimitExceeded {
+        /// Total number of stubs requested.
+        actual: usize,
+        /// Maximum number of stubs accepted.
+        maximum: usize,
+    },
     /// The requested degree sequence has an odd total number of stubs.
     OddStubCount {
         /// Number of vertices.
@@ -180,6 +197,9 @@ impl fmt::Display for RandomRegularMisError {
             }
             Self::StubCountOverflow { vertex_count, degree } => {
                 write!(f, "stub count overflows usize for n={vertex_count}, d={degree}")
+            }
+            Self::StubCountLimitExceeded { actual, maximum } => {
+                write!(f, "stub count {actual} exceeds configured allocation ceiling {maximum}")
             }
             Self::OddStubCount { vertex_count, degree } => {
                 write!(f, "n*d must be even for a d-regular graph (n={vertex_count}, d={degree})")
@@ -238,6 +258,12 @@ pub fn generate_random_regular_mis_graph(
     }
     if max_attempts == 0 {
         return Err(RandomRegularMisError::ZeroAttemptLimit);
+    }
+    if stub_count > MAX_RANDOM_REGULAR_MIS_STUBS {
+        return Err(RandomRegularMisError::StubCountLimitExceeded {
+            actual: stub_count,
+            maximum: MAX_RANDOM_REGULAR_MIS_STUBS,
+        });
     }
 
     let mut rng = XorShift64::new(seed);
@@ -424,6 +450,17 @@ mod tests {
         assert!(
             (observed - expected).abs() < 0.04,
             "K3,3 sample fraction {observed:.4} too far from reference {expected:.4}"
+        );
+    }
+
+    #[test]
+    fn rejects_stub_count_above_allocation_ceiling_before_allocating() {
+        assert_eq!(
+            generate_random_regular_mis_graph(400_000, 3, 17, 1),
+            Err(RandomRegularMisError::StubCountLimitExceeded {
+                actual: 1_200_000,
+                maximum: MAX_RANDOM_REGULAR_MIS_STUBS,
+            })
         );
     }
 
