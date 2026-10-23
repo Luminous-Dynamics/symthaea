@@ -803,6 +803,32 @@
     "tuning_policy": "Use leave-one-dataset-out hyperparameter optimization and randomized Monte Carlo onset/parameters. Hold out datasets and seeds from threshold fitting; report both default and tuned configurations.",
     "source_paper": "https://doi.org/10.1145/3770855.3819070",
     "claims": "This adds an auditable comparison protocol and makes no claim that Symthaea beats any comparator. The referenced KDD 2026 paper reports SEED and STEPD as strong F1 baselines and ABCD as a compelling false-alarm trade-off.",
-    "trace_contract": "Each detector trace must pin detector_version and comparison_track, record label_delay_cycles even when zero, and mark evidence_valid on every alarm. An invalid-evidence alarm is never eligible to match a drift episode; it counts as a false alarm and must fail the hard gate."
+    "trace_contract": "Each detector trace must pin detector_version and comparison_track, record label_delay_cycles even when zero, and mark evidence_valid on every alarm. An invalid-evidence alarm is never eligible to match a drift episode; it counts as a false alarm and must fail the hard gate.",
+    "paired_comparison_contract": {
+      "protocol_id": "paired-dataset-bootstrap-v1",
+      "minimum_independent_datasets": 3,
+      "minimum_unique_seeds": 2,
+      "bootstrap_replicates_min": 1000,
+      "bootstrap_replicates_max": 100000,
+      "resampling": "paired hierarchical bootstrap: sample dataset clusters with replacement, then paired records within each selected dataset; give every sampled dataset equal final weight",
+      "matching_key": [
+        "dataset_id",
+        "seed",
+        "scenario_id"
+      ],
+      "required_outputs": [
+        "candidate_dataset_macro_mean",
+        "baseline_dataset_macro_mean",
+        "dataset_macro_paired_effect",
+        "median_oriented_paired_delta",
+        "paired_win_fraction",
+        "percentile_95_ci_oriented_effect",
+        "bootstrap_fraction_effect_above_zero",
+        "per_dataset",
+        "canonical_input_sha256",
+        "result_sha256"
+      ],
+      "claim_policy": "A positive interval supports a positive paired effect only for the pinned metric, dataset set, evidence-access track, and configurations. It is not a universal SOTA claim. Report costs and all per-dataset outcomes."
+    }
   }
 }
