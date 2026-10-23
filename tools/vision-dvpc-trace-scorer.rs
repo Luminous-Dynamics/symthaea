@@ -90,12 +90,6 @@ impl Choice {
         }
     }
 
-    fn label(self) -> &'static str {
-        match self {
-            Self::Cheap => "cheap",
-            Self::Full => "full",
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -105,7 +99,6 @@ struct Action {
     comparison_id: String,
     policy_id: String,
     choice: Choice,
-    commitment_index: u64,
     latency_budget_us: u64,
     energy_budget_uj: u64,
     declared_latency_us: u64,
@@ -446,7 +439,6 @@ fn read_actions(table: &Table, observations: &BTreeMap<String, Observation>) -> 
             comparison_id: row[3].clone(),
             policy_id: row[4].clone(),
             choice,
-            commitment_index,
             latency_budget_us,
             energy_budget_uj,
             declared_latency_us,
@@ -774,6 +766,31 @@ mod tests {
         let observations = read_observations(&obs, "test").unwrap();
         let action_table = parse_table(&broken, ACTION_HEADER, "ACTION").unwrap();
         assert!(read_actions(&action_table, &observations).unwrap_err().contains("unknown choice"));
+    }
+
+    #[test]
+    fn rejects_action_sample_digest_mismatch() {
+        let original = format!("ACTION\\ttrace-test-000\\t{}\\t", "e".repeat(64));
+        let corrupt = format!("ACTION\\ttrace-test-000\\t{}\\t", "f".repeat(64));
+        let broken = ACTIONS.replace(&original, &corrupt);
+        let (obs, _, _) = tables();
+        let observations = read_observations(&obs, "test").unwrap();
+        let action_table = parse_table(&broken, ACTION_HEADER, "ACTION").unwrap();
+        assert!(read_actions(&action_table, &observations).unwrap_err().contains("sample digest mismatch"));
+    }
+
+    #[test]
+    fn rejects_duplicate_commitment_index() {
+        let original = "ACTION\\ttrace-test-001\\t";
+        let pos = ACTIONS.find(original).expect("fixture row present");
+        let rest = &ACTIONS[pos..];
+        let line_end = rest.find('\\n').expect("fixture line ends");
+        let line = &rest[..line_end];
+        let broken = ACTIONS.replace(line, &line.replace("\\t1\\t25000\\t", "\\t0\\t25000\\t"));
+        let (obs, _, _) = tables();
+        let observations = read_observations(&obs, "test").unwrap();
+        let action_table = parse_table(&broken, ACTION_HEADER, "ACTION").unwrap();
+        assert!(read_actions(&action_table, &observations).unwrap_err().contains("duplicate commitment_index"));
     }
 
     #[test]
