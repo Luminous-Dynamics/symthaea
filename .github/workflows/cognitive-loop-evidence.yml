@@ -14,6 +14,7 @@ on:
     paths:
       - "benchmarks/cognitive-loop-evidence/**"
       - "xtask/src/cognitive_loop_evidence.rs"
+      - "xtask/src/cognitive_drift_score.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
       - ".github/workflows/cognitive-loop-evidence.yml"
