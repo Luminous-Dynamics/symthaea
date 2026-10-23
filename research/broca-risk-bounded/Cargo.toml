@@ -11,3 +11,5 @@ description = "Dependency-free reference implementation for held-out selective r
 path = "src/lib.rs"
 
 [dependencies]
+
+[workspace]
