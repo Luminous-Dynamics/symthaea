@@ -159,12 +159,16 @@ fn parse_table(input: &str, expected_header: &[&str], record_tag: &str) -> Resul
                 return Err(fail(format!("line {line_no}: invalid META row")));
             }
             if meta.insert(fields[1].clone(), fields[2].clone()).is_some() {
-                return Err(fail(format!("line {line_no}: duplicate META key {}", fields[1])));
+                return Err(fail(format!(
+                    "line {line_no}: duplicate META key {}",
+                    fields[1]
+                )));
             }
             continue;
         }
         if header.is_none() {
-            if fields.iter().map(String::as_str).collect::<Vec<_>>().as_slice() != expected_header {
+            let actual_header: Vec<&str> = fields.iter().map(String::as_str).collect();
+            if actual_header.as_slice() != expected_header {
                 return Err(fail(format!(
                     "line {line_no}: exact schema mismatch; unexpected/reordered columns fail closed"
                 )));
@@ -215,7 +219,9 @@ fn validate_meta(meta: &BTreeMap<String, String>) -> Result<(), String> {
     }
     if !matches!(
         meta.get("license_scope").map(String::as_str),
-        Some("synthetic_public_fixture" | "noncommercial_research_only" | "commercial_use_authorized")
+        Some(
+            "synthetic_public_fixture" | "noncommercial_research_only" | "commercial_use_authorized",
+        )
     ) {
         return Err(fail("license scope is not explicitly admissible"));
     }
@@ -224,7 +230,9 @@ fn validate_meta(meta: &BTreeMap<String, String>) -> Result<(), String> {
 
 fn validate_token(raw: &str, field: &str) -> Result<(), String> {
     if raw.is_empty()
-        || !raw.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b':'))
+        || !raw
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b':'))
     {
         return Err(fail(format!("invalid {field} token")));
     }
@@ -239,11 +247,14 @@ fn validate_sha(raw: &str, field: &str) -> Result<(), String> {
 }
 
 fn parse_u64(raw: &str, field: &str) -> Result<u64, String> {
-    raw.parse::<u64>().map_err(|_| fail(format!("{field} must be a non-negative integer")))
+    raw.parse::<u64>()
+        .map_err(|_| fail(format!("{field} must be a non-negative integer")))
 }
 
 fn parse_f64(raw: &str, field: &str) -> Result<f64, String> {
-    let value = raw.parse::<f64>().map_err(|_| fail(format!("{field} must be numeric")))?;
+    let value = raw
+        .parse::<f64>()
+        .map_err(|_| fail(format!("{field} must be numeric")))?;
     if !value.is_finite() {
         return Err(fail(format!("{field} must be finite")));
     }
@@ -253,12 +264,17 @@ fn parse_f64(raw: &str, field: &str) -> Result<f64, String> {
 fn ensure_same_meta(tables: &[&Table]) -> Result<(), String> {
     let first = tables.first().ok_or_else(|| fail("no tables supplied"))?;
     if tables.iter().skip(1).any(|table| table.meta != first.meta) {
-        return Err(fail("dataset, split, utility or licensing metadata differ between inputs"));
+        return Err(fail(
+            "dataset, split, utility or licensing metadata differ between inputs",
+        ));
     }
     Ok(())
 }
 
-fn read_observations(table: &Table, target_split: &str) -> Result<BTreeMap<String, Observation>, String> {
+fn read_observations(
+    table: &Table,
+    target_split: &str,
+) -> Result<BTreeMap<String, Observation>, String> {
     let mut output = BTreeMap::new();
     let dataset_id = table.meta.get("dataset_id").unwrap();
     let revision = table.meta.get("dataset_revision").unwrap();
@@ -271,7 +287,10 @@ fn read_observations(table: &Table, target_split: &str) -> Result<BTreeMap<Strin
         validate_token(&row[3], "dataset_revision")?;
         validate_token(&row[5], "group_id")?;
         if &row[2] != dataset_id || &row[3] != revision {
-            return Err(fail(format!("observation row {}: dataset identity mismatch", i + 1)));
+            return Err(fail(format!(
+                "observation row {}: dataset identity mismatch",
+                i + 1
+            )));
         }
         if row[4] != target_split {
             return Err(fail(format!(
@@ -283,7 +302,10 @@ fn read_observations(table: &Table, target_split: &str) -> Result<BTreeMap<Strin
             validate_sha(&row[position], table.header[position])?;
         }
         if &row[10] != utility {
-            return Err(fail(format!("trace {} utility-spec digest mismatch", row[1])));
+            return Err(fail(format!(
+                "trace {} utility-spec digest mismatch",
+                row[1]
+            )));
         }
         if row[15] != "-" {
             validate_sha(&row[15], "shift_signal_sha256")?;
@@ -302,7 +324,10 @@ fn read_observations(table: &Table, target_split: &str) -> Result<BTreeMap<Strin
         let key = format!("{}:{}:{}", row[2], row[3], row[5]);
         let step = parse_u64(&row[6], "step_index")?;
         if !group_steps.entry(key).or_default().insert(step) {
-            return Err(fail(format!("duplicate step index in group {}", row[5])));
+            return Err(fail(format!(
+                "duplicate step index in group {}",
+                row[5]
+            )));
         }
         let observation = Observation {
             sample_sha256: row[7].clone(),
@@ -311,7 +336,10 @@ fn read_observations(table: &Table, target_split: &str) -> Result<BTreeMap<Strin
             declared_energy_uj,
         };
         if output.insert(row[1].clone(), observation).is_some() {
-            return Err(fail(format!("duplicate observation trace_id {}", row[1])));
+            return Err(fail(format!(
+                "duplicate observation trace_id {}",
+                row[1]
+            )));
         }
     }
     for (group, steps) in group_steps {
@@ -324,12 +352,17 @@ fn read_observations(table: &Table, target_split: &str) -> Result<BTreeMap<Strin
     Ok(output)
 }
 
-fn read_outcomes(table: &Table, observations: &BTreeMap<String, Observation>) -> Result<BTreeMap<String, Outcome>, String> {
+fn read_outcomes(
+    table: &Table,
+    observations: &BTreeMap<String, Observation>,
+) -> Result<BTreeMap<String, Outcome>, String> {
     let mut output = BTreeMap::new();
     for row in &table.rows {
         validate_token(&row[1], "trace_id")?;
         validate_sha(&row[2], "sample_sha256")?;
-        let obs = observations.get(&row[1]).ok_or_else(|| fail(format!("unmatched evaluation trace {}", row[1])))?;
+        let obs = observations
+            .get(&row[1])
+            .ok_or_else(|| fail(format!("unmatched evaluation trace {}", row[1])))?;
         if obs.sample_sha256 != row[2] {
             return Err(fail(format!("sample digest mismatch for {}", row[1])));
         }
@@ -348,7 +381,17 @@ fn read_outcomes(table: &Table, observations: &BTreeMap<String, Observation>) ->
         if !matches!(row[9].as_str(), "in_domain" | "shifted" | "unknown") {
             return Err(fail("invalid shift label"));
         }
-        if !matches!(row[10].as_str(), "none" | "illumination" | "weather" | "occlusion" | "sensor" | "density" | "other" | "unknown") {
+        if !matches!(
+            row[10].as_str(),
+            "none"
+                | "illumination"
+                | "weather"
+                | "occlusion"
+                | "sensor"
+                | "density"
+                | "other"
+                | "unknown"
+        ) {
             return Err(fail("invalid shift mechanism"));
         }
         if (row[9] == "in_domain" && row[10] != "none")
@@ -366,7 +409,10 @@ fn read_outcomes(table: &Table, observations: &BTreeMap<String, Observation>) ->
             actual_energy_uj,
         };
         if output.insert(row[1].clone(), outcome).is_some() {
-            return Err(fail(format!("duplicate evaluation trace {}", row[1])));
+            return Err(fail(format!(
+                "duplicate evaluation trace {}",
+                row[1]
+            )));
         }
     }
     if output.len() != observations.len() {
@@ -375,7 +421,10 @@ fn read_outcomes(table: &Table, observations: &BTreeMap<String, Observation>) ->
     Ok(output)
 }
 
-fn read_actions(table: &Table, observations: &BTreeMap<String, Observation>) -> Result<Vec<Action>, String> {
+fn read_actions(
+    table: &Table,
+    observations: &BTreeMap<String, Observation>,
+) -> Result<Vec<Action>, String> {
     let mut actions = Vec::new();
     let mut seen: BTreeSet<(String, String, String)> = BTreeSet::new();
     let mut per_run_indexes: BTreeMap<(String, String), BTreeSet<u64>> = BTreeMap::new();
@@ -389,7 +438,9 @@ fn read_actions(table: &Table, observations: &BTreeMap<String, Observation>) -> 
         validate_token(&row[3], "comparison_id")?;
         validate_token(&row[4], "policy_id")?;
         let trace_id = row[1].clone();
-        let obs = observations.get(&trace_id).ok_or_else(|| fail(format!("action for unknown trace {trace_id}")))?;
+        let obs = observations
+            .get(&trace_id)
+            .ok_or_else(|| fail(format!("action for unknown trace {trace_id}")))?;
         if obs.sample_sha256 != row[2] {
             return Err(fail(format!("action sample digest mismatch for {trace_id}")));
         }
@@ -404,8 +455,12 @@ fn read_actions(table: &Table, observations: &BTreeMap<String, Observation>) -> 
         if latency_budget_us == 0 || energy_budget_uj == 0 {
             return Err(fail("run budgets must be positive"));
         }
-        if declared_latency_us != obs.declared_latency_us || declared_energy_uj != obs.declared_energy_uj {
-            return Err(fail(format!("action reservation does not match observation for {trace_id}")));
+        if declared_latency_us != obs.declared_latency_us
+            || declared_energy_uj != obs.declared_energy_uj
+        {
+            return Err(fail(format!(
+                "action reservation does not match observation for {trace_id}"
+            )));
         }
         if row[13] != "true" {
             return Err(fail(format!("action for {trace_id} is not marked committed")));
@@ -413,17 +468,26 @@ fn read_actions(table: &Table, observations: &BTreeMap<String, Observation>) -> 
 
         let run_key = (row[3].clone(), row[4].clone());
         if !seen.insert((row[3].clone(), row[4].clone(), trace_id.clone())) {
-            return Err(fail(format!("duplicate policy/trace action {} / {}", row[4], trace_id)));
+            return Err(fail(format!(
+                "duplicate policy/trace action {} / {}",
+                row[4], trace_id
+            )));
         }
         let budget = (latency_budget_us, energy_budget_uj);
         if let Some(previous) = per_run_budgets.insert(run_key.clone(), budget) {
             if previous != budget {
-                return Err(fail(format!("inconsistent budget within run {}", row[4])));
+                return Err(fail(format!(
+                    "inconsistent budget within run {}",
+                    row[4]
+                )));
             }
         }
         if let Some(previous) = comparison_budgets.insert(row[3].clone(), budget) {
             if previous != budget {
-                return Err(fail(format!("policies in comparison {} do not share budgets", row[3])));
+                return Err(fail(format!(
+                    "policies in comparison {} do not share budgets",
+                    row[3]
+                )));
             }
         }
         if !per_run_indexes
@@ -431,7 +495,10 @@ fn read_actions(table: &Table, observations: &BTreeMap<String, Observation>) -> 
             .or_default()
             .insert(commitment_index)
         {
-            return Err(fail(format!("policy {} has duplicate commitment_index", row[4])));
+            return Err(fail(format!(
+                "policy {} has duplicate commitment_index",
+                row[4]
+            )));
         }
         per_run_traces.entry(run_key).or_default().insert(trace_id.clone());
         actions.push(Action {
@@ -457,7 +524,10 @@ fn read_actions(table: &Table, observations: &BTreeMap<String, Observation>) -> 
         let indexes = per_run_indexes.get(run).unwrap();
         for (expected, observed) in indexes.iter().enumerate() {
             if *observed != expected as u64 {
-                return Err(fail(format!("policy {} has non-contiguous commitment_index", run.1)));
+                return Err(fail(format!(
+                "policy {} has non-contiguous commitment_index",
+                run.1
+            )));
             }
         }
     }
@@ -663,7 +733,9 @@ fn score(
         if action.sample_sha256 != outcomes.get(&action.trace_id).unwrap().sample_sha256 {
             return Err(fail("action/outcome sample digest mismatch"));
         }
-        runs.entry((action.comparison_id.clone(), action.policy_id.clone())).or_default().push(action);
+        runs.entry((action.comparison_id.clone(), action.policy_id.clone()))
+            .or_default()
+            .push(action);
     }
 
     let mut metrics: BTreeMap<(String, String), PolicyMetrics> = BTreeMap::new();
@@ -692,8 +764,10 @@ fn score(
         for action in rows {
             let obs = observations.get(&action.trace_id).unwrap();
             let outcome = outcomes.get(&action.trace_id).unwrap();
-            latency_accumulator_overflow |= add_cost(&mut allocator_latency, action.allocator_latency_us);
-            energy_accumulator_overflow |= add_cost(&mut allocator_energy, action.allocator_energy_uj);
+            latency_accumulator_overflow |=
+                add_cost(&mut allocator_latency, action.allocator_latency_us);
+            energy_accumulator_overflow |=
+                add_cost(&mut allocator_energy, action.allocator_energy_uj);
             latency_accumulator_overflow |= add_cost(&mut latency, action.allocator_latency_us);
             energy_accumulator_overflow |= add_cost(&mut energy, action.allocator_energy_uj);
             cheap_safety = cheap_safety.saturating_add(outcome.cheap_safety);
@@ -705,8 +779,10 @@ fn score(
                     outcome.cheap_utility
                 }
                 Choice::Full => {
-                    latency_accumulator_overflow |= add_cost(&mut latency, outcome.actual_latency_us);
-                    energy_accumulator_overflow |= add_cost(&mut energy, outcome.actual_energy_uj);
+                    latency_accumulator_overflow |=
+                        add_cost(&mut latency, outcome.actual_latency_us);
+                    energy_accumulator_overflow |=
+                        add_cost(&mut energy, outcome.actual_energy_uj);
                     if outcome.actual_latency_us > action.declared_latency_us
                         || outcome.actual_energy_uj > action.declared_energy_uj
                     {
@@ -722,7 +798,10 @@ fn score(
                 }
             };
             chosen_utilities.push(utility);
-            per_group_utility.entry((run_key.0.clone(), run_key.1.clone(), obs.group_id.clone())).or_default().push(utility);
+            per_group_utility
+                .entry((run_key.0.clone(), run_key.1.clone(), obs.group_id.clone()))
+                .or_default()
+                .push(utility);
         }
 
         let group_means: Vec<f64> = per_group_utility
@@ -800,8 +879,10 @@ fn score(
     }
     for (run_key, m) in metrics.iter_mut() {
         if let Some(cheap) = cheap_baselines.get(&run_key.0) {
-            m.utility_delta_vs_all_cheap = Some(m.group_balanced_utility - cheap.group_balanced_utility);
-            m.cvar95_delta_vs_all_cheap = Some(m.cvar95_incremental_loss - cheap.cvar95_incremental_loss);
+            m.utility_delta_vs_all_cheap =
+                Some(m.group_balanced_utility - cheap.group_balanced_utility);
+            m.cvar95_delta_vs_all_cheap =
+                Some(m.cvar95_incremental_loss - cheap.cvar95_incremental_loss);
             m.safety_delta_vs_all_cheap = Some(
                 m.chosen_safety_violations as i64 - cheap.chosen_safety_violations as i64,
             );
