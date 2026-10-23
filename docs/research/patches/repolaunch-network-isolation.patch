@@ -13,7 +13,7 @@ diff --git a/launch/core/platforms/linux.py b/launch/core/platforms/linux.py
          container = client.containers.run(
              image_name,
              name=container_name,
-@@ -269,13 +270,68 @@
+@@ -269,13 +270,73 @@
              },
              **run_kwargs,
          )
