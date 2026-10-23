@@ -487,6 +487,13 @@ fn validate_locked_runtime_logs(
         );
     }
     let baseline_identity = baseline.get("container_identity").unwrap_or(&Value::Null);
+    if baseline_identity
+        .get("git_metadata_sanitization_exit_code")
+        .and_then(Value::as_i64)
+        != Some(0)
+    {
+        errors.push("baseline Git metadata sanitization was not confirmed".to_string());
+    }
     if baseline_identity.get("network_mode").and_then(Value::as_str) != Some("none") {
         errors.push("baseline validation container network_mode must be 'none'".to_string());
     }
@@ -597,6 +604,15 @@ fn validate_locked_runtime_logs(
             ));
         }
         let identity = run.get("container_identity").unwrap_or(&Value::Null);
+        if identity
+            .get("git_metadata_sanitization_exit_code")
+            .and_then(Value::as_i64)
+            != Some(0)
+        {
+            errors.push(format!(
+                "gold runtime run {index} Git metadata sanitization was not confirmed"
+            ));
+        }
         if identity.get("network_mode").and_then(Value::as_str) != Some("none") {
             errors.push(format!("gold runtime run {index} network_mode must be 'none'"));
         }
