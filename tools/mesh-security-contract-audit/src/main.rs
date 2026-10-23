@@ -1,9 +1,8 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
-    env,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -84,7 +83,11 @@ fn audit(root: &Path) -> Result<Value, String> {
 
     validate_schema_document(&suite_schema, SUITE_SCHEMA_PATH, &mut errors);
     validate_schema_document(&receipt_schema, RECEIPT_SCHEMA_PATH, &mut errors);
-    validate_schema_document(&audit_receipt_schema, AUDIT_RECEIPT_SCHEMA_PATH, &mut errors);
+    validate_schema_document(
+        &audit_receipt_schema,
+        AUDIT_RECEIPT_SCHEMA_PATH,
+        &mut errors,
+    );
 
     let suite_instance_status = match validate_instance(&suite_schema, &suite, SUITE_PATH) {
         Ok(()) => "PASS",
@@ -96,7 +99,12 @@ fn audit(root: &Path) -> Result<Value, String> {
 
     let semantics = semantic_checks(&suite);
     for error in semantics["errors"].as_array().into_iter().flatten() {
-        errors.push(error.as_str().unwrap_or("unknown semantic error").to_owned());
+        errors.push(
+            error
+                .as_str()
+                .unwrap_or("unknown semantic error")
+                .to_owned(),
+        );
     }
 
     let source_revision = git_head(root)?;
@@ -104,9 +112,9 @@ fn audit(root: &Path) -> Result<Value, String> {
     let tool_source = root.join("tools/mesh-security-contract-audit/src/main.rs");
     let lock_path = root.join("tools/mesh-security-contract-audit/Cargo.lock");
 
-    let schema_checks_pass = !errors.iter().any(|message| {
-        message.starts_with("schema ") || message.starts_with("instance ")
-    });
+    let schema_checks_pass = !errors
+        .iter()
+        .any(|message| message.starts_with("schema ") || message.starts_with("instance "));
     let semantics_pass = semantics["errors"]
         .as_array()
         .is_some_and(|values| values.is_empty());
@@ -194,7 +202,11 @@ fn audit(root: &Path) -> Result<Value, String> {
         ]
     });
 
-    match validate_instance(&audit_receipt_schema, &receipt, "generated contract audit receipt") {
+    match validate_instance(
+        &audit_receipt_schema,
+        &receipt,
+        "generated contract audit receipt",
+    ) {
         Ok(()) => Ok(receipt),
         Err(error) => {
             errors.push(error);
@@ -209,8 +221,8 @@ fn audit(root: &Path) -> Result<Value, String> {
 }
 
 fn read_json(path: &Path) -> Result<Value, String> {
-    let bytes = fs::read(path)
-        .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let bytes =
+        fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
     serde_json::from_slice(&bytes)
         .map_err(|error| format!("invalid JSON in {}: {error}", path.display()))
 }
@@ -265,7 +277,10 @@ fn validate_instance(schema: &Value, instance: &Value, label: &str) -> Result<()
     if errors.is_empty() {
         Ok(())
     } else {
-        Err(format!("instance {label} failed schema validation: {}", errors.join("; ")))
+        Err(format!(
+            "instance {label} failed schema validation: {}",
+            errors.join("; ")
+        ))
     }
 }
 
@@ -296,9 +311,9 @@ fn semantic_checks(suite: &Value) -> Value {
         for (index, scenario) in scenarios.iter().enumerate() {
             match scenario.get("id").and_then(Value::as_str) {
                 Some(id) if scenario_ids.insert(id.to_owned()) => {}
-                Some(id) => errors.push(format!(
-                    "duplicate scenario ID at scenarios[{index}]: {id}"
-                )),
+                Some(id) => {
+                    errors.push(format!("duplicate scenario ID at scenarios[{index}]: {id}"))
+                }
                 None => errors.push(format!("scenarios[{index}] has no string ID")),
             }
 
@@ -308,12 +323,17 @@ fn semantic_checks(suite: &Value) -> Value {
                     references_resolve = false;
                     errors.push(format!(
                         "scenario {} references undeclared property {property}",
-                        scenario.get("id").and_then(Value::as_str).unwrap_or("<missing-id>")
+                        scenario
+                            .get("id")
+                            .and_then(Value::as_str)
+                            .unwrap_or("<missing-id>")
                     ));
                 }
                 None => {
                     references_resolve = false;
-                    errors.push(format!("scenarios[{index}] has no string property reference"));
+                    errors.push(format!(
+                        "scenarios[{index}] has no string property reference"
+                    ));
                 }
             }
         }
@@ -355,8 +375,8 @@ fn git_head(root: &Path) -> Result<String, String> {
 }
 
 fn sha256_file(path: &Path) -> Result<String, String> {
-    let bytes = fs::read(path)
-        .map_err(|error| format!("cannot hash {}: {error}", path.display()))?;
+    let bytes =
+        fs::read(path).map_err(|error| format!("cannot hash {}: {error}", path.display()))?;
     let digest = Sha256::digest(bytes);
     Ok(digest.iter().map(|byte| format!("{byte:02x}")).collect())
 }
@@ -371,9 +391,15 @@ fn emit(receipt: &Value, output: Option<&Path>) -> bool {
     };
 
     if let Some(path) = output {
-        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
             if let Err(error) = fs::create_dir_all(parent) {
-                eprintln!("cannot create receipt directory {}: {error}", parent.display());
+                eprintln!(
+                    "cannot create receipt directory {}: {error}",
+                    parent.display()
+                );
                 println!("{serialized}");
                 return false;
             }
@@ -435,7 +461,10 @@ mod tests {
         let scenario = suite["scenarios"][0].clone();
         suite["scenarios"].as_array_mut().unwrap().push(scenario);
 
-        let errors = semantic_checks(&suite)["errors"].as_array().unwrap().clone();
+        let errors = semantic_checks(&suite)["errors"]
+            .as_array()
+            .unwrap()
+            .clone();
         assert!(
             errors
                 .iter()
@@ -457,8 +486,15 @@ mod tests {
         let mut mutated = suite;
         mutated["scenarios"][0]["property"] = json!("UNDECLARED-SECURITY-PROPERTY");
 
-        let errors = semantic_checks(&mutated)["errors"].as_array().unwrap().clone();
-        assert!(errors.iter().any(|error| error.as_str().unwrap().contains("undeclared property")));
+        let errors = semantic_checks(&mutated)["errors"]
+            .as_array()
+            .unwrap()
+            .clone();
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.as_str().unwrap().contains("undeclared property"))
+        );
     }
 
     #[test]
@@ -484,7 +520,10 @@ mod tests {
         });
         let mut errors = Vec::new();
         validate_schema_document(&invalid_schema, "invalid-fixture.schema.json", &mut errors);
-        assert!(!errors.is_empty(), "invalid JSON Schema must fail its meta-schema");
+        assert!(
+            !errors.is_empty(),
+            "invalid JSON Schema must fail its meta-schema"
+        );
     }
 
     #[test]
