@@ -390,27 +390,62 @@ mod tests {
     fn panel_selection_fails_closed_on_bad_contracts() {
         let (clean, perturbed) = selection_data();
         assert!(matches!(
-            DetectorPanelScorer::fit(&clean, &perturbed, 0, 0.75, 1e-6, DetectorPanelAggregation::MeanPositiveZ),
+            DetectorPanelScorer::fit(
+                &clean,
+                &perturbed,
+                0,
+                0.75,
+                1e-6,
+                DetectorPanelAggregation::MeanPositiveZ,
+            ),
             Err(DetectorPanelError::InvalidTopM)
         ));
         assert!(matches!(
-            DetectorPanelScorer::fit(&clean, &perturbed, 2, 0.5, 1e-6, DetectorPanelAggregation::MeanPositiveZ),
+            DetectorPanelScorer::fit(
+                &clean,
+                &perturbed,
+                2,
+                0.5,
+                1e-6,
+                DetectorPanelAggregation::MeanPositiveZ,
+            ),
             Err(DetectorPanelError::InvalidDetectabilityThreshold)
         ));
         assert!(matches!(
-            DetectorPanelScorer::fit(&clean, &clean, 2, 0.75, 1e-6, DetectorPanelAggregation::MeanPositiveZ),
+            DetectorPanelScorer::fit(
+                &clean,
+                &clean,
+                2,
+                0.75,
+                1e-6,
+                DetectorPanelAggregation::MeanPositiveZ,
+            ),
             Err(DetectorPanelError::NoInformativeDetectors)
         ));
         let mut malformed = clean.clone();
         malformed[0].pop();
         assert!(matches!(
-            DetectorPanelScorer::fit(&malformed, &perturbed, 2, 0.75, 1e-6, DetectorPanelAggregation::MeanPositiveZ),
+            DetectorPanelScorer::fit(
+                &malformed,
+                &perturbed,
+                2,
+                0.75,
+                1e-6,
+                DetectorPanelAggregation::MeanPositiveZ,
+            ),
             Err(DetectorPanelError::InvalidSelectionShape)
         ));
         let mut nonfinite = clean.clone();
         nonfinite[0][0] = f64::NAN;
         assert!(matches!(
-            DetectorPanelScorer::fit(&nonfinite, &perturbed, 2, 0.75, 1e-6, DetectorPanelAggregation::MeanPositiveZ),
+            DetectorPanelScorer::fit(
+                &nonfinite,
+                &perturbed,
+                2,
+                0.75,
+                1e-6,
+                DetectorPanelAggregation::MeanPositiveZ,
+            ),
             Err(DetectorPanelError::NonFiniteSelectionScore)
         ));
     }
