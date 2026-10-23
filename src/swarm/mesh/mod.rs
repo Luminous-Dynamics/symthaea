@@ -392,6 +392,8 @@ pub enum MeshError {
     ReassemblyFailed,
     /// Payload too large for fragmentation.
     PayloadTooLarge,
+    /// A serialized frame exceeds the selected transport's declared MTU.
+    TransportMtuExceeded { frame_len: usize, mtu: usize },
     /// A requested security profile cannot be provided by the selected transport.
     SecurityProfileUnavailable(String),
 }
@@ -403,6 +405,9 @@ impl std::fmt::Display for MeshError {
             Self::Io(msg) => write!(f, "mesh I/O error: {msg}"),
             Self::ReassemblyFailed => write!(f, "fragment reassembly failed"),
             Self::PayloadTooLarge => write!(f, "payload exceeds max fragment count"),
+            Self::TransportMtuExceeded { frame_len, mtu } => {
+                write!(f, "serialized frame size {frame_len} exceeds transport MTU {mtu}")
+            }
             Self::SecurityProfileUnavailable(reason) => {
                 write!(f, "requested mesh security profile unavailable: {reason}")
             }
