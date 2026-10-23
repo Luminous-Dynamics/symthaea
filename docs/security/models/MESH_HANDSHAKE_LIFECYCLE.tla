@@ -121,8 +121,8 @@ ConfirmInitiator ==
 ConfirmResponder ==
   /\ phase = "Candidate"
   /\ candidateSecretPresent
-  /\ peerIdentityBound
-  /\ transcriptBound
+  /\ (peerIdentityBound \/ AdmissionMode = "identity-unbound")
+  /\ (transcriptBound \/ AdmissionMode = "transcript-unbound")
   /\ \/ BackendUsable
      \/ AdmissionMode = "stub-backend"
   /\ responderConfirmed' = TRUE
