@@ -86,6 +86,22 @@ The streaming test models temporal locality by storing a prior query at the midp
 
 Independent Python mathematical model check (not Rust execution): 2,100 cases across 64–2,048-bit synthetic vectors, 1–64 candidates, randomized hint IDs, duplicates, and multiple equal exact matches all returned the same lexicographic minimum `(Hamming distance, candidate index)` as exhaustive exact search. This checks the algorithm's tie/bound logic on small synthetic dimensions; it does not compile, test or benchmark the Rust implementation.
 
+### Phase A4 — batched exact queries and corpus-major traversal
+
+A single-query latency benchmark does not establish the best architecture for bursts of queries. FAISS documents that batch queries improve efficiency by amortizing index-memory access, and that CPU/GPU crossovers depend on index size, batch size and whether the index/query is already resident. Reference: [FAISS CPU/GPU comparison](https://github.com/facebookresearch/faiss/wiki/Comparing-GPU-vs-CPU) and [FAISS performance guidance](https://github.com/facebookresearch/faiss/wiki/How-to-make-Faiss-run-faster).
+
+The new independent `hdc_batch_search` Criterion target compares:
+- query-major traversal (finish the entire corpus scan for query 0, then query 1, etc.);
+- corpus-major traversal (visit each corpus candidate, update every query's incumbent before advancing);
+- batch sizes 1, 4, 8 and 16;
+- corpus sizes 256, 1,024, 4,096 and 16,384 (0.5, 2, 8 and 32 MiB logical corpus payload);
+- independent random query batches and deterministic correlated-query batches;
+- strict exact top-1 winner ID and score equality, including duplicate-candidate tie controls.
+
+For B queries and N candidates, both software paths still compute B×N exact similarities. The key hypothesis is not fewer mathematical comparisons: it is better locality and reduced memory-system/launch overhead when a corpus is scanned for multiple queries. Do not infer physical DRAM traffic from logical bytes or source-level loop order. The actual target's cache/memory counters or device telemetry are required to make that claim.
+
+The next system-level extension is a measured adaptive policy that chooses direct CPU execution vs batched corpus-major execution vs an accelerator based on corpus size, query batch size, data residency, latency SLO and transfer cost. Train/tune this policy only on calibration traces, and evaluate the selected rule on held-out corpus sizes, query correlations and device classes. Do not assume GPU wins: FAISS's published guidance explicitly notes that a small index / small batch frequently favors CPU, whereas large indices and batches are more likely to amortize GPU overhead.
+
 ### Phase B — qualified RTL architecture sweep
 
 Prerequisite: the software-oracle generator and all 12 cases in #8463 compile and simulate at its exact head. Once that gate is met, add a distinct fused similarity-to-argmax primitive; do not treat word-level XOR/popcount success as qualification of the full search datapath.
