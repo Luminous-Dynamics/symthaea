@@ -15,6 +15,10 @@ rtl_xor="${silicon_dir}/rtl/hdc_bind_xor.sv"
 tb_xor="${silicon_dir}/rtl/tb_hdc_bind_xor.sv"
 rtl_hamming="${silicon_dir}/rtl/hdc_hamming_count.sv"
 tb_hamming="${silicon_dir}/rtl/tb_hdc_hamming_count.sv"
+oracle_generator="${silicon_dir}/src/bin/hdc_rtl_oracle.rs"
+silicon_cargo_manifest="${silicon_dir}/Cargo.toml"
+canonical_binary_hv="${repo_root}/crates/core/symthaea-core/src/hdc/binary_hv.rs"
+cargo_lock="${repo_root}/Cargo.lock"
 manifest="${script_dir}/hdl_toolchain_manifest_v1.json"
 receipt_schema="${script_dir}/hdl_run_receipt_v1.schema.json"
 case_matrix="${script_dir}/hdl_expected_case_matrix_v1.json"
@@ -27,7 +31,7 @@ out_dir="${out_root}/${stamp}-pid${BASHPID}"
 mkdir -p "${out_dir}" || { printf 'cannot create output directory: %s\n' "${out_dir}" >&2; exit 2; }
 
 missing=()
-for tool in verilator jq sha256sum git make c++ head grep; do
+for tool in verilator jq sha256sum git make c++ cargo rustc head grep; do
   if ! command -v "${tool}" >/dev/null 2>&1; then missing+=("${tool}"); fi
 done
 
@@ -52,9 +56,13 @@ case_matrix_sha="$(hash_file "${case_matrix}")"
 receipt_validator_sha="$(hash_file "${receipt_validator}")"
 flake_sha="$(hash_file "${flake_nix}")"
 flake_lock_sha="$(hash_file "${flake_lock}")"
+oracle_generator_sha="$(hash_file "${oracle_generator}")"
+silicon_cargo_manifest_sha="$(hash_file "${silicon_cargo_manifest}")"
+canonical_binary_hv_sha="$(hash_file "${canonical_binary_hv}")"
+cargo_lock_sha="$(hash_file "${cargo_lock}")"
 git_head="$(git -C "${repo_root}" rev-parse HEAD 2>/dev/null || printf 'unavailable')"
 
-for required_file in "${rtl_xor}" "${tb_xor}" "${rtl_hamming}" "${tb_hamming}" "${manifest}" "${receipt_schema}" "${case_matrix}" "${receipt_validator}" "${flake_nix}" "${flake_lock}"; do
+for required_file in "${rtl_xor}" "${tb_xor}" "${rtl_hamming}" "${tb_hamming}" "${oracle_generator}" "${silicon_cargo_manifest}" "${canonical_binary_hv}" "${cargo_lock}" "${manifest}" "${receipt_schema}" "${case_matrix}" "${receipt_validator}" "${flake_nix}" "${flake_lock}"; do
   if [[ ! -f "${required_file}" ]]; then
     printf 'Missing required file: %s\n' "${required_file}" >&2
     exit 2
