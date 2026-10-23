@@ -40,6 +40,17 @@ The API returns the number of clusters and observations, replicate count, seed, 
 
 The bootstrap is intended for graph-level paired *effects* (for example, one delta per graph/seed, clustered by graph), not raw device shots treated as independent instances. Keep the estimand and aggregation rule preregistered.
 
+## Independent-sample inference for generator-coupled comparisons
+
+The separate module mis_unpaired_inference provides two routines for distribution-level comparisons where graph-byte pairing is not present.
+
+- unpaired_mean_permutation_test compares two independent graph-level samples using the absolute Welch-studentized mean difference. It enumerates every fixed-size label assignment when the pooled sample is at most 16, otherwise uses seeded Monte Carlo permutations with a plus-one correction and records the draw seed/count and approximate Monte Carlo standard error.
+- unpaired_mean_bootstrap_interval independently resamples each arm to produce a percentile interval and bootstrap standard error for mean(A)-mean(B). Confidence level, seed and replicate count are stored in the result.
+
+The distinction is deliberate: equal integer seeds do not make two generated graphs the same workload. The permutation routine recalculates the studentized statistic under each label assignment, which is more defensible than permuting an unstudentized mean under unequal variances. Still, full label enumeration is an exact randomization p-value only under the stronger exchangeability/equal-distribution null; with only equal means and unequal variances, studentized permutation is asymptotic rather than exact. The bootstrap interval is approximate and assumes independent observations. For MIS data, use one independent graph observation per arm or a prespecified graph-level aggregate; repeated runs within a graph need clustered/hierarchical handling.
+
+These methods do not automatically adjust for multiple comparisons, repair graph-family dependence, or prove anything about quantum advantage. They should accompany raw outcome distributions, the observed effect, sample counts, and the cost vector.
+
 ## Required study practice
 
 - Use independent analysis units. For MIS, a conservative default is one preregistered aggregate per graph instance, with independent graph instances as the paired units. Do not treat shots or repeated seeds on the same graph as independent graph samples.
