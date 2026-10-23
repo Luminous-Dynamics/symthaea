@@ -37,6 +37,8 @@ struct Config {
     seed: u64,
     candidate_multiplier: usize,
     fallback_on_empty: bool,
+    lsh_bands: u32,
+    lsh_rows: u32,
 }
 
 #[derive(Clone, Copy)]
@@ -78,6 +80,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut store_config = StoreConfig::default();
     store_config.initial_capacity = u64::try_from(config.size)?;
+    store_config.lsh_bands = config.lsh_bands;
+    store_config.lsh_rows = config.lsh_rows;
     let mut store = HdcStore::create(&path, store_config)?;
 
     for id in 0..config.size {
@@ -165,6 +169,8 @@ fn parse_args() -> Result<Config, String> {
         "seed",
         "candidate-multiplier",
         "fallback-on-empty",
+        "lsh-bands",
+        "lsh-rows",
     ];
     let mut values = std::collections::HashMap::<String, String>::new();
     for arg in env::args().skip(1) {
@@ -197,6 +203,9 @@ fn parse_args() -> Result<Config, String> {
     let noise_bits = parse_value(&values, "noise-bits", DEFAULT_NOISE_BITS)?;
     let seed = parse_value(&values, "seed", DEFAULT_SEED)?;
     let candidate_multiplier = parse_value(&values, "candidate-multiplier", 4usize)?;
+    let default_store_config = StoreConfig::default();
+    let lsh_bands = parse_value(&values, "lsh-bands", default_store_config.lsh_bands)?;
+    let lsh_rows = parse_value(&values, "lsh-rows", default_store_config.lsh_rows)?;
     let fallback_on_empty = match values.get("fallback-on-empty").map(String::as_str) {
         None | Some("true") => true,
         Some("false") => false,
@@ -227,6 +236,8 @@ fn parse_args() -> Result<Config, String> {
         seed,
         candidate_multiplier,
         fallback_on_empty,
+        lsh_bands,
+        lsh_rows,
     })
 }
 
@@ -365,6 +376,8 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
     println!("# seed={}", config.seed);
     println!("# candidate_multiplier={}", config.candidate_multiplier);
     println!("# fallback_on_empty={}", config.fallback_on_empty);
+    println!("# lsh_bands={}", config.lsh_bands);
+    println!("# lsh_rows={}", config.lsh_rows);
     println!("# target_os={}", env::consts::OS);
     println!("# target_arch={}", env::consts::ARCH);
     println!("# available_parallelism={}", std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1));
@@ -479,6 +492,8 @@ mod tests {
             seed: 42,
             candidate_multiplier: 4,
             fallback_on_empty: true,
+            lsh_bands: 32,
+            lsh_rows: 8,
         };
         let left = build_queries(&config);
         let right = build_queries(&config);
