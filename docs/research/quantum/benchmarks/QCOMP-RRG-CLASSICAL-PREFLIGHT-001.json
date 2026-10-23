@@ -2341,8 +2341,8 @@
             "min": 0,
             "max": 1
           },
-          "locally_optimal_instances": 0,
-          "budget_exhausted": 20
+          "locally_optimal_instances": 20,
+          "budget_exhausted": 0
         }
       }
     },
@@ -4644,8 +4644,8 @@
             "min": 0,
             "max": 1
           },
-          "locally_optimal_instances": 0,
-          "budget_exhausted": 20
+          "locally_optimal_instances": 20,
+          "budget_exhausted": 0
         }
       }
     },
@@ -6947,8 +6947,8 @@
             "min": 0,
             "max": 1
           },
-          "locally_optimal_instances": 0,
-          "budget_exhausted": 20
+          "locally_optimal_instances": 20,
+          "budget_exhausted": 0
         }
       }
     },
