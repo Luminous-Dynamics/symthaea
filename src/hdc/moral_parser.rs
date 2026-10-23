@@ -1225,10 +1225,26 @@ impl MoralParser {
         .iter()
         .any(|cues| cues.iter().any(|candidate| evidence_text.contains(candidate.as_str())));
 
+        fn uncertainty_cue_is_consent_scoped(text: &str, cue: &str) -> bool {
+            text.match_indices(cue).any(|(start, matched)| {
+                let end = start + matched.len();
+                let clause_start = text[..start]
+                    .rfind(['.', ';', '!', '?'])
+                    .map_or(0, |index| index + 1);
+                let clause_end = text[end..]
+                    .find(['.', ';', '!', '?'])
+                    .map_or(text.len(), |offset| end + offset);
+                let clause = &text[clause_start..clause_end];
+                ["consent", "permission", "authorized", "agreed"]
+                    .iter()
+                    .any(|signal| clause.contains(signal))
+            })
+        }
+
         if has_consent_cue {
             if let Some(cue) = UNCERTAINTY_CUES
                 .iter()
-                .filter(|cue| evidence_text.contains(**cue))
+                .filter(|cue| uncertainty_cue_is_consent_scoped(&evidence_text, cue))
                 .max_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)))
             {
                 return ConsentTextAssessment {
@@ -2170,6 +2186,11 @@ mod tests {
         );
         assert_eq!(unrelated_unverified.state, ConsentState::Given);
         assert!(unrelated_unverified.has_affirmative_cue());
+
+        let unrelated_uncertainty_in_later_clause = parser.assess_consent_evidence(
+            "She gave consent to share the report. I am not sure whether it will rain.",
+        );
+        assert_eq!(unrelated_uncertainty_in_later_clause.state, ConsentState::Given);
     }
 
     #[test]
