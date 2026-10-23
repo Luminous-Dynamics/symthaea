@@ -857,6 +857,12 @@ mod tests {
             holographic_unity: 0.0,
             gradient_magnitude: 0.0,
             epistemic_confidence: 0.5,
+            moral_score: 0.0,
+            active_external_requests: 0,
+            vision_hdc_dim: 16384,
+            vision_free_energy: 0.0,
+            vision_complexity: 0.0,
+            vision_accuracy: 1.0,
             _reserved: [0; 2],
         }
     }
