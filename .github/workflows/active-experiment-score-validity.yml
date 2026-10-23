@@ -34,13 +34,6 @@ jobs:
       - name: Format affected crate
         run: cargo fmt --manifest-path crates/core/symthaea-core/Cargo.toml -- --check
 
-      - name: Diagnose workspace lockfile drift
-        run: |
-          cargo update --workspace
-          echo "=== Cargo.lock diff stat ==="
-          git diff --stat -- Cargo.lock
-          echo "=== Cargo.lock reconciliation diff ==="
-          git diff -- Cargo.lock
 
       - name: Focused active-experiment score tests
         run: cargo test --locked -p symthaea-core --lib hdc::conjecture_engine::experiment_selection -- --nocapture
