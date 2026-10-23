@@ -44,7 +44,7 @@ Report empirical false-alarm rate with Wilson or paired-bootstrap intervals; pow
 
 Proposed engineering goals, **not current results**:
 - for a clean null at nominal α=0.05, 10,000+ Monte Carlo streams per confirmatory null world and a confidence interval compatible with the intended bound;
-- at least 80% power on a predeclared medium diffuse shift and 95% on a predeclared large shift at equal false-alarm budget;
+- with batch size 64, 199 independent clean calibration batches, and nominal \u03b1=0.05, at least 80% power for a diffuse +0.25-reference-scale mean shift across all feature coordinates and 95% for a +0.5-reference-scale shift, with rates and intervals reported per held-out world;
 - at least 5x p95 scoring speedup over the exact scorer for (d\geq1,024), (k\leq64), and batch size 64, without an unacceptable loss in held-out power;
 - report a Pareto curve over (k), not a single cherry-picked projection dimension;
 - preregister acceptable missed-detection rates for sparse and projection-orthogonal shifts; if those fail, document fallback to exact or alternative detectors rather than widening claims.
