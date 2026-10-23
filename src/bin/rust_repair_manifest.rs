@@ -438,31 +438,63 @@ struct RuntimeEvidenceSummary {
     container_image_id: String,
     container_ids: Vec<String>,
 }
+
 fn command_exit_code(run: &Value, key: &str) -> Result<i64, String> {
-    run.get(key).and_then(Value::as_i64).ok_or_else(|| format!("{key} missing or not an integer"))
+    run.get(key)
+        .and_then(Value::as_i64)
+        .ok_or_else(|| format!("{key} missing or not an integer"))
 }
-fn validate_container_identity(run: &Value, expected_image_reference: &str) -> Result<(String, String), String> {
-    let identity = run.get("container_identity").and_then(Value::as_object)
+
+fn validate_container_identity(
+    run: &Value,
+    expected_image_reference: &str,
+) -> Result<(String, String), String> {
+    let identity = run
+        .get("container_identity")
+        .and_then(Value::as_object)
         .ok_or_else(|| "container_identity missing or not an object".to_string())?;
-    let container_id = identity.get("container_id").and_then(Value::as_str)
-        .ok_or_else(|| "container_identity.container_id missing".to_string())?.to_ascii_lowercase();
-    if !is_hex(&container_id, 64) { return Err("container_identity.container_id must be a 64-character Docker ID".to_string()); }
-    let configured_image = identity.get("configured_image").and_then(Value::as_str)
+    let container_id = identity
+        .get("container_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "container_identity.container_id missing".to_string())?
+        .to_ascii_lowercase();
+    if !is_hex(&container_id, 64) {
+        return Err(
+            "container_identity.container_id must be a 64-character Docker ID".to_string(),
+        );
+    }
+
+    let configured_image = identity
+        .get("configured_image")
+        .and_then(Value::as_str)
         .ok_or_else(|| "container_identity.configured_image missing".to_string())?;
     if configured_image != expected_image_reference {
-        return Err(format!("configured image reference differs: expected {expected_image_reference:?}, got {configured_image:?}"));
+        return Err(format!(
+            "configured image reference differs: expected {expected_image_reference:?}, got {configured_image:?}"
+        ));
     }
-    let image_id = identity.get("container_image_id").and_then(Value::as_str)
-        .ok_or_else(|| "container_identity.container_image_id missing".to_string())?.to_ascii_lowercase();
+
+    let image_id = identity
+        .get("container_image_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "container_identity.container_image_id missing".to_string())?
+        .to_ascii_lowercase();
     if !image_id.starts_with("sha256:") || !is_hex(&image_id[7..], 64) {
-        return Err("container_image_id must be an immutable sha256:<64-hex> Docker image ID".to_string());
+        return Err(
+            "container_image_id must be an immutable sha256:<64-hex> Docker image ID".to_string(),
+        );
     }
     Ok((container_id, image_id))
 }
+
 fn verify_logged_run(
-    run: &Value, expected_image_reference: &str, expected_role: &str,
-    expected_index: Option<usize>, expected_test_ids: &BTreeSet<String>,
-    expected_log_path: &Path, gold: bool,
+    run: &Value,
+    expected_image_reference: &str,
+    expected_role: &str,
+    expected_index: Option<usize>,
+    expected_test_ids: &BTreeSet<String>,
+    expected_log_path: &Path,
+    gold: bool,
 ) -> Result<(BTreeMap<String, String>, String, String), String> {
     if run.get("role").and_then(Value::as_str) != Some(expected_role) {
         return Err(format!("expected run role {expected_role:?}"));
@@ -481,6 +513,7 @@ fn verify_logged_run(
     if command_exit_code(run, "rebuild_exit_code")? != 0 {
         return Err("rebuild command did not exit zero".to_string());
     }
+
     let test_exit = command_exit_code(run, "test_exit_code")?;
     if test_exit == 124 || test_exit < 0 {
         return Err(format!("test command is unresolved (exit code {test_exit})"));
@@ -488,27 +521,45 @@ fn verify_logged_run(
     if command_exit_code(run, "print_exit_code")? != 0 {
         return Err("print/log command did not exit zero".to_string());
     }
-    let (container_id, image_id) = validate_container_identity(run, expected_image_reference)?;
+
+    let (container_id, image_id) =
+        validate_container_identity(run, expected_image_reference)?;
     let parsed = parse_status_map(run, "parsed_status")?;
     let observed_ids = parsed.keys().cloned().collect::<BTreeSet<_>>();
     if &observed_ids != expected_test_ids {
-        return Err("per-run parsed test-ID set differs from the baseline test-ID set".to_string());
+        return Err(
+            "per-run parsed test-ID set differs from the baseline test-ID set".to_string(),
+        );
     }
     if gold && test_exit != 0 && parsed.values().all(|state| state == "pass") {
-        return Err(format!("gold test command exited {test_exit}, but parser reports every test passing"));
+        return Err(format!(
+            "gold test command exited {test_exit}, but parser reports every test passing"
+        ));
     }
-    let log_sha = run.get("log_sha256").and_then(Value::as_str)
-        .filter(|value| is_hex(value, 64)).ok_or_else(|| "log_sha256 missing or malformed".to_string())?.to_ascii_lowercase();
+
+    let log_sha = run
+        .get("log_sha256")
+        .and_then(Value::as_str)
+        .filter(|value| is_hex(value, 64))
+        .ok_or_else(|| "log_sha256 missing or malformed".to_string())?
+        .to_ascii_lowercase();
     let actual_log_sha = sha256_file(expected_log_path)?;
     if log_sha != actual_log_sha {
-        return Err(format!("raw run log SHA-256 mismatch for {}", expected_log_path.display()));
+        return Err(format!(
+            "raw run log SHA-256 mismatch for {}",
+            expected_log_path.display()
+        ));
     }
     Ok((parsed, container_id, image_id))
 }
+
 fn validate_runtime_evidence(
-    bytes: &[u8], row: &Value, instance_id: &str, validation_dir: &Path, status: &Value,
+    bytes: &[u8],
+    row: &Value,
+    instance_id: &str,
+    validation_dir: &Path,
+    status: &Value,
 ) -> Result<RuntimeEvidenceSummary, Vec<String>> {
-    let evidence_sha = sha256_bytes(bytes);
     let evidence: Value = serde_json::from_slice(bytes)
         .map_err(|error| vec![format!("validation_evidence.json is malformed: {error}")])?;
     let mut errors = Vec::new();
@@ -518,45 +569,92 @@ fn validate_runtime_evidence(
     if evidence.get("instance_id").and_then(Value::as_str) != Some(instance_id) {
         errors.push("validation evidence instance_id does not match candidate".to_string());
     }
+
     let expected_image_reference = match required_string(row, "docker_image") {
-        Ok(value) => value, Err(error) => return Err(vec![error]),
+        Ok(value) => value,
+        Err(error) => return Err(vec![error]),
     };
-    if evidence.get("image_reference").and_then(Value::as_str) != Some(expected_image_reference) {
-        errors.push("validation evidence image_reference differs from candidate metadata".to_string());
+    if evidence.get("image_reference").and_then(Value::as_str)
+        != Some(expected_image_reference)
+    {
+        errors.push(
+            "validation evidence image_reference differs from candidate metadata".to_string(),
+        );
     }
+
     let baseline_expected = parse_status_map(status, "pre_patch_status")
         .map_err(|error| vec![format!("status.json {error}")])?;
     let gold_expected = parse_status_map(status, "post_patch_status")
         .map_err(|error| vec![format!("status.json {error}")])?;
     let expected_test_ids = baseline_expected.keys().cloned().collect::<BTreeSet<_>>();
     let baseline = match evidence.get("baseline") {
-        Some(value) => value, None => return Err(vec!["validation evidence has no baseline record".to_string()]),
+        Some(value) => value,
+        None => return Err(vec!["validation evidence has no baseline record".to_string()]),
     };
-    let baseline_log_path = validation_dir.join(instance_id).join("pre_patch_log.txt");
+    let baseline_log_path = validation_dir
+        .join(instance_id)
+        .join("pre_patch_log.txt");
     let mut run_ids = Vec::new();
     let mut image_ids = Vec::new();
-    match verify_logged_run(baseline, expected_image_reference, "baseline", None, &expected_test_ids, &baseline_log_path, false) {
+
+    match verify_logged_run(
+        baseline,
+        expected_image_reference,
+        "baseline",
+        None,
+        &expected_test_ids,
+        &baseline_log_path,
+        false,
+    ) {
         Ok((baseline_status, container_id, image_id)) => {
-            if baseline_status != baseline_expected { errors.push("baseline parsed statuses differ from status.json pre_patch_status".to_string()); }
-            run_ids.push(container_id); image_ids.push(image_id);
+            if baseline_status != baseline_expected {
+                errors.push(
+                    "baseline parsed statuses differ from status.json pre_patch_status".to_string(),
+                );
+            }
+            run_ids.push(container_id);
+            image_ids.push(image_id);
         }
         Err(error) => errors.push(format!("baseline evidence: {error}")),
     }
+
     let gold_runs = match evidence.get("gold_runs").and_then(Value::as_array) {
         Some(runs) if runs.len() == 3 => runs,
-        Some(runs) => return Err(vec![format!("validation evidence has {} gold runs; exactly 3 required", runs.len())]),
-        None => return Err(vec!["validation evidence gold_runs missing or not an array".to_string()]),
+        Some(runs) => {
+            return Err(vec![format!(
+                "validation evidence has {} gold runs; exactly 3 required",
+                runs.len()
+            )]);
+        }
+        None => {
+            return Err(vec![
+                "validation evidence gold_runs missing or not an array".to_string(),
+            ]);
+        }
     };
     let mut parsed_gold_runs = Vec::with_capacity(3);
     for index in 0..3 {
-        let log_path = validation_dir.join(instance_id).join(format!("gold_run_{index}.log"));
-        match verify_logged_run(&gold_runs[index], expected_image_reference, "gold", Some(index), &expected_test_ids, &log_path, true) {
+        let log_path = validation_dir
+            .join(instance_id)
+            .join(format!("gold_run_{index}.log"));
+        match verify_logged_run(
+            &gold_runs[index],
+            expected_image_reference,
+            "gold",
+            Some(index),
+            &expected_test_ids,
+            &log_path,
+            true,
+        ) {
             Ok((statuses, container_id, image_id)) => {
-                parsed_gold_runs.push(statuses); run_ids.push(container_id); image_ids.push(image_id);
+                parsed_gold_runs.push(statuses);
+                run_ids.push(container_id);
+                image_ids.push(image_id);
             }
             Err(error) => errors.push(format!("gold run {index} evidence: {error}")),
         }
     }
+
     if run_ids.len() == 4 && run_ids.iter().collect::<HashSet<_>>().len() != 4 {
         errors.push("container IDs are not unique across baseline and gold runs".to_string());
     }
@@ -565,22 +663,42 @@ fn validate_runtime_evidence(
     }
     if parsed_gold_runs.len() == 3 {
         let mut all_ids = BTreeSet::new();
-        for run in &parsed_gold_runs { all_ids.extend(run.keys().cloned()); }
+        for run in &parsed_gold_runs {
+            all_ids.extend(run.keys().cloned());
+        }
+
         let mut aggregate = BTreeMap::new();
         for test_id in all_ids {
-            let states = parsed_gold_runs.iter()
-                .map(|run| run.get(&test_id).map(String::as_str).unwrap_or("skip")).collect::<Vec<_>>();
-            let state = if states.contains(&"fail") { "fail" } else if states.contains(&"skip") { "skip" } else { "pass" };
+            let states = parsed_gold_runs
+                .iter()
+                .map(|run| run.get(&test_id).map(String::as_str).unwrap_or("skip"))
+                .collect::<Vec<_>>();
+            let state = if states.contains(&"fail") {
+                "fail"
+            } else if states.contains(&"skip") {
+                "skip"
+            } else {
+                "pass"
+            };
             aggregate.insert(test_id, state.to_string());
         }
         if aggregate != gold_expected {
-            errors.push("per-run parsed statuses do not reproduce status.json post_patch_status".to_string());
+            errors.push(
+                "per-run parsed statuses do not reproduce status.json post_patch_status"
+                    .to_string(),
+            );
         }
     } else {
         errors.push("one or more gold-run parsed statuses could not be validated".to_string());
     }
-    if !errors.is_empty() { return Err(errors); }
-    Ok(RuntimeEvidenceSummary { container_image_id: image_ids[0].clone(), container_ids: run_ids })
+
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+    Ok(RuntimeEvidenceSummary {
+        container_image_id: image_ids[0].clone(),
+        container_ids: run_ids,
+    })
 }
 
 fn hash_field(row: &Value, field: &str) -> Result<String, String> {
