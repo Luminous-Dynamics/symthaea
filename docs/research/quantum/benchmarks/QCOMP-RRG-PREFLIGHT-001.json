@@ -1885,15 +1885,20 @@
     "repository": "Luminous-Dynamics/symthaea",
     "pull_request": 8324,
     "branch": "research/qcomp-portfolio-001a-mis-verifier-current",
-    "inspected_commit": "38ea70144397a7b2a864dac42c9ec473b50a369e",
+    "inspected_commit": "3ced24ce2768f480b8b8945560eebeffcece5eaf",
     "module_path": "crates/domains/symthaea-quantum-comp/src/mis_random_regular.rs",
-    "module_blob_sha1": "e2ad816606b774ce0b5e97170d6a8f7255f666a8",
+    "module_blob_sha1": "a51cb79f336233bf9b5e823fa05cf664402dd897",
     "cli_path": "crates/domains/symthaea-quantum-comp/src/bin/qcomp_rrg_generate.rs",
     "cli_blob_sha1": "da95584daa14f7b6513e5b1aecc7a3ae9048759c",
     "default_rejection_attempt_cap": 100000,
     "max_vertices_per_call": 100000,
     "max_stubs_per_call": 1000000,
-    "seed_stream_alignment": "The canonical Rust API was updated to use the same XorShift64* stream, rejection-sampled Fisher-Yates bounded draw and in-place re-shuffle semantics as this independent JS translation. Exact Rust-to-JS graph-byte parity remains unverified until Rust is executable.",
+    "seed_stream_alignment": "The canonical Rust API was updated to use the same XorShift64* stream, rejection-sampled Fisher-Yates bounded draw and in-place re-shuffle semantics as this independent JS translation. Exact Rust-to-JS graph-byte parity remains unverified until Rust is executable. A static test review also fixed a stub-ceiling fixture that previously would have triggered the vertex ceiling first; the fixture now uses n=100000,d=12 to isolate the stub-limit error.",
     "execution_status": "not compiled or executed"
+  },
+  "preflight_origin": {
+    "created_with": "independent JavaScript translation, not Rust",
+    "initial_candidate_rust_blob_sha1": "8d14638463b08d335facd167c9055f765bb11c15",
+    "consolidation_note": "The initial Rust candidate used a fresh stub clone per retry and a different rejection-bounded draw implementation, so these records were never treated as Rust output-parity evidence. The canonical Rust implementation has since been aligned to the JS preflight semantics, but no byte-by-byte Rust regeneration has been executed."
   }
 }
