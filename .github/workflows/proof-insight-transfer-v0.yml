@@ -600,7 +600,7 @@ jobs:
           assert report["counts"]["not_run_rows_in_split"] == 8
           assert report["metrics"] == {}, "synthetic fixtures must not generate model performance metrics"
           assert report["confirmatory_decision"] == "not_evaluated_synthetic_fixture"
-          assert report["resource_usage"]["paired_rows_with_executed_usage"] == 0
+          assert report["resource_usage"]["executed_rows_with_usage"] == 0
           print("PITB_PROOF_STATE_ANALYZER_PASS: 4 synthetic pairs/8 not_run rows; no model metrics emitted")
           PY
       - name: Validate insight schema and synthetic positive/negative controls
