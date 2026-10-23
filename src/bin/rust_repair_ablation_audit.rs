@@ -1185,8 +1185,8 @@ fn run(cli: Cli) -> Result<(), String> {
     let report = make_report(
         &prereg,
         preregistration_sha256,
-        trial_results_sha256.clone(),
         trial_results_sha256,
+        cli.expected_trial_results_sha256.clone(),
         input_trial_record_count,
         pairs,
     );
