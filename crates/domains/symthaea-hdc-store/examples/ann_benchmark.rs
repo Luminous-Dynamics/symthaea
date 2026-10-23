@@ -498,34 +498,38 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
         exact_p95 as f64 / approximate_p95 as f64
     };
 
-    println!("# summary_unique_queries={}", quality.len());
+    println!("# summary_all_unique_queries={}", quality.len());
     println!("# summary_latency_samples={}", samples.len());
-    println!("# summary_mean_recall_at_k={:.9}", mean(quality.iter().map(|q| q.recall_at_k)));
+    println!("# summary_all_mean_recall_at_k={:.9}", mean(quality.iter().map(|q| q.recall_at_k)));
     println!(
-        "# summary_worst_recall_at_k={:.9}",
+        "# summary_all_worst_recall_at_k={:.9}",
         quality.iter().map(|q| q.recall_at_k).fold(1.0, f64::min)
     );
     println!(
-        "# summary_mean_candidate_fraction={:.9}",
+        "# summary_all_mean_candidate_fraction={:.9}",
         mean(quality.iter().map(|q| q.candidate_fraction))
     );
     println!(
-        "# summary_mean_examined_vectors={:.3}",
+        "# summary_all_mean_examined_vectors={:.3}",
         mean(quality.iter().map(|q| q.examined as f64))
     );
     println!(
-        "# summary_exhaustive_query_fraction={:.9}",
+        "# summary_all_exhaustive_query_fraction={:.9}",
         fraction(quality.iter().filter(|q| q.approximate_exact).count(), quality.len())
     );
     println!(
-        "# summary_fallback_query_fraction={:.9}",
+        "# summary_all_fallback_query_fraction={:.9}",
         fraction(quality.iter().filter(|q| q.fell_back_to_exact).count(), quality.len())
     );
-    println!("# summary_exact_p50_ns={exact_p50}");
-    println!("# summary_exact_p95_ns={exact_p95}");
-    println!("# summary_approximate_p50_ns={approximate_p50}");
-    println!("# summary_approximate_p95_ns={approximate_p95}");
-    println!("# summary_ratio_exact_p95_over_approximate_p95={p95_ratio:.6}");
+    println!("# summary_all_exact_p50_ns={exact_p50}");
+    println!("# summary_all_exact_p95_ns={exact_p95}");
+    println!("# summary_all_approximate_p50_ns={approximate_p50}");
+    println!("# summary_all_approximate_p95_ns={approximate_p95}");
+    println!("# summary_all_ratio_exact_p95_over_approximate_p95={p95_ratio:.6}");
+    emit_quality_summary("near_neighbor", quality);
+    emit_quality_summary("novel", quality);
+    emit_latency_summary("near_neighbor", samples);
+    emit_latency_summary("novel", samples);
     println!(
         "# interpretation={}",
         concat!(
@@ -533,6 +537,68 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
             "or downstream task quality"
         )
     );
+}
+
+fn emit_quality_summary(kind: &str, quality: &[Quality]) {
+    let selected: Vec<&Quality> = quality.iter().filter(|query| query.kind == kind).collect();
+    println!("# {kind}_query_count={}", selected.len());
+    println!(
+        "# {kind}_mean_recall_at_k={:.9}",
+        mean(selected.iter().map(|query| query.recall_at_k))
+    );
+    println!(
+        "# {kind}_worst_recall_at_k={:.9}",
+        selected.iter().map(|query| query.recall_at_k).fold(1.0, f64::min)
+    );
+    println!(
+        "# {kind}_mean_candidate_fraction={:.9}",
+        mean(selected.iter().map(|query| query.candidate_fraction))
+    );
+    println!(
+        "# {kind}_mean_examined_vectors={:.3}",
+        mean(selected.iter().map(|query| query.examined as f64))
+    );
+    println!(
+        "# {kind}_exhaustive_query_fraction={:.9}",
+        fraction(
+            selected.iter().filter(|query| query.approximate_exact).count(),
+            selected.len()
+        )
+    );
+    println!(
+        "# {kind}_fallback_query_fraction={:.9}",
+        fraction(
+            selected.iter().filter(|query| query.fell_back_to_exact).count(),
+            selected.len()
+        )
+    );
+}
+
+fn emit_latency_summary(kind: &str, samples: &[Sample]) {
+    let exact_ns: Vec<u128> = samples
+        .iter()
+        .filter(|sample| sample.kind == kind)
+        .map(|sample| sample.exact_ns)
+        .collect();
+    let approximate_ns: Vec<u128> = samples
+        .iter()
+        .filter(|sample| sample.kind == kind)
+        .map(|sample| sample.approximate_ns)
+        .collect();
+    let exact_p50 = percentile(&exact_ns, 0.50);
+    let exact_p95 = percentile(&exact_ns, 0.95);
+    let approximate_p50 = percentile(&approximate_ns, 0.50);
+    let approximate_p95 = percentile(&approximate_ns, 0.95);
+    let ratio = if approximate_p95 == 0 {
+        0.0
+    } else {
+        exact_p95 as f64 / approximate_p95 as f64
+    };
+    println!("# {kind}_exact_p50_ns={exact_p50}");
+    println!("# {kind}_exact_p95_ns={exact_p95}");
+    println!("# {kind}_approximate_p50_ns={approximate_p50}");
+    println!("# {kind}_approximate_p95_ns={approximate_p95}");
+    println!("# {kind}_ratio_exact_p95_over_approximate_p95={ratio:.6}");
 }
 
 fn join_ids(ids: &[u64]) -> String {
@@ -586,6 +652,30 @@ mod tests {
     }
 
     #[test]
+    fn clustered_corpus_separates_within_cluster_from_between_cluster_similarity() {
+        let config = Config {
+            source_sha: "0123456789abcdef0123456789abcdef01234567".into(),
+            size: 32,
+            clusters: 8,
+            cluster_noise_bits: 1_024,
+            queries: 20,
+            rounds: 1,
+            top_k: 5,
+            noise_bits: 128,
+            seed: 42,
+            candidate_multiplier: 4,
+            fallback_on_empty: true,
+            lsh_bands: 32,
+            lsh_rows: 8,
+        };
+        let anchor = corpus_vector(&config, 0);
+        let same_cluster = corpus_vector(&config, 8);
+        let different_cluster = corpus_vector(&config, 1);
+        assert!(anchor.similarity(&same_cluster) > 0.80);
+        assert!(anchor.similarity(&different_cluster) < 0.65);
+    }
+
+    #[test]
     fn synthetic_query_workload_replays_for_the_same_seed() {
         let config = Config {
             source_sha: "0123456789abcdef0123456789abcdef01234567".into(),
@@ -616,5 +706,7 @@ mod tests {
             assert_eq!(left.kind, right.kind);
             assert_eq!(left.vector, right.vector);
         }
+        assert_eq!(left.iter().filter(|query| query.kind == "novel").count(), 4);
+        assert_eq!(left.iter().filter(|query| query.kind == "near_neighbor").count(), 16);
     }
 }
