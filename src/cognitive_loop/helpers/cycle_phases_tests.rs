@@ -243,6 +243,23 @@ fn test_urgency_consecutive_low_error_resets_on_high_error() {
 }
 
 #[test]
+fn public_cycle_result_marks_first_cycle_prediction_error_invalid() {
+    let mut service =
+        CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
+
+    let result = service.cycle("first cycle has no prior prediction");
+
+    assert!(
+        !result.prediction_error_valid,
+        "a cycle without a prior prediction must not expose its fallback estimate as observed PE"
+    );
+    assert!(
+        result.prediction_error.is_finite(),
+        "the neutral estimate must remain finite for telemetry consumers"
+    );
+}
+
+#[test]
 fn invalid_prediction_comparison_does_not_create_a_replay_experience() {
     let mut service =
         CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
