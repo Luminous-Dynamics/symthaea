@@ -639,10 +639,16 @@ mod tests {
             just_short.extend(clean_escalations(89, index * 89, group));
         }
         let failed = certify_harm_rate_v1(&config(&group_ids), &just_short).unwrap();
-        assert_eq!(failed.status, RiskCertificateStatusV1::NotCertifiedRiskBound);
-        assert!(failed.groups.iter().all(|group| {
-            group.one_sided_upper_bound.unwrap() > 0.05
-        }));
+        assert_eq!(
+            failed.status,
+            RiskCertificateStatusV1::NotCertifiedRiskBound
+        );
+        assert!(
+            failed
+                .groups
+                .iter()
+                .all(|group| { group.one_sided_upper_bound.unwrap() > 0.05 })
+        );
 
         let mut enough = Vec::new();
         for (index, group) in group_ids.iter().enumerate() {
@@ -651,9 +657,12 @@ mod tests {
         let passed = certify_harm_rate_v1(&config(&group_ids), &enough).unwrap();
         assert_eq!(passed.status, RiskCertificateStatusV1::Certified);
         assert_eq!(passed.hypothesis_count, 5);
-        assert!(passed.groups.iter().all(|group| {
-            group.one_sided_upper_bound.unwrap() <= 0.05
-        }));
+        assert!(
+            passed
+                .groups
+                .iter()
+                .all(|group| { group.one_sided_upper_bound.unwrap() <= 0.05 })
+        );
     }
 
     #[test]
