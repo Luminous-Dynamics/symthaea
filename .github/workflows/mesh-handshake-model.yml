@@ -109,10 +109,11 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
           {
             printf 'git_head=%s\n' "$(git rev-parse HEAD)"
             printf 'working_tree_status_sha256=%s\n' "$(git status --porcelain | sha256sum | cut -d' ' -f1)"
-            sha256sum "$MODEL" docs/security/models/mesh_handshake_*.cfg
+            sha256sum "$MODEL" docs/security/models/mesh_handshake_*.cfg docs/security/MESH_HANDSHAKE_LIFECYCLE_ASSURANCE.md
           } > "$EVIDENCE_DIR/run-manifest.txt"
 
       - name: Upload model-check evidence
