@@ -1038,18 +1038,20 @@ mod tests {
             .find(|line| line.starts_with("RESULT\\tmatched\\tall_full\\t"))
             .expect("full baseline row should remain visible");
         let fields: Vec<&str> = full_row.split('\\t').collect();
-        assert_eq!(fields[16], "35000");
-        assert_eq!(fields[20], "true");
-        assert_eq!(fields[22], "2");
-        assert_eq!(fields[23], "false");
+        assert_eq!(fields[17], "35000");
+        assert_eq!(fields[21], "true");
+        assert_eq!(fields[23], "2");
+        assert_eq!(fields[24], "false");
         let router_row = report
             .lines()
             .find(|line| line.starts_with("RESULT\\tmatched\\tvalue_router\\t"))
             .expect("router row should remain visible");
         let router_fields: Vec<&str> = router_row.split('\\t').collect();
-        assert_eq!(router_fields[16], "15000");
-        assert_eq!(router_fields[20], "false");
-        assert_eq!(router_fields[23], "true");
+        assert_eq!(router_fields[17], "15000");
+        assert_eq!(router_fields[21], "false");
+        assert_eq!(router_fields[24], "true");
+        assert_eq!(router_fields[10], "0");
+        assert_eq!(router_fields[11], "1");
     }
 
     #[test]
