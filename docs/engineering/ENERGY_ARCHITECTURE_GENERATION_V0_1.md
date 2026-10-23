@@ -103,9 +103,11 @@ This is a bounded sizing sweep, not an unbounded architecture invention agent, n
 Example commands:
 
 ```sh
-# Export the full 36-point bounded search manifest with rejection records.
+# Export the full 36-point bounded search manifest and materialize all exact
+# candidate documents from the same in-memory search result.
 cargo run -p symthaea-engineering --bin energy_architecture_candidates -- \
-  --design-space --output /tmp/energy-design-space.json
+  --design-space --candidate-output-dir /tmp/energy-candidates \
+  --output /tmp/energy-design-space.json
 
 # Export one sizing variant as the exact candidate object consumed downstream.
 cargo run -p symthaea-engineering --bin energy_architecture_candidates -- \
