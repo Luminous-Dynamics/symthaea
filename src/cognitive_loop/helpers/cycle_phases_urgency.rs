@@ -227,10 +227,10 @@ impl CognitiveLoopService {
         // space), not a genuine model failure. This prevents the "high consciousness but
         // stuck in Critical" trap observed in watch telemetry.
         let consciousness_level = self.carryover.history.consciousness_level;
-        let error_urgency = if self.carryover.urgency.consecutive_low_coherence
+        let forced_critical_by_low_coherence = self.carryover.urgency.consecutive_low_coherence
             > super::super::thresholds::LOW_COHERENCE_EXPLORATION_THRESHOLD
-            && consciousness_level < 0.5
-        {
+            && consciousness_level < 0.5;
+        let error_urgency = if forced_critical_by_low_coherence {
             self.adjust_exploration(
                 "sustained_low_coherence",
                 super::super::thresholds::LOW_COHERENCE_EXPLORATION_BOOST,
@@ -240,20 +240,26 @@ impl CognitiveLoopService {
             error_urgency
         };
 
-        // Compose CognitiveDepth with error-based urgency:
-        // Reflex → cap at Cruise (skip heavy subsystems for familiar inputs)
-        // DeepThought → floor at Normal (force full processing for novel/high-stakes)
-        // Cortical → use error-based urgency as-is
-        let raw_urgency = match self.cognitive_depth {
-            super::super::CognitiveDepth::Reflex => match error_urgency {
-                super::super::CycleUrgency::Critical => super::super::CycleUrgency::Normal,
-                _ => super::super::CycleUrgency::Cruise,
-            },
-            super::super::CognitiveDepth::DeepThought => match error_urgency {
-                super::super::CycleUrgency::Cruise => super::super::CycleUrgency::Normal,
-                _ => error_urgency,
-            },
-            super::super::CognitiveDepth::Cortical => error_urgency,
+        // Compose CognitiveDepth with error-based urgency. Without valid PE
+        // and without an independent surprise or coherence emergency, hold the
+        // current mode instead of reinterpreting the sentinel through depth caps.
+        let raw_urgency = if !prediction_error_valid
+            && !surprise_triggered
+            && !forced_critical_by_low_coherence
+        {
+            self.carryover.urgency.urgency
+        } else {
+            match self.cognitive_depth {
+                super::super::CognitiveDepth::Reflex => match error_urgency {
+                    super::super::CycleUrgency::Critical => super::super::CycleUrgency::Normal,
+                    _ => super::super::CycleUrgency::Cruise,
+                },
+                super::super::CognitiveDepth::DeepThought => match error_urgency {
+                    super::super::CycleUrgency::Cruise => super::super::CycleUrgency::Normal,
+                    _ => error_urgency,
+                },
+                super::super::CognitiveDepth::Cortical => error_urgency,
+            }
         };
 
         // ── Phase 17: Cross-temporal error pattern learning ──────────────
