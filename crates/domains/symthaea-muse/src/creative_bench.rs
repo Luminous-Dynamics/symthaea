@@ -225,15 +225,22 @@ pub fn emotional_alignment(composition: &Composition, target: ValenceArousal) ->
 
 // ─── Form Compliance ─────────────────────────────────────────────────────────
 
-/// Evaluate structural form compliance.
+/// Estimate coarse temporal activity contrast.
 ///
-/// Checks whether the composition has meaningful section structure by
-/// measuring note density variation across the piece. A well-structured
-/// piece has distinct high-density (chorus/climax) and low-density (intro/outro) regions.
+/// Despite the legacy API name, this is not a formal-form validator: the input
+/// Composition has no section-boundary/plan evidence to compare against. A high
+/// value only indicates contrast in note activity, velocity, or register across
+/// equal-duration windows; it does not establish a valid or satisfying form.
 ///
-/// Score: 0.0 (uniform density = no structure) to 1.0 (clear high/low contrast).
+/// Empty windows count as zero in the density profile, but are omitted from
+/// pitch and velocity means. Absence is not a 0 Hz pitch or a zero-velocity
+/// performance. The occupancy factor also prevents a sparse one-window burst
+/// followed by silence from receiving a perfect score.
 pub fn form_compliance(composition: &Composition) -> f32 {
-    if composition.notes.is_empty() || composition.duration_secs < 0.5 {
+    if composition.notes.is_empty()
+        || !composition.duration_secs.is_finite()
+        || composition.duration_secs < 0.5
+    {
         return 0.0;
     }
 
@@ -243,6 +250,7 @@ pub fn form_compliance(composition: &Composition) -> f32 {
     let mut densities = Vec::with_capacity(n_windows);
     let mut mean_velocities = Vec::with_capacity(n_windows);
     let mut mean_pitches = Vec::with_capacity(n_windows);
+    let mut active_windows = 0usize;
 
     for w in 0..n_windows {
         let t_start = w as f32 * window_dur;
@@ -253,40 +261,55 @@ pub fn form_compliance(composition: &Composition) -> f32 {
             .filter(|n| n.start_time >= t_start && n.start_time < t_end)
             .collect();
 
+        if window_notes.is_empty() {
+            // Keep silence visible to temporal-density analysis without
+            // contaminating pitch/velocity statistics with sentinel zeros.
+            densities.push(0.0);
+            continue;
+        }
+
+        active_windows += 1;
         densities.push(window_notes.len() as f32 / window_dur);
 
-        if window_notes.is_empty() {
-            mean_velocities.push(0.0);
-            mean_pitches.push(0.0);
-        } else {
-            let n = window_notes.len() as f32;
-            mean_velocities.push(window_notes.iter().map(|n| n.velocity).sum::<f32>() / n);
-            mean_pitches.push(window_notes.iter().map(|n| n.frequency).sum::<f32>() / n);
-        }
+        let n = window_notes.len() as f32;
+        mean_velocities.push(window_notes.iter().map(|n| n.velocity).sum::<f32>() / n);
+        mean_pitches.push(window_notes.iter().map(|n| n.frequency).sum::<f32>() / n);
     }
 
-    // Coefficient of variation for each dimension
+    // One active window cannot establish temporal contrast. In particular, a
+    // chord burst followed by silence is not evidence of musical form.
+    if active_windows < 2 {
+        return 0.0;
+    }
+
+    // Coefficient of variation for each observed dimension. Empty windows are
+    // represented in the density profile only; missing pitch/velocity
+    // observations remain missing instead of masquerading as valid zeros.
     let cv = |values: &[f32]| -> f32 {
+        if values.is_empty() {
+            return 0.0;
+        }
         let n = values.len() as f32;
         let mean = values.iter().sum::<f32>() / n;
-        if mean < 0.001 {
+        if mean.abs() < 0.001 {
             return 0.0;
         }
         let var = values.iter().map(|&v| (v - mean).powi(2)).sum::<f32>() / n;
-        (var.sqrt() / mean).min(1.0)
+        (var.sqrt() / mean.abs()).min(1.0)
     };
 
     let density_cv = cv(&densities);
     let velocity_cv = cv(&mean_velocities);
     let pitch_cv = cv(&mean_pitches);
 
-    // Combine: any dimension showing variation counts as form.
-    // Velocity and pitch variation matter more for sparse melodies where
-    // density can't show contrast (7 notes / 4 windows ≈ uniform).
+    // Contrast is still only a diagnostic proxy. Occupancy discounts sparse
+    // artifacts and makes it impossible for an empty-window sentinel effect
+    // to saturate the score at 1.0.
     let combined = (density_cv * 0.4 + velocity_cv * 0.35 + pitch_cv * 0.25).clamp(0.0, 1.0);
+    let contrast = (combined / 0.5).clamp(0.0, 1.0);
+    let occupancy = active_windows as f32 / n_windows as f32;
 
-    // Scale: CV > 0.1 starts scoring, CV > 0.5 = full marks
-    (combined / 0.5).clamp(0.0, 1.0)
+    (contrast * occupancy).clamp(0.0, 1.0)
 }
 
 // ─── Harmony Diversity ────────────────────────────────────────────────────────
@@ -981,6 +1004,16 @@ mod tests {
 
     // ─── Form compliance ──────────────────────────────────────────────────────
 
+    fn synthetic_composition(notes: Vec<Note>, duration_secs: f32) -> Composition {
+        Composition {
+            audio: crate::AudioData::F32(Vec::new()),
+            sample_rate: 44_100,
+            notes,
+            duration_secs,
+            section: crate::structure::SectionType::Developmental,
+        }
+    }
+
     #[test]
     fn form_compliance_structured() {
         let config = MuseConfig {
@@ -995,6 +1028,47 @@ mod tests {
         let comp = crate::compose(&config, &state, 42);
         let score = form_compliance(&comp);
         assert!(score >= 0.0 && score <= 1.0);
+    }
+
+    #[test]
+    fn form_compliance_does_not_maximize_on_an_empty_window() {
+        // Three equally active windows followed by silence used to receive
+        // 1.0 because the missing pitch and velocity values were encoded as
+        // valid zeros, inflating all three coefficients of variation.
+        let notes = (0..12)
+            .map(|i| {
+                let window = i / 4;
+                let slot = i % 4;
+                Note {
+                    frequency: 440.0,
+                    start_time: window as f32 + 0.1 + slot as f32 * 0.2,
+                    duration: 0.15,
+                    velocity: 0.8,
+                }
+            })
+            .collect();
+        let composition = synthetic_composition(notes, 4.0);
+
+        let score = form_compliance(&composition);
+        assert!(
+            score < 0.75,
+            "an empty window must not saturate the activity-contrast proxy: {score}"
+        );
+    }
+
+    #[test]
+    fn form_compliance_rejects_single_window_burst_as_form_evidence() {
+        let notes = (0..16)
+            .map(|i| Note {
+                frequency: 440.0,
+                start_time: 0.05 + i as f32 * 0.05,
+                duration: 0.1,
+                velocity: 0.8,
+            })
+            .collect();
+        let composition = synthetic_composition(notes, 4.0);
+
+        assert_eq!(form_compliance(&composition), 0.0);
     }
 
     // ─── Harmony diversity ────────────────────────────────────────────────────

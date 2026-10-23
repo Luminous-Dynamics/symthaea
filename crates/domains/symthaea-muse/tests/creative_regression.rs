@@ -51,9 +51,13 @@
 //!   one of only two gates that catch the drone.
 //! - **Inverted.** `melodic_coherence` is maximized by a single repeated pitch (see
 //!   the retraction above). Still gated by a one-sided floor. NOT fixed.
-//! - **Saturated.** `form_compliance` returns exactly 1.000 for *any* composition
-//!   with an empty analysis window — a structural guarantee, and the reason it reads
-//!   1.000 here. NOT fixed.
+//! - **Partially mitigated in candidate PR #8501.** `form_compliance` used to
+//!   inject zero pitch/velocity sentinels for empty windows, which could saturate the
+//!   score. The candidate fix removes those sentinels, applies an active-window
+//!   occupancy factor, and rejects a single-window burst. This only addresses that
+//!   failure mode: the legacy API is still a coarse activity-contrast proxy, not a
+//!   formal-form validator, and the formula is not human-calibrated.
+//! 
 //! - **Tautological.** `emotional_alignment` has no causal channel from the target
 //!   valence/arousal to the composition in the gated path. NOT fixed.
 //! - **Inherited.** The `composite` still adds `+0.25 × onset_evenness` under a
@@ -412,8 +416,7 @@ fn degenerate_drone_outscores_real_output_this_is_the_defect() {
     );
     assert!(
         s.form_compliance < BASELINE_FORM_COMPLIANCE - TOLERANCE,
-        "drone form_compliance {:.4} now passes — note this metric catches the \
-         drone by luck, not design (it returns 1.000 for any empty window).",
+        "drone form_compliance {:.4} now passes. This is only a coarse activity-contrast regression; it does not establish correct formal structure.",
         s.form_compliance,
     );
 
