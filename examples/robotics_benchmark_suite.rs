@@ -17,6 +17,8 @@
 
 #![allow(clippy::needless_late_init)]
 
+use std::time::Instant;
+
 /// Per-platform benchmark result.
 #[derive(Debug, Clone, Default)]
 struct PlatformResult {
@@ -39,7 +41,7 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
-    let results: Vec<PlatformResult> = Vec::new();
+    let mut results: Vec<PlatformResult> = Vec::new();
 
     // ──────────────────────────────────────────────────────────────
     // Manipulator (7 joints, industrial arm)
