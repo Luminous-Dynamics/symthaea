@@ -783,6 +783,7 @@ mod tests {
 
         non_finite.trial_id = 2;
         non_finite.input_digest = [3; 32];
+        non_finite.domain_assessment_input_digest = [3; 32];
         non_finite.predicted_mean_benefit = 100.0;
         non_finite.predicted_scale = 0.0;
         let decision = policy.decide(non_finite).unwrap();
