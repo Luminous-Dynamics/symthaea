@@ -33,10 +33,10 @@ fn expected_brier_reduction(action: CandidateAction) -> f64 {
         .copied()
         .zip(action.outcomes)
     {
+        let weight_squared = u128::from(weight) * u128::from(weight);
         *group_weights.entry(outcome).or_default() += weight;
-        *group_square_sums.entry(outcome).or_default() +=
-            u128::from(weight) * u128::from(weight);
-        prior_square_sum += u128::from(weight) * u128::from(weight);
+        *group_square_sums.entry(outcome).or_default() += weight_squared;
+        prior_square_sum += weight_squared;
     }
 
     let total = f64::from(total_weight as u32);
