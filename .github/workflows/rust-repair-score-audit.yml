@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "src/bin/rust_repair_score_audit.rs"
+      - "src/bin/rust_repair_ablation_audit.rs"
       - "tools/rust-repair-benchmark-harness/**"
       - "src/bin/rust_repair_manifest.rs"
       - "Cargo.toml"
@@ -55,14 +56,17 @@ jobs:
         with:
           components: clippy, rustfmt
       - name: Check Rust formatting
-        run: rustfmt --edition 2024 --check src/bin/rust_repair_manifest.rs src/bin/rust_repair_score_audit.rs
+        run: rustfmt --edition 2024 --check src/bin/rust_repair_manifest.rs src/bin/rust_repair_score_audit.rs src/bin/rust_repair_ablation_audit.rs
       - name: Verify committed standalone lockfile
         run: test -s tools/rust-repair-benchmark-harness/Cargo.lock
       - name: Test task-manifest auditor
         run: cargo test --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-manifest
       - name: Test scored-run auditor
         run: cargo test --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-score-audit
+      - name: Test paired ablation auditor
+        run: cargo test --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-ablation-audit
       - name: Run strict Clippy on audit binaries
         run: |
           cargo clippy --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-manifest -- -D warnings
           cargo clippy --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-score-audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/rust-repair-benchmark-harness/Cargo.toml --bin rust-repair-ablation-audit -- -D warnings
