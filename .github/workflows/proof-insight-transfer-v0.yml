@@ -568,6 +568,41 @@ jobs:
           print("PITB_PROOF_STATE_EXECUTION_SCHEMA_PASS: valid executed row accepted; 4 contradictory/incomplete execution controls rejected")
           print(f"PITB_PROOF_STATE_OUTCOME_CONTRACT_PASS: {count} explicitly not_run state rows; {len(mutants)}/{len(mutants)} negative controls rejected")
           PY
+      - name: Analyze paired proof-state outcomes with the Rust scorekeeper
+        shell: bash
+        run: |
+          set -euo pipefail
+          suite="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/proof-state-intervention-suite.synthetic.json"
+          outcomes="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/proof-state-intervention-outcomes.synthetic.json"
+          report_schema="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/proof-state-intervention-analysis-report.schema.json"
+          report="$RUNNER_TEMP/pitb-proof-state-intervention-report.json"
+
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --locked --bin analyze_proof_state_intervention -- "$suite" "$outcomes" test "$report" 1000 17
+
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$report" "$report_schema" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          report_path, schema_path = map(Path, sys.argv[1:])
+          report = json.loads(report_path.read_text())
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema, format_checker=FormatChecker()).validate(report)
+
+          assert report["dataset_kind"] == "synthetic_fixture"
+          assert report["split"] == "test"
+          assert report["counts"]["cases_in_split"] == 4
+          assert report["counts"]["rows_in_split"] == 8
+          assert report["counts"]["executed_rows_in_split"] == 0
+          assert report["counts"]["not_run_rows_in_split"] == 8
+          assert report["metrics"] == {}, "synthetic fixtures must not generate model performance metrics"
+          assert report["confirmatory_decision"] == "not_evaluated_synthetic_fixture"
+          assert report["resource_usage"]["paired_rows_with_executed_usage"] == 0
+          print("PITB_PROOF_STATE_ANALYZER_PASS: 4 synthetic pairs/8 not_run rows; no model metrics emitted")
+          PY
       - name: Validate insight schema and synthetic positive/negative controls
         shell: bash
         run: |
