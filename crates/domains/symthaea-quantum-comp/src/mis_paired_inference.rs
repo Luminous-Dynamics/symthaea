@@ -137,6 +137,8 @@ pub enum MisInferenceError {
     NonFiniteClusterObservation { cluster_index: usize, observation_index: usize },
     /// Cluster bootstrap requires a positive replicate count.
     ZeroBootstrapReplicates,
+    /// A p-value is NaN, infinite, below zero, or greater than one at the indicated index.
+    InvalidPValue { index: usize },
 }
 
 impl fmt::Display for MisInferenceError {
@@ -157,6 +159,7 @@ impl fmt::Display for MisInferenceError {
             Self::EmptyCluster { cluster_index } => write!(f, "cluster {cluster_index} has no paired observations"),
             Self::NonFiniteClusterObservation { cluster_index, observation_index } => write!(f, "cluster {cluster_index} observation {observation_index} is not finite"),
             Self::ZeroBootstrapReplicates => write!(f, "cluster bootstrap replicate count must be positive"),
+            Self::InvalidPValue { index } => write!(f, "p-value at index {index} must be finite and in [0, 1]"),
         }
     }
 }
@@ -341,6 +344,36 @@ pub fn median_order_statistic_interval(
         order_statistic_k: k,
         achieved_coverage,
     })
+}
+
+/// Apply the Holm-Bonferroni step-down family-wise-error correction.
+///
+/// Input p-values must already come from valid, predeclared tests. The returned vector
+/// is in the same order as the input and contains adjusted p-values in [0, 1]. Empty
+/// input returns an empty vector. Ties are resolved stably by input index for
+/// deterministic output. Holm's procedure controls family-wise error under arbitrary
+/// dependence provided the underlying individual p-values are valid; it does not fix
+/// post-hoc selection of the comparison family or invalid/exchangeability-violating tests.
+pub fn holm_bonferroni_adjust(p_values: &[f64]) -> Result<Vec<f64>, MisInferenceError> {
+    for (index, p_value) in p_values.iter().enumerate() {
+        if !p_value.is_finite() || !(0.0..=1.0).contains(p_value) {
+            return Err(MisInferenceError::InvalidPValue { index });
+        }
+    }
+    let mut ordered: Vec<(usize, f64)> = p_values.iter().copied().enumerate().collect();
+    ordered.sort_by(|left, right| {
+        left.1.total_cmp(&right.1).then_with(|| left.0.cmp(&right.0))
+    });
+
+    let mut adjusted = vec![0.0_f64; p_values.len()];
+    let mut running_max: f64 = 0.0;
+    let family_size = p_values.len() as f64;
+    for (rank, (original_index, p_value)) in ordered.into_iter().enumerate() {
+        let step_adjusted = ((family_size - rank as f64) * p_value).min(1.0);
+        running_max = running_max.max(step_adjusted);
+        adjusted[original_index] = running_max;
+    }
+    Ok(adjusted)
 }
 
 /// Compute an equal-cluster-weighted mean without summing unscaled extreme values.
@@ -556,6 +589,32 @@ mod tests {
             median_order_statistic_interval(&[1.0, f64::INFINITY], 0.95),
             Err(MisInferenceError::NonFiniteObservation { index: 1 })
         );
+    }
+
+    #[test]
+    fn holm_bonferroni_matches_hand_computed_family_and_preserves_input_order() {
+        let adjusted = holm_bonferroni_adjust(&[0.04, 0.01, 0.03, 1.0]).unwrap();
+        assert_eq!(adjusted, vec![0.09, 0.04, 0.09, 1.0]);
+        assert_eq!(holm_bonferroni_adjust(&[]).unwrap(), Vec::<f64>::new());
+
+        let ties = holm_bonferroni_adjust(&[0.01, 0.01, 0.04]).unwrap();
+        assert_eq!(ties, vec![0.03, 0.03, 0.04]);
+    }
+
+    #[test]
+    fn holm_bonferroni_rejects_invalid_p_values_and_keeps_monotone_sorted_adjustments() {
+        for bad in [-0.01, 1.01, f64::NAN, f64::INFINITY] {
+            assert_eq!(
+                holm_bonferroni_adjust(&[0.05, bad, 0.2]),
+                Err(MisInferenceError::InvalidPValue { index: 1 })
+            );
+        }
+        let raw = [0.2, 0.001, 0.05, 0.03, 0.8];
+        let adjusted = holm_bonferroni_adjust(&raw).unwrap();
+        assert!(adjusted.iter().all(|p| (0.0..=1.0).contains(p)));
+        let mut pairs: Vec<(f64, f64)> = raw.iter().copied().zip(adjusted.iter().copied()).collect();
+        pairs.sort_by(|a, b| a.0.total_cmp(&b.0));
+        assert!(pairs.windows(2).all(|window| window[0].1 <= window[1].1));
     }
 
     #[test]
