@@ -494,8 +494,6 @@ fn add_cost(total: &mut u64, increment: u64) -> bool {
 
 #[derive(Debug, Clone)]
 struct OracleItem {
-    trace_id: String,
-    group_id: String,
     utility_gain: f64,
     latency_us: u64,
     energy_uj: u64,
@@ -601,8 +599,6 @@ fn compute_hindsight_oracle(
         if delta > 0.0 {
             let group_size = *group_counts.get(&observation.group_id)? as f64;
             items.push(OracleItem {
-                trace_id: trace_id.clone(),
-                group_id: observation.group_id.clone(),
                 utility_gain: delta / (group_count * group_size),
                 latency_us: outcome.actual_latency_us,
                 energy_uj: outcome.actual_energy_uj,
@@ -765,6 +761,36 @@ fn score(
         metrics.insert(run_key.clone(), m);
     }
 
+    // The hindsight oracle reads paired outcomes only after all action rows exist.
+    // Its own allocation overhead is zero by definition: it is a non-deployable
+    // perfect-foresight reference, not a policy eligible for the leaderboard.
+    let mut comparison_budgets: BTreeMap<String, (u64, u64)> = BTreeMap::new();
+    for action in actions {
+        comparison_budgets
+            .entry(action.comparison_id.clone())
+            .or_insert((action.latency_budget_us, action.energy_budget_uj));
+    }
+    let mut oracle_by_comparison: BTreeMap<String, Option<OracleMetrics>> = BTreeMap::new();
+    for (comparison, (latency_budget, energy_budget)) in &comparison_budgets {
+        oracle_by_comparison.insert(
+            comparison.clone(),
+            compute_hindsight_oracle(
+                observations,
+                outcomes,
+                *latency_budget,
+                *energy_budget,
+            ),
+        );
+    }
+    for (run_key, metric) in metrics.iter_mut() {
+        if metric.valid_budget_run {
+            if let Some(Some(oracle)) = oracle_by_comparison.get(&run_key.0) {
+                metric.utility_gap_to_oracle =
+                    Some(oracle.group_balanced_utility - metric.group_balanced_utility);
+            }
+        }
+    }
+
     // Snapshot baseline metrics first to avoid aliasing the policy-result map.
     let mut cheap_baselines: BTreeMap<String, PolicyMetrics> = BTreeMap::new();
     for ((comparison, policy), value) in &metrics {
@@ -786,10 +812,10 @@ fn score(
     report.push_str("META\tformat\tVIS-DVPC-006-post-commit-v1\n");
     report.push_str("META\tclaim_class\tpost_commit_trace_scoring_not_allocator_quality_or_sota\n");
     report.push_str("META\tunit_rule\tlatency_us_and_energy_uj_reported_separately\n");
-    report.push_str("RESULT_HEADER\tcomparison_id\tpolicy_id\trecords\tgroups\tmean_utility\tgroup_balanced_utility\tbeneficial_escalations\tharmful_escalations\tneutral_escalations\tmissed_beneficial_opportunities\tcheap_safety_violations\tchosen_safety_violations\tcvar95_incremental_loss\tallocator_latency_us\tallocator_energy_uj\ttotal_incremental_latency_us\ttotal_incremental_energy_uj\tlatency_budget_us\tenergy_budget_uj\tlatency_budget_violation\tenergy_budget_violation\treservation_overruns\tvalid_budget_run\tutility_delta_vs_all_cheap\tcvar95_delta_vs_all_cheap\tsafety_delta_vs_all_cheap\n");
+    report.push_str("RESULT_HEADER\tcomparison_id\tpolicy_id\trecords\tgroups\tmean_utility\tgroup_balanced_utility\tbeneficial_escalations\tharmful_escalations\tneutral_escalations\tmissed_beneficial_opportunities\tcheap_safety_violations\tchosen_safety_violations\tcvar95_incremental_loss\tallocator_latency_us\tallocator_energy_uj\ttotal_incremental_latency_us\ttotal_incremental_energy_uj\tlatency_budget_us\tenergy_budget_uj\tlatency_budget_violation\tenergy_budget_violation\treservation_overruns\tvalid_budget_run\tutility_delta_vs_all_cheap\tcvar95_delta_vs_all_cheap\tsafety_delta_vs_all_cheap\tutility_gap_to_oracle\n");
     for ((comparison, policy), m) in &metrics {
         report.push_str(&format!(
-            "RESULT\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "RESULT\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             comparison, policy, m.records, m.groups, m.chosen_utility_mean, m.group_balanced_utility,
             m.beneficial_escalations, m.harmful_escalations, m.neutral_escalations,
             m.missed_beneficial_opportunities, m.cheap_safety_violations, m.chosen_safety_violations,
@@ -798,10 +824,32 @@ fn score(
             m.energy_budget_uj, m.latency_budget_violation, m.energy_budget_violation,
             m.reservation_overruns, m.valid_budget_run,
             fmt_opt(m.utility_delta_vs_all_cheap), fmt_opt(m.cvar95_delta_vs_all_cheap),
-            fmt_opt_i64(m.safety_delta_vs_all_cheap)
+            fmt_opt_i64(m.safety_delta_vs_all_cheap),
+            fmt_opt(m.utility_gap_to_oracle)
         ));
     }
-    report.push_str("META\toracle\tNOT_COMPUTED_IN_V1\n");
+    report.push_str("META\toracle\tpost_commit_two_resource_pareto_frontier\n");
+    report.push_str("META\toracle_allocator_overhead\tzero; perfect-foresight upper bound; not deployable\n");
+    report.push_str("META\toracle_frontier_cap\t50000; exceeded means NOT_COMPUTED_FRONTIER_CAP\n");
+    report.push_str("ORACLE_HEADER\tcomparison_id\tstatus\tgroup_balanced_utility\tescalations\tincremental_latency_us\tincremental_energy_uj\tlatency_budget_us\tenergy_budget_uj\n");
+    for (comparison, (latency_budget, energy_budget)) in &comparison_budgets {
+        match oracle_by_comparison.get(comparison).and_then(|value| value.as_ref()) {
+            Some(oracle) => report.push_str(&format!(
+                "ORACLE\t{}\tEXACT_TWO_RESOURCE\t{:.6}\t{}\t{}\t{}\t{}\t{}\n",
+                comparison,
+                oracle.group_balanced_utility,
+                oracle.escalations,
+                oracle.latency_us,
+                oracle.energy_uj,
+                latency_budget,
+                energy_budget
+            )),
+            None => report.push_str(&format!(
+                "ORACLE\t{}\tNOT_COMPUTED_FRONTIER_CAP\tNA\tNA\tNA\tNA\t{}\t{}\n",
+                comparison, latency_budget, energy_budget
+            )),
+        }
+    }
     Ok(report)
 }
 
@@ -870,7 +918,7 @@ mod tests {
         let report = score(&observations, &outcomes, &actions).unwrap();
         assert!(report.contains("RESULT\\tmatched\\tall_cheap\\t3\\t2\\t0.333333\\t0.375000"));
         assert!(report.contains("RESULT\\tmatched\\tvalue_router\\t3\\t2\\t0.383333\\t0.412500"));
-        assert!(report.contains("META\\toracle\\tNOT_COMPUTED_IN_V1"));
+        assert!(report.contains("ORACLE\\tmatched\\tEXACT_TWO_RESOURCE\\t0.437500\\t2\\t20000\\t800\\t25000\\t2500"));
         let full_row = report
             .lines()
             .find(|line| line.starts_with("RESULT\\tmatched\\tall_full\\t"))
