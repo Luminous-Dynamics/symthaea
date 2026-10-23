@@ -358,6 +358,10 @@ mod tests {
         let curve = risk_coverage_curve(&observations).unwrap();
         assert_eq!(curve.len(), 4);
         assert_eq!(curve[0].accepted_count, 0);
+        assert_eq!(curve[0].accepted_label_completeness, None);
+        assert_eq!(curve[0].observed_label_risk, None);
+        assert_eq!(curve[0].optimistic_risk, None);
+        assert_eq!(curve[0].pessimistic_risk, None);
         assert_eq!(curve[1].threshold, Some(0.8));
         assert_eq!(curve[1].accepted_count, 2);
         assert_eq!(curve[2].threshold, Some(0.6));
@@ -452,6 +456,9 @@ mod tests {
         assert_eq!(report.points[0].status, ThresholdCertificationStatus::Certified);
         assert_eq!(report.points[1].status, ThresholdCertificationStatus::UnknownAcceptedLabels);
         assert_eq!(report.points[2].status, ThresholdCertificationStatus::NotTestedAfterStop);
+        assert_eq!(report.points[2].accepted_count, 3);
+        assert_eq!(report.points[2].labelled_accepted_count, 2);
+        assert_eq!(report.points[2].unknown_accepted_count, 1);
     }
 
     #[test]
