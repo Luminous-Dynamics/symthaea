@@ -27,7 +27,7 @@ If validation evidence is missing or malformed for any candidate, the program wr
 
 ## Pinned runtime evidence overlay (required before validation)
 
-The current upstream validator discards command exit codes, ignores the boolean returns from `apply_patch`, writes only an aggregate of the three gold logs, and does not preserve each run's resolved Docker image ID. PR #850x includes a patch against exactly SWE-bench-Live commit `62d02936a0726fbf4597b05bd07b09fb99eddae6`:
+The current upstream validator discards command exit codes, ignores the boolean returns from `apply_patch`, writes only an aggregate of the three gold logs, and does not preserve each run's resolved Docker image ID. PR #8513 includes a patch against exactly SWE-bench-Live commit `62d02936a0726fbf4597b05bd07b09fb99eddae6`:
 
 `docs/research/patches/swe-bench-live-validation-evidence.patch`
 
