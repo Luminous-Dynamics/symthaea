@@ -44,9 +44,13 @@ pub struct Cli {
     #[arg(long, global = true, default_value = "human")]
     pub format: OutputFormat,
 
-    /// Override the consciousness level (Φ) for this session.
-    /// Normally computed automatically.
-    #[arg(long, global = true)]
+    /// Compatibility confirmation level for command execution.
+    ///
+    /// This is an operator authorization/confirmation input, NOT a measured
+    /// consciousness value or IIT Phi. It is retained temporarily while the
+    /// legacy numeric executor gate is migrated to `AuthorityContext`.
+    /// `--phi` remains a deprecated compatibility alias.
+    #[arg(long = "confirm-level", alias = "phi", global = true)]
     pub phi: Option<f64>,
 
     /// Subcommand to execute.
@@ -207,10 +211,9 @@ pub enum Command {
     /// written -- this is a pure preview. `--staging <dir>` redirects the
     /// read/write target to a directory other than `/etc/nixos` (e.g. a
     /// scratch copy of your config), so you can try an edit without any
-    /// real-system risk at all. This is separate from the Phi-gated
-    /// command executor (`Rebuild`/`Rollback`/etc.) -- it never runs a
-    /// shell command, only produces validated, git-backed, atomic file
-    /// patches via `ConfigWriter`.
+    /// real-system risk at all. This is separate from command execution -- it
+    /// never runs a shell command, only produces validated, git-backed, atomic
+    /// file patches via `ConfigWriter`.
     Config {
         #[command(subcommand)]
         op: ConfigCommand,
@@ -369,6 +372,18 @@ mod tests {
     fn test_parse_dry_run_flag() {
         let cli = Cli::parse_from(["nixward", "--dry-run", "rebuild"]);
         assert!(cli.dry_run);
+    }
+
+    #[test]
+    fn test_confirmation_level_is_not_named_phi() {
+        let cli = Cli::parse_from(["nixward", "--confirm-level", "0.6", "rebuild"]);
+        assert_eq!(cli.phi, Some(0.6));
+    }
+
+    #[test]
+    fn test_legacy_phi_alias_remains_compatible() {
+        let cli = Cli::parse_from(["nixward", "--phi", "0.6", "rebuild"]);
+        assert_eq!(cli.phi, Some(0.6));
     }
 
     #[test]

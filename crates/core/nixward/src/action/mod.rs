@@ -1,13 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Φ-Gated Action Execution
+//! NixOS action execution.
 //!
-//! All NixOS actions are routed through the consciousness-gated executor.
-//! Sub-modules produce `NixOSCommand` values; the executor checks Φ
-//! thresholds, handles rollback, and records outcomes for episodic memory.
+//! Nixward separates **authority** from **cognitive telemetry**. Sub-modules
+//! produce `NixOSCommand` values; `execution_context` describes who/what may
+//! authorize an action and carries optional cognition metrics, while the legacy
+//! executor remains available during migration for rollback and outcome
+//! handling.
 
 pub mod config_writer;
+pub mod execution_context;
 pub mod executor;
 pub mod flake_ops;
 pub mod gc_manager;
@@ -17,6 +20,10 @@ pub mod plan_executor;
 pub mod service_manager;
 
 pub use config_writer::{ConfigPatch, ConfigWriter, WriteResult};
+pub use execution_context::{
+    AuthorityContext, AuthoritySource, CognitiveContext, ExecutionContext, PhiMeasurement,
+    EXECUTION_CONTEXT_SCHEMA_VERSION,
+};
 pub use executor::{
     ChannelOperation, ExecutionRecord, ExecutionResult, FlakeOperation, NixOSCommand,
     NixOSExecutor, SafetyLevel,
