@@ -421,16 +421,17 @@ impl CalibratedDecisionValueRouterV1 {
             gate
         };
 
-        let value_estimate = if gate == GateReasonV1::CalibratedInDomain {
-            Some(PreEscalationValueEstimateV1 {
-                estimator_id: input.estimator_id.clone(),
-                estimator_artifact_digest: input.estimator_artifact_digest,
-                loss_profile_id: self.profile.loss_profile_id.clone(),
-                source_input_digest: input.input_digest,
-                net_benefit_lower_bound: lower_bound.expect("gate guarantees a finite bound"),
-            })
-        } else {
-            None
+        let value_estimate = match (gate, lower_bound) {
+            (GateReasonV1::CalibratedInDomain, Some(bound)) => {
+                Some(PreEscalationValueEstimateV1 {
+                    estimator_id: input.estimator_id.clone(),
+                    estimator_artifact_digest: input.estimator_artifact_digest,
+                    loss_profile_id: self.profile.loss_profile_id.clone(),
+                    source_input_digest: input.input_digest,
+                    net_benefit_lower_bound: bound,
+                })
+            }
+            _ => None,
         };
 
         // Use the frozen profile's loss contract for fallback commits, even when
