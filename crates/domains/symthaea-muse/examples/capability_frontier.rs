@@ -97,14 +97,14 @@ struct StyleSeedSmoke {
     first_score_sha256: String,
     replay_score_sha256: String,
     symbolic_replay_matches: bool,
-    tempo_bpm: f32,
+    tempo_bpm: Option<f32>,
     meter_beats: u8,
     note_count: usize,
     melody_note_count: usize,
     harmony_note_count: usize,
     bass_note_count: usize,
     counter_melody_note_count: usize,
-    total_seconds: f64,
+    total_seconds: Option<f64>,
     universal_invariant_violations: Vec<&'static str>,
     outcome: &'static str,
 }
@@ -236,8 +236,8 @@ fn run() -> Result<(), String> {
             };
             let first = symthaea_music_theory::composer::compose_styled(&intent, style);
             let replay = symthaea_music_theory::composer::compose_styled(&intent, style);
-            let first_hash = sha256_json(&first)?;
-            let replay_hash = sha256_json(&replay)?;
+            let first_hash = score_sha256(&first);
+            let replay_hash = score_sha256(&replay);
             let replay_matches = first_hash == replay_hash;
             let violations = universal_invariant_violations(&first);
             let outcome = if first.notes.is_empty() {
@@ -262,14 +262,14 @@ fn run() -> Result<(), String> {
                 first_score_sha256: first_hash,
                 replay_score_sha256: replay_hash,
                 symbolic_replay_matches: replay_matches,
-                tempo_bpm: first.tempo_bpm,
+                tempo_bpm: first.tempo_bpm.is_finite().then_some(first.tempo_bpm),
                 meter_beats: first.meter,
                 note_count: first.notes.len(),
                 melody_note_count: first.voice(TheoryRole::Melody).len(),
                 harmony_note_count: first.voice(TheoryRole::Harmony).len(),
                 bass_note_count: first.voice(TheoryRole::Bass).len(),
                 counter_melody_note_count: first.voice(TheoryRole::CounterMelody).len(),
-                total_seconds: first.seconds(),
+                total_seconds: first.seconds().is_finite().then_some(first.seconds()),
                 universal_invariant_violations: violations,
                 outcome,
             });
@@ -436,6 +436,39 @@ fn universal_invariant_violations(score: &Score) -> Vec<&'static str> {
         violations.push("invalid_total_seconds");
     }
     violations
+}
+
+fn score_sha256(score: &Score) -> String {
+    // Hash field values directly so a malformed NaN/Inf emitted by the
+    // composer can still be diagnosed instead of making JSON serialization
+    // abort the whole report and hide later cells.
+    let mut hash = Sha256::new();
+    hash.update(b"melothaea.score-exact-fields.v1\0");
+    hash.update(score.tempo_bpm.to_bits().to_le_bytes());
+    hash.update([score.meter]);
+    hash.update(score.total_beats.num().to_le_bytes());
+    hash.update(score.total_beats.den().to_le_bytes());
+    let key_repr = format!("{:?}", score.key);
+    hash.update((key_repr.len() as u64).to_le_bytes());
+    hash.update(key_repr.as_bytes());
+    hash.update((score.notes.len() as u64).to_le_bytes());
+    for note in &score.notes {
+        hash.update(note.part.0.to_le_bytes());
+        hash.update([note.pitch.midi()]);
+        hash.update(note.onset.num().to_le_bytes());
+        hash.update(note.onset.den().to_le_bytes());
+        hash.update(note.duration.num().to_le_bytes());
+        hash.update(note.duration.den().to_le_bytes());
+        hash.update(note.velocity.to_bits().to_le_bytes());
+        hash.update(note.section_intensity.to_bits().to_le_bytes());
+        let role = format!("{:?}", note.role);
+        hash.update((role.len() as u64).to_le_bytes());
+        hash.update(role.as_bytes());
+        let emphasis = format!("{:?}", note.emphasis);
+        hash.update((emphasis.len() as u64).to_le_bytes());
+        hash.update(emphasis.as_bytes());
+    }
+    format!("{:x}", hash.finalize())
 }
 
 fn sha256_json<T: Serialize>(value: &T) -> Result<String, String> {
