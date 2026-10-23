@@ -38,6 +38,7 @@ struct Cli {
 #[derive(Debug, Serialize)]
 struct TaskManifestRecord {
     instance_id: String,
+    candidate_row_sha256: String,
     repo: String,
     base_commit: String,
     repo_head_sha: String,
@@ -1004,7 +1005,7 @@ fn audit_candidate(
         explicit_fail_to_pass_count,
         gold_nonpassing_test_count: gold_nonpassing_count,
         gold_run_marker_counts: marker_counts,
-        candidate_row_sha256,
+        candidate_row_sha256: candidate_row_sha256.clone(),
         validation_status_sha256: status_json_sha256.clone(),
         baseline_validation_log_sha256: baseline_log_sha256.clone(),
         gold_validation_log_sha256: log_sha256.clone(),
@@ -1024,6 +1025,7 @@ fn audit_candidate(
     let manifest_record = if eligible {
         Some(TaskManifestRecord {
             instance_id: instance_id.to_string(),
+            candidate_row_sha256: candidate_row_sha256.clone(),
             repo: repo.expect("eligible task has repo"),
             base_commit: base_commit.expect("eligible task has base commit"),
             repo_head_sha: runtime_summary
@@ -1156,6 +1158,7 @@ fn run(cli: Cli) -> Result<(), String> {
             agent_prompts_by_id.insert(instance_id.clone(), problem_statement.to_string());
             manifest_tasks.push(TaskManifestRecord {
                 instance_id: record.instance_id.clone(),
+                candidate_row_sha256: record.candidate_row_sha256.clone(),
                 repo: record.repo.clone(),
                 base_commit: record.base_commit.clone(),
                 repo_head_sha: record.repo_head_sha.clone(),
