@@ -429,5 +429,80 @@
     ],
     "ci_policy": "queued/skipped/missing is not a pass",
     "claim_policy": "No SOTA or benchmark improvement claim without pinned comparator configuration, reproducible raw records, and uncertainty intervals."
-  }
+  },
+  "external_drift_detectors": [
+    {
+      "id": "fixed-threshold",
+      "name": "Fixed-threshold PE detector",
+      "family": "fixed-threshold-control",
+      "labels_required": false,
+      "input_contract": "Univariate valid PE or standardized residual stream; omit invalid/missing measurements and report coverage.",
+      "implementation_status": "planned-baseline",
+      "source": "https://doi.org/10.1007/s41060-024-00620-y"
+    },
+    {
+      "id": "ewma-control-chart",
+      "name": "EWMA control-chart detector",
+      "family": "smoothed-control-chart",
+      "labels_required": false,
+      "input_contract": "Univariate valid PE or standardized residual stream; freeze smoothing and alarm thresholds using a separate calibration stream.",
+      "implementation_status": "planned-baseline",
+      "source": "https://doi.org/10.1007/s41060-024-00620-y"
+    },
+    {
+      "id": "page-hinkley",
+      "name": "Page-Hinkley detector",
+      "family": "sequential-mean-change-test",
+      "labels_required": false,
+      "input_contract": "Univariate numeric stream; use the same valid observations as the candidate and calibrate threshold away from scored seeds.",
+      "implementation_status": "planned-baseline",
+      "source": "https://doi.org/10.1007/s41060-024-00620-y"
+    },
+    {
+      "id": "adwin",
+      "name": "ADWIN adaptive-window detector",
+      "family": "adaptive-window",
+      "labels_required": false,
+      "input_contract": "Univariate numeric stream; compare on identical observation cadence and count only valid measurements.",
+      "implementation_status": "planned-baseline",
+      "source": "https://riverml.xyz/latest/api/drift/ADWIN/"
+    },
+    {
+      "id": "kswin",
+      "name": "KSWIN distribution-change detector",
+      "family": "two-window-statistical-test",
+      "labels_required": false,
+      "input_contract": "Univariate numeric stream; report window-size and significance-level sweeps on calibration seeds only.",
+      "implementation_status": "planned-baseline",
+      "source": "https://riverml.xyz/latest/api/drift/KSWIN/"
+    },
+    {
+      "id": "discriminative-drift-detector",
+      "name": "Discriminative Drift Detector (D3)",
+      "family": "unsupervised-multivariate-feature-space",
+      "labels_required": false,
+      "input_contract": "Multivariate numeric observations or a frozen, documented feature embedding; no labels and no post-change test leakage.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://github.com/DFKI-NI/unsupervised-concept-drift-detection"
+    },
+    {
+      "id": "image-based-drift-detector",
+      "name": "Image-Based Drift Detector (IBDD)",
+      "family": "unsupervised-feature-window-representation",
+      "labels_required": false,
+      "input_contract": "Multivariate observations transformed by a pinned time-window-to-image adapter; report transformation cost separately.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://github.com/DFKI-NI/unsupervised-concept-drift-detection"
+    },
+    {
+      "id": "semi-parametric-log-likelihood",
+      "name": "Semi-Parametric Log-Likelihood (SPLL)",
+      "family": "reference-distribution-likelihood",
+      "labels_required": false,
+      "input_contract": "Numerical multivariate reference window with documented clustering/covariance assumptions; no target labels; test abrupt and non-abrupt shifts separately.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://github.com/DFKI-NI/unsupervised-concept-drift-detection"
+    }
+  ],
+  "drift_detector_comparison_protocol": "Pin each detector implementation/version and hyperparameters; tune only on a disjoint calibration stream; use identical valid observations and no label access for the label-free track; never remap invalid/missing PE to zero or maximal surprise; report false alarms per 1,000 valid observations, missed-drift rate, detection-delay distribution, precision/recall by abrupt/gradual/recurring drift, invalid-sample coverage, throughput, and peak memory. Publish per-seed event traces. These detector candidates are planned, not yet implemented or measured."
 }
