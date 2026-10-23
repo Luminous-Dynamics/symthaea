@@ -155,8 +155,10 @@ impl NeuroevolutionManager {
 
         // Accumulate observations every cycle
         self.accumulated_psi.push(snapshot.unified_psi);
-        self.accumulated_prediction_error
-            .push(snapshot.prediction_error);
+        if snapshot.prediction_error_valid != 0 {
+            self.accumulated_prediction_error
+                .push(snapshot.prediction_error);
+        }
         self.accumulated_confidence
             .push(snapshot.prediction_confidence);
 
@@ -294,6 +296,7 @@ mod tests {
         let mut snap = CycleSnapshot::default();
         snap.unified_psi = 0.5;
         snap.prediction_error = 0.3;
+        snap.prediction_error_valid = 1;
         snap.prediction_confidence = 0.6;
         snap
     }
