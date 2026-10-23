@@ -1547,6 +1547,32 @@ mod tests {
     }
 
     #[test]
+    fn scored_container_rejects_unsanitized_git_metadata() {
+        let image_id = format!("sha256:{}", "c".repeat(64));
+        let task = serde_json::json!({
+            "container_image_id": image_id,
+            "network_mode": "none",
+            "repo_head_sha": "a".repeat(40),
+            "container_ids": [format!("{:064x}", 1), format!("{:064x}", 2)]
+        });
+        let candidate = serde_json::json!({"docker_image": "example@sha256:deadbeef"});
+        let evidence = serde_json::json!({
+            "container_identity": {
+                "container_id": format!("{:064x}", 9),
+                "configured_image": "example@sha256:deadbeef",
+                "container_image_id": image_id,
+                "network_mode": "none",
+                "git_metadata_sanitization_exit_code": 86
+            }
+        });
+        let errors = validate_scored_container_identity(&task, &candidate, &evidence)
+            .unwrap_err();
+        assert!(errors.iter().any(|error| {
+            error.contains("Git metadata sanitization was not confirmed")
+        }));
+    }
+
+    #[test]
     fn scored_container_rejects_a_bridge_network() {
         let image_id = format!("sha256:{}", "c".repeat(64));
         let task = serde_json::json!({
