@@ -99,6 +99,7 @@ struct Action {
     comparison_id: String,
     policy_id: String,
     choice: Choice,
+    commitment_index: u64,
     latency_budget_us: u64,
     energy_budget_uj: u64,
     declared_latency_us: u64,
@@ -117,6 +118,7 @@ struct PolicyMetrics {
     harmful_escalations: usize,
     neutral_escalations: usize,
     missed_beneficial_opportunities: usize,
+    beneficial_opportunities_not_affordable: usize,
     cheap_safety_violations: u64,
     chosen_safety_violations: u64,
     cvar95_incremental_loss: f64,
@@ -514,6 +516,7 @@ fn read_actions(
             comparison_id: row[3].clone(),
             policy_id: row[4].clone(),
             choice,
+            commitment_index,
             latency_budget_us,
             energy_budget_uj,
             declared_latency_us,
@@ -764,11 +767,14 @@ fn score(
         let mut harmful = 0;
         let mut neutral = 0;
         let mut missed = 0;
+        let mut beneficial_not_affordable = 0;
 
         let first = rows.first().ok_or_else(|| fail("empty policy run"))?;
         m.latency_budget_us = first.latency_budget_us;
         m.energy_budget_uj = first.energy_budget_uj;
-        for action in rows {
+        let mut ordered_rows = rows.clone();
+        ordered_rows.sort_by_key(|action| action.commitment_index);
+        for action in ordered_rows {
             let obs = observations.get(&action.trace_id).unwrap();
             let outcome = outcomes.get(&action.trace_id).unwrap();
             latency_accumulator_overflow |=
@@ -780,7 +786,25 @@ fn score(
             cheap_safety = cheap_safety.saturating_add(outcome.cheap_safety);
             let utility = match action.choice {
                 Choice::Cheap => {
-                    if outcome.full_utility > outcome.cheap_utility { missed += 1; }
+                    if outcome.full_utility > outcome.cheap_utility {
+                        let reservation_fits = latency
+                            .checked_add(action.declared_latency_us)
+                            .is_some_and(|next| next <= m.latency_budget_us)
+                            && energy
+                                .checked_add(action.declared_energy_uj)
+                                .is_some_and(|next| next <= m.energy_budget_uj);
+                        let actual_cost_fits = latency
+                            .checked_add(outcome.actual_latency_us)
+                            .is_some_and(|next| next <= m.latency_budget_us)
+                            && energy
+                                .checked_add(outcome.actual_energy_uj)
+                                .is_some_and(|next| next <= m.energy_budget_uj);
+                        if reservation_fits && actual_cost_fits {
+                            missed += 1;
+                        } else {
+                            beneficial_not_affordable += 1;
+                        }
+                    }
                     chosen_safety = chosen_safety.saturating_add(outcome.cheap_safety);
                     losses.push(0.0);
                     outcome.cheap_utility
@@ -833,6 +857,7 @@ fn score(
         m.harmful_escalations = harmful;
         m.neutral_escalations = neutral;
         m.missed_beneficial_opportunities = missed;
+        m.beneficial_opportunities_not_affordable = beneficial_not_affordable;
         m.cheap_safety_violations = cheap_safety;
         m.chosen_safety_violations = chosen_safety;
         m.cvar95_incremental_loss = cvar95(&losses);
@@ -900,13 +925,14 @@ fn score(
     report.push_str("META\tformat\tVIS-DVPC-006-post-commit-v1\n");
     report.push_str("META\tclaim_class\tpost_commit_trace_scoring_not_allocator_quality_or_sota\n");
     report.push_str("META\tunit_rule\tlatency_us_and_energy_uj_reported_separately\n");
-    report.push_str("RESULT_HEADER\tcomparison_id\tpolicy_id\trecords\tgroups\tmean_utility\tgroup_balanced_utility\tbeneficial_escalations\tharmful_escalations\tneutral_escalations\tmissed_beneficial_opportunities\tcheap_safety_violations\tchosen_safety_violations\tcvar95_incremental_loss\tallocator_latency_us\tallocator_energy_uj\ttotal_incremental_latency_us\ttotal_incremental_energy_uj\tlatency_budget_us\tenergy_budget_uj\tlatency_budget_violation\tenergy_budget_violation\treservation_overruns\tvalid_budget_run\tutility_delta_vs_all_cheap\tcvar95_delta_vs_all_cheap\tsafety_delta_vs_all_cheap\tutility_gap_to_oracle\n");
+    report.push_str("RESULT_HEADER\tcomparison_id\tpolicy_id\trecords\tgroups\tmean_utility\tgroup_balanced_utility\tbeneficial_escalations\tharmful_escalations\tneutral_escalations\tmissed_beneficial_opportunities\tbeneficial_opportunities_not_affordable\tcheap_safety_violations\tchosen_safety_violations\tcvar95_incremental_loss\tallocator_latency_us\tallocator_energy_uj\ttotal_incremental_latency_us\ttotal_incremental_energy_uj\tlatency_budget_us\tenergy_budget_uj\tlatency_budget_violation\tenergy_budget_violation\treservation_overruns\tvalid_budget_run\tutility_delta_vs_all_cheap\tcvar95_delta_vs_all_cheap\tsafety_delta_vs_all_cheap\tutility_gap_to_oracle\n");
     for ((comparison, policy), m) in &metrics {
         report.push_str(&format!(
             "RESULT\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             comparison, policy, m.records, m.groups, m.chosen_utility_mean, m.group_balanced_utility,
             m.beneficial_escalations, m.harmful_escalations, m.neutral_escalations,
-            m.missed_beneficial_opportunities, m.cheap_safety_violations, m.chosen_safety_violations,
+            m.missed_beneficial_opportunities, m.beneficial_opportunities_not_affordable,
+            m.cheap_safety_violations, m.chosen_safety_violations,
             m.cvar95_incremental_loss, m.allocator_latency_us, m.allocator_energy_uj,
             m.total_incremental_latency_us, m.total_incremental_energy_uj, m.latency_budget_us,
             m.energy_budget_uj, m.latency_budget_violation, m.energy_budget_violation,
