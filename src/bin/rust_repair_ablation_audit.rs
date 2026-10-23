@@ -271,7 +271,10 @@ fn validate_preregistration(prereg: &Preregistration) -> Result<(), String> {
         return Err("unsupported preregistration format_version or protocol_id".to_string());
     }
     for (field, value) in [
-        ("benchmark_manifest_sha256", prereg.benchmark_manifest_sha256.as_str()),
+        (
+            "benchmark_manifest_sha256",
+            prereg.benchmark_manifest_sha256.as_str(),
+        ),
         ("agent_harness_sha256", prereg.agent_harness_sha256.as_str()),
         ("prompt_sha256", prereg.prompt_sha256.as_str()),
         ("scaffold_sha256", prereg.scaffold_sha256.as_str()),
@@ -295,9 +298,7 @@ fn validate_preregistration(prereg: &Preregistration) -> Result<(), String> {
     if prereg.network_policy != "none" {
         return Err("strict paired comparison requires network_policy=\"none\"".to_string());
     }
-    if !(MIN_BOOTSTRAP_RESAMPLES..=MAX_BOOTSTRAP_RESAMPLES)
-        .contains(&prereg.bootstrap_resamples)
-    {
+    if !(MIN_BOOTSTRAP_RESAMPLES..=MAX_BOOTSTRAP_RESAMPLES).contains(&prereg.bootstrap_resamples) {
         return Err(format!(
             "bootstrap_resamples must be in {MIN_BOOTSTRAP_RESAMPLES}..={MAX_BOOTSTRAP_RESAMPLES}"
         ));
@@ -326,10 +327,7 @@ fn validate_preregistration(prereg: &Preregistration) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_trial_static(
-    trial: &TrialRecord,
-    prereg: &Preregistration,
-) -> Result<(), String> {
+fn validate_trial_static(trial: &TrialRecord, prereg: &Preregistration) -> Result<(), String> {
     if !non_empty(&trial.run_id) || !non_empty(&trial.instance_id) {
         return Err("run_id and instance_id must not be empty".to_string());
     }
@@ -363,19 +361,31 @@ fn validate_trial_static(
         ));
     }
     for (field, observed, expected) in [
-        ("model_id", trial.model_id.as_str(), prereg.model_id.as_str()),
+        (
+            "model_id",
+            trial.model_id.as_str(),
+            prereg.model_id.as_str(),
+        ),
         (
             "agent_harness_sha256",
             trial.agent_harness_sha256.as_str(),
             prereg.agent_harness_sha256.as_str(),
         ),
-        ("prompt_sha256", trial.prompt_sha256.as_str(), prereg.prompt_sha256.as_str()),
+        (
+            "prompt_sha256",
+            trial.prompt_sha256.as_str(),
+            prereg.prompt_sha256.as_str(),
+        ),
         (
             "scaffold_sha256",
             trial.scaffold_sha256.as_str(),
             prereg.scaffold_sha256.as_str(),
         ),
-        ("budget_id", trial.budget_id.as_str(), prereg.budget_id.as_str()),
+        (
+            "budget_id",
+            trial.budget_id.as_str(),
+            prereg.budget_id.as_str(),
+        ),
         (
             "container_image_id",
             trial.container_image_id.as_str(),
@@ -403,7 +413,10 @@ fn validate_relative_report_path(value: &str) -> Result<(), String> {
     if value.contains('\\')
         || path.is_absolute()
         || path.components().any(|component| {
-            matches!(component, Component::ParentDir | Component::RootDir | Component::Prefix(_))
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
         })
         || !path
             .components()
@@ -437,9 +450,7 @@ fn load_score_report(
         .map_err(|error| format!("score report {} is malformed JSON: {error}", path.display()))?;
     if report.get("format_version").and_then(Value::as_u64) != Some(1)
         || report.get("protocol_id").and_then(Value::as_str) != Some(SCORE_PROTOCOL_ID)
-        || report
-            .get("task_manifest_sha256")
-            .and_then(Value::as_str)
+        || report.get("task_manifest_sha256").and_then(Value::as_str)
             != Some(expected_task_manifest_sha256)
     {
         return Err(format!(
@@ -462,7 +473,12 @@ fn load_score_report(
         let instance_id = row
             .get("instance_id")
             .and_then(Value::as_str)
-            .ok_or_else(|| format!("score report {} has task without instance_id", path.display()))?;
+            .ok_or_else(|| {
+                format!(
+                    "score report {} has task without instance_id",
+                    path.display()
+                )
+            })?;
         let outcome_text = row
             .get("outcome")
             .and_then(Value::as_str)
@@ -502,8 +518,7 @@ fn parse_trial_results(
         .collect::<BTreeMap<_, _>>();
     let mut grouped = BTreeMap::<String, BTreeMap<Arm, ObservedTrial>>::new();
     let mut run_ids = BTreeSet::new();
-    let mut score_cache =
-        BTreeMap::<String, (String, BTreeMap<String, Outcome>)>::new();
+    let mut score_cache = BTreeMap::<String, (String, BTreeMap<String, Outcome>)>::new();
     let mut record_count = 0usize;
 
     for (line_index, line) in text.lines().enumerate() {
@@ -513,8 +528,12 @@ fn parse_trial_results(
                 line_index + 1
             ));
         }
-        let trial: TrialRecord = serde_json::from_str(line)
-            .map_err(|error| format!("invalid trial-results JSONL line {}: {error}", line_index + 1))?;
+        let trial: TrialRecord = serde_json::from_str(line).map_err(|error| {
+            format!(
+                "invalid trial-results JSONL line {}: {error}",
+                line_index + 1
+            )
+        })?;
         validate_trial_static(&trial, prereg)?;
         if !run_ids.insert(trial.run_id.clone()) {
             return Err(format!("duplicate run_id {:?}", trial.run_id));
@@ -596,11 +615,12 @@ fn join_assignments(
                     assignment.instance_id
                 ));
             }
-            let earliest_arm = if gcs_trial.record.started_at_ms < control_trial.record.started_at_ms {
-                Arm::Gcs
-            } else {
-                Arm::Control
-            };
+            let earliest_arm =
+                if gcs_trial.record.started_at_ms < control_trial.record.started_at_ms {
+                    Arm::Gcs
+                } else {
+                    Arm::Control
+                };
             if earliest_arm != assignment.first_arm {
                 return Err(format!(
                     "task {:?} observed execution order differs from preregistered first_arm",
@@ -713,8 +733,7 @@ fn resolved_effect(pairs: &[AuditPair]) -> (usize, usize, usize, usize, Option<f
     }
     let ties = resolved_count.saturating_sub(gcs_wins + control_wins);
     let effect = (resolved_count > 0).then_some(
-        (gcs_passes as f64 / resolved_count as f64
-            - control_passes as f64 / resolved_count as f64)
+        (gcs_passes as f64 / resolved_count as f64 - control_passes as f64 / resolved_count as f64)
             * 100.0,
     );
     (resolved_count, gcs_wins, control_wins, ties, effect)
@@ -727,7 +746,11 @@ fn unresolved_sensitivity_bounds(pairs: &[AuditPair]) -> (f64, f64) {
         let gcs = pair.outcome(Arm::Gcs);
         let control = pair.outcome(Arm::Control);
         let gcs_low = if gcs == Outcome::Pass { 1.0 } else { 0.0 };
-        let gcs_high = if gcs == Outcome::Unresolved { 1.0 } else { gcs_low };
+        let gcs_high = if gcs == Outcome::Unresolved {
+            1.0
+        } else {
+            gcs_low
+        };
         let control_low = if control == Outcome::Pass { 1.0 } else { 0.0 };
         let control_high = if control == Outcome::Unresolved {
             1.0
@@ -807,10 +830,7 @@ fn cluster_bootstrap_ci(
         }
     }
     estimates.sort_by(f64::total_cmp);
-    let interval = match (
-        percentile(&estimates, 0.025),
-        percentile(&estimates, 0.975),
-    ) {
+    let interval = match (percentile(&estimates, 0.025), percentile(&estimates, 0.975)) {
         (Some(lower_percentage_points), Some(upper_percentage_points)) => {
             Some(ConfidenceInterval {
                 lower_percentage_points,
@@ -838,17 +858,16 @@ fn make_report(
         ties,
         resolved_effect_percentage_points,
     ) = resolved_effect(&pairs);
-    let (resolved_repository_count, cluster_bootstrap_ci95) = cluster_bootstrap_ci(
-        &pairs,
-        prereg.bootstrap_seed,
-        prereg.bootstrap_resamples,
-    );
+    let (resolved_repository_count, cluster_bootstrap_ci95) =
+        cluster_bootstrap_ci(&pairs, prereg.bootstrap_seed, prereg.bootstrap_resamples);
     let denominator = pairs.len() as f64;
     let conservative_delta = (gcs.verified_pass_count as f64 / denominator
         - control.verified_pass_count as f64 / denominator)
         * 100.0;
-    let (unresolved_sensitivity_lower_percentage_points, unresolved_sensitivity_upper_percentage_points) =
-        unresolved_sensitivity_bounds(&pairs);
+    let (
+        unresolved_sensitivity_lower_percentage_points,
+        unresolved_sensitivity_upper_percentage_points,
+    ) = unresolved_sensitivity_bounds(&pairs);
     let unresolved_pair_count = pairs.len().saturating_sub(fully_resolved_pair_count);
     let overall_unresolved_rate =
         (gcs.unresolved_count + control.unresolved_count) as f64 / (2.0 * pairs.len() as f64);
@@ -856,12 +875,11 @@ fn make_report(
     let overall_unresolved_rate_below_2_percent = overall_unresolved_rate < 0.02;
     let arm_unresolved_rate_difference_below_1_percentage_point =
         arm_unresolved_rate_difference < 0.01;
-    let at_least_10_resolved_repositories =
-        resolved_repository_count >= MIN_REPOSITORIES_FOR_CI;
+    let at_least_10_resolved_repositories = resolved_repository_count >= MIN_REPOSITORIES_FOR_CI;
     let superiority_effect_satisfied =
         resolved_effect_percentage_points.is_some_and(|effect| effect >= 5.0);
-    let superiority_ci_satisfied = cluster_bootstrap_ci95
-        .is_some_and(|interval| interval.lower_percentage_points > 0.0);
+    let superiority_ci_satisfied =
+        cluster_bootstrap_ci95.is_some_and(|interval| interval.lower_percentage_points > 0.0);
     let full_assignment_sensitivity_lower_bound_above_zero =
         unresolved_sensitivity_lower_percentage_points > 0.0;
     let unresolved_gates_satisfied = overall_unresolved_rate_below_2_percent
@@ -880,9 +898,9 @@ fn make_report(
         }
         _ => false,
     };
-    let noninferiority_satisfied = cluster_bootstrap_ci95
-        .is_some_and(|interval| interval.lower_percentage_points >= -1.5)
-        && unresolved_sensitivity_lower_percentage_points >= -1.5;
+    let noninferiority_satisfied =
+        cluster_bootstrap_ci95.is_some_and(|interval| interval.lower_percentage_points >= -1.5)
+            && unresolved_sensitivity_lower_percentage_points >= -1.5;
     let cost_efficiency_noninferiority_gate_met = cost_reduction_satisfied
         && noninferiority_satisfied
         && at_least_10_resolved_repositories
@@ -980,7 +998,10 @@ fn make_report(
 }
 
 fn write_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
-    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
         fs::create_dir_all(parent)
             .map_err(|error| format!("cannot create {}: {error}", parent.display()))?;
     }
@@ -991,14 +1012,15 @@ fn write_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
 }
 
 fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
-    if args.iter().any(|argument| argument == "--help" || argument == "-h") {
-        println!(
-            concat!(
-                "Usage: rust-repair-ablation-audit ",
-                "--preregistration PATH --expected-preregistration-sha256 HEX ",
-                "--trial-results JSONL --score-reports-dir PATH --report-out PATH"
-            )
-        );
+    if args
+        .iter()
+        .any(|argument| argument == "--help" || argument == "-h")
+    {
+        println!(concat!(
+            "Usage: rust-repair-ablation-audit ",
+            "--preregistration PATH --expected-preregistration-sha256 HEX ",
+            "--trial-results JSONL --score-reports-dir PATH --report-out PATH"
+        ));
         return Ok(None);
     }
     let mut values = BTreeMap::<String, String>::new();
@@ -1078,8 +1100,12 @@ fn run(cli: Cli) -> Result<(), String> {
         pairs,
     );
     write_json(&cli.report_out, &report)?;
-    let report_bytes = fs::read(&cli.report_out)
-        .map_err(|error| format!("cannot re-read report {}: {error}", cli.report_out.display()))?;
+    let report_bytes = fs::read(&cli.report_out).map_err(|error| {
+        format!(
+            "cannot re-read report {}: {error}",
+            cli.report_out.display()
+        )
+    })?;
     println!(
         "ABLATION AUDIT: {} assigned tasks, {} fully resolved pairs, GCS wins {}, control wins {}; report sha256:{} ({})",
         report.assignment_count,
@@ -1112,11 +1138,7 @@ fn main() {
 mod tests {
     use super::*;
 
-    fn test_pair(
-        repository_id: &str,
-        gcs: Outcome,
-        control: Outcome,
-    ) -> AuditPair {
+    fn test_pair(repository_id: &str, gcs: Outcome, control: Outcome) -> AuditPair {
         AuditPair {
             assignment: Assignment {
                 instance_id: format!("task-{repository_id}"),
@@ -1168,10 +1190,18 @@ mod tests {
     fn preregistration_rejects_networked_trials_and_short_bootstrap() {
         let mut prereg = test_preregistration(10);
         prereg.network_policy = "bridge".to_string();
-        assert!(validate_preregistration(&prereg).unwrap_err().contains("network_policy"));
+        assert!(
+            validate_preregistration(&prereg)
+                .unwrap_err()
+                .contains("network_policy")
+        );
         prereg.network_policy = "none".to_string();
         prereg.bootstrap_resamples = 999;
-        assert!(validate_preregistration(&prereg).unwrap_err().contains("bootstrap_resamples"));
+        assert!(
+            validate_preregistration(&prereg)
+                .unwrap_err()
+                .contains("bootstrap_resamples")
+        );
     }
 
     #[test]
@@ -1181,9 +1211,11 @@ mod tests {
             Arm::Control => Arm::Gcs,
             Arm::Gcs => Arm::Control,
         };
-        assert!(validate_preregistration(&prereg)
-            .unwrap_err()
-            .contains("hash-randomization seed"));
+        assert!(
+            validate_preregistration(&prereg)
+                .unwrap_err()
+                .contains("hash-randomization seed")
+        );
     }
 
     #[test]
@@ -1214,23 +1246,33 @@ mod tests {
                 ),
             ]),
         )]);
-        assert!(join_assignments(&prereg, grouped)
-            .unwrap_err()
-            .contains("execution order"));
+        assert!(
+            join_assignments(&prereg, grouped)
+                .unwrap_err()
+                .contains("execution order")
+        );
     }
 
     #[test]
     fn duplicate_preregistered_tasks_are_rejected() {
         let mut prereg = test_preregistration(10);
         prereg.assignment.push(prereg.assignment[0].clone());
-        assert!(validate_preregistration(&prereg).unwrap_err().contains("duplicate"));
+        assert!(
+            validate_preregistration(&prereg)
+                .unwrap_err()
+                .contains("duplicate")
+        );
     }
 
     #[test]
     fn preregistration_requires_immutable_digests() {
         let mut prereg = test_preregistration(10);
         prereg.agent_harness_sha256 = "not-a-hash".to_string();
-        assert!(validate_preregistration(&prereg).unwrap_err().contains("agent_harness_sha256"));
+        assert!(
+            validate_preregistration(&prereg)
+                .unwrap_err()
+                .contains("agent_harness_sha256")
+        );
     }
 
     #[test]
@@ -1238,7 +1280,11 @@ mod tests {
         let prereg = test_preregistration(10);
         let mut trial = test_trial("gcs", Arm::Gcs, Outcome::Pass, 1);
         trial.gcs_enabled = false;
-        assert!(validate_trial_static(&trial, &prereg).unwrap_err().contains("gcs_enabled"));
+        assert!(
+            validate_trial_static(&trial, &prereg)
+                .unwrap_err()
+                .contains("gcs_enabled")
+        );
     }
 
     #[test]
@@ -1246,7 +1292,11 @@ mod tests {
         let prereg = test_preregistration(10);
         let mut trial = test_trial("gcs", Arm::Gcs, Outcome::Pass, 1);
         trial.model_id = "different-model".to_string();
-        assert!(validate_trial_static(&trial, &prereg).unwrap_err().contains("model_id"));
+        assert!(
+            validate_trial_static(&trial, &prereg)
+                .unwrap_err()
+                .contains("model_id")
+        );
     }
 
     #[test]
@@ -1303,8 +1353,14 @@ mod tests {
         let first = cluster_bootstrap_ci(&large, 7, 1_000);
         let second = cluster_bootstrap_ci(&large, 7, 1_000);
         assert_eq!(first.0, 10);
-        assert_eq!(first.1.map(|ci| (ci.lower_percentage_points, ci.upper_percentage_points)),
-                   second.1.map(|ci| (ci.lower_percentage_points, ci.upper_percentage_points)));
+        assert_eq!(
+            first
+                .1
+                .map(|ci| (ci.lower_percentage_points, ci.upper_percentage_points)),
+            second
+                .1
+                .map(|ci| (ci.lower_percentage_points, ci.upper_percentage_points))
+        );
         assert_eq!(first.1.unwrap().lower_percentage_points, 100.0);
     }
 
@@ -1340,10 +1396,13 @@ mod tests {
         let bytes = serde_json::to_vec(&report).unwrap();
         fs::write(temp.path().join("score.json"), &bytes).unwrap();
         let digest = sha256_bytes(&bytes);
-        let outcomes = load_score_report(temp.path(), "score.json", &digest, &task_manifest).unwrap();
+        let outcomes =
+            load_score_report(temp.path(), "score.json", &digest, &task_manifest).unwrap();
         assert_eq!(outcomes.get("task-a"), Some(&Outcome::Pass));
         assert!(load_score_report(temp.path(), "score.json", &digest, &"b".repeat(64)).is_err());
-        assert!(load_score_report(temp.path(), "score.json", &"0".repeat(64), &task_manifest).is_err());
+        assert!(
+            load_score_report(temp.path(), "score.json", &"0".repeat(64), &task_manifest).is_err()
+        );
     }
 
     fn test_preregistration(repository_count: usize) -> Preregistration {
