@@ -185,15 +185,73 @@ fn improve_one_for_two(
     }
 }
 
-fn run(path: &str) -> Result<(), String> {
+
+#[derive(Debug)]
+struct RunFailure {
+    kind: &'static str,
+    message: String,
+    source_bytes: Option<usize>,
+    source_fnv1a64: Option<u64>,
+    elapsed_ns: u128,
+}
+
+fn failure_receipt_json(path: &str, failure: &RunFailure) -> String {
+    let source_bytes = failure.source_bytes
+        .map(|bytes| bytes.to_string())
+        .unwrap_or_else(|| "null".to_owned());
+    let source_hash = failure.source_fnv1a64
+        .map(|hash| format!("\"{hash:016x}\""))
+        .unwrap_or_else(|| "null".to_owned());
+    format!(
+        concat!(
+            "{{\n",
+            "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.mis-smoke-run.v2\",\n",
+            "  \"benchmark_track\": \"correctness-smoke-not-competitive\",\n",
+            "  \"return_status\": \"failed\",\n",
+            "  \"source_path\": \"{}\",\n",
+            "  \"source_bytes\": {},\n",
+            "  \"source_fnv1a64\": {},\n",
+            "  \"error_kind\": \"{}\",\n",
+            "  \"error\": \"{}\",\n",
+            "  \"software\": {{\"package_version\": \"{}\", \"target_os\": \"{}\", \"target_arch\": \"{}\", \"rustc_version\": \"{}\"}},\n",
+            "  \"determinism\": \"deterministic-no-random-seed\",\n",
+            "  \"resource_limits\": {{\"time_limit_ns\": null, \"memory_limit_bytes\": null}},\n",
+            "  \"timing_ns\": {{\"end_to_end\": {}}},\n",
+            "  \"limitations\": [\"FNV-1a is a non-cryptographic integrity checksum\", \"no runtime limit or memory limit was configured\", \"failure receipt records a read or parse failure rather than silently dropping the run\", \"this run does not execute a quantum backend\"]\n",
+            "}}"
+        ),
+        json_escape(path),
+        source_bytes,
+        source_hash,
+        failure.kind,
+        json_escape(&failure.message),
+        env!("CARGO_PKG_VERSION"),
+        env::consts::OS,
+        env::consts::ARCH,
+        option_env!("RUSTC_VERSION").unwrap_or("not-recorded-at-build"),
+        failure.elapsed_ns
+    )
+}
+
+fn run(path: &str) -> Result<(), RunFailure> {
     let end_to_end_start = Instant::now();
-    let source = fs::read_to_string(path)
-        .map_err(|error| format!("failed to read {path:?}: {error}"))?;
+    let source = fs::read_to_string(path).map_err(|error| RunFailure {
+        kind: "source_read",
+        message: format!("failed to read {path:?}: {error}"),
+        source_bytes: None,
+        source_fnv1a64: None,
+        elapsed_ns: end_to_end_start.elapsed().as_nanos(),
+    })?;
     let source_hash = fnv1a64(source.as_bytes());
 
     let parse_start = Instant::now();
-    let parsed = parse_dimacs_mis(&source)
-        .map_err(|error| format!("failed to parse {path:?}: {error}"))?;
+    let parsed = parse_dimacs_mis(&source).map_err(|error| RunFailure {
+        kind: "dimacs_parse",
+        message: format!("failed to parse {path:?}: {error}"),
+        source_bytes: Some(source.len()),
+        source_fnv1a64: Some(source_hash),
+        elapsed_ns: end_to_end_start.elapsed().as_nanos(),
+    })?;
     let parse_ns = parse_start.elapsed().as_nanos();
 
     let greedy_start = Instant::now();
@@ -201,7 +259,13 @@ fn run(path: &str) -> Result<(), String> {
     let greedy_ns = greedy_start.elapsed().as_nanos();
     let greedy_report = parsed.graph.verify_solution(&greedy, Some(greedy.len()));
     if !greedy_report.feasible {
-        return Err("internal error: greedy baseline failed independent verification".to_owned());
+        return Err(RunFailure {
+            kind: "greedy_verification",
+            message: "internal error: greedy baseline failed independent verification".to_owned(),
+            source_bytes: Some(source.len()),
+            source_fnv1a64: Some(source_hash),
+            elapsed_ns: end_to_end_start.elapsed().as_nanos(),
+        });
     }
 
     let local_start = Instant::now();
@@ -215,14 +279,26 @@ fn run(path: &str) -> Result<(), String> {
         parsed.graph.verify_solution(&result.vertices, Some(result.vertices.len()))
     });
     if local_report.as_ref().is_some_and(|report| !report.feasible) {
-        return Err("internal error: 1-for-2 local improvement failed independent verification".to_owned());
+        return Err(RunFailure {
+            kind: "local_verification",
+            message: "internal error: 1-for-2 local improvement failed independent verification".to_owned(),
+            source_bytes: Some(source.len()),
+            source_fnv1a64: Some(source_hash),
+            elapsed_ns: end_to_end_start.elapsed().as_nanos(),
+        });
     }
 
     let exact_start = Instant::now();
     let exact: Option<Vec<usize>> = if parsed.graph.vertex_count() <= EXACT_ORACLE_MAX_VERTICES {
         Some(
             parsed.graph.exact_maximum_independent_set()
-                .map_err(|error| format!("exact reference failed: {error}"))?,
+                .map_err(|error| RunFailure {
+                kind: "exact_oracle",
+                message: format!("exact reference failed: {error}"),
+                source_bytes: Some(source.len()),
+                source_fnv1a64: Some(source_hash),
+                elapsed_ns: end_to_end_start.elapsed().as_nanos(),
+            })?,
         )
     } else {
         None
@@ -232,7 +308,13 @@ fn run(path: &str) -> Result<(), String> {
         parsed.graph.verify_solution(solution, Some(solution.len()))
     });
     if exact_report.as_ref().is_some_and(|report| !report.feasible) {
-        return Err("internal error: exact reference failed independent verification".to_owned());
+        return Err(RunFailure {
+            kind: "exact_verification",
+            message: "internal error: exact reference failed independent verification".to_owned(),
+            source_bytes: Some(source.len()),
+            source_fnv1a64: Some(source_hash),
+            elapsed_ns: end_to_end_start.elapsed().as_nanos(),
+        });
     }
 
     // Hash a deterministic normalized result body (not runtime fields) so repeated runs
@@ -265,6 +347,7 @@ fn run(path: &str) -> Result<(), String> {
             "{{\n",
             "  \"schema\": \"org.luminousdynamics.symthaea.qcomp.mis-smoke-run.v2\",\n",
             "  \"benchmark_track\": \"correctness-smoke-not-competitive\",\n",
+            "  \"return_status\": \"completed\",\n",
             "  \"source_path\": \"{}\",\n",
             "  \"source_bytes\": {},\n",
             "  \"source_fnv1a64\": \"{:016x}\",\n",
@@ -274,6 +357,9 @@ fn run(path: &str) -> Result<(), String> {
             "  \"local_improvement\": {{\"status\": \"{}\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"exchanges\": {}, \"pair_checks\": {}, \"elapsed_ns\": {}}},\n",
             "  \"exact_oracle\": {{\"status\": \"{}\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"elapsed_ns\": {}}},\n",
             "  \"timing_ns\": {{\"parse\": {}, \"end_to_end\": {}}},\n",
+            "  \"software\": {{\"package_version\": \"{}\", \"target_os\": \"{}\", \"target_arch\": \"{}\", \"rustc_version\": \"{}\"}},\n",
+            "  \"determinism\": \"deterministic-no-random-seed\",\n",
+            "  \"resource_limits\": {{\"time_limit_ns\": null, \"memory_limit_bytes\": null}},\n",
             "  \"normalized_result_fnv1a64\": \"{:016x}\",\n",
             "  \"limitations\": [\"FNV-1a is a non-cryptographic integrity checksum\", \"wall-clock timings are local diagnostics and are not comparable across machines without a controlled protocol\", \"the bounded exact oracle is a correctness reference, not a competitive solver\", \"this run does not execute a quantum backend\"]\n",
             "}}"
@@ -301,6 +387,10 @@ fn run(path: &str) -> Result<(), String> {
         exact_ns.map(|value| value.to_string()).unwrap_or_else(|| "null".to_owned()),
         parse_ns,
         end_to_end_ns,
+        env!("CARGO_PKG_VERSION"),
+        env::consts::OS,
+        env::consts::ARCH,
+        option_env!("RUSTC_VERSION").unwrap_or("not-recorded-at-build"),
         normalized_hash
     );
     Ok(())
@@ -316,7 +406,8 @@ fn main() -> ExitCode {
     match run(&args[1]) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("{error}");
+            eprintln!("{}", error.message);
+            println!("{}", failure_receipt_json(&args[1], &error));
             ExitCode::FAILURE
         }
     }
@@ -372,6 +463,26 @@ mod tests {
         assert_eq!(improved.exchanges, 0);
         assert_eq!(improved.pair_checks, 0);
         assert!(graph.verify_solution(&improved.vertices, Some(improved.vertices.len())).feasible);
+    }
+
+
+    #[test]
+    fn failure_receipt_preserves_parse_failure_and_source_identity() {
+        let failure = RunFailure {
+            kind: "dimacs_parse",
+            message: "bad \"header\"\nline".to_owned(),
+            source_bytes: Some(42),
+            source_fnv1a64: Some(0x0123_4567_89ab_cdef),
+            elapsed_ns: 17,
+        };
+        let receipt = failure_receipt_json("graphs/farm\n.gph", &failure);
+        assert!(receipt.contains("\"return_status\": \"failed\""));
+        assert!(receipt.contains("\"error_kind\": \"dimacs_parse\""));
+        assert!(receipt.contains("\"source_bytes\": 42"));
+        assert!(receipt.contains("\"source_fnv1a64\": \"0123456789abcdef\""));
+        assert!(receipt.contains("\"error\": \"bad \\\"header\\\"\\nline\""));
+        assert!(receipt.contains("\"source_path\": \"graphs/farm\\n.gph\""));
+        assert!(receipt.contains("\"time_limit_ns\": null"));
     }
 
 }
