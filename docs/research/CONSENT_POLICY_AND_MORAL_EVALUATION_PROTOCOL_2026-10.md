@@ -102,3 +102,18 @@ Measure this separately from parser precision/recall:
 - **Performance:** report p50/p95/p99 gate latency separately from external record retrieval.
 
 The helper only enforces the consent-specific precondition at its call site. It does not authenticate records, choose the action policy, guarantee a trusted clock, integrate every executor, or make an external side effect atomic with a revocation store. Callers must obtain fresh verified evidence immediately before use and complete other required checks. If a resource can change concurrently, use resource-side version/transaction enforcement. Do not infer end-to-end safety or SOTA superiority from the helper, parser F1 or a handful of unit tests.
+
+### Deterministic consent-gate matrix probe
+
+The separate example `consent_gate_matrix_bench` enumerates **9,600 synthetic combinations** across:
+- all three consent-requirement outcomes (`NotRequired`, `Required`, `Unresolved`);
+- all five consent states;
+- all eight record/identity/authority verification-flag combinations;
+- revoked vs. non-revoked records;
+- missing vs. present evidence;
+- exact vs. mismatched request/evidence scope, including an empty record ID;
+- valid, not-yet-valid, expired and invalid validity windows.
+
+It checks that blocked cases never invoke the closure, explicitly NotRequired cases retain their outcome, and the one valid Required configuration returns Satisfied and invokes the closure exactly once. It reports false permits, false blocks and closure-invocation mismatches, exiting nonzero when an invariant fails. Reproduce with `cargo run --example consent_gate_matrix_bench`.
+
+This is an exhaustive deterministic matrix only for the listed *synthetic dimensions*. It does not cover cryptographic record validation, real revocation races, trusted-clock failure, canonicalization bugs, dispatcher bypasses, persistence/replay across processes, concurrency, or external side effects. Its expected oracle is intentionally simpler than the implementation, but it shares the same Rust request/evidence types; an independent reviewer should inspect the oracle and fixture construction. It remains unexecuted in this authoring environment and is not yet a release gate.
