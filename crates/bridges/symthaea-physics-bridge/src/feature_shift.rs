@@ -249,6 +249,28 @@ mod tests {
     }
 
     #[test]
+    fn fixed_reference_separates_mean_and_scale_changes() {
+        let reference = rows_with_correlation(128, 0.0);
+        let scorer = FeatureShiftScorer::fit(&reference, 1e-9).unwrap();
+
+        let mean_shift = reference
+            .iter()
+            .map(|row| vec![row[0] + 0.5, row[1]])
+            .collect::<Vec<_>>();
+        let mean_score = scorer.score(&mean_shift).unwrap();
+        assert!(mean_score.normalized_mean_shift > 5.0);
+        assert!(mean_score.normalized_mean_shift > mean_score.normalized_scale_shift);
+
+        let scale_shift = reference
+            .iter()
+            .map(|row| vec![row[0] * 3.0, row[1]])
+            .collect::<Vec<_>>();
+        let scale_score = scorer.score(&scale_shift).unwrap();
+        assert!(scale_score.normalized_scale_shift > 8.0);
+        assert!(scale_score.normalized_scale_shift > scale_score.normalized_mean_shift);
+    }
+
+    #[test]
     fn fixed_reference_rejects_malformed_or_nonfinite_rows() {
         assert!(FeatureShiftScorer::fit(&[], 1e-9).is_none());
         assert!(FeatureShiftScorer::fit(&[vec![1.0]], 1e-9).is_none());
