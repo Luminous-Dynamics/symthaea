@@ -174,6 +174,32 @@ pub fn evaluate_consent_gate(
     ConsentGateOutcome::Satisfied
 }
 
+/// Evaluate the consent precondition at the point of use and invoke a protected
+/// action only when this consent-specific gate is satisfied or the policy
+/// explicitly says consent is not required.
+///
+/// Callers must fetch fresh evidence and a trusted current time immediately
+/// before calling this function, and must complete all *other* authorization,
+/// safety, and legal checks before invoking it. Parser output must never be
+/// represented as verified evidence. This synchronous helper inserts no
+/// `await` between checking consent and invoking the closure, but it cannot
+/// eliminate races in an external system: resources with concurrent revocation
+/// or mutation must additionally enforce revision/transaction checks themselves.
+///
+/// A blocked result never invokes `action`.
+pub fn execute_after_consent_check<T>(
+    requirement: ConsentRequirement,
+    request: ConsentRequest<'_>,
+    evidence: Option<&ConsentEvidence<'_>>,
+    now_unix_s: u64,
+    action: impl FnOnce() -> T,
+) -> Result<T, ConsentBlockReason> {
+    match evaluate_consent_gate(requirement, request, evidence, now_unix_s) {
+        ConsentGateOutcome::Blocked(reason) => Err(reason),
+        ConsentGateOutcome::Satisfied | ConsentGateOutcome::NotRequired => Ok(action()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -336,4 +362,40 @@ mod tests {
             ConsentGateOutcome::NotRequired
         );
     }
+    #[test]
+    fn blocked_point_of_use_gate_never_invokes_protected_action() {
+        let mut invoked = false;
+        let result = execute_after_consent_check(
+            ConsentRequirement::Required,
+            request(),
+            Some(&evidence(ConsentState::Unknown)),
+            NOW,
+            || {
+                invoked = true;
+                7
+            },
+        );
+
+        assert_eq!(result, Err(ConsentBlockReason::UnknownState));
+        assert!(!invoked, "a blocked consent gate must not run the action closure");
+    }
+
+    #[test]
+    fn satisfied_point_of_use_gate_invokes_protected_action_exactly_once() {
+        let invocations = std::cell::Cell::new(0);
+        let result = execute_after_consent_check(
+            ConsentRequirement::Required,
+            request(),
+            Some(&evidence(ConsentState::Given)),
+            NOW,
+            || {
+                invocations.set(invocations.get() + 1);
+                "executed"
+            },
+        );
+
+        assert_eq!(result, Ok("executed"));
+        assert_eq!(invocations.get(), 1);
+    }
+
 }
