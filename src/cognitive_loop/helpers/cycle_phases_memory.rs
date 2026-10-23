@@ -306,9 +306,13 @@ impl CognitiveLoopService {
         surprise_thresh: f64,
         module_timings: &mut super::super::ModuleTimings,
     ) -> EpisodicReplayResult {
-        let prediction_error = state.prediction_error;
-        let prediction_error_valid =
-            state.prediction_error_valid && prediction_error.is_finite();
+        let prediction_error_sample = state
+            .prediction_evidence
+            .value_for_observation(self.stats.total_cycles as u64);
+        let prediction_error_valid = prediction_error_sample.is_some();
+        // Replay uses only a value bound to this observation cycle. Invalid or
+        // stale evidence contributes no numeric outcome to the episode.
+        let prediction_error = prediction_error_sample.unwrap_or(0.0);
         let coherence = state.coherence;
         let compressed_state = state.compressed_state;
         let output = state.output;
