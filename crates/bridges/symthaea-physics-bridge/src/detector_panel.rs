@@ -295,10 +295,12 @@ fn auc_perturbed_higher(clean: &[f64], perturbed: &[f64]) -> f64 {
             end += 1;
         }
         let average_rank = ((start + 1) as f64 + end as f64) / 2.0;
-        let positives_in_group = labelled[start..end]
-            .iter()
-            .filter(|entry| entry.1)
-            .count();
+        let mut positives_in_group = 0_usize;
+        for (_, positive) in &labelled[start..end] {
+            if *positive {
+                positives_in_group += 1;
+            }
+        }
         positive_rank_sum += average_rank * positives_in_group as f64;
         start = end;
     }
@@ -366,11 +368,13 @@ mod tests {
     fn outer_conformal_calibration_is_separate_and_typed() {
         let panel = fit_panel(DetectorPanelAggregation::MeanPositiveZ);
         let mut outer_clean = Vec::new();
-        for index in 0..100 {
-            let x = (index % 40) as f64 * 0.05;
-            let y = (index % 40) as f64 * 0.04;
-            let quiet = ((index * 3) % 5) as f64 * 0.1;
-            outer_clean.push(panel.score(&[x, y, quiet]).unwrap());
+        let mut state = 0x61A7_0E5D_93C2_B841_u64;
+        for _ in 0..100 {
+            state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+            let x = ((state >> 11) as f64 / ((1_u64 << 53) as f64)) * 1.95;
+            state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+            let quiet = ((state >> 11) as f64 / ((1_u64 << 53) as f64)) * 0.4;
+            outer_clean.push(panel.score(&[x, x * 0.8, quiet]).unwrap());
         }
         let calibrator = ConformalAdequacyCalibrator::new(&outer_clean, 0.05).unwrap();
         let (_, perturbed) = selection_data();
