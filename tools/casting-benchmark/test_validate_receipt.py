@@ -61,6 +61,18 @@ class ReceiptValidatorTests(unittest.TestCase):
         invalid["accounting"]["failed_evaluations"] = 0
         self.assertTrue(any("must sum exactly" in error for error in validate_receipt(invalid)))
 
+    def test_extreme_integer_metrics_fail_closed_without_exceptions(self) -> None:
+        invalid = copy.deepcopy(self.receipt)
+        invalid["metrics"]["final_hypervolume"] = 10 ** 10000
+        self.assertTrue(validate_receipt(invalid))
+
+    def test_multifidelity_level_identifiers_are_restricted(self) -> None:
+        invalid = copy.deepcopy(self.receipt)
+        invalid["evaluation_mode"] = "multi_fidelity"
+        invalid["accounting"]["fidelity_evaluations"] = {"low level": 48, "high": 16}
+        invalid["accounting"]["fidelity_cost_units_by_level"] = {"low level": 48.0, "high": 160.0}
+        self.assertTrue(any("invalid fidelity level identifier" in error for error in validate_receipt(invalid)))
+
     def test_success_with_error_termination_is_rejected(self) -> None:
         invalid = copy.deepcopy(self.receipt)
         invalid["termination_reason"] = "error"
