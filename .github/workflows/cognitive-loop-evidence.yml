@@ -68,6 +68,9 @@ jobs:
           jq -e '
             .metric_id == "event-f1" and
             .dataset_count == 3 and
+            .minimum_seeds_per_dataset == 2 and
+            .sota_coverage_gate_pass == false and
+            (.sota_coverage_gate_reason | contains("seven datasets and 50 seeds")) and
             .paired_record_count == 12 and
             .interval_supports_positive_effect == true and
             (.percentile_95_ci_oriented_effect[0] > 0) and
