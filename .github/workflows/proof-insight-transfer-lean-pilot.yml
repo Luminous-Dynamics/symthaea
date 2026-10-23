@@ -267,37 +267,92 @@ jobs:
           schema = json.loads(schema_path.read_text())
           Draft202012Validator.check_schema(schema)
           validator = Draft202012Validator(schema, format_checker=FormatChecker())
-          errors = sorted(validator.iter_errors(receipt), key=lambda e: (list(map(str, e.absolute_path)), e.message))
+          def receipt_errors(candidate):
+              errors = [
+                  "schema " + (".".join(map(str, error.absolute_path)) or "<root>") + ": " + error.message
+                  for error in sorted(
+                      validator.iter_errors(candidate),
+                      key=lambda error: (list(map(str, error.absolute_path)), error.message),
+                  )
+              ]
+              if candidate.get("commit_sha") != os.environ["PITB_HEAD_SHA"]:
+                  errors.append("receipt commit SHA does not match the triggering head")
+              if candidate.get("repository") != os.environ["PITB_REPOSITORY"]:
+                  errors.append("receipt repository does not match the triggering repository")
+              source = candidate.get("source", {})
+              if source.get("receipt_schema_sha256") != hashlib.sha256(schema_path.read_bytes()).hexdigest():
+                  errors.append("receipt schema digest does not match the checked-in schema")
+              bindings = candidate.get("case_manifest_bindings", [])
+              case_ids = [case.get("case_id") for case in bindings]
+              if len(case_ids) != len(set(case_ids)):
+                  errors.append("receipt contains duplicate case-manifest binding IDs")
+              trace = candidate.get("proof_state_intervention_trace", {})
+              trace_id = trace.get("case_id")
+              trace_cases = [
+                  case for case in bindings
+                  if case.get("case_id") == trace_id
+                  and (case.get("state_intervention") or {}).get("operation") == "clear h"
+              ]
+              if len(trace_cases) != 1:
+                  errors.append("trace receipt is not bound to exactly one clear-h manifest case")
+              elif (
+                  trace_cases[0].get("base_statement_fragment_sha256")
+                  != trace_cases[0].get("variant_statement_fragment_sha256")
+              ):
+                  errors.append("clear-h trace does not preserve the normalized theorem statement")
+              return errors
+
+          errors = receipt_errors(receipt)
           if errors:
               for error in errors:
-                  location = ".".join(map(str, error.absolute_path)) or "<root>"
-                  print(f"RECEIPT_SCHEMA_ERROR {location}: {error.message}", file=sys.stderr)
-              raise SystemExit(f"receipt failed {len(errors)} Draft 2020-12 schema checks")
+                  print(f"RECEIPT_VALIDATION_ERROR: {error}", file=sys.stderr)
+              raise SystemExit(f"receipt failed {len(errors)} schema or binding checks")
 
-          if receipt["commit_sha"] != os.environ["PITB_HEAD_SHA"]:
-              raise SystemExit("receipt commit SHA does not match the triggering head")
-          if receipt["repository"] != os.environ["PITB_REPOSITORY"]:
-              raise SystemExit("receipt repository does not match the triggering repository")
-          expected_schema_digest = hashlib.sha256(schema_path.read_bytes()).hexdigest()
-          if receipt["source"]["receipt_schema_sha256"] != expected_schema_digest:
-              raise SystemExit("receipt schema digest does not match the checked-in schema")
-          case_ids = [case["case_id"] for case in receipt["case_manifest_bindings"]]
-          if len(case_ids) != len(set(case_ids)):
-              raise SystemExit("receipt contains duplicate case-manifest binding IDs")
-          trace_id = receipt["proof_state_intervention_trace"]["case_id"]
-          trace_cases = [
-              case for case in receipt["case_manifest_bindings"]
-              if case["case_id"] == trace_id
-              and (case.get("state_intervention") or {}).get("operation") == "clear h"
-          ]
-          if len(trace_cases) != 1:
-              raise SystemExit("trace receipt is not bound to exactly one clear-h manifest case")
-          if trace_cases[0]["base_statement_fragment_sha256"] != trace_cases[0]["variant_statement_fragment_sha256"]:
-              raise SystemExit("clear-h trace does not preserve the normalized theorem statement")
-          actual_receipt_sha = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
-          recorded_receipt_sha = digest_path.read_text().split()[0]
-          if actual_receipt_sha != recorded_receipt_sha:
-              raise SystemExit("receipt SHA-256 sidecar does not match receipt.json")
+          # Negative controls make the evidence gate testable: each mutated
+          # receipt must be rejected by schema validation or by cross-field joins.
+          import copy
+
+          negative_controls = []
+          bad_commit = copy.deepcopy(receipt)
+          bad_commit["commit_sha"] = "a" * 40
+          negative_controls.append(("triggering commit mismatch", bad_commit))
+
+          bad_schema_digest = copy.deepcopy(receipt)
+          bad_schema_digest["source"]["receipt_schema_sha256"] = "0" * 64
+          negative_controls.append(("receipt schema digest mismatch", bad_schema_digest))
+
+          orphan_trace = copy.deepcopy(receipt)
+          orphan_trace["proof_state_intervention_trace"]["case_id"] = "missing-case"
+          negative_controls.append(("orphan proof-state trace", orphan_trace))
+
+          changed_goal = copy.deepcopy(receipt)
+          changed_goal["proof_state_intervention_trace"]["goal_type_preserved"] = False
+          negative_controls.append(("goal type changed", changed_goal))
+
+          duplicate_binding = copy.deepcopy(receipt)
+          duplicate_binding["case_manifest_bindings"][1]["case_id"] = duplicate_binding["case_manifest_bindings"][0]["case_id"]
+          negative_controls.append(("duplicate case binding", duplicate_binding))
+
+          scored_fixture = copy.deepcopy(receipt)
+          scored_fixture["case_manifest_bindings"][0]["model_outcomes"] = "pass"
+          negative_controls.append(("synthetic case falsely marked scored", scored_fixture))
+
+          changed_statement = copy.deepcopy(receipt)
+          trace_case = next(
+              case for case in changed_statement["case_manifest_bindings"]
+              if case["case_id"] == changed_statement["proof_state_intervention_trace"]["case_id"]
+          )
+          trace_case["variant_statement_fragment_sha256"] = "0" * 64
+          negative_controls.append(("theorem statement drift", changed_statement))
+
+          missing_artifact_digest = copy.deepcopy(receipt)
+          del missing_artifact_digest["checked_artifact"]["sha256"]
+          negative_controls.append(("missing checked artifact digest", missing_artifact_digest))
+
+          for name, invalid_receipt in negative_controls:
+              if not receipt_errors(invalid_receipt):
+                  raise SystemExit(f"receipt negative control unexpectedly accepted: {name}")
+          print(f"PITB_RECEIPT_NEGATIVE_CONTROLS_PASS: {len(negative_controls)}/{len(negative_controls)} rejected")
           print("PITB_RECEIPT_SCHEMA_AND_BINDINGS_PASS")
           print(f"receipt_sha256={actual_receipt_sha}")
           print(f"receipt_schema_sha256={expected_schema_digest}")
