@@ -1405,6 +1405,8 @@ mod tests {
         let mut misspec_pit_detections = 0usize;
         let mut pit_audit_queries = 0usize;
         let mut protocol_failures = 0usize;
+        let mut total_model_family_expansions = 0usize;
+        let mut terminal_pit_alarms = 0usize;
 
         for seed in 1..=SEEDS {
             let clean_baseline = run_trial_with_discrepancy(
@@ -1446,6 +1448,10 @@ mod tests {
             misspec_pit_detections +=
                 if misspecified_pit.model_discrepancy_detected { 1 } else { 0 };
             pit_audit_queries += misspecified_pit.audit_queries + clean_pit.audit_queries;
+            total_model_family_expansions +=
+                clean_pit.model_family_expansions + misspecified_pit.model_family_expansions;
+            terminal_pit_alarms += if clean_pit.terminal_pit_alarm { 1 } else { 0 };
+            terminal_pit_alarms += if misspecified_pit.terminal_pit_alarm { 1 } else { 0 };
             protocol_failures += if clean_pit.monitoring_protocol_invalid { 1 } else { 0 };
             protocol_failures += if misspecified_pit.monitoring_protocol_invalid { 1 } else { 0 };
         }
@@ -1458,7 +1464,8 @@ mod tests {
                 "misspec_baseline_false_singletons={misspec_baseline_false_singletons},",
                 "misspec_pit_false_singletons={misspec_pit_false_singletons},",
                 "misspec_pit_detections={misspec_pit_detections},",
-                "pit_audit_queries={pit_audit_queries},protocol_failures={protocol_failures}"
+                "pit_audit_queries={pit_audit_queries},model_family_expansions={total_model_family_expansions},",
+                "terminal_pit_alarms={terminal_pit_alarms},protocol_failures={protocol_failures}"
             )
         );
 
@@ -1470,6 +1477,8 @@ mod tests {
             pit_audit_queries > 0,
             "the integrated policy never reached a singleton audit"
         );
+        assert!(total_model_family_expansions <= 4 * SEEDS as usize);
+        assert!(terminal_pit_alarms <= 2 * SEEDS as usize);
         assert!(clean_baseline_successes <= SEEDS as usize);
         assert!(clean_pit_successes <= SEEDS as usize);
         assert!(misspec_pit_detections <= SEEDS as usize);
