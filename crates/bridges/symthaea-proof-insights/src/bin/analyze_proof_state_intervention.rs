@@ -460,7 +460,7 @@ fn analyze(
         "limitations": [
             concat!(
                 "The analyzer validates suite-to-outcome joins but does not ",
-                "establish the mathematical 
+                "establish the mathematical ",
                 "correctness of reviewer labels."
             ),
             concat!(
