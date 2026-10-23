@@ -155,8 +155,19 @@ pub fn score_trace(mut trace: DriftTrace) -> anyhow::Result<DriftScore> {
         );
     }
 
-    let canonical_trace = serde_json::to_vec(&trace)?;
-    let canonical_trace_sha256 = sha256_hex(&canonical_trace);
+    // Canonical digest is invariant to array ordering in the JSON input.
+    let mut canonical_trace = trace.clone();
+    canonical_trace.drift_events.sort_by_key(|event| (
+        event.start_cycle,
+        event.end_cycle,
+        event.id.clone(),
+    ));
+    canonical_trace.detections.sort_by_key(|detection| (
+        detection.cycle_index,
+        detection.evidence_valid,
+    ));
+    let canonical_trace_bytes = serde_json::to_vec(&canonical_trace)?;
+    let canonical_trace_sha256 = sha256_hex(&canonical_trace_bytes);
 
     // Earliest-deadline interval matching maximizes event/alarm matches for interval-compatible
     // events; alarms still prefer the earliest valid timestamp within each window.
@@ -381,6 +392,27 @@ mod tests {
         let mut bad = trace(vec![], vec![]);
         bad.comparison_track = "secret-label-leak".to_owned();
         assert!(score_trace(bad).is_err());
+    }
+
+    #[test]
+    fn trace_digest_is_invariant_to_event_and_alarm_order() {
+        let first = trace(
+            vec![
+                DriftEvent { id: "d2".to_owned(), start_cycle: 300, end_cycle: 305 },
+                DriftEvent { id: "d1".to_owned(), start_cycle: 100, end_cycle: 105 },
+            ],
+            vec![
+                Detection { cycle_index: 301, evidence_valid: true },
+                Detection { cycle_index: 101, evidence_valid: true },
+            ],
+        );
+        let mut second = first.clone();
+        second.drift_events.reverse();
+        second.detections.reverse();
+        let a = score_trace(first).expect("first trace scores");
+        let b = score_trace(second).expect("reordered trace scores");
+        assert_eq!(a.canonical_trace_sha256, b.canonical_trace_sha256);
+        assert_eq!(a.result_sha256, b.result_sha256);
     }
 
     #[test]
