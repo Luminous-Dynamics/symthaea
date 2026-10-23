@@ -1,5 +1,5 @@
 use morphology_continuity_oracle::{
-    canonical_templates, evaluate_episode, template, TargetEvidence, REQUEST_SHA256,
+    REQUEST_SHA256, TargetEvidence, canonical_templates, evaluate_episode, template,
 };
 use std::env;
 
