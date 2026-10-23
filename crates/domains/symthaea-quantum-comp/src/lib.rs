@@ -55,7 +55,6 @@ pub mod release_manifest;
 pub mod replay;
 pub mod reporting;
 pub mod rng;
-pub mod random_regular_mis;
 pub mod robustness;
 pub mod schema;
 pub mod significance;
@@ -111,10 +110,6 @@ pub use matrix::{
     ExperimentMatrixCell, ExperimentMatrixConfig, ExperimentMatrixReport, ExperimentMatrixRunner,
 };
 pub use migration::{MigrationGuide, MigrationRisk, MigrationStep, alpha9_to_alpha10_migration};
-pub use random_regular_mis::{
-    RANDOM_REGULAR_MIS_GENERATOR_VERSION, RandomRegularMisError, RandomRegularMisGraph,
-    generate_random_regular_mis_graph, MAX_RANDOM_REGULAR_MIS_STUBS,
-};
 pub use noise_sweep::{NoiseSweepConfig, NoiseSweepPoint, NoiseSweepReport, NoiseSweepRunner};
 pub use phase_hdc::PhaseHypervector;
 pub use preflight::{
