@@ -113,8 +113,7 @@ impl RandomProjectionFeatureShiftScorer {
     pub fn score(&self, audit_rows: &[Vec<f64>]) -> Option<FeatureShiftScore> {
         if audit_rows.len() < 2
             || audit_rows.iter().any(|row| {
-                row.len() != self.feature_means.len()
-                    || row.iter().any(|value| !value.is_finite())
+                row.len() != self.feature_means.len() || row.iter().any(|value| !value.is_finite())
             })
         {
             return None;
@@ -169,10 +168,9 @@ impl RandomProjectionFeatureShiftScorer {
             let mean_shift = (audit_means[index] - self.reference_projection_means[index]).abs()
                 / reference_scale
                 * n.sqrt();
-            let scale_shift = (audit_scales[index].max(PROJECTED_SCALE_FLOOR).ln()
-                - reference_scale.ln())
-            .abs()
-                * (n / 2.0).sqrt();
+            let scale_shift =
+                (audit_scales[index].max(PROJECTED_SCALE_FLOOR).ln() - reference_scale.ln()).abs()
+                    * (n / 2.0).sqrt();
             if !mean_shift.is_finite() || !scale_shift.is_finite() {
                 return None;
             }
@@ -382,7 +380,10 @@ fn column_scales(rows: &[Vec<f64>], means: &[f64], feature_count: usize) -> Opti
         .into_iter()
         .map(|sum| (sum / denominator).sqrt())
         .collect::<Vec<_>>();
-    scales.iter().all(|value| value.is_finite()).then_some(scales)
+    scales
+        .iter()
+        .all(|value| value.is_finite())
+        .then_some(scales)
 }
 
 fn pairwise_correlations(
@@ -391,9 +392,7 @@ fn pairwise_correlations(
     scales: &[f64],
     feature_count: usize,
 ) -> Option<Vec<f64>> {
-    let correlation_count = feature_count
-        .checked_mul(feature_count.saturating_sub(1))?
-        / 2;
+    let correlation_count = feature_count.checked_mul(feature_count.saturating_sub(1))? / 2;
     let mut correlations = Vec::with_capacity(correlation_count);
     for left in 0..feature_count {
         for right in (left + 1)..feature_count {
@@ -619,8 +618,8 @@ mod tests {
         let projected_p95 = timing_percentile(&mut projected_times, 95);
         let exact_pairs = exact.correlation_count();
         let projected_pairs = projected.projected_correlation_count();
-        let exact_reference_bytes = FEATURES * 2 * std::mem::size_of::<f64>()
-            + exact_pairs * std::mem::size_of::<f64>();
+        let exact_reference_bytes =
+            FEATURES * 2 * std::mem::size_of::<f64>() + exact_pairs * std::mem::size_of::<f64>();
         let projected_reference_bytes = FEATURES * 2 * std::mem::size_of::<f64>()
             + FEATURES * PROJECTIONS * std::mem::size_of::<i8>()
             + PROJECTIONS * 2 * std::mem::size_of::<f64>()
@@ -640,5 +639,4 @@ mod tests {
             exact_p50 as f64 / projected_p50.max(1) as f64
         );
     }
-
 }
