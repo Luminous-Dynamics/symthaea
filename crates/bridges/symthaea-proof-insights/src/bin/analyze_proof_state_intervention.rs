@@ -23,6 +23,9 @@ const ANALYZER_SOURCE: &str = include_str!("analyze_proof_state_intervention.rs"
 const DEFAULT_BOOTSTRAP_REPLICATES: usize = 2_000;
 const DEFAULT_SEED: u64 = 0x5053_494E_5445_5256;
 const MIN_BOOTSTRAP_REPLICATES: usize = 1_000;
+// A percentile bootstrap over very few clusters gives unstable, low-information intervals.
+// This is a descriptive reporting floor, not a guarantee of adequate statistical power.
+const MIN_COMPONENTS_FOR_INTERVAL: usize = 20;
 
 #[derive(Debug, Clone)]
 struct StateRow {
@@ -60,6 +63,8 @@ struct Metric {
     numerator: usize,
     denominator: usize,
     estimate: Option<f64>,
+    independent_components: usize,
+    interval_status: &'static str,
     lower_95: Option<f64>,
     upper_95: Option<f64>,
 }
@@ -457,9 +462,9 @@ fn analyze(
             "seed": seed,
             "interval": "percentile_95",
             "note": concat!(
-                "Intervals are component-clustered descriptive intervals; ",
-                "the analyzer never certifies ",
-                "the independent truth of the supplied labels."
+                "Intervals are component-clustered percentile-bootstrap summaries emitted only when at least ",
+                "20 independent components contribute. This is a descriptive reporting floor, not a ",
+                "prospective power analysis; the analyzer never certifies the independent truth of supplied labels."
             ),
         },
         "counts": Value::Object(counts),
@@ -923,7 +928,15 @@ fn estimate(points: Vec<Point>, replicates: usize, seed: u64) -> Metric {
     let denominator = points.len();
     let numerator = points.iter().filter(|point| point.success).count();
     if denominator == 0 {
-        return Metric { numerator, denominator, estimate: None, lower_95: None, upper_95: None };
+        return Metric {
+            numerator,
+            denominator,
+            estimate: None,
+            independent_components: 0,
+            interval_status: "not_reported_no_observations",
+            lower_95: None,
+            upper_95: None,
+        };
     }
     let estimate = numerator as f64 / denominator as f64;
     let mut grouped = BTreeMap::<String, Vec<bool>>::new();
@@ -931,13 +944,16 @@ fn estimate(points: Vec<Point>, replicates: usize, seed: u64) -> Metric {
         grouped.entry(point.component_id.clone()).or_default().push(point.success);
     }
     let components: Vec<_> = grouped.keys().cloned().collect();
-    if components.len() < 2 {
-        // Cluster resampling cannot estimate between-component uncertainty from
-        // one independent component. Keep the point estimate; expose no interval.
+    if components.len() < MIN_COMPONENTS_FOR_INTERVAL {
+        // Keep the descriptive point estimate, but do not manufacture a confidence
+        // interval from a handful of nominally independent clusters. The 20-cluster
+        // threshold is only a reporting floor; prospective power analysis is still required.
         return Metric {
             numerator,
             denominator,
             estimate: Some(estimate),
+            independent_components: components.len(),
+            interval_status: "suppressed_insufficient_independent_components",
             lower_95: None,
             upper_95: None,
         };
@@ -965,6 +981,8 @@ fn estimate(points: Vec<Point>, replicates: usize, seed: u64) -> Metric {
         numerator,
         denominator,
         estimate: Some(estimate),
+        independent_components: components.len(),
+        interval_status: "reported_descriptive_interval",
         lower_95: lower,
         upper_95: upper,
     }
@@ -983,8 +1001,10 @@ fn metric_json(metric: Metric) -> Value {
         "numerator": metric.numerator,
         "denominator": metric.denominator,
         "estimate": metric.estimate,
+        "independent_components": metric.independent_components,
         "confidence_interval_95": {
             "method": "component_clustered_percentile_bootstrap",
+            "status": metric.interval_status,
             "lower": metric.lower_95,
             "upper": metric.upper_95
         }
@@ -1102,8 +1122,41 @@ mod tests {
         ];
         let result = estimate(points, 1000, 9);
         assert_eq!(result.estimate, Some(2.0 / 3.0));
+        assert_eq!(result.independent_components, 1);
+        assert_eq!(result.interval_status, "suppressed_insufficient_independent_components");
         assert_eq!(result.lower_95, None);
         assert_eq!(result.upper_95, None);
+    }
+
+    #[test]
+    fn bootstrap_interval_is_suppressed_below_twenty_independent_components() {
+        let points = (0..19)
+            .map(|index| Point {
+                component_id: format!("component-{index}"),
+                success: index % 2 == 0,
+            })
+            .collect();
+        let result = estimate(points, 1_000, 23);
+        assert_eq!(result.independent_components, 19);
+        assert_eq!(result.interval_status, "suppressed_insufficient_independent_components");
+        assert!(result.estimate.is_some());
+        assert_eq!(result.lower_95, None);
+        assert_eq!(result.upper_95, None);
+    }
+
+    #[test]
+    fn bootstrap_interval_is_reported_at_twenty_independent_components() {
+        let points = (0..20)
+            .map(|index| Point {
+                component_id: format!("component-{index}"),
+                success: index % 2 == 0,
+            })
+            .collect();
+        let result = estimate(points, 1_000, 29);
+        assert_eq!(result.independent_components, 20);
+        assert_eq!(result.interval_status, "reported_descriptive_interval");
+        assert!(result.lower_95.is_some());
+        assert!(result.upper_95.is_some());
     }
 
     fn checked_in_synthetic_inputs() -> (Value, Value) {
