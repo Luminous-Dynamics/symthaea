@@ -12192,7 +12192,8 @@
     "total_graph_instances": 700000,
     "algorithm_under_test": "fixed-angle quantum-enhanced greedy with depth p=4",
     "comparison_requirements": [
-      "Use each generated graph for both p=4 hybrid and Marino-Kirkpatrick baseline so outcomes are paired.",
+      "Keep two designs distinct: same-completed-graph paired comparisons for graph-conditioned solvers; original Marino-Kirkpatrick deferred-decision comparison is unpaired at the distribution level unless identical completed-graph inputs are actually verified.",
+      "Do not label an input-conditioned adaptation of Marino-Kirkpatrick as the original algorithm; if implemented, pin and evaluate it as a distinct variant.",
       "Add ordinary minimum-degree greedy as a control, including the p=1 identity control.",
       "Keep graph-generation seeds and instance order frozen; record a raw output row per solver-instance pair.",
       "Pre-register N<=2000 as the primary reproduction comparison because the preprint reports statistically significant improvement through that range; report N=5000 as a separately labelled scaling result.",
@@ -12210,5 +12211,39 @@
     "extension_96": "The existing 96-workload split across degrees 3/4 and held-out sizes is an extension/generalization track, not the paper's 3-regular replication-shape cohort.",
     "paper_shape_1400": "A separate seeded 3-regular cohort with the seven sizes and 200 instances per size reported in the public preprint.",
     "sota_campaign_700000": "A specified larger streaming campaign (100000 graphs per size) for the Marino-Kirkpatrick SOTA comparison; it has not been executed and should not be conflated with the 1400-graph replication-shape set."
+  },
+  "comparison_designs": {
+    "fixed_instance_solver_panel": {
+      "estimand": "difference in verified independence ratio/quality when each algorithm receives the identical completed graph",
+      "algorithms": [
+        "p=1 fixed-angle QAOA-informed greedy identity control, which should reduce to minimum-degree greedy with randomized tie handling",
+        "p=4 QAOA-informed greedy using a pinned expectation-value source and distinct simulator/physical-QPU evidence",
+        "ordinary minimum-degree greedy with predeclared tie-breaking",
+        "seeded multi-start minimum-degree greedy with all restarts and total runtime charged",
+        "fixed-instance classical local-search or ILS baseline, with declared time/iteration budget"
+      ],
+      "pairing_unit": "graph SHA-256 plus preregistered repetition seed; graph is the outer statistical cluster",
+      "inference": "paired graph-level effects; cluster-aware uncertainty; correct preregistered multiplicity",
+      "evidence_boundary": "The original Marino-Kirkpatrick deferred-decision procedure is not included in this paired panel unless a separate completed-graph solver variant is implemented and explicitly labelled as a new variant."
+    },
+    "generator_coupled_distribution_comparison": {
+      "estimand": "difference in independence-ratio distributions over the same declared random simple d-regular graph distribution, with graph/independent-set construction coupled in the Marino-Kirkpatrick arm",
+      "reference_algorithm": "Original Marino-Kirkpatrick deferred-decision prioritized procedure, source and compilation provenance pinned separately",
+      "comparison_to_qgreedy": "Unpaired distribution-level comparison. The algorithms do not consume identical completed graph bytes: Marino-Kirkpatrick discovers edges as part of constructing the graph and uses those partial labels to decide future pairing/virtual-node actions.",
+      "do_not_do": "Do not assign a shared graph-pair key or run a paired sign-flip test between original Marino-Kirkpatrick outputs and QGreedy outputs unless exact same-graph identity is actually established.",
+      "required_controls": [
+        "Verify the paper's uniform simple d-regular generation contract and rejection behavior; no loops or parallel edges in accepted graph samples.",
+        "Use preregistered size/degree cells and report sample counts, seed ranges, failed attempts and graph statistics for each arm.",
+        "Report unpaired mean/median independence ratio, distribution quantiles, uncertainty and runtime/cost with a correctly specified independent-sample analysis.",
+        "Compare the finite-N results to the published asymptotic lower-bound reference r_infinity approximately 0.445330 as a theory line, not as a same-instance observation.",
+        "Keep N<=2000 primary and N=5000 scaling/sensitivity separate as preregistered by the paper-shaped track."
+      ]
+    },
+    "compatibility_rationale": "Marino-Kirkpatrick (arXiv:2003.12293, Section 2–3) uses deferred edge revelation and generates the random d-regular graph concurrently with its label/virtual-node process. It claims uniform sampling under constrained stub pairings. It is therefore not natively a function from arbitrary completed graph input to MIS solution. A fixed graph input-adapted implementation is a different algorithm and must have a different ID.",
+    "source_refs": [
+      "https://arxiv.org/abs/2003.12293",
+      "https://arxiv.org/abs/2601.21923",
+      "https://journals.aps.org/prresearch/accepted/10.1103/ds1n-wsdm"
+    ]
   }
 }
