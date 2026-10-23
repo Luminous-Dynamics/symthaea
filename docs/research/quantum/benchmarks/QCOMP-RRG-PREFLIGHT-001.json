@@ -1829,5 +1829,47 @@
     "Twenty seeds per size is a generator smoke sample, not a statistical validation of the configuration-model distribution and not the complete 200-per-size paper-shaped cohort.",
     "FNV-1a edge-list fingerprints are non-cryptographic screening IDs, not provenance hashes. A Rust run must record SHA-256 of each materialized DIMACS byte stream.",
     "No solver, QAOA expectation calculation, QPU, or performance comparison was run."
-  ]
+  ],
+  "distributional_sanity_check": {
+    "status": "independent-javascript-translation-only; not Rust execution or certification",
+    "graph_size": 6,
+    "degree": 3,
+    "sample_count": 100000,
+    "seed_derivation": "SplitMix64-derived seed words starting from index 123456789; each seed initializes the same XorShift64* stream used by the proposed Rust generator",
+    "graph_isomorphism_classes": {
+      "no_triangles": {
+        "interpretation": "K3,3",
+        "exact_labeled_graph_count": 10,
+        "exact_probability": 0.14285714285714285,
+        "observed_count": 14277,
+        "observed_probability": 0.14277
+      },
+      "contains_triangles": {
+        "interpretation": "triangular prism",
+        "exact_labeled_graph_count": 60,
+        "exact_probability": 0.8571428571428571,
+        "observed_count": 85723,
+        "observed_probability": 0.85723
+      },
+      "exact_reference": "There are 70 labeled simple 3-regular graphs on six vertices: 10 labeled K3,3 graphs and 60 labeled triangular-prism graphs. Each simple graph has (3!)^6 stub pairings, so uniform configuration-model pairing conditioned on simplicity gives the 1/7 versus 6/7 probabilities."
+    },
+    "observed_pairing_attempts": {
+      "mean_attempts_until_simple_graph": 10.59313,
+      "maximum_attempts": 118,
+      "observed_acceptance_fraction": 0.09440080505006547,
+      "exact_simple_pairing_acceptance_probability": 0.09477581242287125,
+      "note": "The 18 stubs have 17!! = 34,459,425 pairings; 70 simple labelled 3-regular graphs each correspond to (3!)^6 = 46,656 stub pairings."
+    },
+    "diagnostics": {
+      "standardized_K33_frequency_z": -0.07875066137286975,
+      "pearson_chi_square_1df": 0.006201666666668145,
+      "interpretation": "No gross small-N frequency discrepancy appeared in this sample; a passing diagnostic is not proof of uniform sampling at all sizes."
+    },
+    "limitations": [
+      "This 100,000-sample audit executed an independent JavaScript translation, not the Rust generator.",
+      "A deterministic PRNG stream and seed set are not independent true random draws; the exercise is a regression/sanity check rather than statistical certification.",
+      "Small-N results do not establish distributional correctness for all N, degrees, or rejection budgets.",
+      "The new Rust unit test uses 5,000 sequential seeds and a deliberately coarse frequency tolerance; its execution remains unconfirmed until a Rust toolchain is available."
+    ]
+  }
 }
