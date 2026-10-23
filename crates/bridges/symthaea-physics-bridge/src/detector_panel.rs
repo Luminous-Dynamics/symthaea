@@ -40,6 +40,8 @@ pub enum DetectorPanelError {
     InvalidSelectionShape,
     /// At least one selection score is non-finite.
     NonFiniteSelectionScore,
+    /// Finite input scores overflowed while computing normalization statistics.
+    NumericalOverflow,
     /// top_m must be between one and the number of detector columns.
     InvalidTopM,
     /// The AUC threshold must be finite and in (0.5, 1].
@@ -131,8 +133,10 @@ impl DetectorPanelScorer {
             return Err(DetectorPanelError::NonFiniteSelectionScore);
         }
 
-        let clean_means = column_means(clean_selection_scores, detector_count);
-        let clean_scales = column_scales(clean_selection_scores, &clean_means, detector_count);
+        let clean_means = column_means(clean_selection_scores, detector_count)
+            .ok_or(DetectorPanelError::NumericalOverflow)?;
+        let clean_scales = column_scales(clean_selection_scores, &clean_means, detector_count)
+            .ok_or(DetectorPanelError::NumericalOverflow)?;
         let mut candidates = Vec::with_capacity(detector_count);
 
         for detector_index in 0..detector_count {
@@ -251,27 +255,53 @@ fn column_values(matrix: &[Vec<f64>], column: usize) -> Vec<f64> {
     matrix.iter().map(|row| row[column]).collect()
 }
 
-fn column_means(matrix: &[Vec<f64>], width: usize) -> Vec<f64> {
-    (0..width)
-        .map(|column| {
-            matrix.iter().map(|row| row[column]).sum::<f64>() / matrix.len() as f64
-        })
-        .collect()
+fn column_means(matrix: &[Vec<f64>], width: usize) -> Option<Vec<f64>> {
+    if matrix.is_empty() || width == 0 || matrix.iter().any(|row| row.len() != width) {
+        return None;
+    }
+    let mut sums = vec![0.0_f64; width];
+    for row in matrix {
+        for (sum, value) in sums.iter_mut().zip(row.iter()) {
+            *sum += *value;
+            if !sum.is_finite() {
+                return None;
+            }
+        }
+    }
+    let means = sums
+        .into_iter()
+        .map(|sum| sum / matrix.len() as f64)
+        .collect::<Vec<_>>();
+    means.iter().all(|mean| mean.is_finite()).then_some(means)
 }
 
-fn column_scales(matrix: &[Vec<f64>], means: &[f64], width: usize) -> Vec<f64> {
-    (0..width)
-        .map(|column| {
-            let sum = matrix
-                .iter()
-                .map(|row| {
-                    let centered = row[column] - means[column];
-                    centered * centered
-                })
-                .sum::<f64>();
-            (sum / matrix.len() as f64).sqrt()
-        })
-        .collect()
+fn column_scales(matrix: &[Vec<f64>], means: &[f64], width: usize) -> Option<Vec<f64>> {
+    if matrix.is_empty()
+        || width == 0
+        || means.len() != width
+        || matrix.iter().any(|row| row.len() != width)
+    {
+        return None;
+    }
+    let mut sums_of_squares = vec![0.0_f64; width];
+    for row in matrix {
+        for column in 0..width {
+            let centered = row[column] - means[column];
+            let square = centered * centered;
+            if !centered.is_finite() || !square.is_finite() {
+                return None;
+            }
+            sums_of_squares[column] += square;
+            if !sums_of_squares[column].is_finite() {
+                return None;
+            }
+        }
+    }
+    let scales = sums_of_squares
+        .into_iter()
+        .map(|sum| (sum / matrix.len() as f64).sqrt())
+        .collect::<Vec<_>>();
+    scales.iter().all(|scale| scale.is_finite()).then_some(scales)
 }
 
 /// Exact empirical AUC for perturbed-positive observations against clean-negative observations.
@@ -425,6 +455,18 @@ mod tests {
                 DetectorPanelAggregation::MeanPositiveZ,
             ),
             Err(DetectorPanelError::NoInformativeDetectors)
+        ));
+        let overflow = vec![vec![f64::MAX; 3]; 3];
+        assert!(matches!(
+            DetectorPanelScorer::fit(
+                &overflow,
+                &perturbed,
+                2,
+                0.75,
+                1e-6,
+                DetectorPanelAggregation::MeanPositiveZ,
+            ),
+            Err(DetectorPanelError::NumericalOverflow)
         ));
         let mut malformed = clean.clone();
         malformed[0].pop();
