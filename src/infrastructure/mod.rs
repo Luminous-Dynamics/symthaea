@@ -29,7 +29,7 @@ pub mod somatic_error_bridge;
 pub mod task_supervisor;
 pub mod thermal_bridge;
 
-pub use auth::{AuthError, AuthProvider, AuthToken};
+pub use auth::{AuthError, AuthProvider, AuthToken, LocalAuth, LocalPeerIdentity};
 pub use cache::{CacheStats, HdcCache, LruCache};
 pub use file_watcher::{ConfigWatcher, WatchEvent, WatchEventKind};
 pub use flake_updater::{FlakeInput, FlakeUpdater, UpdatePreview, UpdateResult};
