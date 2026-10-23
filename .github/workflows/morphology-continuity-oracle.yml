@@ -38,6 +38,9 @@ jobs:
       - name: Verify frozen request digest
         run: echo "9348ff465116c23bacf9dfa5f1ed6ce98bb14bfa042b228800d6406ef542681f  tools/morphology-continuity-oracle/canonical_request_v0_1.txt" | sha256sum --check -
 
+      - name: Verify frozen active-evidence request digest
+        run: echo "bdbc62fb67b3461d91f51789a17eb940dddc750c50306190e599e9eec6dd6b18  tools/morphology-continuity-oracle/active_evidence_request_v0_1.txt" | sha256sum --check -
+
       - name: Formatting
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
 
