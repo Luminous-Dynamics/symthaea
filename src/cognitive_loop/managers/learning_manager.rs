@@ -419,7 +419,7 @@ mod tests {
 
         let _ = manager.process(&snapshot);
 
-        assert!(manager.surprise_history.is_empty());
+        assert_eq!(manager.surprise_count, 0);
         assert_eq!(manager.plasticity, initial_plasticity);
     }
 
