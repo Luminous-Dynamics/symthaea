@@ -200,6 +200,18 @@ impl MeshReceiver {
         self
     }
 
+    /// Whether this receiver requires per-fragment AEAD before reassembly.
+    pub(crate) fn fragment_encryption_enabled(&self) -> bool {
+        #[cfg(feature = "mesh-encryption")]
+        {
+            self.fragment_encryption
+        }
+        #[cfg(not(feature = "mesh-encryption"))]
+        {
+            false
+        }
+    }
+
     /// Set the timeout for incomplete assemblies.
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
@@ -260,7 +272,10 @@ impl MeshReceiver {
                     }
                 }
             } else {
-                raw
+                // A requested encrypted-fragment profile must never silently
+                // become plaintext merely because the key has not propagated.
+                self.stats.packets_decrypt_failed += 1;
+                return None;
             }
         } else {
             raw
