@@ -1946,7 +1946,7 @@ mod tests {
                 "clean_pit_reference_equivalents={clean_pit_reference_equivalents},",
                 "misspec_pit_reference_equivalents={misspec_pit_reference_equivalents},",
                 "clean_pit_alarms={clean_pit_alarms},",
-                "misspec_baseline_false_singletons={misspec_baseline_false_singletons},"
+                "misspec_baseline_false_singletons={misspec_baseline_false_singletons},",
                 "misspec_pit_false_singletons={misspec_pit_false_singletons},",
                 "misspec_pit_detections={misspec_pit_detections},",
                 "pit_audit_queries={pit_audit_queries},typed_recovery_restarts={total_typed_recovery_restarts},",
