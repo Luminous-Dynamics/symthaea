@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-engineering-optimization"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Evidence-bearing, algorithm-neutral engineering design-space and Pareto contracts for Symthaea"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+categories = ["science", "simulation"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+thiserror = { workspace = true }
