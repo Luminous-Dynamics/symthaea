@@ -125,11 +125,13 @@ impl CognitiveLoopService {
                     .take(32)
                     .copied()
                     .collect();
-                dream.record_consolidation_event(
-                    &perception.encoding.compressed_state,
-                    action,
-                    perception.urgency.prediction_error,
-                );
+                if perception.urgency.prediction_error_valid {
+                    dream.record_consolidation_event(
+                        &perception.encoding.compressed_state,
+                        action,
+                        perception.urgency.prediction_error,
+                    );
+                }
             }
         }
 
