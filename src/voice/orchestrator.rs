@@ -108,10 +108,10 @@ impl VoiceOrchestrator {
         cycle_result: &CycleResult,
     ) -> Vec<f32> {
         // 1. Update the voice bridge with CfC output
-        self.voice_bridge.update(
+        self.voice_bridge.update_with_evidence(
             &cycle_result.output,
             1.0, // tau (default; could be extracted from CfC state)
-            cycle_result.prediction_error,
+            cycle_result.prediction_error_valid.then_some(cycle_result.prediction_error),
             HashMap::new(),
             cycle_result.detected_primitives.clone(),
         );
