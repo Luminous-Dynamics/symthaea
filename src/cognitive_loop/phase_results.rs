@@ -14,6 +14,7 @@
 #[cfg(feature = "vision-manifold")]
 use super::types::MentalMovie;
 use super::types::MoralJudgmentSummary;
+use super::types::PredictionErrorEvidence;
 use super::{CycleUrgency, ResponseStrategy};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::predictive_encoder::EncodingResult;
@@ -88,6 +89,8 @@ pub(super) struct PercUrgency {
     /// Compatibility-facing numeric PE may be a sentinel; this flag marks whether
     /// the current cycle contains a genuine, comparable prediction observation.
     pub(super) prediction_error_valid: bool,
+    /// Typed evidence shared with downstream consumer phases.
+    pub(super) prediction_evidence: PredictionErrorEvidence,
     pub(super) prediction_error: f32,
     pub(super) error_slope: f32,
     pub(super) oscillation_ratio: f32,
