@@ -131,7 +131,7 @@ impl RiskCertificateV1 {
     /// Deterministic TSV receipt; hashes and identifiers are kept as fixed fields.
     pub fn to_tsv(&self) -> String {
         let mut out = format!(
-            "RISK_CERT_V1\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.9}\t{:.9}\t{}\t{}\t{}\t{}\n",
+            "RISK_CERT_V1\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.9}\t{:.9}\t{}\t{}\t{}\t{}\n",
             self.status.label(),
             self.policy_id,
             digest_hex(&self.policy_digest),
