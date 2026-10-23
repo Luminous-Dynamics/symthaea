@@ -22,6 +22,16 @@ The test is exact only when the null makes paired signs exchangeable, such as a 
 
 Values are rescaled before summation, reducing overflow risk for finite input values. Non-finite values, empty samples, invalid confidence, invalid exact limits and zero Monte Carlo draws fail explicitly.
 
+### 3. Hierarchical graph-cluster bootstrap
+
+The new `hierarchical_cluster_bootstrap_mean` function accepts paired differences grouped by independent graph instance. It samples graph clusters with replacement in the outer stage, then resamples each selected graph's repeated paired trials within that graph, preserving its repetition count. Each graph is weighted equally in the reported mean, so a graph with many repeated seeds does not become many independent graphs.
+
+The API returns the number of clusters and observations, replicate count, seed, graph-weighted point estimate, and percentile interval. It rejects fewer than two clusters, empty clusters, non-finite differences, invalid confidence levels, and zero bootstrap replicates. A deterministic seed makes the resampling replayable.
+
+**Inference boundary:** this is an approximate percentile bootstrap, not an exact finite-sample interval. It assumes graphs are independent sampling units and that repeated runs within each graph represent the intended within-graph resampling population. It does not correct for family-level dependence, dataset leakage, or multiple policy comparisons. Where many graphs come from a small number of graph-generating families, resampling may need to use the family as the independent outer cluster instead.
+
+The bootstrap is intended for graph-level paired *effects* (for example, one delta per graph/seed, clustered by graph), not raw device shots treated as independent instances. Keep the estimand and aggregation rule preregistered.
+
 ## Required study practice
 
 - Use independent analysis units. For MIS, a conservative default is one preregistered aggregate per graph instance, with independent graph instances as the paired units. Do not treat shots or repeated seeds on the same graph as independent graph samples.
@@ -29,11 +39,11 @@ Values are rescaled before summation, reducing overflow risk for finite input va
 - Freeze direction, statistic, cohort, exclusions and analysis plan before confirmatory evaluation.
 - Report the effect size and paired raw outcomes alongside p-values. A p-value alone is not a practical-value measurement.
 - Add a documented multiplicity procedure for preregistered families of policy comparisons before using these helpers for a confirmatory leaderboard.
-- Add cluster-aware bootstrap and Pareto-frontier stability as follow-up work; these are not implemented by this contribution.
+- Hierarchical graph-cluster bootstrap is implemented as an approximate percentile interval. Multiple-comparison correction and Pareto-frontier stability remain follow-up work.
 - Keep synthetic, classical solver, ideal simulator, tensor-network simulator, circuit-export-only and physical-QPU evidence separate. These helpers do not attest evidence provenance or verify MIS feasibility.
 
 ## Tests authored
 
-The module includes hand-computed fixtures for an exact three-pair sign-flip p-value and a 95% median interval with six observations; an insufficient-sample case; non-finite/invalid-input checks; large finite magnitudes; and deterministic replay for the Monte Carlo path.
+The module includes hand-computed fixtures for an exact three-pair sign-flip p-value and a 95% median interval with six observations; a small-sample median-coverage sweep against integer-binomial reference values; non-finite/invalid-input checks; large finite magnitudes; deterministic Monte Carlo replay; and graph-cluster bootstrap fixtures for equal cluster weighting, deterministic replay, and malformed clusters.
 
 **Validation boundary:** these Rust tests are authored but have not been compiled or executed in this authoring environment. The code has not been used to analyze a QOBLIB or physical-QPU cohort. No performance, quantum advantage, SOTA, or statistical calibration claim is made. CI is not treated as passed until a result is actually published.
