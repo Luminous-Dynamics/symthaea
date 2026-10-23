@@ -106,6 +106,35 @@ if (("${#missing[@]}" > 0)); then
   exit 2
 fi
 
+identity_failure=""
+if [[ ! "${git_head}" =~ ^[a-f0-9]{40}$ ]]; then identity_failure="git_head"; fi
+for digest in "${rtl_xor_sha}" "${tb_xor_sha}" "${rtl_hamming_sha}" "${tb_hamming_sha}" "${runner_sha}" "${manifest_sha}" "${receipt_schema_sha}" "${case_matrix_sha}" "${receipt_validator_sha}" "${flake_sha}" "${flake_lock_sha}"; do
+  if [[ ! "${digest}" =~ ^[a-f0-9]{64}$ ]]; then identity_failure="source_hash"; break; fi
+done
+if [[ -n "${identity_failure}" ]]; then
+  jq -n \
+    --arg status "failed" \
+    --arg timestamp_utc "${stamp}" \
+    --arg git_head "${git_head}" \
+    --arg verilator_version "${verilator_version}" \
+    --arg out_dir "${out_dir}" \
+    --arg rtl_xor_sha256 "${rtl_xor_sha}" \
+    --arg tb_xor_sha256 "${tb_xor_sha}" \
+    --arg rtl_hamming_sha256 "${rtl_hamming_sha}" \
+    --arg tb_hamming_sha256 "${tb_hamming_sha}" \
+    --arg runner_sha256 "${runner_sha}" \
+    --arg manifest_sha256 "${manifest_sha}" \
+    --arg receipt_schema_sha256 "${receipt_schema_sha}" \
+    --arg case_matrix_sha256 "${case_matrix_sha}" \
+    --arg receipt_validator_sha256 "${receipt_validator_sha}" \
+    --arg flake_sha256 "${flake_sha}" \
+    --arg flake_lock_sha256 "${flake_lock_sha}" \
+    '{schema_version:"1.1", qualification:"hdc_rtl_correctness_sweep", status:$status, timestamp_utc:$timestamp_utc, git_head:$git_head, verilator_version:$verilator_version, missing_tools:[], source_hashes:{rtl_bind_xor:$rtl_xor_sha256,tb_bind_xor:$tb_xor_sha256,rtl_hamming_count:$rtl_hamming_sha256,tb_hamming_count:$tb_hamming_sha256,runner:$runner_sha256,manifest:$manifest_sha256,receipt_schema:$receipt_schema_sha256,case_matrix:$case_matrix_sha256,receipt_validator:$receipt_validator_sha256,flake:$flake_sha256,flake_lock:$flake_lock_sha256}, widths_tested:[], architectures:["xor","linear_popcount","balanced_popcount"], case_results:[], output_directory:$out_dir, claim_ceiling:"No test started: Git checkout identity or a required source/configuration hash is unavailable."}' \
+    > "${out_dir}/receipt.json"
+  printf 'UNQUALIFIED: Git checkout identity or source hash unavailable; receipt: %s/receipt.json\n' "${out_dir}" >&2
+  exit 2
+fi
+
 case_results="[]"
 overall_status="simulation_smoke_pass"
 for width in 64 128 256 512; do
