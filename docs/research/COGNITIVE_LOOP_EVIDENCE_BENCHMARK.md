@@ -173,7 +173,7 @@ The differentiator is a **causal, evidence-audited cognitive loop**: one observa
 
 ## Machine-readable scenario manifest
 
-`benchmarks/cognitive-loop-evidence/scenarios.json` is the implementation-facing companion to this contract. It currently defines **30 cases across six suites (S0–S5)**: validity invariants, calibration and distribution shift, continual learning, phase causality, end-to-end benchmark adapters, and system behavior. It includes the B0–B7 baseline matrix, including B4 for calibrated uncertainty. These are proposed cases and configurations; the manifest is not yet a runnable benchmark suite and no results are implied.
+`benchmarks/cognitive-loop-evidence/scenarios.json` is the implementation-facing companion to this contract. It currently defines **38 cases across six suites (S0–S5)**: validity invariants, calibration and distribution shift, continual learning, phase causality, end-to-end benchmark adapters, and system behavior. It includes the B0–B7 baseline matrix, including B4 for calibrated uncertainty. These are proposed cases and configurations; the manifest is not yet a runnable benchmark suite and no results are implied.
 
 
 ## External drift-detector baselines
@@ -225,7 +225,7 @@ cargo run --locked -p xtask -- score-cognitive-loop-drift --input path/to/drift-
 cargo test --locked -p xtask cognitive_drift_score
 ```
 
-Trace schema v1 requires a detector ID, full commit hash, configuration digest, seed, stream length, valid-observation count, maximum delay, ground-truth intervals, and alarm cycle indices. Each event is scored against the interval `[start_cycle, end_cycle + max_detection_delay_cycles]`; one alarm can match at most one event, duplicate/unmatched alarms count as false positives, and unmatched events count as missed. Invalid/missing PE sentinels are not valid observations.
+Trace schema v1 requires a detector ID, full commit hash, configuration digest, seed, stream length, valid-observation count, maximum delay, ground-truth intervals, and alarm cycle indices with per-alarm evidence validity. Each event is scored against the interval `[start_cycle, end_cycle + max_detection_delay_cycles]`; one alarm can match at most one event, duplicate/unmatched alarms count as false positives, and unmatched events count as missed. Invalid/missing PE sentinels are not valid observations.
 
 The scorer is intended to report event precision/recall/F1, false alarms per 1,000 valid observations, missed-drift rate, and a penalized normalized delay. The delay penalty is delay divided by transition width plus the post-window delay budget, clipped to `[0,1]`; missed events receive 1.0. This is our explicitly defined metric—not a claim to reproduce the paper's exact metric. Publish metric version and per-event matches beside aggregate results.
 
