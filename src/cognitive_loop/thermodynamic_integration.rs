@@ -499,6 +499,20 @@ mod tests {
     }
 
     #[test]
+    fn invalid_pe_does_not_trigger_landauer_memory_pressure() {
+        let mut ti = ThermodynamicIntegration::default();
+        let mut input = default_input();
+        input.prediction_error = 10.0;
+        input.prediction_error_valid = false;
+        input.energy_per_cycle = 1e-15;
+
+        let fb = ti.run_cycle(&input);
+
+        assert_eq!(ti.bridge.memory_landauer_cost, 0.0);
+        assert!(!fb.memory_consolidation_suppressed);
+    }
+
+    #[test]
     fn test_absent_modules_graceful() {
         let mut ti = ThermodynamicIntegration::default();
         let input = ThermodynamicInput::default(); // All has_* = false
