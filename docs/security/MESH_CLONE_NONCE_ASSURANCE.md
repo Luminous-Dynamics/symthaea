@@ -25,6 +25,10 @@ This reference model is valid only if the real system enforces every abstraction
 
 For disconnected radios, a central online fencing service may be impractical. The design must then use an actually enforceable alternative, such as a provisioned per-device key that cannot be copied with application state, a hardware monotonic counter, or a protocol whose key and nonce namespaces are independently and durably allocated. A UUID chosen at process restart is not a proof of uniqueness.
 
+## Existing authority-kernel relationship
+
+The exclusive-owner/fencing part should be treated as a concrete mesh refinement of the repository's existing SYM-FV-041D / ExclusiveLease conservation work (#6127), not as a second general-purpose lease theorem. The mesh-specific obligation is stronger than abstract exclusivity alone: the runtime must prove that the currently fenced owner is the only process able to reach the AEAD send path, and that a new generation actually changes the effective traffic-key namespace (or reserves a disjoint counter range). That refinement is not established by this model.
+
 ## What this proves—and does not
 
 The intended claim is narrow: **the bounded state model can produce a clone/reuse counterexample for the legacy policy and preserve its modeled nonce-uniqueness invariant for the fenced reference policy**.
