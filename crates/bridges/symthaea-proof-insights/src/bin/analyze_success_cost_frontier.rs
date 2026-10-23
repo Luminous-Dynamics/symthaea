@@ -600,6 +600,7 @@ fn analyze(
                     .filter(|outcome| !matches!(outcome.status.as_str(), "not_attempted" | "tool_unavailable" | "out_of_scope"))
                     .count();
                 let rate = ratio(successes, plan.targets.len());
+                let rate_value = successes as f64 / plan.targets.len() as f64;
                 let groups = group_rate_counts(&selected);
                 let ci = bootstrap_rate(&groups, bootstrap_replicates, stable_seed(seed, &format!("rate:{}:{}", arm.id, budget.id)));
                 let curve = json!({
@@ -635,7 +636,7 @@ fn analyze(
                     arm.id.clone(),
                     arm.method_class.clone(),
                     budget.id.clone(),
-                    rate,
+                    rate_value,
                     cost_per_target,
                     executed,
                 ));
