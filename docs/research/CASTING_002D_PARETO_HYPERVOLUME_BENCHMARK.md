@@ -118,3 +118,32 @@ cargo test -p symthaea-core casting_multiobjective_benchmark
 ```
 
 CASTING-002E does not add an optimizer or prove SOTA performance. It adds metrics needed to compare a future coverage-seeking optimizer fairly.
+
+## CASTING-002F — Analytical multi-objective reference problems
+
+The test-only module now contains decision-space objective evaluators and deterministic sampled analytical fronts for canonical two-objective **ZDT1, ZDT2, ZDT3 and ZDT4** problems:
+
+- **ZDT1:** continuous convex front, \(f_2 = 1 - \sqrt{f_1}\) on the Pareto set.
+- **ZDT2:** continuous concave front, \(f_2 = 1 - f_1^2\).
+- **ZDT3:** five disconnected front segments. The segment boundaries are frozen to published approximate values and sampled independently; no interpolation bridges gaps.
+- **ZDT4:** same global front shape as ZDT1, but a multi-modal decision landscape, useful for detecting methods that find the easy front geometry but fail to reach the global Pareto set.
+
+The decision-space evaluators implement the standard \(g(x)\) penalty and validate vector length, finite values and each problem's domain. Reference-front generation includes both ends of each segment. The deterministic sample convention is uniform in \(f_1\), not Euclidean arc length; therefore generated front resolution and convention must be frozen for IGD+/epsilon comparisons. These are finite samples of continuous fronts, not the mathematical continuum itself.
+
+### New regression tests
+
+The module now has 23 authored test cases. Six new ZDT tests cover hand-calculated objective values, a ZDT4 non-optimal tail penalty, deterministic and correctly sized fronts, attainable Pareto-set points, nondominance plus zero self-comparison epsilon/IGD+, and fail-closed decision-domain/resolution validation. The previous 17 archive/metric tests remain.
+
+### Benchmark references and industry comparator boundary
+
+- The ZDT formulas and disconnected ZDT3 front intervals follow the widely used pymoo benchmark definitions: https://www.pymoo.org/problems/multi/zdt.html
+- COCO's public BBOB-biobj archive offers 55 standardized bi-objective functions and should be a later external validation suite, not silently conflated with these four fixtures: https://coco-platform.org/data-archive/index.html
+- BoTorch provides qLogNEHVI, qLogEHVI and qLogNParEGO as strong reference implementations for multi-objective Bayesian optimization: https://botorch.org/docs/multi_objective
+- STAGE-BO (ICML 2026) explicitly targets under-covered Pareto regions through adaptive epsilon constraints: https://proceedings.mlr.press/v306/yang26af.html
+- TAMO (ICLR 2026) explores amortized in-context proposal generation; proposal latency must be reported separately from pretraining cost and amortized query count: https://proceedings.iclr.cc/paper_files/paper/2026/hash/901b378426e1816eabb776a786c02f41-Abstract-Conference.html
+
+Suggested exact validation command:
+
+    cargo test -p symthaea-core casting_multiobjective_benchmark
+
+The source is still test-only and these test cases have not been compiled or executed in this authoring environment. No method has yet been benchmarked across these fronts, and no physical casting or commercial equivalence claim is supported.
