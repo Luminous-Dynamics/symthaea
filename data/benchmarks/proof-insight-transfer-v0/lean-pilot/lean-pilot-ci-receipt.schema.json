@@ -1,0 +1,297 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/lean-pilot/lean-pilot-ci-receipt.schema.json",
+  "title": "PITB Lean Pilot Content-Addressed CI Receipt v0",
+  "description": "Strict evidence contract for the pinned Lean pilot build, axiom checks, and the fixed-goal local-context intervention trace. A structurally valid receipt is not a model outcome or a proof of benchmark utility.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "repository",
+    "commit_sha",
+    "workflow_run_id",
+    "workflow_run_attempt",
+    "toolchain",
+    "lean_version",
+    "lake_version",
+    "source",
+    "checked_artifact",
+    "build_log_sha256",
+    "proof_state_intervention_trace",
+    "checks",
+    "case_manifest_bindings",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.lean-pilot-ci-receipt.v0"
+    },
+    "repository": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "commit_sha": {
+      "$ref": "#/$defs/commit"
+    },
+    "workflow_run_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "workflow_run_attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "toolchain": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lean_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lake_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "case_manifest_path",
+        "case_manifest_sha256",
+        "lakefile_sha256",
+        "toolchain_file_sha256",
+        "lake_manifest_sha256",
+        "receipt_schema_path",
+        "receipt_schema_sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "PITBCounterfactualPilot.lean"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "case_manifest_path": {
+          "const": "cases.json"
+        },
+        "case_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "lakefile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "toolchain_file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "lake_manifest_sha256": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "receipt_schema_path": {
+          "const": "lean-pilot-ci-receipt.schema.json"
+        },
+        "receipt_schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "checked_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "build_log_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "proof_state_intervention_trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "base_snapshot_sha256",
+        "variant_snapshot_sha256",
+        "base_local_context_sha256",
+        "variant_local_context_sha256",
+        "goal_type_sha256",
+        "goal_type_preserved",
+        "required_declaration_present_before",
+        "required_declaration_absent_after",
+        "alternate_route_hypothesis_present_after",
+        "trace_log_sha256",
+        "case_id",
+        "case_manifest_sha256",
+        "target_statement_fragment_sha256"
+      ],
+      "properties": {
+        "operation": {
+          "const": "clear h"
+        },
+        "base_snapshot_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "variant_snapshot_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "base_local_context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "variant_local_context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "goal_type_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "goal_type_preserved": {
+          "const": true
+        },
+        "required_declaration_present_before": {
+          "const": true
+        },
+        "required_declaration_absent_after": {
+          "const": true
+        },
+        "alternate_route_hypothesis_present_after": {
+          "const": true
+        },
+        "trace_log_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_statement_fragment_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lake_build",
+        "direct_reelaboration_with_structured_state_trace",
+        "same_goal_and_required_hypothesis_withdrawal_verified_from_trace",
+        "lean_kernel_checked_examples",
+        "nanoda_independent_type_check",
+        "sorry_disallowed_by_nanoda",
+        "axiom_audit",
+        "unlisted_axioms_disallowed",
+        "axiom_allowlist"
+      ],
+      "properties": {
+        "lake_build": { "const": "passed" },
+        "direct_reelaboration_with_structured_state_trace": { "const": "passed" },
+        "same_goal_and_required_hypothesis_withdrawal_verified_from_trace": { "const": "passed" },
+        "lean_kernel_checked_examples": { "const": "passed" },
+        "nanoda_independent_type_check": { "const": "passed" },
+        "sorry_disallowed_by_nanoda": { "const": true },
+        "axiom_audit": { "const": "passed" },
+        "unlisted_axioms_disallowed": { "const": true },
+        "axiom_allowlist": {
+          "type": "array",
+          "items": { "enum": ["propext", "Classical.choice", "Quot.sound"] },
+          "uniqueItems": true
+        }
+      }
+    },
+    "case_manifest_bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "mutation_kind",
+          "expected_relation",
+          "base_statement_fragment_sha256",
+          "variant_statement_fragment_sha256",
+          "evidence_declarations",
+          "contract_precondition",
+          "state_intervention",
+          "model_outcomes"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mutation_kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_relation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "base_statement_fragment_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "variant_statement_fragment_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "evidence_declarations": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "contract_precondition": {
+            "oneOf": [
+              { "type": "object" },
+              { "type": "null" }
+            ]
+          },
+          "state_intervention": {
+            "oneOf": [
+              { "type": "object" },
+              { "type": "null" }
+            ]
+          },
+          "model_outcomes": {
+            "const": "not_run"
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    }
+  }
+}
