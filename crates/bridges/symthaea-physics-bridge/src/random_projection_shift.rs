@@ -8,7 +8,8 @@
 //! correlations and therefore costs O(n d²) for a batch with n rows and d features.
 //! This scorer freezes k < d Rademacher projections at fit time, then measures mean,
 //! scale, and pairwise-correlation changes in that k-dimensional sketch. Scoring costs
-//! O(n d k + n k²), with no dense d-by-k matrix retained.
+//! O(n d k + n k²). Projection signs are precomputed as compact one-byte coefficients, avoiding
+//! repeated hash mixing for every audit observation and avoiding an f64 projection matrix.
 //!
 //! Projection compresses information and can miss changes orthogonal to the chosen sketch.
 //! It is an explicitly uncalibrated nonconformity score, not a p-value or a guarantee.
@@ -36,6 +37,7 @@ pub struct RandomProjectionFeatureShiftScorer {
     reference_projection_scales: Vec<f64>,
     reference_projection_correlations: Vec<f64>,
     projection_count: usize,
+    projection_signs: Vec<i8>,
     seed: u64,
     scale_floor: f64,
 }
@@ -69,13 +71,14 @@ impl RandomProjectionFeatureShiftScorer {
 
         let feature_means = column_means(reference_rows, feature_count)?;
         let feature_scales = column_scales(reference_rows, &feature_means, feature_count)?;
+        let projection_signs = make_projection_signs(feature_count, projection_count, seed)?;
         let projected_reference = project_rows(
             reference_rows,
             &feature_means,
             &feature_scales,
             scale_floor,
             projection_count,
-            seed,
+            &projection_signs,
         )?;
         let reference_projection_means = column_means(&projected_reference, projection_count)?;
         let reference_projection_scales = column_scales(
@@ -97,6 +100,7 @@ impl RandomProjectionFeatureShiftScorer {
             reference_projection_scales,
             reference_projection_correlations,
             projection_count,
+            projection_signs,
             seed,
             scale_floor,
         })
@@ -122,7 +126,7 @@ impl RandomProjectionFeatureShiftScorer {
             &self.feature_scales,
             self.scale_floor,
             self.projection_count,
-            self.seed,
+            &self.projection_signs,
         )?;
         let audit_means = column_means(&projected_audit, self.projection_count)?;
         let audit_scales = column_scales(&projected_audit, &audit_means, self.projection_count)?;
@@ -211,6 +215,11 @@ impl RandomProjectionFeatureShiftScorer {
         self.projection_count
     }
 
+    /// Fixed projection seed, useful for an auditable calibration receipt.
+    pub fn seed(&self) -> u64 {
+        self.seed
+    }
+
     /// Number of pairwise correlations compared in the compressed sketch.
     pub fn projected_correlation_count(&self) -> usize {
         self.reference_projection_correlations.len()
@@ -227,12 +236,13 @@ fn project_rows(
     feature_scales: &[f64],
     scale_floor: f64,
     projection_count: usize,
-    seed: u64,
+    projection_signs: &[i8],
 ) -> Option<Vec<Vec<f64>>> {
     if rows.is_empty()
         || feature_means.is_empty()
         || feature_means.len() != feature_scales.len()
         || projection_count == 0
+        || feature_means.len().checked_mul(projection_count)? != projection_signs.len()
     {
         return None;
     }
@@ -251,8 +261,9 @@ fn project_rows(
             if !standardized.is_finite() {
                 return None;
             }
+            let sign_offset = feature.checked_mul(projection_count)?;
             for (component, sum) in projected.iter_mut().enumerate() {
-                *sum += standardized * rademacher_sign(seed, component, feature);
+                *sum += standardized * projection_signs[sign_offset + component] as f64;
                 if !sum.is_finite() {
                     return None;
                 }
@@ -267,6 +278,25 @@ fn project_rows(
         projected_rows.push(projected);
     }
     Some(projected_rows)
+}
+
+fn make_projection_signs(
+    feature_count: usize,
+    projection_count: usize,
+    seed: u64,
+) -> Option<Vec<i8>> {
+    let coefficient_count = feature_count.checked_mul(projection_count)?;
+    let mut signs = Vec::with_capacity(coefficient_count);
+    for feature in 0..feature_count {
+        for component in 0..projection_count {
+            signs.push(if rademacher_sign(seed, component, feature) > 0.0 {
+                1
+            } else {
+                -1
+            });
+        }
+    }
+    Some(signs)
 }
 
 fn rademacher_sign(seed: u64, component: usize, feature: usize) -> f64 {
