@@ -568,6 +568,14 @@ mod tests {
         assert!(!coverage[2].covered);
         assert_eq!(coverage[2].selected_channels, 0);
         assert!((coverage[2].best_detectability_auc - 0.5).abs() < 1e-12);
+
+        let clean_audit_score = panel.score(&clean[20]).unwrap();
+        let mut location_audit = clean[20].clone();
+        location_audit[0] += 3.0;
+        let mut reverse_audit = clean[20].clone();
+        reverse_audit[1] -= 2.0;
+        assert!(panel.score(&location_audit).unwrap() > clean_audit_score + 1.0);
+        assert!(panel.score(&reverse_audit).unwrap() > clean_audit_score + 1.0);
     }
 
     #[test]
