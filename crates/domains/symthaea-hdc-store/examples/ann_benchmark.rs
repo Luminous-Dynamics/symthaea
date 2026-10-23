@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use std::env;
 use std::error::Error;
 use std::io;
+use std::process::Command;
 use std::time::Instant;
 
 use symthaea_core::hdc::BinaryHV;
@@ -75,6 +76,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = parse_args().map_err(|message| {
         io::Error::new(io::ErrorKind::InvalidInput, message)
     })?;
+    verify_source_binding(&config.source_sha)?;
     let dir = tempdir()?;
     let path = dir.path().join("ann-benchmark.hdc");
 
@@ -155,6 +157,37 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     emit_report(&config, &samples, &first_round_quality);
+    Ok(())
+}
+
+fn verify_source_binding(expected_sha: &str) -> Result<(), Box<dyn Error>> {
+    let head = Command::new("git").args(["rev-parse", "HEAD"]).output()?;
+    if !head.status.success() {
+        return Err(io::Error::other("git rev-parse HEAD failed").into());
+    }
+    let actual_sha = String::from_utf8(head.stdout)?.trim().to_owned();
+    if actual_sha != expected_sha {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("source SHA mismatch: argument {expected_sha}, checked-out HEAD {actual_sha}"),
+        )
+        .into());
+    }
+
+    let status = Command::new("git")
+        .args(["status", "--porcelain", "--untracked-files=no"])
+        .output()?;
+    if !status.status.success() {
+        return Err(io::Error::other("git status failed").into());
+    }
+    let dirty = String::from_utf8(status.stdout)?;
+    if !dirty.trim().is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "tracked working tree is dirty; commit or revert tracked changes before benchmarking",
+        )
+        .into());
+    }
     Ok(())
 }
 
