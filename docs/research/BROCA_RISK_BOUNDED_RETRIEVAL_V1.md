@@ -4,6 +4,8 @@ Status: design and preregistration proposal. No adaptive policy is implemented b
 
 Related work:
 - [Issue #8477: approximate HDC retrieval against exact MemoryBridge](https://github.com/Luminous-Dynamics/symthaea/issues/8477)
+- [Issue #7778: nested-width progressive retrieval and adaptive precision](https://github.com/Luminous-Dynamics/symthaea/issues/7778) — complementary representation/precision ladder
+- [Issue #6531: adaptive HDC resolution ladder](https://github.com/Luminous-Dynamics/symthaea/issues/6531) — compatible-representation constraints
 - [PR #8494: paired exact-vs-approximate retrieval benchmark](https://github.com/Luminous-Dynamics/symthaea/pull/8494)
 - [Store ANN evaluation contract](../../crates/domains/symthaea-hdc-store/docs/ANN_EVALUATION.md)
 - [Store read-only ANN contract](../../crates/domains/symthaea-hdc-store/docs/READ_ONLY_ANN.md)
@@ -21,6 +23,8 @@ The proposed shift is from **fixed approximate retrieval** to **risk-bounded ada
 5. Treat unsupported query classes, drift, missing diagnostics, and failed integrity checks as reasons to fail closed to exact search—not reasons to lower the quality bar.
 
 This makes latency a controlled resource allocation problem rather than an unconditional promise that ANN is always faster. It also keeps approximate similarity separate from the claim that a result is globally top-K.
+
+**Boundary with existing work:** issue #7778 investigates progressively increasing HDC dimensionality/precision to preserve candidates; this document investigates when to trust, escalate, or reject an approximate retrieval result. These axes may compose, but they must first be evaluated independently, then as a joint policy against the same exact high-width oracle. Do not count the two proposals as independent wins if they save the same work or compound the same miss risk.
 
 ## Non-goals and safety boundary
 
@@ -83,6 +87,8 @@ Run the same stable query IDs and the same store contents through each arm. Sepa
 | LSH without fallback | Ablation that exposes quality loss and prevents fallback from masking ANN weakness |
 | Risk-gated ANN → exact | Main hypothesis: accept only queries whose calibrated unsafe-result risk meets the contract |
 | Progressive ANN → exact | Evaluate only after real expansion/probe tiers exist |
+| Nested-width HDC ladder (#7778) | Separate precision-routing axis; compare to maximum-width exact reference |
+| Joint risk gate × precision ladder | Optional composition arm, only after each axis passes independently |
 | FAISS `IndexBinaryFlat` | Optimized exact binary-Hamming baseline |
 | FAISS `IndexBinaryHNSW` and/or `IndexBinaryIVF` | Established approximate binary index baselines |
 | pgvector bit-Hamming HNSW | Database/index operational baseline |
