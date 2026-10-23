@@ -80,6 +80,111 @@ fn greedy_min_residual_degree(graph: &MisGraph) -> Vec<usize> {
     selected
 }
 
+
+const LOCAL_SEARCH_MAX_VERTICES: usize = 250;
+const LOCAL_SEARCH_MAX_PAIR_CHECKS: usize = 2_000_000;
+
+/// Result of deterministic feasible 1-for-2 improvement of an independent set.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LocalImprovementResult {
+    vertices: Vec<usize>,
+    exchanges: usize,
+    pair_checks: usize,
+    locally_optimal: bool,
+}
+
+/// Repeatedly replace one selected vertex by two mutually nonadjacent compatible
+/// unselected vertices. Candidate pairs are scanned in ascending vertex order, making
+/// the result deterministic. A pair-check budget makes the diagnostic bounded; if it
+/// expires the current feasible solution is returned but not labelled locally optimal.
+fn improve_one_for_two(
+    graph: &MisGraph,
+    initial: &[usize],
+    pair_check_budget: usize,
+) -> LocalImprovementResult {
+    let vertex_count = graph.vertex_count();
+    let mut adjacency = vec![Vec::new(); vertex_count];
+    for &(u, v) in graph.edges() {
+        adjacency[u].push(v);
+        adjacency[v].push(u);
+    }
+    for neighbors in &mut adjacency {
+        neighbors.sort_unstable();
+    }
+
+    let mut selected = vec![false; vertex_count];
+    for &vertex in initial {
+        if vertex < vertex_count {
+            selected[vertex] = true;
+        }
+    }
+    let mut exchanges = 0usize;
+    let mut pair_checks = 0usize;
+
+    loop {
+        let mut selected_neighbor_count = vec![0usize; vertex_count];
+        for vertex in 0..vertex_count {
+            if selected[vertex] {
+                for &neighbor in &adjacency[vertex] {
+                    selected_neighbor_count[neighbor] += 1;
+                }
+            }
+        }
+
+        let mut found_move: Option<(usize, usize, usize)> = None;
+        'removed: for removed in 0..vertex_count {
+            if !selected[removed] {
+                continue;
+            }
+
+            // A candidate is compatible with every selected vertex except possibly the
+            // one removed. The count test avoids scanning the whole selected set for
+            // every candidate; if its one selected neighbor is removed, it is allowed.
+            let candidates: Vec<usize> = (0..vertex_count)
+                .filter(|&candidate| {
+                    !selected[candidate]
+                        && (selected_neighbor_count[candidate] == 0
+                            || (selected_neighbor_count[candidate] == 1
+                                && adjacency[candidate].binary_search(&removed).is_ok()))
+                })
+                .collect();
+
+            for left_index in 0..candidates.len() {
+                let left = candidates[left_index];
+                for &right in &candidates[(left_index + 1)..] {
+                    pair_checks += 1;
+                    if pair_checks > pair_check_budget {
+                        let vertices = selected.iter().enumerate()
+                            .filter_map(|(vertex, &keep)| keep.then_some(vertex))
+                            .collect();
+                        return LocalImprovementResult {
+                            vertices, exchanges, pair_checks: pair_check_budget,
+                            locally_optimal: false,
+                        };
+                    }
+                    if adjacency[left].binary_search(&right).is_err() {
+                        found_move = Some((removed, left, right));
+                        break 'removed;
+                    }
+                }
+            }
+        }
+
+        let Some((removed, left, right)) = found_move else {
+            let vertices = selected.iter().enumerate()
+                .filter_map(|(vertex, &keep)| keep.then_some(vertex))
+                .collect();
+            return LocalImprovementResult {
+                vertices, exchanges, pair_checks, locally_optimal: true,
+            };
+        };
+        selected[removed] = false;
+        selected[left] = true;
+        selected[right] = true;
+        exchanges += 1;
+    }
+}
+
 fn run(path: &str) -> Result<(), String> {
     let end_to_end_start = Instant::now();
     let source = fs::read_to_string(path)
@@ -97,6 +202,20 @@ fn run(path: &str) -> Result<(), String> {
     let greedy_report = parsed.graph.verify_solution(&greedy, Some(greedy.len()));
     if !greedy_report.feasible {
         return Err("internal error: greedy baseline failed independent verification".to_owned());
+    }
+
+    let local_start = Instant::now();
+    let local: Option<LocalImprovementResult> = if parsed.graph.vertex_count() <= LOCAL_SEARCH_MAX_VERTICES {
+        Some(improve_one_for_two(&parsed.graph, &greedy, LOCAL_SEARCH_MAX_PAIR_CHECKS))
+    } else {
+        None
+    };
+    let local_ns = local.as_ref().map(|_| local_start.elapsed().as_nanos());
+    let local_report = local.as_ref().map(|result| {
+        parsed.graph.verify_solution(&result.vertices, Some(result.vertices.len()))
+    });
+    if local_report.as_ref().is_some_and(|report| !report.feasible) {
+        return Err("internal error: 1-for-2 local improvement failed independent verification".to_owned());
     }
 
     let exact_start = Instant::now();
@@ -118,12 +237,22 @@ fn run(path: &str) -> Result<(), String> {
 
     // Hash a deterministic normalized result body (not runtime fields) so repeated runs
     // can compare outputs even though measured elapsed time naturally changes.
+    let local_normalized = local.as_ref().map(|result| {
+        format!(
+            "locally_optimal={}|exchanges={}|pair_checks={}|vertices={}",
+            result.locally_optimal,
+            result.exchanges,
+            result.pair_checks,
+            result.vertices.iter().map(|vertex| (vertex + 1).to_string()).collect::<Vec<_>>().join(",")
+        )
+    }).unwrap_or_else(|| "skipped-vertex-limit".to_owned());
     let normalized = format!(
-        "v1|{}|{}|{}|greedy-min-residual-degree|{}|exact={}",
+        "v2|{}|{}|{}|greedy-min-residual-degree|{}|local={}|exact={}",
         format!("{source_hash:016x}"),
         parsed.declared_vertex_count,
         parsed.declared_edge_count,
         greedy.iter().map(|vertex| (vertex + 1).to_string()).collect::<Vec<_>>().join(","),
+        local_normalized,
         exact.as_ref().map(|vertices| vertices.iter()
             .map(|vertex| (vertex + 1).to_string()).collect::<Vec<_>>().join(","))
             .unwrap_or_else(|| "skipped-over-limit".to_owned())
@@ -142,6 +271,7 @@ fn run(path: &str) -> Result<(), String> {
             "  \"vertices\": {},\n",
             "  \"edges\": {},\n",
             "  \"greedy\": {{\"policy\": \"minimum-residual-degree-then-lowest-index\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"elapsed_ns\": {}}},\n",
+            "  \"local_improvement\": {{\"status\": \"{}\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"exchanges\": {}, \"pair_checks\": {}, \"elapsed_ns\": {}}},\n",
             "  \"exact_oracle\": {{\"status\": \"{}\", \"objective\": {}, \"feasible\": {}, \"vertices_one_based\": {}, \"elapsed_ns\": {}}},\n",
             "  \"timing_ns\": {{\"parse\": {}, \"end_to_end\": {}}},\n",
             "  \"normalized_result_fnv1a64\": \"{:016x}\",\n",
@@ -157,6 +287,13 @@ fn run(path: &str) -> Result<(), String> {
         greedy_report.feasible,
         json_vertices(&greedy),
         greedy_ns,
+        local.as_ref().map(|result| if result.locally_optimal { "locally-optimal" } else { "pair-check-budget-exhausted" }).unwrap_or("skipped-vertex-limit"),
+        local_report.as_ref().map(|report| report.computed_objective.to_string()).unwrap_or_else(|| "null".to_owned()),
+        local_report.as_ref().map(|report| report.feasible.to_string()).unwrap_or_else(|| "null".to_owned()),
+        local.as_ref().map(|result| json_vertices(&result.vertices)).unwrap_or_else(|| "null".to_owned()),
+        local.as_ref().map(|result| result.exchanges.to_string()).unwrap_or_else(|| "null".to_owned()),
+        local.as_ref().map(|result| result.pair_checks.to_string()).unwrap_or_else(|| "null".to_owned()),
+        local_ns.map(|value| value.to_string()).unwrap_or_else(|| "null".to_owned()),
         if exact.is_some() { "ran" } else { "skipped-vertex-limit" },
         exact_report.as_ref().map(|report| report.computed_objective.to_string()).unwrap_or_else(|| "null".to_owned()),
         exact_report.as_ref().map(|report| report.feasible.to_string()).unwrap_or_else(|| "null".to_owned()),
@@ -207,4 +344,34 @@ mod tests {
         assert_eq!(selected, vec![1, 2, 3]);
         assert!(graph.verify_solution(&selected, Some(3)).feasible);
     }
+
+    #[test]
+    fn one_for_two_exchange_improves_a_feasible_greedy_set() {
+        // Vertices 0 and 1 are the deterministic greedy result; removing 0 permits
+        // adding mutually nonadjacent vertices 4 and 5.
+        let graph = MisGraph::new(6, [
+            (0, 4), (0, 5), (1, 2), (1, 3), (2, 3), (2, 4), (2, 5),
+        ]).unwrap();
+        let greedy = greedy_min_residual_degree(&graph);
+        assert_eq!(greedy, vec![0, 1]);
+        let improved = improve_one_for_two(&graph, &greedy, LOCAL_SEARCH_MAX_PAIR_CHECKS);
+        assert!(improved.locally_optimal);
+        assert_eq!(improved.vertices, vec![1, 4, 5]);
+        assert_eq!(improved.exchanges, 1);
+        assert!(graph.verify_solution(&improved.vertices, Some(3)).feasible);
+    }
+
+    #[test]
+    fn local_improvement_budget_exhaustion_is_explicit_and_keeps_feasibility() {
+        let graph = MisGraph::new(6, [
+            (0, 4), (0, 5), (1, 2), (1, 3), (2, 3), (2, 4), (2, 5),
+        ]).unwrap();
+        let greedy = greedy_min_residual_degree(&graph);
+        let improved = improve_one_for_two(&graph, &greedy, 0);
+        assert!(!improved.locally_optimal);
+        assert_eq!(improved.exchanges, 0);
+        assert_eq!(improved.pair_checks, 0);
+        assert!(graph.verify_solution(&improved.vertices, Some(improved.vertices.len())).feasible);
+    }
+
 }
