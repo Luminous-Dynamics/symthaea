@@ -1113,15 +1113,15 @@ pub const AEAD_NONCE_SIZE: usize = 12;
 #[cfg(feature = "mesh-encryption")]
 pub const AEAD_TAG_SIZE: usize = 16;
 
-/// Build a 12-byte ChaCha20-Poly1305 nonce with type separation and epoch.
+/// Build the legacy 12-byte ChaCha20-Poly1305 nonce layout.
 ///
 /// Layout: `source_id[0..6] | payload_type | epoch | sequence[0..4]`
 ///
-/// - **payload_type** prevents nonce collision across wisdom/heartbeat/affective/gradient
-///   sequences (all start at 0 but use different type bytes).
-/// - **epoch** is a random byte generated once at Mind construction, preventing
-///   restart nonce reuse under the same key.
-/// - **sequence** is per-type monotonic (wraps safely at 2^32 ≈ 2.7 years at 50Hz).
+/// This layout is **not a nonce-uniqueness proof**. Only 48 bits of `source_id`
+/// enter the nonce; the 8-bit random `epoch` collides with a prior epoch with
+/// probability 1/256; and the 32-bit sequence repeats after wrap if the same
+/// key and epoch remain in use. A repeated (key, nonce) pair breaks the AEAD
+/// security assumptions. See `docs/security/MESH_AEAD_NONCE_UNIQUENESS.md`.
 #[cfg(feature = "mesh-encryption")]
 pub fn build_nonce(source_id: &[u8; 8], payload_type: u8, epoch: u8, sequence: u32) -> [u8; 12] {
     let mut nonce = [0u8; 12];
@@ -1135,12 +1135,12 @@ pub fn build_nonce(source_id: &[u8; 8], payload_type: u8, epoch: u8, sequence: u
 /// Encrypt a compressed packet envelope using ChaCha20-Poly1305.
 ///
 /// Returns `[nonce (12 bytes) | ciphertext+tag]`.
-/// The nonce includes payload_type and epoch to prevent cross-type
-/// and restart nonce reuse. See [`build_nonce`].
+/// Payload type separates one legacy namespace; the short epoch does not
+/// guarantee restart-safe uniqueness. See [`build_nonce`].
 ///
-/// **`epoch`** must be a random byte generated once at node startup
-/// (via `rand::thread_rng().r#gen::<u8>()`). This prevents nonce reuse
-/// across node restarts when using the same key material.
+/// **`epoch`** is a legacy one-byte random value. It only reduces the chance
+/// of a repeated epoch; it cannot guarantee restart-safe nonce uniqueness when
+/// the same key is reused. See `docs/security/MESH_AEAD_NONCE_UNIQUENESS.md`.
 #[cfg(feature = "mesh-encryption")]
 pub fn encrypt_packet(
     envelope: &[u8],
@@ -1152,10 +1152,10 @@ pub fn encrypt_packet(
     encrypt_packet_typed(envelope, key, source_id, 0, epoch, sequence)
 }
 
-/// Encrypt with explicit payload_type and epoch (nonce-safe variant).
+/// Encrypt with explicit payload type and epoch in the legacy nonce layout.
 ///
-/// Prefer this over [`encrypt_packet`] to prevent nonce reuse across
-/// packet types and across node restarts.
+/// This separates the type field but does not by itself guarantee nonce
+/// uniqueness across sender collisions, process restarts, or sequence wrap.
 #[cfg(feature = "mesh-encryption")]
 pub fn encrypt_packet_typed(
     envelope: &[u8],
@@ -1242,7 +1242,7 @@ pub fn decrypt_packet(data: &[u8], key: &[u8; 32]) -> Option<Vec<u8>> {
 }
 
 // ============================================================================
-// XChaCha20-Poly1305 (NONCE-MISUSE RESISTANT)
+// XChaCha20-Poly1305 (EXTENDED NONCE)
 // ============================================================================
 
 /// Nonce size for XChaCha20-Poly1305 (192 bits).
@@ -1251,9 +1251,12 @@ pub const XCHACHA_NONCE_SIZE: usize = 24;
 
 /// Encrypt using XChaCha20-Poly1305 with a random 24-byte nonce.
 ///
-/// XChaCha20 uses a 192-bit nonce large enough for random generation
-/// without collision risk (birthday bound ≈ 2^96). This eliminates
-/// nonce-reuse concerns entirely at the cost of 12 extra nonce bytes per packet.
+/// The 192-bit nonce makes accidental random collisions negligible for
+/// realistic message counts when the RNG is healthy (birthday-bound scaling
+/// is approximately q^2 / 2^193 for q messages under one key). It does not
+/// make nonce reuse safe: repeated key/nonce pairs remain unsafe, and RNG
+/// failure, cloned state, or caller-controlled reuse still need consideration.
+/// Compared with the legacy 12-byte layout, this adds 12 bytes per packet.
 ///
 /// Returns `[nonce (24 bytes) | ciphertext+tag]`.
 #[cfg(feature = "mesh-encryption")]
@@ -1320,8 +1323,8 @@ pub struct RotatingKeyPair {
     /// Version of the previous key (for versioned decrypt hints).
     #[zeroize(skip)]
     previous_version: u8,
-    /// Random epoch byte generated once at construction. Prevents nonce reuse
-    /// across node restarts under the same key material (P0 security fix).
+    /// Legacy random 8-bit epoch, generated at construction. It does not
+    /// guarantee nonce uniqueness across restarts when the key is reused.
     #[zeroize(skip)]
     epoch: u8,
     /// Optional sensor context key overlay. When set, the effective encryption
@@ -1335,7 +1338,8 @@ pub struct RotatingKeyPair {
 impl RotatingKeyPair {
     /// Create a new key pair with a single key (no rotation in progress).
     ///
-    /// Generates a random epoch byte to prevent nonce reuse across restarts.
+    /// Generates the legacy 8-bit epoch; this is probabilistic separation,
+    /// not a guarantee of nonce uniqueness across restarts.
     pub fn new(key: [u8; 32]) -> Self {
         Self {
             current: key,

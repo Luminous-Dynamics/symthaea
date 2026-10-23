@@ -109,7 +109,7 @@ pub struct DualLayerMesh {
     /// Optional ChaCha20-Poly1305 encryption key for packet envelopes.
     #[cfg(feature = "mesh-encryption")]
     encryption_key: Option<[u8; 32]>,
-    /// Random epoch byte for nonce construction (prevents restart nonce reuse).
+    /// Legacy 8-bit packet-level epoch (defaults to zero; not randomized by `new`). It does not guarantee restart nonce uniqueness. Fragment-level nonce construction does not include this epoch.
     #[cfg(feature = "mesh-encryption")]
     encryption_epoch: u8,
     /// Whether to encrypt individual LoRa fragments (fragment-level AEAD).
@@ -140,18 +140,21 @@ impl DualLayerMesh {
 
     /// Set the ChaCha20-Poly1305 encryption key for outbound packets.
     ///
-    /// When set, all packets are encrypted after compression, before
-    /// fragmentation/transmission.
+    /// This enables the legacy packet-level nonce format described in
+    /// `docs/security/MESH_AEAD_NONCE_UNIQUENESS.md`; setting a key alone does
+    /// not establish a restart-safe nonce namespace or per-sender identity.
     #[cfg(feature = "mesh-encryption")]
     pub fn with_encryption_key(mut self, key: [u8; 32]) -> Self {
         self.encryption_key = Some(key);
         self
     }
 
-    /// Set the encryption epoch for nonce construction.
+    /// Set the legacy 8-bit epoch for packet-level nonce construction.
     ///
-    /// Should be a random byte generated once per Mind/node lifetime.
-    /// Prevents nonce reuse across restarts under the same key.
+    /// The default is zero unless explicitly changed. Setting a fresh random
+    /// value only reduces restart collision probability; it does not guarantee
+    /// uniqueness when the same key is reused. Fragment-level encryption does
+    /// not include this epoch. See `docs/security/MESH_AEAD_NONCE_UNIQUENESS.md`.
     #[cfg(feature = "mesh-encryption")]
     pub fn with_encryption_epoch(mut self, epoch: u8) -> Self {
         self.encryption_epoch = epoch;
@@ -254,8 +257,10 @@ impl DualLayerMesh {
         let compressed = super::compress_packet(&raw);
 
         // Optionally encrypt the compressed envelope (compress → encrypt).
-        // Uses typed nonce: source_id[0..6] | payload_type | epoch | sequence
-        // to prevent cross-type nonce collision and restart reuse.
+        // Uses the legacy typed nonce layout. Payload type separates one field, but
+        // the truncated source ID and short epoch do not guarantee uniqueness.
+        // Fragment encryption has a separate nonce path with a 16-bit thought ID.
+        // See `docs/security/MESH_AEAD_NONCE_UNIQUENESS.md`.
         #[cfg(feature = "mesh-encryption")]
         let envelope = if let Some(ref key) = self.encryption_key {
             super::encrypt_packet_typed(

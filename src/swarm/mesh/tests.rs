@@ -1982,3 +1982,166 @@ fn test_fragment_wrong_key_rejected() {
         "Wrong key must fail"
     );
 }
+
+
+// ============================================================================
+// Legacy AEAD nonce-uniqueness regression witnesses
+// ============================================================================
+
+/// This test intentionally reproduces a known-broken legacy behavior; it is
+/// not a passing security invariant. The first six source-ID bytes are copied
+/// into the nonce while the final two are ignored. With a shared key, distinct
+/// IDs can therefore reuse a nonce and reveal the XOR of equal-length plaintexts.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn legacy_nonce_source_id_truncation_reveals_plaintext_xor() {
+    let key = [0x5Au8; 32];
+    let source_a = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
+    let source_b = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x99, 0xAA];
+    let plaintext_a = *b"plaintext-one!!!";
+    let plaintext_b = *b"plaintext-two!!!";
+
+    assert_ne!(source_a, source_b);
+    assert_eq!(&source_a[..6], &source_b[..6]);
+
+    let packet_a = encrypt_packet_typed(&plaintext_a, &key, &source_a, 3, 0x42, 7);
+    let packet_b = encrypt_packet_typed(&plaintext_b, &key, &source_b, 3, 0x42, 7);
+
+    assert_eq!(
+        &packet_a[..AEAD_NONCE_SIZE],
+        &packet_b[..AEAD_NONCE_SIZE],
+        "legacy source-ID truncation must reproduce the nonce collision"
+    );
+
+    let ciphertext_a =
+        &packet_a[AEAD_NONCE_SIZE..packet_a.len() - AEAD_TAG_SIZE];
+    let ciphertext_b =
+        &packet_b[AEAD_NONCE_SIZE..packet_b.len() - AEAD_TAG_SIZE];
+    assert_eq!(ciphertext_a.len(), plaintext_a.len());
+    assert_eq!(ciphertext_b.len(), plaintext_b.len());
+
+    let leaked_relation: Vec<u8> = ciphertext_a
+        .iter()
+        .zip(ciphertext_b.iter())
+        .map(|(a, b)| *a ^ *b)
+        .collect();
+    let expected_relation: Vec<u8> = plaintext_a
+        .iter()
+        .zip(plaintext_b.iter())
+        .map(|(a, b)| *a ^ *b)
+        .collect();
+
+    assert_eq!(
+        leaked_relation, expected_relation,
+        "reused ChaCha20 stream reveals plaintext_a XOR plaintext_b"
+    );
+}
+
+
+/// Intentional legacy vulnerability witness: fragment nonce construction uses
+/// only the low 16 bits of sequence via thought_id(), and no epoch. This test
+/// demonstrates ciphertext leakage when the same key/source/fragment index is
+/// reused after thought_id wraps. It is not a passing security invariant.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn legacy_fragment_nonce_reuses_after_16_bit_sequence_wrap() {
+    let key = [0xA5u8; 32];
+    let source_id = [0x31, 0x42, 0x53, 0x64, 0x75, 0x86, 0x97, 0xA8];
+    let packet_a = WisdomPacket {
+        source_id,
+        sequence: 7,
+        phi: 0.5,
+        urgency: MeshUrgency::Normal,
+        timestamp_s: 1_700_000_000,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: [0; 32],
+        ttl: 0,
+        wisdom: test_hv(1),
+    };
+    let packet_b = WisdomPacket {
+        sequence: 7 + (1 << 16),
+        wisdom: test_hv(2),
+        ..packet_a.clone()
+    };
+    let plaintext_a = *b"fragment-one-000";
+    let plaintext_b = *b"fragment-two-000";
+
+    assert_ne!(packet_a.sequence, packet_b.sequence);
+    assert_eq!(packet_a.thought_id(), packet_b.thought_id());
+
+    let encrypted_a = encrypt_fragment(
+        &plaintext_a,
+        &key,
+        &source_id,
+        packet_a.thought_id(),
+        0,
+    );
+    let encrypted_b = encrypt_fragment(
+        &plaintext_b,
+        &key,
+        &source_id,
+        packet_b.thought_id(),
+        0,
+    );
+
+    assert_eq!(
+        &encrypted_a[..AEAD_NONCE_SIZE],
+        &encrypted_b[..AEAD_NONCE_SIZE],
+        "fragment nonce repeats when the 16-bit thought ID repeats"
+    );
+
+    let ciphertext_a =
+        &encrypted_a[AEAD_NONCE_SIZE..encrypted_a.len() - AEAD_TAG_SIZE];
+    let ciphertext_b =
+        &encrypted_b[AEAD_NONCE_SIZE..encrypted_b.len() - AEAD_TAG_SIZE];
+    let leaked_relation: Vec<u8> = ciphertext_a
+        .iter()
+        .zip(ciphertext_b.iter())
+        .map(|(a, b)| *a ^ *b)
+        .collect();
+    let expected_relation: Vec<u8> = plaintext_a
+        .iter()
+        .zip(plaintext_b.iter())
+        .map(|(a, b)| *a ^ *b)
+        .collect();
+
+    assert_eq!(
+        leaked_relation, expected_relation,
+        "reused fragment nonce reveals plaintext_a XOR plaintext_b"
+    );
+}
+
+
+/// Intentional integration witness: fragment-level AEAD adds a 12-byte nonce
+/// and 16-byte tag to an already MTU-sized LoRa frame. The encrypted result is
+/// 250 bytes although LORA_MTU is 222, so it cannot pass through the receiver's
+/// fixed-size LoRa read buffer as one frame. This records the current broken
+/// size contract; it is not a passing transport-safety invariant.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn legacy_fragment_encryption_exceeds_lora_mtu() {
+    let key = [0x6Du8; 32];
+    let source_id = [0x12, 0x23, 0x34, 0x45, 0x56, 0x67, 0x78, 0x89];
+    let fragments = fragment(0x1234, &[0xA5; PAYLOAD_SIZE]);
+    let frag = fragments.first().expect("non-empty payload produces a fragment");
+    assert_eq!(frag.payload_len as usize, PAYLOAD_SIZE);
+
+    let mut frame = [0u8; LORA_MTU];
+    let frame_len = frag.to_bytes(&mut frame);
+    assert_eq!(frame_len, LORA_MTU);
+
+    let encrypted = encrypt_fragment(
+        &frame[..frame_len],
+        &key,
+        &source_id,
+        frag.thought_id,
+        frag.fragment_index,
+    );
+
+    assert_eq!(
+        encrypted.len(),
+        LORA_MTU + AEAD_NONCE_SIZE + AEAD_TAG_SIZE,
+        "the legacy encryption wrapper exceeds the documented physical frame MTU"
+    );
+    assert!(encrypted.len() > LORA_MTU);
+}
