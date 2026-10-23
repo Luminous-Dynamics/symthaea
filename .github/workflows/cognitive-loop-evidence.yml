@@ -9,6 +9,7 @@ on:
       - "xtask/src/cognitive_loop_evidence.rs"
       - "xtask/src/cognitive_drift_score.rs"
       - "xtask/src/cognitive_drift_compare.rs"
+      - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
       - ".github/workflows/cognitive-loop-evidence.yml"
@@ -21,6 +22,7 @@ on:
       - "xtask/src/cognitive_loop_evidence.rs"
       - "xtask/src/cognitive_drift_score.rs"
       - "xtask/src/cognitive_drift_compare.rs"
+      - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
       - ".github/workflows/cognitive-loop-evidence.yml"
@@ -52,6 +54,9 @@ jobs:
       - name: Test paired comparison and bootstrap failure modes
         run: cargo test --locked -p xtask cognitive_drift_compare
 
+      - name: Test counterfactual adaptation utility failure modes
+        run: cargo test --locked -p xtask cognitive_adaptation_utility
+
       - name: Run the drift scorer CLI against the synthetic fixture
         run: |
           cargo run --locked -p xtask -- score-cognitive-loop-drift --input benchmarks/cognitive-loop-evidence/synthetic-smoke-trace.json --out "$RUNNER_TEMP/drift-score.json"
@@ -81,3 +86,19 @@ jobs:
             (.canonical_input_sha256 | length) == 64 and
             (.result_sha256 | length) == 64
           ' "$RUNNER_TEMP/paired-comparison.json"
+
+      - name: Run the counterfactual adaptation utility CLI against the synthetic fixture
+        run: |
+          cargo run --locked -p xtask -- score-counterfactual-adaptation-utility --input benchmarks/cognitive-loop-evidence/synthetic-counterfactual-adaptation.json --out "$RUNNER_TEMP/adaptation-utility.json"
+          jq -e '
+            .metric_version == "counterfactual-adaptation-utility-v1" and
+            .dataset_id == "synthetic-fixture-not-measured" and
+            .no_adapt.cycle_count == 4 and
+            .detector_triggered.cycle_count == 4 and
+            .oracle_timed.cycle_count == 4 and
+            (.detector_task_loss_improvement_vs_no_adapt > 0.27 and .detector_task_loss_improvement_vs_no_adapt < 0.28) and
+            (.detector_task_loss_regret_vs_oracle_timed > 0.09 and .detector_task_loss_regret_vs_oracle_timed < 0.11) and
+            .detector_dominated_by_no_adapt == false and
+            (.canonical_input_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/adaptation-utility.json"
