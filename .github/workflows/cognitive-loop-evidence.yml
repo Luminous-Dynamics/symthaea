@@ -6,6 +6,7 @@ on:
       - "benchmarks/cognitive-loop-evidence/**"
       - "xtask/src/cognitive_loop_evidence.rs"
       - "xtask/src/cognitive_drift_score.rs"
+      - "xtask/src/cognitive_drift_compare.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
       - ".github/workflows/cognitive-loop-evidence.yml"
@@ -43,6 +44,8 @@ jobs:
         run: cargo test --locked -p xtask cognitive_loop_evidence
       - name: Test drift trace scoring failure modes
         run: cargo test --locked -p xtask cognitive_drift_score
+      - name: Test paired comparison and bootstrap failure modes
+        run: cargo test --locked -p xtask cognitive_drift_compare
 
       - name: Run the drift scorer CLI against the synthetic fixture
         run: |
@@ -57,3 +60,16 @@ jobs:
             (.canonical_trace_sha256 | length) == 64 and
             (.result_sha256 | length) == 64
           ' "$RUNNER_TEMP/drift-score.json"
+
+      - name: Run the paired comparison CLI against the synthetic fixture
+        run: |
+          cargo run --locked -p xtask -- compare-cognitive-loop-drift --input benchmarks/cognitive-loop-evidence/synthetic-paired-comparison.json --out "$RUNNER_TEMP/paired-comparison.json"
+          jq -e '
+            .metric_id == "event-f1" and
+            .dataset_count == 3 and
+            .paired_record_count == 12 and
+            .interval_supports_positive_effect == true and
+            (.percentile_95_ci_oriented_effect[0] > 0) and
+            (.canonical_input_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/paired-comparison.json"
