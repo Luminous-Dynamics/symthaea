@@ -323,8 +323,15 @@ pub fn unpaired_mean_permutation_test(
     let observed_scaled = mean_difference_scaled(&a, &b);
     let observed_statistic = welch_statistic_scaled(&a, &b);
     let abs_observed = observed_statistic.abs();
-    let tolerance = 64.0 * f64::EPSILON * abs_observed.max(1.0);
-    let threshold = (abs_observed - tolerance).max(0.0);
+    let threshold = if abs_observed.is_finite() {
+        let tolerance = 64.0 * f64::EPSILON * abs_observed.max(1.0);
+        (abs_observed - tolerance).max(0.0)
+    } else {
+        // For a non-zero mean difference with zero estimated standard error, the
+        // limiting Welch statistic is infinite. Preserve that ordering explicitly;
+        // computing infinity - infinity would create NaN and corrupt the tail count.
+        f64::INFINITY
+    };
     let mean_a = rescale_statistic(mean(&a), scale)?;
     let mean_b = rescale_statistic(mean(&b), scale)?;
     let effect = rescale_statistic(observed_scaled, scale)?;
