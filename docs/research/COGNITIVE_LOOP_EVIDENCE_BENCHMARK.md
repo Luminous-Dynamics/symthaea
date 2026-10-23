@@ -207,3 +207,26 @@ cargo test -p xtask cognitive_loop_evidence
 ```
 
 The validator fails closed on duplicate suite/case/baseline identifiers, missing B0–B7 controls, incomplete validity-case expectations, invalid evidence configured to update PE training or enter replay, hard-gate cases without assertions, missing result-provenance fields, and a CI policy that does not explicitly reject skipped checks. It prints a suite/case count only after the manifest contract passes. Keep `status` at `proposal-not-measured` until actual pinned runs and raw records exist. The command does not execute the scenarios and produces no SOTA claim.
+
+## Current state-of-the-art drift comparisons and evaluation protocol
+
+A KDD 2026 evaluation framework compares 14 detectors on seven real-world data streams across class-prior, label-swap, feature-permutation, and feature-filtering drifts, each abrupt and gradual. It recommends evaluating per-stream with randomized drift onset and leave-one-dataset-out hyperparameter tuning; SEED and STEPD rank strongly on detection F1, while ABCD has a strong false-alarm trade-off. [Paper](https://doi.org/10.1145/3770855.3819070) · [Reproduction repository](https://github.com/vcerqueira/experiments-drift_evaluation).
+
+The manifest now includes the complete eight-cell core drift matrix and adds SEED, STEPD, ABCD(error stream), ABCD(X), STUDD+ADWIN, and Dynamic Threshold Determination (DTD) as planned comparators. Existing D3/IBDD/SPLL and simpler controls remain. These are not yet runnable adapters or measured results. DTD is especially relevant because its AAAI 2026 work argues that adaptive threshold selection can outperform any single fixed threshold in its studied settings ([paper](https://doi.org/10.1609/aaai.v40i29.39586)).
+
+Detector comparisons are separated by **evidence access**: valid-PE-only, feature-only unsupervised, auxiliary-loss unsupervised, and observed-outcome. A feature-only detector cannot detect a pure target mapping change with no feature-distribution change. That should be measured as a boundary of observability, not “solved” by leaking labels.
+
+## Timing-aware drift scoring
+
+The Rust `xtask score-cognitive-loop-drift` command scores alarm traces against registered ground-truth episodes independently of the full cognitive loop:
+
+```bash
+cargo run --locked -p xtask -- score-cognitive-loop-drift --input path/to/drift-trace.json --out reports/drift-score.json
+cargo test --locked -p xtask cognitive_drift_score
+```
+
+Trace schema v1 requires a detector ID, full commit hash, configuration digest, seed, stream length, valid-observation count, maximum delay, ground-truth intervals, and alarm cycle indices. Each event is scored against the interval `[start_cycle, end_cycle + max_detection_delay_cycles]`; one alarm can match at most one event, duplicate/unmatched alarms count as false positives, and unmatched events count as missed. Invalid/missing PE sentinels are not valid observations.
+
+The scorer is intended to report event precision/recall/F1, false alarms per 1,000 valid observations, missed-drift rate, and a penalized normalized delay. The delay penalty is delay divided by transition width plus the post-window delay budget, clipped to `[0,1]`; missed events receive 1.0. This is our explicitly defined metric—not a claim to reproduce the paper's exact metric. Publish metric version and per-event matches beside aggregate results.
+
+Incremental drift, recurring drift, and correlated sensor shifts are planned future extensions, not part of the current eight-cell core matrix.
