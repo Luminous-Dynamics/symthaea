@@ -21,6 +21,8 @@ It does this for each raw resource dimension separately, without summing unlike 
 - Metrics remain separate in the output and are sorted deterministically. Wall time overlaps stage times and must not be summed with its component timers into one total.
 - For a candidate whose marginal cost is no greater than the baseline, the result reports the smallest positive cohort size at which its total is no greater. If marginal cost is higher, no durable break-even is claimed; the candidate may still be cheaper for a small cohort because its fixed setup is lower.
 
+**Wall-clock caveat:** fixed + N × marginal wall time only models end-to-end latency under the declared serial execution regime. If graph jobs run concurrently or share batches, do not infer latency by multiplying a mean per-instance time; measure the actual end-to-end time at each cohort size. Cumulative CPU time, circuit counts and shots can still be additive when their accounting boundary is explicit. Stage times may overlap; do not sum them with wall time.
+
 ## Hand-checkable example
 
 Suppose a quantum-informed method has fixed setup of 1,001 units and costs 2 units per graph, while the classical baseline has setup of 1 unit and costs 12 units per graph.
