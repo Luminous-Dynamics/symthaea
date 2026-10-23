@@ -42,6 +42,7 @@ struct TaskManifestRecord {
     repo: String,
     base_commit: String,
     repo_head_sha: String,
+    runtime_platform: String,
     docker_image: String,
     problem_statement_sha256: String,
     gold_patch_sha256: String,
@@ -90,6 +91,7 @@ struct ControllerTaskRecord {
     run_index: usize,
     instance_id: String,
     repo_head_sha: String,
+    runtime_platform: String,
     docker_image_reference: String,
     container_image_id: String,
     network_mode: String,
@@ -130,6 +132,7 @@ struct TaskAudit {
     runtime_evidence_sha256: Option<String>,
     container_image_id: Option<String>,
     repo_head_sha: Option<String>,
+    runtime_platform: Option<String>,
     network_mode: Option<String>,
     workspace_clean: Option<bool>,
 }
@@ -451,6 +454,7 @@ struct RuntimeEvidenceSummary {
     container_image_id: String,
     network_mode: String,
     repo_head_sha: String,
+    runtime_platform: String,
     workspace_clean: bool,
     container_ids: Vec<String>,
 }
@@ -475,6 +479,15 @@ fn validate_container_identity(
         != Some(0)
     {
         return Err("Git metadata sanitization was not confirmed".to_string());
+    }
+    let runtime_platform = identity
+        .get("runtime_platform")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "container_identity.runtime_platform missing".to_string())?;
+    if runtime_platform != "linux" {
+        return Err(format!(
+            "strict Rust repair evaluation requires Linux runtime; observed {runtime_platform:?}"
+        ));
     }
     let network_mode = identity
         .get("network_mode")
@@ -759,6 +772,7 @@ fn validate_runtime_evidence(
         container_image_id: image_ids[0].clone(),
         network_mode: "none".to_string(),
         repo_head_sha: expected_base_commit,
+        runtime_platform: "linux".to_string(),
         workspace_clean: true,
         container_ids: run_ids,
     })
@@ -1016,6 +1030,9 @@ fn audit_candidate(
         repo_head_sha: runtime_summary
             .as_ref()
             .map(|summary| summary.repo_head_sha.clone()),
+        runtime_platform: runtime_summary
+            .as_ref()
+            .map(|summary| summary.runtime_platform.clone()),
         network_mode: runtime_summary
             .as_ref()
             .map(|summary| summary.network_mode.clone()),
@@ -1032,6 +1049,11 @@ fn audit_candidate(
                 .as_ref()
                 .expect("eligible task has runtime summary")
                 .repo_head_sha
+                .clone(),
+            runtime_platform: runtime_summary
+                .as_ref()
+                .expect("eligible task has runtime summary")
+                .runtime_platform
                 .clone(),
             docker_image: docker_image.expect("eligible task has docker image"),
             problem_statement_sha256: problem_statement_sha256.expect("eligible task has prompt"),
@@ -1162,6 +1184,7 @@ fn run(cli: Cli) -> Result<(), String> {
                 repo: record.repo.clone(),
                 base_commit: record.base_commit.clone(),
                 repo_head_sha: record.repo_head_sha.clone(),
+                runtime_platform: record.runtime_platform.clone(),
                 docker_image: record.docker_image.clone(),
                 problem_statement_sha256: record.problem_statement_sha256.clone(),
                 gold_patch_sha256: record.gold_patch_sha256.clone(),
@@ -1233,6 +1256,7 @@ fn run(cli: Cli) -> Result<(), String> {
                         run_index,
                         instance_id: task.instance_id.clone(),
                         repo_head_sha: task.repo_head_sha.clone(),
+                        runtime_platform: task.runtime_platform.clone(),
                         docker_image_reference: task.docker_image.clone(),
                         container_image_id: task.container_image_id.clone(),
                         network_mode: task.network_mode.clone(),
@@ -1490,6 +1514,7 @@ mod tests {
                     "container_id": format!("{:064x}", run_index + 2),
                     "configured_image": image_reference,
                     "container_image_id": image_id,
+                    "runtime_platform": "linux",
                     "network_mode": "none",
                     "git_metadata_sanitization_exit_code": 0,
                     "repo_digests": []
@@ -1515,6 +1540,7 @@ mod tests {
                     "container_id": format!("{:064x}", 1),
                     "configured_image": image_reference,
                     "container_image_id": image_id,
+                    "runtime_platform": "linux",
                     "network_mode": "none",
                     "git_metadata_sanitization_exit_code": 0,
                     "repo_digests": []
@@ -1653,6 +1679,38 @@ mod tests {
         assert!(result.audit.unresolved);
         assert!(result.manifest_record.is_none());
         assert!(result.audit.reasons.iter().any(|reason| reason.contains("test-ID sets differ")));
+    }
+
+    #[test]
+    fn non_linux_runtime_cannot_be_locked_under_linux_only_isolation() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-windows-runtime";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail")],
+            &[("bug-fixed", "pass")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let bytes = fs::read(&evidence_path).unwrap();
+        let mut evidence: Value = serde_json::from_slice(&bytes).unwrap();
+        evidence["gold_runs"][0]["container_identity"]["runtime_platform"] =
+            Value::String("windows".to_string());
+        fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"wrong runtime platform row"),
+        );
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result.audit.reasons.iter().any(|reason| {
+            reason.contains("strict Rust repair evaluation requires Linux runtime")
+        }));
     }
 
     #[test]
@@ -1954,6 +2012,7 @@ mod tests {
             run_index: 0,
             instance_id: "owner__repo-issue-1".to_string(),
             repo_head_sha: "a".repeat(40),
+            runtime_platform: "linux".to_string(),
             docker_image_reference: "image@sha256:deadbeef".to_string(),
             container_image_id: format!("sha256:{}", "b".repeat(64)),
             network_mode: "none".to_string(),
@@ -1966,6 +2025,7 @@ mod tests {
                 "run_index": 0,
                 "instance_id": "owner__repo-issue-1",
                 "repo_head_sha": "a".repeat(40),
+                "runtime_platform": "linux",
                 "docker_image_reference": "image@sha256:deadbeef",
                 "container_image_id": format!("sha256:{}", "b".repeat(64)),
                 "network_mode": "none",
