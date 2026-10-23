@@ -1,0 +1,20 @@
+META	format	VIS-DVPC-TRACE-001-v1
+META	dataset_id	synthetic_fixture
+META	dataset_revision	fixture-v1
+META	dataset_snapshot_sha256	aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+META	source_manifest_sha256	bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+META	split_manifest_sha256	cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+META	utility_spec_sha256	dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+META	license_id	synthetic_fixture
+META	license_scope	synthetic_public_fixture
+META	higher_is_better	true
+ACTION_HEADER	trace_id	sample_sha256	comparison_id	policy_id	choice	commitment_index	latency_budget_us	energy_budget_uj	declared_extra_latency_us	declared_extra_energy_uj	allocator_latency_us	allocator_energy_uj	committed
+ACTION	trace-test-000	eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee	matched	all_cheap	cheap	0	25000	2500	12000	450	0	0	true
+ACTION	trace-test-001	6666666666666666666666666666666666666666666666666666666666666666	matched	all_cheap	cheap	1	25000	2500	12000	450	0	0	true
+ACTION	trace-test-000	eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee	matched	all_full	full	0	25000	2500	12000	450	0	0	true
+ACTION	trace-test-001	6666666666666666666666666666666666666666666666666666666666666666	matched	all_full	full	1	25000	2500	12000	450	0	0	true
+ACTION	trace-test-000	eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee	matched	value_router	full	0	25000	2500	12000	450	1000	10	true
+ACTION	trace-test-001	6666666666666666666666666666666666666666666666666666666666666666	matched	value_router	cheap	1	25000	2500	12000	450	1000	10	true
+ACTION	trace-test-002	9999999999999999999999999999999999999999999999999999999999999999	matched	all_cheap	cheap	2	25000	2500	12000	450	0	0	true
+ACTION	trace-test-002	9999999999999999999999999999999999999999999999999999999999999999	matched	all_full	full	2	25000	2500	12000	450	0	0	true
+ACTION	trace-test-002	9999999999999999999999999999999999999999999999999999999999999999	matched	value_router	cheap	2	25000	2500	12000	450	1000	10	true
