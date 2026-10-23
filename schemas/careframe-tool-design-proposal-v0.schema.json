@@ -707,6 +707,39 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "electrical": {
+                "properties": {
+                  "powered": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "powered"
+                ]
+              }
+            },
+            "required": [
+              "electrical"
+            ]
+          },
+          "then": {
+            "properties": {
+              "electrical": {
+                "properties": {
+                  "max_power_w": {
+                    "exclusiveMinimum": 0
+                  },
+                  "protective_isolation_declared": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
         }
       ]
     }
