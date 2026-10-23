@@ -487,6 +487,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn valid_pe_window_excludes_invalid_fallbacks_and_non_finite_values() {
+        let errors = [0.2, 1.0, f32::NAN, 0.6];
+        let validity = [true, false, true, true];
+
+        let (mean, count) = mean_valid_pe_window(&errors, &validity, 0, errors.len());
+
+        assert_eq!(count, 2);
+        assert!((mean - 0.4).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn valid_pe_window_with_no_valid_samples_reports_empty_coverage() {
+        let errors = [1.0, 0.8];
+        let validity = [false, false];
+
+        let (mean, count) = mean_valid_pe_window(&errors, &validity, 0, errors.len());
+
+        assert_eq!(mean, 0.0);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
     fn test_fep_error_reduction_sine() {
         // Fixed: BPTT regression for 4-item cyclic patterns was caused by:
         // 1. reset_states_only() call in train_step_bptt erasing temporal memory
