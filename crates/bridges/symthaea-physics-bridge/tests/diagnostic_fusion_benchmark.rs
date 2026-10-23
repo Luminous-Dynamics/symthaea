@@ -6,12 +6,11 @@
 //! substitute for the preregistered, held-out SOTA comparison documented in the research note.
 
 use symthaea_physics_bridge::adequacy_calibration::{
-    minimum_component_p_fusion_score, standardized_residual_diagnostics,
-    standardized_rms_residual, sum_log_component_p_fusion_score,
-    ConformalAdequacyCalibrator, ResidualDiagnosticScores,
+    ConformalAdequacyCalibrator, ResidualDiagnosticScores, minimum_component_p_fusion_score,
+    standardized_residual_diagnostics, standardized_rms_residual, sum_log_component_p_fusion_score,
 };
 use symthaea_physics_bridge::feature_shift::{
-    classify_shift_evidence, FeatureShiftScorer, ShiftTriageDecision,
+    FeatureShiftScorer, ShiftTriageDecision, classify_shift_evidence,
 };
 
 #[derive(Debug)]
@@ -101,8 +100,7 @@ fn wilson_interval(successes: usize, trials: usize) -> (f64, f64) {
     let z = 1.959_963_984_540_054_f64;
     let denominator = 1.0 + z * z / n;
     let center = (p + z * z / (2.0 * n)) / denominator;
-    let half_width =
-        z * ((p * (1.0 - p) / n + z * z / (4.0 * n * n)).sqrt()) / denominator;
+    let half_width = z * ((p * (1.0 - p) / n + z * z / (4.0 * n * n)).sqrt()) / denominator;
     (center - half_width, center + half_width)
 }
 
@@ -144,8 +142,7 @@ fn feature_shift_detects_input_drift_when_residual_monitor_is_silent() {
                 .aggregate
         })
         .collect::<Vec<_>>();
-    let feature_calibrator =
-        ConformalAdequacyCalibrator::new(&calibration_scores, ALPHA).unwrap();
+    let feature_calibrator = ConformalAdequacyCalibrator::new(&calibration_scores, ALPHA).unwrap();
     let residual_calibration = vec![0.0; CALIBRATION_BATCHES];
     let residual_calibrator =
         ConformalAdequacyCalibrator::new(&residual_calibration, ALPHA).unwrap();
@@ -202,7 +199,10 @@ fn feature_shift_detects_input_drift_when_residual_monitor_is_silent() {
          shifted={shifted_residual_alarms}"
     );
 
-    assert!(clean_rate <= 0.09, "clean feature-shift alarm rate was {clean_rate:.4}");
+    assert!(
+        clean_rate <= 0.09,
+        "clean feature-shift alarm rate was {clean_rate:.4}"
+    );
     assert!(
         shifted_rate >= 0.80,
         "feature-shift detection was too weak: {shifted_rate:.4}"
@@ -242,16 +242,11 @@ fn matched_heavy_tail_and_standardized_heteroscedastic_null_smoke() {
             .iter()
             .map(|score| score.maximum())
             .collect::<Vec<_>>();
-        let heavy_rms_calibrator =
-            ConformalAdequacyCalibrator::new(&heavy_rms, ALPHA).unwrap();
-        let heavy_max_calibrator =
-            ConformalAdequacyCalibrator::new(&heavy_max, ALPHA).unwrap();
-        let heavy_audit =
-            score_residual_batch(&rng.student_t4_batch(BATCH_SIZE), &zeros, &ones);
-        heavy_tail_alarms[0] += calibrated_alarm(
-            &heavy_rms_calibrator,
-            heavy_audit.rms_standardized_residual,
-        ) as usize;
+        let heavy_rms_calibrator = ConformalAdequacyCalibrator::new(&heavy_rms, ALPHA).unwrap();
+        let heavy_max_calibrator = ConformalAdequacyCalibrator::new(&heavy_max, ALPHA).unwrap();
+        let heavy_audit = score_residual_batch(&rng.student_t4_batch(BATCH_SIZE), &zeros, &ones);
+        heavy_tail_alarms[0] +=
+            calibrated_alarm(&heavy_rms_calibrator, heavy_audit.rms_standardized_residual) as usize;
         heavy_tail_alarms[1] +=
             calibrated_alarm(&heavy_max_calibrator, heavy_audit.maximum()) as usize;
 
@@ -280,12 +275,9 @@ fn matched_heavy_tail_and_standardized_heteroscedastic_null_smoke() {
             .zip(scales.iter())
             .map(|(noise, scale)| noise * scale)
             .collect::<Vec<_>>();
-        let heteroscedastic = standardized_residual_diagnostics(
-            &heteroscedastic_observed,
-            &zeros,
-            &scales,
-        )
-        .expect("known predictive scales standardize the null residuals");
+        let heteroscedastic =
+            standardized_residual_diagnostics(&heteroscedastic_observed, &zeros, &scales)
+                .expect("known predictive scales standardize the null residuals");
         heteroscedastic_alarms[0] += calibrated_alarm(
             &gaussian_rms_calibrator,
             heteroscedastic.rms_standardized_residual,
@@ -348,14 +340,10 @@ fn diagnostic_fusion_rust_benchmark_smoke() {
 
     for replication in 0..REPLICATIONS {
         let calibration_a = (0..SPLIT_BATCHES)
-            .map(|_| {
-                score_residual_batch(&rng.normal_batch(BATCH_SIZE), &zeros, &ones)
-            })
+            .map(|_| score_residual_batch(&rng.normal_batch(BATCH_SIZE), &zeros, &ones))
             .collect::<Vec<_>>();
         let calibration_b = (0..SPLIT_BATCHES)
-            .map(|_| {
-                score_residual_batch(&rng.normal_batch(BATCH_SIZE), &zeros, &ones)
-            })
+            .map(|_| score_residual_batch(&rng.normal_batch(BATCH_SIZE), &zeros, &ones))
             .collect::<Vec<_>>();
         let calibration_all = calibration_a
             .iter()
@@ -371,10 +359,8 @@ fn diagnostic_fusion_rust_benchmark_smoke() {
             .iter()
             .map(|scores| scores.maximum())
             .collect::<Vec<_>>();
-        let rms_calibrator =
-            ConformalAdequacyCalibrator::new(&rms_reference, ALPHA).unwrap();
-        let max_calibrator =
-            ConformalAdequacyCalibrator::new(&max_reference, ALPHA).unwrap();
+        let rms_calibrator = ConformalAdequacyCalibrator::new(&rms_reference, ALPHA).unwrap();
+        let max_calibrator = ConformalAdequacyCalibrator::new(&max_reference, ALPHA).unwrap();
 
         let component_calibrators = (0..4)
             .map(|component| {
@@ -408,10 +394,8 @@ fn diagnostic_fusion_rust_benchmark_smoke() {
                 .unwrap()
             })
             .collect::<Vec<_>>();
-        let min_calibrator =
-            ConformalAdequacyCalibrator::new(&min_reference, ALPHA).unwrap();
-        let sum_calibrator =
-            ConformalAdequacyCalibrator::new(&sum_reference, ALPHA).unwrap();
+        let min_calibrator = ConformalAdequacyCalibrator::new(&min_reference, ALPHA).unwrap();
+        let sum_calibrator = ConformalAdequacyCalibrator::new(&sum_reference, ALPHA).unwrap();
 
         let clean = rng.normal_batch(BATCH_SIZE);
         let mut localized = rng.normal_batch(BATCH_SIZE);
