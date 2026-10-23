@@ -47,6 +47,14 @@ pub enum MisDimacsError {
     DuplicateEdge { line: usize, u: usize, v: usize },
     /// The number of edge records differed from the declaration.
     DeclaredEdgeCountMismatch { declared: usize, observed: usize },
+    /// Source text exceeded the configured byte limit.
+    InputByteLimitExceeded { actual: usize, maximum: usize },
+    /// Declared vertex count exceeded the configured allocation limit.
+    VertexLimitExceeded { declared: usize, maximum: usize },
+    /// Declared edge count exceeded the configured storage limit.
+    EdgeLimitExceeded { declared: usize, maximum: usize },
+    /// Observed edge records exceeded the configured storage limit.
+    EdgeRecordLimitExceeded { line: usize, maximum: usize },
     /// Construction of the canonical graph failed.
     GraphConstruction(MisGraphError),
     /// A solution contained a token other than a vertex index.
@@ -74,6 +82,10 @@ impl fmt::Display for MisDimacsError {
             Self::SelfLoop { line, vertex } => write!(f, "self-loop at vertex {vertex} on line {line}"),
             Self::DuplicateEdge { line, u, v } => write!(f, "duplicate undirected edge ({u}, {v}) on line {line}"),
             Self::DeclaredEdgeCountMismatch { declared, observed } => write!(f, "problem line declares {declared} edges but file contains {observed} edge records"),
+            Self::InputByteLimitExceeded { actual, maximum } => write!(f, "input has {actual} bytes, exceeding the configured {maximum}-byte limit"),
+            Self::VertexLimitExceeded { declared, maximum } => write!(f, "problem line declares {declared} vertices, exceeding the configured limit of {maximum}"),
+            Self::EdgeLimitExceeded { declared, maximum } => write!(f, "problem line declares {declared} edges, exceeding the configured limit of {maximum}"),
+            Self::EdgeRecordLimitExceeded { line, maximum } => write!(f, "edge record at line {line} exceeds the configured limit of {maximum}"),
             Self::GraphConstruction(error) => write!(f, "failed to construct graph: {error}"),
             Self::InvalidSolutionToken { line, token } => write!(f, "invalid solution token {token:?} on line {line}"),
             Self::ZeroSolutionVertex { line } => write!(f, "solution vertex zero is invalid at line {line}"),
@@ -92,6 +104,44 @@ impl std::error::Error for MisDimacsError {}
 /// problem line p edge n m, and exactly m edge lines e u v. Nodes are one-based.
 /// Repeated undirected edges, self-loops, and out-of-range nodes are rejected.
 pub fn parse_dimacs_mis(input: &str) -> Result<ParsedMisDimacs, MisDimacsError> {
+    parse_dimacs_mis_with_limits(input, MisDimacsLimits::default())
+}
+
+/// Resource limits for parsing untrusted or externally sourced DIMACS graphs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MisDimacsLimits {
+    /// Maximum UTF-8 source size in bytes. Default: 64 MiB, enough for the pinned QOBLIB C4000-5 file.
+    pub max_input_bytes: usize,
+    /// Maximum declared/allocated vertex count. Default: 100,000.
+    pub max_vertices: usize,
+    /// Maximum declared/stored edge count. Default: 5,000,000.
+    pub max_edges: usize,
+}
+
+impl Default for MisDimacsLimits {
+    fn default() -> Self {
+        Self {
+            max_input_bytes: 64 * 1024 * 1024,
+            max_vertices: 100_000,
+            max_edges: 5_000_000,
+        }
+    }
+}
+
+/// Parse DIMACS with explicit resource limits. The function rejects input sizes and
+/// graph declarations before allocation, and stops if observed edge records exceed
+/// the configured edge budget. Raise limits only when the execution environment is
+/// provisioned for the corresponding memory footprint.
+pub fn parse_dimacs_mis_with_limits(
+    input: &str,
+    limits: MisDimacsLimits,
+) -> Result<ParsedMisDimacs, MisDimacsError> {
+    if input.len() > limits.max_input_bytes {
+        return Err(MisDimacsError::InputByteLimitExceeded {
+            actual: input.len(),
+            maximum: limits.max_input_bytes,
+        });
+    }
     let mut problem: Option<(usize, usize)> = None;
     // Keep source line with each canonical edge so duplicates can be rejected after
     // one sort. This avoids a HashSet allocation proportional to every input edge,
@@ -127,6 +177,18 @@ pub fn parse_dimacs_mis(input: &str) -> Result<ParsedMisDimacs, MisDimacsError> 
                     .map_err(|_| MisDimacsError::InvalidInteger { line, field: "vertex_count" })?;
                 let edge_count = fields[3].parse::<usize>()
                     .map_err(|_| MisDimacsError::InvalidInteger { line, field: "edge_count" })?;
+                if vertex_count > limits.max_vertices {
+                    return Err(MisDimacsError::VertexLimitExceeded {
+                        declared: vertex_count,
+                        maximum: limits.max_vertices,
+                    });
+                }
+                if edge_count > limits.max_edges {
+                    return Err(MisDimacsError::EdgeLimitExceeded {
+                        declared: edge_count,
+                        maximum: limits.max_edges,
+                    });
+                }
                 problem = Some((vertex_count, edge_count));
             }
             "e" => {
@@ -146,6 +208,12 @@ pub fn parse_dimacs_mis(input: &str) -> Result<ParsedMisDimacs, MisDimacsError> 
                 }
                 if u == v {
                     return Err(MisDimacsError::SelfLoop { line, vertex: u });
+                }
+                if source_edges.len() >= limits.max_edges {
+                    return Err(MisDimacsError::EdgeRecordLimitExceeded {
+                        line,
+                        maximum: limits.max_edges,
+                    });
                 }
                 let canonical = if u < v { (u - 1, v - 1) } else { (v - 1, u - 1) };
                 source_edges.push((canonical.0, canonical.1, line));
@@ -368,6 +436,41 @@ e 4 17\n";
         assert!(parsed.graph.verify_solution(&exact, Some(10)).feasible);
     }
 
+
+    #[test]
+    fn parser_limits_reject_input_and_graph_declarations_before_allocation() {
+        assert_eq!(
+            parse_dimacs_mis_with_limits(
+                "p edge 2 1\\ne 1 2\\n",
+                MisDimacsLimits { max_input_bytes: 4, ..MisDimacsLimits::default() }
+            ),
+            Err(MisDimacsError::InputByteLimitExceeded {
+                actual: 15,
+                maximum: 4,
+            })
+        );
+        assert_eq!(
+            parse_dimacs_mis_with_limits(
+                "p edge 2 1\\ne 1 2\\n",
+                MisDimacsLimits { max_vertices: 1, ..MisDimacsLimits::default() }
+            ),
+            Err(MisDimacsError::VertexLimitExceeded { declared: 2, maximum: 1 })
+        );
+        assert_eq!(
+            parse_dimacs_mis_with_limits(
+                "p edge 2 1\\ne 1 2\\n",
+                MisDimacsLimits { max_edges: 0, ..MisDimacsLimits::default() }
+            ),
+            Err(MisDimacsError::EdgeLimitExceeded { declared: 1, maximum: 0 })
+        );
+        assert_eq!(
+            parse_dimacs_mis_with_limits(
+                "p edge 2 0\\ne 1 2\\n",
+                MisDimacsLimits { max_edges: 1, ..MisDimacsLimits::default() }
+            ),
+            Err(MisDimacsError::EdgeRecordLimitExceeded { line: 2, maximum: 1 })
+        );
+    }
 
     #[test]
     fn parses_large_sparse_instance_with_linear_edge_storage() {
