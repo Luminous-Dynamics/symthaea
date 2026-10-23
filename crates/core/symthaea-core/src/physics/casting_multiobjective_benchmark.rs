@@ -99,7 +99,7 @@ impl fmt::Display for ParetoMetricError {
             }
             Self::NonFiniteMetricResult => f.write_str("front metric overflowed or produced a non-finite result"),
             Self::InvalidDecisionDimension => {
-                f.write_str("ZDT decision vector must contain at least two variables")
+                f.write_str("ZDT1/ZDT2/ZDT3 require 30 variables; ZDT4 requires 10")
             }
             Self::NonFiniteDecisionVariable => f.write_str("ZDT decision variables must be finite"),
             Self::DecisionOutOfDomain => {
@@ -806,10 +806,25 @@ enum ZdtProblem {
     Zdt4,
 }
 
-/// Evaluate a ZDT decision vector using the standard domain for each problem.
-/// ZDT1/2/3 use [0,1]^n; ZDT4 uses x1 in [0,1] and remaining variables in [-5,5].
+/// ZDT1/2/3 use 30 variables in [0, 1]; ZDT4 uses 10 variables, x1 in [0, 1],
+/// and remaining variables in [-10, 10], matching the standard benchmark dimensions.
+fn canonical_zdt_dimension(problem: ZdtProblem) -> usize {
+    match problem {
+        ZdtProblem::Zdt1 | ZdtProblem::Zdt2 | ZdtProblem::Zdt3 => 30,
+        ZdtProblem::Zdt4 => 10,
+    }
+}
+
+/// Construct a Pareto-set decision with x1 = f1 and all tail variables set to zero.
+fn zdt_pareto_decision(problem: ZdtProblem, f1: f64) -> Vec<f64> {
+    let mut decision = vec![0.0; canonical_zdt_dimension(problem)];
+    decision[0] = f1;
+    decision
+}
+
+/// Evaluate a ZDT decision vector using canonical benchmark dimensions and domains.
 fn evaluate_zdt(problem: ZdtProblem, decision: &[f64]) -> Result<[f64; 2], ParetoMetricError> {
-    if decision.len() < 2 {
+    if decision.len() != canonical_zdt_dimension(problem) {
         return Err(ParetoMetricError::InvalidDecisionDimension);
     }
     if decision.iter().any(|value| !value.is_finite()) {
@@ -1197,26 +1212,35 @@ mod tests {
 
     #[test]
     fn zdt1_zdt2_and_zdt3_match_known_objective_values() {
-        let zdt1 = evaluate_zdt(ZdtProblem::Zdt1, &[0.5, 0.0, 0.0]).unwrap();
+        let zdt1_decision = zdt_pareto_decision(ZdtProblem::Zdt1, 0.5);
+        let zdt1 = evaluate_zdt(ZdtProblem::Zdt1, &zdt1_decision).unwrap();
         assert_abs_close(zdt1[0], 0.5, 1e-12);
         assert_abs_close(zdt1[1], 1.0 - 0.5_f64.sqrt(), 1e-12);
 
-        let zdt2 = evaluate_zdt(ZdtProblem::Zdt2, &[0.5, 0.0, 0.0]).unwrap();
+        let zdt2_decision = zdt_pareto_decision(ZdtProblem::Zdt2, 0.5);
+        let zdt2 = evaluate_zdt(ZdtProblem::Zdt2, &zdt2_decision).unwrap();
         assert_abs_close(zdt2[0], 0.5, 1e-12);
         assert_abs_close(zdt2[1], 0.75, 1e-12);
 
-        let zdt3 = evaluate_zdt(ZdtProblem::Zdt3, &[0.5, 0.0, 0.0]).unwrap();
+        let zdt3_decision = zdt_pareto_decision(ZdtProblem::Zdt3, 0.5);
+        let zdt3 = evaluate_zdt(ZdtProblem::Zdt3, &zdt3_decision).unwrap();
         assert_abs_close(zdt3[0], 0.5, 1e-12);
         assert_abs_close(zdt3[1], 1.0 - 0.5_f64.sqrt(), 1e-12);
     }
 
     #[test]
     fn zdt4_matches_known_front_and_exposes_multimodal_tail_penalty() {
-        let optimum = evaluate_zdt(ZdtProblem::Zdt4, &[0.5, 0.0, 0.0]).unwrap();
+        let optimum_decision = zdt_pareto_decision(ZdtProblem::Zdt4, 0.5);
+        let optimum = evaluate_zdt(ZdtProblem::Zdt4, &optimum_decision).unwrap();
         assert_abs_close(optimum[1], 1.0 - 0.5_f64.sqrt(), 1e-12);
 
         // A tail coordinate away from its global optimum increases g on the canonical domain.
-        let non_optimal = evaluate_zdt(ZdtProblem::Zdt4, &[0.5, 1.0, 0.0]).unwrap();
+        let mut non_optimal_decision = zdt_pareto_decision(ZdtProblem::Zdt4, 0.5);
+        non_optimal_decision[1] = 1.0;
+        let non_optimal = evaluate_zdt(ZdtProblem::Zdt4, &non_optimal_decision).unwrap();
+        let mut in_domain_multimodal = zdt_pareto_decision(ZdtProblem::Zdt4, 0.5);
+        in_domain_multimodal[1] = 6.0;
+        assert!(evaluate_zdt(ZdtProblem::Zdt4, &in_domain_multimodal).is_ok());
         assert_abs_close(non_optimal[1], 1.0, 1e-12);
         assert!(non_optimal[1] > optimum[1]);
     }
@@ -1244,7 +1268,7 @@ mod tests {
         for problem in [ZdtProblem::Zdt1, ZdtProblem::Zdt2, ZdtProblem::Zdt3, ZdtProblem::Zdt4] {
             let front = zdt_reference_front(problem, 17).unwrap();
             for expected in &front {
-                let decision = [expected[0], 0.0, 0.0];
+                let decision = zdt_pareto_decision(problem, expected[0]);
                 let actual = evaluate_zdt(problem, &decision).unwrap();
                 assert_abs_close(actual[0], expected[0], 1e-10);
                 assert_abs_close(actual[1], expected[1], 1e-8);
@@ -1274,16 +1298,22 @@ mod tests {
             evaluate_zdt(ZdtProblem::Zdt1, &[0.5]),
             Err(ParetoMetricError::InvalidDecisionDimension)
         );
+        let mut non_finite = zdt_pareto_decision(ZdtProblem::Zdt1, 0.5);
+        non_finite[0] = f64::NAN;
         assert_eq!(
-            evaluate_zdt(ZdtProblem::Zdt1, &[f64::NAN, 0.0]),
+            evaluate_zdt(ZdtProblem::Zdt1, &non_finite),
             Err(ParetoMetricError::NonFiniteDecisionVariable)
         );
+        let mut invalid_zdt1 = zdt_pareto_decision(ZdtProblem::Zdt1, 0.5);
+        invalid_zdt1[1] = -0.01;
         assert_eq!(
-            evaluate_zdt(ZdtProblem::Zdt1, &[0.5, -0.01]),
+            evaluate_zdt(ZdtProblem::Zdt1, &invalid_zdt1),
             Err(ParetoMetricError::DecisionOutOfDomain)
         );
+        let mut invalid_zdt4 = zdt_pareto_decision(ZdtProblem::Zdt4, 0.5);
+        invalid_zdt4[1] = 10.01;
         assert_eq!(
-            evaluate_zdt(ZdtProblem::Zdt4, &[0.5, 10.01]),
+            evaluate_zdt(ZdtProblem::Zdt4, &invalid_zdt4),
             Err(ParetoMetricError::DecisionOutOfDomain)
         );
         assert_eq!(
