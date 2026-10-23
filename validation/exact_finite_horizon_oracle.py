@@ -22,12 +22,6 @@ ACTIONS = tuple(VARIABLES)
 HORIZONS = (1, 2, 3)
 POLICIES = ("round_robin", "random_uniform", "greedy_graph_information", "greedy_kernel_information", "greedy_joint_information", "coverage_then_joint_information", "exact_bellman_oracle")
 
-# For attempted action i, the realized set is either {i} or {i, (i+1)%3}.
-def action_subsets(action):
-    one = 1 << action
-    pair = one | (1 << ((action + 1) % 3))
-    return ((one, 1.0), (pair, 1.0))
-
 OBSERVATIONS = {a: tuple((s, y) for s in (1 << a, (1 << a) | (1 << ((a + 1) % 3))) for y in range(8)) for a in ACTIONS}
 
 def entropy(ps):
@@ -107,7 +101,7 @@ def choose_action(policy, posterior, history):
 def terminal_entropy(posterior):
     return entropy(posterior)
 
-# Cached by posterior+remaining depth; posterior floats are deterministic from history.
+# Cache keys retain the full floating-point posterior tuple; no rounded-state merging.
 def oracle_value(posterior, remaining, cache=None):
     if cache is None:
         cache = {}
@@ -169,10 +163,7 @@ def run_benchmark(max_horizon=3):
     for horizon in range(1, max_horizon + 1):
         oracle = oracle_value(prior, horizon, cache)
         for policy in POLICIES:
-            if policy == "exact_bellman_oracle":
-                expected_h = oracle
-            else:
-                expected_h = policy_value(prior, horizon, policy, cache=cache)
+            expected_h = oracle if policy == "exact_bellman_oracle" else policy_value(prior, horizon, policy, cache=cache)
             gap = expected_h - oracle
             if gap < -1e-8:
                 raise AssertionError(f"policy {policy} beats exact oracle by {-gap} bits")
@@ -232,6 +223,5 @@ def main():
         else: print(raw.decode(), end="")
         return 0
     except (ValueError, AssertionError, OSError, RuntimeError, RecursionError) as exc:
-        print(f"NOT QUALIFIED: {exc}")
-        return 2
+        print(f"NOT QUALIFIED: {exc}"); return 2
 if __name__ == "__main__": raise SystemExit(main())
