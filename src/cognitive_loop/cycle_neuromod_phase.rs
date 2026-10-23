@@ -304,6 +304,7 @@ impl CognitiveLoopService {
                 .unwrap_or(bus.current_signals.prediction_error);
             bus.current_signals = crate::experience::PrincipledSignals {
                 prediction_error: admitted_prediction_error,
+                prediction_error_valid: prediction_error.is_some_and(|value| value.is_finite()),
                 uncertainty: (1.0 - self.prediction_confidence) as f32,
                 coherence: coherence.clamp(0.0, 1.0),
                 confidence: self.prediction_confidence as f32,
