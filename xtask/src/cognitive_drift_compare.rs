@@ -89,6 +89,10 @@ pub struct ComparisonResult {
     pub baseline_configuration_digest: String,
     pub comparison_track: String,
     pub dataset_count: usize,
+    pub minimum_seeds_per_dataset: usize,
+    /// Coverage only: passing this does not establish superiority over state of the art.
+    pub sota_coverage_gate_pass: bool,
+    pub sota_coverage_gate_reason: String,
     pub paired_record_count: usize,
     pub bootstrap_method: String,
     pub bootstrap_replicates: usize,
@@ -229,6 +233,15 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
         .collect();
 
     let dataset_count = per_dataset.len();
+    let minimum_seeds_per_dataset = by_dataset_seed.values().map(BTreeMap::len).min().unwrap_or(0);
+    let sota_coverage_gate_pass = dataset_count >= 7 && minimum_seeds_per_dataset >= 50;
+    let sota_coverage_gate_reason = if sota_coverage_gate_pass {
+        "Coverage requirement met (at least seven datasets and 50 seeds per dataset); comparative evidence, uncertainty, costs, and baseline fairness still require review.".to_owned()
+    } else {
+        format!(
+            "Not eligible for a state-of-the-art claim: need at least seven datasets and 50 seeds per dataset; observed {dataset_count} datasets and minimum {minimum_seeds_per_dataset} seeds per dataset. This gate measures coverage only."
+        )
+    };
     let candidate_dataset_macro_mean =
         per_dataset.iter().map(|item| item.candidate_mean).sum::<f64>() / dataset_count as f64;
     let baseline_dataset_macro_mean =
@@ -294,6 +307,9 @@ pub fn compare(mut input: ComparisonInput) -> anyhow::Result<ComparisonResult> {
         baseline_configuration_digest: input.baseline.configuration_digest,
         comparison_track: input.candidate.comparison_track,
         dataset_count,
+        minimum_seeds_per_dataset,
+        sota_coverage_gate_pass,
+        sota_coverage_gate_reason,
         paired_record_count: input.pairs.len(),
         bootstrap_method: "hierarchical-paired-bootstrap/dataset-then-seed-scenario-block/v1".to_owned(),
         bootstrap_replicates: input.bootstrap.replicates,
@@ -408,8 +424,8 @@ mod tests {
         ComparisonInput {
             schema_version: 1,
             metric: MetricSpec {
-                id: "event-f1".to_owned(),
-                unit: "fraction".to_owned(),
+                id: if higher_is_better { "event-f1" } else { "p95-latency" }.to_owned(),
+                unit: if higher_is_better { "fraction" } else { "milliseconds" }.to_owned(),
                 higher_is_better,
             },
             candidate: Arm {
@@ -439,6 +455,8 @@ mod tests {
         let result = compare(fixture(true)).expect("comparison succeeds");
         assert_eq!(result.dataset_count, 3);
         assert_eq!(result.paired_record_count, 18);
+        assert!(!result.sota_coverage_gate_pass);
+        assert!(result.sota_coverage_gate_reason.contains("seven datasets and 50 seeds"));
         assert!((result.dataset_macro_paired_effect - 0.1).abs() < 1e-12);
         assert!(result.percentile_95_ci_oriented_effect[0] > 0.0);
         assert!(result.interval_supports_positive_effect);
