@@ -52,6 +52,19 @@ jobs:
                  .authority.clinical_use_authorized == false' \
             examples/careframe-tool-design-proposal-v0.example.json
 
+      - name: Check proposal cross-references and matched task definition
+        run: |
+          set -euo pipefail
+          jq -e '
+            . as $root |
+            ($root.candidate_manifests | map(.tool_id)) as $ids |
+            ($root.task.intended_task) as $task |
+            (($ids | length) == ($ids | unique | length)) and
+            all($root.candidate_manifests[]; .intended_task == $task) and
+            all($root.hypotheses[].candidate_tool_id; . as $id | ($ids | index($id)) != null) and
+            all($ids[]; . as $id | any($root.hypotheses[]; .candidate_tool_id == $id))
+          ' examples/careframe-tool-design-proposal-v0.example.json
+
       - name: Bind proposal to exact scenario bytes
         run: |
           set -euo pipefail
@@ -74,6 +87,12 @@ jobs:
             examples/careframe-tool-design-proposal-v0.example.json > /tmp/careframe-actuation-escalation.json
           if check-jsonschema --schemafile schemas/careframe-tool-design-proposal-v0.schema.json /tmp/careframe-actuation-escalation.json; then
             echo "ERROR: schema accepted an unauthorized actuation escalation" >&2
+            exit 1
+          fi
+          jq '.authority.patient_contact_authorized = true' \
+            examples/careframe-tool-design-proposal-v0.example.json > /tmp/careframe-contact-escalation.json
+          if check-jsonschema --schemafile schemas/careframe-tool-design-proposal-v0.schema.json /tmp/careframe-contact-escalation.json; then
+            echo "ERROR: schema accepted an unauthorized patient-contact escalation" >&2
             exit 1
           fi
 
