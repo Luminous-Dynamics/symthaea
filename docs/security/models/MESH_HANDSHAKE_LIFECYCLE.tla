@@ -16,7 +16,8 @@ ASSUME
   /\ RequireHybrid \in BOOLEAN
   /\ DowngradeAuthorized \in BOOLEAN
   /\ BackendUsable \in BOOLEAN
-  /\ AdmissionMode \in {"strict", "one-sided", "stub-backend", "downgrade"}
+  /\ AdmissionMode \in {"strict", "one-sided", "stub-backend", "downgrade",
+                          "identity-unbound", "transcript-unbound"}
 
 VARIABLES
   phase,
@@ -89,8 +90,8 @@ BindIdentityAndTranscript ==
   /\ chosenProfile \in Profiles
   /\ \/ AdmissionMode = "downgrade"
      \/ ProfileAllowed(chosenProfile)
-  /\ peerIdentityBound' = TRUE
-  /\ transcriptBound' = TRUE
+  /\ peerIdentityBound' = AdmissionMode # "identity-unbound"
+  /\ transcriptBound' = AdmissionMode # "transcript-unbound"
   /\ candidateSecretPresent' = (BackendUsable
                                \/ AdmissionMode = "stub-backend")
   /\ phase' = "Candidate"
@@ -103,8 +104,8 @@ BindIdentityAndTranscript ==
 ConfirmInitiator ==
   /\ phase = "Candidate"
   /\ candidateSecretPresent
-  /\ peerIdentityBound
-  /\ transcriptBound
+  /\ (peerIdentityBound \/ AdmissionMode = "identity-unbound")
+  /\ (transcriptBound \/ AdmissionMode = "transcript-unbound")
   /\ \/ BackendUsable
      \/ AdmissionMode = "stub-backend"
   /\ initiatorConfirmed' = TRUE
@@ -150,11 +151,21 @@ Establish ==
                   /\ initiatorConfirmed
              ELSE IF AdmissionMode = "stub-backend"
                   THEN TRUE
-                  ELSE /\ BackendUsable
-                       /\ peerIdentityBound
-                       /\ transcriptBound
-                       /\ initiatorConfirmed
-                       /\ responderConfirmed
+                  ELSE IF AdmissionMode = "identity-unbound"
+                       THEN /\ transcriptBound
+                            /\ initiatorConfirmed
+                            /\ responderConfirmed
+                            /\ ProfileAllowed(chosenProfile)
+                       ELSE IF AdmissionMode = "transcript-unbound"
+                            THEN /\ peerIdentityBound
+                                 /\ initiatorConfirmed
+                                 /\ responderConfirmed
+                                 /\ ProfileAllowed(chosenProfile)
+                            ELSE /\ BackendUsable
+                                 /\ peerIdentityBound
+                                 /\ transcriptBound
+                                 /\ initiatorConfirmed
+                                 /\ responderConfirmed
   /\ sessionEstablished' = TRUE
   /\ phase' = "Established"
   /\ UNCHANGED << chosenProfile,
