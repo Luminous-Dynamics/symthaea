@@ -31,6 +31,12 @@ As inspected on October 22, 2026, the upstream *code repository* was at commit `
 
 If the upstream task data cannot be resolved to an immutable revision and reproducible task list, stop and report the blocker. Do not silently substitute the latest moving split or describe a partial sample as the official benchmark. Respect upstream license, redistribution and leaderboard-submission rules.
 
+#### Blind rollout and contamination controls
+
+For the strict-comparability lane, expose only the task's `problem_statement` and the prebuilt sandbox to the agent. Do not expose `patch`, `test_patch`, `hint`, `hints_text`, `all_hints_text`, `FAIL_TO_PASS`, `PASS_TO_PASS`, commit URLs, evaluator logs, or task metadata that is not part of the official agent interface. Disable web/search access and task-specific retrieval during the rollout; fetch dependencies before the run or from a recorded allowlist/cache. Preserve full input/output tool trajectories so protocol compliance can be independently reviewed.
+
+Use one rollout per task for the primary pass@1 result; the official SWE-bench-Live protocol asks for a single rollout based on the problem statement in the task container. Do not rerun a failed task until one attempt passes and then report it as pass@1. Retry, pass@k, best@k, browser-enabled or retrieval-enabled variants may be valuable separate experiments, but must have distinct preregistrations, budgets and result labels and must never be pooled with strict pass@1.
+
 ### Lane B — Symthaea-held-out Rust repairs
 
 Curate 50–100 reviewed development tasks, then a held-out confirmatory set targeting 250–500 tasks distributed over many repositories and task families. The final count must be supported by a preregistered power/precision analysis; task count cannot compensate for too few independent repository clusters.
