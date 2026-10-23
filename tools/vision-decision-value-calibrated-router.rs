@@ -18,12 +18,11 @@
 #[path = "vision-decision-value-vector-budget.rs"]
 mod vector_budget;
 
+use std::collections::BTreeSet;
 use vector_budget::{
     AllocationChoice, AllocationCommitV1, AllocationError, ObservedResourceCost,
-    PreEscalationInputV1, PreEscalationValueEstimateV1, ResourceVector,
-    VectorBudgetAllocatorV1,
+    PreEscalationInputV1, PreEscalationValueEstimateV1, ResourceVector, VectorBudgetAllocatorV1,
 };
-use std::collections::BTreeSet;
 
 pub type EvidenceDigest = [u8; 32];
 
@@ -148,11 +147,17 @@ impl SplitConformalBenefitProfileV1 {
             || self.calibration_split_id.trim().is_empty()
             || self.domain_id.trim().is_empty()
             || self.domain_assessor_id.trim().is_empty()
-            || self.domain_assessor_artifact_digest.iter().all(|byte| *byte == 0)
+            || self
+                .domain_assessor_artifact_digest
+                .iter()
+                .all(|byte| *byte == 0)
             || self.loss_profile_id.trim().is_empty()
             || self.estimator_id.trim().is_empty()
             || self.estimator_artifact_digest.iter().all(|byte| *byte == 0)
-            || self.calibration_manifest_digest.iter().all(|byte| *byte == 0)
+            || self
+                .calibration_manifest_digest
+                .iter()
+                .all(|byte| *byte == 0)
             || !self.alpha.is_finite()
             || self.alpha <= 0.0
             || self.alpha >= 1.0
@@ -263,11 +268,20 @@ fn validate_config(config: &CalibrationConfigV1) -> Result<(), CalibrationError>
         || config.calibration_split_id.trim().is_empty()
         || config.domain_id.trim().is_empty()
         || config.domain_assessor_id.trim().is_empty()
-        || config.domain_assessor_artifact_digest.iter().all(|byte| *byte == 0)
+        || config
+            .domain_assessor_artifact_digest
+            .iter()
+            .all(|byte| *byte == 0)
         || config.loss_profile_id.trim().is_empty()
         || config.estimator_id.trim().is_empty()
-        || config.estimator_artifact_digest.iter().all(|byte| *byte == 0)
-        || config.calibration_manifest_digest.iter().all(|byte| *byte == 0)
+        || config
+            .estimator_artifact_digest
+            .iter()
+            .all(|byte| *byte == 0)
+        || config
+            .calibration_manifest_digest
+            .iter()
+            .all(|byte| *byte == 0)
         || !config.alpha.is_finite()
         || config.alpha <= 0.0
         || config.alpha >= 1.0
@@ -362,10 +376,7 @@ impl CalibratedRouterDecisionV1 {
     /// Stable receipt combines calibration provenance, gate state and allocation.
     pub fn to_tsv(&self) -> String {
         let allocation = self.allocation.to_tsv();
-        let fields = allocation
-            .trim_end()
-            .strip_prefix("COMMIT\t")
-            .unwrap_or("");
+        let fields = allocation.trim_end().strip_prefix("COMMIT\t").unwrap_or("");
         format!(
             "DVPC008\t{}\t{}\t{}\t{:.6}\t{}\t{}\n",
             self.gate_reason.label(),
@@ -442,15 +453,13 @@ impl CalibratedDecisionValueRouterV1 {
         };
 
         let value_estimate = match (gate, lower_bound) {
-            (GateReasonV1::CalibratedInDomain, Some(bound)) => {
-                Some(PreEscalationValueEstimateV1 {
-                    estimator_id: input.estimator_id.clone(),
-                    estimator_artifact_digest: input.estimator_artifact_digest,
-                    loss_profile_id: self.profile.loss_profile_id.clone(),
-                    source_input_digest: input.input_digest,
-                    net_benefit_lower_bound: bound,
-                })
-            }
+            (GateReasonV1::CalibratedInDomain, Some(bound)) => Some(PreEscalationValueEstimateV1 {
+                estimator_id: input.estimator_id.clone(),
+                estimator_artifact_digest: input.estimator_artifact_digest,
+                loss_profile_id: self.profile.loss_profile_id.clone(),
+                source_input_digest: input.input_digest,
+                net_benefit_lower_bound: bound,
+            }),
             _ => None,
         };
 
@@ -471,7 +480,8 @@ impl CalibratedDecisionValueRouterV1 {
 
         Ok(CalibratedRouterDecisionV1 {
             gate_reason: gate,
-            calibrated_lower_bound: lower_bound.filter(|_| gate == GateReasonV1::CalibratedInDomain),
+            calibrated_lower_bound: lower_bound
+                .filter(|_| gate == GateReasonV1::CalibratedInDomain),
             calibration_profile_id: self.profile.profile_id.clone(),
             calibration_count: self.profile.calibration_count(),
             target_marginal_coverage: self.profile.target_marginal_coverage(),
@@ -586,12 +596,8 @@ mod tests {
     }
 
     fn router() -> CalibratedDecisionValueRouterV1 {
-        CalibratedDecisionValueRouterV1::new(
-            profile(0.4),
-            0.05,
-            ResourceVector::new(100, 100),
-        )
-        .unwrap()
+        CalibratedDecisionValueRouterV1::new(profile(0.4), 0.05, ResourceVector::new(100, 100))
+            .unwrap()
     }
 
     #[test]
@@ -623,8 +629,7 @@ mod tests {
 
     #[test]
     fn rejects_unsupported_finite_sample_quantile_rank() {
-        let error = fit_split_conformal_profile_v1(&config(0.05), &calibration_rows())
-            .unwrap_err();
+        let error = fit_split_conformal_profile_v1(&config(0.05), &calibration_rows()).unwrap_err();
         assert_eq!(
             error,
             CalibrationError::UnsupportedQuantileRank { rank: 6, count: 5 }
@@ -729,7 +734,10 @@ mod tests {
         let mut candidate = input(1, 1000.0, 0.001);
         candidate.estimator_artifact_digest = [0xEF; 32];
         let decision = policy.decide(candidate).unwrap();
-        assert_eq!(decision.gate_reason, GateReasonV1::EstimatorArtifactMismatch);
+        assert_eq!(
+            decision.gate_reason,
+            GateReasonV1::EstimatorArtifactMismatch
+        );
         assert_eq!(decision.allocation.choice, AllocationChoice::KeepCheap);
         assert_eq!(decision.calibrated_lower_bound, None);
     }
@@ -788,7 +796,10 @@ mod tests {
         let mut candidate = input(2, 1000.0, 0.001);
         candidate.domain_assessor_artifact_digest = [0xEE; 32];
         let decision = policy.decide(candidate).unwrap();
-        assert_eq!(decision.gate_reason, GateReasonV1::DomainAssessorArtifactMismatch);
+        assert_eq!(
+            decision.gate_reason,
+            GateReasonV1::DomainAssessorArtifactMismatch
+        );
         assert_eq!(decision.allocation.choice, AllocationChoice::KeepCheap);
         assert_eq!(policy.budget().reserved(), ResourceVector::default());
     }
