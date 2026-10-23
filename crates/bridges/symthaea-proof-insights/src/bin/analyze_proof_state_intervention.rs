@@ -19,6 +19,7 @@ use sha2::{Digest, Sha256};
 const SUITE_VERSION: &str = "pitb.proof-state-intervention-suite.v0";
 const OUTCOME_VERSION: &str = "pitb.proof-state-intervention-outcomes.v0";
 const REPORT_VERSION: &str = "pitb.proof-state-intervention-analysis.v0";
+const ANALYZER_SOURCE: &str = include_str!("analyze_proof_state_intervention.rs");
 const DEFAULT_BOOTSTRAP_REPLICATES: usize = 2_000;
 const DEFAULT_SEED: u64 = 0x5053_494E_5445_5256;
 const MIN_BOOTSTRAP_REPLICATES: usize = 1_000;
@@ -449,6 +450,7 @@ fn analyze(
         "split": requested_split,
         "suite_sha256": suite_digest,
         "outcomes_sha256": outcomes_digest,
+        "analyzer_source_sha256": hex_digest(ANALYZER_SOURCE.as_bytes()),
         "bootstrap": {
             "unit": "component_id",
             "replicates": bootstrap_replicates,
