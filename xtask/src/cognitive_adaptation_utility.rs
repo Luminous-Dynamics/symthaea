@@ -32,6 +32,8 @@ pub struct CounterfactualUtilityInput {
 pub struct CounterfactualArm {
     pub name: String,
     pub version: String,
+    /// Digest computed by this arm for the exogenous stream it actually consumed.
+    pub exogenous_stream_sha256: String,
     pub repository_head_sha: String,
     pub configuration_digest: String,
     pub observations: Vec<ArmObservation>,
@@ -50,6 +52,7 @@ pub struct ArmObservation {
 pub struct ArmUtilityMetrics {
     pub name: String,
     pub version: String,
+    pub exogenous_stream_sha256: String,
     pub repository_head_sha: String,
     pub configuration_digest: String,
     pub cycle_count: usize,
@@ -121,6 +124,16 @@ pub fn score_counterfactual_utility(
     validate_arm(&mut input.no_adapt, "no_adapt")?;
     validate_arm(&mut input.detector_triggered, "detector_triggered")?;
     validate_arm(&mut input.oracle_timed, "oracle_timed")?;
+    for (arm, name) in [
+        (&input.no_adapt, "no_adapt"),
+        (&input.detector_triggered, "detector_triggered"),
+        (&input.oracle_timed, "oracle_timed"),
+    ] {
+        ensure!(
+            arm.exogenous_stream_sha256 == input.shared_stream_sha256,
+            "{name} exogenous stream digest must match shared_stream_sha256"
+        );
+    }
 
     let cycle_count = input.no_adapt.observations.len();
     ensure!(cycle_count > 0, "counterfactual arms must contain at least one observation");
@@ -205,6 +218,7 @@ fn validate_arm(arm: &mut CounterfactualArm, context: &str) -> anyhow::Result<()
     nonempty(&arm.name, &format!("{context}.name"))?;
     nonempty(&arm.version, &format!("{context}.version"))?;
     validate_commit_sha(&arm.repository_head_sha, &format!("{context}.repository_head_sha"))?;
+    validate_digest(&arm.exogenous_stream_sha256, 64, &format!("{context}.exogenous_stream_sha256"))?;
     validate_digest(&arm.configuration_digest, 64, &format!("{context}.configuration_digest"))?;
     ensure!(!arm.observations.is_empty(), "{context}.observations must not be empty");
     for observation in &arm.observations {
@@ -247,6 +261,7 @@ fn arm_metrics(arm: &CounterfactualArm) -> anyhow::Result<ArmUtilityMetrics> {
     Ok(ArmUtilityMetrics {
         name: arm.name.clone(),
         version: arm.version.clone(),
+        exogenous_stream_sha256: arm.exogenous_stream_sha256.clone(),
         repository_head_sha: arm.repository_head_sha.clone(),
         configuration_digest: arm.configuration_digest.clone(),
         cycle_count: arm.observations.len(),
@@ -309,6 +324,7 @@ mod tests {
         CounterfactualArm {
             name: name.to_owned(),
             version: format!("{name}-v1"),
+            exogenous_stream_sha256: "c".repeat(64),
             repository_head_sha: "a".repeat(40),
             configuration_digest: "b".repeat(64),
             observations: losses
@@ -373,6 +389,14 @@ mod tests {
         let result = score_counterfactual_utility(input).expect("valid input");
         assert!(result.detector_dominated_by_no_adapt);
         assert_eq!(result.adaptation_cost_units_per_task_loss_unit_reduced, None);
+    }
+
+    #[test]
+    fn rejects_counterfactual_arm_that_consumed_a_different_stream() {
+        let mut input = fixture();
+        input.detector_triggered.exogenous_stream_sha256 = "d".repeat(64);
+        let error = score_counterfactual_utility(input).unwrap_err().to_string();
+        assert!(error.contains("must match shared_stream_sha256"));
     }
 
     #[test]
