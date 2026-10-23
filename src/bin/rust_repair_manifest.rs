@@ -49,6 +49,7 @@ struct TaskManifestRecord {
     gold_validation_log_sha256: String,
     runtime_evidence_sha256: String,
     container_image_id: String,
+    network_mode: String,
     container_ids: Vec<String>,
     fail_to_pass_count: usize,
     pass_to_pass_count: usize,
@@ -87,6 +88,7 @@ struct ControllerTaskRecord {
     instance_id: String,
     docker_image_reference: String,
     container_image_id: String,
+    network_mode: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -122,6 +124,7 @@ struct TaskAudit {
     gold_validation_log_sha256: Option<String>,
     runtime_evidence_sha256: Option<String>,
     container_image_id: Option<String>,
+    network_mode: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -439,6 +442,7 @@ fn run_marker_counts(log: &str) -> Vec<usize> {
 #[derive(Debug)]
 struct RuntimeEvidenceSummary {
     container_image_id: String,
+    network_mode: String,
     container_ids: Vec<String>,
 }
 
@@ -456,6 +460,15 @@ fn validate_container_identity(
         .get("container_identity")
         .and_then(Value::as_object)
         .ok_or_else(|| "container_identity missing or not an object".to_string())?;
+    let network_mode = identity
+        .get("network_mode")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "container_identity.network_mode missing".to_string())?;
+    if network_mode != "none" {
+        return Err(format!(
+            "container_identity.network_mode must be 'none' for strict evaluation; observed {network_mode:?}"
+        ));
+    }
     let container_id = identity
         .get("container_id")
         .and_then(Value::as_str)
@@ -700,6 +713,7 @@ fn validate_runtime_evidence(
     }
     Ok(RuntimeEvidenceSummary {
         container_image_id: image_ids[0].clone(),
+        network_mode: "none".to_string(),
         container_ids: run_ids,
     })
 }
@@ -953,6 +967,9 @@ fn audit_candidate(
         container_image_id: runtime_summary
             .as_ref()
             .map(|summary| summary.container_image_id.clone()),
+        network_mode: runtime_summary
+            .as_ref()
+            .map(|summary| summary.network_mode.clone()),
     };
 
     let manifest_record = if eligible {
@@ -974,6 +991,11 @@ fn audit_candidate(
                 .as_ref()
                 .expect("eligible task has runtime summary")
                 .container_image_id
+                .clone(),
+            network_mode: runtime_summary
+                .as_ref()
+                .expect("eligible task has runtime summary")
+                .network_mode
                 .clone(),
             container_ids: runtime_summary
                 .as_ref()
@@ -1087,6 +1109,7 @@ fn run(cli: Cli) -> Result<(), String> {
                 gold_validation_log_sha256: record.gold_validation_log_sha256.clone(),
                 runtime_evidence_sha256: record.runtime_evidence_sha256.clone(),
                 container_image_id: record.container_image_id.clone(),
+                network_mode: record.network_mode.clone(),
                 container_ids: record.container_ids.clone(),
                 fail_to_pass_count: record.fail_to_pass_count,
                 pass_to_pass_count: record.pass_to_pass_count,
@@ -1148,6 +1171,7 @@ fn run(cli: Cli) -> Result<(), String> {
                         instance_id: task.instance_id.clone(),
                         docker_image_reference: task.docker_image.clone(),
                         container_image_id: task.container_image_id.clone(),
+                        network_mode: task.network_mode.clone(),
                     })
                     .collect(),
                 visibility_warning: "EVALUATOR-ONLY: never expose this controller manifest to the coding agent. Agent-visible JSONL contains only problem_statement. Retain the configured image reference and use container_image_id as the observed immutable runtime identity when reproducing the task environment.".to_string(),
