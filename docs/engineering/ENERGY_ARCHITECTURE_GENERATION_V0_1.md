@@ -63,3 +63,23 @@ Targets only; no measurements have been claimed:
 Syntactic/structural validation is weaker than energy conservation; energy accounting is weaker than calibrated physics; calibrated simulation is weaker than software/controller/power hardware-in-the-loop; HIL is weaker than independently reviewed field evidence. The report must keep those levels separate.
 
 External comparison lanes include [SAM](https://sam.nlr.gov/) for supported component/storage trajectories, [REopt](https://developer.nlr.gov/docs/energy-optimization/reopt/) for matched site/microgrid optimization cases, and [PyPSA](https://docs.pypsa.org/latest/) / [GenX](https://genxproject.github.io/GenX.jl/stable/User_Guide/workflow/) for matching network/planning subproblems. Do not claim to outperform these tools without pinned versions, matched assumptions, full results and reproducible artifacts.
+
+
+## Deterministic byte export
+
+The companion binary `energy_architecture_candidates` makes the reference generator's output consumable by the cross-repository pipeline without reconstructing the candidates by hand:
+
+```sh
+# Export all validated candidates as one JSON array.
+cargo run -p symthaea-engineering --bin energy_architecture_candidates -- --output /tmp/energy-candidates.json
+
+# Export one exact candidate object for the current Sol-Atlas adapter.
+cargo run -p symthaea-engineering --bin energy_architecture_candidates -- --candidate-id synthetic-pv-battery-grid --output /tmp/energy-candidate.json
+
+# Bind the exact exported bytes for the integration manifest/receipt.
+sha256sum /tmp/energy-candidate.json
+```
+
+The binary validates every generated candidate with the existing structural validator before writing. Unknown candidate IDs and invalid candidates fail with a nonzero exit; no fallback candidate is substituted. JSON output is deterministic for a pinned build and code path, but consumers must still validate against the pinned shared Symtropy schema and bind receipts to the exact bytes consumed.
+
+This is a serialized bridge primitive, not proof of cross-repository integration: the command still needs to be executed on the exact PR head, its bytes validated against the shared schema, and the single-candidate export compiled by Sol-Atlas and audited against its actual run report.
