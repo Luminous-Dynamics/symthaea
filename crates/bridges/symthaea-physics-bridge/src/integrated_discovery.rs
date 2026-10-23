@@ -72,10 +72,8 @@ use symthaea_core::hdc::conjecture_engine::{
     select_experiment_by_worst_case_information_gain_per_cost, select_most_informative_experiment,
 };
 
-use crate::dimensional_inference::{infer_dimensions, InferenceResult, UnitMap};
-use crate::prequential_pit_martingale::{
-    PrequentialPitDecision, PrequentialPitMartingale,
-};
+use crate::dimensional_inference::{InferenceResult, UnitMap, infer_dimensions};
+use crate::prequential_pit_martingale::{PrequentialPitDecision, PrequentialPitMartingale};
 use crate::typed_generation::random_expr_with_dimension;
 use crate::types::DimensionalSignature;
 
@@ -115,13 +113,14 @@ fn standard_normal_cdf(value: f64) -> Option<f64> {
     let sign = if value < 0.0 { -1.0 } else { 1.0 };
     let x = value.abs() / std::f64::consts::SQRT_2;
     let t = 1.0 / (1.0 + 0.3275911 * x);
-    let polynomial = (((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t
-        - 0.284496736)
+    let polynomial = (((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736)
         * t)
         + 0.254829592)
         * t;
     let probability = 0.5 * (1.0 + sign * (1.0 - polynomial * (-x * x).exp()));
-    probability.is_finite().then_some(probability.clamp(0.0, 1.0))
+    probability
+        .is_finite()
+        .then_some(probability.clamp(0.0, 1.0))
 }
 
 fn shuffle<T>(rng: &mut u64, items: &mut [T]) {
@@ -185,22 +184,18 @@ fn eval_at(e: &Expr, point: &Experiment) -> Option<f64> {
 
 /// Evaluator-only equivalence check on a separate pre-generated design. This function must only
 /// be called after the policy finishes; its reference expression and points never inform search.
-fn evaluator_matches_reference(
-    candidate: &Expr,
-    reference: &Expr,
-    holdout: &[Experiment],
-) -> bool {
+fn evaluator_matches_reference(candidate: &Expr, reference: &Expr, holdout: &[Experiment]) -> bool {
     if holdout.len() < 8 {
         return false;
     }
-    holdout.iter().all(|point| {
-        match (eval_at(candidate, point), eval_at(reference, point)) {
+    holdout.iter().all(
+        |point| match (eval_at(candidate, point), eval_at(reference, point)) {
             (Some(predicted), Some(expected)) => {
                 (predicted - expected).abs() <= 1.0e-6 * (1.0 + expected.abs())
             }
             _ => false,
-        }
-    })
+        },
+    )
 }
 
 fn vars_used(e: &Expr, out: &mut HashSet<String>) {
@@ -333,12 +328,9 @@ fn structured_correction_basis(
 ) -> Option<Expr> {
     let units = demo_units();
     let basis = match family {
-        RecoveryProposalFamily::AdditiveCorrection => random_expr_with_dimension(
-            rng,
-            DimensionalSignature::ENERGY,
-            &units,
-            GEN_MAX_DEPTH,
-        ),
+        RecoveryProposalFamily::AdditiveCorrection => {
+            random_expr_with_dimension(rng, DimensionalSignature::ENERGY, &units, GEN_MAX_DEPTH)
+        }
         RecoveryProposalFamily::MultiplicativeCorrection => {
             let factor = random_expr_with_dimension(
                 rng,
@@ -355,12 +347,8 @@ fn structured_correction_basis(
             let name = VAR_NAMES[rand_index(rng, VAR_NAMES.len())];
             let variable_dimension = *units.get(name)?;
             let correction_dimension = DimensionalSignature::ENERGY.sub(&variable_dimension);
-            let correction = random_expr_with_dimension(
-                rng,
-                correction_dimension,
-                &units,
-                GEN_MAX_DEPTH,
-            );
+            let correction =
+                random_expr_with_dimension(rng, correction_dimension, &units, GEN_MAX_DEPTH);
             Expr::BinOp(
                 BinOp::Mul,
                 Box::new(Expr::Var(name.to_string())),
@@ -500,18 +488,12 @@ fn reseed_typed_candidates_after_alarm(
         attempts += 1;
 
         let candidate = if family == RecoveryProposalFamily::GenericTyped {
-            random_expr_with_dimension(
-                rng,
-                DimensionalSignature::ENERGY,
-                &units,
-                GEN_MAX_DEPTH,
-            )
+            random_expr_with_dimension(rng, DimensionalSignature::ENERGY, &units, GEN_MAX_DEPTH)
         } else {
             let Some(basis) = structured_correction_basis(rng, &base, family) else {
                 continue;
             };
-            let Some(coefficient) =
-                fit_linear_correction_coefficient(&base, &basis, observations)
+            let Some(coefficient) = fit_linear_correction_coefficient(&base, &basis, observations)
             else {
                 continue;
             };
@@ -641,7 +623,6 @@ impl PipelineConfig {
         out
     };
 }
-
 
 /// Generate the initial truth-absent candidate pool from public task inputs only.
 /// Deliberately accepts no reference expression, truth values, or evaluator holdout, making
@@ -793,11 +774,7 @@ fn run_trial(seed: u64, config: PipelineConfig, max_rounds: usize) -> TrialOutco
 /// Estimate a common observation-noise scale from live predictions alone.
 /// The simulator uses truth-scaled noise; the median proxy avoids leakage from the
 /// hidden law and makes the EIG selector's homoscedastic approximation explicit.
-fn selection_noise_std_dev(
-    remaining: &[Experiment],
-    live: &[usize],
-    hypotheses: &[Expr],
-) -> f64 {
+fn selection_noise_std_dev(remaining: &[Experiment], live: &[usize], hypotheses: &[Expr]) -> f64 {
     let mut magnitudes = Vec::new();
     for experiment in remaining {
         for index in live {
@@ -943,7 +920,6 @@ fn run_trial_with_mode(
     };
     let initial_hypotheses = hypotheses.clone();
 
-
     // Independent evaluator-only points: never passed to the experiment selector or recovery
     // generator. Ground-truth equivalence is scored only after the adaptive policy terminates.
     let mut evaluator_rng = seed ^ 0xE7A1_0A7A_2026_0001;
@@ -963,16 +939,12 @@ fn run_trial_with_mode(
     const OOD_ATTEMPT_CAP: usize = 4096;
     const OOD_ABSOLUTE_VALUE_CAP: f64 = 1.0e12;
     let mut ood_evaluator_rng = seed ^ 0x00D0_0D0E_2026_0001;
-    let mut extrapolation_holdout: Vec<Experiment> =
-        Vec::with_capacity(OOD_HOLDOUT_TARGET);
+    let mut extrapolation_holdout: Vec<Experiment> = Vec::with_capacity(OOD_HOLDOUT_TARGET);
     let mut ood_attempts = 0usize;
-    while extrapolation_holdout.len() < OOD_HOLDOUT_TARGET
-        && ood_attempts < OOD_ATTEMPT_CAP
-    {
+    while extrapolation_holdout.len() < OOD_HOLDOUT_TARGET && ood_attempts < OOD_ATTEMPT_CAP {
         ood_attempts += 1;
         let point = random_extrapolation_experiment(&mut ood_evaluator_rng);
-        if eval_at(&ground_truth, &point)
-            .is_some_and(|value| value.abs() < OOD_ABSOLUTE_VALUE_CAP)
+        if eval_at(&ground_truth, &point).is_some_and(|value| value.abs() < OOD_ABSOLUTE_VALUE_CAP)
         {
             extrapolation_holdout.push(point);
         }
@@ -1062,8 +1034,7 @@ fn run_trial_with_mode(
                         .map(|(experiment, _)| experiment.clone())
                     }
                     ActiveSelector::WorstCaseInformationGain => {
-                        let nominal_noise =
-                            selection_noise_std_dev(&remaining, &live, &hypotheses);
+                        let nominal_noise = selection_noise_std_dev(&remaining, &live, &hypotheses);
                         // These are bundled stress scenarios, not a full Cartesian sweep:
                         // three measurement scales paired with the nominal model and two
                         // alternative smooth discrepancy shapes. All parameters are fixed
@@ -1147,8 +1118,8 @@ fn run_trial_with_mode(
             .map(|(index, value)| (value * (3.0 + index as f64)).sin())
             .sum::<f64>()
             / coordinates.len().max(1) as f64;
-        let true_val = base_true_val
-            + systematic_discrepancy * (1.0 + base_true_val.abs()) * discrepancy_wave;
+        let true_val =
+            base_true_val + systematic_discrepancy * (1.0 + base_true_val.abs()) * discrepancy_wave;
         // `smoothing`'s real question: is it worth taking K_REPEATS repeated noisy readings at
         // this SAME chosen point and blending them (CfC, dt-aware, irregular gaps between
         // readings), vs. a single one-shot reading? Deliberately NOT smoothing across
@@ -1332,23 +1303,15 @@ fn run_trial_with_mode(
     }
 
     let ground_truth_equivalent = live.len() == 1
-        && evaluator_matches_reference(
-            &hypotheses[live[0]],
-            &ground_truth,
-            &holdout,
-        );
+        && evaluator_matches_reference(&hypotheses[live[0]], &ground_truth, &holdout);
     let ground_truth_extrapolation_equivalent = live.len() == 1
         && extrapolation_holdout.len() >= OOD_HOLDOUT_MINIMUM
-        && evaluator_matches_reference(
-            &hypotheses[live[0]],
-            &ground_truth,
-            &extrapolation_holdout,
-        );
+        && evaluator_matches_reference(&hypotheses[live[0]], &ground_truth, &extrapolation_holdout);
     // Evaluator-only audit of the initial candidate set. It runs after the policy ends and is
     // used only to identify accidentally oracle-present trials in the truth-absent track.
-    let initial_pool_contains_reference = initial_hypotheses.iter().any(|candidate| {
-        evaluator_matches_reference(candidate, &ground_truth, &holdout)
-    });
+    let initial_pool_contains_reference = initial_hypotheses
+        .iter()
+        .any(|candidate| evaluator_matches_reference(candidate, &ground_truth, &holdout));
 
     TrialOutcome {
         rounds_used: round,
@@ -1446,9 +1409,7 @@ fn mean_on_off(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adequacy_calibration::{
-        ConformalAdequacyCalibrator, standardized_rms_residual,
-    };
+    use crate::adequacy_calibration::{ConformalAdequacyCalibrator, standardized_rms_residual};
     use crate::model_adequacy::{
         DiscoveryAction, DiscoverySnapshot, TerminationStatus, ValidationStatus,
         next_discovery_action,
@@ -1514,10 +1475,9 @@ mod tests {
                 .map(|(index, value)| (value * (3.0 + index as f64)).sin())
                 .sum::<f64>()
                 / coordinates.len().max(1) as f64;
-            let simulated_observation = prediction
-                + discrepancy_amplitude * (1.0 + prediction.abs()) * discrepancy_wave;
-            let actual_noise_scale =
-                NOISE_SIGMA_FRACTION * (1.0 + simulated_observation.abs());
+            let simulated_observation =
+                prediction + discrepancy_amplitude * (1.0 + prediction.abs()) * discrepancy_wave;
+            let actual_noise_scale = NOISE_SIGMA_FRACTION * (1.0 + simulated_observation.abs());
             let measurement =
                 simulated_observation + rand_gaussian(&mut noise_rng, actual_noise_scale);
             let predictive_scale = NOISE_SIGMA_FRACTION * (1.0 + prediction.abs());
@@ -1623,19 +1583,39 @@ mod tests {
             clean_nominal_successes += if clean_nominal.success { 1 } else { 0 };
             clean_robust_successes += if clean_robust.success { 1 } else { 0 };
             misspec_nominal_false_singletons +=
-                if misspec_nominal.overconfident_under_misspecification { 1 } else { 0 };
+                if misspec_nominal.overconfident_under_misspecification {
+                    1
+                } else {
+                    0
+                };
             misspec_robust_false_singletons +=
-                if misspec_robust.overconfident_under_misspecification { 1 } else { 0 };
-            misspec_nominal_detected +=
-                if misspec_nominal.model_discrepancy_detected { 1 } else { 0 };
-            misspec_robust_detected +=
-                if misspec_robust.model_discrepancy_detected { 1 } else { 0 };
+                if misspec_robust.overconfident_under_misspecification {
+                    1
+                } else {
+                    0
+                };
+            misspec_nominal_detected += if misspec_nominal.model_discrepancy_detected {
+                1
+            } else {
+                0
+            };
+            misspec_robust_detected += if misspec_robust.model_discrepancy_detected {
+                1
+            } else {
+                0
+            };
             misspec_nominal_unresolved += if misspec_nominal.final_live > 1 { 1 } else { 0 };
             misspec_robust_unresolved += if misspec_robust.final_live > 1 { 1 } else { 0 };
-            misspec_nominal_selection_failures +=
-                if misspec_nominal.selection_failed { 1 } else { 0 };
-            misspec_robust_selection_failures +=
-                if misspec_robust.selection_failed { 1 } else { 0 };
+            misspec_nominal_selection_failures += if misspec_nominal.selection_failed {
+                1
+            } else {
+                0
+            };
+            misspec_robust_selection_failures += if misspec_robust.selection_failed {
+                1
+            } else {
+                0
+            };
             misspec_nominal_round_total += misspec_nominal.rounds_used;
             misspec_robust_round_total += misspec_robust.rounds_used;
             paired.push(RobustEIGPair {
@@ -1643,8 +1623,7 @@ mod tests {
                 clean_robust_success: clean_robust.success,
                 misspec_nominal_false_singleton: misspec_nominal
                     .overconfident_under_misspecification,
-                misspec_robust_false_singleton: misspec_robust
-                    .overconfident_under_misspecification,
+                misspec_robust_false_singleton: misspec_robust.overconfident_under_misspecification,
                 misspec_nominal_detected: misspec_nominal.model_discrepancy_detected,
                 misspec_robust_detected: misspec_robust.model_discrepancy_detected,
                 misspec_nominal_unresolved: misspec_nominal.final_live > 1,
@@ -1658,23 +1637,39 @@ mod tests {
 
         let (clean_delta, clean_ci_low, clean_ci_high) = paired_bootstrap_mean_ci(
             &paired,
-            |pair| (if pair.clean_robust_success { 1.0 } else { 0.0 })
-                - (if pair.clean_nominal_success { 1.0 } else { 0.0 }),
+            |pair| {
+                (if pair.clean_robust_success { 1.0 } else { 0.0 })
+                    - (if pair.clean_nominal_success { 1.0 } else { 0.0 })
+            },
             0x524f_4255_5354_434c,
         );
         let (false_delta, false_ci_low, false_ci_high) = paired_bootstrap_mean_ci(
             &paired,
             |pair| {
-                (if pair.misspec_robust_false_singleton { 1.0 } else { 0.0 })
-                    - (if pair.misspec_nominal_false_singleton { 1.0 } else { 0.0 })
+                (if pair.misspec_robust_false_singleton {
+                    1.0
+                } else {
+                    0.0
+                }) - (if pair.misspec_nominal_false_singleton {
+                    1.0
+                } else {
+                    0.0
+                })
             },
             0x524f_4255_5354_4643,
         );
         let (detect_delta, detect_ci_low, detect_ci_high) = paired_bootstrap_mean_ci(
             &paired,
             |pair| {
-                (if pair.misspec_robust_detected { 1.0 } else { 0.0 })
-                    - (if pair.misspec_nominal_detected { 1.0 } else { 0.0 })
+                (if pair.misspec_robust_detected {
+                    1.0
+                } else {
+                    0.0
+                }) - (if pair.misspec_nominal_detected {
+                    1.0
+                } else {
+                    0.0
+                })
             },
             0x524f_4255_5354_4445,
         );
@@ -1682,8 +1677,15 @@ mod tests {
         let (failure_delta, failure_ci_low, failure_ci_high) = paired_bootstrap_mean_ci(
             &paired,
             |pair| {
-                (if pair.misspec_robust_selection_failed { 1.0 } else { 0.0 })
-                    - (if pair.misspec_nominal_selection_failed { 1.0 } else { 0.0 })
+                (if pair.misspec_robust_selection_failed {
+                    1.0
+                } else {
+                    0.0
+                }) - (if pair.misspec_nominal_selection_failed {
+                    1.0
+                } else {
+                    0.0
+                })
             },
             0x524f_4255_5354_5346,
         );
@@ -1715,9 +1717,7 @@ mod tests {
             SEEDS as usize
         );
         assert_eq!(
-            misspec_robust_false_singletons
-                + misspec_robust_detected
-                + misspec_robust_unresolved,
+            misspec_robust_false_singletons + misspec_robust_detected + misspec_robust_unresolved,
             SEEDS as usize
         );
         assert!(clean_ci_low <= clean_ci_high);
@@ -1759,12 +1759,8 @@ mod tests {
         let mut paired_outcomes: Vec<SelectorPair> = Vec::with_capacity(SEEDS as usize);
 
         for seed in 1..=SEEDS {
-            let raw = run_trial_with_selector(
-                seed,
-                config,
-                ROUND_BUDGET,
-                ActiveSelector::RawVariance,
-            );
+            let raw =
+                run_trial_with_selector(seed, config, ROUND_BUDGET, ActiveSelector::RawVariance);
             let eig = run_trial_with_selector(
                 seed,
                 config,
@@ -1793,7 +1789,8 @@ mod tests {
         let (success_delta, success_ci_low, success_ci_high) = paired_bootstrap_mean_ci(
             &paired_outcomes,
             |pair| {
-                (if pair.eig_false_singleton { 1.0 } else { 0.0 }) - (if pair.eig_detected { 1.0 } else { 0.0 })
+                (if pair.eig_false_singleton { 1.0 } else { 0.0 })
+                    - (if pair.eig_detected { 1.0 } else { 0.0 })
             },
             0x4549_475f_5355_4343,
         );
@@ -1860,10 +1857,16 @@ mod tests {
             } else {
                 0
             };
-            unresolved_without_recovery +=
-                if baseline.final_live != 1 || !baseline.success { 1 } else { 0 };
-            empty_pool_recovery_attempts +=
-                if recovered.recovery_triggered_on_empty_pool { 1 } else { 0 };
+            unresolved_without_recovery += if baseline.final_live != 1 || !baseline.success {
+                1
+            } else {
+                0
+            };
+            empty_pool_recovery_attempts += if recovered.recovery_triggered_on_empty_pool {
+                1
+            } else {
+                0
+            };
             accepted_recovery_candidates += recovered.accepted_recovery_candidates;
             false_singletons_after_recovery +=
                 if recovered.final_live == 1 && !recovered.ground_truth_equivalent {
@@ -1871,7 +1874,11 @@ mod tests {
                 } else {
                     0
                 };
-            same_domain_recovered += if recovered.ground_truth_equivalent { 1 } else { 0 };
+            same_domain_recovered += if recovered.ground_truth_equivalent {
+                1
+            } else {
+                0
+            };
             ood_recovered += if recovered.ground_truth_extrapolation_equivalent {
                 1
             } else {
@@ -1880,18 +1887,16 @@ mod tests {
             full_recovery_successes += if recovered.success { 1 } else { 0 };
         }
 
-        println!(
-            concat!(
-                "truth_absent_recovery,seeds={SEEDS},budget={ROUND_BUDGET},",
-                "initial_reference_hits={initial_reference_hits},",
-                "unresolved_without_recovery={unresolved_without_recovery},",
-                "empty_pool_recovery_attempts={empty_pool_recovery_attempts},",
-                "accepted_recovery_candidates={accepted_recovery_candidates},",
-                "false_singletons_after_recovery={false_singletons_after_recovery},",
-                "same_domain_recovered={same_domain_recovered},",
-                "ood_recovered={ood_recovered},full_recovery_successes={full_recovery_successes}"
-            )
-        );
+        println!(concat!(
+            "truth_absent_recovery,seeds={SEEDS},budget={ROUND_BUDGET},",
+            "initial_reference_hits={initial_reference_hits},",
+            "unresolved_without_recovery={unresolved_without_recovery},",
+            "empty_pool_recovery_attempts={empty_pool_recovery_attempts},",
+            "accepted_recovery_candidates={accepted_recovery_candidates},",
+            "false_singletons_after_recovery={false_singletons_after_recovery},",
+            "same_domain_recovered={same_domain_recovered},",
+            "ood_recovered={ood_recovered},full_recovery_successes={full_recovery_successes}"
+        ));
         assert_eq!(
             initial_reference_hits, 0,
             "truth-absent initial pool unexpectedly contains a reference-equivalent candidate"
@@ -1951,7 +1956,11 @@ mod tests {
             .collect();
 
         assert!(holdout.iter().all(is_extrapolation_experiment));
-        assert!(evaluator_matches_reference(&equivalent, &reference, &holdout));
+        assert!(evaluator_matches_reference(
+            &equivalent,
+            &reference,
+            &holdout
+        ));
         assert!(!evaluator_matches_reference(&shifted, &reference, &holdout));
     }
 
@@ -1981,13 +1990,23 @@ mod tests {
             Box::new(Expr::Const(0.5)),
         );
         let mut rng = 0xE7A1_0A7A_2026_0001_u64;
-        let holdout: Vec<Experiment> = (0..64)
-            .map(|_| random_experiment(&mut rng))
-            .collect();
+        let holdout: Vec<Experiment> = (0..64).map(|_| random_experiment(&mut rng)).collect();
 
-        assert!(evaluator_matches_reference(&equivalent, &reference, &holdout));
-        assert!(!evaluator_matches_reference(&non_equivalent, &reference, &holdout));
-        assert!(!evaluator_matches_reference(&equivalent, &reference, &holdout[..4]));
+        assert!(evaluator_matches_reference(
+            &equivalent,
+            &reference,
+            &holdout
+        ));
+        assert!(!evaluator_matches_reference(
+            &non_equivalent,
+            &reference,
+            &holdout
+        ));
+        assert!(!evaluator_matches_reference(
+            &equivalent,
+            &reference,
+            &holdout[..4]
+        ));
     }
 
     #[test]
@@ -2021,9 +2040,8 @@ mod tests {
                 candidate = Some(proposal);
                 break;
             }
-            let candidate = candidate.expect(
-                "typed correction family failed to propose a valid expression",
-            );
+            let candidate =
+                candidate.expect("typed correction family failed to propose a valid expression");
             assert!(matches!(
                 infer_dimensions(&candidate, &units),
                 InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
@@ -2122,11 +2140,7 @@ mod tests {
                 Box::new(time_squared),
             )),
         );
-        let corrected = Expr::BinOp(
-            BinOp::Add,
-            Box::new(base.clone()),
-            Box::new(correction),
-        );
+        let corrected = Expr::BinOp(BinOp::Add, Box::new(base.clone()), Box::new(correction));
         let mut rng = 0xA11C_E5ED_9876_5432_u64;
         let observations: Vec<(Experiment, f64)> = (0..24)
             .map(|_| {
@@ -2195,10 +2209,19 @@ mod tests {
             0,
         );
 
-        assert!(summary.accepted_count > 0, "bounded typed recovery failed to add any candidate");
+        assert!(
+            summary.accepted_count > 0,
+            "bounded typed recovery failed to add any candidate"
+        );
         assert!(summary.accepted_count <= RECOVERY_CANDIDATES_PER_EXPANSION);
-        assert!(!live.contains(&0), "the alarmed provisional candidate stayed live");
-        assert!(live.contains(&1) && live.contains(&2), "archived alternatives were not reopened");
+        assert!(
+            !live.contains(&0),
+            "the alarmed provisional candidate stayed live"
+        );
+        assert!(
+            live.contains(&1) && live.contains(&2),
+            "archived alternatives were not reopened"
+        );
         assert_eq!(live.len(), archived_count - 1 + summary.accepted_count);
         let units = demo_units();
         for index in archived_count..hypotheses.len() {
@@ -2289,54 +2312,92 @@ mod tests {
 
             clean_baseline_successes += if clean_baseline.success { 1 } else { 0 };
             clean_pit_successes += if clean_pit.success { 1 } else { 0 };
-            clean_pit_reference_equivalents +=
-                if clean_pit.ground_truth_equivalent { 1 } else { 0 };
-            misspec_pit_reference_equivalents +=
-                if misspecified_pit.ground_truth_equivalent { 1 } else { 0 };
-            clean_pit_ood_equivalents +=
-                if clean_pit.ground_truth_extrapolation_equivalent { 1 } else { 0 };
-            misspec_pit_ood_equivalents +=
-                if misspecified_pit.ground_truth_extrapolation_equivalent { 1 } else { 0 };
+            clean_pit_reference_equivalents += if clean_pit.ground_truth_equivalent {
+                1
+            } else {
+                0
+            };
+            misspec_pit_reference_equivalents += if misspecified_pit.ground_truth_equivalent {
+                1
+            } else {
+                0
+            };
+            clean_pit_ood_equivalents += if clean_pit.ground_truth_extrapolation_equivalent {
+                1
+            } else {
+                0
+            };
+            misspec_pit_ood_equivalents += if misspecified_pit.ground_truth_extrapolation_equivalent
+            {
+                1
+            } else {
+                0
+            };
             clean_pit_ood_points += clean_pit.extrapolation_holdout_points;
             misspec_pit_ood_points += misspecified_pit.extrapolation_holdout_points;
-            clean_pit_alarms += if clean_pit.prequential_pit_alarm { 1 } else { 0 };
+            clean_pit_alarms += if clean_pit.prequential_pit_alarm {
+                1
+            } else {
+                0
+            };
             misspec_baseline_false_singletons +=
-                if misspecified_baseline.overconfident_under_misspecification { 1 } else { 0 };
-            misspec_pit_false_singletons +=
-                if misspecified_pit.overconfident_under_misspecification { 1 } else { 0 };
-            misspec_pit_detections +=
-                if misspecified_pit.model_discrepancy_detected { 1 } else { 0 };
+                if misspecified_baseline.overconfident_under_misspecification {
+                    1
+                } else {
+                    0
+                };
+            misspec_pit_false_singletons += if misspecified_pit.overconfident_under_misspecification
+            {
+                1
+            } else {
+                0
+            };
+            misspec_pit_detections += if misspecified_pit.model_discrepancy_detected {
+                1
+            } else {
+                0
+            };
             pit_audit_queries += misspecified_pit.audit_queries + clean_pit.audit_queries;
             total_typed_recovery_restarts +=
                 clean_pit.typed_recovery_restarts + misspecified_pit.typed_recovery_restarts;
             structured_recovery_candidates += clean_pit.structured_recovery_candidates
                 + misspecified_pit.structured_recovery_candidates;
             terminal_pit_alarms += if clean_pit.terminal_pit_alarm { 1 } else { 0 };
-            terminal_pit_alarms += if misspecified_pit.terminal_pit_alarm { 1 } else { 0 };
-            protocol_failures += if clean_pit.monitoring_protocol_invalid { 1 } else { 0 };
-            protocol_failures += if misspecified_pit.monitoring_protocol_invalid { 1 } else { 0 };
+            terminal_pit_alarms += if misspecified_pit.terminal_pit_alarm {
+                1
+            } else {
+                0
+            };
+            protocol_failures += if clean_pit.monitoring_protocol_invalid {
+                1
+            } else {
+                0
+            };
+            protocol_failures += if misspecified_pit.monitoring_protocol_invalid {
+                1
+            } else {
+                0
+            };
         }
 
-        println!(
-            concat!(
-                "prequential_pit_integrated,seeds={SEEDS},budget={MAX_ROUNDS},",
-                "discrepancy={DISCREPANCY},clean_baseline_successes={clean_baseline_successes},",
-                "clean_pit_successes={clean_pit_successes},",
-                "clean_pit_reference_equivalents={clean_pit_reference_equivalents},",
-                "misspec_pit_reference_equivalents={misspec_pit_reference_equivalents},",
-                "clean_pit_ood_equivalents={clean_pit_ood_equivalents},",
-                "misspec_pit_ood_equivalents={misspec_pit_ood_equivalents},",
-                "clean_pit_ood_points={clean_pit_ood_points},",
-                "misspec_pit_ood_points={misspec_pit_ood_points},",
-                "clean_pit_alarms={clean_pit_alarms},",
-                "misspec_baseline_false_singletons={misspec_baseline_false_singletons},",
-                "misspec_pit_false_singletons={misspec_pit_false_singletons},",
-                "misspec_pit_detections={misspec_pit_detections},",
-                "pit_audit_queries={pit_audit_queries},typed_recovery_restarts={total_typed_recovery_restarts},",
-                "structured_recovery_candidates={structured_recovery_candidates},",
-                "terminal_pit_alarms={terminal_pit_alarms},protocol_failures={protocol_failures}"
-            )
-        );
+        println!(concat!(
+            "prequential_pit_integrated,seeds={SEEDS},budget={MAX_ROUNDS},",
+            "discrepancy={DISCREPANCY},clean_baseline_successes={clean_baseline_successes},",
+            "clean_pit_successes={clean_pit_successes},",
+            "clean_pit_reference_equivalents={clean_pit_reference_equivalents},",
+            "misspec_pit_reference_equivalents={misspec_pit_reference_equivalents},",
+            "clean_pit_ood_equivalents={clean_pit_ood_equivalents},",
+            "misspec_pit_ood_equivalents={misspec_pit_ood_equivalents},",
+            "clean_pit_ood_points={clean_pit_ood_points},",
+            "misspec_pit_ood_points={misspec_pit_ood_points},",
+            "clean_pit_alarms={clean_pit_alarms},",
+            "misspec_baseline_false_singletons={misspec_baseline_false_singletons},",
+            "misspec_pit_false_singletons={misspec_pit_false_singletons},",
+            "misspec_pit_detections={misspec_pit_detections},",
+            "pit_audit_queries={pit_audit_queries},typed_recovery_restarts={total_typed_recovery_restarts},",
+            "structured_recovery_candidates={structured_recovery_candidates},",
+            "terminal_pit_alarms={terminal_pit_alarms},protocol_failures={protocol_failures}"
+        ));
 
         assert_eq!(
             protocol_failures, 0,
@@ -2435,14 +2496,28 @@ mod tests {
 
             clean_eig_successes += if clean_eig.success { 1 } else { 0 };
             clean_audit_successes += if clean_audit.success { 1 } else { 0 };
-            misspecified_eig_false_singletons +=
-                if misspec_eig.overconfident_under_misspecification { 1 } else { 0 };
+            misspecified_eig_false_singletons += if misspec_eig.overconfident_under_misspecification
+            {
+                1
+            } else {
+                0
+            };
             misspecified_audit_false_singletons +=
-                if misspec_audit.overconfident_under_misspecification { 1 } else { 0 };
-            misspecified_eig_detections +=
-                if misspec_eig.model_discrepancy_detected { 1 } else { 0 };
-            misspecified_audit_detections +=
-                if misspec_audit.model_discrepancy_detected { 1 } else { 0 };
+                if misspec_audit.overconfident_under_misspecification {
+                    1
+                } else {
+                    0
+                };
+            misspecified_eig_detections += if misspec_eig.model_discrepancy_detected {
+                1
+            } else {
+                0
+            };
+            misspecified_audit_detections += if misspec_audit.model_discrepancy_detected {
+                1
+            } else {
+                0
+            };
             misspecified_eig_unresolved += if misspec_eig.final_live > 1 { 1 } else { 0 };
             misspecified_audit_unresolved += if misspec_audit.final_live > 1 { 1 } else { 0 };
             audit_query_total += misspec_audit.audit_queries;
