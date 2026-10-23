@@ -13,6 +13,8 @@
 pub mod bindings;
 pub mod nixos_patterns;
 pub mod primitives;
+#[cfg(test)]
+mod wasm_sandbox_tests;
 
 pub use nixos_patterns::{
     ChannelOperation, ExecutionRecord as NixOSExecutionRecord,
@@ -522,11 +524,19 @@ impl ActionIR {
                     AccessKind::Write,
                 )?;
             }
+            ActionIR::WasmSandbox { module_path, .. } => {
+                let canonical = sandbox.validate(module_path)?;
+                ensure_pattern(
+                    &canonical,
+                    &policy.capabilities.filesystem.read_patterns,
+                    sandbox,
+                    AccessKind::Read,
+                )?;
+            }
             ActionIR::ReadSensor { .. }
             | ActionIR::WriteServo { .. }
-            | ActionIR::SwarmGossip { .. }
-            | ActionIR::WasmSandbox { .. } => {
-                // HAL, Swarm, and Forge primitives are currently allowed by default if they pass the global Phi gate
+            | ActionIR::SwarmGossip { .. } => {
+                // HAL and Swarm primitives remain governed by their existing global Phi gate.
             }
             ActionIR::RunCommand {
                 program,
@@ -1183,18 +1193,55 @@ impl SimpleExecutor {
                     #[cfg(feature = "wasm-sandbox")]
                     {
                         use wasmtime::*;
-                        let engine = Engine::default();
-                        let module = Module::from_file(&engine, module_path)
-                            .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
-                        let mut store = Store::new(&engine, ());
-                        let instance = Instance::new(&mut store, &module, &[])
-                            .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+
+                        const WASM_FUEL_BUDGET: u64 = 50_000_000;
+                        const WASM_MEMORY_LIMIT_BYTES: usize = 64 * 1024 * 1024;
+
+                        let canonical = sandbox
+                            .validate(module_path)
+                            .map_err(ExecutionError::Policy)?;
+
+                        let mut config = Config::new();
+                        config.consume_fuel(true);
+                        let engine = Engine::new(&config).map_err(|e| {
+                            ExecutionError::Unsupported(format!(
+                                "failed to initialize bounded wasm engine: {e}"
+                            ))
+                        })?;
+                        let module = Module::from_file(&engine, &canonical).map_err(|e| {
+                            ExecutionError::Unsupported(format!("failed to load wasm module: {e}"))
+                        })?;
+
+                        let limits = StoreLimitsBuilder::new()
+                            .memory_size(WASM_MEMORY_LIMIT_BYTES)
+                            .instances(1)
+                            .tables(4)
+                            .memories(1)
+                            .trap_on_grow_failure(true)
+                            .build();
+                        let mut store = Store::new(&engine, limits);
+                        store.limiter(|limits| limits);
+                        store.set_fuel(WASM_FUEL_BUDGET).map_err(|e| {
+                            ExecutionError::Unsupported(format!(
+                                "failed to set wasm fuel budget: {e}"
+                            ))
+                        })?;
+
+                        let instance = Instance::new(&mut store, &module, &[]).map_err(|e| {
+                            ExecutionError::Unsupported(format!(
+                                "failed to instantiate wasm module: {e}"
+                            ))
+                        })?;
                         let func = instance
                             .get_typed_func::<(), i32>(&mut store, function_name)
-                            .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
-                        let res = func
-                            .call(&mut store, ())
-                            .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+                            .map_err(|e| {
+                                ExecutionError::Unsupported(format!(
+                                    "failed to resolve wasm export: {e}"
+                                ))
+                            })?;
+                        let res = func.call(&mut store, ()).map_err(|e| {
+                            ExecutionError::Unsupported(format!("wasm guest trapped: {e}"))
+                        })?;
 
                         ActionOutcome::WasmResult {
                             output: vec![res as u8],
