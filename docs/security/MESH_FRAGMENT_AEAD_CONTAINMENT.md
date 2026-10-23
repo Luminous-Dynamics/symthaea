@@ -20,7 +20,7 @@ These are source/API findings. They do not establish that a particular deployed 
 - Keep the existing packet-envelope AEAD path available when configured, with fragment encryption disabled.
 - Add an optional `MeshTransport::recv_raw_with_source` method whose default fails closed. An adapter may implement it only when it can provide a transport-authenticated identity bound to the mesh peer. Copying the nonce's source prefix or trusting an unauthenticated radio address is insufficient.
 - When a receiver is configured to require fragment AEAD, absence of its key rejects the frame and increments the decrypt-failure counter instead of parsing plaintext.
-- Count an unavailable authenticated-source adapter in receiver failure telemetry.
+- Count an unavailable authenticated-source adapter in a dedicated `fragment_source_unavailable` counter; do not misclassify it as an AEAD decryption failure.
 
 No wire format or cryptographic primitive is changed. This is intentionally a narrow containment patch, not a production v3 design and not proof that the current overall mesh protocol is secure.
 
