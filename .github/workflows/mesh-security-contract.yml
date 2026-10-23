@@ -90,7 +90,8 @@ jobs:
               sha256sum "$MANIFEST"
             fi
             if [ -f tools/mesh-security-contract-audit/Cargo.lock ]; then
-              sha256sum tools/mesh-security-contract-audit/Cargo.lock
+              cp tools/mesh-security-contract-audit/Cargo.lock "$EVIDENCE_DIR/Cargo.lock"
+              sha256sum "$EVIDENCE_DIR/Cargo.lock"
             fi
             if [ -f "$EVIDENCE_DIR/mesh-security-contract-audit.json" ]; then
               sha256sum "$EVIDENCE_DIR/mesh-security-contract-audit.json"
