@@ -1174,31 +1174,57 @@ impl CognitiveLoopService {
         prediction_error: f32,
         coherence: f32,
     ) {
+        self.update_drives_and_reflection_with_evidence(Some(prediction_error), pattern, coherence);
+    }
+
+    /// Update PE-dependent drive and self-reflection state only when the current
+    /// prediction comparison is genuine. Independent physics/coherence pathways
+    /// remain available on cycles with missing PE evidence.
+    pub(in crate::cognitive_loop) fn update_drives_and_reflection_with_evidence(
+        &mut self,
+        prediction_error: Option<f32>,
+        pattern: crate::dynamics::temporal_signatures::ConsciousnessPattern,
+        coherence: f32,
+    ) {
+        let prediction_error = prediction_error.filter(|value| value.is_finite());
         let adapted_thresholds = self
             .consciousness
             .self_model_tier
             .self_reflection
             .get_thresholds();
-        self.behavior.flow_state.update_with_thresholds(
-            pattern,
-            prediction_error,
-            coherence,
-            self.prediction_confidence as f32,
-            adapted_thresholds.flow_error,
-            adapted_thresholds.flow_coherence,
-        );
+        if let Some(prediction_error) = prediction_error {
+            self.behavior.flow_state.update_with_thresholds(
+                pattern,
+                prediction_error,
+                coherence,
+                self.prediction_confidence as f32,
+                adapted_thresholds.flow_error,
+                adapted_thresholds.flow_coherence,
+            );
 
-        // Curiosity drive — route exploration mutation through feedback system
-        self.behavior
-            .curiosity_drive
-            .set_boredom_threshold(adapted_thresholds.boredom);
-        match self.behavior.curiosity_drive.update(prediction_error) {
-            super::super::drives::ExplorationUpdate::Set(val) => {
-                self.set_exploration("curiosity_drive_boredom", val);
+            // Curiosity drive — route exploration mutation through feedback system.
+            // Missing PE must not be interpreted as a successful low-error forecast.
+            self.behavior
+                .curiosity_drive
+                .set_boredom_threshold(adapted_thresholds.boredom);
+            match self.behavior.curiosity_drive.update(prediction_error) {
+                super::super::drives::ExplorationUpdate::Set(val) => {
+                    self.set_exploration("curiosity_drive_boredom", val);
+                }
+                super::super::drives::ExplorationUpdate::Scale(factor) => {
+                    self.scale_exploration("curiosity_drive_decay", factor);
+                }
             }
-            super::super::drives::ExplorationUpdate::Scale(factor) => {
-                self.scale_exploration("curiosity_drive_decay", factor);
-            }
+
+            self.consciousness
+                .self_model_tier
+                .self_reflection
+                .record_cycle(
+                    prediction_error,
+                    self.behavior.flow_state.in_flow,
+                    self.behavior.curiosity_drive.should_explore(),
+                    self.prediction_confidence as f32,
+                );
         }
 
         // Physics-domain exploration modulation:
@@ -1217,16 +1243,8 @@ impl CognitiveLoopService {
             }
         }
 
-        // Self-reflection
-        self.consciousness
-            .self_model_tier
-            .self_reflection
-            .record_cycle(
-                prediction_error,
-                self.behavior.flow_state.in_flow,
-                self.behavior.curiosity_drive.should_explore(),
-                self.prediction_confidence as f32,
-            );
+        // Self-reflection uses admitted history above. It may still act on
+        // previously accumulated records even when the current PE is absent.
         if self
             .consciousness
             .self_model_tier
