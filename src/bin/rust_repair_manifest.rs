@@ -1422,6 +1422,7 @@ mod tests {
                     "container_id": format!("{:064x}", run_index + 2),
                     "configured_image": image_reference,
                     "container_image_id": image_id,
+                    "network_mode": "none",
                     "repo_digests": []
                 },
                 "log_sha256": sha256_bytes(run_log.as_bytes()),
@@ -1442,6 +1443,7 @@ mod tests {
                     "container_id": format!("{:064x}", 1),
                     "configured_image": image_reference,
                     "container_image_id": image_id,
+                    "network_mode": "none",
                     "repo_digests": []
                 },
                 "log_sha256": sha256_bytes(baseline_log.as_bytes()),
@@ -1577,6 +1579,36 @@ mod tests {
         assert!(result.audit.unresolved);
         assert!(result.manifest_record.is_none());
         assert!(result.audit.reasons.iter().any(|reason| reason.contains("test-ID sets differ")));
+    }
+
+    #[test]
+    fn bridged_network_container_is_rejected_for_strict_trials() {
+        let root = tempfile::tempdir().unwrap();
+        let instance_id = "owner__repo-network-enabled";
+        let row = write_candidate_artifacts(
+            root.path(),
+            instance_id,
+            &[("bug-fixed", "fail")],
+            &[("bug-fixed", "pass")],
+            &["bug-fixed"],
+            &[],
+            "eval No.0\npass\n eval No.1\npass\n eval No.2\npass\n",
+        );
+        let evidence_path = root.path().join(instance_id).join("validation_evidence.json");
+        let bytes = fs::read(&evidence_path).unwrap();
+        let mut evidence: Value = serde_json::from_slice(&bytes).unwrap();
+        evidence["gold_runs"][1]["container_identity"]["network_mode"] =
+            Value::String("bridge".to_string());
+        fs::write(&evidence_path, serde_json::to_vec(&evidence).unwrap()).unwrap();
+        let result = audit_candidate(
+            &row,
+            instance_id,
+            root.path(),
+            sha256_bytes(b"network enabled row"),
+        );
+        assert!(!result.audit.eligible);
+        assert!(result.audit.unresolved);
+        assert!(result.audit.reasons.iter().any(|reason| reason.contains("network_mode must be 'none'")));
     }
 
     #[test]
