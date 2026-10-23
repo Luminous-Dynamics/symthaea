@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "benchmark": "symthaea-cognitive-loop-evidence",
   "status": "proposal-not-measured",
   "purpose": "Pin deterministic evidence-validity, phase-causality, calibration, continual-learning, and systems-efficiency scenarios before implementing the runner.",
