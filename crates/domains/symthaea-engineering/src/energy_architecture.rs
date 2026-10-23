@@ -372,8 +372,24 @@ pub fn validate_candidate(
     if !valid_nonempty(&candidate.system_boundary.site_id)
         || !valid_nonempty(&candidate.system_boundary.description)
         || candidate.system_boundary.included_boundaries.is_empty()
+        || candidate
+            .system_boundary
+            .included_boundaries
+            .iter()
+            .any(|boundary| !valid_nonempty(boundary))
+        || candidate
+            .system_boundary
+            .excluded_boundaries
+            .iter()
+            .any(|boundary| !valid_nonempty(boundary))
     {
         violations.push("system boundary is incomplete".to_owned());
+    }
+    if candidate.components.is_empty() {
+        violations.push("candidate has no components".to_owned());
+    }
+    if candidate.services.is_empty() {
+        violations.push("candidate has no declared services".to_owned());
     }
     if candidate.horizon.end_unix_seconds <= candidate.horizon.start_unix_seconds
         || candidate.horizon.interval_seconds == 0
@@ -548,6 +564,9 @@ pub fn validate_candidate(
         {
             violations.push(format!("empty or duplicate service ID {}", service.service_id));
         }
+        if !valid_nonempty(&service.description) {
+            violations.push(format!("service {} has an empty description", service.service_id));
+        }
         if !components.contains_key(service.component_id.as_str()) {
             violations.push(format!(
                 "service {} references unknown component {}",
@@ -594,6 +613,9 @@ pub fn validate_candidate(
                 "scenario {} is not assumption-classed but has no source",
                 scenario.scenario_id
             ));
+        }
+        if !valid_nonempty(&scenario.description) {
+            violations.push(format!("scenario {} has an empty description", scenario.scenario_id));
         }
         if scenario.intervals.is_empty() {
             violations.push(format!("scenario {} has no intervals", scenario.scenario_id));
@@ -1160,6 +1182,16 @@ mod tests {
         assert!(value["scenarios"].is_array());
         assert_eq!(value["services"][0]["service_kind"], "electricity");
         assert_eq!(value["components"][0]["ports"][0]["carrier"], "electricity");
+    }
+
+    #[test]
+    fn candidates_without_components_or_services_are_rejected() {
+        let mut candidates = reference_service_hub_candidates();
+        candidates[0].components.clear();
+        candidates[0].services.clear();
+        let error = validate_candidate(&candidates[0]).unwrap_err();
+        assert!(error.violations.iter().any(|violation| violation.contains("no components")));
+        assert!(error.violations.iter().any(|violation| violation.contains("no declared services")));
     }
 
     #[test]
