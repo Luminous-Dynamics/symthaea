@@ -562,6 +562,8 @@ impl CognitiveLoopService {
         CycleResult {
             output,
             prediction_error: dynamics.core.prediction_error,
+            prediction_error_valid: perception.urgency.prediction_error_valid
+                && dynamics.core.prediction_error.is_finite(),
             peak_attention: perception.encoding.encoding_result.peak_attention,
             detected_primitives: mem::take(
                 &mut perception.encoding.encoding_result.detected_primitives,
