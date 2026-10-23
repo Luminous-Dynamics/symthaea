@@ -2199,6 +2199,101 @@ jobs:
 
           print("PITB_SUCCESS_COST_FRONTIER_PLAN_PASS: 18 complete target/arm/budget cells, 3 monotonic caps, 8 negative controls rejected; fixture remains validation-only")
           PY
+      - name: Analyze the synthetic success-cost frontier contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          plan="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/success-cost-frontier-plan.synthetic.json"
+          outcomes="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/success-cost-frontier-outcomes.synthetic.jsonl"
+          schema="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/success-cost-frontier-outcome.schema.json"
+          report_schema="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/success-cost-frontier-analysis-report.schema.json"
+          analyzer_source="$GITHUB_WORKSPACE/crates/bridges/symthaea-proof-insights/src/bin/analyze_success_cost_frontier.rs"
+          report="$RUNNER_TEMP/pitb-success-cost-frontier-report.json"
+          cargo run --locked --bin analyze_success_cost_frontier -- "$plan" "$outcomes" "$report" 1000 20261023
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$plan" "$outcomes" "$schema" "$report" "$report_schema" "$analyzer_source" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          plan_path, outcomes_path, schema_path, report_path, report_schema_path, source_path = map(Path, sys.argv[1:])
+          plan = json.loads(plan_path.read_text())
+          outcome_schema = json.loads(schema_path.read_text())
+          report_schema = json.loads(report_schema_path.read_text())
+          Draft202012Validator.check_schema(outcome_schema)
+          Draft202012Validator.check_schema(report_schema)
+          outcome_validator = Draft202012Validator(outcome_schema, format_checker=FormatChecker())
+          report_validator = Draft202012Validator(report_schema, format_checker=FormatChecker())
+          rows = [json.loads(line) for line in outcomes_path.read_text().splitlines()]
+          for number, row in enumerate(rows, start=1):
+              errors = list(outcome_validator.iter_errors(row))
+              if errors:
+                  raise SystemExit(f"outcome line {number} violates schema: {errors[0].message}")
+          report = json.loads(report_path.read_text())
+          report_validator.validate(report)
+
+          def sha256(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          if len(rows) != len(plan["assignments"]) or len(rows) != 18:
+              raise SystemExit("frontier outcome fixture does not cover all 18 planned assignments")
+          if any(row["status"] != "not_attempted" for row in rows):
+              raise SystemExit("synthetic frontier rows must remain explicitly not_attempted")
+          if report["dataset_kind"] != "synthetic_fixture" or report["split"] != "validation":
+              raise SystemExit("synthetic frontier report must remain validation-only")
+          if report["counts"]["planned_cells"] != 18 or report["counts"]["outcome_rows"] != 18:
+              raise SystemExit("frontier report cell accounting mismatch")
+          if report["counts"]["executed_rows"] != 0 or report["counts"]["unexecuted_rows"] != 18:
+              raise SystemExit("synthetic frontier fixture must show 0 executed / 18 unexecuted rows")
+          if report["counts"]["verified_successes"] != 0 or report["counts"]["outcome_status_counts"] != {"not_attempted": 18}:
+              raise SystemExit("synthetic frontier fixture cannot claim model success")
+          if report["curves"] or report["paired_effects"] or report["pareto_frontier"]:
+              raise SystemExit("synthetic frontier fixture must not emit performance curves or frontier points")
+          if report["confirmatory_decision"] != "not_evaluated_synthetic_fixture":
+              raise SystemExit("synthetic report must keep the confirmatory decision unassessed")
+          if report["plan_sha256"] != sha256(plan_path) or report["outcomes_sha256"] != sha256(outcomes_path):
+              raise SystemExit("report source digest mismatch")
+          if report["analyzer_source_sha256"] != sha256(source_path):
+              raise SystemExit("report analyzer source SHA-256 mismatch")
+
+          # Negative control: the analyzer must never accept a forged run outcome
+          # against the synthetic plan, even when all receipt-shaped fields exist.
+          import copy
+          import subprocess
+          import tempfile
+          forged = copy.deepcopy(rows)
+          row = forged[0]
+          target = next(item for item in plan["targets"] if item["target_id"] == row["target_id"])
+          digest = "a" * 64
+          row.update({
+              "status": "verified_success",
+              "checker_passed": True,
+              "semantic_gate_passed": True,
+              "successor_gate_status": "passed",
+              "checked_target_statement_sha256": target["statement_sha256"],
+              "checker_receipt_sha256": digest,
+              "semantic_gate_receipt_sha256": digest,
+              "successor_gate_receipt_sha256": digest,
+              "run_receipt_sha256": digest,
+              "model_calls_used": 1,
+              "tokens_used": 1,
+              "wall_ms": 1,
+              "cost_microusd": 1
+          })
+          outcome_validator.validate(row)
+          with tempfile.TemporaryDirectory(prefix="pitb-frontier-negative-") as tmp:
+              mutant = Path(tmp) / "forged.jsonl"
+              mutant.write_text("\n".join(json.dumps(item) for item in forged) + "\n")
+              result = subprocess.run([
+                  "cargo", "run", "--locked", "--quiet", "--bin", "analyze_success_cost_frontier", "--",
+                  str(plan_path), str(mutant), str(Path(tmp) / "out.json"), "1000", "20261023"
+              ], capture_output=True, text=True)
+              if result.returncode == 0:
+                  raise SystemExit("frontier analyzer accepted a forged executed model result in a synthetic fixture")
+          print("PITB_SUCCESS_COST_FRONTIER_ANALYZER_PASS: exact 18-cell join, report/source hashes, independent schema validation, and synthetic-score forgery rejected")
+          PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
         run: |
