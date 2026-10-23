@@ -149,7 +149,7 @@ fn column_means(rows: &[Vec<f64>], feature_count: usize) -> Option<Vec<f64>> {
     let mut sums = vec![0.0_f64; feature_count];
     for row in rows {
         for (sum, value) in sums.iter_mut().zip(row.iter()) {
-            *sum += value;
+            *sum += *value;
             if !sum.is_finite() {
                 return None;
             }
