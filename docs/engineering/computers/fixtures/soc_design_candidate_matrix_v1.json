@@ -1,0 +1,248 @@
+{
+  "schema_version": "1.0",
+  "experiment_id": "SOC-DESIGN-001-CANDIDATE-MATRIX-V1",
+  "evidence_status": "research_proposal_not_measured",
+  "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8459",
+  "design_spec": "docs/engineering/computers/SOC_DESIGN_001_V1.md",
+  "canonical_owners": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/7905",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/5804",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/5805",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/5808",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/5800",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/8413",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/8446"
+  ],
+  "proposed_selection_gates": {
+    "target_throughput_improvement_ratio": 1.5,
+    "target_joules_per_accepted_task_reduction_fraction": 0.3,
+    "quality_must_be_equivalent": true,
+    "p95_latency_max_regression_fraction": 0.1,
+    "privacy_or_correctness_violation_is_hard_fail": true,
+    "status": "proposed_not_achieved"
+  },
+  "candidates": [
+    {
+      "id": "PHONE-COMMERCIAL-REFERENCE-A20PRO",
+      "profile": "phone",
+      "role": "external_industry_reference",
+      "cpu": "Apple A20 Pro CPU; proprietary",
+      "gpu": "Apple A20 Pro GPU; proprietary",
+      "accelerator": "Integrated Neural Engine / GPU neural accelerators; proprietary",
+      "source_urls": [
+        "https://www.apple.com/newsroom/2026/09/apple-debuts-iphone-18-pro-and-iphone-18-pro-max/"
+      ],
+      "execution_stage": "physical_device_benchmark_if_accessible",
+      "our_device_tested": false,
+      "metrics": null,
+      "notes": "Manufacturer-reported 2nm, 6-core CPU, 7-core GPU, +50% memory bandwidth versus A19 Pro, up to +40% GPU versus A19 Pro are vendor claims; external context only, not our reproduced measurements."
+    },
+    {
+      "id": "PHONE-COMMERCIAL-REFERENCE-ANDROID",
+      "profile": "phone",
+      "role": "external_industry_reference",
+      "cpu": "Qualcomm Snapdragon 8 Elite Gen 5 or MediaTek Dimensity 9500; exact device required",
+      "gpu": "Adreno 840 or Mali-G1 Ultra; exact variant and firmware required",
+      "accelerator": "Device-specific NPU; exact runtime/backend required",
+      "source_urls": [
+        "https://www.qualcomm.com/products/mobile/snapdragon/8-series-mobile-platforms",
+        "https://www.mediatek.com/products/smartphones/mediatek-dimensity-9500"
+      ],
+      "execution_stage": "physical_device_benchmark_if_accessible",
+      "our_device_tested": false,
+      "metrics": null,
+      "notes": "Choose one exact phone and firmware per run. Vendor family names alone do not bind measured results."
+    },
+    {
+      "id": "PHONE-RISCV-CVA6-HDC-64",
+      "profile": "phone",
+      "role": "research_bringup_reference",
+      "cpu": "CVA6-class configurable RISC-V core",
+      "gpu": "None in first bring-up",
+      "accelerator": "Symthaea HDC tile 64-bit streaming datapath",
+      "memory": "explicit local SRAM and host interface; capacity not set",
+      "execution_stage": "simulation_then_supported_fpga",
+      "our_device_tested": false,
+      "metrics": null,
+      "notes": "Control/bring-up research profile only; no claim of phone performance, production Android readiness or power efficiency."
+    },
+    {
+      "id": "PHONE-RISCV-CVA6-HDC-256",
+      "profile": "phone",
+      "role": "accelerator_width_variant",
+      "cpu": "Same exact CVA6 configuration as paired 64-bit candidate",
+      "gpu": "None in first bring-up",
+      "accelerator": "Symthaea HDC tile 256-bit streaming datapath",
+      "memory": "same local SRAM configuration as paired candidate",
+      "execution_stage": "simulation_then_supported_fpga",
+      "our_device_tested": false,
+      "metrics": null,
+      "notes": "Change one architectural factor at a time. Compare latency, area, clock, transfer and measured board energy; no phone-SOC claim."
+    },
+    {
+      "id": "LAPTOP-RISCV-BOOM-VORTEX-HDC-256",
+      "profile": "laptop",
+      "role": "open_research_reference",
+      "cpu": "BOOM out-of-order RISC-V via Chipyard; exact generator/config hash required",
+      "gpu": "Vortex v3.0 configurable RISC-V GPGPU research stack; pin exact tag/commit and backend",
+      "accelerator": "Symthaea HDC tile 256-bit streaming datapath",
+      "memory": "explicit cache/SRAM/host transfer model; capacities not preselected",
+      "source_urls": [
+        "https://chipyard.readthedocs.io/en/stable/generators/boom/",
+        "https://github.com/vortexgpgpu/vortex",
+        "https://github.com/vortexgpgpu/vortex/releases/tag/v3.0"
+      ],
+      "execution_stage": "simulator_then_rtl_then_supported_fpga",
+      "our_device_tested": false,
+      "metrics": null,
+      "notes": "Research stack to test architecture/tooling; v3.0 documents fixed-function graphics, tensor-core structured sparsity, async transfer and Vulkan/HIP backends, but exact build/backend/target qualification remains required. Not assumed equivalent to a shipping laptop CPU/discrete GPU."
+    },
+    {
+      "id": "LAPTOP-RISCV-BOOM-VORTEX-HDC-512",
+      "profile": "laptop",
+      "role": "accelerator_width_variant",
+      "cpu": "Same exact BOOM config as paired 256-bit candidate",
+      "gpu": "Vortex v3.0 configurable RISC-V GPGPU research stack; pin exact tag/commit and backend",
+      "accelerator": "Symthaea HDC tile 512-bit streaming datapath",
+      "memory": "same local SRAM and command batching as paired candidate",
+      "execution_stage": "simulator_then_rtl_then_supported_fpga",
+      "our_device_tested": false,
+      "metrics": null,
+      "notes": "Research stack to test architecture/tooling; v3.0 documents fixed-function graphics, tensor-core structured sparsity, async transfer and Vulkan/HIP backends, but exact build/backend/target qualification remains required. Not assumed equivalent to a shipping laptop CPU/discrete GPU.",
+      "source_urls": [
+        "https://github.com/vortexgpgpu/vortex/releases/tag/v3.0"
+      ]
+    },
+    {
+      "id": "LAPTOP-COMMERCIAL-BASELINE",
+      "profile": "laptop",
+      "role": "physical_software_baseline",
+      "cpu": "Record exact commercial laptop CPU and full configuration",
+      "gpu": "Record exact integrated/discrete GPU and driver",
+      "accelerator": "Existing available CPU/GPU/NPU runtime only",
+      "source_urls": [
+        "https://mlcommons.org/benchmarks/client/"
+      ],
+      "execution_stage": "physical_device_benchmark",
+      "our_device_tested": false,
+      "metrics": null,
+      "notes": "Run the best available optimized software baseline on the exact machine; do not compare modeled FPGA joules with measured laptop joules."
+    }
+  ],
+  "eda_flow": {
+    "pcb": "KiCad 10.x; schematic, ERC/DRC, layout and output hashes",
+    "rtl_simulation": "Verilator plus canonical software differential fixtures",
+    "formal": "supported Yosys/SymbiYosys/SMT flow where appropriate; record exact properties and tool versions",
+    "synthesis": "Yosys and/or supported vendor synthesis",
+    "fpga": "named board/part, bitstream hash, clock constraints and board observation receipt",
+    "asic": "LibreLane or OpenROAD Flow Scripts with exact PDK/library/constraints/corners; PPA is technology-specific",
+    "orchestration": "Rust/Nix manifest and adapters; Symtropy consumes qualified evidence for system/thermal co-design",
+    "note": "No toolchain is asserted installed or already integrated. Qualification starts with capability probes."
+  },
+  "negative_controls": [
+    {
+      "id": "software_baseline_already_wins",
+      "condition": "accelerator transfer+dispatch overhead exceeds compute saved",
+      "expected": "reject_custom_block_or_limit_scope"
+    },
+    {
+      "id": "rtl_semantic_mismatch",
+      "condition": "one HDC output differs from frozen BinaryHV oracle",
+      "expected": "hard_fail_before_synthesis"
+    },
+    {
+      "id": "fpga_asic_equivalence_claim",
+      "condition": "FPGA resources or clock presented as advanced-node ASIC PPA",
+      "expected": "reject_claim"
+    },
+    {
+      "id": "missing_pdk_corner",
+      "condition": "physical-design result lacks target library/corner identity",
+      "expected": "unqualified_ppa"
+    },
+    {
+      "id": "modeled_energy_as_measured",
+      "condition": "simulated power is labeled measured joules/task",
+      "expected": "hard_fail_evidence"
+    },
+    {
+      "id": "phone_subsystem_gap",
+      "condition": "CPU/GPU architecture omits required modem RF ISP boot or OS integration",
+      "expected": "not_a_complete_phone_soc"
+    },
+    {
+      "id": "vortex_as_production_gpu",
+      "condition": "open research GPU is claimed to be commercial-class mobile graphics without matched physical tests",
+      "expected": "reject_claim"
+    },
+    {
+      "id": "tool_versions_unbound",
+      "condition": "EDA output has no tool/config/source digests",
+      "expected": "reject_receipt"
+    },
+    {
+      "id": "thermal_domain_transfer",
+      "condition": "Symtropy predicts a new chassis or firmware from an unqualified reference",
+      "expected": "abstain_not_qualified"
+    }
+  ],
+  "claim_ceiling": "Candidate definitions only. No CPU/GPU/accelerator performance, energy, area, tapeout, fabricated silicon or product superiority has been measured.",
+  "current_benchmark_refs": {
+    "laptop": "https://mlcommons.org/benchmarks/client/",
+    "phone": "https://mlcommons.org/2026/06/mlperf-mobile-v6/",
+    "gpu_release": "https://github.com/vortexgpgpu/vortex/releases/tag/v3.0",
+    "status": "public reference points only; no candidate measured in this fixture"
+  },
+  "hdc_accelerator_microarchitecture_sweep": {
+    "status": "proposed_not_measured",
+    "canonical_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5808",
+    "related_rtl_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/8463",
+    "datapath_widths_bits": [
+      64,
+      128,
+      256,
+      512
+    ],
+    "variants": [
+      {
+        "id": "bind_xor",
+        "operation": "exact XOR word bind/unbind",
+        "parameter": "DATA_W",
+        "architectural_note": "one-entry elastic output; same semantics across widths"
+      },
+      {
+        "id": "hamming_linear_popcount",
+        "operation": "exact popcount(operand_a XOR operand_b)",
+        "parameters": [
+          "DATA_W",
+          "BALANCED_TREE=0"
+        ],
+        "architectural_note": "linear combinational accumulation reference"
+      },
+      {
+        "id": "hamming_balanced_tree",
+        "operation": "exact popcount(operand_a XOR operand_b)",
+        "parameters": [
+          "DATA_W",
+          "BALANCED_TREE=1"
+        ],
+        "architectural_note": "balanced adder tree hypothesis; timing/area advantage not measured"
+      }
+    ],
+    "expected_simulation_cases": 12,
+    "comparison_metrics_after_synthesis": [
+      "lint/elaboration",
+      "formal/differential correctness",
+      "logic depth or timing under same constraints",
+      "area/resources",
+      "host transfer and accumulator cost",
+      "power/energy only under explicit measured boundary"
+    ],
+    "fail_closed_rules": [
+      "any width/architecture mismatch against reference fails that exact case",
+      "one passing variant does not qualify another width or architecture",
+      "simulation success is not synthesis/PPA/FPGA/ASIC evidence",
+      "do not rank linear versus tree on simulated cycle results alone"
+    ]
+  }
+}
