@@ -53,6 +53,10 @@ enum ParetoMetricError {
     EmptyReferenceFront,
     TooFewPointsForSpacing,
     NonFiniteMetricResult,
+    InvalidDecisionDimension,
+    NonFiniteDecisionVariable,
+    DecisionOutOfDomain,
+    InvalidReferenceFrontResolution,
 }
 
 impl fmt::Display for ParetoMetricError {
@@ -403,6 +407,115 @@ fn nearest_neighbour_spacing(
     }
 }
 
+
+/// Canonical two-objective ZDT benchmark families used for known-front validation.
+/// All objectives are minimized. These are standard synthetic optimization fixtures,
+/// not casting physics or material-process models.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ZdtProblem {
+    Zdt1,
+    Zdt2,
+    Zdt3,
+    Zdt4,
+}
+
+/// Evaluate a ZDT decision vector using the standard domain for each problem.
+/// ZDT1/2/3 use [0,1]^n; ZDT4 uses x1 in [0,1] and remaining variables in [-5,5].
+fn evaluate_zdt(problem: ZdtProblem, decision: &[f64]) -> Result<[f64; 2], ParetoMetricError> {
+    if decision.len() < 2 {
+        return Err(ParetoMetricError::InvalidDecisionDimension);
+    }
+    if decision.iter().any(|value| !value.is_finite()) {
+        return Err(ParetoMetricError::NonFiniteDecisionVariable);
+    }
+    let first_is_valid = (0.0..=1.0).contains(&decision[0]);
+    let tail_is_valid = match problem {
+        ZdtProblem::Zdt4 => decision[1..].iter().all(|value| (-5.0..=5.0).contains(value)),
+        ZdtProblem::Zdt1 | ZdtProblem::Zdt2 | ZdtProblem::Zdt3 => {
+            decision[1..].iter().all(|value| (0.0..=1.0).contains(value))
+        }
+    };
+    if !first_is_valid || !tail_is_valid {
+        return Err(ParetoMetricError::DecisionOutOfDomain);
+    }
+
+    let f1 = decision[0];
+    let g = match problem {
+        ZdtProblem::Zdt4 => {
+            1.0 + 10.0 * (decision.len() - 1) as f64
+                + decision[1..]
+                    .iter()
+                    .map(|value| value * value - 10.0 * (4.0 * std::f64::consts::PI * value).cos())
+                    .sum::<f64>()
+        }
+        ZdtProblem::Zdt1 | ZdtProblem::Zdt2 | ZdtProblem::Zdt3 => {
+            1.0 + 9.0 * decision[1..].iter().sum::<f64>() / (decision.len() - 1) as f64
+        }
+    };
+    if !g.is_finite() || g <= 0.0 {
+        return Err(ParetoMetricError::NonFiniteMetricResult);
+    }
+
+    let ratio = f1 / g;
+    let h = match problem {
+        ZdtProblem::Zdt1 | ZdtProblem::Zdt4 => 1.0 - ratio.sqrt(),
+        ZdtProblem::Zdt2 => 1.0 - ratio * ratio,
+        ZdtProblem::Zdt3 => {
+            1.0 - ratio.sqrt() - ratio * (10.0 * std::f64::consts::PI * f1).sin()
+        }
+    };
+    let f2 = g * h;
+    if !f1.is_finite() || !f2.is_finite() {
+        return Err(ParetoMetricError::NonFiniteMetricResult);
+    }
+    Ok([f1, f2])
+}
+
+/// Generate a deterministic sampled approximation to the analytical Pareto front.
+/// points_per_segment includes both endpoints of each segment and must be >= 2.
+/// ZDT3's five separated intervals are sampled independently; gaps are never bridged.
+/// Sampling is uniform in f1 parameter, not Euclidean arc length. Freeze this convention
+/// before using epsilon/IGD+ to compare optimizer runs.
+fn zdt_reference_front(
+    problem: ZdtProblem,
+    points_per_segment: usize,
+) -> Result<Vec<[f64; 2]>, ParetoMetricError> {
+    if points_per_segment < 2 {
+        return Err(ParetoMetricError::InvalidReferenceFrontResolution);
+    }
+
+    let intervals: &[(f64, f64)] = match problem {
+        ZdtProblem::Zdt1 | ZdtProblem::Zdt2 | ZdtProblem::Zdt4 => &[(0.0, 1.0)],
+        ZdtProblem::Zdt3 => &[
+            (0.0, 0.0830015349),
+            (0.1822287280, 0.2577623634),
+            (0.4093136748, 0.4538821041),
+            (0.6183967944, 0.6525117038),
+            (0.8233317983, 0.8518328654),
+        ],
+    };
+
+    let mut front = Vec::with_capacity(intervals.len() * points_per_segment);
+    for &(start, end) in intervals {
+        for sample_index in 0..points_per_segment {
+            let fraction = sample_index as f64 / (points_per_segment - 1) as f64;
+            let f1 = start + (end - start) * fraction;
+            let f2 = match problem {
+                ZdtProblem::Zdt1 | ZdtProblem::Zdt4 => 1.0 - f1.sqrt(),
+                ZdtProblem::Zdt2 => 1.0 - f1 * f1,
+                ZdtProblem::Zdt3 => {
+                    1.0 - f1.sqrt() - f1 * (10.0 * std::f64::consts::PI * f1).sin()
+                }
+            };
+            if !f1.is_finite() || !f2.is_finite() {
+                return Err(ParetoMetricError::NonFiniteMetricResult);
+            }
+            front.push([f1, f2]);
+        }
+    }
+    Ok(front)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -685,6 +798,104 @@ mod tests {
         assert_eq!(
             inverted_generational_distance_plus(&[[f64::MAX, 0.0]], &[[-f64::MAX, 0.0]]),
             Err(ParetoMetricError::NonFiniteMetricResult)
+        );
+    }
+
+
+    #[test]
+    fn zdt1_zdt2_and_zdt3_match_known_objective_values() {
+        let zdt1 = evaluate_zdt(ZdtProblem::Zdt1, &[0.5, 0.0, 0.0]).unwrap();
+        assert_abs_close(zdt1[0], 0.5, 1e-12);
+        assert_abs_close(zdt1[1], 1.0 - 0.5_f64.sqrt(), 1e-12);
+
+        let zdt2 = evaluate_zdt(ZdtProblem::Zdt2, &[0.5, 0.0, 0.0]).unwrap();
+        assert_abs_close(zdt2[0], 0.5, 1e-12);
+        assert_abs_close(zdt2[1], 0.75, 1e-12);
+
+        let zdt3 = evaluate_zdt(ZdtProblem::Zdt3, &[0.5, 0.0, 0.0]).unwrap();
+        assert_abs_close(zdt3[0], 0.5, 1e-12);
+        assert_abs_close(zdt3[1], 1.0 - 0.5_f64.sqrt(), 1e-12);
+    }
+
+    #[test]
+    fn zdt4_matches_known_front_and_exposes_multimodal_tail_penalty() {
+        let optimum = evaluate_zdt(ZdtProblem::Zdt4, &[0.5, 0.0, 0.0]).unwrap();
+        assert_abs_close(optimum[1], 1.0 - 0.5_f64.sqrt(), 1e-12);
+
+        // A tail coordinate away from its global optimum increases g on the canonical domain.
+        let non_optimal = evaluate_zdt(ZdtProblem::Zdt4, &[0.5, 1.0, 0.0]).unwrap();
+        assert_abs_close(non_optimal[1], 1.0, 1e-12);
+        assert!(non_optimal[1] > optimum[1]);
+    }
+
+    #[test]
+    fn zdt_reference_fronts_are_deterministic_and_correctly_sized() {
+        for problem in [ZdtProblem::Zdt1, ZdtProblem::Zdt2, ZdtProblem::Zdt4] {
+            let first = zdt_reference_front(problem, 101).unwrap();
+            let second = zdt_reference_front(problem, 101).unwrap();
+            assert_eq!(first, second);
+            assert_eq!(first.len(), 101);
+        }
+
+        let zdt3 = zdt_reference_front(ZdtProblem::Zdt3, 21).unwrap();
+        assert_eq!(zdt3.len(), 5 * 21);
+        // Segment boundaries are explicit; no sampled interval bridges a disconnected gap.
+        assert!(zdt3[20][0] < zdt3[21][0]);
+        assert!(zdt3[41][0] < zdt3[42][0]);
+        assert!(zdt3[62][0] < zdt3[63][0]);
+        assert!(zdt3[83][0] < zdt3[84][0]);
+    }
+
+    #[test]
+    fn each_reference_front_point_is_attainable_by_a_pareto_set_decision() {
+        for problem in [ZdtProblem::Zdt1, ZdtProblem::Zdt2, ZdtProblem::Zdt3, ZdtProblem::Zdt4] {
+            let front = zdt_reference_front(problem, 17).unwrap();
+            for expected in &front {
+                let decision = [expected[0], 0.0, 0.0];
+                let actual = evaluate_zdt(problem, &decision).unwrap();
+                assert_abs_close(actual[0], expected[0], 1e-10);
+                assert_abs_close(actual[1], expected[1], 1e-8);
+            }
+        }
+    }
+
+    #[test]
+    fn sampled_zdt_reference_fronts_are_nondominated_and_metric_known_answers() {
+        for problem in [ZdtProblem::Zdt1, ZdtProblem::Zdt2, ZdtProblem::Zdt3, ZdtProblem::Zdt4] {
+            let front = zdt_reference_front(problem, 9).unwrap();
+            for (i, left) in front.iter().enumerate() {
+                for (j, right) in front.iter().enumerate() {
+                    if i != j {
+                        assert!(!dominates(*left, *right), "point {i} dominates point {j} for {problem:?}");
+                    }
+                }
+            }
+            assert_abs_close(additive_epsilon_indicator(&front, &front).unwrap(), 0.0, 1e-12);
+            assert_abs_close(inverted_generational_distance_plus(&front, &front).unwrap(), 0.0, 1e-12);
+        }
+    }
+
+    #[test]
+    fn zdt_evaluator_rejects_malformed_non_finite_and_out_of_domain_decisions() {
+        assert_eq!(
+            evaluate_zdt(ZdtProblem::Zdt1, &[0.5]),
+            Err(ParetoMetricError::InvalidDecisionDimension)
+        );
+        assert_eq!(
+            evaluate_zdt(ZdtProblem::Zdt1, &[f64::NAN, 0.0]),
+            Err(ParetoMetricError::NonFiniteDecisionVariable)
+        );
+        assert_eq!(
+            evaluate_zdt(ZdtProblem::Zdt1, &[0.5, -0.01]),
+            Err(ParetoMetricError::DecisionOutOfDomain)
+        );
+        assert_eq!(
+            evaluate_zdt(ZdtProblem::Zdt4, &[0.5, 5.01]),
+            Err(ParetoMetricError::DecisionOutOfDomain)
+        );
+        assert_eq!(
+            zdt_reference_front(ZdtProblem::Zdt3, 1),
+            Err(ParetoMetricError::InvalidReferenceFrontResolution)
         );
     }
 
