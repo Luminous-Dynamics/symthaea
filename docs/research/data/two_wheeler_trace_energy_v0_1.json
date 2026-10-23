@@ -1,0 +1,277 @@
+{
+  "manifest_id": "TWO-WHEELER-TRACE-ENERGY-001",
+  "schema_version": "0.1.0",
+  "created_date": "2026-10-18",
+  "status": "frozen_expected_cases_not_yet_executed",
+  "evidence_class": "Synthetic",
+  "integration_method": "piecewise_linear_signed_wheel_power_and_ground_speed",
+  "zero_crossing_policy": "For an interval whose endpoint powers have opposite signs, solve the linear zero crossing and integrate positive and negative triangular areas separately.",
+  "cases": [
+    {
+      "scenario_id": "WTRACE-POS-001",
+      "class": "positive_control",
+      "title": "Constant positive wheel power",
+      "samples": [
+        {
+          "timestamp_s": 0,
+          "input": {
+            "mass_kg": 180,
+            "rotating_equivalent_mass_kg": 0,
+            "speed_mps": 10,
+            "acceleration_mps2": 0,
+            "grade_rad": 0,
+            "rolling_resistance_coefficient": 0.015,
+            "air_density_kg_m3": 1.225,
+            "drag_area_m2": 0.6,
+            "wind_speed_mps": 0
+          }
+        },
+        {
+          "timestamp_s": 10,
+          "input": {
+            "mass_kg": 180,
+            "rotating_equivalent_mass_kg": 0,
+            "speed_mps": 10,
+            "acceleration_mps2": 0,
+            "grade_rad": 0,
+            "rolling_resistance_coefficient": 0.015,
+            "air_density_kg_m3": 1.225,
+            "drag_area_m2": 0.6,
+            "wind_speed_mps": 0
+          }
+        }
+      ],
+      "expected_status": "COMPUTED",
+      "expected_output": {
+        "duration_s": 10,
+        "distance_m": 100,
+        "positive_wheel_work_j": 6322.7955,
+        "negative_wheel_work_j": 0,
+        "net_signed_wheel_work_j": 6322.7955,
+        "positive_mechanical_wh_per_km": 17.563321
+      },
+      "absolute_tolerance": 0.0001,
+      "relative_tolerance": 0.000001,
+      "must_not_claim": [
+        "battery_energy_consumption",
+        "powertrain_efficiency",
+        "regenerative_energy_recovered"
+      ]
+    },
+    {
+      "scenario_id": "WTRACE-POS-002",
+      "class": "positive_control",
+      "title": "Linear wheel-power zero crossing splits traction and overrun work",
+      "samples": [
+        {
+          "timestamp_s": 0,
+          "input": {
+            "mass_kg": 180,
+            "rotating_equivalent_mass_kg": 0,
+            "speed_mps": 10,
+            "acceleration_mps2": 0,
+            "grade_rad": 0,
+            "rolling_resistance_coefficient": 0.015,
+            "air_density_kg_m3": 1.225,
+            "drag_area_m2": 0.6,
+            "wind_speed_mps": 0
+          }
+        },
+        {
+          "timestamp_s": 2,
+          "input": {
+            "mass_kg": 180,
+            "rotating_equivalent_mass_kg": 0,
+            "speed_mps": 10,
+            "acceleration_mps2": 0,
+            "grade_rad": -0.08,
+            "rolling_resistance_coefficient": 0.015,
+            "air_density_kg_m3": 1.225,
+            "drag_area_m2": 0.6,
+            "wind_speed_mps": 0
+          }
+        }
+      ],
+      "expected_status": "COMPUTED",
+      "expected_output": {
+        "duration_s": 2,
+        "distance_m": 20,
+        "positive_wheel_work_j": 283.229061,
+        "negative_wheel_work_j": 430.168584,
+        "net_signed_wheel_work_j": -146.939523,
+        "positive_mechanical_wh_per_km": 3.933737
+      },
+      "absolute_tolerance": 0.0001,
+      "relative_tolerance": 0.000001,
+      "must_not_claim": [
+        "battery_energy_consumption",
+        "powertrain_efficiency",
+        "regenerative_energy_recovered"
+      ]
+    },
+    {
+      "scenario_id": "WTRACE-POS-003",
+      "class": "positive_control",
+      "title": "Constant negative wheel power remains uncredited overrun energy",
+      "samples": [
+        {
+          "timestamp_s": 0,
+          "input": {
+            "mass_kg": 180,
+            "rotating_equivalent_mass_kg": 0,
+            "speed_mps": 10,
+            "acceleration_mps2": 0,
+            "grade_rad": -0.08,
+            "rolling_resistance_coefficient": 0.015,
+            "air_density_kg_m3": 1.225,
+            "drag_area_m2": 0.6,
+            "wind_speed_mps": 0
+          }
+        },
+        {
+          "timestamp_s": 5,
+          "input": {
+            "mass_kg": 180,
+            "rotating_equivalent_mass_kg": 0,
+            "speed_mps": 10,
+            "acceleration_mps2": 0,
+            "grade_rad": -0.08,
+            "rolling_resistance_coefficient": 0.015,
+            "air_density_kg_m3": 1.225,
+            "drag_area_m2": 0.6,
+            "wind_speed_mps": 0
+          }
+        }
+      ],
+      "expected_status": "COMPUTED",
+      "expected_output": {
+        "duration_s": 5,
+        "distance_m": 50,
+        "positive_wheel_work_j": 0,
+        "negative_wheel_work_j": 3896.095366,
+        "net_signed_wheel_work_j": -3896.095366,
+        "positive_mechanical_wh_per_km": 0
+      },
+      "absolute_tolerance": 0.0001,
+      "relative_tolerance": 0.000001,
+      "must_not_claim": [
+        "regenerated_battery_energy"
+      ]
+    },
+    {
+      "scenario_id": "WTRACE-POS-004",
+      "class": "positive_control",
+      "title": "Zero-distance trace leaves per-distance metric unavailable",
+      "samples": [
+        {
+          "timestamp_s": 0,
+          "input": {
+            "mass_kg": 100,
+            "rotating_equivalent_mass_kg": 0,
+            "speed_mps": 0,
+            "acceleration_mps2": 0,
+            "grade_rad": 0,
+            "rolling_resistance_coefficient": 0,
+            "air_density_kg_m3": 1.2,
+            "drag_area_m2": 0,
+            "wind_speed_mps": 0
+          }
+        },
+        {
+          "timestamp_s": 10,
+          "input": {
+            "mass_kg": 100,
+            "rotating_equivalent_mass_kg": 0,
+            "speed_mps": 0,
+            "acceleration_mps2": 0,
+            "grade_rad": 0,
+            "rolling_resistance_coefficient": 0,
+            "air_density_kg_m3": 1.2,
+            "drag_area_m2": 0,
+            "wind_speed_mps": 0
+          }
+        }
+      ],
+      "expected_status": "COMPUTED",
+      "expected_output": {
+        "duration_s": 10,
+        "distance_m": 0,
+        "positive_wheel_work_j": 0,
+        "negative_wheel_work_j": 0,
+        "net_signed_wheel_work_j": 0,
+        "positive_mechanical_wh_per_km": null
+      },
+      "absolute_tolerance": 0.0001,
+      "relative_tolerance": 0.000001,
+      "must_not_claim": [
+        "per_distance_efficiency"
+      ]
+    },
+    {
+      "scenario_id": "WTRACE-NEG-001",
+      "class": "negative_control",
+      "title": "Duplicate timestamps rejected",
+      "samples": [
+        {
+          "timestamp_s": 0,
+          "input": {
+            "mass_kg": 180,
+            "rotating_equivalent_mass_kg": 0,
+            "speed_mps": 10,
+            "acceleration_mps2": 0,
+            "grade_rad": 0,
+            "rolling_resistance_coefficient": 0.015,
+            "air_density_kg_m3": 1.225,
+            "drag_area_m2": 0.6,
+            "wind_speed_mps": 0
+          }
+        },
+        {
+          "timestamp_s": 0,
+          "input": {
+            "mass_kg": 180,
+            "rotating_equivalent_mass_kg": 0,
+            "speed_mps": 10,
+            "acceleration_mps2": 0,
+            "grade_rad": 0,
+            "rolling_resistance_coefficient": 0.015,
+            "air_density_kg_m3": 1.225,
+            "drag_area_m2": 0.6,
+            "wind_speed_mps": 0
+          }
+        }
+      ],
+      "expected_status": "REJECT_INPUT",
+      "expected_error": "non_monotonic_time",
+      "must_not_claim": [
+        "trace_energy"
+      ]
+    },
+    {
+      "scenario_id": "WTRACE-NEG-002",
+      "class": "negative_control",
+      "title": "Single sample cannot establish a time-integrated trace",
+      "samples": [
+        {
+          "timestamp_s": 0,
+          "input": {
+            "mass_kg": 180,
+            "rotating_equivalent_mass_kg": 0,
+            "speed_mps": 10,
+            "acceleration_mps2": 0,
+            "grade_rad": 0,
+            "rolling_resistance_coefficient": 0.015,
+            "air_density_kg_m3": 1.225,
+            "drag_area_m2": 0.6,
+            "wind_speed_mps": 0
+          }
+        }
+      ],
+      "expected_status": "REJECT_INPUT",
+      "expected_error": "trace_needs_two_samples",
+      "must_not_claim": [
+        "trace_energy"
+      ]
+    }
+  ]
+}

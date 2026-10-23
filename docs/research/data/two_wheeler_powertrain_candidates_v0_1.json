@@ -1,0 +1,283 @@
+{
+  "register_id": "TWO-WHEELER-POWERTRAIN-CANDIDATES-001",
+  "schema_version": "0.1.0",
+  "created_date": "2026-10-18",
+  "status": "research_screen_not_performance_ranked",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8056",
+  "evidence_policy": {
+    "missing_data": "unknown_not_zero",
+    "performance_values": "none_invented",
+    "rank_policy": "no_global_rank_until_same_mission_data_exist",
+    "simulation_is_physical_qualification": false,
+    "LCF_net_energy_claim_allowed": false
+  },
+  "comparison_requirement": {
+    "basis": "same_declared_wheel_work_and_mobility_mission",
+    "record_layers_separately": [
+      "component",
+      "storage_to_wheel",
+      "tank_or_source_to_wheel",
+      "well_to_wheel",
+      "lifecycle",
+      "factory_and_service"
+    ],
+    "hard_constraints": [
+      "safety",
+      "legal_applicability",
+      "minimum_mission_utility",
+      "evidence_completeness"
+    ]
+  },
+  "candidates": [
+    {
+      "id": "PT-ICE-GASOLINE-BASELINE",
+      "architecture": "spark_ignition_gasoline_ice",
+      "role": "reference_candidate",
+      "product_scope": [
+        "motorcycle"
+      ],
+      "status": "baseline_to_freeze",
+      "evidence_needed": [
+        "exact_vehicle_variant",
+        "WMTC_or_declared_cycle",
+        "fuel_consumption",
+        "fuel_pathway",
+        "service_and_lifecycle_inputs"
+      ],
+      "primary_falsifiers": [
+        "duty_cycle_mismatch",
+        "fuel_or_load_inputs_missing",
+        "maintenance_and_upstream_energy_omitted"
+      ]
+    },
+    {
+      "id": "PT-BEV-DIRECT",
+      "architecture": "battery_electric_direct_or_reduction_drive",
+      "role": "primary_near_term_candidate",
+      "product_scope": [
+        "e_bicycle",
+        "motorcycle"
+      ],
+      "status": "first_design_target",
+      "evidence_needed": [
+        "pack_level_capacity_and_mass",
+        "wall_charge_energy",
+        "charger_efficiency",
+        "motor_inverter_efficiency_map",
+        "temperature_and_age_derating",
+        "service_replacement_data"
+      ],
+      "primary_falsifiers": [
+        "cell_level_metric_substituted_for_pack",
+        "wall_charge_losses_omitted",
+        "degradation_or_thermal_derating_omitted"
+      ]
+    },
+    {
+      "id": "PT-BEV-SWAP",
+      "architecture": "battery_electric_with_replaceable_or_swappable_pack",
+      "role": "service_architecture_variant",
+      "product_scope": [
+        "e_bicycle",
+        "motorcycle"
+      ],
+      "status": "conditional_candidate",
+      "evidence_needed": [
+        "pack_interface_and_safety",
+        "spare_pack_inventory",
+        "charging_logistics",
+        "replacement_events",
+        "uptime_and_capital_cost"
+      ],
+      "primary_falsifiers": [
+        "spare_pack_capital_omitted",
+        "charging_dependency_hidden",
+        "pack_revision_mismatch"
+      ]
+    },
+    {
+      "id": "PT-HYBRID-SERIES",
+      "architecture": "combustion_generator_electric_traction_buffer_battery",
+      "role": "conditional_candidate",
+      "product_scope": [
+        "motorcycle"
+      ],
+      "status": "compare_if_range_or_charging_constraints_justify",
+      "evidence_needed": [
+        "engine_map",
+        "generator_efficiency",
+        "motor_inverter_map",
+        "buffer_battery",
+        "all_auxiliary_loads",
+        "fueling_and_service_inputs"
+      ],
+      "primary_falsifiers": [
+        "conversion_stages_omitted",
+        "generator_and_cooling_mass_omitted",
+        "different_duty_cycle"
+      ]
+    },
+    {
+      "id": "PT-HYBRID-PARALLEL",
+      "architecture": "mechanically_coupled_combustion_and_electric_traction",
+      "role": "conditional_candidate",
+      "product_scope": [
+        "motorcycle"
+      ],
+      "status": "compare_if_architecture_has_clear_use_case",
+      "evidence_needed": [
+        "engine_and_motor_maps",
+        "transmission_and_clutch_losses",
+        "control_strategy",
+        "regeneration_data",
+        "service_and_failure_modes"
+      ],
+      "primary_falsifiers": [
+        "peak_component_efficiencies_multiplied_without_operating_map",
+        "added_complexity_and_mass_omitted"
+      ]
+    },
+    {
+      "id": "PT-FUEL-CELL-H2",
+      "architecture": "hydrogen_fuel_cell_buffer_battery_electric_traction",
+      "role": "infrastructure_conditional_candidate",
+      "product_scope": [
+        "motorcycle"
+      ],
+      "status": "screen_only_if_hydrogen_pathway_exists",
+      "evidence_needed": [
+        "hydrogen_production_and_delivery_pathway",
+        "tank_mass_volume_and_safety",
+        "fuel_cell_stack_efficiency_and_lifetime",
+        "buffer_battery",
+        "service_and_cost_data"
+      ],
+      "primary_falsifiers": [
+        "hydrogen_assumed_green_without_pathway",
+        "storage_and_balance_of_plant_omitted",
+        "fuel_cell_lifetime_missing"
+      ]
+    },
+    {
+      "id": "PT-ALT-LIQUID-FUEL-ICE",
+      "architecture": "combustion_engine_with_declared_biofuel_or_efuel",
+      "role": "fuel_pathway_sensitivity",
+      "product_scope": [
+        "motorcycle"
+      ],
+      "status": "conditional_candidate",
+      "evidence_needed": [
+        "specific_fuel_properties",
+        "engine_compatibility",
+        "upstream_energy_and_emissions",
+        "feedstock_or_renewable_energy_pathway",
+        "price_and_availability"
+      ],
+      "primary_falsifiers": [
+        "fuel_label_substituted_for_lifecycle_evidence",
+        "compatibility_unverified",
+        "upstream_process_omitted"
+      ]
+    },
+    {
+      "id": "PT-PLASMA-ASSISTED-ICE",
+      "architecture": "plasma_assisted_ignition_for_internal_combustion",
+      "role": "subsystem_research_hypothesis",
+      "product_scope": [
+        "laboratory_ignition_study",
+        "future_engine_test"
+      ],
+      "status": "screen_after_baseline",
+      "evidence_needed": [
+        "matched_fuel_and_duty_cycle",
+        "ignition_system_parasitics",
+        "lean_limit_and_misfire_data",
+        "emissions",
+        "electrode_durability",
+        "high_pressure_behavior"
+      ],
+      "primary_falsifiers": [
+        "ignition_power_omitted",
+        "only_steady_peak_result_reported",
+        "emissions_or_durability_regress",
+        "no_net_cycle_gain"
+      ]
+    },
+    {
+      "id": "PT-ION-HALL-THRUSTER",
+      "architecture": "electric_space_plasma_thruster",
+      "role": "out_of_scope_ground_powertrain",
+      "product_scope": [
+        "spacecraft_only"
+      ],
+      "status": "do_not_rank_against_motorcycle_without_new_physics",
+      "evidence_needed": [
+        "thrust_to_power",
+        "operating_medium",
+        "propellant",
+        "thruster_and_power_supply_mass",
+        "life_and_thermal_data"
+      ],
+      "primary_falsifiers": [
+        "specific_impulse_used_as_road_acceleration_proxy",
+        "required_wheel_force_not_closed",
+        "ambient_and_thrust_density_not_addressed"
+      ]
+    },
+    {
+      "id": "PT-ATMOSPHERIC-MHD-PLASMA",
+      "architecture": "atmospheric_electromagnetic_plasma_propulsion",
+      "role": "speculative_screen_only",
+      "product_scope": [
+        "analysis_and_independent_laboratory_feasibility_only"
+      ],
+      "status": "no_product_rank",
+      "evidence_needed": [
+        "force_vs_power",
+        "ionization_energy",
+        "ambient_coupling",
+        "thermal_and_material_limits",
+        "system_mass",
+        "measured_repeatable_thrust"
+      ],
+      "primary_falsifiers": [
+        "no_closure_of_force_per_power",
+        "auxiliary_energy_omitted",
+        "theoretical_force_not_physically_measured"
+      ]
+    },
+    {
+      "id": "PT-LCF-FUSION-SPARK",
+      "architecture": "lattice_confinement_fusion_hypothesis",
+      "role": "physics_research_only",
+      "product_scope": [
+        "authorized_independent_laboratory_research"
+      ],
+      "status": "excluded_from_viable_vehicle_frontier",
+      "evidence_needed": [
+        "independent_replication",
+        "full_boundary_input_energy",
+        "calorimetry_and_uncertainty",
+        "nuclear_product_accounting",
+        "radiation_and_containment_assessment",
+        "useful_conversion_and_recirculating_loads"
+      ],
+      "primary_falsifiers": [
+        "neutron_signal_mistaken_for_net_energy",
+        "beam_or_xray_input_omitted",
+        "measurement_error_control_missing",
+        "no_positive_net_useful_output"
+      ],
+      "repository": "https://github.com/Luminous-Dynamics/spark-engine"
+    }
+  ],
+  "references": [
+    "https://www.nasa.gov/space-technology-mission-directorate/tdm/solar-electric-propulsion/",
+    "https://www.nasa.gov/smallsat-institute/sst-soa/in-space_propulsion/",
+    "https://www.mdpi.com/1996-1073/16/4/1604",
+    "https://doi.org/10.1016/j.energy.2025.135911",
+    "https://www.nasa.gov/glenn/glenn-expertise-space-exploration/lattice-confinement-fusion/",
+    "https://doi.org/10.1103/PhysRevC.101.044609",
+    "https://doi.org/10.1103/PhysRevC.101.044610"
+  ]
+}

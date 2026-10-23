@@ -1,0 +1,268 @@
+{
+  "manifest_id": "TWO-WHEELER-POWERTRAIN-ENERGY-LEDGER-001",
+  "schema_version": "0.1.0",
+  "created_date": "2026-10-18",
+  "status": "frozen_expected_cases_not_yet_executed",
+  "evidence_class": "Synthetic",
+  "execution": {
+    "rust_verifier_source_present": true,
+    "cli_command_wired": true,
+    "compiled_or_executed": false,
+    "independent_verifier_connected": true,
+    "result": null,
+    "command": "cargo run -p xtask -- powertrain-energy-ledger --input docs/research/data/two_wheeler_powertrain_energy_ledger_v0_1.json",
+    "note": "The Rust source and CLI command are present in the PR, but they have not been compiled or executed in this environment. Numeric stream values are synthetic rule fixtures, not measurements."
+  },
+  "decision_vocabulary": [
+    "ACCEPT_LEDGER_ONLY",
+    "BLOCK",
+    "INCOMPLETE_LEDGER",
+    "INDETERMINATE",
+    "REJECT_CLAIM"
+  ],
+  "cases": [
+    {
+      "scenario_id": "PT-LEDGER-POS-001",
+      "class": "positive_control",
+      "title": "Synthetic well-defined conversion ledger",
+      "facts": {
+        "boundary_declared": true,
+        "boundary_id": "SYNTHETIC-SOURCE-TO-WHEEL",
+        "boundary_definition": "All source energy across a declared synthetic system boundary to useful wheel work and declared losses.",
+        "claim_kind": "well_to_wheel_efficiency",
+        "input_inventory_complete": true,
+        "upstream_stages_included": true,
+        "auxiliary_inputs_complete": true,
+        "all_auxiliary_inputs_included": true,
+        "energy_metered_at_boundary": true,
+        "complete_energy_balance": true,
+        "comparison_boundaries_match": true,
+        "input_streams": [
+          {
+            "id": "wall_energy_input",
+            "energy_j": 1000000,
+            "uncertainty_j": 1000
+          }
+        ],
+        "output_streams": [
+          {
+            "id": "wheel_work",
+            "energy_j": 200000,
+            "uncertainty_j": 1000
+          },
+          {
+            "id": "declared_losses",
+            "energy_j": 800000,
+            "uncertainty_j": 1000
+          }
+        ],
+        "requested_claim": "ledger_contract_only"
+      },
+      "expected_decision": "ACCEPT_LEDGER_ONLY",
+      "expected_reasons": [
+        "boundary and source inventory are declared",
+        "auxiliary inputs and measurement uncertainty are explicit",
+        "complete synthetic energy balance closes within the declared uncertainty"
+      ],
+      "must_not_claim": [
+        "real_vehicle_efficiency",
+        "measured_energy_savings",
+        "physical_qualification"
+      ]
+    },
+    {
+      "scenario_id": "PT-LEDGER-NEG-001",
+      "class": "negative_control",
+      "title": "Compare different energy boundaries as if equivalent",
+      "facts": {
+        "boundary_declared": true,
+        "input_inventory_complete": true,
+        "auxiliary_inputs_complete": true,
+        "energy_metered_at_boundary": true,
+        "comparison_boundaries_match": false,
+        "claim_kind": "powertrain_comparison",
+        "requested_claim": "candidate_is_more_efficient"
+      },
+      "expected_decision": "BLOCK",
+      "expected_reasons": [
+        "candidate and baseline use different declared energy boundaries",
+        "a motor-terminal result cannot be compared directly with a fuel-well-to-wheel result"
+      ],
+      "must_not_claim": [
+        "candidate_is_more_efficient"
+      ]
+    },
+    {
+      "scenario_id": "PT-LEDGER-NEG-002",
+      "class": "negative_control",
+      "title": "Well-to-wheel claim omits upstream energy pathway",
+      "facts": {
+        "boundary_declared": true,
+        "input_inventory_complete": true,
+        "upstream_stages_included": false,
+        "auxiliary_inputs_complete": true,
+        "energy_metered_at_boundary": true,
+        "claim_kind": "well_to_wheel_efficiency",
+        "requested_claim": "well_to_wheel_result"
+      },
+      "expected_decision": "BLOCK",
+      "expected_reasons": [
+        "upstream energy supply stages are excluded from a well-to-wheel claim"
+      ],
+      "must_not_claim": [
+        "well_to_wheel_result"
+      ]
+    },
+    {
+      "scenario_id": "PT-LEDGER-NEG-003",
+      "class": "negative_control",
+      "title": "Plasma-assisted combustion ignores ignition parasitics",
+      "facts": {
+        "boundary_declared": true,
+        "input_inventory_complete": true,
+        "auxiliary_inputs_complete": false,
+        "all_auxiliary_inputs_included": false,
+        "energy_metered_at_boundary": true,
+        "claim_kind": "plasma_assisted_net_gain",
+        "requested_claim": "net_cycle_efficiency_gain"
+      },
+      "expected_decision": "BLOCK",
+      "expected_reasons": [
+        "plasma subsystem parasitic energy is not included",
+        "net benefit is not established when new subsystem loads are omitted"
+      ],
+      "must_not_claim": [
+        "net_cycle_efficiency_gain"
+      ]
+    },
+    {
+      "scenario_id": "PT-LEDGER-NEG-004",
+      "class": "negative_control",
+      "title": "LCF net-electric gain is inferred from neutron count alone",
+      "facts": {
+        "boundary_declared": true,
+        "input_inventory_complete": false,
+        "auxiliary_inputs_complete": false,
+        "all_auxiliary_inputs_included": false,
+        "energy_metered_at_boundary": false,
+        "complete_energy_balance": false,
+        "claim_kind": "facility_net_electric",
+        "output_basis": "neutron_count_only",
+        "independent_calorimetry": false,
+        "beam_and_xray_inputs_included": false,
+        "requested_claim": "LCF_net_electric_gain"
+      },
+      "expected_decision": "REJECT_CLAIM",
+      "expected_reasons": [
+        "neutron detection is not a calibrated useful-energy output measurement",
+        "facility input and auxiliary energy accounting are incomplete"
+      ],
+      "must_not_claim": [
+        "LCF_net_electric_gain",
+        "net_energy_gain"
+      ]
+    },
+    {
+      "scenario_id": "PT-LEDGER-NEG-005",
+      "class": "negative_control",
+      "title": "Ion-thruster specific impulse is used as motorcycle wheel power evidence",
+      "facts": {
+        "boundary_declared": true,
+        "input_inventory_complete": true,
+        "auxiliary_inputs_complete": true,
+        "energy_metered_at_boundary": true,
+        "claim_kind": "motorcycle_wheel_power",
+        "output_basis": "specific_impulse_only",
+        "independent_thrust_test": false,
+        "requested_claim": "sufficient_motorcycle_thrust"
+      },
+      "expected_decision": "REJECT_CLAIM",
+      "expected_reasons": [
+        "specific impulse alone does not establish road-relevant thrust-to-power or wheel force"
+      ],
+      "must_not_claim": [
+        "sufficient_motorcycle_thrust"
+      ]
+    },
+    {
+      "scenario_id": "PT-LEDGER-NEG-006",
+      "class": "negative_control",
+      "title": "Unknown energy input is imputed as zero",
+      "facts": {
+        "boundary_declared": true,
+        "input_inventory_complete": false,
+        "unknown_input_imputed_as_zero": true,
+        "auxiliary_inputs_complete": true,
+        "energy_metered_at_boundary": true,
+        "claim_kind": "well_to_wheel_efficiency",
+        "requested_claim": "complete_efficiency"
+      },
+      "expected_decision": "INCOMPLETE_LEDGER",
+      "expected_reasons": [
+        "unknown input energy is not zero",
+        "the energy ledger cannot support a complete efficiency claim"
+      ],
+      "must_not_claim": [
+        "complete_efficiency"
+      ]
+    },
+    {
+      "scenario_id": "PT-LEDGER-NEG-007",
+      "class": "negative_control",
+      "title": "Complete declared balance violates energy conservation beyond uncertainty",
+      "facts": {
+        "boundary_declared": true,
+        "input_inventory_complete": true,
+        "auxiliary_inputs_complete": true,
+        "energy_metered_at_boundary": true,
+        "complete_energy_balance": true,
+        "input_streams": [
+          {
+            "id": "all_declared_inputs",
+            "energy_j": 100000,
+            "uncertainty_j": 100
+          }
+        ],
+        "output_streams": [
+          {
+            "id": "all_declared_outputs",
+            "energy_j": 130000,
+            "uncertainty_j": 100
+          }
+        ],
+        "claim_kind": "conversion_efficiency",
+        "requested_claim": "ledger_closes",
+        "boundary_id": "SYNTHETIC-COMPLETE-BALANCE",
+        "boundary_definition": "Synthetic complete energy-inventory boundary including every stated input and output stream."
+      },
+      "expected_decision": "BLOCK",
+      "expected_reasons": [
+        "output lower bound exceeds input upper bound for a declared complete balance",
+        "the boundary, units, omitted source terms or observations must be reconciled"
+      ],
+      "must_not_claim": [
+        "ledger_closes"
+      ]
+    },
+    {
+      "scenario_id": "PT-LEDGER-NEG-008",
+      "class": "negative_control",
+      "title": "Boundary definition and source metering are absent",
+      "facts": {
+        "boundary_declared": false,
+        "input_inventory_complete": true,
+        "auxiliary_inputs_complete": true,
+        "energy_metered_at_boundary": false,
+        "claim_kind": "conversion_efficiency",
+        "requested_claim": "validated_efficiency"
+      },
+      "expected_decision": "INDETERMINATE",
+      "expected_reasons": [
+        "system boundary and measurement basis are not established"
+      ],
+      "must_not_claim": [
+        "validated_efficiency"
+      ]
+    }
+  ]
+}
