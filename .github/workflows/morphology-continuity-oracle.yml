@@ -51,7 +51,7 @@ jobs:
       - name: Verify frozen decision-sensitivity request digest
         run: echo "0c3c496acb70af6290d94e9033f244483d733b382868f094cdf0400e317c82c1  tools/morphology-continuity-oracle/decision_sensitivity_request_v0_5.txt" | sha256sum --check -
       - name: Verify frozen robust evidence request digest
-        run: echo "f9dcdd6267f7c22451b5e3b56c19acfead6c9aa2193d008df34005030b844934  tools/morphology-continuity-oracle/robust_evidence_request_v0_6.txt" | sha256sum --check -
+        run: echo "ad9cc12fcf128e2435ad608a04642bb8895ef94372c93eb247aa9fa86882d146  tools/morphology-continuity-oracle/robust_evidence_request_v0_6.txt" | sha256sum --check -
 
       - name: Formatting
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
