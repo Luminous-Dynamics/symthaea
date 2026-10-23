@@ -259,6 +259,7 @@ mod tests {
         CycleSnapshot {
             coherence,
             prediction_error: pe,
+            prediction_error_valid: 1,
             arousal,
             attention_budget_exceeded: u8::from(budget_exceeded),
             prediction_confidence: 0.5,
@@ -371,6 +372,20 @@ mod tests {
             "Sensitivity should increase in vigilance: {}",
             pm.attention_sensitivity
         );
+    }
+
+    #[test]
+    fn test_invalid_pe_does_not_clear_existing_vigilance() {
+        let mut manager = PerceptionManager::default();
+        manager.vigilant = true;
+        let initial_sensitivity = manager.attention_sensitivity;
+        let mut snapshot = snapshot(0.9, 0.0, 0.5, false);
+        snapshot.prediction_error_valid = 0;
+
+        let _ = manager.process(&snapshot);
+
+        assert!(manager.vigilant);
+        assert_eq!(manager.attention_sensitivity, initial_sensitivity);
     }
 
     #[test]
