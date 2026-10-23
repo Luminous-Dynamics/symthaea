@@ -839,41 +839,92 @@ fn run_trial_with_mode(
         .map(|p| eval_at(&ground_truth, p).unwrap())
         .collect();
 
-    // Near-miss distractors are drawn from a seed-only (condition-independent) stream, so
-    // every one of the 8 configs for a given seed faces the identical near-miss cluster --
-    // only the wildcard distractors below vary by `typed_candidates`.
-    let mut near_miss_rng = seed ^ 0x2026_0716_0000_0003;
-    let mut hypotheses = vec![ground_truth.clone()];
-    hypotheses.extend(near_miss_distractors(
-        &mut near_miss_rng,
-        &ground_truth,
-        NEAR_MISS_COUNT,
-    ));
+    let mut hypotheses: Vec<Expr> = Vec::with_capacity(POOL_SIZE);
+    if truth_absent {
+        // Open-ended track: candidate generation receives the public variable units and
+        // task probes only. It must not read ground-truth values, create near-misses from truth,
+        // or use evaluator feedback to reject candidate structures.
+        let mut candidate_rng = seed
+            ^ if config.typed_candidates {
+                0xA11C_E55E_2026_0001
+            } else {
+                0xA11C_E55E_2026_0002
+            };
+        let mut candidate_probe_values: Vec<Vec<f64>> = Vec::new();
+        let mut attempts = 0usize;
+        let attempt_cap = GEN_ATTEMPT_CAP * POOL_SIZE;
+        while hypotheses.len() < POOL_SIZE && attempts < attempt_cap {
+            attempts += 1;
+            let candidate = if config.typed_candidates {
+                random_expr_with_dimension(
+                    &mut candidate_rng,
+                    DimensionalSignature::ENERGY,
+                    &demo_units(),
+                    GEN_MAX_DEPTH,
+                )
+            } else {
+                naive_untyped_expr(&mut candidate_rng, GEN_MAX_DEPTH)
+            };
+            let Some(values) = probes
+                .iter()
+                .map(|point| eval_at(&candidate, point))
+                .collect::<Option<Vec<_>>>()
+            else {
+                continue;
+            };
+            if !values.iter().all(|value| value.abs() > 1.0e-6 && value.abs() < 1.0e6)
+                || candidate_probe_values
+                    .iter()
+                    .any(|known| !functionally_distinct(&values, known))
+            {
+                continue;
+            }
+            candidate_probe_values.push(values);
+            hypotheses.push(candidate);
+        }
+        assert_eq!(
+            hypotheses.len(),
+            POOL_SIZE,
+            "truth-absent candidate generator exhausted its predeclared attempt budget"
+        );
+    } else {
+        // Oracle-present discrimination track: the reference is deliberately included, and
+        // near-miss candidates are derived from it. Results from this track are not open-ended
+        // discovery results and are always reported separately from the truth-absent track.
+        let mut near_miss_rng = seed ^ 0x2026_0716_0000_0003;
+        hypotheses.push(ground_truth.clone());
+        hypotheses.extend(near_miss_distractors(
+            &mut near_miss_rng,
+            &ground_truth,
+            NEAR_MISS_COUNT,
+        ));
 
-    let mut gen_rng = seed
-        ^ if config.typed_candidates {
-            0x7A3F_9B21_0000_0001
-        } else {
-            0xC0DE_BAAD_0000_0002
-        };
-    while hypotheses.len() < POOL_SIZE {
-        let d = if config.typed_candidates {
-            typed_distractor(&mut gen_rng, &gt_vals, &probes)
-        } else {
-            untyped_distractor(&mut gen_rng, &gt_vals, &probes).0
-        };
-        hypotheses.push(d);
+        let mut gen_rng = seed
+            ^ if config.typed_candidates {
+                0x7A3F_9B21_0000_0001
+            } else {
+                0xC0DE_BAAD_0000_0002
+            };
+        while hypotheses.len() < POOL_SIZE {
+            let distractor = if config.typed_candidates {
+                typed_distractor(&mut gen_rng, &gt_vals, &probes)
+            } else {
+                untyped_distractor(&mut gen_rng, &gt_vals, &probes).0
+            };
+            hypotheses.push(distractor);
+        }
     }
+    let initial_hypotheses = hypotheses.clone();
 
-    // Shared experiment pool across all 8 configs for this seed: only finite-for-ground-truth
-    // points are kept, so no condition can spuriously eliminate ground truth via an undefined
-    // evaluation point that was never a fair test to begin with.
+    // In the truth-absent track the experiment design is independent of the reference law.
+    // An undefined reference evaluation becomes an explicit failed trial at measurement time;
+    // evaluator knowledge does not remove candidate points before the selector sees them.
     let mut exp_rng = seed ^ 0x1111_2222_3333_4444;
     let mut candidate_pool: Vec<Experiment> = Vec::with_capacity(EXPERIMENT_POOL_SIZE);
     while candidate_pool.len() < EXPERIMENT_POOL_SIZE {
-        let e = random_experiment(&mut exp_rng);
-        if eval_at(&ground_truth, &e).is_some() {
-            candidate_pool.push(e);
+        let experiment = random_experiment(&mut exp_rng);
+        if truth_absent || eval_at(&ground_truth, &experiment).is_some() {
+            candidate_pool.push(experiment);
         }
     }
     // Independent evaluator-only points: never passed to the experiment selector or recovery
@@ -1061,8 +1112,12 @@ fn run_trial_with_mode(
         };
         used.push(chosen.clone());
 
-        let base_true_val =
-            eval_at(&ground_truth, &chosen).expect("filtered pool guarantees finiteness");
+        let Some(base_true_val) = eval_at(&ground_truth, &chosen) else {
+            // In truth-absent mode the policy cannot use hidden truth to pre-filter designs.
+            // If the evaluator's physical law is undefined at this selected point, fail closed.
+            selection_failed = true;
+            break;
+        };
         // This controlled additive term is hidden from every candidate and selector.
         // A nonzero amplitude perturbs observations relative to the finite candidate
         // pool; selectors must not read this term.
