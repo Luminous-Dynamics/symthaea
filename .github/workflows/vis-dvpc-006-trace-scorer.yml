@@ -51,13 +51,18 @@ jobs:
       - name: Validate score schema and paired results
         run: |
           awk -F '\t' '
-            $1 == "RESULT_HEADER" { if (NF != 27) exit 2; header = 1 }
-            $1 == "RESULT" { if (NF != 27) exit 3; rows += 1 }
+            $1 == "RESULT_HEADER" { if (NF != 28) exit 2; header = 1 }
+            $1 == "RESULT" { if (NF != 28) exit 3; rows += 1 }
+            $1 == "ORACLE_HEADER" { if (NF != 9) exit 5; oracle_header = 1 }
+            $1 == "ORACLE" { if (NF != 9) exit 6; oracle_rows += 1 }
             END {
-              if (!header || rows != 3) exit 4
-              printf "validated result_rows=%d\n", rows
+              if (!header || rows != 3 || !oracle_header || oracle_rows != 1) exit 7
+              printf "validated result_rows=%d oracle_rows=%d\n", rows, oracle_rows
             }
           ' /tmp/vis-dvpc-006-a.tsv
           grep -F $'RESULT\tmatched\tall_cheap\t3\t2\t0.333333\t0.375000' /tmp/vis-dvpc-006-a.tsv
           grep -F $'RESULT\tmatched\tvalue_router\t3\t2\t0.383333\t0.412500' /tmp/vis-dvpc-006-a.tsv
-          grep -F $'META\toracle\tNOT_COMPUTED_IN_V1' /tmp/vis-dvpc-006-a.tsv
+          grep -F 
+ORACLE\tmatched\tEXACT_TWO_RESOURCE\t0.437500\t2\t20000\t800\t25000\t2500' /tmp/vis-dvpc-006-a.tsv
+          grep -F 
+META\toracle_allocator_overhead\tzero; perfect-foresight upper bound; not deployable' /tmp/vis-dvpc-006-a.tsv
