@@ -103,7 +103,7 @@ pub enum ObjectiveDirection {
     Maximize,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ObjectiveId {
     EssentialUnservedEnergy,
@@ -1148,7 +1148,8 @@ mod tests {
 
     #[test]
     fn serialized_candidates_use_the_symtropy_contract_field_names() {
-        let candidate = &reference_service_hub_candidates()[2];
+        let candidates = reference_service_hub_candidates();
+        let candidate = &candidates[2];
         let value = serde_json::to_value(candidate).expect("candidate serializes");
         assert_eq!(value["schema_version"], CANDIDATE_SCHEMA_VERSION);
         assert_eq!(value["synthetic"], true);
