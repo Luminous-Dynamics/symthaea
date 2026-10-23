@@ -71,6 +71,21 @@ The exact pruning bound can lose against a straight SIMD/vectorized scan because
 
 Independent mathematical reference check (not Rust execution): 12 deterministic model seeds × random/planted conditions × 16/64/128-byte chunks matched the full-scan winner in all 72 cases. In a separate 4,096-candidate / 8 MiB traversal-count pilot, the random-only corpus visited 97.70% of candidate bytes with 16-byte chunks and 99.06% with 64-byte chunks. With one approximately 10%-distance target planted at the midpoint, the model visited 59.08% and 60.51%, respectively. This is a count of modeled bytes visited—not execution time, energy, a compiled benchmark, or a Rust-source test. It supports testing the hypothesis but also shows why this cannot be advertised as a universal win: the bound prunes substantially more when a good incumbent appears, and randomized-only inputs offer little work reduction. These figures should be replaced or corroborated by exact-head Rust execution and realistic corpus traces.
 
+### Phase A3 — temporal-incumbent exact search
+
+A useful cognitive workload often arrives as a sequence of related queries rather than independent random vectors. If the previous query's nearest candidate ID remains a strong candidate for the new query, it can initialize the best-known complete Hamming distance. The hint is not accepted as the answer: the algorithm still checks every other candidate fully or rejects it using its monotone partial-distance lower bound.
+
+The new `hinted_early_abandon_hamming_argmin` benchmark path receives that prior candidate ID. It uses tie-safe pruning:
+- partial distance strictly greater than the incumbent distance can always be pruned;
+- equality can be pruned only when the candidate index is greater than the incumbent index;
+- a fully evaluated equal-distance candidate replaces the incumbent only if its index is smaller.
+
+That subtlety matters because changing candidate evaluation order must not change the public lowest-index tie rule. It also means this optimization is exact, unlike approximate nearest-neighbor shortlists.
+
+The streaming test models temporal locality by storing a prior query at the midpoint of the candidate corpus, then making the current query a deterministic ~10%-bit perturbation of that prior vector. It compares a cold scan against the hinted scan, with winner-ID equality against the exact full scan. A random-only scenario is retained as the control. This experiment asks whether a temporally valid incumbent substantially tightens the bound; it does not presume that all production query streams are correlated.
+
+Independent Python mathematical model check (not Rust execution): 2,100 cases across 64–2,048-bit synthetic vectors, 1–64 candidates, randomized hint IDs, duplicates, and multiple equal exact matches all returned the same lexicographic minimum `(Hamming distance, candidate index)` as exhaustive exact search. This checks the algorithm's tie/bound logic on small synthetic dimensions; it does not compile, test or benchmark the Rust implementation.
+
 ### Phase B — qualified RTL architecture sweep
 
 Prerequisite: the software-oracle generator and all 12 cases in #8463 compile and simulate at its exact head. Once that gate is met, add a distinct fused similarity-to-argmax primitive; do not treat word-level XOR/popcount success as qualification of the full search datapath.
