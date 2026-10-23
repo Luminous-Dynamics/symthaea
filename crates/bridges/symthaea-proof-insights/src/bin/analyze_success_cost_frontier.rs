@@ -210,7 +210,7 @@ fn parse_plan(value: &Value) -> Result<Plan> {
         {
             bail!("{context}: artifact_path must be repository-relative and cannot escape the root");
         }
-        validate_sha(string(item, "source_commit", &context)?, "target source commit")?;
+        validate_commit(string(item, "source_commit", &context)?, "target source commit")?;
         // Source commits are SHA-1 identifiers; artifact/statement content digests are SHA-256.
         validate_sha(string(item, "artifact_sha256", &context)?, "target artifact")?;
         let statement_sha256 = string(item, "statement_sha256", &context)?.to_owned();
@@ -899,6 +899,17 @@ impl SplitMix64 {
 fn sha256(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn validate_commit(value: &str, context: &str) -> Result<()> {
+    if value.len() != 40
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        bail!("{context}: expected 40 lowercase hexadecimal characters");
+    }
+    Ok(())
 }
 
 fn validate_sha(value: &str, context: &str) -> Result<()> {
