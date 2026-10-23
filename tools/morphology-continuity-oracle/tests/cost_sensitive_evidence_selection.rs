@@ -44,7 +44,7 @@ fn expected_brier_reduction(action: CandidateAction) -> f64 {
     let expected_posterior_concentration: f64 = group_square_sums
         .iter()
         .map(|(outcome, square_sum)| {
-            let group_weight = *group_weights.get(outcome).expect("group exists") as u32;
+            let group_weight = *group_weights.get(*outcome).expect("group exists") as u32;
             *square_sum as f64 / (total * f64::from(group_weight))
         })
         .sum();
