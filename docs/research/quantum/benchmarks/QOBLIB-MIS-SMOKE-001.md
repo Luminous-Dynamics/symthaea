@@ -6,9 +6,9 @@ Status: **runner authored; Rust execution not yet confirmed**
 
 From the Symthaea workspace root, after Rust dependencies/toolchain are available:
 
-    cargo run -p symthaea-quantum-comp --bin qoblib_mis_smoke -- --seed-base 42 /path/to/QOBLIB/07-independentset/instances/farm.gph > farm-smoke.json
+    cargo run -p symthaea-quantum-comp --bin qoblib_mis_smoke -- --seed-base 42 --target-objective 10 /path/to/QOBLIB/07-independentset/instances/farm.gph > farm-smoke.json
 
-The command reads one DIMACS edge-format graph and writes exactly one JSON record to stdout. On successful runs the receipt has return_status=completed; on input/read/verification failures it emits a return_status=failed receipt with an error kind, escaped error text, elapsed time, and source byte/hash identity when the input was readable, then exits nonzero. It also writes a diagnostic to stderr. This preserves failures as data instead of silently dropping them. Keep stdout as the raw inspectable receipt. Receipt schema v4 also contains a bounded deterministic 1-for-2 local-improvement result for graphs of at most 250 vertices; pair-search is capped at 2,000,000 checks, and a budget-exhausted result is explicitly not labelled locally optimal. The pinned source cohort is tracked in QOBLIB-MIS-COHORT-001.json.
+The command reads one DIMACS edge-format graph and writes exactly one JSON record to stdout. On successful runs the receipt has return_status=completed; on input/read/verification failures it emits a return_status=failed receipt with an error kind, escaped error text, elapsed time, and source byte/hash identity when the input was readable, then exits nonzero. It also writes a diagnostic to stderr. This preserves failures as data instead of silently dropping them. Keep stdout as the raw inspectable receipt. Receipt schema v5 also contains a bounded deterministic 1-for-2 local-improvement result for graphs of at most 250 vertices; pair-search is capped at 2,000,000 checks, and a budget-exhausted result is explicitly not labelled locally optimal. The pinned source cohort is tracked in QOBLIB-MIS-COHORT-001.json.
 
 ## Fail-closed parser limits
 
@@ -17,7 +17,7 @@ The runner reads file metadata before reading graph contents and refuses an inpu
 ## Output contract
 
 The receipt records:
-- schema and explicit correctness-smoke track label;
+- schema (currently v5) and explicit correctness-smoke track label;
 - supplied source path, byte count and FNV-1a 64-bit checksum of the exact input bytes;
 - parsed vertex/edge counts;
 - the deterministic minimum-residual-degree greedy solution, its one-based vertex list, independently recomputed objective and feasibility verdict;
@@ -25,6 +25,7 @@ The receipt records:
 - the tiny exact reference result and feasibility verdict when the graph has at most 24 vertices, or an explicit skipped-over-limit status otherwise;
 - parser, greedy, portfolio, local-improvement, exact-oracle and end-to-end elapsed nanoseconds;
 - QOBLIB-compatible incumbent time series in seconds: `qoblib_objective_time_series.deterministic_greedy` contains one run, `multi_start_greedy_per_trial` contains one trace per seeded restart, and `local_improvement_stage` contains its own stage-relative trace when run;
+- Optional fixed-target analysis via `--target-objective <usize>`: records per-arm trial counts, target-hit counts, empirical hit rate and time-to-target seconds for each run. Unreached targets are `null`, never dropped; targets above the graph's vertex count fail closed. With no target supplied, `target_analysis` is `null`;
 - explicit seed-base and restart-count provenance for the randomized portfolio, with `--seed-base <u64>` available to replay or run a distinct deterministic campaign. The 64-bit `seed_base` and `best_seed` are JSON decimal strings, not JSON numbers, so consumers preserve the full integer exactly;
 - a stable non-cryptographic checksum over normalized input, policy/configuration, seeds and outcomes, excluding variable runtime fields;
 - package version, target OS/architecture, compile-time Rust version when provided, explicit determinism/replay wording, and null time/memory limits when none were configured;
@@ -43,6 +44,8 @@ The residual-degree greedy implementation uses a lazy min-heap and updates degre
 ## Incumbent time series and time-to-solution
 
 Each trace is encoded as QOBLIB's outer array of runs and inner array of `{"Time": seconds, "Incumbent": objective}` observations. Times start at zero relative to each traced run or local-search stage. The greedy traces begin at objective zero and append the feasible independent-set cardinality after each chosen vertex; the local-improvement trace begins at the greedy input's cardinality and appends values only after accepted 1-for-2 improvements. Every trace ends with a terminal observation at or after the last update, with the final incumbent repeated if it did not change. For MIS maximization the incumbent objective is nondecreasing.
+
+A fixed target can be supplied using `--target-objective <usize>`. Choose it before the run from an authoritative optimum/best-known objective or the application's declared quality threshold; do not pick it after inspecting outputs. The report returns each trial's first hit time in seconds, the number of hits and empirical hit rate. This is an observed cohort summary, not a calibrated future-success probability. A target above the graph's vertex count is rejected, and an unreached target remains `null` in the per-trial list. Local-improvement target time remains relative to that stage, so it is not directly comparable to the complete-run timing without including prior stages.
 
 The 16 stochastic greedy restarts each have an independent relative-time trace and retain their individual final objective. This supports target-hit / empirical time-to-solution analysis across trials without treating all run steps as independent samples. The local-improvement trace measures only that stage, not the full end-to-end pipeline; add preceding-stage costs or use the complete-run outcome when comparing it with a full solver. The top-level end-to-end time remains the operational whole-run measure. Time fields are local diagnostics, not cross-machine SOTA timings.
 
