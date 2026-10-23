@@ -22,10 +22,7 @@ fn expected_brier_reduction(action: CandidateAction) -> f64 {
     expected_brier_reduction_with_prior(action, HYPOTHESIS_PRIOR_WEIGHTS)
 }
 
-fn expected_brier_reduction_with_prior(
-    action: CandidateAction,
-    prior_weights: [u64; 3],
-) -> f64 {
+fn expected_brier_reduction_with_prior(action: CandidateAction, prior_weights: [u64; 3]) -> f64 {
     if !action.provenance_validated {
         return 0.0;
     }
@@ -35,11 +32,7 @@ fn expected_brier_reduction_with_prior(
     let mut group_square_sums: BTreeMap<&str, u128> = BTreeMap::new();
     let mut prior_square_sum = 0_u128;
 
-    for (weight, outcome) in prior_weights
-        .iter()
-        .copied()
-        .zip(action.outcomes)
-    {
+    for (weight, outcome) in prior_weights.iter().copied().zip(action.outcomes) {
         let weight_squared = u128::from(weight) * u128::from(weight);
         *group_weights.entry(outcome).or_default() += weight;
         *group_square_sums.entry(outcome).or_default() += weight_squared;
@@ -83,8 +76,7 @@ fn choose_action_with_prior(
             None => true,
             Some((current, current_gain)) => {
                 gain_per_cost > current_gain + 1.0e-12
-                    || ((gain_per_cost - current_gain).abs() <= 1.0e-12
-                        && action.id < current.id)
+                    || ((gain_per_cost - current_gain).abs() <= 1.0e-12 && action.id < current.id)
             }
         };
         if replace {
@@ -190,7 +182,10 @@ fn deterministic_ties_use_a_stable_id_order() {
             provenance_validated: true,
         },
     ];
-    assert_eq!(choose_action(&tied).map(|action| action.id), Some("source-a"));
+    assert_eq!(
+        choose_action(&tied).map(|action| action.id),
+        Some("source-a")
+    );
 }
 
 fn assert_all_action_orderings(
@@ -258,8 +253,7 @@ fn brier_reduction_and_action_choice_are_invariant_to_hypothesis_permutation() {
         }
 
         assert_eq!(
-            choose_action_with_prior(&permuted_actions, permuted_prior)
-                .map(|action| action.id),
+            choose_action_with_prior(&permuted_actions, permuted_prior).map(|action| action.id),
             expected_choice
         );
     }
