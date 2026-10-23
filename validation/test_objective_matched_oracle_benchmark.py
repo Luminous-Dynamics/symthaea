@@ -34,6 +34,13 @@ class ObjectiveMatchedOracleTests(unittest.TestCase):
         for policy in POLICIES:
             self.assertEqual({r['scored_objective'] for r in result['rows'] if r['policy'] == policy}, set(OBJECTIVES))
 
+    def test_horizon_three_regret_nonnegative_and_oracle_zero(self):
+        result = run_benchmark(3)
+        self.assertTrue(all(r['regret_bits_vs_objective_matched_oracle'] >= 0.0 for r in result['rows']))
+        for objective in OBJECTIVES:
+            row = next(r for r in result['rows'] if r['horizon'] == 3 and r['policy'] == f'oracle_{objective}' and r['scored_objective'] == objective)
+            self.assertAlmostEqual(row['regret_bits_vs_objective_matched_oracle'], 0.0, places=10)
+
     def test_results_deterministic(self):
         self.assertEqual(run_benchmark(2), run_benchmark(2))
 
