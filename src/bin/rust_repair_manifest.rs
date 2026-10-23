@@ -540,28 +540,32 @@ fn validate_container_identity(
     Ok((container_id, image_id))
 }
 
+struct RunExpectation<'a> {
+    expected_image_reference: &'a str,
+    expected_base_commit: &'a str,
+    expected_role: &'a str,
+    expected_index: Option<usize>,
+    expected_test_ids: &'a BTreeSet<String>,
+    expected_log_path: &'a Path,
+    gold: bool,
+}
+
 fn verify_logged_run(
     run: &Value,
-    expected_image_reference: &str,
-    expected_base_commit: &str,
-    expected_role: &str,
-    expected_index: Option<usize>,
-    expected_test_ids: &BTreeSet<String>,
-    expected_log_path: &Path,
-    gold: bool,
+    expectation: &RunExpectation<'_>,
 ) -> Result<(BTreeMap<String, String>, String, String), String> {
-    if run.get("role").and_then(Value::as_str) != Some(expected_role) {
-        return Err(format!("expected run role {expected_role:?}"));
+    if run.get("role").and_then(Value::as_str) != Some(expectation.expected_role) {
+        return Err(format!("expected run role {:?}", expectation.expected_role));
     }
-    if let Some(index) = expected_index {
-        if run.get("run_index").and_then(Value::as_u64) != Some(index as u64) {
-            return Err(format!("run_index must be {index}"));
-        }
+    if let Some(index) = expectation.expected_index
+        && run.get("run_index").and_then(Value::as_u64) != Some(index as u64)
+    {
+        return Err(format!("run_index must be {index}"));
     }
     if run.get("test_patch_applied").and_then(Value::as_bool) != Some(true) {
         return Err("test patch application did not return true".to_string());
     }
-    if gold && run.get("solution_patch_applied").and_then(Value::as_bool) != Some(true) {
+    if expectation.gold && run.get("solution_patch_applied").and_then(Value::as_bool) != Some(true) {
         return Err("gold solution patch application did not return true".to_string());
     }
     if command_exit_code(run, "workspace_clean_exit_code")? != 0 {
@@ -578,10 +582,10 @@ fn verify_logged_run(
     if !(is_hex(&observed_repo_head, 40) || is_hex(&observed_repo_head, 64)) {
         return Err("repo_head_sha must be a 40- or 64-character Git SHA".to_string());
     }
-    if observed_repo_head != expected_base_commit.to_ascii_lowercase() {
+    if observed_repo_head != expectation.expected_base_commit.to_ascii_lowercase() {
         return Err(format!(
             "container repository HEAD differs from task base_commit: expected {}, observed {}",
-            expected_base_commit, observed_repo_head
+            expectation.expected_base_commit, observed_repo_head
         ));
     }
     if command_exit_code(run, "rebuild_exit_code")? != 0 {
@@ -598,13 +602,14 @@ fn verify_logged_run(
         return Err("print/log command did not exit zero".to_string());
     }
 
-    let (container_id, image_id) = validate_container_identity(run, expected_image_reference)?;
+    let (container_id, image_id) =
+        validate_container_identity(run, expectation.expected_image_reference)?;
     let parsed = parse_status_map(run, "parsed_status")?;
     let observed_ids = parsed.keys().cloned().collect::<BTreeSet<_>>();
-    if &observed_ids != expected_test_ids {
+    if &observed_ids != expectation.expected_test_ids {
         return Err("per-run parsed test-ID set differs from the baseline test-ID set".to_string());
     }
-    if gold && test_exit != 0 && parsed.values().all(|state| state == "pass") {
+    if expectation.gold && test_exit != 0 && parsed.values().all(|state| state == "pass") {
         return Err(format!(
             "gold test command exited {test_exit}, but parser reports every test passing"
         ));
@@ -616,11 +621,11 @@ fn verify_logged_run(
         .filter(|value| is_hex(value, 64))
         .ok_or_else(|| "log_sha256 missing or malformed".to_string())?
         .to_ascii_lowercase();
-    let actual_log_sha = sha256_file(expected_log_path)?;
+    let actual_log_sha = sha256_file(expectation.expected_log_path)?;
     if log_sha != actual_log_sha {
         return Err(format!(
             "raw run log SHA-256 mismatch for {}",
-            expected_log_path.display()
+            expectation.expected_log_path.display()
         ));
     }
     Ok((parsed, container_id, image_id))
@@ -681,13 +686,15 @@ fn validate_runtime_evidence(
 
     match verify_logged_run(
         baseline,
-        expected_image_reference,
-        &expected_base_commit,
-        "baseline",
-        None,
-        &expected_test_ids,
-        &baseline_log_path,
-        false,
+        &RunExpectation {
+            expected_image_reference,
+            expected_base_commit: &expected_base_commit,
+            expected_role: "baseline",
+            expected_index: None,
+            expected_test_ids: &expected_test_ids,
+            expected_log_path: &baseline_log_path,
+            gold: false,
+        },
     ) {
         Ok((baseline_status, container_id, image_id)) => {
             if baseline_status != baseline_expected {
@@ -716,19 +723,21 @@ fn validate_runtime_evidence(
         }
     };
     let mut parsed_gold_runs = Vec::with_capacity(3);
-    for index in 0..3 {
+    for (index, gold_run) in gold_runs.iter().enumerate() {
         let log_path = validation_dir
             .join(instance_id)
             .join(format!("gold_run_{index}.log"));
         match verify_logged_run(
-            &gold_runs[index],
-            expected_image_reference,
-            &expected_base_commit,
-            "gold",
-            Some(index),
-            &expected_test_ids,
-            &log_path,
-            true,
+            gold_run,
+            &RunExpectation {
+                expected_image_reference,
+                expected_base_commit: &expected_base_commit,
+                expected_role: "gold",
+                expected_index: Some(index),
+                expected_test_ids: &expected_test_ids,
+                expected_log_path: &log_path,
+                gold: true,
+            },
         ) {
             Ok((statuses, container_id, image_id)) => {
                 parsed_gold_runs.push(statuses);
