@@ -116,6 +116,8 @@ pub mod genealogy;
 pub mod intervention;
 #[cfg(feature = "muse-live")]
 pub mod live_output;
+pub mod listener_response;
+pub mod listener_response_benchmark;
 pub mod mel_extractor;
 pub mod mel_mlp;
 pub mod melody;

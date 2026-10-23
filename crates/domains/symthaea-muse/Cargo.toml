@@ -106,6 +106,9 @@ name = "prompt_steering"
 required-features = ["clap-fad", "theory"]
 
 [[bin]]
+name = "muse_listener_response_benchmark"
+
+[[bin]]
 name = "muse_studio"
 required-features = ["studio"]
 
