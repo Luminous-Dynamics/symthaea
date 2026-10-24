@@ -59,8 +59,8 @@ The upstream receipt still decides eligibility. An `INFEASIBLE` point remains in
 
 Let A and B be eligible points, and let `[L_A, U_A]` and `[L_B, U_B]` be their supplied simultaneous utility bands.
 
-- **CERTIFIED_DOMINATED:** A certainly dominates B under the supplied bands when A is no worse in both measured resource dimensions, `L_A >= U_B`, and at least one objective is strictly better.
-- **CERTIFIED_NONDOMINATED:** no eligible point can dominate B under the supplied bands and resource ordering.
+- **BAND_DOMINATED:** A certainly dominates B under the supplied bands when A is no worse in both measured resource dimensions, `L_A >= U_B`, and at least one objective is strictly better.
+- **BAND_NONDOMINATED:** no eligible point can dominate B under the supplied bands and resource ordering.
 - **UNRESOLVED:** at least one point might dominate B, but the intervals do not establish dominance or rule it out.
 - **DUPLICATE_EQUIVALENT:** a lexicographically earlier point has identical resource values and interval bounds. This is deterministic deduplication, not statistical evidence that one point is better.
 - **INFEASIBLE:** the upstream safety/resource gate failed; uncertainty cannot rehabilitate it.
