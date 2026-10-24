@@ -1,0 +1,2348 @@
+{
+  "corpus_id": "VIS-MFG-ROUTE-CORPUS-001",
+  "schema_version": "0.1.0",
+  "created_on": "2026-10-18",
+  "status": "UNQUALIFIED",
+  "purpose": "Display-specific process-route profiles that map manufacturing stages to the existing generic MFG-PROC/SEMI-PROC owners. These are high-level plans, not qualified process recipes or evidence of execution.",
+  "ownership": {
+    "process_flow_semantics": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+    "generic_manufacturing_semantics": "https://github.com/Luminous-Dynamics/symthaea/issues/5686",
+    "qualification_composition": "https://github.com/Luminous-Dynamics/symthaea/issues/5892",
+    "display_yield_benchmark": "https://github.com/Luminous-Dynamics/symthaea/issues/7868",
+    "display_manufacturing_routes": "https://github.com/Luminous-Dynamics/symthaea/issues/8012",
+    "evidence_profile": "https://github.com/Luminous-Dynamics/mycelix/issues/5157"
+  },
+  "reference_sources": [
+    {
+      "id": "SRC-MICROLED-CMOS-2026",
+      "title": "Micro-LED/CMOS Integration Technologies for High-Resolution AR Microdisplays: Scaling Limits, Yield, and Reliability",
+      "year": 2026,
+      "url": "https://doi.org/10.1002/lpor.71634",
+      "role": "Review of transfer, bonding, interconnect, alignment, thermal and yield scaling constraints."
+    },
+    {
+      "id": "SRC-MICROLED-TRANSFER-2026",
+      "title": "Assembly and integration of micro-led displays: a review of transfer methods targeting near-perfect yield",
+      "year": 2026,
+      "url": "https://doi.org/10.1088/2631-7990/ae25a8",
+      "role": "Review of transfer/integration route families and the production-yield challenge."
+    },
+    {
+      "id": "SRC-LASER-REPAIR-2026",
+      "title": "Research on influencing factors of laser repair bonding for panel-level Micro-LED chips",
+      "year": 2026,
+      "url": "https://doi.org/10.1016/j.mssp.2026.110452",
+      "role": "Example of setup-specific repair-bonding experiments and thermo-mechanical modeling; not a universal process recipe."
+    },
+    {
+      "id": "SRC-OLEDOS-2025",
+      "title": "OLED-on-silicon (OLEDoS) microdisplays: Technology challenges, design considerations, and adaptation in eXtended Reality (XR) ecosystem – Review",
+      "year": 2025,
+      "url": "https://doi.org/10.1016/j.nxnano.2025.100132",
+      "role": "Review of CMOS backplane, OLED frontplane, encapsulation, dicing, packaging and testing stages."
+    },
+    {
+      "id": "SRC-WAVEGUIDE-NIL-2025",
+      "title": "High-Uniformity Full-Color Waveguides Fabricated by Nanoimprint Lithography for Near-Eye Display",
+      "year": 2025,
+      "url": "https://doi.org/10.1002/sdtp.18177",
+      "role": "Manufacturing example for nanoimprint-fabricated surface-relief gratings and waveguide optical uniformity."
+    },
+    {
+      "id": "SRC-LCD-MURA-2021",
+      "title": "Survey of Mura Defect Detection in Liquid Crystal Displays Based on Machine Vision",
+      "year": 2021,
+      "url": "https://www.mdpi.com/2073-4352/11/12/1444",
+      "role": "Review of TFT-LCD array, cell, module stages and stage-specific appearance defects."
+    },
+    {
+      "id": "SRC-LCD-FAB-2007",
+      "title": "LCD Panel Fabrication Processes and Equipment",
+      "year": 2007,
+      "url": "https://www.hitachi.com/ICSFiles/afieldfile/2007/08/27/r2007_03_108.pdf",
+      "role": "Historical industrial overview of array, color-filter, cell and module assembly; use only for high-level sequence cross-checking."
+    },
+    {
+      "id": "SRC-NIL-MFG-2026",
+      "title": "Nanoimprint lithography for scalable electronic and photonic nanomanufacturing",
+      "year": 2026,
+      "url": "https://doi.org/10.1186/s11671-026-04870-6",
+      "role": "Review of nanoimprint process variants, master/template fidelity and wear, resist fill, residual-layer control, demolding, overlay, defect mitigation and scale-up for photonics/electronics."
+    }
+  ],
+  "routes": [
+    {
+      "route_id": "DISPLAY-MICROLED-TRANSFER-001",
+      "technology_family": "microled_on_active_backplane",
+      "target_module": "Calibrated Micro-LED display module",
+      "architecture_variants": [
+        "RGB emitter transfer",
+        "blue emitter plus color-conversion layer",
+        "flip-chip bonding",
+        "hybrid bonding",
+        "laser-assisted repair bonding"
+      ],
+      "scope_note": "Variant names identify alternative routes only. This record does not select a process, publish operating parameters, or establish any physical capability.",
+      "source_ids": [
+        "SRC-MICROLED-CMOS-2026",
+        "SRC-MICROLED-TRANSFER-2026",
+        "SRC-LASER-REPAIR-2026"
+      ],
+      "stages": [
+        {
+          "stage_id": "MICLED-01",
+          "sequence": 1,
+          "stage_name": "Incoming emitter-wafer and known-good-die acceptance",
+          "operation_class": "inspection_and_test",
+          "canonical_family_key": "semiconductor:wafer-inspection-and-test",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "All transfer routes require incoming emitter identity and a declared inspection/binning record.",
+          "input_state": "incoming_emitter_wafer_or_die_lot",
+          "intended_output_state": "accepted_binned_emitter_population",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "supplier/wafer/die-lot identity",
+            "inspection method and coverage",
+            "electrical/optical bin map when available",
+            "raw measurement digests and uncertainty"
+          ],
+          "known_failure_modes": [
+            "uninspected die regions",
+            "mis-binning",
+            "lot identity mismatch",
+            "spatially clustered defects"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
+        },
+        {
+          "stage_id": "MICLED-02",
+          "sequence": 2,
+          "stage_name": "Active-backplane acceptance",
+          "operation_class": "inspection_and_test",
+          "canonical_family_key": "semiconductor:backplane-electrical-test",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "The active backplane is qualified under its own exact profile before transfer.",
+          "input_state": "incoming_active_backplane",
+          "intended_output_state": "accepted_backplane_and_pixel_map",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "backplane revision and configuration",
+            "electrical map and known-defect map",
+            "calibration/currentness",
+            "accepted denominator"
+          ],
+          "known_failure_modes": [
+            "dead or weak drive pixels",
+            "pad damage",
+            "backplane-to-map registration error"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
+        },
+        {
+          "stage_id": "MICLED-03",
+          "sequence": 3,
+          "stage_name": "Transfer-map and equipment readiness review",
+          "operation_class": "inspection_and_alignment",
+          "canonical_family_key": "semiconductor:alignment-and-placement",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Freeze source/destination coordinate mapping and equipment capability before placement.",
+          "input_state": "accepted_binned_emitter_population_plus_accepted_backplane",
+          "intended_output_state": "committed_transfer_map_and_preflight_record",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "mapping/profile digest",
+            "coordinate frame and fiducial record",
+            "equipment capability/profile reference",
+            "preflight inspection output"
+          ],
+          "known_failure_modes": [
+            "frame mismatch",
+            "rotation/offset bias",
+            "stale fiducials",
+            "tool capability not qualified"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-01",
+                  "condition": "Known-good emitter population and map are accepted."
+                },
+                {
+                  "stage_id": "MICLED-02",
+                  "condition": "Active backplane and pixel map are accepted."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "MICLED-04",
+          "sequence": 4,
+          "stage_name": "Emitter transfer and placement",
+          "operation_class": "joining_and_assembly",
+          "canonical_family_key": "semiconductor:die-transfer-and-placement",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "The selected route may be mass transfer, stamp/roll transfer, laser transfer, fluidic assembly or another declared architecture; do not mix their metrics.",
+          "input_state": "committed_transfer_map_and_preflight_record",
+          "intended_output_state": "placed_emitter_population_with_as_placed_map",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "transferred/attempted/accepted counts",
+            "as-placed coordinate residuals",
+            "placement method/profile identity",
+            "failed/missing/chipped die map"
+          ],
+          "known_failure_modes": [
+            "missing emitters",
+            "misplacement",
+            "rotation/tilt error",
+            "chip damage",
+            "correlated local transfer failures"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-03",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "MICLED-05",
+          "sequence": 5,
+          "stage_name": "Bonding and electrical interconnect",
+          "operation_class": "joining_and_bonding",
+          "canonical_family_key": "semiconductor:chip-bonding-and-interconnect",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Use the selected route's separately qualified process profile; no generic operating values are prescribed here.",
+          "input_state": "placed_emitter_population_with_as_placed_map",
+          "intended_output_state": "bonded_population_with_interconnect_state",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "bond-process identity and tool state",
+            "bonded/attempted/rejected denominators",
+            "continuity/contact-resistance evidence where applicable",
+            "thermal/mechanical inspection context"
+          ],
+          "known_failure_modes": [
+            "open/short interconnects",
+            "insufficient contact area",
+            "thermo-mechanical stress",
+            "bond voiding",
+            "pitch-dependent alignment failure"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-04",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "MICLED-06",
+          "sequence": 6,
+          "stage_name": "Post-transfer electrical and optical inspection",
+          "operation_class": "inspection_and_test",
+          "canonical_family_key": "semiconductor:post-bond-metrology",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Do not infer a good bond or functioning pixel from step completion alone.",
+          "input_state": "bonded_population_with_interconnect_state",
+          "intended_output_state": "observed_post_bond_pixel_and_defect_map",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "per-pixel electrical/optical test results",
+            "inspection coverage and defect class",
+            "measurement calibration and uncertainty",
+            "raw output digest"
+          ],
+          "known_failure_modes": [
+            "undetected dark/weak pixels",
+            "false-positive/false-negative inspection",
+            "unobserved regions",
+            "test escape"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-05",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "MICLED-07",
+          "sequence": 7,
+          "stage_name": "Defect repair and retest",
+          "operation_class": "repair_and_retest",
+          "canonical_family_key": "semiconductor:bounded-repair-and-retest",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "conditional",
+          "condition": "Run only where defect class, repair access and approved process profile allow repair; otherwise record reject/scrap/unknown.",
+          "input_state": "observed_post_bond_pixel_and_defect_map",
+          "intended_output_state": "repaired_rejected_or_unresolved_population_with_new_lineage",
+          "inspection_gate": "conditional_hold",
+          "required_evidence": [
+            "repair eligibility and reason",
+            "original and post-repair defect IDs",
+            "repair attempts and added time/material/energy",
+            "post-repair electrical/optical retest"
+          ],
+          "known_failure_modes": [
+            "repair damage to neighboring devices",
+            "rework-loop escalation",
+            "false repair success",
+            "history overwritten",
+            "post-repair drift"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-06",
+                  "condition": "Post-transfer inspection found a repair-eligible defect."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "MICLED-08",
+          "sequence": 8,
+          "stage_name": "Color architecture integration",
+          "operation_class": "optical_stack_integration",
+          "canonical_family_key": "display:color-architecture-integration",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "architecture_dependent",
+          "condition": "Required optical/color-conversion integration depends on RGB emitters versus converted emission and the selected stack.",
+          "input_state": "post_repair_population_and_declared_color_strategy",
+          "intended_output_state": "integrated_color_architecture_with_measured_map",
+          "inspection_gate": "conditional_hold",
+          "required_evidence": [
+            "color strategy and material/source identity",
+            "per-channel optical/electrical outputs",
+            "spatial color-conversion/uniformity evidence",
+            "material and process lineage"
+          ],
+          "known_failure_modes": [
+            "color nonuniformity",
+            "conversion-layer defects",
+            "spectral mismatch",
+            "cross-contamination",
+            "added optical loss"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "one_of_conditioned",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-06",
+                  "condition": "No repair is required; inspection disposition is recorded."
+                },
+                {
+                  "stage_id": "MICLED-07",
+                  "condition": "Repair was attempted and retest/disposition is recorded."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "MICLED-09",
+          "sequence": 9,
+          "stage_name": "Encapsulation, protective layers and optical package",
+          "operation_class": "packaging_and_protection",
+          "canonical_family_key": "display:encapsulation-and-optical-package",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "architecture_dependent",
+          "condition": "The exact stack is architecture-specific; keep sealing/cover/optics variants explicit.",
+          "input_state": "integrated_color_architecture_with_measured_map",
+          "intended_output_state": "protected_display_stack_with_package_identity",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "package/encapsulation profile identity",
+            "inspection for particles, cracks or delamination",
+            "optical-transmission and contamination evidence",
+            "material/lot lineage"
+          ],
+          "known_failure_modes": [
+            "moisture/contamination ingress",
+            "delamination",
+            "stray reflections",
+            "optical loss",
+            "thermal path degradation"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-08",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "MICLED-10",
+          "sequence": 10,
+          "stage_name": "Module dicing, mounting and electrical connection",
+          "operation_class": "packaging_and_assembly",
+          "canonical_family_key": "semiconductor:module-packaging-and-test",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "conditional",
+          "condition": "Required when the selected panel process has not already completed separation and module mounting.",
+          "input_state": "protected_display_stack_with_package_identity",
+          "intended_output_state": "mounted_module_with_electrical_interface_record",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "dicing/mounting route identity",
+            "edge/chip damage inspection",
+            "connector/interconnect verification",
+            "lot and unit serial lineage"
+          ],
+          "known_failure_modes": [
+            "edge cracking",
+            "bond-wire/interposer faults",
+            "mounting stress",
+            "thermal interface variation"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-09",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "MICLED-11",
+          "sequence": 11,
+          "stage_name": "Photometric, color and optical calibration",
+          "operation_class": "calibration_and_optical_test",
+          "canonical_family_key": "display:optical-calibration-and-acceptance",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "required",
+          "condition": "Calibrate under the declared viewing/ambient/thermal conditions and record the device mode.",
+          "input_state": "mounted_module_with_electrical_interface_record",
+          "intended_output_state": "calibrated_module_with_optical_quality_vector",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "luminance/color map",
+            "pixel defect map",
+            "uniformity/contrast/flicker metrics applicable to claim",
+            "instrument calibration, uncertainty and raw digest",
+            "exact mode/profile identity"
+          ],
+          "known_failure_modes": [
+            "mura/nonuniformity",
+            "white-point/color error",
+            "profile mismatch",
+            "stale calibration",
+            "test-pattern sensitivity"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-10",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "MICLED-12",
+          "sequence": 12,
+          "stage_name": "Final acceptance and reliability screen",
+          "operation_class": "reliability_and_final_test",
+          "canonical_family_key": "display:module-reliability-acceptance",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Final-good status is exact-profile-relative and must preserve early failures and repairs.",
+          "input_state": "calibrated_module_with_optical_quality_vector",
+          "intended_output_state": "accepted_rejected_or_unqualified_calibrated_module",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "final acceptance profile version",
+            "first-pass and final-good status",
+            "thermal/aging/reliability outcomes if run",
+            "failed/aborted units retained",
+            "final unit and evidence digests"
+          ],
+          "known_failure_modes": [
+            "latent bond failure",
+            "luminance/color drift",
+            "thermal runaway/out-of-profile behavior",
+            "denominator loss",
+            "uncertainty or calibration gaps"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-11",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "component_interfaces": [
+        {
+          "component_id": "MICCOMP-01",
+          "component_name": "Emitter wafer and known-good die",
+          "component_scope": "Incoming GaN-based emitter subject, lot and bins; upstream epitaxy, device processing and die prep remain external qualified process profiles.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-MICROLED-CMOS-2026",
+            "SRC-MICROLED-TRANSFER-2026"
+          ],
+          "incoming_acceptance_evidence": [
+            "wafer/die lot and die count",
+            "electrical and optical bin map with coverage"
+          ],
+          "interface_characteristics": [
+            "die outline/orientation",
+            "spectral bin and brightness/current profile",
+            "electrode/pad geometry and surface/passivation state",
+            "coordinate-map reference"
+          ],
+          "known_failure_modes": [
+            "clustered emitter defects",
+            "mis-binning",
+            "surface/contact damage"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "MICCOMP-02",
+          "component_name": "CMOS active backplane",
+          "component_scope": "Active-matrix silicon/backplane and pixel-driver subject that receives transferred emitters.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5887",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-MICROLED-CMOS-2026"
+          ],
+          "incoming_acceptance_evidence": [
+            "backplane revision and wafer/lot identity",
+            "electrical pixel/driver test map"
+          ],
+          "interface_characteristics": [
+            "pixel pitch and address map",
+            "pad position/size and coordinate frame",
+            "drive/electrical limits under its qualified profile",
+            "thermal interface envelope"
+          ],
+          "known_failure_modes": [
+            "dead/weak drive pixels",
+            "pad damage",
+            "pad-to-die coordinate mismatch"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "MICCOMP-03",
+          "component_name": "Transfer carrier, fiducials and placement system",
+          "component_scope": "Transfer-tooling and alignment component set; equipment identity and capability are referenced, not asserted.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5889",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-MICROLED-TRANSFER-2026"
+          ],
+          "incoming_acceptance_evidence": [
+            "tool/fixture identity and capability profile",
+            "fiducial and calibration record"
+          ],
+          "interface_characteristics": [
+            "source-to-destination mapping",
+            "placement/rotation/tilt residuals",
+            "sampling/inspection coverage",
+            "calibration validity"
+          ],
+          "known_failure_modes": [
+            "stale calibration",
+            "coordinate-frame mismatch",
+            "placement bias or rotation",
+            "uncaught local failure clusters"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "MICCOMP-04",
+          "component_name": "Bond and interconnect stack",
+          "component_scope": "Bonding interface, pad/metal stack and repair route, all tied to a separately qualified process/material profile.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5889",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-MICROLED-CMOS-2026",
+            "SRC-LASER-REPAIR-2026"
+          ],
+          "incoming_acceptance_evidence": [
+            "material and lot identity",
+            "bond/interconnect profile and equipment state"
+          ],
+          "interface_characteristics": [
+            "contact geometry and electrical continuity",
+            "thermal/mechanical state observations",
+            "repair accessibility and retest boundary"
+          ],
+          "known_failure_modes": [
+            "open/short joints",
+            "voids/contact loss",
+            "thermal-stress damage",
+            "repair-induced neighbor damage"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "MICCOMP-05",
+          "component_name": "Color architecture and pixel optical stack",
+          "component_scope": "RGB emitter or declared color-conversion approach; architecture-specific rather than universal.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5670",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-MICROLED-CMOS-2026"
+          ],
+          "incoming_acceptance_evidence": [
+            "color strategy and material/source identity",
+            "spatial/spectral input measurements"
+          ],
+          "interface_characteristics": [
+            "emission spectrum/channel mapping",
+            "conversion efficiency/transmission",
+            "pixel crosstalk and color uniformity",
+            "barrier/adhesion compatibility"
+          ],
+          "known_failure_modes": [
+            "spectral mismatch",
+            "conversion-layer defects",
+            "color crosstalk",
+            "spatial nonuniformity"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "MICCOMP-06",
+          "component_name": "Encapsulation, cover optics and module package",
+          "component_scope": "Protected optical package, mechanical mount and thermal interface surrounding the emissive/optical stack.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5670",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-MICROLED-CMOS-2026"
+          ],
+          "incoming_acceptance_evidence": [
+            "package BOM and material lot IDs",
+            "surface/particle and adhesion inspection"
+          ],
+          "interface_characteristics": [
+            "optical path/transmission and surface quality",
+            "thermal path and mounting datum",
+            "repair/replacement access where supported"
+          ],
+          "known_failure_modes": [
+            "contamination/ingress",
+            "delamination",
+            "stray reflection",
+            "thermal impedance drift"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        }
+      ]
+    },
+    {
+      "route_id": "DISPLAY-OLEDOS-001",
+      "technology_family": "oled_on_silicon_microdisplay",
+      "target_module": "Calibrated OLED-on-silicon microdisplay",
+      "architecture_variants": [
+        "OLED-on-CMOS backplane",
+        "color-filter approach",
+        "direct-color or other declared frontplane variants",
+        "alternate encapsulation/package profiles"
+      ],
+      "scope_note": "Abstract route map only; detailed deposition, vacuum, organic-material, encapsulation or chemical parameters are not included.",
+      "source_ids": [
+        "SRC-OLEDOS-2025"
+      ],
+      "stages": [
+        {
+          "stage_id": "OLEDOS-01",
+          "sequence": 1,
+          "stage_name": "CMOS backplane acceptance",
+          "operation_class": "inspection_and_electrical_test",
+          "canonical_family_key": "semiconductor:cmos-backplane-acceptance",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Upstream foundry process and exact backplane revision remain external qualified inputs.",
+          "input_state": "incoming_cmos_backplane_wafer",
+          "intended_output_state": "accepted_cmos_backplane_with_pixel_drive_map",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "wafer/lot and design revision",
+            "electrical/functional test map",
+            "process status and calibration context"
+          ],
+          "known_failure_modes": [
+            "pixel drive defects",
+            "line/column faults",
+            "lot/revision mismatch"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
+        },
+        {
+          "stage_id": "OLEDOS-02",
+          "sequence": 2,
+          "stage_name": "Surface preparation and anode condition",
+          "operation_class": "surface_preparation",
+          "canonical_family_key": "semiconductor:surface-preparation-and-electrode-conditioning",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Only a separately qualified process profile may define the physical operation.",
+          "input_state": "accepted_cmos_backplane_with_pixel_drive_map",
+          "intended_output_state": "prepared_backplane_with_surface_state_evidence",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "pre/post state references",
+            "surface/electrode inspection where available",
+            "material/lot/tool identity",
+            "metrology record"
+          ],
+          "known_failure_modes": [
+            "contamination",
+            "surface damage",
+            "contact/injection variation"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-01",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "OLEDOS-03",
+          "sequence": 3,
+          "stage_name": "OLED frontplane stack integration",
+          "operation_class": "thin_film_deposition",
+          "canonical_family_key": "semiconductor:thin-film-stack-deposition",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "The literature reference defines route context only; recipe details and tool qualification belong to the actual process owner.",
+          "input_state": "prepared_backplane_with_surface_state_evidence",
+          "intended_output_state": "frontplane_stack_with_run_lineage",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "stack/profile ID",
+            "material lot/custody records",
+            "run context and tool identity",
+            "post-deposition inspection and unresolved unknowns"
+          ],
+          "known_failure_modes": [
+            "thickness/composition nonuniformity",
+            "particles",
+            "shorts/opens",
+            "pixel dark spots"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-02",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "OLEDOS-04",
+          "sequence": 4,
+          "stage_name": "Electrode completion and encapsulation",
+          "operation_class": "encapsulation_and_protection",
+          "canonical_family_key": "display:oled-electrode-and-encapsulation",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "required",
+          "condition": "Encapsulation route and materials must be explicit; do not assume all architectures share one seal flow.",
+          "input_state": "frontplane_stack_with_run_lineage",
+          "intended_output_state": "encapsulated_frontplane_with_barrier_identity",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "encapsulation material/process identity",
+            "barrier/edge inspection",
+            "inert handling/custody evidence when relevant",
+            "raw inspection digests"
+          ],
+          "known_failure_modes": [
+            "moisture/oxygen ingress",
+            "edge-seal failure",
+            "cracking/delamination",
+            "optical transmission loss"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-03",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "OLEDOS-05",
+          "sequence": 5,
+          "stage_name": "In-process optical/electrical inspection",
+          "operation_class": "inspection_and_test",
+          "canonical_family_key": "display:frontplane-inspection",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "required",
+          "condition": "Inspect before dicing/package costs are incurred where the selected line supports it.",
+          "input_state": "encapsulated_frontplane_with_barrier_identity",
+          "intended_output_state": "inspected_wafer_with_defect_map",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "inspection coverage and defect classes",
+            "pixel brightness/color and electrical tests",
+            "instrument/calibration record",
+            "defect map digest"
+          ],
+          "known_failure_modes": [
+            "missed dark pixels",
+            "mura defect",
+            "false repair eligibility",
+            "unobserved wafer regions"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-04",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "OLEDOS-06",
+          "sequence": 6,
+          "stage_name": "Wafer separation/dicing",
+          "operation_class": "separation_and_handling",
+          "canonical_family_key": "semiconductor:wafer-dicing",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Dicing/edge process profile is tied to the exact wafer and encapsulation stack.",
+          "input_state": "inspected_wafer_with_defect_map",
+          "intended_output_state": "separated_die_population_with_edge_inspection",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "input wafer lineage",
+            "dicing recipe/profile reference",
+            "die count and losses",
+            "edge/crack inspection"
+          ],
+          "known_failure_modes": [
+            "edge chipping",
+            "die cracking",
+            "seal damage",
+            "kerf-related area loss"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-05",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "OLEDOS-07",
+          "sequence": 7,
+          "stage_name": "Packaging, mounting and optical stack assembly",
+          "operation_class": "packaging_and_assembly",
+          "canonical_family_key": "display:microdisplay-packaging",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "required",
+          "condition": "Record polarizers, cover optics, adhesive and enclosure as exact variants rather than implicit defaults.",
+          "input_state": "separated_die_population_with_edge_inspection",
+          "intended_output_state": "packaged_microdisplay_with_optical_stack_identity",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "package/optical-stack BOM identity",
+            "bond/adhesive and mounting checks",
+            "optical transmission and alignment evidence",
+            "unit lineage"
+          ],
+          "known_failure_modes": [
+            "active-area loss",
+            "misalignment",
+            "adhesive/cover defects",
+            "stray reflections"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-06",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "OLEDOS-08",
+          "sequence": 8,
+          "stage_name": "Electrical and optical calibration",
+          "operation_class": "calibration_and_test",
+          "canonical_family_key": "display:microdisplay-calibration",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "required",
+          "condition": "Final calibration uses named equipment, patterns, mode and optical measurement geometry.",
+          "input_state": "packaged_microdisplay_with_optical_stack_identity",
+          "intended_output_state": "calibrated_microdisplay_with_quality_vector",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "electrical map",
+            "luminance/color/contrast response",
+            "calibration identity/currentness",
+            "pattern/uncertainty and raw digests"
+          ],
+          "known_failure_modes": [
+            "burn-in drift",
+            "nonuniformity",
+            "black-level defects",
+            "mode/profile mismatch"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-07",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "OLEDOS-09",
+          "sequence": 9,
+          "stage_name": "Reliability and final disposition",
+          "operation_class": "reliability_and_final_test",
+          "canonical_family_key": "display:microdisplay-reliability-acceptance",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Report reliability only if the defined stress/test has actually been run.",
+          "input_state": "calibrated_microdisplay_with_quality_vector",
+          "intended_output_state": "accepted_rejected_or_unqualified_microdisplay",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "final acceptance profile",
+            "stress-test plan and results if executed",
+            "first-pass/final yield counts",
+            "failed/unknown articles retained"
+          ],
+          "known_failure_modes": [
+            "lifetime drift",
+            "encapsulation degradation",
+            "thermal/mechanical failure",
+            "missing qualification evidence"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-08",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "component_interfaces": [
+        {
+          "component_id": "OLED-COMP-01",
+          "component_name": "CMOS backplane and anode",
+          "component_scope": "Foundry-built silicon drive substrate and pixel interface; wafer process qualification remains external.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-OLEDOS-2025"
+          ],
+          "incoming_acceptance_evidence": [
+            "backplane lot/revision and electrical map",
+            "surface/anode state evidence"
+          ],
+          "interface_characteristics": [
+            "pixel drive addressing",
+            "anode geometry and reflective/optical interface",
+            "planarity/contact interface"
+          ],
+          "known_failure_modes": [
+            "pixel drive defects",
+            "surface contamination",
+            "anode variability"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "OLED-COMP-02",
+          "component_name": "OLED emissive frontplane materials and stack",
+          "component_scope": "Organic frontplane deposition and material lots, bound to an external qualified process profile.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-OLEDOS-2025"
+          ],
+          "incoming_acceptance_evidence": [
+            "frontplane stack/profile identity",
+            "material lot and run lineage"
+          ],
+          "interface_characteristics": [
+            "layer-stack revision",
+            "emission spectrum and luminance/current profile",
+            "thermal budget compatibility"
+          ],
+          "known_failure_modes": [
+            "thickness/composition nonuniformity",
+            "dark spots",
+            "particles/shorts",
+            "color/luminance drift"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "OLED-COMP-03",
+          "component_name": "Electrode and encapsulation barrier",
+          "component_scope": "Electrode completion, environmental barrier, edge seal and any transparent cover/optical layer.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5670",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-OLEDOS-2025"
+          ],
+          "incoming_acceptance_evidence": [
+            "encapsulation material/process identity",
+            "barrier/edge inspection record"
+          ],
+          "interface_characteristics": [
+            "transmission and active-area budget",
+            "seal geometry and material compatibility",
+            "moisture/oxygen protection evidence"
+          ],
+          "known_failure_modes": [
+            "edge ingress",
+            "delamination",
+            "cracking",
+            "active-area loss"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "OLED-COMP-04",
+          "component_name": "Diced die, mount and optical package",
+          "component_scope": "Separated microdisplay die and its electrical/optical mounting interface.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5670",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-OLEDOS-2025"
+          ],
+          "incoming_acceptance_evidence": [
+            "dicing lot and die/edge inspection",
+            "package/interconnect BOM identity"
+          ],
+          "interface_characteristics": [
+            "die outline and mounting datum",
+            "polarizer/cover/adhesive stack identity",
+            "thermal and mechanical interface"
+          ],
+          "known_failure_modes": [
+            "edge chipping",
+            "mounting stress",
+            "adhesive defects",
+            "optical misalignment"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "OLED-COMP-05",
+          "component_name": "Photometric calibration and final tester",
+          "component_scope": "Measurement chain and fixture that establishes the module's calibrated output profile.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5670",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891"
+          ],
+          "reference_source_ids": [
+            "SRC-OLEDOS-2025"
+          ],
+          "incoming_acceptance_evidence": [
+            "instrument identity/calibration validity",
+            "test pattern and display mode identity"
+          ],
+          "interface_characteristics": [
+            "luminance/color/contrast metrics",
+            "pixel map and measurement uncertainty",
+            "profile/digest linking the calibration to the exact module"
+          ],
+          "known_failure_modes": [
+            "stale calibration",
+            "pattern-dependent result",
+            "unmeasured field/region",
+            "test/profile mismatch"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        }
+      ]
+    },
+    {
+      "route_id": "DISPLAY-TFTLCD-001",
+      "technology_family": "tft_lcd_panel",
+      "target_module": "Calibrated TFT-LCD panel/module",
+      "architecture_variants": [
+        "large-area TFT array",
+        "separate RGB color-filter substrate",
+        "selected backlight and polarizer configurations"
+      ],
+      "scope_note": "High-level generic route only. Layer sequences, material stacks and production parameters remain defined by actual qualified process profiles.",
+      "source_ids": [
+        "SRC-LCD-MURA-2021",
+        "SRC-LCD-FAB-2007"
+      ],
+      "stages": [
+        {
+          "stage_id": "TFTLCD-01",
+          "sequence": 1,
+          "stage_name": "TFT-array substrate process",
+          "operation_class": "semiconductor_and_thin_film_fabrication",
+          "canonical_family_key": "semiconductor:tft-array-fabrication",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Array operations are an upstream process flow; this route record does not define lithography/deposition/etch recipes.",
+          "input_state": "bare_array_glass",
+          "intended_output_state": "tft_array_plate_with_state_and_lot_lineage",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "substrate/lot identity",
+            "step and inspection lineage",
+            "electrical array test",
+            "layer/defect map and coverage"
+          ],
+          "known_failure_modes": [
+            "open/short lines",
+            "pixel transistor defects",
+            "particle defects",
+            "line-edge/film nonuniformity"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
+        },
+        {
+          "stage_id": "TFTLCD-02",
+          "sequence": 2,
+          "stage_name": "Array inspection and permitted repair",
+          "operation_class": "inspection_and_repair",
+          "canonical_family_key": "display:tft-array-inspection-repair",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "conditional",
+          "condition": "Repair is allowed only for classified defects and an approved profile; keep original and rework states.",
+          "input_state": "tft_array_plate_with_state_and_lot_lineage",
+          "intended_output_state": "accepted_reworked_or_rejected_array_plate",
+          "inspection_gate": "conditional_hold",
+          "required_evidence": [
+            "pre/post repair defect map",
+            "repair reason and attempt count",
+            "electrical retest",
+            "changed quality/denominator record"
+          ],
+          "known_failure_modes": [
+            "repair-induced shorts",
+            "false repair",
+            "unrecorded scrap",
+            "spatial cluster defects"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-01",
+                  "condition": "Array inspection identifies eligible repair or a formal pass/reject disposition."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "TFTLCD-03",
+          "sequence": 3,
+          "stage_name": "Color-filter substrate process",
+          "operation_class": "thin_film_and_pattern_fabrication",
+          "canonical_family_key": "display:color-filter-substrate-fabrication",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Color-filter route and supplier/lot identity must be fixed for comparisons.",
+          "input_state": "incoming_color_filter_glass",
+          "intended_output_state": "color_filter_plate_with_color_and_defect_map",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "filter/lot identity",
+            "color transmission map",
+            "pattern/inspection output",
+            "measurement uncertainty"
+          ],
+          "known_failure_modes": [
+            "color nonuniformity",
+            "misregistration",
+            "black-matrix/pixel contamination"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
+        },
+        {
+          "stage_id": "TFTLCD-04",
+          "sequence": 4,
+          "stage_name": "Color-filter inspection and disposition",
+          "operation_class": "inspection_and_repair",
+          "canonical_family_key": "display:color-filter-inspection",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Record reject/rework decisions; do not conceal discarded plates.",
+          "input_state": "color_filter_plate_with_color_and_defect_map",
+          "intended_output_state": "accepted_or_rejected_color_filter_plate",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "inspection coverage",
+            "color/geometry test",
+            "defect class and disposition",
+            "raw map digest"
+          ],
+          "known_failure_modes": [
+            "undetected color defects",
+            "pattern misregistration",
+            "insufficient inspection coverage"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-03",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "TFTLCD-05",
+          "sequence": 5,
+          "stage_name": "Cell preparation and alignment-layer process",
+          "operation_class": "surface_preparation_and_alignment",
+          "canonical_family_key": "display:lc-cell-alignment-preparation",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Surface conditioning, alignment layer and spacer/seal steps remain route-profile-specific.",
+          "input_state": "accepted_array_and_color_filter_plates",
+          "intended_output_state": "cell_ready_substrates_with_alignment_lineage",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "both substrate identities",
+            "alignment/spacer/seal profile ref",
+            "surface and particle inspection",
+            "matching/registration evidence"
+          ],
+          "known_failure_modes": [
+            "contamination",
+            "gap nonuniformity",
+            "orientation defects",
+            "substrate mismatch"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "one_of_conditioned",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-01",
+                  "condition": "Array is accepted without repair."
+                },
+                {
+                  "stage_id": "TFTLCD-02",
+                  "condition": "Array repair/retest disposition is complete."
+                }
+              ]
+            },
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-04",
+                  "condition": "Color-filter inspection disposition is complete."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "TFTLCD-06",
+          "sequence": 6,
+          "stage_name": "Cell bonding, fill and sealing",
+          "operation_class": "joining_and_cell_assembly",
+          "canonical_family_key": "display:lc-cell-assembly",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Record bonded substrate pair, cell-gap evidence and fill/seal disposition where applicable.",
+          "input_state": "cell_ready_substrates_with_alignment_lineage",
+          "intended_output_state": "sealed_lc_cell_with_pair_lineage",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "paired substrate IDs",
+            "cell gap/uniformity and seal inspection",
+            "bubble/particle/contamination checks",
+            "process attempt and hold records"
+          ],
+          "known_failure_modes": [
+            "cell gap variation",
+            "bubble/void",
+            "seal leak",
+            "bond-induced mura"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-05",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "TFTLCD-07",
+          "sequence": 7,
+          "stage_name": "Cell-level optical inspection and repair",
+          "operation_class": "inspection_and_repair",
+          "canonical_family_key": "display:lc-cell-inspection-repair",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "conditional",
+          "condition": "Use an approved defect-class repair route or record reject/scrap; no blanket repair assumptions.",
+          "input_state": "sealed_lc_cell_with_pair_lineage",
+          "intended_output_state": "inspected_cell_with_defect_and_repair_history",
+          "inspection_gate": "conditional_hold",
+          "required_evidence": [
+            "uniformity/mura maps",
+            "repair and retest lineage",
+            "coverage and instrument profile",
+            "scrapped/unknown denominator"
+          ],
+          "known_failure_modes": [
+            "mura escapes",
+            "repair damage",
+            "false acceptance"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-06",
+                  "condition": "Cell inspection identifies a repairable defect."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "TFTLCD-08",
+          "sequence": 8,
+          "stage_name": "Polarizer/backlight/module assembly",
+          "operation_class": "optical_stack_and_module_assembly",
+          "canonical_family_key": "display:polarizer-backlight-module-assembly",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "required",
+          "condition": "Backlight, polarizers, drivers and enclosure are versioned component identities.",
+          "input_state": "inspected_cell_with_defect_and_repair_history",
+          "intended_output_state": "assembled_module_with_component_lineage",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "component/lot IDs",
+            "assembly alignment",
+            "driver/backlight electrical check",
+            "light leakage/contamination inspection"
+          ],
+          "known_failure_modes": [
+            "backlight nonuniformity",
+            "polarizer defects",
+            "driver bonding faults",
+            "mechanical stress"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "one_of_conditioned",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-06",
+                  "condition": "Cell repair not required; inspection/disposition complete."
+                },
+                {
+                  "stage_id": "TFTLCD-07",
+                  "condition": "Cell repair/retest disposition complete."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "TFTLCD-09",
+          "sequence": 9,
+          "stage_name": "Driver/board interface and power qualification",
+          "operation_class": "electrical_and_power_test",
+          "canonical_family_key": "display:module-electrical-interface-test",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Power measurements are tied to the exact image/power stimulus/profile.",
+          "input_state": "assembled_module_with_component_lineage",
+          "intended_output_state": "electrically_tested_module_with_power_profile",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "driver interface test",
+            "power test method/edition",
+            "stimulus identity",
+            "power trace digest and uncertainty"
+          ],
+          "known_failure_modes": [
+            "intermittent connections",
+            "unexpected power draw",
+            "wrong test signal"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-08",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "TFTLCD-10",
+          "sequence": 10,
+          "stage_name": "Optical calibration and final image-quality test",
+          "operation_class": "calibration_and_optical_test",
+          "canonical_family_key": "display:panel-calibration-and-image-quality",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "required",
+          "condition": "Use pattern-robust photometry and report every predeclared context.",
+          "input_state": "electrically_tested_module_with_power_profile",
+          "intended_output_state": "calibrated_panel_with_image_quality_vector",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "luminance/color/grayscale maps",
+            "mura/contrast/temporal measures",
+            "profile and instrument calibration",
+            "per-pattern outcomes and raw digests"
+          ],
+          "known_failure_modes": [
+            "mura/test-pattern sensitivity",
+            "color/tone drift",
+            "stale profile",
+            "hidden bad regions"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-09",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "TFTLCD-11",
+          "sequence": 11,
+          "stage_name": "Reliability and final disposition",
+          "operation_class": "reliability_and_final_test",
+          "canonical_family_key": "display:panel-reliability-acceptance",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Yield and reliability claims must state denominator and exact acceptance envelope.",
+          "input_state": "calibrated_panel_with_image_quality_vector",
+          "intended_output_state": "accepted_rejected_or_unqualified_panel",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "final acceptance profile",
+            "first-pass and final yield",
+            "reliability results if executed",
+            "retained rejected/unknown history"
+          ],
+          "known_failure_modes": [
+            "aging drift",
+            "dead-pixel growth",
+            "backlight failure",
+            "missing evidence"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-10",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "component_interfaces": [
+        {
+          "component_id": "LCD-COMP-01",
+          "component_name": "TFT-array glass and backplane",
+          "component_scope": "Thin-film transistor array substrate with layer and electrical state supplied by its qualified line.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5887",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-LCD-MURA-2021",
+            "SRC-LCD-FAB-2007"
+          ],
+          "incoming_acceptance_evidence": [
+            "substrate/lot and array revision",
+            "electrical line/pixel test map"
+          ],
+          "interface_characteristics": [
+            "line/pixel coordinate map",
+            "surface and edge condition",
+            "input to array repair/hold decision"
+          ],
+          "known_failure_modes": [
+            "open/short lines",
+            "particle defects",
+            "pixel transistor failures",
+            "mura originating in array"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "LCD-COMP-02",
+          "component_name": "Color-filter plate",
+          "component_scope": "Separate RGB color filter/black-matrix substrate with optical and registration map.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-LCD-MURA-2021",
+            "SRC-LCD-FAB-2007"
+          ],
+          "incoming_acceptance_evidence": [
+            "filter substrate and lot ID",
+            "transmission/color and pattern inspection map"
+          ],
+          "interface_characteristics": [
+            "RGB registration to array coordinate frame",
+            "spectral/color transmission",
+            "black-matrix/defect map"
+          ],
+          "known_failure_modes": [
+            "color nonuniformity",
+            "misregistration",
+            "contamination"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "LCD-COMP-03",
+          "component_name": "Liquid-crystal cell, alignment, spacer and seal stack",
+          "component_scope": "Cell assembly interface joining array and color-filter plate with controlled cell gap and sealing.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-LCD-MURA-2021",
+            "SRC-LCD-FAB-2007"
+          ],
+          "incoming_acceptance_evidence": [
+            "paired plate identities",
+            "alignment/spacer/seal profile reference"
+          ],
+          "interface_characteristics": [
+            "cell gap/uniformity",
+            "orientation/alignment state",
+            "seal integrity and fill evidence"
+          ],
+          "known_failure_modes": [
+            "gap mura",
+            "bubbles/voids",
+            "seal leaks",
+            "alignment defects"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "LCD-COMP-04",
+          "component_name": "Polarizer, backlight and optical films",
+          "component_scope": "Optical stack and backlight components with lot/variant records and emitted-field measurements.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5670",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-LCD-MURA-2021"
+          ],
+          "incoming_acceptance_evidence": [
+            "component BOM and lot identity",
+            "pre/post assembly luminance map"
+          ],
+          "interface_characteristics": [
+            "luminance uniformity",
+            "spectrum/color/angle distribution",
+            "thermal and mechanical mounting interface"
+          ],
+          "known_failure_modes": [
+            "backlight mura",
+            "polarizer/film defect",
+            "stray light",
+            "spectral/color mismatch"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "LCD-COMP-05",
+          "component_name": "Driver IC, flex, board and power interface",
+          "component_scope": "Electronics and connectors powering/addressing the cell and supporting the declared display mode.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5670",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-LCD-FAB-2007"
+          ],
+          "incoming_acceptance_evidence": [
+            "driver/firmware revision and interface test",
+            "connector/flex identity"
+          ],
+          "interface_characteristics": [
+            "timing and addressing",
+            "supply/power boundary",
+            "electrical stress and thermal context"
+          ],
+          "known_failure_modes": [
+            "intermittent bonds",
+            "line/column faults",
+            "mode mismatch",
+            "excess power"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "LCD-COMP-06",
+          "component_name": "Panel inspection, calibration and mura tester",
+          "component_scope": "Metrology setup that records spatial, color, grayscale and temporal defects by pattern/context.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5670"
+          ],
+          "reference_source_ids": [
+            "SRC-LCD-MURA-2021",
+            "SRC-LCD-FAB-2007"
+          ],
+          "incoming_acceptance_evidence": [
+            "camera/photometer calibration",
+            "pattern/ROI/ambient context"
+          ],
+          "interface_characteristics": [
+            "mura/gray/color maps",
+            "precision/recall and inspected coverage",
+            "uniformity/temporal output profile"
+          ],
+          "known_failure_modes": [
+            "false acceptance",
+            "false reject",
+            "coverage gaps",
+            "pattern sensitivity"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        }
+      ]
+    },
+    {
+      "route_id": "DISPLAY-AR-WAVEGUIDE-001",
+      "technology_family": "ar_waveguide_module",
+      "target_module": "Calibrated AR light-engine and waveguide module",
+      "architecture_variants": [
+        "surface-relief grating by thermal nanoimprint",
+        "surface-relief grating by UV nanoimprint",
+        "step-and-flash or jet-and-flash nanoimprint",
+        "roll-to-roll nanoimprint for compatible flexible/large-area substrates",
+        "grating by declared lithography-and-etch route",
+        "single-layer or multilayer optical stack",
+        "RGB or color-conversion/light-engine variants"
+      ],
+      "scope_note": "Component and assembly route only; no optical design or nanofabrication recipe is prescribed and sourced optics remain supplier-qualified inputs.",
+      "source_ids": [
+        "SRC-WAVEGUIDE-NIL-2025",
+        "SRC-MICROLED-CMOS-2026",
+        "SRC-NIL-MFG-2026"
+      ],
+      "stages": [
+        {
+          "stage_id": "ARWG-01",
+          "sequence": 1,
+          "stage_name": "Light-engine acceptance",
+          "operation_class": "inspection_and_optical_test",
+          "canonical_family_key": "display:light-engine-acceptance",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "required",
+          "condition": "Light engine may be OLED-on-silicon, Micro-LED, LCOS or another declared architecture; identify it exactly.",
+          "input_state": "incoming_display_light_engine",
+          "intended_output_state": "accepted_light_engine_with_electrical_and_optical_profile",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "display technology/revision",
+            "luminance/color and electrical map",
+            "calibration and test-profile identity",
+            "raw measurement digests"
+          ],
+          "known_failure_modes": [
+            "output instability",
+            "pixel defects",
+            "mode mismatch",
+            "unmeasured thermal drift"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
+        },
+        {
+          "stage_id": "ARWG-02",
+          "sequence": 2,
+          "stage_name": "Waveguide blank/wafer and material acceptance",
+          "operation_class": "incoming_material_inspection",
+          "canonical_family_key": "optical:waveguide-substrate-acceptance",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "required",
+          "condition": "Record glass/polymer/high-index substrate and sourced-part identity; do not assume stack equivalence.",
+          "input_state": "incoming_waveguide_blank_or_sourced_optic",
+          "intended_output_state": "accepted_waveguide_subject_with_material_and_surface_map",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "material/lot and geometry",
+            "surface/flatness/defect map",
+            "refractive-index evidence if available",
+            "supplier/source and rights records"
+          ],
+          "known_failure_modes": [
+            "surface defects",
+            "material variation",
+            "warpage",
+            "unknown source/profile"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
+        },
+        {
+          "stage_id": "ARWG-03",
+          "sequence": 3,
+          "stage_name": "Grating or nanostructure fabrication",
+          "operation_class": "optical_patterning_and_fabrication",
+          "canonical_family_key": "optical:grating-fabrication",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "architecture_dependent",
+          "condition": "Nanoimprint, lithography/etch and other pattern routes are separate profiles. The NIL paper is not a universal process recipe.",
+          "input_state": "accepted_waveguide_subject_with_material_and_surface_map",
+          "intended_output_state": "patterned_waveguide_with_grating_identity_and_map",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "pattern-route/profile and master/tool revision identity",
+            "master/replica pattern digest and mold-cycle/wear state",
+            "resist/material lot and profile reference",
+            "grating geometry/period/profile measurements across the declared field",
+            "residual-layer thickness and spatial-uniformity map",
+            "overlay/alignment and fill/demold defect coverage",
+            "inspection/calibration records and raw output digest"
+          ],
+          "known_failure_modes": [
+            "replica defects",
+            "feature-size or duty-cycle drift",
+            "overlay/alignment error",
+            "mold wear or template damage",
+            "incomplete resist filling",
+            "residual-layer nonuniformity",
+            "demolding deformation or fracture",
+            "particle contamination"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-02",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "ARWG-04",
+          "sequence": 4,
+          "stage_name": "Grating/optical-stack metrology",
+          "operation_class": "optical_metrology",
+          "canonical_family_key": "optical:grating-and-stack-metrology",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "required",
+          "condition": "Characterize the actual fabricated optic before module assembly.",
+          "input_state": "patterned_waveguide_with_grating_identity_and_map",
+          "intended_output_state": "measured_waveguide_with_optical_parameter_map",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "grating/stack measurements",
+            "spectral/angular response",
+            "instrument calibration and uncertainty",
+            "raw map and inspection coverage"
+          ],
+          "known_failure_modes": [
+            "uniformity failure",
+            "chromaticity/dispersion error",
+            "scattering",
+            "measurement-method bias"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-03",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "ARWG-05",
+          "sequence": 5,
+          "stage_name": "Coating, lamination or stack assembly",
+          "operation_class": "coating_and_optical_assembly",
+          "canonical_family_key": "optical:coating-lamination-and-stack-assembly",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "conditional",
+          "condition": "Required only for the declared optical route; distinguish single-layer from multilayer architectures.",
+          "input_state": "measured_waveguide_with_optical_parameter_map",
+          "intended_output_state": "assembled_optical_stack_with_layer_lineage",
+          "inspection_gate": "conditional_hold",
+          "required_evidence": [
+            "layer/component BOM and lot identity",
+            "coating/lamination profile ref",
+            "adhesion/particle/void inspection",
+            "transmission/reflection and color evidence"
+          ],
+          "known_failure_modes": [
+            "delamination",
+            "voids",
+            "surface contamination",
+            "added optical loss",
+            "thermal stress"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-04",
+                  "condition": "Execute only for the declared coated/laminated optical-stack architecture."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "ARWG-06",
+          "sequence": 6,
+          "stage_name": "Light-engine-to-waveguide alignment and fixation",
+          "operation_class": "optomechanical_alignment_and_bonding",
+          "canonical_family_key": "optical:light-engine-waveguide-alignment",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "required",
+          "condition": "Record coordinate frames and adjustment/fixture identity; alignment is not inferred from visual inspection alone.",
+          "input_state": "accepted_light_engine_with_electrical_and_optical_profile_plus_assembled_waveguide",
+          "intended_output_state": "aligned_light_engine_waveguide_pair_with_pose_and_bond_record",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "coordinate frame/pose solution",
+            "alignment residuals and uncertainty",
+            "fixture/tool calibration",
+            "bond/adhesive and stress evidence"
+          ],
+          "known_failure_modes": [
+            "eyebox shift",
+            "distortion",
+            "vignetting",
+            "bond drift",
+            "thermo-mechanical misalignment"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-01",
+                  "condition": "Light engine passed its incoming acceptance gate."
+                }
+              ]
+            },
+            {
+              "mode": "one_of_conditioned",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-04",
+                  "condition": "No additional coating/lamination stage is required."
+                },
+                {
+                  "stage_id": "ARWG-05",
+                  "condition": "Required coating/lamination is inspected and dispositioned."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "ARWG-07",
+          "sequence": 7,
+          "stage_name": "Angle-resolved waveguide optical metrology",
+          "operation_class": "optical_performance_test",
+          "canonical_family_key": "optical:angle-resolved-waveguide-metrology",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "required",
+          "condition": "Use predeclared angle, wavelength/color, depth, eye-box and ambient conditions; nominal waveguide efficiency alone is insufficient.",
+          "input_state": "aligned_light_engine_waveguide_pair_with_pose_and_bond_record",
+          "intended_output_state": "measured_module_with_eyebox_efficiency_uniformity_color_and_distortion_map",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "angle-resolved luminance/efficiency",
+            "eye-box/FOV convention and threshold",
+            "color and spatial uniformity",
+            "crosstalk/ghosting/distortion metrics where applicable",
+            "calibration, uncertainty and raw captures"
+          ],
+          "known_failure_modes": [
+            "low efficiency",
+            "eyebox dropout",
+            "color nonuniformity",
+            "ghost images",
+            "distortion",
+            "test-angle cherry-picking"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-06",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "ARWG-08",
+          "sequence": 8,
+          "stage_name": "Calibration and compensation profile",
+          "operation_class": "calibration_and_optical_test",
+          "canonical_family_key": "display:ar-optical-calibration",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+          "conditionality": "required",
+          "condition": "Calibration binds the exact engine, optic, assembly pose, thermal state and profile.",
+          "input_state": "measured_module_with_eyebox_efficiency_uniformity_color_and_distortion_map",
+          "intended_output_state": "calibrated_ar_module_with_profile_digest",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "calibration table/profile digest",
+            "instrument/time/temperature record",
+            "held-out angle/position validation",
+            "stale-profile negative control"
+          ],
+          "known_failure_modes": [
+            "overfit calibration",
+            "profile mismatch",
+            "drift outside calibration set"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-07",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage_id": "ARWG-09",
+          "sequence": 9,
+          "stage_name": "Environmental reliability and final module acceptance",
+          "operation_class": "reliability_and_final_test",
+          "canonical_family_key": "display:ar-waveguide-module-acceptance",
+          "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
+          "conditionality": "required",
+          "condition": "Final acceptance must preserve optical floors and measured reliability under the declared stress envelope.",
+          "input_state": "calibrated_ar_module_with_profile_digest",
+          "intended_output_state": "accepted_rejected_or_unqualified_ar_module",
+          "inspection_gate": "required_hold",
+          "required_evidence": [
+            "final acceptance profile",
+            "reliability tests only if executed",
+            "pre/post stress optical maps",
+            "yield denominator and rejected/unknown lineage"
+          ],
+          "known_failure_modes": [
+            "alignment drift",
+            "adhesive/coat aging",
+            "temperature-dependent color shift",
+            "latent surface damage"
+          ],
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-08",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "component_interfaces": [
+        {
+          "component_id": "ARCOMP-01",
+          "component_name": "Display light engine",
+          "component_scope": "A Micro-LED, OLED-on-silicon, LCOS or other declared engine with its own module acceptance profile.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5670",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-MICROLED-CMOS-2026"
+          ],
+          "incoming_acceptance_evidence": [
+            "engine technology/revision",
+            "electrical and luminance/color map"
+          ],
+          "interface_characteristics": [
+            "pupil/exit geometry and coordinate frame",
+            "spectrum and luminance range",
+            "thermal/electrical compatibility"
+          ],
+          "known_failure_modes": [
+            "unstable brightness",
+            "pixel defects",
+            "mode mismatch",
+            "unmeasured drift"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "ARCOMP-02",
+          "component_name": "Waveguide blank or sourced optic",
+          "component_scope": "Substrate with material, geometry, surface and source/lot identity.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-WAVEGUIDE-NIL-2025"
+          ],
+          "incoming_acceptance_evidence": [
+            "blank/sourced optic identity",
+            "surface/flatness/defect map"
+          ],
+          "interface_characteristics": [
+            "refractive/material profile",
+            "surface finish and substrate geometry",
+            "mechanical datum"
+          ],
+          "known_failure_modes": [
+            "warpage",
+            "surface contamination",
+            "material variation"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "ARCOMP-03",
+          "component_name": "Grating master, replication tooling and patterned waveguide",
+          "component_scope": "Nanoimprint or separately declared lithography/etch route for couplers; the master/tool and replica are distinct identities.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5889",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-WAVEGUIDE-NIL-2025",
+            "SRC-NIL-MFG-2026"
+          ],
+          "incoming_acceptance_evidence": [
+            "route/profile and master/tool ID with inspection state",
+            "replica/substrate lot and pattern digest",
+            "template defect/contamination inspection coverage",
+            "resist/material lot and documented compatibility profile"
+          ],
+          "interface_characteristics": [
+            "period/duty/profile and feature-height uniformity measurements",
+            "residual-layer thickness and across-field variation",
+            "overlay/alignment and field-coordinate registration",
+            "master wear/cycle count and permitted-life evidence",
+            "defect map for fill, demolding, contamination and replication fidelity",
+            "explicit interface to downstream etch or coating/lamination when applicable"
+          ],
+          "known_failure_modes": [
+            "master wear or template damage",
+            "replica defects and particle replication",
+            "feature-size drift",
+            "incomplete cavity filling",
+            "residual-layer variation",
+            "demolding deformation/fracture",
+            "overlay/alignment error"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "ARCOMP-04",
+          "component_name": "Coating, adhesive, laminate and optical stack",
+          "component_scope": "Architecture-specific optional layers and bonds that affect transmission, distortion, spectral response and mechanical stability.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5670",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-WAVEGUIDE-NIL-2025"
+          ],
+          "incoming_acceptance_evidence": [
+            "layer/material lot IDs",
+            "coating/adhesive route profile"
+          ],
+          "interface_characteristics": [
+            "transmission/reflection by wavelength and angle",
+            "adhesion/voids/contamination",
+            "stress/warpage interface"
+          ],
+          "known_failure_modes": [
+            "delamination",
+            "optical loss",
+            "color shift",
+            "thermo-mechanical distortion"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "ARCOMP-05",
+          "component_name": "Precision alignment/fixation fixture",
+          "component_scope": "Fixture, references and adhesive/bonding system connecting engine and waveguide in a declared coordinate frame.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5889",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
+          ],
+          "reference_source_ids": [
+            "SRC-WAVEGUIDE-NIL-2025"
+          ],
+          "incoming_acceptance_evidence": [
+            "fixture and calibration identity",
+            "datum/coordinate reference"
+          ],
+          "interface_characteristics": [
+            "six-degree-of-freedom pose and uncertainty",
+            "alignment repeatability",
+            "thermal drift"
+          ],
+          "known_failure_modes": [
+            "eyebox shift",
+            "pose creep",
+            "fixture calibration error"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        },
+        {
+          "component_id": "ARCOMP-06",
+          "component_name": "Angle-resolved optical metrology/calibration system",
+          "component_scope": "Instrument chain for luminance, eyebox, usable FOV, color, distortion, crosstalk and spatial/angular output.",
+          "process_semantics_owners": [
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5668",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5670",
+            "https://github.com/Luminous-Dynamics/symthaea/issues/5891"
+          ],
+          "reference_source_ids": [
+            "SRC-WAVEGUIDE-NIL-2025"
+          ],
+          "incoming_acceptance_evidence": [
+            "calibration/timebase and camera/photometer response",
+            "test pattern, wavelength, angle/depth convention"
+          ],
+          "interface_characteristics": [
+            "per-angle and per-color measurement envelope",
+            "uncertainty and raw capture digest",
+            "profile tied to exact assembled optic/engine pair"
+          ],
+          "known_failure_modes": [
+            "test-angle cherry-picking",
+            "insufficient dynamic sampling",
+            "unmeasured eyebox",
+            "stale calibration"
+          ],
+          "evidence_status": "UNQUALIFIED"
+        }
+      ]
+    }
+  ]
+}

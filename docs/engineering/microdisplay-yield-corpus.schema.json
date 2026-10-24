@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/microdisplay-yield-corpus-0.1.0.json",
+  "title": "MICRODISP-YIELD-CORPUS-001",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title",
+    "corpus_id",
+    "schema_version",
+    "status",
+    "created_date",
+    "owner_issue",
+    "case_count",
+    "minimum_case_count",
+    "references",
+    "evidence_lanes",
+    "cases"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "corpus_id": {
+      "const": "MICRODISP-YIELD-CORPUS-001"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "UNQUALIFIED"
+    },
+    "created_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "owner_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "case_count": {
+      "const": 20
+    },
+    "minimum_case_count": {
+      "const": 20
+    },
+    "references": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "url",
+          "title",
+          "use"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "use": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "evidence_lanes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "domain",
+          "inputs",
+          "expected_behavior",
+          "metrics",
+          "negative_controls",
+          "claim_limit",
+          "status",
+          "evidence_class",
+          "reference_ids"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^MICLED-[A-Z0-9-]+$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "domain": {
+            "enum": [
+              "yield_arithmetic",
+              "defect_spatial_model",
+              "inspection",
+              "placement_alignment",
+              "electrical_integration",
+              "repair",
+              "thermal_optical",
+              "visual_utility",
+              "reliability",
+              "metrology",
+              "evidence",
+              "configuration",
+              "economics",
+              "optimization",
+              "provenance"
+            ]
+          },
+          "inputs": {
+            "type": "object",
+            "minProperties": 1
+          },
+          "expected_behavior": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metrics": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "negative_controls": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "claim_limit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "const": "UNQUALIFIED"
+          },
+          "evidence_class": {
+            "const": "SYNTHETIC_MODEL"
+          },
+          "reference_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "microled-cmos-2026",
+                "microled-yield-2026",
+                "semi-inspection",
+                "phot-engineering",
+                "mycelix-evidence"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
