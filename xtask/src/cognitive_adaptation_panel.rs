@@ -127,6 +127,7 @@ pub fn evaluate(mut input: AdaptationPanelInput) -> anyhow::Result<AdaptationPan
     let expected_scenarios: BTreeSet<&str> = input.expected_scenario_ids.iter().map(String::as_str).collect();
     let mut observed_keys = BTreeSet::new();
     let mut arm_registry: BTreeMap<String, ArmRegistry> = BTreeMap::new();
+    let mut observed_stream_ids = BTreeSet::new();
     let mut task_loss_metric_id: Option<String> = None;
     let mut task_loss_unit: Option<String> = None;
 
@@ -149,6 +150,10 @@ pub fn evaluate(mut input: AdaptationPanelInput) -> anyhow::Result<AdaptationPan
             "runs[{index}] scenario_id is not in the registered scenario grid"
         );
         ensure!(!score.stream_id.trim().is_empty(), "runs[{index}] stream_id must not be empty");
+        ensure!(
+            observed_stream_ids.insert(score.stream_id.as_str()),
+            "stream_id is reused across panel cells; every dataset × seed × scenario needs its own pinned stream identity"
+        );
         ensure!(!score.task_loss_metric_id.trim().is_empty(), "runs[{index}] task_loss_metric_id must not be empty");
         ensure!(!score.task_loss_unit.trim().is_empty(), "runs[{index}] task_loss_unit must not be empty");
         validate_digest(&score.shared_stream_sha256, "shared_stream_sha256")?;
@@ -604,6 +609,19 @@ mod tests {
         record.result_sha256 = Some(sha256_hex(&serde_json::to_vec(&copy).unwrap()));
         input.runs.push(record);
         assert!(evaluate(input).unwrap_err().to_string().contains("primary effect field"));
+    }
+
+    #[test]
+    fn rejects_stream_identity_reuse_across_distinct_panel_cells() {
+        let mut input = empty_panel();
+        let first = score("dataset-a", 0, REQUIRED_SCENARIO_IDS[0]);
+        let mut second = score("dataset-a", 1, REQUIRED_SCENARIO_IDS[0]);
+        second.stream_id = first.stream_id.clone();
+        let mut copy = second.clone();
+        copy.result_sha256 = None;
+        second.result_sha256 = Some(sha256_hex(&serde_json::to_vec(&copy).unwrap()));
+        input.runs = vec![first, second];
+        assert!(evaluate(input).unwrap_err().to_string().contains("stream_id is reused"));
     }
 
     #[test]
