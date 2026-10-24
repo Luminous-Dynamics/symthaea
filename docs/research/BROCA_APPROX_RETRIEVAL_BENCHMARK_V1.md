@@ -15,7 +15,7 @@ Use a release build and pin the exact 40-hex source commit. Example:
 ```sh
 cargo run -p symthaea-hdc-store --example ann_benchmark --release -- \
   --source-sha="$(git rev-parse HEAD)" \
-  --size=10000 --clusters=64 --cluster-noise-bits=1024 --lsh-configs=32x8,16x16,64x4 --queries=200 --rounds=5 --top-k=10 --seed=42
+  --size=10000 --clusters=64 --cluster-noise-bits=1024 --noise-bits=128 --hard-noise-bits=4096 --lsh-configs=32x8,16x16,64x4 --queries=200 --rounds=5 --top-k=10 --seed=42
 ```
 
 Run at multiple store sizes, using the same machine and compiler build:
@@ -33,7 +33,7 @@ The LSH parameters are explicit and recorded in the output. By default, each run
 
 To test the approximate path with its candidate-count and empty-result fallbacks disabled, run a separate matrix with `--candidate-multiplier=0 --fallback-on-empty=false`. Keep the default-fallback matrix as well: disabling fallback may improve latency while degrading recall, so neither matrix is sufficient by itself.
 
-The example includes eleven authored source-level tests for deterministic workload replay, exact corruption count, clustered-neighborhood separation, Recall@K semantics including ties, LSH sweep parsing, and deterministic/group-aware bootstrap behavior. Rust tests have not yet run in this authoring environment. Run them with:
+The example includes eleven authored source-level tests for deterministic workload replay and stratum composition, exact corruption count, clustered-neighborhood separation, Recall@K semantics including ties, LSH sweep parsing, and deterministic/group-aware bootstrap behavior. Rust tests have not yet run in this authoring environment. Run them with:
 
 ```sh
 cargo test -p symthaea-hdc-store --example ann_benchmark
@@ -44,18 +44,18 @@ The CLI requires a full 40-hex source SHA that exactly matches `git rev-parse HE
 ## Workload contract
 
 - The store contains deterministic, seeded 16,384-bit BinaryHV vectors inserted through the real HdcStore API. Each vector is a deterministic prototype for one of `--clusters=64` clusters, corrupted with `--cluster-noise-bits=1024` flips by default. This creates controlled, non-identical neighbors within a cluster and separated prototypes across clusters.
-- Eighty percent of query cases are known-memory probes: a stored vector is corrupted with `--noise-bits=128` additional flips. Twenty percent are random out-of-distribution (OOD) probes.
+- The default 200-query workload has three explicit strata: 60% low-noise known-memory probes (`--noise-bits=128`), 20% hard-neighbor probes (`--hard-noise-bits=4096`), and 20% random out-of-distribution (OOD) probes. Each known-memory query starts from a stored anchor, so the hard stratum preserves a real nearest-neighbor target while substantially increasing its Hamming perturbation; it probes whether LSH can miss the true neighbor even when that neighbor is present.
 - The exact full scan defines reference top-K IDs. **Exact-ID Recall@K** is intersection size divided by the number of exact top-K results (which is `min(K, live_count)`). The harness also reports **tie-aware Recall@K**, which treats an approximate neighbor as equivalent when its similarity is at least the exact Kth-neighbor similarity. This controls for interchangeable Hamming-score ties at the top-K boundary. Exact-ID recall remains the conventional strict metric; tie-aware recall is a complement, not a replacement.
 - For the synthetic OOD class, exact top-K is still a mathematical retrieval reference but does not imply there is a semantically relevant answer; do not use its Recall@K as the primary quality gate.
 - The LSH path reports vectors examined, total live vectors, exhaustive status and exact-fallback status.
 - Exact and approximate retrieval calls alternate order per query/round. Query creation, store construction, ID comparison and CSV output are outside the timed retrieval intervals.
-- The report separately emits quality and latency summaries for `near_neighbor` and `novel` queries for each LSH configuration. Quality uses unique queries from round zero; latency percentiles use all repeated samples. Each query's median exact/approximate speedup across rounds is computed first. The speedup interval then uses a deterministic 2,000-resample **group bootstrap**: known-memory probes are grouped by the source cluster that generated their anchor, while each random novel/OOD probe is a singleton group. Every query within a selected group travels together during resampling. The raw CSV includes `group_id`, and the report records the resampling unit and group count. Repeated timing rounds remain timing repetitions, not independent query samples. This corrects a dependence issue in the earlier query-level bootstrap; it is still synthetic-query uncertainty, not hardware/run-to-run uncertainty.
+- The report separately emits quality and latency summaries for `near_neighbor`, `hard_neighbor`, and `novel` queries for each LSH configuration. Quality uses unique queries from round zero; latency percentiles use all repeated samples. Each query's median exact/approximate speedup across rounds is computed first. The speedup interval then uses a deterministic 2,000-resample **group bootstrap**: known-memory probes are grouped by the source cluster that generated their anchor, while each random novel/OOD probe is a singleton group. Every query within a selected group travels together during resampling. The raw CSV includes `group_id`, and the report records the resampling unit and group count. Repeated timing rounds remain timing repetitions, not independent query samples. This corrects a dependence issue in the earlier query-level bootstrap; it is still synthetic-query uncertainty, not hardware/run-to-run uncertainty.
 
 This controlled clustered workload is still not a realistic semantic-memory corpus. It does not reproduce organic topic structure, duplicate/contradictory facts, temporal updates, deletion semantics, user/session isolation or long-running agent behavior. Passing these gates is a retrieval-substrate signal only, not evidence that downstream memory tasks improve.
 
 ## Initial acceptance targets (proposed, not achieved)
 
-For a store size of 10,000 or more and at least 100 unique queries, the approximate path should meet **all** of the following for the `near_neighbor` query class. The OOD class is reported separately; it must not be pooled into the acceptance gate because arbitrary random vectors do not define a meaningful answerability target. These are proposed engineering targets, not published SOTA thresholds:
+For a store size of 10,000 or more and at least 100 unique queries, the approximate path should meet **all** of the following initial gates on the `near_neighbor` class. Report `hard_neighbor` as a separate adversarial stratum with the same per-class metrics, plus an explicit hard-query unsafe-acceptance risk analysis before a router is allowed to accept it; do not use the aggregate easy-query score to mask hard-query failures. The `novel` OOD class is reported separately because arbitrary random vectors do not define a meaningful answerability target. These are proposed engineering targets, not published SOTA thresholds:
 
 | Measure | Initial target |
 |---|---:|
@@ -68,7 +68,7 @@ For a store size of 10,000 or more and at least 100 unique queries, the approxim
 | p95 retrieval latency relative to exact | ≥ 2× faster (exact p95 / approximate p95 ≥ 2) |
 | Median per-query speedup, lower bootstrap 95% bound | > 1× (evidence against a no-speedup result) |
 
-Report every raw query and both classes, not only aggregate averages. A failure is useful evidence; do not loosen thresholds or omit failed query classes after seeing the result. Add a separate, labeled abstention/no-relevant-evidence evaluation before making claims about OOD behavior.
+Report every raw query and all three classes, not only aggregate averages. A failure is useful evidence; do not loosen thresholds or omit failed query classes after seeing the result. Add a separate, labeled abstention/no-relevant-evidence evaluation before making claims about OOD behavior.
 
 ## Industry comparison: keep two evaluation layers separate
 
