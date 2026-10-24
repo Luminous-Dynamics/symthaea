@@ -506,6 +506,7 @@ mod tests {
     }
 
     #[test]
+    #[test]
     fn lexical_overlap_can_be_false_positive_but_stays_unreviewed() {
         let tag = Regex::new(r"<[^>]*>").unwrap();
         let entity = Regex::new(r"&[A-Za-z]+;").unwrap();
