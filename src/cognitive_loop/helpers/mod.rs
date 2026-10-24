@@ -344,6 +344,7 @@ impl CognitiveLoopService {
         let prediction_evidence = Self::compute_prediction_error_evidence(
             &compressed_state,
             self.last_prediction.as_deref(),
+            self.last_prediction_cycle,
             observation_cycle,
         );
         let prediction_error_sample =
