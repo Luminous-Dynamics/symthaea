@@ -663,6 +663,7 @@ struct ParsedExecution {
     model_version: Option<String>,
     config_sha256: Option<String>,
     budget_caps: Option<Usage>,
+    semantic_gate_status: Option<String>,
     applicability_judgment: Option<String>,
     decision: Option<String>,
     original_move_applied: Option<bool>,
