@@ -45,6 +45,15 @@ for value in "$QUERIES" "$ROUNDS" "$TOP_K" "$CLUSTERS" "$CLUSTER_NOISE_BITS" "$N
   fi
 done
 
+if (( QUERIES == 0 || ROUNDS == 0 || TOP_K == 0 || CLUSTERS == 0 )); then
+  echo "QUERIES, ROUNDS, TOP_K and CLUSTERS must be positive" >&2
+  exit 2
+fi
+if [[ ! "$SEED" =~ ^[0-9]+$ ]]; then
+  echo "SEED must be a non-negative integer" >&2
+  exit 2
+fi
+
 for SIZE in "${SIZES_ARRAY[@]}"; do
   if [[ ! "$SIZE" =~ ^[1-9][0-9]*$ ]]; then
     echo "each SIZES entry must be a positive integer; got '$SIZE'" >&2
@@ -56,16 +65,12 @@ for SIZE in "${SIZES_ARRAY[@]}"; do
   fi
 done
 
-# Build once; each run still pins and verifies the exact HEAD SHA.
+# Build once; cargo run below respects Cargo/Nix target-directory settings.
 cargo build --release -p symthaea-hdc-store --example ann_benchmark
-BIN="$ROOT/target/release/examples/ann_benchmark"
-if [[ ! -x "$BIN" ]]; then
-  echo "expected benchmark binary was not produced: $BIN" >&2
-  exit 3
-fi
 
 write_environment_receipt() {
   local path="$1"
+  shift
   {
     echo "source_sha=$SOURCE_SHA"
     echo "git_branch=$(git branch --show-current)"
@@ -102,9 +107,9 @@ for SIZE in "${SIZES_ARRAY[@]}"; do
       "--lsh-configs=$LSH_CONFIGS"
     )
     printf 'Running n=%s fallback_on_empty=%s source=%s\n' "$SIZE" "$FALLBACK" "$SOURCE_SHA"
-    write_environment_receipt "$RECEIPT" "$BIN" "${ARGS[@]}"
+    write_environment_receipt "$RECEIPT" cargo run --release -p symthaea-hdc-store --example ann_benchmark -- "${ARGS[@]}"
     set +e
-    "$BIN" "${ARGS[@]}" > "$OUTPUT"
+    cargo run --release -p symthaea-hdc-store --example ann_benchmark -- "${ARGS[@]}" > "$OUTPUT"
     STATUS=$?
     set -e
     {
