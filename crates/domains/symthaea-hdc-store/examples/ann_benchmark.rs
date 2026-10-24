@@ -8,7 +8,7 @@
 //! cargo run -p symthaea-hdc-store --example ann_benchmark --release -- \
 //!   --source-sha=<40-hex-commit> --size=10000 --queries=200 --rounds=5 --top-k=10
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::error::Error;
 use std::io;
@@ -63,12 +63,16 @@ impl LshConfig {
 struct Query {
     vector: BinaryHV,
     kind: &'static str,
+    /// Statistical resampling block: one source cluster per known-memory lineage;
+    /// novel/OOD probes get their own block.
+    group_id: u64,
 }
 
 struct Sample {
     query_index: usize,
     round: usize,
     kind: &'static str,
+    group_id: u64,
     lsh_bands: u32,
     lsh_rows: u32,
     exact_ns: u128,
@@ -186,6 +190,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     query_index,
                     round,
                     kind: query.kind,
+                    group_id: query.group_id,
                     lsh_bands: lsh_config.bands,
                     lsh_rows: lsh_config.rows,
                     exact_ns,
@@ -416,6 +421,8 @@ fn build_queries(config: &Config, store: &HdcStore) -> Vec<Query> {
             queries.push(Query {
                 vector: BinaryHV::random(mix64(novel_input)),
                 kind: "novel",
+                // Keep the OOD group ID disjoint from all source-cluster IDs.
+                group_id: config.clusters as u64 + query_index as u64,
             });
         } else {
             let anchor = query_index
@@ -430,6 +437,8 @@ fn build_queries(config: &Config, store: &HdcStore) -> Vec<Query> {
             queries.push(Query {
                 vector,
                 kind: "near_neighbor",
+                // Probes from a shared source cluster are not assumed independent.
+                group_id: (anchor % config.clusters) as u64,
             });
         }
     }
@@ -565,6 +574,8 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
         .unwrap_or(1);
     println!("# available_parallelism={available_parallelism}");
     println!("# quality metrics are computed from unique queries (round 0); latencies pool repeated rounds");
+    println!("# bootstrap_unit=source_cluster_for_near_neighbor; singleton_query_for_novel");
+    println!("# bootstrap_resampling=sample query medians by group with replacement, retaining all queries in each sampled group");
     println!(
         "query_index,round,kind,lsh_bands,lsh_rows,exact_ns,approximate_ns,recall_at_k,tie_aware_recall_at_k,examined,total_live,candidate_fraction,approximate_exact,fell_back_to_exact,exact_ids,approximate_ids"
     );
@@ -656,17 +667,25 @@ fn emit_report(config: &Config, samples: &[Sample], quality: &[Quality]) {
         for kind in ["near_neighbor", "novel"] {
             emit_quality_summary(kind, arm, quality);
             emit_latency_summary(kind, arm, samples);
-            let speedups = paired_query_speedups(kind, arm, samples);
-            let (lower, upper) = bootstrap_median_ci(
-                &speedups,
-                config.seed ^ (u64::from(arm.bands) << 32) ^ u64::from(arm.rows) ^ kind_seed(kind),
-            );
+            let grouped_speedups = paired_query_speedups(kind, arm, samples);
+            let speedups: Vec<f64> =
+                grouped_speedups.iter().map(|(_, speedup)| *speedup).collect();
+            let seed = config.seed
+                ^ (u64::from(arm.bands) << 32)
+                ^ u64::from(arm.rows)
+                ^ kind_seed(kind);
+            let (lower, upper) = bootstrap_grouped_median_ci(&grouped_speedups, seed);
             println!(
                 "# arm_{label}_{kind}_median_per_query_speedup={:.6}",
                 median_f64(&speedups)
             );
-            println!("# arm_{label}_{kind}_median_speedup_bootstrap_95ci_low={lower:.6}");
-            println!("# arm_{label}_{kind}_median_speedup_bootstrap_95ci_high={upper:.6}");
+            println!("# arm_{label}_{kind}_median_speedup_group_bootstrap_95ci_low={lower:.6}");
+            println!("# arm_{label}_{kind}_median_speedup_group_bootstrap_95ci_high={upper:.6}");
+            println!("# arm_{label}_{kind}_bootstrap_query_count={}", speedups.len());
+            println!(
+                "# arm_{label}_{kind}_bootstrap_group_count={}",
+                grouped_speedups.iter().map(|(group, _)| *group).collect::<HashSet<_>>().len()
+            );
             println!(
                 "# arm_{label}_{kind}_bootstrap_resamples={}",
                 if speedups.len() < 2 { 0 } else { BOOTSTRAP_RESAMPLES }
@@ -775,7 +794,7 @@ fn emit_latency_summary(kind: &str, arm: LshConfig, samples: &[Sample]) {
     );
 }
 
-fn paired_query_speedups(kind: &str, arm: LshConfig, samples: &[Sample]) -> Vec<f64> {
+fn paired_query_speedups(kind: &str, arm: LshConfig, samples: &[Sample]) -> Vec<(u64, f64)> {
     let mut speedups = Vec::new();
     for first_sample in samples.iter().filter(|sample| {
         sample.round == 0
@@ -797,7 +816,7 @@ fn paired_query_speedups(kind: &str, arm: LshConfig, samples: &[Sample]) -> Vec<
             })
             .collect();
         if !ratios.is_empty() {
-            speedups.push(median_f64(&ratios));
+            speedups.push((first_sample.group_id, median_f64(&ratios)));
         }
     }
     speedups
@@ -827,19 +846,27 @@ fn percentile_f64_sorted(sorted: &[f64], quantile: f64) -> f64 {
     sorted[rank - 1]
 }
 
-fn bootstrap_median_ci(values: &[f64], seed: u64) -> (f64, f64) {
-    if values.len() < 2 {
-        let point = median_f64(values);
+fn bootstrap_grouped_median_ci(values: &[(u64, f64)], seed: u64) -> (f64, f64) {
+    let mut groups = BTreeMap::<u64, Vec<f64>>::new();
+    for &(group_id, value) in values {
+        groups.entry(group_id).or_default().push(value);
+    }
+    if groups.len() < 2 {
+        let point = median_f64(&values.iter().map(|(_, value)| *value).collect::<Vec<_>>());
         return (point, point);
     }
+
+    // Cluster bootstrap: resample independent groups, not individual queries.
+    // All per-query observations in a selected group travel together.
+    let blocks: Vec<&[f64]> = groups.values().map(Vec::as_slice).collect();
     let mut estimates = Vec::with_capacity(BOOTSTRAP_RESAMPLES);
     for resample in 0..BOOTSTRAP_RESAMPLES {
         let mut sample = Vec::with_capacity(values.len());
         let mut state = mix64(seed ^ (resample as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
-        for _ in 0..values.len() {
+        for _ in 0..blocks.len() {
             state = mix64(state.wrapping_add(0xD1B5_4A32_D192_ED03));
-            let index = (state % values.len() as u64) as usize;
-            sample.push(values[index]);
+            let index = (state % blocks.len() as u64) as usize;
+            sample.extend_from_slice(blocks[index]);
         }
         estimates.push(median_f64(&sample));
     }
