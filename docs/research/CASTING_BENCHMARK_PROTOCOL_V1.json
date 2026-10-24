@@ -55,7 +55,13 @@
         1.1,
         1.1
       ],
-      "reference_point_policy": "Fixed per suite instance and shared by all algorithms; minimize both objectives. Never choose reference points per run or algorithm."
+      "reference_point_policy": "Fixed per suite instance and shared by all algorithms; minimize both objectives. Never choose reference points per run or algorithm.",
+      "fixed_ideal_point": [
+        0,
+        0
+      ],
+      "normalization_area": 1.2100000000000002,
+      "objective_direction": "minimize_all"
     },
     {
       "id": "coco_bbob_biobj",
@@ -139,7 +145,7 @@
     "id": "suite_native_anytime_performance",
     "direction": "maximize",
     "definitions": {
-      "zdt_standard": "Primary for the fixed-reference 2D ZDT track is normalized stepwise hypervolume AUC recomputed by the independent trace scorer. After each objective call, record the exact feasible-archive hypervolume; carry the last hypervolume through any unused part of the planned evaluation budget after an allowed predeclared early stop; divide the sum by planned_budget times the fixed ideal-to-reference rectangle area. Use frozen ideal/reference points shared by all algorithms.",
+      "zdt_standard": "Primary for the fixed-reference 2D ZDT track is normalized stepwise hypervolume AUC independently recomputed from the immutable JSONL evaluation trace. After each objective call, record exact feasible-archive hypervolume; carry the last observed hypervolume through any unused part of the planned budget after a predeclared early stop; divide the sum by planned_budget times the fixed ideal-to-reference rectangle area. Use ideal [0,0] and reference [1.1,1.1] for the stated ZDT suite; the normalization area is 1.21. Values are supplementary and must not be conflated with COCO's native metric.",
       "coco_bbob_biobj": "Use COCO's official target-reaching/runtime and ECDF methodology, prescribed normalized objective-space conventions, and official target sets as the primary result. The custom hypervolume AUC is supplementary only and must never replace or be presented as the official COCO metric.",
       "casting_simulator": "Report best quality achieved at fixed declared fidelity-aware cost budgets, with a separately reported per-run trace-derived quality curve. Freeze all objective units, constraints, reference points, fidelity costs, and analysis before unsealing final seeds."
     },
@@ -284,6 +290,9 @@
       "feasible_fraction",
       "invalid_or_failed_fraction"
     ],
-    "numeric_tolerance_absolute": 1e-9
+    "numeric_tolerance_absolute": 1e-9,
+    "scorer_file": "tools/casting-benchmark/score_trace.py",
+    "trace_schema_file": "docs/research/CASTING_BENCHMARK_TRACE.schema.json",
+    "receipt_schema_file": "docs/research/CASTING_BENCHMARK_RECEIPT.schema.json"
   }
 }
