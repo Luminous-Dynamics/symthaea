@@ -205,8 +205,9 @@ fn scope_relation(event_scope: &ConsentEvidenceScope, requested: &ConsentScope) 
 /// - Known mismatch on any scope dimension excludes the event.
 /// - Potentially relevant events with incomplete scope force Unknown rather than
 ///   being guessed into or out of the requested scope.
-/// - Any non-asserted event that could concern the requested scope forces
-///   Unknown; it is retained as a potential conflict, not turned into a grant.
+/// - Interrogative (`Asked`) events are ignored because questions do not assert
+///   transitions. Quoted, reported, conditional, and hypothetical events that
+///   could concern the requested scope force Unknown rather than updating state.
 /// - Every applicable asserted event needs explicit temporal ordering. Duplicate
 ///   order tokens are ambiguous. The event with the largest unique order token
 ///   is returned, independent of slice order.
