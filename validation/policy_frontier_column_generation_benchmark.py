@@ -140,6 +140,7 @@ def verify_pricing_result(result, objective, learner, candidate_prior_names, hor
     result["scalarized_risk_bits"] = scalar_rescored
     return result
 
+
 def solve_column_generation(objective, learner_prior_name, candidate_prior_names, horizon,
                             max_iterations=100, tolerance=1e-8):
     if learner_prior_name not in PRIOR_NAMES:
@@ -199,6 +200,8 @@ def solve_column_generation(objective, learner_prior_name, candidate_prior_names
             converged = True
             break
         if not is_new:
+            # Duplicate optimal columns plus a positive gap indicates either a
+            # numeric/dual-oracle defect or an invalid stopping tolerance.
             if certified_gap > tolerance:
                 raise RuntimeError("pricing returned an existing tree despite a nonzero certificate gap")
             converged = True
@@ -211,6 +214,8 @@ def solve_column_generation(objective, learner_prior_name, candidate_prior_names
     final_dual = final_master["scenario_dual_weights"]
     if converged and last_pricing_result is not None and last_pricing_dual is not None and \
             max(abs(a-b) for a, b in zip(final_dual, last_pricing_dual)) <= 1e-7:
+        # The last pricing call already used this unchanged master dual and was
+        # independently re-scored. Reuse it rather than repeat the same DP.
         final_pricing = last_pricing_result
     else:
         final_pricing = pricing(learner, horizon, final_dual)
@@ -223,6 +228,7 @@ def solve_column_generation(objective, learner_prior_name, candidate_prior_names
     if converged and gap > tolerance * 2:
         raise AssertionError(f"convergence claim contradicts final certificate gap {gap}")
 
+    # Every master column was independently re-scored before insertion.
     mixture_risks = final_risks.T @ np.asarray(final_master["weights"], dtype=float)
     if abs(float(max(mixture_risks)) - primal_upper) > 1e-7:
         raise AssertionError("final mixture objective differs from independently re-scored trees")
@@ -252,6 +258,7 @@ def run_benchmark(candidate_prior_names=PRIOR_NAMES, learner_prior_names=PRIOR_N
                   objectives=OBJECTIVES, horizons=(1, 2), max_iterations=100, tolerance=1e-8):
     rows = []
     for objective in objectives:
+        # Cold exact-frontier oracle is used only to validate the column-generation solver.
         _, exact_frontier, _, exact_stats = make_frontier_solver(objective, candidate_prior_names)
         for learner_name in learner_prior_names:
             learner = tuple(build_prior(learner_name))
@@ -271,7 +278,8 @@ def run_benchmark(candidate_prior_names=PRIOR_NAMES, learner_prior_names=PRIOR_N
                     "candidate_prior_names": list(candidate_prior_names), "horizon": horizon,
                     "column_generation": cg,
                     "exact_frontier_oracle": {
-                        "frontier_size": len(exact_options), "frontier_peak": exact_stats["max"],
+                        "frontier_size": len(exact_options),
+                        "frontier_peak": exact_stats["max"],
                         "frontier_states": exact_stats["states"],
                         "minimax_mixture_worst_case_bits": exact_mix["worst_case_bits"],
                         "minimax_mixture_primal_dual_gap_bits": exact_mix["primal_dual_gap_bits"],
@@ -285,23 +293,28 @@ def run_benchmark(candidate_prior_names=PRIOR_NAMES, learner_prior_names=PRIOR_N
                     raise AssertionError(f"column generation disagrees with exact frontier by {exact_gap} bits")
                 rows.append(row)
     return {
-        "schema": SCHEMA, "status": "FINITE_MODEL_COLUMN_GENERATION_WITH_EXACT_FRONTIER_ORACLE",
+        "schema": SCHEMA,
+        "status": "FINITE_MODEL_COLUMN_GENERATION_WITH_EXACT_FRONTIER_ORACLE",
         "source_base_blobs": BASE_SOURCE_BLOBS,
         "protocol": {
-            "candidate_true_prior_identity_fixed_per_episode": True, "true_prior_identity_hidden_from_policy": True,
+            "candidate_true_prior_identity_fixed_per_episode": True,
+            "true_prior_identity_hidden_from_policy": True,
             "score": "expected terminal categorical cross-entropy (bits)",
             "algorithm": "restricted master minimax LP + exact scalarized dynamic-programming pricing oracle + primal/dual stopping gap",
             "oracle_role": "exhaustive Pareto-frontier solver is used only for independent finite-model validation and frontier-size comparison",
             "limitations": ["16 joint hypotheses; chain/fork graphs only", "six finite, uncalibrated candidate priors", "exact target-subset telemetry", "no intervention costs, measurement noise, missing telemetry, or task disturbance", "no external benchmark executed", "runtime is environment-specific research measurement"],
-        }, "rows": rows,
+        },
+        "rows": rows,
     }
 
 
 def self_test():
+    # An explicit two-scenario game where the minimax optimum mixes policies.
     from randomized_minimax_policy_mix_benchmark import solve_minimax_mixture as lp
     r = lp([[0, 1], [1, 0]])
     assert abs(r["worst_case_bits"] - 0.5) < 1e-8
-    result = run_benchmark(("uniform", "high_spill_biased"), ("uniform", "chain_biased"), ("joint",), (1, 2))
+    result = run_benchmark(("uniform", "high_spill_biased"),
+                           ("uniform", "chain_biased"), ("joint",), (1, 2))
     assert len(result["rows"]) == 4
     for row in result["rows"]:
         cg = row["column_generation"]
@@ -333,11 +346,12 @@ def main():
         raw = (json.dumps(result, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n").encode()
         digest = hashlib.sha256(raw).hexdigest()
         if args.output:
-            args.output.parent.mkdir(parents=True, exist_ok=True); args.output.write_bytes(raw)
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_bytes(raw)
             print(f"wrote {args.output} bytes={len(raw)} sha256={digest}")
         else: print(raw.decode(), end="")
         return 0
-    except (ValueError, RuntimeError, AssertionError, OSError, RecursionError) as exc:
+    except (ValueError, AssertionError, OSError, RuntimeError, RecursionError) as exc:
         print(f"NOT QUALIFIED: {exc}"); return 2
 
 if __name__ == "__main__": raise SystemExit(main())
