@@ -637,9 +637,11 @@
       "family": "sequential-mean-change-test",
       "labels_required": false,
       "input_contract": "Univariate numeric stream; use the same valid observations as the candidate and calibrate threshold away from scored seeds.",
-      "implementation_status": "planned-baseline",
+      "implementation_status": "implemented-rust-reference-baseline",
       "source": "https://doi.org/10.1007/s41060-024-00620-y",
-      "comparison_track": "valid-pe-only"
+      "comparison_track": "valid-pe-only",
+      "implementation_path": "xtask/src/cognitive_drift_baselines.rs",
+      "implementation_scope": "One-sided upward-shift Page-Hinkley control on valid PE; explicit calibration initialization and latch/rearm policy. Not a full external benchmark reproduction."
     },
     {
       "id": "adwin",
@@ -852,7 +854,7 @@
       "source": "https://doi.org/10.1145/3770855.3819070"
     }
   ],
-  "drift_detector_comparison_protocol": "Pin versions; tune on a disjoint calibration stream; never remap invalid/missing PE; report false alarms and detection-delay. Fixed-threshold and EWMA now have executable Rust reference baselines on the valid-PE-only track; external specialist comparators and pinned public datasets are not yet implemented or measured.",
+  "drift_detector_comparison_protocol": "Pin versions; tune on a disjoint calibration stream; never remap invalid/missing PE; report false alarms and detection-delay. Fixed-threshold, EWMA, and a one-sided Page-Hinkley reference control now have executable Rust implementations on the valid-PE-only track. External specialist comparators and pinned public datasets are not yet implemented or measured.",
   "drift_protocol": {
     "protocol_id": "leave-one-dataset-out-monte-carlo-v1",
     "monte_carlo_seeds": 50,
