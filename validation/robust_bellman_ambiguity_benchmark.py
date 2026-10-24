@@ -30,7 +30,7 @@ from robust_ambiguity_policy_benchmark import robust_action, update_scenarios
 SCHEMA = "symthaea-robust-bellman-ambiguity-benchmark-v1"
 BASE_SOURCE_BLOBS = {
     "objective_matched_oracle_benchmark.py": "f101346c2f37cfad4e029ae280e9a002548f309c",
-    "prior_misspecification_benchmark.py": "541c31521e1b9e49dfb84c0fa265b5f93b4acc1dc",
+    "prior_misspecification_benchmark.py": "541c31521e1b9e49dfb84c0fa265e877ca9ea632",
     "robust_ambiguity_policy_benchmark.py": "c511c9651de071458734e014137484d982c717dc",
 }
 POLICIES = ("robust_bellman_rectangular", "robust_minimax_one_step", "greedy_joint",
