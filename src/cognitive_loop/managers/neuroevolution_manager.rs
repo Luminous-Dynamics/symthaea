@@ -161,7 +161,7 @@ impl NeuroevolutionManager {
         self.accumulated_psi.push(snapshot.unified_psi);
         if let Some(prediction_error) = self
             .prediction_error_cursor
-            .admit(snapshot.cycle_number, snapshot.prediction_error_sample())
+            .admit_evidence(&snapshot.prediction_error_evidence(), snapshot.cycle_number)
         {
             self.accumulated_prediction_error.push(prediction_error);
         }
