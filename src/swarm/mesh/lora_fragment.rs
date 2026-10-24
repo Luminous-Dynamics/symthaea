@@ -326,6 +326,9 @@ pub struct FragmentAssembler {
     total_fragments: u8,
     data_count: u8,
     expected_payload_size: usize,
+    /// False when the untrusted fragment count cannot represent this payload.
+    /// Invalid metadata never allocates attacker-selected assembler vectors.
+    valid: bool,
     received: Vec<bool>,
     fragments: Vec<Option<[u8; PAYLOAD_SIZE]>>,
     payload_lens: Vec<u8>,
@@ -339,29 +342,50 @@ impl FragmentAssembler {
     /// - `total_fragments`: data_count + 1 (from any received fragment header)
     /// - `expected_payload_size`: total original payload size (e.g., 2048 for BinaryHV)
     pub fn new(thought_id: u16, total_fragments: u8, expected_payload_size: usize) -> Self {
-        let data_count = total_fragments.saturating_sub(1);
+        let declared_data_count = total_fragments.saturating_sub(1) as usize;
+        let max_data_count = expected_payload_size
+            .saturating_add(PAYLOAD_SIZE - 1)
+            / PAYLOAD_SIZE;
+        // A stream has at least one data fragment plus the FEC slot. For a
+        // known maximum payload size, any larger declared count is malformed.
+        // Bound vector allocation before using attacker-controlled metadata.
+        let valid = expected_payload_size > 0
+            && total_fragments >= 2
+            && declared_data_count <= max_data_count;
+        let data_count = if valid { declared_data_count as u8 } else { 0 };
+        let receive_slots = if valid { total_fragments as usize } else { 0 };
+        let data_slots = if valid { declared_data_count } else { 0 };
         Self {
             thought_id,
             total_fragments,
             data_count,
             expected_payload_size,
-            received: vec![false; total_fragments as usize],
-            fragments: vec![None; data_count as usize],
-            payload_lens: vec![0; data_count as usize],
+            valid,
+            received: vec![false; receive_slots],
+            fragments: vec![None; data_slots],
+            payload_lens: vec![0; data_slots],
             fec: None,
         }
     }
 
     /// Feed a received fragment. Returns `true` when the payload is reconstructable.
     pub fn feed(&mut self, frag: &LoRaFragment) -> bool {
-        if frag.thought_id != self.thought_id {
+        if !self.valid || frag.thought_id != self.thought_id {
             return false;
         }
-        if frag.fragment_index >= self.total_fragments {
+        if frag.total_fragments != self.total_fragments
+            || frag.fragment_index >= self.total_fragments
+        {
             return false;
         }
 
         let idx = frag.fragment_index as usize;
+        // The last slot is reserved for the single XOR parity fragment. Without
+        // this check, an untrusted non-FEC frame at that index indexes past the
+        // data-fragment vector and can panic the receiver.
+        if frag.is_fec() != (idx == self.data_count as usize) {
+            return false;
+        }
 
         // Duplicate — ignore but report current status
         if self.received[idx] {
@@ -382,6 +406,9 @@ impl FragmentAssembler {
 
     /// Whether the payload can be fully reconstructed.
     pub fn is_complete(&self) -> bool {
+        if !self.valid {
+            return false;
+        }
         let data_received = self.received[..self.data_count as usize]
             .iter()
             .filter(|&&r| r)
@@ -430,7 +457,7 @@ impl FragmentAssembler {
 
     /// Reconstruct the original payload. Returns `None` if insufficient fragments.
     pub fn assemble(&self) -> Option<Vec<u8>> {
-        if !self.is_complete() {
+        if !self.valid || !self.is_complete() {
             return None;
         }
 
@@ -752,6 +779,46 @@ mod tests {
     fn truncated_buffer_rejected() {
         assert!(LoRaFragment::from_bytes(&[0; 4]).is_none());
         assert!(LoRaFragment::from_bytes(&[]).is_none());
+    }
+
+    // -- Malformed metadata is fail-closed --
+
+    #[test]
+    fn assembler_rejects_non_fec_frame_in_reserved_parity_slot() {
+        let payload = vec![0xA5; PAYLOAD_SIZE * 2];
+        let mut frags = fragment(9, &payload);
+        let last_index = frags.len() - 1;
+
+        // Forge a non-FEC data frame at the reserved parity index. The
+        // assembler must reject it rather than indexing past fragments[].
+        frags[last_index].flags &= !FLAG_FEC;
+        frags[last_index].checksum = frags[last_index].compute_checksum();
+
+        let mut assembler = FragmentAssembler::new(9, frags.len() as u8, payload.len());
+        assert!(!assembler.feed(&frags[last_index]));
+        assert_eq!(assembler.received_data_count(), 0);
+        assert!(assembler.assemble().is_none());
+    }
+
+    #[test]
+    fn assembler_rejects_fragment_count_inconsistent_with_payload_bound() {
+        let payload = vec![0x5A; PAYLOAD_SIZE * 10];
+        let mut assembler = FragmentAssembler::new(10, 12, payload.len());
+
+        let mut frags = fragment(10, &payload);
+        for frag in &mut frags {
+            frag.total_fragments = 12;
+            if frag.is_fec() {
+                frag.fragment_index = 11;
+            }
+            frag.checksum = frag.compute_checksum();
+        }
+
+        for frag in &frags {
+            assert!(!assembler.feed(frag));
+        }
+        assert!(!assembler.is_complete());
+        assert!(assembler.assemble().is_none());
     }
 
     // -- Wrong thought_id rejected --
