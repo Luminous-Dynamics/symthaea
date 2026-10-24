@@ -68,17 +68,21 @@ fn expected_loss_after_measurement(reliability: u16) -> Option<f64> {
     let total_weight = PRIOR_WEIGHTS.iter().sum::<u64>() as f64;
     let mut expected_loss = 0.0;
 
-    for outcome_index in 0..3 {
+    let likelihood_columns = [
+        [likelihoods[0][0], likelihoods[1][0], likelihoods[2][0]],
+        [likelihoods[0][1], likelihoods[1][1], likelihoods[2][1]],
+        [likelihoods[0][2], likelihoods[1][2], likelihoods[2][2]],
+    ];
+    for likelihood_column in likelihood_columns {
         let best_joint_loss = DECISION_LOSSES
             .iter()
             .map(|decision_losses| {
                 PRIOR_WEIGHTS
                     .iter()
-                    .enumerate()
-                    .map(|(hypothesis_index, weight)| {
-                        *weight as f64
-                            * f64::from(decision_losses[hypothesis_index])
-                            * f64::from(likelihoods[hypothesis_index][outcome_index])
+                    .zip(decision_losses.iter())
+                    .zip(likelihood_column.iter())
+                    .map(|((weight, loss), probability)| {
+                        *weight as f64 * f64::from(*loss) * f64::from(*probability)
                     })
                     .sum::<f64>()
             })
