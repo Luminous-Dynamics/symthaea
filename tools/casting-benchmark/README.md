@@ -241,3 +241,61 @@ This closes the gap between fidelity diagnostics and internal-policy evaluation,
 
 
 Important evidence boundary: this runner performs its analytic truth audit in-process after the policy returns. Its run JSON is **not yet** passed through the separate immutable-trace scorer, so the resulting policy comparisons remain diagnostic. Before publication-grade claims, emit a fixed-schema trace/receipt pair, lock the trace/scorer/manifest digests, and independently recompute the metrics. The three-seed default is for smoke/diagnostic comparisons; it is not enough for superiority claims.
+
+
+## Independent replay scoring for scenario-policy runs
+
+The runner's in-process metric calculations are convenient diagnostics, not a final evidence authority. `tools/casting-benchmark/score_scenario_policy_bakeoff.py` is a separate process that consumes a saved result JSON, rejects schema/trace inconsistencies, replays every logged low/medium/high observation against the scenario evaluator, reconciles all fidelity costs, checks promotion labels, and independently recomputes exact 2D hypervolume and per-cell/paired summaries from the raw run ledger.
+
+Example:
+
+```sh
+python3 tools/casting-benchmark/multifidelity_scenario_policy_bakeoff.py \
+  --scenarios smooth_stationary,local_bias_island \
+  --dimensions 2,5 \
+  --severities 0.5,1 \
+  --seeds 17,23,29 \
+  --cost-budget 200 --design-count 128 > /tmp/casting-scenario-results.json
+
+python3 tools/casting-benchmark/score_scenario_policy_bakeoff.py \
+  /tmp/casting-scenario-results.json \
+  --receipt /tmp/casting-scenario-receipt.json
+```
+
+The receipt records SHA-256 of the input result and of the exact local source/manifest bytes used during replay. These are provenance digests, not signatures and not pre-run preregistration. The scorer ignores input aggregate values and rebuilds summaries from the validated raw run ledger; missing/duplicated run keys, schema drift, changed fidelity values, budget/cost mismatch, false-promotion mismatch or hypervolume mismatch are rejected.
+
+A successful receipt is labelled `SYNTHETIC_TRACE_REPLAYED_NOT_SOTA_EVIDENCE`. This means the saved synthetic trace is consistent with the recorded scenario code and its metrics reconcile. It does not establish external SOTA, physical casting validity, or industrial benefit. Because replay currently uses the same frozen analytic scenario implementation as its truth oracle, source identities still need to be pinned before the run and independently reviewed before publication. The default three seeds remain diagnostic only; the optimizer comparison protocol calls for at least 20 paired seeds (target 30) and predeclared multiplicity handling.
+
+Targeted scorer tests:
+
+```sh
+python3 -m unittest discover -s tools/casting-benchmark -p 'test_score_scenario_policy_bakeoff.py' -v
+```
+
+
+### Independently replay the saved policy ledger
+
+The policy runner computes convenience metrics in-process. To verify them separately after the run, save the full JSON output and replay it:
+
+```sh
+python3 tools/casting-benchmark/multifidelity_scenario_policy_bakeoff.py \
+  --scenarios smooth_stationary,local_bias_island \
+  --dimensions 2,5 \
+  --severities 0.5,1 \
+  --seeds 17,23,29 \
+  --cost-budget 200 --design-count 128 > /tmp/casting-scenario-results.json
+
+python3 tools/casting-benchmark/score_scenario_policy_bakeoff.py \
+  /tmp/casting-scenario-results.json \
+  --receipt /tmp/casting-scenario-receipt.json
+```
+
+The separate scorer verifies the exact result/run/evaluation/promotion shapes, replays each fidelity observation against the scenario evaluator, reconciles counts and costs, checks predicted versus observed promotion margins, independently recomputes hypervolume, and rebuilds summaries and paired comparisons from scored runs. Any trace/metric/contract mismatch returns a non-zero exit code.
+
+The receipt hashes the input result and local source/manifest bytes used to replay it. Those hashes are post-run provenance, not a digital signature or pre-run lock. A valid receipt is labelled `SYNTHETIC_TRACE_REPLAYED_NOT_SOTA_EVIDENCE`; this proves internal consistency with the synthetic source, not industrial or physical validity. The scenario model is reused as the analytic oracle, so an independent model review and immutable pre-run source lock remain necessary for publication-grade claims.
+
+Targeted tests:
+
+```sh
+python3 -m unittest discover -s tools/casting-benchmark -p 'test_score_scenario_policy_bakeoff.py' -v
+```
