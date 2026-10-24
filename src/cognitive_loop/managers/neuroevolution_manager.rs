@@ -85,6 +85,8 @@ pub struct NeuroevolutionManager {
     /// Accumulated observations between manager runs.
     accumulated_psi: Vec<f64>,
     accumulated_prediction_error: Vec<f32>,
+    /// Highest cycle whose PE evidence was admitted (prevents duplicate/stale replay).
+    last_prediction_error_cycle: Option<u64>,
     accumulated_confidence: Vec<f64>,
     /// Latest champion topology suggestion.
     champion: ChampionSuggestion,
@@ -120,6 +122,7 @@ impl NeuroevolutionManager {
             initialized: false,
             accumulated_psi: Vec::new(),
             accumulated_prediction_error: Vec::new(),
+            last_prediction_error_cycle: None,
             accumulated_confidence: Vec::new(),
             champion: ChampionSuggestion::default(),
             pending_mutations: Vec::new(),
@@ -156,7 +159,13 @@ impl NeuroevolutionManager {
         // Accumulate observations every cycle
         self.accumulated_psi.push(snapshot.unified_psi);
         if let Some(prediction_error) = snapshot.prediction_error_sample() {
-            self.accumulated_prediction_error.push(prediction_error);
+            let is_new_cycle = self
+                .last_prediction_error_cycle
+                .map_or(true, |last_cycle| snapshot.cycle_number > last_cycle);
+            if is_new_cycle {
+                self.accumulated_prediction_error.push(prediction_error);
+                self.last_prediction_error_cycle = Some(snapshot.cycle_number);
+            }
         }
         self.accumulated_confidence
             .push(snapshot.prediction_confidence);
@@ -305,6 +314,37 @@ mod tests {
         let mgr = NeuroevolutionManager::new();
         assert_eq!(mgr.interval, NEUROEVOLUTION_MANAGER_INTERVAL);
         assert!(!mgr.initialized);
+    }
+
+    #[test]
+    fn duplicate_or_out_of_order_pe_cycle_is_not_admitted_twice() {
+        let mut manager = NeuroevolutionManager::new();
+        let mut snapshot = test_snapshot();
+        snapshot.cycle_number = 42;
+
+        manager.process(&snapshot);
+        assert_eq!(manager.accumulated_prediction_error, vec![0.3]);
+
+        manager.process(&snapshot);
+        assert_eq!(
+            manager.accumulated_prediction_error,
+            vec![0.3],
+            "reprocessing the same observation must not duplicate PE evidence"
+        );
+
+        snapshot.cycle_number = 41;
+        snapshot.prediction_error = 0.9;
+        manager.process(&snapshot);
+        assert_eq!(
+            manager.accumulated_prediction_error,
+            vec![0.3],
+            "out-of-order evidence must not enter the evolution fitness stream"
+        );
+
+        snapshot.cycle_number = 43;
+        snapshot.prediction_error = 0.6;
+        manager.process(&snapshot);
+        assert_eq!(manager.accumulated_prediction_error, vec![0.3, 0.6]);
     }
 
     #[test]
