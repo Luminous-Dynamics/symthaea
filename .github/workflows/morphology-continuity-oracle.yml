@@ -63,6 +63,9 @@ jobs:
       - name: Verify frozen class-conditional robustness request digest
         run: echo "ea56ce4d22ef2baf5e2eaad4469541a058e48d70a5829b4d85f58705537f1580  tools/morphology-continuity-oracle/class_conditional_robustness_request_v1_0.txt" | sha256sum --check -
 
+      - name: Verify frozen exact class-conditional coverage request digest
+        run: echo "902a08227de0eb386fc1d31080d1946dc2b24cede8dcb1be0682eecdfc633316  tools/morphology-continuity-oracle/class_conditional_robustness_request_v1_1.txt" | sha256sum --check -
+
       - name: Formatting
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
 
