@@ -1127,6 +1127,27 @@ mod prediction_evidence_replay_tests {
     }
 
     #[test]
+    fn preencoded_hv_cycle_reports_missing_prediction_provenance() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+        let hv = symthaea_core::hdc::ContinuousHV::from_vec(vec![0.1; 16_384]);
+
+        let result = service.cycle_with_hv(&hv);
+
+        assert!(!result.prediction_error_valid);
+        let evidence = result
+            .metadata
+            .prediction_evidence
+            .as_ref()
+            .expect("pre-encoded HV path must expose typed PE telemetry");
+        assert_eq!(
+            evidence.status,
+            crate::cognitive_loop::types::PredictionEvidenceStatus::NoPriorPrediction
+        );
+        assert_eq!(evidence.observation_cycle, service.stats.total_cycles as u64);
+    }
+
+    #[test]
     fn embedding_prediction_error_reports_specific_evidence_status() {
         use crate::cognitive_loop::types::PredictionEvidenceStatus as Status;
 
