@@ -26,9 +26,7 @@ fn bool_field(value: &Value, key: &str) -> Option<bool> {
 }
 
 fn nearly_equal(a: f64, b: f64) -> bool {
-    a.is_finite()
-        && b.is_finite()
-        && (a - b).abs() <= 1.0e-8_f64.max(a.abs().max(b.abs()) * 1.0e-8)
+    a.is_finite() && b.is_finite() && (a - b).abs() <= 1.0e-8_f64.max(a.abs().max(b.abs()) * 1.0e-8)
 }
 
 fn push_check(errors: &mut Vec<String>, condition: bool, message: impl Into<String>) {
@@ -38,7 +36,10 @@ fn push_check(errors: &mut Vec<String>, condition: bool, message: impl Into<Stri
 }
 
 fn read_f64(value: &Value, key: &str) -> Option<f64> {
-    value.get(key).and_then(Value::as_f64).filter(|v| v.is_finite())
+    value
+        .get(key)
+        .and_then(Value::as_f64)
+        .filter(|v| v.is_finite())
 }
 
 fn manifest_digest(manifest: &[Value]) -> Option<String> {
@@ -71,7 +72,13 @@ fn task_digest_from_manifest(task: &Value) -> Option<String> {
     // Mirror the producer's length-prefixed content encoding. This avoids
     // ambiguous fixture hashes when any source field contains newlines.
     let mut hasher = blake3::Hasher::new();
-    for field in [id, description, expected_symbol, reference_source, test_source] {
+    for field in [
+        id,
+        description,
+        expected_symbol,
+        reference_source,
+        test_source,
+    ] {
         hasher.update(&(field.len() as u64).to_be_bytes());
         hasher.update(field.as_bytes());
     }
@@ -92,7 +99,8 @@ fn score_success(run: &Value, expected: u64) -> bool {
         && run.get("runtime_error").is_some_and(Value::is_null)
         && u64_field(run, "tests_passed") == Some(expected)
         && u64_field(run, "tests_failed") == Some(0)
-        && u64_field(run, "tests_passed").unwrap_or(0)
+        && u64_field(run, "tests_passed")
+            .unwrap_or(0)
             .saturating_add(u64_field(run, "tests_failed").unwrap_or(0))
             == expected
 }
@@ -104,7 +112,8 @@ fn oracle_complete(run: &Value, expected: u64) -> bool {
     expected > 0
         && bool_field(run, "compiled") == Some(true)
         && bool_field(run, "simulated") == Some(false)
-        && u64_field(run, "tests_passed").unwrap_or(0)
+        && u64_field(run, "tests_passed")
+            .unwrap_or(0)
             .saturating_add(u64_field(run, "tests_failed").unwrap_or(0))
             == expected
 }
@@ -123,8 +132,7 @@ fn verify_mode_summary(
     let compiles = selected_runs
         .iter()
         .filter(|run| {
-            bool_field(run, "compiled") == Some(true)
-                && bool_field(run, "simulated") == Some(false)
+            bool_field(run, "compiled") == Some(true) && bool_field(run, "simulated") == Some(false)
         })
         .count() as u64;
     let complete = selected_runs
@@ -156,11 +164,39 @@ fn verify_mode_summary(
     }
 
     for (key, expected) in [
-        ("pass_rate", if count == 0 { 0.0 } else { passed as f64 / count as f64 }),
-        ("complete_oracle_rate", if count == 0 { 0.0 } else { complete as f64 / count as f64 }),
-        ("agent_elapsed_ms_mean", if count == 0 { 0.0 } else { time_total as f64 / count as f64 }),
+        (
+            "pass_rate",
+            if count == 0 {
+                0.0
+            } else {
+                passed as f64 / count as f64
+            },
+        ),
+        (
+            "complete_oracle_rate",
+            if count == 0 {
+                0.0
+            } else {
+                complete as f64 / count as f64
+            },
+        ),
+        (
+            "agent_elapsed_ms_mean",
+            if count == 0 {
+                0.0
+            } else {
+                time_total as f64 / count as f64
+            },
+        ),
         ("energy_total", energy_total),
-        ("energy_mean", if count == 0 { 0.0 } else { energy_total / count as f64 }),
+        (
+            "energy_mean",
+            if count == 0 {
+                0.0
+            } else {
+                energy_total / count as f64
+            },
+        ),
     ] {
         push_check(
             errors,
@@ -194,7 +230,11 @@ fn audit(
         matches!(model_mode, "native" | "ollama" | "cloud"),
         "model_mode must be native, ollama, or cloud",
     );
-    push_check(&mut errors, !model_label.trim().is_empty(), "model_label must be non-empty");
+    push_check(
+        &mut errors,
+        !model_label.trim().is_empty(),
+        "model_label must be non-empty",
+    );
     let runtime_configuration = report.get("runtime_configuration");
     push_check(
         &mut errors,
@@ -226,7 +266,11 @@ fn audit(
     if manifest.is_empty() || manifest.len() > 1_000 {
         return vec!["task_manifest length must be in 1..=1000".to_string()];
     }
-    push_check(&mut errors, !manifest.is_empty(), "task_manifest must not be empty");
+    push_check(
+        &mut errors,
+        !manifest.is_empty(),
+        "task_manifest must not be empty",
+    );
     let computed_manifest_sha = manifest_digest(manifest);
     push_check(
         &mut errors,
@@ -258,15 +302,22 @@ fn audit(
         if let Some(mutants) = mutant_sources {
             for mutant in mutants {
                 if let Some(source) = mutant.as_str() {
-                    current_mutant_hashes.push(blake3::hash(source.as_bytes()).to_hex().to_string());
+                    current_mutant_hashes
+                        .push(blake3::hash(source.as_bytes()).to_hex().to_string());
                 } else {
-                    errors.push(format!("task_manifest[{index}] contains a non-string mutant source"));
+                    errors.push(format!(
+                        "task_manifest[{index}] contains a non-string mutant source"
+                    ));
                 }
             }
         }
         let expected = u64_field(task, "expected_test_functions").unwrap_or(0);
         let recomputed_task_digest = task_digest_from_manifest(task);
-        push_check(&mut errors, !id.is_empty(), format!("task_manifest[{index}] has empty task_id"));
+        push_check(
+            &mut errors,
+            !id.is_empty(),
+            format!("task_manifest[{index}] has empty task_id"),
+        );
         push_check(
             &mut errors,
             is_hex(digest, 64) && is_hex(reference_digest, 64) && is_hex(test_digest, 64),
@@ -281,13 +332,17 @@ fn audit(
             &mut errors,
             is_hex(reference_digest, 64)
                 && reference_digest == blake3::hash(reference_source.as_bytes()).to_hex().as_str(),
-            format!("task_manifest[{index}] reference-source digest does not match the included source"),
+            format!(
+                "task_manifest[{index}] reference-source digest does not match the included source"
+            ),
         );
         push_check(
             &mut errors,
             is_hex(test_digest, 64)
                 && test_digest == blake3::hash(test_source.as_bytes()).to_hex().as_str(),
-            format!("task_manifest[{index}] test-source digest does not match the included fixture"),
+            format!(
+                "task_manifest[{index}] test-source digest does not match the included fixture"
+            ),
         );
         push_check(
             &mut errors,
@@ -317,7 +372,11 @@ fn audit(
         u64_field(report, "task_count") == Some(task_count),
         "task_count does not match the manifest",
     );
-    push_check(&mut errors, repeats > 0 && repeats <= 20, "repeats must be in 1..=20");
+    push_check(
+        &mut errors,
+        repeats > 0 && repeats <= 20,
+        "repeats must be in 1..=20",
+    );
     if repeats == 0 || repeats > 20 {
         return errors;
     }
@@ -345,7 +404,10 @@ fn audit(
     );
     push_check(
         &mut errors,
-        matches!(str_field(report, "model_mode"), Some("native" | "ollama" | "cloud")),
+        matches!(
+            str_field(report, "model_mode"),
+            Some("native" | "ollama" | "cloud")
+        ),
         "model_mode must be native, ollama, or cloud",
     );
 
@@ -353,7 +415,9 @@ fn audit(
     let empty_source_digest = blake3::hash(b"").to_hex().to_string();
     let controls = report.get("oracle_controls").unwrap_or(report);
     let references = controls.get("reference_controls").and_then(Value::as_array);
-    let empty_patches = controls.get("empty_patch_controls").and_then(Value::as_array);
+    let empty_patches = controls
+        .get("empty_patch_controls")
+        .and_then(Value::as_array);
     push_check(
         &mut errors,
         bool_field(controls, "all_references_pass") == Some(true),
@@ -380,7 +444,11 @@ fn audit(
         for control in items {
             let id = str_field(control, "task_id").unwrap_or("");
             let expected = expected_counts.get(id).copied().unwrap_or(0);
-            push_check(&mut errors, expected > 0, format!("unknown reference-control task {id}"));
+            push_check(
+                &mut errors,
+                expected > 0,
+                format!("unknown reference-control task {id}"),
+            );
             push_check(
                 &mut errors,
                 seen.insert(id.to_string(), ()).is_none(),
@@ -401,13 +469,20 @@ fn audit(
             push_check(
                 &mut errors,
                 str_field(control, "reference_blake3").is_some_and(|s| {
-                    is_hex(s, 64) && reference_hashes.get(id).is_some_and(|expected_hash| expected_hash.as_str() == s)
+                    is_hex(s, 64)
+                        && reference_hashes
+                            .get(id)
+                            .is_some_and(|expected_hash| expected_hash.as_str() == s)
                 }),
                 format!("reference digest is malformed or differs from manifest for task {id}"),
             );
         }
         for id in expected_counts.keys() {
-            push_check(&mut errors, seen.contains_key(id), format!("missing reference control for task {id}"));
+            push_check(
+                &mut errors,
+                seen.contains_key(id),
+                format!("missing reference control for task {id}"),
+            );
         }
     }
     if let Some(items) = empty_patches {
@@ -427,7 +502,9 @@ fn audit(
             let compile_errors = control.get("compile_errors").and_then(Value::as_array);
             let has_real_rustc_diagnostic = compile_errors.is_some_and(|errors| {
                 errors.iter().any(|error| {
-                    error.as_str().is_some_and(|message| message.trim_start().starts_with("error"))
+                    error
+                        .as_str()
+                        .is_some_and(|message| message.trim_start().starts_with("error"))
                 })
             });
             push_check(
@@ -437,18 +514,25 @@ fn audit(
                     && bool_field(control, "simulated") == Some(false)
                     && control.get("runtime_error").is_some_and(Value::is_null)
                     && has_real_rustc_diagnostic,
-                format!("empty patch was not rejected by a real, non-simulated rustc compile for task {id}"),
+                format!(
+                    "empty patch was not rejected by a real, non-simulated rustc compile for task {id}"
+                ),
             );
             push_check(
                 &mut errors,
-                str_field(control, "empty_patch_blake3").is_some_and(|s| {
-                    is_hex(s, 64) && s == empty_source_digest.as_str()
-                }),
-                format!("empty-patch digest is malformed or differs from the empty source for task {id}"),
+                str_field(control, "empty_patch_blake3")
+                    .is_some_and(|s| is_hex(s, 64) && s == empty_source_digest.as_str()),
+                format!(
+                    "empty-patch digest is malformed or differs from the empty source for task {id}"
+                ),
             );
         }
         for id in expected_counts.keys() {
-            push_check(&mut errors, seen.contains_key(id), format!("missing empty-patch control for task {id}"));
+            push_check(
+                &mut errors,
+                seen.contains_key(id),
+                format!("missing empty-patch control for task {id}"),
+            );
         }
     }
 
@@ -469,10 +553,14 @@ fn audit(
         let mut seen: HashMap<(String, usize), ()> = HashMap::new();
         for (index, control) in items.iter().enumerate() {
             let id = str_field(control, "task_id").unwrap_or("");
-            let mutation_index = u64_field(control, "mutation_index").and_then(|value| usize::try_from(value).ok());
+            let mutation_index =
+                u64_field(control, "mutation_index").and_then(|value| usize::try_from(value).ok());
             let expected_count = expected_counts.get(id).copied().unwrap_or(0);
-            let expected_hash = mutation_index
-                .and_then(|mutation_index| mutant_hashes.get(id).and_then(|hashes| hashes.get(mutation_index)));
+            let expected_hash = mutation_index.and_then(|mutation_index| {
+                mutant_hashes
+                    .get(id)
+                    .and_then(|hashes| hashes.get(mutation_index))
+            });
             push_check(
                 &mut errors,
                 expected_hash.is_some(),
@@ -488,7 +576,8 @@ fn audit(
             let source_hash = str_field(control, "mutation_source_blake3").unwrap_or("");
             push_check(
                 &mut errors,
-                expected_hash.is_some_and(|digest| digest.as_str() == source_hash) && is_hex(source_hash, 64),
+                expected_hash.is_some_and(|digest| digest.as_str() == source_hash)
+                    && is_hex(source_hash, 64),
                 format!("mutation control source digest mismatch for task {id}"),
             );
             let passed = u64_field(control, "tests_passed").unwrap_or(0);
@@ -514,7 +603,10 @@ fn audit(
             push_check(
                 &mut errors,
                 bool_field(control, "mutant_killed") == Some(killed) && killed,
-                format!("semantic mutant was not behaviorally killed for task {id} mutant {:?}", mutation_index),
+                format!(
+                    "semantic mutant was not behaviorally killed for task {id} mutant {:?}",
+                    mutation_index
+                ),
             );
         }
         for (id, hashes) in &mutant_hashes {
@@ -529,7 +621,10 @@ fn audit(
     }
 
     let Some(runs) = report.get("runs").and_then(Value::as_array) else {
-        return errors.into_iter().chain(std::iter::once("runs must be an array".to_string())).collect();
+        return errors
+            .into_iter()
+            .chain(std::iter::once("runs must be an array".to_string()))
+            .collect();
     };
     let expected_runs = task_count.saturating_mul(repeats).saturating_mul(2);
     push_check(
@@ -565,7 +660,10 @@ fn audit(
             .is_some_and(|tiers| {
                 tiers.iter().all(|tier| {
                     tier.as_str().is_some_and(|name| {
-                        matches!(name, "Native" | "Hardware" | "LocalLLM" | "CloudLLM" | "Simulated")
+                        matches!(
+                            name,
+                            "Native" | "Hardware" | "LocalLLM" | "CloudLLM" | "Simulated"
+                        )
                     })
                 }) && (!tiers.is_empty() || bool_field(run, "behavioral_success") == Some(false))
             });
@@ -619,11 +717,16 @@ fn audit(
 
         if let Some(enabled) = enabled {
             let slot = if enabled { 1 } else { 0 };
-            let entry = pair_slots.entry((id.to_string(), repeat)).or_insert([None, None]);
+            let entry = pair_slots
+                .entry((id.to_string(), repeat))
+                .or_insert([None, None]);
             push_check(
                 &mut errors,
                 entry[slot].is_none(),
-                format!("duplicate {} run for task {id} repeat {repeat}", if enabled { "GCS-on" } else { "GCS-off" }),
+                format!(
+                    "duplicate {} run for task {id} repeat {repeat}",
+                    if enabled { "GCS-on" } else { "GCS-off" }
+                ),
             );
             if entry[slot].is_none() {
                 entry[slot] = Some(run);
@@ -668,7 +771,9 @@ fn audit(
                 &mut errors,
                 u64_field(off, "expected_test_functions") == Some(*expected)
                     && u64_field(on, "expected_test_functions") == Some(*expected),
-                format!("paired oracle counts disagree with manifest for task {id} repeat {repeat}"),
+                format!(
+                    "paired oracle counts disagree with manifest for task {id} repeat {repeat}"
+                ),
             );
 
             // An incomplete oracle makes the pair unresolved, not tied.
@@ -689,10 +794,26 @@ fn audit(
     }
 
     let summary = report.get("summary").unwrap_or(report);
-    let off_runs: Vec<&Value> = runs.iter().filter(|r| bool_field(r, "gcs_advisories_enabled") == Some(false)).collect();
-    let on_runs: Vec<&Value> = runs.iter().filter(|r| bool_field(r, "gcs_advisories_enabled") == Some(true)).collect();
-    verify_mode_summary(summary.get("gcs_off").unwrap_or(summary), &off_runs, false, &mut errors);
-    verify_mode_summary(summary.get("gcs_on").unwrap_or(summary), &on_runs, true, &mut errors);
+    let off_runs: Vec<&Value> = runs
+        .iter()
+        .filter(|r| bool_field(r, "gcs_advisories_enabled") == Some(false))
+        .collect();
+    let on_runs: Vec<&Value> = runs
+        .iter()
+        .filter(|r| bool_field(r, "gcs_advisories_enabled") == Some(true))
+        .collect();
+    verify_mode_summary(
+        summary.get("gcs_off").unwrap_or(summary),
+        &off_runs,
+        false,
+        &mut errors,
+    );
+    verify_mode_summary(
+        summary.get("gcs_on").unwrap_or(summary),
+        &on_runs,
+        true,
+        &mut errors,
+    );
 
     let paired = summary.get("paired").unwrap_or(summary);
     let pair_count = task_count.saturating_mul(repeats);
@@ -774,14 +895,21 @@ fn bootstrap_task_cluster_interval(
     seed: u64,
     resamples: usize,
 ) -> Option<(f64, f64, f64)> {
-    if task_deltas.is_empty() || resamples == 0 || task_deltas.iter().any(|delta| !delta.is_finite()) {
+    if task_deltas.is_empty()
+        || resamples == 0
+        || task_deltas.iter().any(|delta| !delta.is_finite())
+    {
         return None;
     }
 
     // Equal weight per task: repeat-level paired differences are averaged inside
     // each task cluster, then entire task clusters are resampled with replacement.
     let point_estimate = task_deltas.iter().sum::<f64>() / task_deltas.len() as f64;
-    let mut state = if seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { seed };
+    let mut state = if seed == 0 {
+        0x9E37_79B9_7F4A_7C15
+    } else {
+        seed
+    };
     let mut samples = Vec::with_capacity(resamples);
     for _ in 0..resamples {
         let mut sum = 0.0;
@@ -879,11 +1007,8 @@ fn clustered_bootstrap_summary(report: &Value) -> Option<Value> {
         }));
     }
 
-    let (point, lower, upper) = bootstrap_task_cluster_interval(
-        &per_task_deltas,
-        seed,
-        BOOTSTRAP_RESAMPLES,
-    )?;
+    let (point, lower, upper) =
+        bootstrap_task_cluster_interval(&per_task_deltas, seed, BOOTSTRAP_RESAMPLES)?;
     Some(serde_json::json!({
         "method": "deterministic percentile bootstrap over task-identity clusters",
         "bootstrap_resamples": BOOTSTRAP_RESAMPLES,
@@ -945,7 +1070,9 @@ fn print_usage(program: &str) {
 
 fn main() {
     let mut args = env::args();
-    let program = args.next().unwrap_or_else(|| "coding_gcs_ablation_verify".into());
+    let program = args
+        .next()
+        .unwrap_or_else(|| "coding_gcs_ablation_verify".into());
     let Some(path) = args.next() else {
         print_usage(&program);
         std::process::exit(2);
@@ -965,11 +1092,17 @@ fn main() {
         }
     };
 
-    if expected_source_sha.as_deref().is_some_and(|s| !is_hex(s, 40)) {
+    if expected_source_sha
+        .as_deref()
+        .is_some_and(|s| !is_hex(s, 40))
+    {
         eprintln!("--expected-source-sha must be 40 hexadecimal characters");
         std::process::exit(2);
     }
-    if expected_manifest_sha.as_deref().is_some_and(|s| !is_hex(s, 64)) {
+    if expected_manifest_sha
+        .as_deref()
+        .is_some_and(|s| !is_hex(s, 64))
+    {
         eprintln!("--expected-manifest-blake3 must be 64 hexadecimal characters");
         std::process::exit(2);
     }
@@ -1000,7 +1133,8 @@ fn main() {
         println!("Repeats: {}", u64_field(&report, "repeats").unwrap_or(0));
         println!(
             "Paired trials: {}",
-            report.pointer("/summary/paired/paired_task_trials")
+            report
+                .pointer("/summary/paired/paired_task_trials")
                 .and_then(Value::as_u64)
                 .unwrap_or(0)
         );
@@ -1010,11 +1144,19 @@ fn main() {
         );
         println!(
             "External source pin: {}",
-            if expected_source_sha.is_some() { "matched" } else { "not supplied" }
+            if expected_source_sha.is_some() {
+                "matched"
+            } else {
+                "not supplied"
+            }
         );
         println!(
             "External manifest pin: {}",
-            if expected_manifest_sha.is_some() { "matched" } else { "not supplied" }
+            if expected_manifest_sha.is_some() {
+                "matched"
+            } else {
+                "not supplied"
+            }
         );
         if let Some(statistics) = clustered_bootstrap_summary(&report) {
             let clusters = u64_field(&statistics, "task_cluster_count").unwrap_or(0);
@@ -1036,7 +1178,9 @@ fn main() {
                 println!("Statistical caveat: {warning}");
             }
         }
-        println!("Caveat: consistency checks are not independent execution or authenticated attestation.");
+        println!(
+            "Caveat: consistency checks are not independent execution or authenticated attestation."
+        );
     } else {
         eprintln!("RECEIPT REJECTED: {} problem(s)", errors.len());
         for (index, error) in errors.iter().enumerate() {
@@ -1085,7 +1229,13 @@ mod tests {
         let test_source = "#[test] fn task_a_is_true() { assert!(task_a()); }";
         let mutant_sources = vec!["pub fn task_a() -> bool { false }"];
         let mut task_hasher = blake3::Hasher::new();
-        for field in [task_id, description, expected_symbol, reference_source, test_source] {
+        for field in [
+            task_id,
+            description,
+            expected_symbol,
+            reference_source,
+            test_source,
+        ] {
             task_hasher.update(&(field.len() as u64).to_be_bytes());
             task_hasher.update(field.as_bytes());
         }
@@ -1096,9 +1246,13 @@ mod tests {
             task_hasher.update(mutant.as_bytes());
         }
         let task_digest = task_hasher.finalize().to_hex().to_string();
-        let reference_digest = blake3::hash(reference_source.as_bytes()).to_hex().to_string();
+        let reference_digest = blake3::hash(reference_source.as_bytes())
+            .to_hex()
+            .to_string();
         let test_digest = blake3::hash(test_source.as_bytes()).to_hex().to_string();
-        let mutant_digest = blake3::hash(mutant_sources[0].as_bytes()).to_hex().to_string();
+        let mutant_digest = blake3::hash(mutant_sources[0].as_bytes())
+            .to_hex()
+            .to_string();
         let manifest = vec![serde_json::json!({
             "task_id": task_id,
             "description": description,
@@ -1220,25 +1374,41 @@ mod tests {
         let source = "a".repeat(40);
         let manifest = "b".repeat(64);
         let valid = vec![
-            "--expected-source-sha".to_string(), source.clone(),
-            "--expected-manifest-blake3".to_string(), manifest.clone(),
+            "--expected-source-sha".to_string(),
+            source.clone(),
+            "--expected-manifest-blake3".to_string(),
+            manifest.clone(),
         ];
         assert_eq!(
             parse_pin_args(&valid).unwrap(),
             (Some(source.clone()), Some(manifest.clone()))
         );
-        assert!(parse_pin_args(&vec![
-            "--expected-source-sha".to_string(), source.clone(),
-            "--expected-source-sha".to_string(), source.clone(),
-        ]).is_err());
-        assert!(parse_pin_args(&vec![
-            "--expected-manifest-blake3".to_string(), manifest.clone(),
-            "--expected-manifest-blake3".to_string(), manifest.clone(),
-        ]).is_err());
+        assert!(
+            parse_pin_args(&vec![
+                "--expected-source-sha".to_string(),
+                source.clone(),
+                "--expected-source-sha".to_string(),
+                source.clone(),
+            ])
+            .is_err()
+        );
+        assert!(
+            parse_pin_args(&vec![
+                "--expected-manifest-blake3".to_string(),
+                manifest.clone(),
+                "--expected-manifest-blake3".to_string(),
+                manifest.clone(),
+            ])
+            .is_err()
+        );
         assert!(parse_pin_args(&vec!["--expected-source-sha".to_string()]).is_err());
-        assert!(parse_pin_args(&vec![
-            "--expected-source-sha".to_string(), "--expected-manifest-blake3".to_string(),
-        ]).is_err());
+        assert!(
+            parse_pin_args(&vec![
+                "--expected-source-sha".to_string(),
+                "--expected-manifest-blake3".to_string(),
+            ])
+            .is_err()
+        );
         assert!(parse_pin_args(&vec!["--unknown".to_string(), "value".to_string()]).is_err());
     }
 
@@ -1252,9 +1422,7 @@ mod tests {
 
     #[test]
     fn manifest_digest_binds_order_and_identifiers() {
-        let task = |id: &str, digest: &str| {
-            serde_json::json!({"task_id": id, "task_digest_blake3": digest})
-        };
+        let task = |id: &str, digest: &str| serde_json::json!({"task_id": id, "task_digest_blake3": digest});
         let a = task("a", &"a".repeat(64));
         let b = task("b", &"b".repeat(64));
         let forward = manifest_digest(&[a.clone(), b.clone()]).unwrap();
@@ -1314,7 +1482,14 @@ mod tests {
         let report = valid_fixture();
         let manifest_sha = str_field(&report, "task_manifest_blake3").unwrap();
         let expected_source_sha = "1".repeat(40);
-        assert!(audit(&report, Some(expected_source_sha.as_str()), Some(manifest_sha)).is_empty());
+        assert!(
+            audit(
+                &report,
+                Some(expected_source_sha.as_str()),
+                Some(manifest_sha)
+            )
+            .is_empty()
+        );
     }
 
     #[test]
@@ -1341,16 +1516,30 @@ mod tests {
         let report = valid_fixture();
         let summary = clustered_bootstrap_summary(&report).unwrap();
         assert_eq!(u64_field(&summary, "task_cluster_count"), Some(1));
-        assert_eq!(read_f64(&summary, "mean_task_level_delta_percentage_points"), Some(-100.0));
-        assert_eq!(read_f64(&summary, "ci95_lower_percentage_points"), Some(-100.0));
-        assert_eq!(read_f64(&summary, "ci95_upper_percentage_points"), Some(-100.0));
-        assert!(str_field(&summary, "warning").unwrap().contains("Small number of task clusters"));
+        assert_eq!(
+            read_f64(&summary, "mean_task_level_delta_percentage_points"),
+            Some(-100.0)
+        );
+        assert_eq!(
+            read_f64(&summary, "ci95_lower_percentage_points"),
+            Some(-100.0)
+        );
+        assert_eq!(
+            read_f64(&summary, "ci95_upper_percentage_points"),
+            Some(-100.0)
+        );
+        assert!(
+            str_field(&summary, "warning")
+                .unwrap()
+                .contains("Small number of task clusters")
+        );
     }
 
     #[test]
     fn inconsistent_model_identity_metadata_is_rejected() {
         let mut report = valid_fixture();
-        report["runtime_configuration"]["requested_model"] = Value::String("different-model".to_string());
+        report["runtime_configuration"]["requested_model"] =
+            Value::String("different-model".to_string());
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("requested_model")));
     }
@@ -1366,9 +1555,16 @@ mod tests {
     #[test]
     fn missing_generation_tiers_are_rejected() {
         let mut report = valid_fixture();
-        report["runs"][0].as_object_mut().unwrap().remove("generation_tiers");
+        report["runs"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("generation_tiers");
         let errors = audit(&report, None, None);
-        assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("generation_tiers"))
+        );
     }
 
     #[test]
@@ -1376,7 +1572,11 @@ mod tests {
         let mut report = valid_fixture();
         report["runs"][0]["generation_tiers"] = serde_json::json!(["ImaginaryLLM"]);
         let errors = audit(&report, None, None);
-        assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("generation_tiers"))
+        );
     }
 
     #[test]
@@ -1385,7 +1585,11 @@ mod tests {
         report["runs"][0]["generation_tiers"] = serde_json::json!([]);
         report["runs"][0]["behavioral_success"] = Value::Bool(true);
         let errors = audit(&report, None, None);
-        assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("generation_tiers"))
+        );
     }
 
     #[test]
@@ -1394,7 +1598,11 @@ mod tests {
         report["runs"][0]["generation_tiers"] = serde_json::json!([]);
         report["runs"][0]["behavioral_success"] = Value::Bool(false);
         let errors = audit(&report, None, None);
-        assert!(!errors.iter().any(|error| error.contains("generation_tiers")));
+        assert!(
+            !errors
+                .iter()
+                .any(|error| error.contains("generation_tiers"))
+        );
     }
 
     #[test]
@@ -1429,7 +1637,11 @@ mod tests {
         report["oracle_controls"]["mutation_controls"][0]["tests_passed"] = Value::from(1);
         report["oracle_controls"]["mutation_controls"][0]["mutant_killed"] = Value::Bool(false);
         let errors = audit(&report, None, None);
-        assert!(errors.iter().any(|error| error.contains("not behaviorally killed")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("not behaviorally killed"))
+        );
     }
 
     #[test]
@@ -1453,9 +1665,11 @@ mod tests {
     #[test]
     fn unexpected_external_source_pin_is_rejected() {
         let report = valid_fixture();
-        assert!(audit(&report, Some(&"2".repeat(40)), None)
-            .iter()
-            .any(|error| error.contains("--expected-source-sha")));
+        assert!(
+            audit(&report, Some(&"2".repeat(40)), None)
+                .iter()
+                .any(|error| error.contains("--expected-source-sha"))
+        );
     }
 
     #[test]
@@ -1464,7 +1678,11 @@ mod tests {
         report["task_manifest"][0]["test_source"] =
             Value::String("#[test] fn task_a_is_true() { assert!(!task_a()); }".to_string());
         let errors = audit(&report, None, None);
-        assert!(errors.iter().any(|error| error.contains("test-source digest")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("test-source digest"))
+        );
         assert!(errors.iter().any(|error| error.contains("task digest")));
     }
 
@@ -1474,7 +1692,11 @@ mod tests {
         report["task_manifest"][0]["expected_test_functions"] = Value::from(2);
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("task digest")));
-        assert!(errors.iter().any(|error| error.contains("expected test count")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("expected test count"))
+        );
     }
 
     #[test]
@@ -1484,6 +1706,10 @@ mod tests {
         let new_outer = manifest_digest(report["task_manifest"].as_array().unwrap()).unwrap();
         report["task_manifest_blake3"] = Value::String(new_outer);
         let errors = audit(&report, None, None);
-        assert!(errors.iter().any(|error| error.contains("task digest does not match")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("task digest does not match"))
+        );
     }
 }

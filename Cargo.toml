@@ -15,6 +15,9 @@ members = [
 # members despite being listed below, because of this). `default-members`
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
+    # Source-only remnant has no Cargo.toml; exclude it from the core/* workspace glob
+    # until this crate is restored as a valid package.
+    "crates/core/symthaea-observation-attestation",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
@@ -1117,6 +1120,11 @@ required-features = ["vision-manifold", "swarm"]
 [[bin]]
 name = "rust-repair-manifest"
 path = "src/bin/rust_repair_manifest.rs"
+required-features = ["rust-repair-manifest"]
+
+[[bin]]
+name = "rust-repair-score-audit"
+path = "src/bin/rust_repair_score_audit.rs"
 required-features = ["rust-repair-manifest"]
 
 # Examples

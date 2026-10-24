@@ -111,9 +111,7 @@ fn task_suite() -> Vec<TaskCase> {
 #[test] fn gcd_zero_left() { assert_eq!(gcd(0, 5), 5); }
 #[test] fn gcd_zero_right() { assert_eq!(gcd(9, 0), 9); }
 "#,
-            mutant_sources: &[
-                "pub fn gcd(a: u64, b: u64) -> u64 { a.min(b) }",
-            ],
+            mutant_sources: &["pub fn gcd(a: u64, b: u64) -> u64 { a.min(b) }"],
         },
         TaskCase {
             id: "is_even",
@@ -127,9 +125,7 @@ fn task_suite() -> Vec<TaskCase> {
 #[test] fn even_negative() { assert!(is_even(-8)); }
 #[test] fn even_zero() { assert!(is_even(0)); }
 "#,
-            mutant_sources: &[
-                "pub fn is_even(n: i64) -> bool { n % 2 != 0 }",
-            ],
+            mutant_sources: &["pub fn is_even(n: i64) -> bool { n % 2 != 0 }"],
         },
         TaskCase {
             id: "reverse_string",
@@ -142,9 +138,7 @@ fn task_suite() -> Vec<TaskCase> {
 #[test] fn reverse_empty() { assert_eq!(reverse_string(""), ""); }
 #[test] fn reverse_unicode() { assert_eq!(reverse_string("hé🙂"), "🙂éh"); }
 "#,
-            mutant_sources: &[
-                "pub fn reverse_string(s: &str) -> String { s.to_string() }",
-            ],
+            mutant_sources: &["pub fn reverse_string(s: &str) -> String { s.to_string() }"],
         },
         TaskCase {
             id: "sum_slice",
@@ -277,8 +271,12 @@ fn is_behaviorally_successful(run: &OracleRun, expected: usize) -> bool {
 }
 
 fn run_candidate(
-    task: &TaskCase, repeat: usize, gcs_advisories_enabled: bool, execution_order: &str,
-    use_llm: bool, use_cloud: bool,
+    task: &TaskCase,
+    repeat: usize,
+    gcs_advisories_enabled: bool,
+    execution_order: &str,
+    use_llm: bool,
+    use_cloud: bool,
 ) -> EvalResult {
     let temp_dir = tempfile::tempdir().expect("temporary work directory");
     let config = CodingAgentConfig {
@@ -308,16 +306,32 @@ fn run_candidate(
     let oracle_complete = is_oracle_complete(&oracle, expected);
     let behavioral_success = oracle_complete && is_behaviorally_successful(&oracle, expected);
     EvalResult {
-        task_id: task.id.to_string(), repeat, gcs_advisories_enabled,
-        execution_order: execution_order.to_string(), code_written, expected_symbol_found,
-        generated_source_blake3: source_digest(&source), compiled: oracle.compiled,
-        simulated: oracle.simulated, expected_test_functions: expected,
-        tests_passed: oracle.tests_passed, tests_failed: oracle.tests_failed,
-        oracle_complete, behavioral_success, runtime_error: oracle.runtime_error,
-        compile_errors: oracle.compile_errors, agent_elapsed_ms, verification_elapsed_ms,
-        iterations: result.iterations_used, energy: result.total_energy,
+        task_id: task.id.to_string(),
+        repeat,
+        gcs_advisories_enabled,
+        execution_order: execution_order.to_string(),
+        code_written,
+        expected_symbol_found,
+        generated_source_blake3: source_digest(&source),
+        compiled: oracle.compiled,
+        simulated: oracle.simulated,
+        expected_test_functions: expected,
+        tests_passed: oracle.tests_passed,
+        tests_failed: oracle.tests_failed,
+        oracle_complete,
+        behavioral_success,
+        runtime_error: oracle.runtime_error,
+        compile_errors: oracle.compile_errors,
+        agent_elapsed_ms,
+        verification_elapsed_ms,
+        iterations: result.iterations_used,
+        energy: result.total_energy,
         final_phase: format!("{}", result.final_phase),
-        generation_tiers: result.generation_tiers.iter().map(ToString::to_string).collect(),
+        generation_tiers: result
+            .generation_tiers
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
     }
 }
 
@@ -349,7 +363,10 @@ fn eval_json(result: &EvalResult) -> serde_json::Value {
 }
 
 fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
-    let mode: Vec<&EvalResult> = results.iter().filter(|r| r.gcs_advisories_enabled == enabled).collect();
+    let mode: Vec<&EvalResult> = results
+        .iter()
+        .filter(|r| r.gcs_advisories_enabled == enabled)
+        .collect();
     let total = mode.len();
     let passed = mode.iter().filter(|r| r.behavioral_success).count();
     let compiled = mode.iter().filter(|r| r.compiled && !r.simulated).count();
@@ -424,23 +441,24 @@ fn resolve_model_identity(
         let model = configured_model("SYMTHAEA_LLM_MODEL", local_model, "gemma4:e2b")?;
         return Ok(("ollama".to_string(), model));
     }
-    Ok(("native".to_string(), "native dispatcher / no external LLM requested".to_string()))
+    Ok((
+        "native".to_string(),
+        "native dispatcher / no external LLM requested".to_string(),
+    ))
 }
 
 fn configured_model(env_name: &str, value: Option<&str>, default: &str) -> Result<String, String> {
     match value {
-        Some(value) if value.trim().is_empty() => {
-            Err(format!("{env_name} is set but empty; refusing an ambiguous model identity"))
-        }
+        Some(value) if value.trim().is_empty() => Err(format!(
+            "{env_name} is set but empty; refusing an ambiguous model identity"
+        )),
         Some(value) => Ok(value.trim().to_string()),
         None => Ok(default.to_string()),
     }
 }
 
 fn validate_source_revision(supplied: &str, actual_head: &str) -> Result<(), &'static str> {
-    let valid_sha = |sha: &str| {
-        sha.len() == 40 && sha.bytes().all(|byte| byte.is_ascii_hexdigit())
-    };
+    let valid_sha = |sha: &str| sha.len() == 40 && sha.bytes().all(|byte| byte.is_ascii_hexdigit());
     if !valid_sha(supplied) {
         return Err("GIT_COMMIT_SHA must be a full 40-character hexadecimal commit SHA");
     }
@@ -481,7 +499,9 @@ fn require_source_revision() -> String {
             std::process::exit(2);
         }
     };
-    let actual_head = String::from_utf8_lossy(&head_output.stdout).trim().to_string();
+    let actual_head = String::from_utf8_lossy(&head_output.stdout)
+        .trim()
+        .to_string();
     if let Err(error) = validate_source_revision(&supplied, &actual_head) {
         eprintln!("{error}");
         std::process::exit(2);
@@ -554,7 +574,8 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
                     return Err("--repeats may only be specified once".to_string());
                 }
                 let value = args.get(index + 1).ok_or("--repeats requires an integer")?;
-                repeats = value.parse::<usize>()
+                repeats = value
+                    .parse::<usize>()
                     .map_err(|_| format!("invalid --repeats value: {value:?}"))?;
                 if !(1..=20).contains(&repeats) {
                     return Err("--repeats must be in 1..=20".to_string());
@@ -583,7 +604,13 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
         return Err("choose at most one backend: --llm or --cloud".to_string());
     }
 
-    Ok(Some(CliOptions { use_llm, use_cloud, repeats, output_path, print_manifest: false }))
+    Ok(Some(CliOptions {
+        use_llm,
+        use_cloud,
+        repeats,
+        output_path,
+        print_manifest: false,
+    }))
 }
 
 fn print_usage() {
@@ -611,10 +638,21 @@ fn main() {
     // Refuse to produce a benchmark receipt that cannot be tied to an exact,
     // clean source checkout. Do this before controls or any agent trials.
     let source_revision = require_source_revision();
-    let CliOptions { use_llm, use_cloud, repeats, output_path, print_manifest } = options;
+    let CliOptions {
+        use_llm,
+        use_cloud,
+        repeats,
+        output_path,
+        print_manifest,
+    } = options;
     let tasks = task_suite();
-    if tasks.iter().any(|task| expected_test_functions(task) == 0 || task.mutant_sources.is_empty()) {
-        eprintln!("Invalid task suite: every task must have declared tests and at least one semantic mutant");
+    if tasks
+        .iter()
+        .any(|task| expected_test_functions(task) == 0 || task.mutant_sources.is_empty())
+    {
+        eprintln!(
+            "Invalid task suite: every task must have declared tests and at least one semantic mutant"
+        );
         std::process::exit(2);
     }
     let manifest = manifest_digest(&tasks);
@@ -658,7 +696,10 @@ fn main() {
         let empty_patch_fails = !empty.simulated
             && !empty.compiled
             && empty.runtime_error.is_none()
-            && empty.compile_errors.iter().any(|error| error.trim_start().starts_with("error"));
+            && empty
+                .compile_errors
+                .iter()
+                .any(|error| error.trim_start().starts_with("error"));
         reference_controls.push(serde_json::json!({
             "task_id": task.id,
             "reference_blake3": source_digest(task.reference_source),
@@ -681,7 +722,10 @@ fn main() {
             "compile_errors": empty.compile_errors.iter().take(2).collect::<Vec<_>>()
         }));
         if !reference_passes || !empty_patch_fails {
-            eprintln!("Oracle control failed for task {}: reference_passes={}, empty_patch_fails={}", task.id, reference_passes, empty_patch_fails);
+            eprintln!(
+                "Oracle control failed for task {}: reference_passes={}, empty_patch_fails={}",
+                task.id, reference_passes, empty_patch_fails
+            );
             std::process::exit(3);
         }
         if task.mutant_sources.is_empty() {
@@ -712,7 +756,11 @@ fn main() {
             if !mutant_killed {
                 eprintln!(
                     "Oracle mutation control failed for task {} mutant {}: compiled={}, complete={}, failed_tests={}",
-                    task.id, mutation_index, mutant.compiled, mutant_oracle_complete, mutant.tests_failed
+                    task.id,
+                    mutation_index,
+                    mutant.compiled,
+                    mutant_oracle_complete,
+                    mutant.tests_failed
                 );
                 std::process::exit(3);
             }
@@ -723,7 +771,11 @@ fn main() {
     let mut pairs = Vec::new();
     for (task_idx, task) in tasks.iter().enumerate() {
         for repeat_idx in 0..repeats {
-            let order = if (task_idx + repeat_idx) % 2 == 0 { "off_then_on" } else { "on_then_off" };
+            let order = if (task_idx + repeat_idx) % 2 == 0 {
+                "off_then_on"
+            } else {
+                "on_then_off"
+            };
             let (off, on) = if order == "off_then_on" {
                 let off = run_candidate(task, repeat_idx + 1, false, order, use_llm, use_cloud);
                 let on = run_candidate(task, repeat_idx + 1, true, order, use_llm, use_cloud);
@@ -735,8 +787,13 @@ fn main() {
             };
             eprintln!(
                 "[{}/{}] task={} repeat={} off={} on={} order={}",
-                task_idx + 1, tasks.len(), task.id, repeat_idx + 1,
-                off.behavioral_success, on.behavioral_success, order
+                task_idx + 1,
+                tasks.len(),
+                task.id,
+                repeat_idx + 1,
+                off.behavioral_success,
+                on.behavioral_success,
+                order
             );
             all_results.push(off.clone());
             all_results.push(on.clone());
@@ -797,9 +854,15 @@ fn main() {
     match serde_json::to_string_pretty(&report) {
         Ok(json) => match std::fs::write(&output_path, json) {
             Ok(()) => eprintln!("GCS ablation receipt: {}", output_path.display()),
-            Err(error) => { eprintln!("Failed to write receipt: {error}"); std::process::exit(4); }
+            Err(error) => {
+                eprintln!("Failed to write receipt: {error}");
+                std::process::exit(4);
+            }
         },
-        Err(error) => { eprintln!("Failed to serialize receipt: {error}"); std::process::exit(4); }
+        Err(error) => {
+            eprintln!("Failed to serialize receipt: {error}");
+            std::process::exit(4);
+        }
     }
 }
 
@@ -826,7 +889,11 @@ mod provenance_tests {
         assert!(!parsed.use_llm);
         assert!(!parsed.use_cloud);
         assert_eq!(parsed.repeats, 3);
-        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v3.json"));
+        assert!(
+            parsed
+                .output_path
+                .ends_with("symthaea_gcs_ablation_v3.json")
+        );
     }
 
     #[test]
@@ -884,7 +951,9 @@ mod provenance_tests {
         assert!(resolve_model_identity(true, false, Some("  "), None, false).is_err());
         assert!(resolve_model_identity(false, true, None, Some(""), true).is_err());
         assert_eq!(
-            resolve_model_identity(false, false, None, None, false).unwrap().0,
+            resolve_model_identity(false, false, None, None, false)
+                .unwrap()
+                .0,
             "native"
         );
     }
