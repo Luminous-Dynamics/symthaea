@@ -232,6 +232,8 @@ def score_trace(
     trace_bytes: bytes,
     trace_schema_bytes: bytes,
     scorer_bytes: bytes,
+    protocol_bytes: bytes,
+    analysis_lock_bytes: bytes,
     for_publication: bool = False,
 ) -> dict[str, Any]:
     """Validate receipt identity/accounting, verify digests and independently recompute metrics."""
@@ -239,9 +241,49 @@ def score_trace(
     if receipt_errors:
         raise TraceScoreError("invalid receipt: " + "; ".join(receipt_errors))
 
+    # Bind the run to the exact protocol and analysis-lock bytes in this checkout.
+    if receipt["protocol_sha256"] != sha256_hex(protocol_bytes):
+        raise TraceScoreError("protocol digest mismatch: protocol_sha256")
+    if receipt["analysis_lock_sha256"] != sha256_hex(analysis_lock_bytes):
+        raise TraceScoreError("analysis-lock digest mismatch: analysis_lock_sha256")
+    protocol = _strict_json_loads(protocol_bytes.decode("utf-8", errors="strict"))
+    analysis_lock = _strict_json_loads(analysis_lock_bytes.decode("utf-8", errors="strict"))
+    if not isinstance(protocol, dict) or protocol.get("protocol_id") != receipt["protocol_id"]:
+        raise TraceScoreError("protocol lock does not identify the receipt protocol")
+    if protocol.get("raw_trace_contract", {}).get("schema_version") != TRACE_SCHEMA_VERSION:
+        raise TraceScoreError("protocol lock does not declare the frozen trace schema version")
+    if protocol.get("raw_trace_contract", {}).get("analysis_lock_file") != "docs/research/CASTING_BENCHMARK_ANALYSIS_LOCK_V1.json":
+        raise TraceScoreError("protocol lock does not point to the frozen analysis lock")
+    if not isinstance(analysis_lock, dict) or analysis_lock.get("protocol_id") != receipt["protocol_id"]:
+        raise TraceScoreError("analysis lock does not identify the receipt protocol")
+    if analysis_lock.get("analysis_lock_version") != "1.0.0":
+        raise TraceScoreError("unsupported analysis-lock version")
+
     if receipt["evaluation_mode"] != "single_fidelity":
         raise TraceScoreError("v1 trace scorer only supports single_fidelity receipts")
     suite = receipt["suite"]
+    suite_contracts = analysis_lock.get("suite_contracts")
+    if not isinstance(suite_contracts, dict) or suite["id"] not in suite_contracts:
+        raise TraceScoreError(f"suite is not present in immutable analysis lock: {suite['id']}")
+    contract = suite_contracts[suite["id"]]
+    if not isinstance(contract, dict):
+        raise TraceScoreError("malformed suite contract in analysis lock")
+    if contract.get("fixture_only") is True and receipt["synthetic_fixture_only"] is not True:
+        raise TraceScoreError("test-only suite contract requires synthetic_fixture_only=true")
+    if suite.get("objective_count") != contract.get("objective_count"):
+        raise TraceScoreError("objective count differs from immutable suite contract")
+    if suite.get("objective_direction") != contract.get("objective_direction"):
+        raise TraceScoreError("objective direction differs from immutable suite contract")
+    instance_contracts = contract.get("instances")
+    instance_contract = instance_contracts.get(suite.get("instance_id")) if isinstance(instance_contracts, dict) else None
+    if not isinstance(instance_contract, dict):
+        raise TraceScoreError("suite instance is not present in immutable analysis lock")
+    if suite.get("dimension") != instance_contract.get("decision_dimension"):
+        raise TraceScoreError("decision dimension differs from immutable suite instance contract")
+    if suite.get("ideal_point") != contract.get("ideal_point"):
+        raise TraceScoreError("ideal point differs from immutable suite contract")
+    if suite.get("reference_point") != contract.get("reference_point"):
+        raise TraceScoreError("reference point differs from immutable suite contract")
     if suite["objective_count"] != 2 or suite["objective_direction"] != "minimize_all":
         raise TraceScoreError("v1 trace scorer only supports exactly two minimization objectives")
 
@@ -262,6 +304,15 @@ def score_trace(
         raise TraceScoreError(f"trace schema is not valid UTF-8: {exc}") from exc
     if not isinstance(trace_schema, dict) or trace_schema.get("properties", {}).get("schema_version", {}).get("const") != TRACE_SCHEMA_VERSION:
         raise TraceScoreError("trace schema is missing the frozen v1.0.0 version contract")
+
+    expected_normalization_area = (
+        (reference[0] - ideal[0]) * (reference[1] - ideal[1])
+    )
+    locked_area = contract.get("normalization_area")
+    if not _finite_number(locked_area) or not math.isclose(
+        expected_normalization_area, float(locked_area), rel_tol=0.0, abs_tol=ABS_TOLERANCE
+    ):
+        raise TraceScoreError("normalization area differs from immutable suite contract")
 
     artifacts = receipt["artifacts"]
     expected_hashes = {
@@ -354,11 +405,18 @@ def score_trace(
         "run_id": receipt["run_id"],
         "status": receipt["status"],
         "audited": True,
-        "publishable_as_empirical": not receipt["synthetic_fixture_only"],
+        "publishable_as_empirical": receipt["status"] == "success" and not receipt["synthetic_fixture_only"],
         "objective_evaluations": actual_count,
         "planned_budget": receipt["budget"]["objective_evaluations"],
         "status_counts": counts,
         "trace_sha256": expected_hashes["raw_trace_sha256"],
+        "protocol_sha256": sha256_hex(protocol_bytes),
+        "analysis_lock_sha256": sha256_hex(analysis_lock_bytes),
+        "algorithm_id": receipt["algorithm"]["id"],
+        "algorithm_version": receipt["algorithm"]["version"],
+        "suite_id": suite["id"],
+        "suite_instance_id": suite["instance_id"],
+        "seed": receipt["seed"],
         "metrics_recomputed": recomputed,
         "reported_metrics_match": receipt["status"] == "success",
         "note": (
@@ -378,6 +436,16 @@ def main() -> int:
         type=Path,
         default=Path(__file__).resolve().parents[2] / "docs" / "research" / "CASTING_BENCHMARK_TRACE.schema.json",
     )
+    parser.add_argument(
+        "--protocol",
+        type=Path,
+        default=Path(__file__).resolve().parents[2] / "docs" / "research" / "CASTING_BENCHMARK_PROTOCOL_V1.json",
+    )
+    parser.add_argument(
+        "--analysis-lock",
+        type=Path,
+        default=Path(__file__).resolve().parents[2] / "docs" / "research" / "CASTING_BENCHMARK_ANALYSIS_LOCK_V1.json",
+    )
     parser.add_argument("--for-publication", action="store_true")
     args = parser.parse_args()
 
@@ -388,11 +456,15 @@ def main() -> int:
         trace_bytes = args.trace.read_bytes()
         trace_schema_bytes = args.trace_schema.read_bytes()
         scorer_bytes = Path(__file__).read_bytes()
+        protocol_bytes = args.protocol.read_bytes()
+        analysis_lock_bytes = args.analysis_lock.read_bytes()
         result = score_trace(
             receipt,
             trace_bytes,
             trace_schema_bytes,
             scorer_bytes,
+            protocol_bytes,
+            analysis_lock_bytes,
             for_publication=args.for_publication,
         )
     except (OSError, UnicodeError, TraceScoreError) as exc:
