@@ -467,7 +467,7 @@ fn worst_case_policy_risk_over_priors(
                                 * f64::from(decisions[actions[outcome_index]][class_index]);
                         }
                     }
-                    worst = worst.max(loss / f64::from(PROBABILITY_SCALE * PROBABILITY_SCALE));
+                    worst = worst.max(loss / (f64::from(PROBABILITY_SCALE) * f64::from(PROBABILITY_SCALE)));
                 }
             }
         }
