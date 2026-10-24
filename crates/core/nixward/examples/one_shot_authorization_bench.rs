@@ -77,6 +77,8 @@ fn main() {
         .expect("benchmark ledger lifetime is valid");
 
     let mut latencies_ns = Vec::with_capacity(CASES);
+    let mut scenario_latencies_ns: [Vec<u64>; 7] =
+        std::array::from_fn(|_| Vec::with_capacity(CASES / 7 + 1));
     let mut scenario_counts = [0usize; 7];
     let mut false_permits = 0usize;
     let mut false_blocks = 0usize;
@@ -84,8 +86,9 @@ fn main() {
     let mut denied = 0usize;
 
     for index in 0..CASES {
-        let scenario = Scenario::ALL[index % Scenario::ALL.len()];
-        scenario_counts[index % Scenario::ALL.len()] += 1;
+        let scenario_index = index % Scenario::ALL.len();
+        let scenario = Scenario::ALL[scenario_index];
+        scenario_counts[scenario_index] += 1;
 
         let decision_id = format!("microbench-decision-{index:05}");
         let request = AuthorizationRequest::new(
@@ -154,7 +157,9 @@ fn main() {
         // setup are outside this timer, so this is not end-to-end latency.
         let start = Instant::now();
         let outcome = ledger.consume(&permit, &attempt);
-        latencies_ns.push(start.elapsed().as_nanos().min(u64::MAX as u128) as u64);
+        let elapsed_ns = start.elapsed().as_nanos().min(u64::MAX as u128) as u64;
+        latencies_ns.push(elapsed_ns);
+        scenario_latencies_ns[scenario_index].push(elapsed_ns);
 
         let actual_allow = outcome.is_ok();
         if actual_allow {
@@ -182,6 +187,9 @@ fn main() {
     }
 
     latencies_ns.sort_unstable();
+    for samples in &mut scenario_latencies_ns {
+        samples.sort_unstable();
+    }
 
     println!("benchmark=one_shot_authorization_ledger");
     println!("cases={CASES}");
@@ -195,7 +203,23 @@ fn main() {
     println!("sum_consume_ns={}", latencies_ns.iter().sum::<u64>());
     println!("scenario_counts:");
     for (index, scenario) in Scenario::ALL.iter().enumerate() {
+        let samples = &scenario_latencies_ns[index];
         println!("  {}={}", scenario.name(), scenario_counts[index]);
+        println!(
+            "  {}_p50_consume_ns={}",
+            scenario.name(),
+            percentile(samples, 50)
+        );
+        println!(
+            "  {}_p95_consume_ns={}",
+            scenario.name(),
+            percentile(samples, 95)
+        );
+        println!(
+            "  {}_p99_consume_ns={}",
+            scenario.name(),
+            percentile(samples, 99)
+        );
     }
     println!(
         "status={}",
