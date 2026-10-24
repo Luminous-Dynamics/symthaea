@@ -1,0 +1,940 @@
+//! Counterfactual utility scoring for adaptation policies.
+//!
+//! Drift-event F1 measures alarms, not whether acting on those alarms helps the task.
+//! This evaluator compares five policy arms on a declared common cycle panel:
+//! no adaptation, detector-triggered, benefit-gated, staged-verify-rollback, and oracle-timed.
+//! It reports whole-stream and registered phase-window loss, recovery, and intervention cost
+//! separately; it never hides the trade-off inside an unregistered weighted aggregate.
+
+use anyhow::{ensure, Context};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::{fs, path::Path};
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct CounterfactualUtilityInput {
+    pub schema_version: u32,
+    pub dataset_id: String,
+    pub stream_id: String,
+    pub scenario_id: String,
+    /// Information-access track shared by every arm in this panel.
+    pub comparison_track: String,
+    pub shared_stream_sha256: String,
+    pub seed: u64,
+    pub task_loss_metric_id: String,
+    pub task_loss_unit: String,
+    /// Registered half-open cycle windows and recovery criterion, frozen before scoring.
+    pub evaluation_windows: EvaluationWindows,
+    pub no_adapt: CounterfactualArm,
+    pub detector_triggered: CounterfactualArm,
+    pub detector_benefit_gated: CounterfactualArm,
+    pub staged_verify_rollback: CounterfactualArm,
+    pub oracle_timed: CounterfactualArm,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvaluationWindows {
+    /// Half-open stable pre-shift baseline window [start, end).
+    pub pre_shift_start_cycle: u64,
+    pub pre_shift_end_cycle: u64,
+    /// Half-open post-shift evaluation window [start, end); transition cycles may be omitted.
+    pub post_shift_start_cycle: u64,
+    pub post_shift_end_cycle: u64,
+    /// Absolute task-loss threshold fixed before evaluation, in task_loss_unit.
+    pub recovery_loss_threshold: f64,
+    /// Number of consecutive post-shift observations at/below threshold to declare recovery.
+    pub recovery_consecutive_cycles: u64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct CounterfactualArm {
+    pub name: String,
+    pub version: String,
+    /// Digest computed by this arm for the exogenous stream it actually consumed.
+    pub exogenous_stream_sha256: String,
+    pub repository_head_sha: String,
+    pub configuration_digest: String,
+    pub observations: Vec<ArmObservation>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ArmObservation {
+    pub cycle_index: u64,
+    pub task_loss: f64,
+    /// Observed adaptation resource cost, in the manifest-declared cost unit.
+    pub adaptation_cost_units: f64,
+    /// Optional task-outcome availability tick; required when binding to an executed replay receipt.
+    #[serde(default)]
+    pub task_loss_available_at_tick: Option<u64>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ArmUtilityMetrics {
+    pub name: String,
+    pub version: String,
+    pub exogenous_stream_sha256: String,
+    pub repository_head_sha: String,
+    pub configuration_digest: String,
+    pub cycle_count: usize,
+    pub cumulative_task_loss: f64,
+    pub mean_task_loss: f64,
+    pub pre_shift_mean_task_loss: f64,
+    pub post_shift_mean_task_loss: f64,
+    pub post_shift_cumulative_task_loss: f64,
+    /// Sum of max(task_loss - declared recovery threshold, 0) over post-shift cycles.
+    pub post_shift_loss_area_above_threshold: f64,
+    /// Absolute first cycle of the first recovery-length run below the registered threshold.
+    pub recovery_cycle: Option<u64>,
+    /// Recovery cycle minus post_shift_start_cycle; absent when recovery was not observed.
+    pub recovery_delay_cycles: Option<u64>,
+    pub total_adaptation_cost_units: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CounterfactualUtilityScore {
+    pub metric_version: String,
+    pub canonical_input_sha256: String,
+    /// SHA-256 of serialized result with this field set to null.
+    pub result_sha256: Option<String>,
+    pub dataset_id: String,
+    pub stream_id: String,
+    pub scenario_id: String,
+    pub comparison_track: String,
+    pub shared_stream_sha256: String,
+    pub seed: u64,
+    pub task_loss_metric_id: String,
+    pub task_loss_unit: String,
+    pub no_adapt: ArmUtilityMetrics,
+    pub detector_triggered: ArmUtilityMetrics,
+    pub detector_benefit_gated: ArmUtilityMetrics,
+    pub staged_verify_rollback: ArmUtilityMetrics,
+    pub oracle_timed: ArmUtilityMetrics,
+    /// Positive means detector-triggered adaptation lowers task loss vs no adaptation.
+    pub detector_task_loss_improvement_vs_no_adapt: f64,
+    /// Positive means detector-triggered adaptation has more whole-stream loss than oracle timing.
+    pub detector_task_loss_regret_vs_oracle_timed: f64,
+    /// Positive means detector-triggered adaptation lowers post-shift loss vs no adaptation.
+    pub detector_post_shift_task_loss_improvement_vs_no_adapt: f64,
+    /// Positive means detector-triggered adaptation has more post-shift loss than oracle timing.
+    pub detector_post_shift_task_loss_regret_vs_oracle_timed: f64,
+    /// Positive means benefit-gated adaptation lowers post-shift loss relative to no adaptation.
+    pub detector_benefit_gated_post_shift_task_loss_improvement_vs_no_adapt: f64,
+    /// Positive means staged adaptation lowers post-shift loss relative to no adaptation.
+    pub staged_post_shift_task_loss_improvement_vs_no_adapt: f64,
+    /// Positive means staged verification lowers post-shift loss relative to detector-triggered adaptation.
+    pub staged_post_shift_task_loss_improvement_vs_detector_triggered: f64,
+    /// Positive means staged verification has more post-shift loss than oracle timing.
+    pub staged_post_shift_task_loss_regret_vs_oracle_timed: f64,
+    /// Positive means the detector policy costs more resources than no adaptation.
+    pub detector_adaptation_cost_delta_vs_no_adapt: f64,
+    /// Positive means benefit-gated adaptation costs more resources than no adaptation.
+    pub detector_benefit_gated_adaptation_cost_delta_vs_no_adapt: f64,
+    /// Positive means staged verification costs more resources than no adaptation.
+    pub staged_adaptation_cost_delta_vs_no_adapt: f64,
+    /// Positive means staged verification costs more resources than detector-triggered adaptation.
+    pub staged_adaptation_cost_delta_vs_detector_triggered: f64,
+    /// True when staged verification is no better on post-shift loss and costs more than detector-triggered.
+    pub staged_dominated_by_detector_triggered: bool,
+    /// True when no adaptation is no worse on whole-stream loss and uses strictly fewer resources than benefit-gated policy.
+    pub detector_benefit_gated_dominated_by_no_adapt: bool,
+    /// True when no adaptation is no worse on whole-stream loss and uses strictly fewer resources than staged policy.
+    pub staged_dominated_by_no_adapt: bool,
+    /// True when no adaptation is no worse on task loss and uses strictly fewer resources.
+    pub detector_dominated_by_no_adapt: bool,
+    /// Resource units spent per total task-loss unit reduced; absent when there is no gain.
+    pub adaptation_cost_units_per_task_loss_unit_reduced: Option<f64>,
+    /// Provenance fields are populated only when the scorer is invoked with a validated replay receipt.
+    #[serde(default)]
+    pub source_replay_receipt_sha256: Option<String>,
+    #[serde(default)]
+    pub source_replay_receipt_validation_sha256: Option<String>,
+    #[serde(default)]
+    pub source_replay_run_id: Option<String>,
+    #[serde(default)]
+    pub source_replay_run_kind: Option<String>,
+    pub interpretation_guard: String,
+}
+
+pub fn evaluate_file(path: &Path) -> anyhow::Result<CounterfactualUtilityScore> {
+    let bytes = fs::read(path)
+        .with_context(|| format!("reading counterfactual utility input {}", path.display()))?;
+    let input: CounterfactualUtilityInput = serde_json::from_slice(&bytes)
+        .with_context(|| format!("parsing counterfactual utility input {}", path.display()))?;
+    score_counterfactual_utility(input)
+}
+
+/// Score outcomes and bind the result to a replay receipt that is independently revalidated here.
+pub fn evaluate_file_with_receipt(
+    input_path: &Path,
+    receipt_path: &Path,
+) -> anyhow::Result<CounterfactualUtilityScore> {
+    let input_bytes = fs::read(input_path)
+        .with_context(|| format!("reading counterfactual utility input {}", input_path.display()))?;
+    let mut input: CounterfactualUtilityInput = serde_json::from_slice(&input_bytes)
+        .with_context(|| format!("parsing counterfactual utility input {}", input_path.display()))?;
+    // Normalize each arm exactly as the ordinary scorer does before digesting or joining cycles.
+    for arm in [
+        &mut input.no_adapt,
+        &mut input.detector_triggered,
+        &mut input.detector_benefit_gated,
+        &mut input.staged_verify_rollback,
+        &mut input.oracle_timed,
+    ] {
+        arm.observations.sort_by_key(|observation| observation.cycle_index);
+    }
+    let mut score = score_counterfactual_utility(input.clone())?;
+    let bytes = fs::read(receipt_path)
+        .with_context(|| format!("reading replay receipt {}", receipt_path.display()))?;
+    let receipt: crate::cognitive_replay_receipt::ReplayReceipt =
+        serde_json::from_slice(&bytes)
+            .with_context(|| format!("parsing replay receipt {}", receipt_path.display()))?;
+    bind_replay_receipt(&mut score, &input, receipt)?;
+    Ok(score)
+}
+
+/// Verify the raw receipt and its identity/configuration join before recording its digests.
+/// The resulting digest commits to both the score and the validated receipt linkage.
+fn bind_replay_receipt(
+    score: &mut CounterfactualUtilityScore,
+    input: &CounterfactualUtilityInput,
+    receipt: crate::cognitive_replay_receipt::ReplayReceipt,
+) -> anyhow::Result<()> {
+    let validation = crate::cognitive_replay_receipt::validate_receipt(receipt.clone())?;
+    ensure!(score.dataset_id == receipt.dataset_id,
+        "replay receipt dataset_id differs from adaptation score");
+    ensure!(score.stream_id == receipt.stream_id,
+        "replay receipt stream_id differs from adaptation score");
+    ensure!(score.seed == receipt.environment_seed,
+        "replay receipt environment_seed differs from adaptation score seed");
+    ensure!(score.shared_stream_sha256 == receipt.event_ledger_sha256,
+        "replay receipt event_ledger_sha256 differs from the scored shared stream digest");
+
+    ensure!(score.no_adapt.cycle_count as u64 == receipt.stream_length_ticks,
+        "replay receipt stream length differs from scored cycle panel");
+    let receipt_arms: std::collections::BTreeMap<&str, &crate::cognitive_replay_receipt::ReplayArm> =
+        receipt.arms.iter().map(|arm| (arm.arm_id.as_str(), arm)).collect();
+    let input_arms = [
+        (&input.no_adapt, &score.no_adapt),
+        (&input.detector_triggered, &score.detector_triggered),
+        (&input.detector_benefit_gated, &score.detector_benefit_gated),
+        (&input.staged_verify_rollback, &score.staged_verify_rollback),
+        (&input.oracle_timed, &score.oracle_timed),
+    ];
+    for (input_arm, arm) in input_arms {
+        let source = receipt_arms.get(arm.name.as_str())
+            .with_context(|| format!("validated replay receipt is missing arm {}", arm.name))?;
+        ensure!(arm.repository_head_sha == source.repository_head_sha,
+            "replay receipt policy revision differs for arm {}", arm.name);
+        ensure!(arm.configuration_digest == source.configuration_digest,
+            "replay receipt policy configuration differs for arm {}", arm.name);
+        ensure!(arm.exogenous_stream_sha256 == receipt.event_ledger_sha256,
+            "scored stream digest differs from the validated event ledger for arm {}", arm.name);
+        ensure!(input_arm.observations.len() == source.decisions.len(),
+            "replay receipt cycle count differs for arm {}", arm.name);
+        if receipt.run_kind == "replay" {
+            for (observation, decision) in input_arm.observations.iter().zip(&source.decisions) {
+                ensure!(observation.cycle_index == decision.decision_tick,
+                    "replay receipt cycle index differs for arm {}", arm.name);
+                ensure!(decision.task_loss == Some(observation.task_loss),
+                    "replay receipt task_loss differs from scored outcome for arm {} at tick {}",
+                    arm.name, observation.cycle_index);
+                ensure!(decision.adaptation_cost_units == Some(observation.adaptation_cost_units),
+                    "replay receipt adaptation_cost_units differs from scored cost for arm {} at tick {}",
+                    arm.name, observation.cycle_index);
+                ensure!(decision.task_loss_available_at_tick == observation.task_loss_available_at_tick,
+                    "replay receipt task_loss_available_at_tick differs from scored observation for arm {} at tick {}",
+                    arm.name, observation.cycle_index);
+            }
+        }
+    }
+
+    score.source_replay_receipt_sha256 = Some(validation.canonical_receipt_sha256);
+    score.source_replay_receipt_validation_sha256 = Some(
+        validation.result_sha256.context("receipt validator omitted result_sha256")?
+    );
+    score.source_replay_run_id = Some(receipt.run_id);
+    score.source_replay_run_kind = Some(receipt.run_kind);
+    score.result_sha256 = Some(result_digest(score)?);
+    Ok(())
+}
+
+pub fn score_counterfactual_utility(
+    mut input: CounterfactualUtilityInput,
+) -> anyhow::Result<CounterfactualUtilityScore> {
+    ensure!(input.schema_version == 3, "counterfactual utility schema_version must be 2");
+    nonempty(&input.dataset_id, "dataset_id")?;
+    nonempty(&input.stream_id, "stream_id")?;
+    nonempty(&input.scenario_id, "scenario_id")?;
+    ensure!(
+        ["valid-pe-only", "feature-only-unsupervised", "auxiliary-loss-unsupervised", "observed-outcome"]
+            .contains(&input.comparison_track.as_str()),
+        "comparison_track must be one of the declared evidence-access tracks"
+    );
+    nonempty(&input.task_loss_metric_id, "task_loss_metric_id")?;
+    nonempty(&input.task_loss_unit, "task_loss_unit")?;
+    validate_digest(&input.shared_stream_sha256, 64, "shared_stream_sha256")?;
+    ensure!(
+        input.no_adapt.name == "no-adapt",
+        "no_adapt arm name must be 'no-adapt'"
+    );
+    ensure!(
+        input.detector_triggered.name == "detector-triggered",
+        "detector_triggered arm name must be 'detector-triggered'"
+    );
+    ensure!(
+        input.detector_benefit_gated.name == "detector-benefit-gated",
+        "detector_benefit_gated arm name must be 'detector-benefit-gated'"
+    );
+    ensure!(
+        input.staged_verify_rollback.name == "staged-verify-rollback",
+        "staged_verify_rollback arm name must be 'staged-verify-rollback'"
+    );
+    ensure!(
+        input.oracle_timed.name == "oracle-timed",
+        "oracle_timed arm name must be 'oracle-timed'"
+    );
+
+    validate_arm(&mut input.no_adapt, "no_adapt")?;
+    validate_arm(&mut input.detector_triggered, "detector_triggered")?;
+    validate_arm(&mut input.detector_benefit_gated, "detector_benefit_gated")?;
+    validate_arm(&mut input.staged_verify_rollback, "staged_verify_rollback")?;
+    validate_arm(&mut input.oracle_timed, "oracle_timed")?;
+    for (arm, name) in [
+        (&input.no_adapt, "no_adapt"),
+        (&input.detector_triggered, "detector_triggered"),
+        (&input.detector_benefit_gated, "detector_benefit_gated"),
+        (&input.staged_verify_rollback, "staged_verify_rollback"),
+        (&input.oracle_timed, "oracle_timed"),
+    ] {
+        ensure!(
+            arm.exogenous_stream_sha256 == input.shared_stream_sha256,
+            "{name} exogenous stream digest must match shared_stream_sha256"
+        );
+    }
+
+    let cycle_count = input.no_adapt.observations.len();
+    ensure!(cycle_count > 0, "counterfactual arms must contain at least one observation");
+    ensure!(
+        input.detector_triggered.observations.len() == cycle_count
+            && input.detector_benefit_gated.observations.len() == cycle_count
+            && input.staged_verify_rollback.observations.len() == cycle_count
+            && input.oracle_timed.observations.len() == cycle_count,
+        "all five counterfactual arms must cover the same number of cycles"
+    );
+    for index in 0..cycle_count {
+        let expected = index as u64;
+        ensure!(
+            input.no_adapt.observations[index].cycle_index == expected
+                && input.detector_triggered.observations[index].cycle_index == expected
+                && input.detector_benefit_gated.observations[index].cycle_index == expected
+                && input.staged_verify_rollback.observations[index].cycle_index == expected
+                && input.oracle_timed.observations[index].cycle_index == expected,
+            "counterfactual arms must share the same contiguous cycle panel starting at zero"
+        );
+        ensure!(
+            input.no_adapt.observations[index].adaptation_cost_units == 0.0,
+            "no-adapt arm must have zero adaptation cost at every cycle"
+        );
+    }
+
+    validate_evaluation_windows(&input.evaluation_windows, cycle_count as u64)?;
+    let canonical_input_sha256 = hex_sha256(&serde_json::to_vec(&input)?);
+    let no_adapt = arm_metrics(&input.no_adapt, &input.evaluation_windows)?;
+    let detector_triggered = arm_metrics(&input.detector_triggered, &input.evaluation_windows)?;
+    let detector_benefit_gated = arm_metrics(&input.detector_benefit_gated, &input.evaluation_windows)?;
+    let staged_verify_rollback = arm_metrics(&input.staged_verify_rollback, &input.evaluation_windows)?;
+    let oracle_timed = arm_metrics(&input.oracle_timed, &input.evaluation_windows)?;
+
+    let improvement = no_adapt.mean_task_loss - detector_triggered.mean_task_loss;
+    let regret = detector_triggered.mean_task_loss - oracle_timed.mean_task_loss;
+    let post_shift_improvement =
+        no_adapt.post_shift_mean_task_loss - detector_triggered.post_shift_mean_task_loss;
+    let post_shift_regret =
+        detector_triggered.post_shift_mean_task_loss - oracle_timed.post_shift_mean_task_loss;
+    let benefit_gated_post_shift_improvement =
+        no_adapt.post_shift_mean_task_loss - detector_benefit_gated.post_shift_mean_task_loss;
+    let staged_post_shift_improvement_vs_no_adapt =
+        no_adapt.post_shift_mean_task_loss - staged_verify_rollback.post_shift_mean_task_loss;
+    let staged_post_shift_improvement =
+        detector_triggered.post_shift_mean_task_loss - staged_verify_rollback.post_shift_mean_task_loss;
+    let staged_post_shift_regret =
+        staged_verify_rollback.post_shift_mean_task_loss - oracle_timed.post_shift_mean_task_loss;
+    let cost_delta =
+        detector_triggered.total_adaptation_cost_units - no_adapt.total_adaptation_cost_units;
+    let benefit_gated_cost_delta =
+        detector_benefit_gated.total_adaptation_cost_units - no_adapt.total_adaptation_cost_units;
+    let staged_cost_delta_vs_no_adapt =
+        staged_verify_rollback.total_adaptation_cost_units - no_adapt.total_adaptation_cost_units;
+    let staged_cost_delta =
+        staged_verify_rollback.total_adaptation_cost_units - detector_triggered.total_adaptation_cost_units;
+    let benefit_gated_dominated_by_no_adapt =
+        detector_benefit_gated.mean_task_loss >= no_adapt.mean_task_loss
+            && detector_benefit_gated.total_adaptation_cost_units
+                > no_adapt.total_adaptation_cost_units;
+    let staged_dominated_by_detector_triggered =
+        staged_verify_rollback.post_shift_mean_task_loss
+            >= detector_triggered.post_shift_mean_task_loss
+            && staged_verify_rollback.total_adaptation_cost_units
+                > detector_triggered.total_adaptation_cost_units;
+    let staged_dominated_by_no_adapt =
+        staged_verify_rollback.mean_task_loss >= no_adapt.mean_task_loss
+            && staged_verify_rollback.total_adaptation_cost_units
+                > no_adapt.total_adaptation_cost_units;
+    let detector_dominated_by_no_adapt =
+        detector_triggered.mean_task_loss >= no_adapt.mean_task_loss
+            && detector_triggered.total_adaptation_cost_units
+                > no_adapt.total_adaptation_cost_units;
+    ensure!(
+        improvement.is_finite()
+            && regret.is_finite()
+            && post_shift_improvement.is_finite()
+            && post_shift_regret.is_finite()
+            && benefit_gated_post_shift_improvement.is_finite()
+            && staged_post_shift_improvement_vs_no_adapt.is_finite()
+            && staged_post_shift_improvement.is_finite()
+            && staged_post_shift_regret.is_finite()
+            && cost_delta.is_finite()
+            && benefit_gated_cost_delta.is_finite()
+            && staged_cost_delta_vs_no_adapt.is_finite()
+            && staged_cost_delta.is_finite(),
+        "counterfactual metric calculation overflowed"
+    );
+
+    let total_loss_reduction = improvement * cycle_count as f64;
+    ensure!(
+        total_loss_reduction.is_finite(),
+        "counterfactual total loss reduction overflowed"
+    );
+    let adaptation_cost_units_per_task_loss_unit_reduced =
+        if total_loss_reduction > 0.0 {
+            let ratio = detector_triggered.total_adaptation_cost_units / total_loss_reduction;
+            ensure!(ratio.is_finite(), "adaptation-cost efficiency ratio overflowed");
+            Some(ratio)
+        } else {
+            None
+        };
+
+    let mut result = CounterfactualUtilityScore {
+        metric_version: "counterfactual-adaptation-utility-v3".to_owned(),
+        canonical_input_sha256,
+        result_sha256: None,
+        dataset_id: input.dataset_id,
+        stream_id: input.stream_id,
+        scenario_id: input.scenario_id,
+        comparison_track: input.comparison_track,
+        shared_stream_sha256: input.shared_stream_sha256,
+        seed: input.seed,
+        task_loss_metric_id: input.task_loss_metric_id,
+        task_loss_unit: input.task_loss_unit,
+        no_adapt,
+        detector_triggered,
+        detector_benefit_gated,
+        staged_verify_rollback,
+        oracle_timed,
+        detector_task_loss_improvement_vs_no_adapt: improvement,
+        detector_task_loss_regret_vs_oracle_timed: regret,
+        detector_post_shift_task_loss_improvement_vs_no_adapt: post_shift_improvement,
+        detector_post_shift_task_loss_regret_vs_oracle_timed: post_shift_regret,
+        detector_benefit_gated_post_shift_task_loss_improvement_vs_no_adapt: benefit_gated_post_shift_improvement,
+        staged_post_shift_task_loss_improvement_vs_no_adapt: staged_post_shift_improvement_vs_no_adapt,
+        staged_post_shift_task_loss_improvement_vs_detector_triggered: staged_post_shift_improvement,
+        staged_post_shift_task_loss_regret_vs_oracle_timed: staged_post_shift_regret,
+        detector_adaptation_cost_delta_vs_no_adapt: cost_delta,
+        detector_benefit_gated_adaptation_cost_delta_vs_no_adapt: benefit_gated_cost_delta,
+        staged_adaptation_cost_delta_vs_no_adapt: staged_cost_delta_vs_no_adapt,
+        staged_adaptation_cost_delta_vs_detector_triggered: staged_cost_delta,
+        staged_dominated_by_detector_triggered,
+        detector_benefit_gated_dominated_by_no_adapt: benefit_gated_dominated_by_no_adapt,
+        staged_dominated_by_no_adapt,
+        detector_dominated_by_no_adapt,
+        adaptation_cost_units_per_task_loss_unit_reduced,
+        source_replay_receipt_sha256: None,
+        source_replay_receipt_validation_sha256: None,
+        source_replay_run_id: None,
+        source_replay_run_kind: None,
+        interpretation_guard: "Counterfactual task-loss and resource-cost results only; oracle-timed is a ground-truth-timing reference, not a deployable detector. Shared-stream digest and paired arms do not by themselves prove identical hidden state or implementation correctness. Receipt linkage checks artifact identity and consistency, not honest execution. Do not collapse metrics into a composite score without a preregistered cost conversion.".to_owned(),
+    };
+    result.result_sha256 = Some(result_digest(&result)?);
+    Ok(result)
+}
+
+fn validate_arm(arm: &mut CounterfactualArm, context: &str) -> anyhow::Result<()> {
+    nonempty(&arm.name, &format!("{context}.name"))?;
+    nonempty(&arm.version, &format!("{context}.version"))?;
+    validate_commit_sha(&arm.repository_head_sha, &format!("{context}.repository_head_sha"))?;
+    validate_digest(&arm.exogenous_stream_sha256, 64, &format!("{context}.exogenous_stream_sha256"))?;
+    validate_digest(&arm.configuration_digest, 64, &format!("{context}.configuration_digest"))?;
+    ensure!(!arm.observations.is_empty(), "{context}.observations must not be empty");
+    for observation in &arm.observations {
+        ensure!(
+            observation.task_loss.is_finite() && observation.task_loss >= 0.0,
+            "{context} task_loss must be finite and non-negative"
+        );
+        ensure!(
+            observation.adaptation_cost_units.is_finite()
+                && observation.adaptation_cost_units >= 0.0,
+            "{context} adaptation cost must be finite and non-negative"
+        );
+        if let Some(available_at) = observation.task_loss_available_at_tick {
+            ensure!(available_at >= observation.cycle_index,
+                "{context} task_loss_available_at_tick cannot precede cycle_index {}",
+                observation.cycle_index);
+        }
+    }
+    arm.observations.sort_by_key(|o| o.cycle_index);
+    for pair in arm.observations.windows(2) {
+        ensure!(
+            pair[0].cycle_index != pair[1].cycle_index,
+            "{context} has duplicate cycle_index {}",
+            pair[0].cycle_index
+        );
+    }
+    Ok(())
+}
+
+fn arm_metrics(
+    arm: &CounterfactualArm,
+    windows: &EvaluationWindows,
+) -> anyhow::Result<ArmUtilityMetrics> {
+    let cumulative_task_loss = checked_sum(
+        arm.observations.iter().map(|o| o.task_loss),
+        &format!("{} cumulative task loss", arm.name),
+    )?;
+    let total_adaptation_cost_units = checked_sum(
+        arm.observations.iter().map(|o| o.adaptation_cost_units),
+        &format!("{} adaptation cost", arm.name),
+    )?;
+    let mean_task_loss = cumulative_task_loss / arm.observations.len() as f64;
+    ensure!(
+        mean_task_loss.is_finite(),
+        "{} mean task loss is not finite",
+        arm.name
+    );
+
+    let pre_start = windows.pre_shift_start_cycle as usize;
+    let pre_end = windows.pre_shift_end_cycle as usize;
+    let post_start = windows.post_shift_start_cycle as usize;
+    let post_end = windows.post_shift_end_cycle as usize;
+    let pre = &arm.observations[pre_start..pre_end];
+    let post = &arm.observations[post_start..post_end];
+    let pre_shift_mean_task_loss =
+        checked_sum(pre.iter().map(|o| o.task_loss), "pre-shift task loss")? / pre.len() as f64;
+    let post_shift_cumulative_task_loss =
+        checked_sum(post.iter().map(|o| o.task_loss), "post-shift cumulative task loss")?;
+    let post_shift_mean_task_loss =
+        post_shift_cumulative_task_loss / post.len() as f64;
+    let post_shift_loss_area_above_threshold = checked_sum(
+        post.iter().map(|o| (o.task_loss - windows.recovery_loss_threshold).max(0.0)),
+        "post-shift loss area above recovery threshold",
+    )?;
+    let hold = windows.recovery_consecutive_cycles as usize;
+    let recovery_offset = post.windows(hold).position(|segment| {
+        segment.iter().all(|o| o.task_loss <= windows.recovery_loss_threshold)
+    });
+    let recovery_cycle = recovery_offset.map(|offset| post[offset].cycle_index);
+    let recovery_delay_cycles = recovery_cycle.map(|cycle| cycle - windows.post_shift_start_cycle);
+
+    ensure!(
+        pre_shift_mean_task_loss.is_finite()
+            && post_shift_cumulative_task_loss.is_finite()
+            && post_shift_mean_task_loss.is_finite()
+            && post_shift_loss_area_above_threshold.is_finite(),
+        "{} phase-specific metric calculation overflowed",
+        arm.name
+    );
+    Ok(ArmUtilityMetrics {
+        name: arm.name.clone(),
+        version: arm.version.clone(),
+        exogenous_stream_sha256: arm.exogenous_stream_sha256.clone(),
+        repository_head_sha: arm.repository_head_sha.clone(),
+        configuration_digest: arm.configuration_digest.clone(),
+        cycle_count: arm.observations.len(),
+        cumulative_task_loss,
+        mean_task_loss,
+        pre_shift_mean_task_loss,
+        post_shift_mean_task_loss,
+        post_shift_cumulative_task_loss,
+        post_shift_loss_area_above_threshold,
+        recovery_cycle,
+        recovery_delay_cycles,
+        total_adaptation_cost_units,
+    })
+}
+
+fn validate_evaluation_windows(windows: &EvaluationWindows, cycle_count: u64) -> anyhow::Result<()> {
+    ensure!(
+        windows.pre_shift_start_cycle < windows.pre_shift_end_cycle,
+        "pre-shift window must be non-empty"
+    );
+    ensure!(
+        windows.post_shift_start_cycle < windows.post_shift_end_cycle,
+        "post-shift window must be non-empty"
+    );
+    ensure!(
+        windows.pre_shift_end_cycle <= windows.post_shift_start_cycle,
+        "pre-shift and post-shift windows must not overlap"
+    );
+    ensure!(
+        windows.post_shift_end_cycle <= cycle_count,
+        "evaluation windows must lie within the common cycle panel"
+    );
+    ensure!(
+        windows.recovery_loss_threshold.is_finite() && windows.recovery_loss_threshold >= 0.0,
+        "recovery_loss_threshold must be finite and non-negative"
+    );
+    ensure!(
+        windows.recovery_consecutive_cycles > 0
+            && windows.recovery_consecutive_cycles
+                <= windows.post_shift_end_cycle - windows.post_shift_start_cycle,
+        "recovery_consecutive_cycles must fit within the post-shift window"
+    );
+    Ok(())
+}
+
+fn checked_sum(values: impl Iterator<Item = f64>, label: &str) -> anyhow::Result<f64> {
+    let mut sum = 0.0;
+    for value in values {
+        sum += value;
+        ensure!(sum.is_finite(), "{label} overflowed");
+    }
+    Ok(sum)
+}
+
+fn result_digest(result: &CounterfactualUtilityScore) -> anyhow::Result<String> {
+    let mut copy = result.clone();
+    copy.result_sha256 = None;
+    Ok(hex_sha256(&serde_json::to_vec(&copy)?))
+}
+
+fn validate_commit_sha(value: &str, context: &str) -> anyhow::Result<()> {
+    ensure!(
+        value.len() == 40 || value.len() == 64,
+        "{context} must be a full 40- or 64-character commit hash"
+    );
+    ensure!(
+        value.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "{context} must be hexadecimal"
+    );
+    Ok(())
+}
+
+fn validate_digest(value: &str, length: usize, context: &str) -> anyhow::Result<()> {
+    ensure!(
+        value.len() == length && value.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "{context} must be a {length}-character hexadecimal SHA-256 digest"
+    );
+    Ok(())
+}
+
+fn nonempty(value: &str, context: &str) -> anyhow::Result<()> {
+    ensure!(!value.trim().is_empty(), "{context} must not be empty");
+    Ok(())
+}
+
+fn hex_sha256(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn arm(name: &str, losses: &[f64], costs: &[f64]) -> CounterfactualArm {
+        CounterfactualArm {
+            name: name.to_owned(),
+            version: format!("{name}-v1"),
+            exogenous_stream_sha256: "c".repeat(64),
+            repository_head_sha: "a".repeat(40),
+            configuration_digest: "b".repeat(64),
+            observations: losses
+                .iter()
+                .zip(costs.iter())
+                .enumerate()
+                .map(|(index, (&task_loss, &adaptation_cost_units))| ArmObservation {
+                    cycle_index: index as u64,
+                    task_loss,
+                    adaptation_cost_units,
+                    task_loss_available_at_tick: Some(index as u64),
+                })
+                .collect(),
+        }
+    }
+
+    fn fixture() -> CounterfactualUtilityInput {
+        CounterfactualUtilityInput {
+            schema_version: 3,
+            dataset_id: "dataset-a".to_owned(),
+            stream_id: "stream-17".to_owned(),
+            scenario_id: "gradual-drift-recovery".to_owned(),
+            comparison_track: "valid-pe-only".to_owned(),
+            shared_stream_sha256: "c".repeat(64),
+            seed: 17,
+            task_loss_metric_id: "one-step-prediction-loss".to_owned(),
+            task_loss_unit: "normalized-loss".to_owned(),
+            evaluation_windows: EvaluationWindows {
+                pre_shift_start_cycle: 0,
+                pre_shift_end_cycle: 1,
+                post_shift_start_cycle: 1,
+                post_shift_end_cycle: 4,
+                recovery_loss_threshold: 0.35,
+                recovery_consecutive_cycles: 2,
+            },
+            no_adapt: arm("no-adapt", &[0.1, 0.5, 0.9, 0.7], &[0.0; 4]),
+            detector_triggered: arm(
+                "detector-triggered",
+                &[0.1, 0.4, 0.3, 0.3],
+                &[0.0, 0.2, 0.4, 0.1],
+            ),
+            detector_benefit_gated: arm(
+                "detector-benefit-gated",
+                &[0.1, 0.45, 0.25, 0.25],
+                &[0.0, 0.1, 0.2, 0.05],
+            ),
+            staged_verify_rollback: arm(
+                "staged-verify-rollback",
+                &[0.1, 0.4, 0.2, 0.2],
+                &[0.0, 0.1, 0.1, 0.05],
+            ),
+            oracle_timed: arm(
+                "oracle-timed",
+                &[0.1, 0.2, 0.2, 0.2],
+                &[0.0, 0.4, 0.4, 0.1],
+            ),
+        }
+    }
+
+    #[test]
+    fn reports_task_loss_and_resource_cost_as_separate_axes() {
+        let result = score_counterfactual_utility(fixture()).expect("valid counterfactual input");
+        assert!((result.no_adapt.mean_task_loss - 0.55).abs() < 1e-12);
+        assert!((result.detector_triggered.mean_task_loss - 0.275).abs() < 1e-12);
+        assert!((result.oracle_timed.mean_task_loss - 0.175).abs() < 1e-12);
+        assert!((result.detector_task_loss_improvement_vs_no_adapt - 0.275).abs() < 1e-12);
+        assert!((result.detector_task_loss_regret_vs_oracle_timed - 0.1).abs() < 1e-12);
+        assert!((result.detector_post_shift_task_loss_improvement_vs_no_adapt - (11.0 / 30.0)).abs() < 1e-12);
+        assert!((result.detector_post_shift_task_loss_regret_vs_oracle_timed - (2.0 / 15.0)).abs() < 1e-12);
+        assert!((result.detector_triggered.post_shift_mean_task_loss - (1.0 / 3.0)).abs() < 1e-12);
+        assert_eq!(result.no_adapt.recovery_cycle, None);
+        assert_eq!(result.detector_triggered.recovery_cycle, Some(2));
+        assert_eq!(result.detector_triggered.recovery_delay_cycles, Some(1));
+        assert_eq!(result.oracle_timed.recovery_cycle, Some(1));
+        assert!((result.detector_benefit_gated_post_shift_task_loss_improvement_vs_no_adapt - (23.0 / 60.0)).abs() < 1e-12);
+        assert!((result.staged_post_shift_task_loss_improvement_vs_no_adapt - (13.0 / 30.0)).abs() < 1e-12);
+        assert!((result.staged_post_shift_task_loss_improvement_vs_detector_triggered - (1.0 / 15.0)).abs() < 1e-12);
+        assert!((result.staged_post_shift_task_loss_regret_vs_oracle_timed - (1.0 / 15.0)).abs() < 1e-12);
+        assert!((result.staged_verify_rollback.post_shift_mean_task_loss - (4.0 / 15.0)).abs() < 1e-12);
+        assert_eq!(result.staged_verify_rollback.recovery_cycle, Some(2));
+        assert!((result.staged_verify_rollback.total_adaptation_cost_units - 0.25).abs() < 1e-12);
+        assert!((result.detector_triggered.total_adaptation_cost_units - 0.7).abs() < 1e-12);
+        assert!(!result.detector_dominated_by_no_adapt);
+        assert_eq!(result.result_sha256.as_ref().map(String::len), Some(64));
+    }
+
+    #[test]
+    fn detects_detector_policy_that_costs_resources_without_improving_loss() {
+        let mut input = fixture();
+        input.detector_triggered.observations = arm(
+            "detector-triggered",
+            &[0.2, 0.6, 0.9, 0.7],
+            &[0.1, 0.1, 0.1, 0.1],
+        )
+        .observations;
+        let result = score_counterfactual_utility(input).expect("valid input");
+        assert!(result.detector_dominated_by_no_adapt);
+        assert_eq!(result.adaptation_cost_units_per_task_loss_unit_reduced, None);
+    }
+
+    #[test]
+    fn rejects_empty_overlapping_or_out_of-range_evaluation_windows() {
+        let mut empty = fixture();
+        empty.evaluation_windows.post_shift_start_cycle = 4;
+        assert!(score_counterfactual_utility(empty).unwrap_err().to_string().contains("post-shift window must be non-empty"));
+
+        let mut overlapping = fixture();
+        overlapping.evaluation_windows.pre_shift_end_cycle = 3;
+        assert!(score_counterfactual_utility(overlapping).unwrap_err().to_string().contains("must not overlap"));
+
+        let mut out_of_range = fixture();
+        out_of_range.evaluation_windows.post_shift_end_cycle = 5;
+        assert!(score_counterfactual_utility(out_of_range).unwrap_err().to_string().contains("within the common cycle panel"));
+    }
+
+    #[test]
+    fn rejects_undeclared_information_access_track() {
+        let mut input = fixture();
+        input.comparison_track = "future-labels-and-oracle".to_owned();
+        assert!(score_counterfactual_utility(input).unwrap_err().to_string().contains("comparison_track"));
+    }
+
+    #[test]
+    fn rejects_counterfactual_arm_that_consumed_a_different_stream() {
+        let mut input = fixture();
+        input.detector_triggered.exogenous_stream_sha256 = "d".repeat(64);
+        let error = score_counterfactual_utility(input).unwrap_err().to_string();
+        assert!(error.contains("must match shared_stream_sha256"));
+    }
+
+    #[test]
+    fn rejects_mismatched_stream_or_cycle_panel_in_new_policy_arms() {
+        let mut mismatched_stream = fixture();
+        mismatched_stream.detector_benefit_gated.exogenous_stream_sha256 = "d".repeat(64);
+        assert!(score_counterfactual_utility(mismatched_stream)
+            .unwrap_err().to_string().contains("must match shared_stream_sha256"));
+
+        let mut mismatched_panel = fixture();
+        mismatched_panel.staged_verify_rollback.observations[3].cycle_index = 99;
+        assert!(score_counterfactual_utility(mismatched_panel).is_err());
+    }
+
+    #[test]
+    fn canonical_digest_is_invariant_to_observation_order() {
+        let first = fixture();
+        let mut second = first.clone();
+        second.no_adapt.observations.reverse();
+        second.detector_triggered.observations.reverse();
+        second.oracle_timed.observations.reverse();
+        let a = score_counterfactual_utility(first).expect("first scores");
+        let b = score_counterfactual_utility(second).expect("second scores");
+        assert_eq!(a.canonical_input_sha256, b.canonical_input_sha256);
+        assert_eq!(a.result_sha256, b.result_sha256);
+    }
+
+    #[test]
+    fn rejects_mismatched_cycle_panels_and_nonzero_no_adapt_cost() {
+        let mut mismatched = fixture();
+        mismatched.oracle_timed.observations[2].cycle_index = 9;
+        assert!(score_counterfactual_utility(mismatched).is_err());
+
+        let mut bad_baseline = fixture();
+        bad_baseline.no_adapt.observations[1].adaptation_cost_units = 0.01;
+        assert!(score_counterfactual_utility(bad_baseline)
+            .unwrap_err()
+            .to_string()
+            .contains("zero adaptation cost"));
+    }
+
+    #[test]
+    fn rejects_invalid_provenance_nonfinite_losses_and_duplicate_cycles() {
+        let mut bad_provenance = fixture();
+        bad_provenance.shared_stream_sha256 = "short".to_owned();
+        assert!(score_counterfactual_utility(bad_provenance).is_err());
+
+        let mut bad_loss = fixture();
+        bad_loss.detector_triggered.observations[0].task_loss = f64::NAN;
+        assert!(score_counterfactual_utility(bad_loss).is_err());
+
+        let mut duplicate = fixture();
+        duplicate.no_adapt.observations[1].cycle_index = 0;
+        assert!(score_counterfactual_utility(duplicate).is_err());
+    }
+
+    #[test]
+    fn binds_score_to_validated_receipt_and_rejects_receipt_identity_or_policy_drift() {
+        let mut input = fixture();
+        let mut receipt = crate::cognitive_replay_receipt::tests::valid_receipt();
+        receipt.run_kind = "replay".to_owned();
+        receipt.dataset_id = input.dataset_id.clone();
+        receipt.stream_id = input.stream_id.clone();
+        receipt.environment_seed = input.seed;
+        // Keep the test receipt cycle panel aligned with the four scored observations.
+        receipt.stream_length_ticks = input.no_adapt.observations.len() as u64;
+        receipt.events.truncate(receipt.stream_length_ticks as usize);
+        let deliveries: Vec<crate::cognitive_replay_receipt::DeliveryRecord> = receipt.events.iter()
+            .map(|event| crate::cognitive_replay_receipt::DeliveryRecord {
+                event_id: event.event_id.clone(),
+                delivered_at_tick: event.available_at_tick,
+            })
+            .collect();
+        for receipt_arm in &mut receipt.arms {
+            receipt_arm.decisions.truncate(receipt.stream_length_ticks as usize);
+            receipt_arm.deliveries = deliveries.clone();
+        }
+
+        let stream_digest = hex_sha256(&serde_json::to_vec(&receipt.events).expect("serialize event ledger"));
+        receipt.event_ledger_sha256 = stream_digest.clone();
+        input.shared_stream_sha256 = stream_digest.clone();
+        for arm in [
+            &mut input.no_adapt,
+            &mut input.detector_triggered,
+            &mut input.detector_benefit_gated,
+            &mut input.staged_verify_rollback,
+            &mut input.oracle_timed,
+        ] {
+            arm.exogenous_stream_sha256 = stream_digest.clone();
+        }
+
+        for receipt_arm in &mut receipt.arms {
+            let scored_arm = match receipt_arm.arm_id.as_str() {
+                "no-adapt" => &input.no_adapt,
+                "detector-triggered" => &input.detector_triggered,
+                "detector-benefit-gated" => &input.detector_benefit_gated,
+                "staged-verify-rollback" => &input.staged_verify_rollback,
+                "oracle-timed" => &input.oracle_timed,
+                other => panic!("unexpected receipt arm {other}"),
+            };
+            receipt_arm.repository_head_sha = scored_arm.repository_head_sha.clone();
+            receipt_arm.configuration_digest = scored_arm.configuration_digest.clone();
+        }
+
+        for receipt_arm in &mut receipt.arms {
+            let scored = match receipt_arm.arm_id.as_str() {
+                "no-adapt" => &input.no_adapt,
+                "detector-triggered" => &input.detector_triggered,
+                "detector-benefit-gated" => &input.detector_benefit_gated,
+                "staged-verify-rollback" => &input.staged_verify_rollback,
+                "oracle-timed" => &input.oracle_timed,
+                other => panic!("unexpected receipt arm {other}"),
+            };
+            for (decision, observation) in receipt_arm.decisions.iter_mut().zip(&scored.observations) {
+                decision.task_loss = Some(observation.task_loss);
+                decision.adaptation_cost_units = Some(observation.adaptation_cost_units);
+                decision.task_loss_available_at_tick = observation.task_loss_available_at_tick;
+            }
+        }
+
+        let mut score = score_counterfactual_utility(input.clone()).expect("score fixture");
+        bind_replay_receipt(&mut score, &input, receipt.clone()).expect("matching receipt binds");
+        assert_eq!(score.source_replay_run_kind.as_deref(), Some("replay"));
+        assert_eq!(
+            score.source_replay_receipt_sha256.as_ref().map(String::len),
+            Some(64)
+        );
+        assert_eq!(
+            score.source_replay_receipt_validation_sha256.as_ref().map(String::len),
+            Some(64)
+        );
+        assert_eq!(score.result_sha256.as_ref().map(String::len), Some(64));
+
+        let mut wrong_identity = receipt.clone();
+        wrong_identity.stream_id = "different-stream".to_owned();
+        let error = bind_replay_receipt(&mut score.clone(), &input, wrong_identity)
+            .expect_err("receipt from another stream must fail closed");
+        assert!(error.to_string().contains("stream_id differs"));
+
+        let mut wrong_policy = receipt.clone();
+        wrong_policy.arms[0].configuration_digest = "9".repeat(64);
+        let error = bind_replay_receipt(&mut score.clone(), &input, wrong_policy)
+            .expect_err("policy configuration mismatch must fail closed");
+        assert!(error.to_string().contains("configuration differs"));
+
+        let mut wrong_outcome = receipt.clone();
+        wrong_outcome.arms[0].decisions[0].task_loss = Some(99.0);
+        let error = bind_replay_receipt(&mut score.clone(), &input, wrong_outcome)
+            .expect_err("receipt outcomes must match the observations being scored");
+        assert!(error.to_string().contains("task_loss differs from scored outcome"));
+
+        let mut wrong_availability = receipt;
+        wrong_availability.arms[0].decisions[1].task_loss_available_at_tick = Some(3);
+        let error = bind_replay_receipt(&mut score.clone(), &input, wrong_availability)
+            .expect_err("outcome availability timestamps must match the scored input");
+        assert!(error.to_string().contains("task_loss_available_at_tick differs from scored observation"));
+    }
+
+}

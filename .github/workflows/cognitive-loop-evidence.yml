@@ -1,0 +1,337 @@
+name: Cognitive Loop Evidence Contract
+
+on:
+  pull_request:
+    paths:
+      - "benchmarks/cognitive-loop-evidence/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "scripts/check-workspace-targets.sh"
+      - "xtask/src/cognitive_loop_evidence.rs"
+      - "xtask/src/cognitive_drift_score.rs"
+      - "xtask/src/cognitive_drift_compare.rs"
+      - "xtask/src/cognitive_drift_baselines.rs"
+      - "xtask/src/cognitive_replay_receipt.rs"
+      - "xtask/src/cognitive_adaptation_utility.rs"
+      - "xtask/src/cognitive_adaptation_panel.rs"
+      - "xtask/src/main.rs"
+      - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
+      - "docs/research/COGNITIVE_LOOP_ADAPTATION_DECISION_VALUE.md"
+      - ".github/workflows/cognitive-loop-evidence.yml"
+  push:
+    branches: [main]
+    paths:
+      - "benchmarks/cognitive-loop-evidence/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "scripts/check-workspace-targets.sh"
+      - "xtask/src/cognitive_loop_evidence.rs"
+      - "xtask/src/cognitive_drift_score.rs"
+      - "xtask/src/cognitive_drift_compare.rs"
+      - "xtask/src/cognitive_drift_baselines.rs"
+      - "xtask/src/cognitive_replay_receipt.rs"
+      - "xtask/src/cognitive_adaptation_utility.rs"
+      - "xtask/src/cognitive_adaptation_panel.rs"
+      - "xtask/src/main.rs"
+      - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
+      - "docs/research/COGNITIVE_LOOP_ADAPTATION_DECISION_VALUE.md"
+      - ".github/workflows/cognitive-loop-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cognitive-loop-evidence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  manifest-contract:
+    name: Validate manifest contract (not model performance)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Verify workspace targets are tracked
+        run: bash scripts/check-workspace-targets.sh
+      - name: Diagnose Cargo.lock consistency without relaxing the gate
+        id: lock-diagnostic
+        run: |
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          cargo update --workspace
+          if cmp -s "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Cargo.lock is consistent with the current workspace manifests."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            diff -u "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock > "$RUNNER_TEMP/Cargo.lock.diff" || true
+            cat "$RUNNER_TEMP/Cargo.lock.diff"
+            echo "::error::Cargo.lock requires a committed workspace dependency update; all locked test commands remain fail-closed."
+            exit 1
+          fi
+      - name: Upload Cargo.lock diagnostic artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cognitive-loop-cargo-lock-diagnostic-${{ github.run_id }}
+          path: |
+            Cargo.lock
+            ${{ runner.temp }}/Cargo.lock.before
+            ${{ runner.temp }}/Cargo.lock.diff
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Validate manifest and hard-gate invariants
+        run: cargo run --locked -p xtask -- validate-cognitive-loop-evidence
+      - name: Test validator failure modes
+        run: cargo test --locked -p xtask cognitive_loop_evidence
+      - name: Test drift trace scoring failure modes
+        run: cargo test --locked -p xtask cognitive_drift_score
+      - name: Test paired comparison and bootstrap failure modes
+        run: cargo test --locked -p xtask cognitive_drift_compare
+
+      - name: Test counterfactual adaptation utility failure modes
+        run: cargo test --locked -p xtask cognitive_adaptation_utility
+
+      - name: Test adaptation panel coverage and aggregation
+        run: cargo test --locked -p xtask cognitive_adaptation_panel
+
+      - name: Test scalar drift baseline failure modes
+        run: cargo test --locked -p xtask cognitive_drift_baselines
+      - name: Test replay receipt validation failure modes
+        run: cargo test --locked -p xtask cognitive_replay_receipt
+
+      - name: Run the drift scorer CLI against the synthetic fixture
+        run: |
+          cargo run --locked -p xtask -- score-cognitive-loop-drift --input benchmarks/cognitive-loop-evidence/synthetic-smoke-trace.json --out "$RUNNER_TEMP/drift-score.json"
+          jq -e '
+            .stream_id == "synthetic-smoke-fixture-not-measured" and
+            .ground_truth_events == 2 and
+            .true_positive_events == 2 and
+            .false_positive_alarms == 1 and
+            .missed_events == 0 and
+            .hard_gate_pass == true and
+            (.canonical_trace_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/drift-score.json"
+
+      - name: Run the paired comparison CLI against the synthetic fixture
+        run: |
+          cargo run --locked -p xtask -- compare-cognitive-loop-drift --input benchmarks/cognitive-loop-evidence/synthetic-paired-comparison.json --out "$RUNNER_TEMP/paired-comparison.json"
+          jq -e '
+            .metric_id == "event-f1" and
+            .dataset_count == 3 and
+            .minimum_seeds_per_dataset == 2 and
+            .sota_coverage_gate_pass == false and
+            (.sota_coverage_gate_reason | contains("seven datasets and 50 seeds")) and
+            .paired_record_count == 12 and
+            .interval_supports_positive_effect == true and
+            (.percentile_95_ci_oriented_effect[0] > 0) and
+            (.canonical_input_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/paired-comparison.json"
+
+      - name: Run the counterfactual adaptation utility CLI against the synthetic fixture
+        run: |
+          cargo run --locked -p xtask -- score-counterfactual-adaptation-utility --input benchmarks/cognitive-loop-evidence/synthetic-counterfactual-adaptation.json --out "$RUNNER_TEMP/adaptation-utility.json"
+          jq -e '
+            .metric_version == "counterfactual-adaptation-utility-v3" and
+            .comparison_track == "valid-pe-only" and
+            .dataset_id == "synthetic-fixture-not-measured" and
+            .no_adapt.cycle_count == 4 and
+            .detector_triggered.cycle_count == 4 and
+            .detector_benefit_gated.cycle_count == 4 and
+            .staged_verify_rollback.cycle_count == 4 and
+            .oracle_timed.cycle_count == 4 and
+            (.staged_post_shift_task_loss_improvement_vs_detector_triggered > 0.06 and .staged_post_shift_task_loss_improvement_vs_detector_triggered < 0.07) and
+            (.staged_post_shift_task_loss_improvement_vs_no_adapt > 0.43 and .staged_post_shift_task_loss_improvement_vs_no_adapt < 0.44) and
+            (.staged_adaptation_cost_delta_vs_detector_triggered < -0.44 and .staged_adaptation_cost_delta_vs_detector_triggered > -0.46) and
+            .staged_verify_rollback.recovery_cycle == 2 and
+            .staged_dominated_by_detector_triggered == false and
+            .staged_dominated_by_no_adapt == false and
+            .detector_benefit_gated_dominated_by_no_adapt == false and
+            (.detector_task_loss_improvement_vs_no_adapt > 0.27 and .detector_task_loss_improvement_vs_no_adapt < 0.28) and
+            (.detector_task_loss_regret_vs_oracle_timed > 0.09 and .detector_task_loss_regret_vs_oracle_timed < 0.11) and
+            (.detector_post_shift_task_loss_improvement_vs_no_adapt > 0.36 and .detector_post_shift_task_loss_improvement_vs_no_adapt < 0.37) and
+            (.detector_post_shift_task_loss_regret_vs_oracle_timed > 0.13 and .detector_post_shift_task_loss_regret_vs_oracle_timed < 0.14) and
+            (.detector_triggered.post_shift_mean_task_loss > 0.33 and .detector_triggered.post_shift_mean_task_loss < 0.34) and
+            .no_adapt.recovery_cycle == null and
+            .detector_triggered.recovery_cycle == 2 and
+            .detector_triggered.recovery_delay_cycles == 1 and
+            .oracle_timed.recovery_cycle == 1 and
+            .detector_dominated_by_no_adapt == false and
+            (.canonical_input_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64 and
+            .source_replay_receipt_sha256 == null and
+            .source_replay_receipt_validation_sha256 == null and
+            .source_replay_run_id == null and
+            .source_replay_run_kind == null
+          ' "$RUNNER_TEMP/adaptation-utility.json"
+
+      - name: Run the no-impact-shift adaptation negative control
+        run: |
+          cargo run --locked -p xtask -- score-counterfactual-adaptation-utility --input benchmarks/cognitive-loop-evidence/synthetic-counterfactual-no-impact.json --out "$RUNNER_TEMP/no-impact-adaptation-utility.json"
+          jq -e '
+            .metric_version == "counterfactual-adaptation-utility-v3" and
+            .comparison_track == "valid-pe-only" and
+            .dataset_id == "synthetic-no-impact-fixture-not-measured" and
+            .scenario_id == "nuisance-shift-no-task-impact-adaptation-harms" and
+            .no_adapt.mean_task_loss == .oracle_timed.mean_task_loss and
+            (.detector_task_loss_improvement_vs_no_adapt < -0.12 and .detector_task_loss_improvement_vs_no_adapt > -0.13) and
+            (.detector_post_shift_task_loss_improvement_vs_no_adapt < -0.16 and .detector_post_shift_task_loss_improvement_vs_no_adapt > -0.17) and
+            (.staged_post_shift_task_loss_improvement_vs_no_adapt < -0.14 and .staged_post_shift_task_loss_improvement_vs_no_adapt > -0.16) and
+            .detector_benefit_gated.post_shift_mean_task_loss == .no_adapt.post_shift_mean_task_loss and
+            .detector_benefit_gated.total_adaptation_cost_units == 0 and
+            .detector_benefit_gated_dominated_by_no_adapt == false and
+            .staged_dominated_by_no_adapt == true and
+            (.staged_adaptation_cost_delta_vs_no_adapt > 0.44 and .staged_adaptation_cost_delta_vs_no_adapt < 0.46) and
+            .no_adapt.recovery_cycle == 1 and
+            .detector_triggered.recovery_cycle == 2 and
+            .detector_triggered.recovery_delay_cycles == 1 and
+            (.detector_task_loss_regret_vs_oracle_timed > 0.12 and .detector_task_loss_regret_vs_oracle_timed < 0.13) and
+            (.detector_adaptation_cost_delta_vs_no_adapt > 0.59 and .detector_adaptation_cost_delta_vs_no_adapt < 0.61) and
+            .detector_dominated_by_no_adapt == true and
+            (.canonical_input_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/no-impact-adaptation-utility.json"
+
+      - name: Verify incomplete adaptation panel fails closed
+        run: |
+          cargo run --locked -p xtask -- compare-cognitive-adaptation-panel --input benchmarks/cognitive-loop-evidence/synthetic-adaptation-panel-incomplete.json --out "$RUNNER_TEMP/adaptation-panel-incomplete.json"
+          jq -e '
+            .metric_version == "cognitive-adaptation-panel-v1" and
+            .comparison_track == "valid-pe-only" and
+            .complete_coverage_gate_pass == false and
+            .receipt_linkage_gate_pass == false and
+            .expected_dataset_count == 7 and
+            .expected_seed_count_per_dataset == 50 and
+            .expected_run_count == 2800 and
+            .observed_run_count == 0 and
+            .missing_cell_count == 2800 and
+            (.missing_cells | length) == 2800 and
+            .primary_comparison == null and
+            (.canonical_input_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64 and
+            (.interpretation_guard | contains("Missing coverage"))
+          ' "$RUNNER_TEMP/adaptation-panel-incomplete.json"
+
+      - name: Validate the synthetic cognitive replay receipt
+        run: |
+          cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json --out "$RUNNER_TEMP/replay-receipt-validation.json"
+          jq -e '
+            .metric_version == "cognitive-replay-receipt-v2" and
+            .run_kind == "synthetic-not-measured" and
+            .event_count == 5 and
+            .arm_count == 5 and
+            .total_decision_count == 25 and
+            ([.arm_summaries[] | select(.arm_id == "staged-verify-rollback")][0].commits == 1) and
+            ([.arm_summaries[] | select(.arm_id == "staged-verify-rollback")][0].rollbacks == 1) and
+            ([.arm_summaries[] | select(.arm_id == "no-adapt")][0].commits == 0) and
+            (.canonical_receipt_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/replay-receipt-validation.json"
+
+      - name: Reject executed replay receipts with missing outcome records
+        run: |
+          jq '.run_kind = "replay"' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-missing-outcomes.json"
+          if cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input "$RUNNER_TEMP/replay-missing-outcomes.json" --out "$RUNNER_TEMP/replay-missing-outcomes-output.json"; then
+            echo "::error::Executed replay receipt without per-cycle task loss/cost was accepted."
+            exit 1
+          fi
+
+      - name: Reject future-information leakage in replay receipts
+        run: |
+          jq '.arms[0].decisions[0].observed_event_ids += ["e1"]' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-future-leak.json"
+          if cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input "$RUNNER_TEMP/replay-future-leak.json" --out "$RUNNER_TEMP/replay-future-leak-output.json"; then
+            echo "::error::Replay receipt accepted a future/unavailable event."
+            exit 1
+          fi
+
+      - name: Reject oracle-channel access in a deployable replay arm
+        run: |
+          jq '.arms[0].oracle_channel_access = true' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-oracle-leak.json"
+          if cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input "$RUNNER_TEMP/replay-oracle-leak.json" --out "$RUNNER_TEMP/replay-oracle-leak-output.json"; then
+            echo "::error::Replay receipt accepted oracle access by a deployable arm."
+            exit 1
+          fi
+
+      - name: Reject verify action without an evidence digest
+        run: |
+          jq '.arms[3].decisions[2].verification_evidence_sha256 = null' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-verify-without-evidence.json"
+          if cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input "$RUNNER_TEMP/replay-verify-without-evidence.json" --out "$RUNNER_TEMP/replay-verify-without-evidence-output.json"; then
+            echo "::error::Replay receipt accepted verification without an evidence digest."
+            exit 1
+          fi
+
+      - name: Reject commit without verified staged candidate
+        run: |
+          jq '.arms[3].decisions[2].action = "commit" | .arms[3].decisions[2].verification_evidence_sha256 = null' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-unverified-commit.json"
+          if cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input "$RUNNER_TEMP/replay-unverified-commit.json" --out "$RUNNER_TEMP/replay-unverified-commit-output.json"; then
+            echo "::error::Replay receipt accepted a commit without verification."
+            exit 1
+          fi
+
+      - name: Run the fixed-threshold drift baseline against the synthetic fixture
+        run: |
+          cargo run --locked -p xtask -- run-cognitive-drift-baseline --input benchmarks/cognitive-loop-evidence/synthetic-fixed-threshold-run.json --out "$RUNNER_TEMP/scalar-drift-baseline.json"
+          jq -e '
+            .metric_version == "scalar-drift-baselines-v1" and
+            .detector_id == "fixed-threshold" and
+            .comparison_track == "valid-pe-only" and
+            .valid_evaluation_observation_count == 7 and
+            .evaluation_cycle_count == 8 and
+            .score.true_positive_events == 2 and
+            .score.false_positive_alarms == 0 and
+            .score.missed_events == 0 and
+            .score.hard_gate_pass == true and
+            (.canonical_input_sha256 | length) == 64 and
+            (.configuration_digest | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/scalar-drift-baseline.json"
+
+      - name: Run the Page-Hinkley baseline against the synthetic fixture
+        run: |
+          cargo run --locked -p xtask -- run-cognitive-drift-baseline --input benchmarks/cognitive-loop-evidence/synthetic-page-hinkley-run.json --out "$RUNNER_TEMP/page-hinkley-baseline.json"
+          jq -e '
+            .metric_version == "scalar-drift-baselines-v1" and
+            .detector_id == "page-hinkley" and
+            .comparison_track == "valid-pe-only" and
+            .valid_evaluation_observation_count == 7 and
+            .evaluation_cycle_count == 8 and
+            .score.true_positive_events == 2 and
+            .score.false_positive_alarms == 0 and
+            .score.missed_events == 0 and
+            .score.hard_gate_pass == true and
+            (.detections | map(.cycle_index)) == [1, 6] and
+            (.canonical_input_sha256 | length) == 64 and
+            (.configuration_digest | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/page-hinkley-baseline.json"
+
+      - name: Run the predictive-rank martingale portfolio against its synthetic fixture
+        run: |
+          cargo run --locked -p xtask -- run-cognitive-drift-baseline --input benchmarks/cognitive-loop-evidence/synthetic-predictive-rank-martingale-run.json --out "$RUNNER_TEMP/predictive-rank-martingale.json"
+          jq -e '
+            .metric_version == "scalar-drift-baselines-v1" and
+            .detector_id == "predictive-rank-martingale-portfolio" and
+            .comparison_track == "valid-pe-only" and
+            .calibration_observation_count == 20 and
+            .valid_evaluation_observation_count == 40 and
+            .evaluation_cycle_count == 40 and
+            .score.ground_truth_events == 1 and
+            .score.true_positive_events == 1 and
+            .score.false_positive_alarms == 0 and
+            .score.missed_events == 0 and
+            .score.hard_gate_pass == true and
+            (.detections | length) == 1 and
+            (.detections[0].cycle_index < 40) and
+            .diagnostics.statistic_name == "predictive-rank-martingale-portfolio-wealth" and
+            .diagnostics.stopping_alpha == 0.2 and
+            .diagnostics.threshold_or_boundary == 5 and
+            .diagnostics.stopped_at_first_crossing == true and
+            .diagnostics.valid_samples_processed == (.detections[0].cycle_index + 1) and
+            (.diagnostics.maximum_statistic >= .diagnostics.threshold_or_boundary) and
+            (.canonical_input_sha256 | length) == 64 and
+            (.configuration_digest | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/predictive-rank-martingale.json"

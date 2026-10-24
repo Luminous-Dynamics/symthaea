@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "metric": {
+    "id": "event-f1",
+    "unit": "fraction",
+    "higher_is_better": true
+  },
+  "candidate": {
+    "name": "synthetic-candidate",
+    "version": "smoke-fixture-1",
+    "repository_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "comparison_track": "valid-pe-only"
+  },
+  "baseline": {
+    "name": "synthetic-baseline",
+    "version": "smoke-fixture-1",
+    "repository_head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+    "configuration_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "comparison_track": "valid-pe-only"
+  },
+  "bootstrap": {
+    "replicates": 1000,
+    "seed": 20261023
+  },
+  "pairs": [
+    {
+      "dataset_id": "dataset-a",
+      "seed": 11,
+      "scenario_id": "class-prior-abrupt",
+      "candidate_value": 0.82,
+      "baseline_value": 0.72
+    },
+    {
+      "dataset_id": "dataset-a",
+      "seed": 11,
+      "scenario_id": "label-swap-gradual",
+      "candidate_value": 0.82,
+      "baseline_value": 0.72
+    },
+    {
+      "dataset_id": "dataset-a",
+      "seed": 23,
+      "scenario_id": "class-prior-abrupt",
+      "candidate_value": 0.82,
+      "baseline_value": 0.72
+    },
+    {
+      "dataset_id": "dataset-a",
+      "seed": 23,
+      "scenario_id": "label-swap-gradual",
+      "candidate_value": 0.82,
+      "baseline_value": 0.72
+    },
+    {
+      "dataset_id": "dataset-b",
+      "seed": 11,
+      "scenario_id": "class-prior-abrupt",
+      "candidate_value": 0.82,
+      "baseline_value": 0.72
+    },
+    {
+      "dataset_id": "dataset-b",
+      "seed": 11,
+      "scenario_id": "label-swap-gradual",
+      "candidate_value": 0.82,
+      "baseline_value": 0.72
+    },
+    {
+      "dataset_id": "dataset-b",
+      "seed": 23,
+      "scenario_id": "class-prior-abrupt",
+      "candidate_value": 0.82,
+      "baseline_value": 0.72
+    },
+    {
+      "dataset_id": "dataset-b",
+      "seed": 23,
+      "scenario_id": "label-swap-gradual",
+      "candidate_value": 0.82,
+      "baseline_value": 0.72
+    },
+    {
+      "dataset_id": "dataset-c",
+      "seed": 11,
+      "scenario_id": "class-prior-abrupt",
+      "candidate_value": 0.82,
+      "baseline_value": 0.72
+    },
+    {
+      "dataset_id": "dataset-c",
+      "seed": 11,
+      "scenario_id": "label-swap-gradual",
+      "candidate_value": 0.82,
+      "baseline_value": 0.72
+    },
+    {
+      "dataset_id": "dataset-c",
+      "seed": 23,
+      "scenario_id": "class-prior-abrupt",
+      "candidate_value": 0.82,
+      "baseline_value": 0.72
+    },
+    {
+      "dataset_id": "dataset-c",
+      "seed": 23,
+      "scenario_id": "label-swap-gradual",
+      "candidate_value": 0.82,
+      "baseline_value": 0.72
+    }
+  ]
+}

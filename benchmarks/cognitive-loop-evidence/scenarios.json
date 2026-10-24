@@ -1,0 +1,1037 @@
+{
+  "schema_version": 3,
+  "benchmark": "symthaea-cognitive-loop-evidence",
+  "status": "proposal-not-measured",
+  "purpose": "Pin deterministic evidence-validity, phase-causality, calibration, continual-learning, and systems-efficiency scenarios before implementing the runner.",
+  "notes": [
+    "A failed hard invariant cannot be averaged away by task reward.",
+    "Missing evidence is not the same label as zero error or maximal surprise.",
+    "Use deterministic seeds and retain raw per-cycle records.",
+    "Metric targets live in ../research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md and are aspirational until measured."
+  ],
+  "baselines": [
+    {
+      "id": "B0",
+      "name": "legacy-raw-scalar",
+      "purpose": "Reference failure mode; compare only where reproducible."
+    },
+    {
+      "id": "B1",
+      "name": "validity-gate-only",
+      "purpose": "Isolate evidence validity."
+    },
+    {
+      "id": "B2",
+      "name": "single-update-only",
+      "purpose": "Isolate phase duplication removal."
+    },
+    {
+      "id": "B3",
+      "name": "validity-plus-single-update-plus-replay-gate",
+      "purpose": "Candidate implementation."
+    },
+    {
+      "id": "B4",
+      "name": "validity-plus-calibrated-uncertainty",
+      "purpose": "Measure incremental value of calibrated predictive confidence after validity and phase-ordering fixes."
+    },
+    {
+      "id": "B5",
+      "name": "stateless-adaptation-disabled",
+      "purpose": "Measure gain beyond no online learning."
+    },
+    {
+      "id": "B6",
+      "name": "persistence-or-last-valid",
+      "purpose": "Simple predictive baseline."
+    },
+    {
+      "id": "B7",
+      "name": "shuffled-outcome",
+      "purpose": "Negative control for spurious learning."
+    }
+  ],
+  "scenario_groups": [
+    {
+      "id": "S0-validity",
+      "hard_gate": true,
+      "cases": [
+        {
+          "id": "no-prior-prediction",
+          "inject": "First cycle has no prior prediction.",
+          "expected_valid": false,
+          "expected_pe_training_update": false,
+          "expected_replay_admission": false,
+          "assertions": [
+            "legacy diagnostic remains documented",
+            "control path uses explicit prior, not raw sentinel",
+            "PE histories unchanged",
+            "state window advances"
+          ]
+        },
+        {
+          "id": "empty-prediction",
+          "inject": "Prior prediction vector has length zero.",
+          "expected_valid": false,
+          "expected_pe_training_update": false,
+          "expected_replay_admission": false,
+          "assertions": [
+            "no PE attention update",
+            "no PE stat update",
+            "no replay sample from invalid transition"
+          ]
+        },
+        {
+          "id": "zero-norm-prediction",
+          "inject": "Prior prediction exists but its norm is zero or below declared tolerance.",
+          "expected_valid": false,
+          "expected_pe_training_update": false,
+          "expected_replay_admission": false,
+          "assertions": [
+            "legacy sentinel is not surprise evidence",
+            "PE-driven controller state does not change"
+          ]
+        },
+        {
+          "id": "dimension-mismatch",
+          "inject": "Predicted and observed representations cannot be compared in the declared common space.",
+          "expected_valid": false,
+          "expected_pe_training_update": false,
+          "expected_replay_admission": false,
+          "assertions": [
+            "explicit invalid reason",
+            "no silent truncation unless comparison contract explicitly permits it"
+          ]
+        },
+        {
+          "id": "non-finite-observation",
+          "inject": "Prediction or observation includes NaN or infinity.",
+          "expected_valid": false,
+          "expected_pe_training_update": false,
+          "expected_replay_admission": false,
+          "assertions": [
+            "finite fallback/control output",
+            "invalid reason retained"
+          ]
+        },
+        {
+          "id": "valid-identical",
+          "inject": "Valid prediction equals target under declared metric.",
+          "expected_valid": true,
+          "expected_pe_training_update": true,
+          "expected_replay_admission": true,
+          "assertions": [
+            "PE near metric-specific minimum",
+            "expected statistics update exactly once"
+          ]
+        },
+        {
+          "id": "valid-orthogonal",
+          "inject": "Valid unit vectors are orthogonal in the declared representation space.",
+          "expected_valid": true,
+          "expected_pe_training_update": true,
+          "expected_replay_admission": true,
+          "assertions": [
+            "PE near metric-specific reference",
+            "no range violation"
+          ]
+        },
+        {
+          "id": "valid-antiparallel",
+          "inject": "Valid normalized vectors point in opposite directions.",
+          "expected_valid": true,
+          "expected_pe_training_update": true,
+          "expected_replay_admission": true,
+          "assertions": [
+            "PE near metric-specific maximum",
+            "not classified as invalid"
+          ]
+        },
+        {
+          "id": "low-amplitude-nonzero",
+          "inject": "Both comparison vectors are nonzero but have small magnitudes.",
+          "expected_valid": "per-comparison-contract",
+          "expected_pe_training_update": "if-valid",
+          "expected_replay_admission": "if-valid",
+          "assertions": [
+            "norm tolerance is explicit",
+            "validity does not depend on arbitrary absolute scale when the metric is scale-invariant"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S1-calibration-and-shift",
+      "hard_gate": false,
+      "cases": [
+        {
+          "id": "stable-stream",
+          "inject": "Stationary input distribution with labelled no-change intervals.",
+          "metrics": [
+            "false-surprise-rate",
+            "brier-score",
+            "log-loss",
+            "ece",
+            "p50-p95-p99-latency"
+          ]
+        },
+        {
+          "id": "abrupt-shift",
+          "inject": "Pre-registered level/rotation/distribution changes with exact change-point labels.",
+          "metrics": [
+            "change-recall",
+            "false-positive-rate",
+            "detection-delay",
+            "precision",
+            "auprc"
+          ]
+        },
+        {
+          "id": "gradual-drift",
+          "inject": "Slow continuous drift without an abrupt boundary.",
+          "metrics": [
+            "tracking-error",
+            "false-escalations",
+            "recovery-time",
+            "calibration-by-window"
+          ]
+        },
+        {
+          "id": "missingness-burst",
+          "inject": "Remove prediction/target observations for variable-length windows.",
+          "metrics": [
+            "false-surprise-rate",
+            "replay-contamination-rate",
+            "history-contamination-count",
+            "recovery-after-observation-returns"
+          ]
+        },
+        {
+          "id": "corrupted-predictor",
+          "inject": "Predictor emits zero vector, wrong dimensions, NaN, or infinity.",
+          "metrics": [
+            "invalid-evidence-contamination-count",
+            "finite-output-rate",
+            "downstream-state-delta"
+          ]
+        },
+        {
+          "id": "shuffled-outcome-negative-control",
+          "inject": "Shuffle labels/outcomes while preserving input distribution.",
+          "metrics": [
+            "adaptation-gain",
+            "reward-gain",
+            "confidence-change"
+          ],
+          "assertions": [
+            "no unexplained performance gain over matched stateless baseline"
+          ]
+        },
+        {
+          "id": "class-prior-abrupt",
+          "inject": "Apply the change immediately at onset. Change class frequency while keeping class-conditional feature generation explicit.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "class-prior",
+          "transition": "abrupt"
+        },
+        {
+          "id": "class-prior-gradual",
+          "inject": "Linearly mix old and transformed observations over a registered transition window. Change class frequency while keeping class-conditional feature generation explicit.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "class-prior",
+          "transition": "gradual"
+        },
+        {
+          "id": "label-swap-abrupt",
+          "inject": "Apply the change immediately at onset. Change the target mapping for a selected class while keeping its feature vector unchanged.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "label-swap",
+          "transition": "abrupt"
+        },
+        {
+          "id": "label-swap-gradual",
+          "inject": "Linearly mix old and transformed observations over a registered transition window. Change the target mapping for a selected class while keeping its feature vector unchanged.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "label-swap",
+          "transition": "gradual"
+        },
+        {
+          "id": "feature-permutation-abrupt",
+          "inject": "Apply the change immediately at onset. Apply a fixed registered feature permutation while labels remain unchanged.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "feature-permutation",
+          "transition": "abrupt"
+        },
+        {
+          "id": "feature-permutation-gradual",
+          "inject": "Linearly mix old and transformed observations over a registered transition window. Apply a fixed registered feature permutation while labels remain unchanged.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "feature-permutation",
+          "transition": "gradual"
+        },
+        {
+          "id": "feature-filtering-abrupt",
+          "inject": "Apply the change immediately at onset. Filter observations based on a feature threshold selected from the pre-drift calibration window.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "feature-filtering",
+          "transition": "abrupt"
+        },
+        {
+          "id": "feature-filtering-gradual",
+          "inject": "Linearly mix old and transformed observations over a registered transition window. Filter observations based on a feature threshold selected from the pre-drift calibration window.",
+          "metrics": [
+            "event-precision",
+            "event-recall",
+            "event-f1",
+            "false-alarms-per-1000-valid-observations",
+            "missed-drift-rate",
+            "mean-normalized-detection-delay-penalized",
+            "per-seed-uncertainty"
+          ],
+          "assertions": [
+            "record exact ground-truth onset and completion cycle",
+            "use identical input-access track and valid-observation set across detectors",
+            "tune only on non-test data",
+            "retain raw alarm times and per-seed results",
+            "report abrupt and gradual results separately"
+          ],
+          "drift_type": "feature-filtering",
+          "transition": "gradual"
+        }
+      ]
+    },
+    {
+      "id": "S2-continual-learning",
+      "hard_gate": false,
+      "cases": [
+        {
+          "id": "sequential-motifs",
+          "inject": "Tasks share reusable motifs but vary surface context.",
+          "metrics": [
+            "reward-by-task",
+            "gain-over-stateless",
+            "samples-to-target",
+            "cost-per-task"
+          ]
+        },
+        {
+          "id": "distractor-interference",
+          "inject": "Previously learned motif is interleaved with unrelated task sequences.",
+          "metrics": [
+            "forgetting",
+            "retrieval-precision",
+            "false-memory-replay-rate"
+          ]
+        },
+        {
+          "id": "delayed-outcome",
+          "inject": "Prediction occurs before its outcome becomes observable.",
+          "metrics": [
+            "outcome-provenance-correctness",
+            "reward-assignment-error",
+            "adaptation-gain"
+          ]
+        },
+        {
+          "id": "post-shift-recovery",
+          "inject": "Previously stable task changes mapping after a measured baseline period.",
+          "metrics": [
+            "median-recovery-time",
+            "tail-recovery-time",
+            "pre-shift-retention",
+            "resource-cost"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S3-phase-causality",
+      "hard_gate": true,
+      "cases": [
+        {
+          "id": "one-surprise-update",
+          "inject": "Hold input/state fixed and enable one surprise event.",
+          "assertions": [
+            "surprise/exploration stateful routine count equals one per cycle",
+            "log emitted update reason and target subsystem"
+          ]
+        },
+        {
+          "id": "one-urgency-update",
+          "inject": "Hold input/state fixed and run one perception cycle.",
+          "assertions": [
+            "urgency history advances at most once",
+            "low-error streak advances at most once",
+            "mode-transition count increases at most once"
+          ]
+        },
+        {
+          "id": "invalid-pe-counterfactual",
+          "inject": "Run paired trials differing only by an invalid PE sentinel.",
+          "assertions": [
+            "PE-gated state deltas are zero",
+            "independent sensory/safety/deadline effects remain enabled and separately attributed"
+          ]
+        },
+        {
+          "id": "valid-pe-counterfactual",
+          "inject": "Run paired trials differing only by a genuine PE value across threshold.",
+          "assertions": [
+            "only declared PE-dependent consumers respond",
+            "deltas and event order are reproducible by seed"
+          ]
+        },
+        {
+          "id": "duplicate-call-negative-control",
+          "inject": "Deliberately invoke a stateful phase twice in the test harness.",
+          "assertions": [
+            "single-update invariant test detects duplicate call"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S4-end-to-end-capability",
+      "hard_gate": false,
+      "cases": [
+        {
+          "id": "clbench-matched-stateless-baseline",
+          "inject": "Run a pinned Continual Learning Bench task sequence with the published stateful/stateless protocol and matched interaction/resource budgets.",
+          "metrics": [
+            "reward-gain-over-stateless",
+            "cost-per-task",
+            "sample-efficiency",
+            "forgetting"
+          ],
+          "assertions": [
+            "pin benchmark release/task snapshot",
+            "retain all per-sequence records",
+            "report comparable baseline config"
+          ]
+        },
+        {
+          "id": "swebench-verified-audited-pinned-adapter",
+          "inject": "Run the pinned SWE-bench Verified subset with documented model/scaffold/tool configuration and the benchmark's specified test protocol.",
+          "metrics": [
+            "resolved-rate",
+            "cost-per-instance",
+            "task-duration",
+            "false-resolution-rate"
+          ],
+          "assertions": [
+            "pin dataset snapshot, tool/scaffold and test protocol",
+            "benchmark-review index currently labels SWE-bench Verified flawed; treat published score as diagnostic, not uncontested ground truth",
+            "audit sampled task/test disagreements and publish both published-set and audited-subset results",
+            "report cost and task-level failure analysis"
+          ]
+        },
+        {
+          "id": "osworld-pinned-execution-grade",
+          "inject": "Run a pinned OSWorld/OSWorld-Verified-compatible task release with execution-based grading and versioned environment setup.",
+          "metrics": [
+            "task-success",
+            "steps-to-completion",
+            "cost-per-task",
+            "grader-disagreement-rate"
+          ],
+          "assertions": [
+            "pin task set and environment image",
+            "OSWorld 2.1 was marked flawed in a September 2026 audit: 36 of 50 reviewed tasks had scoring issues",
+            "use an audited/pinned task subset and report grader disagreement",
+            "compare only matched scaffolds and budgets"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S5-systems",
+      "hard_gate": false,
+      "cases": [
+        {
+          "id": "steady-state-throughput",
+          "inject": "Fixed input stream and fixed model/config on pinned hardware.",
+          "metrics": [
+            "cycles-per-second",
+            "p50-latency",
+            "p95-latency",
+            "p99-latency",
+            "peak-rss",
+            "allocations-if-instrumented"
+          ]
+        },
+        {
+          "id": "surprise-heavy-load",
+          "inject": "Frequent genuine shift events interspersed with stable segments.",
+          "metrics": [
+            "p95-latency",
+            "throughput",
+            "task-outcome",
+            "learning-work-per-event"
+          ]
+        },
+        {
+          "id": "resource-pressure",
+          "inject": "Constrain compute/resource budget while retaining a valid evidence source.",
+          "metrics": [
+            "deadline-miss-rate",
+            "task-quality",
+            "resource-cost",
+            "evidence-drop-rate"
+          ]
+        }
+      ]
+    }
+  ],
+  "result_contract": {
+    "required_fields": [
+      "repository_head_sha",
+      "configuration_digest",
+      "toolchain",
+      "feature_flags",
+      "hardware",
+      "scenario_id",
+      "seed",
+      "baseline_id",
+      "metric_version",
+      "cycle_records_digest",
+      "result_digest",
+      "hard_gate_violations",
+      "per_seed_metrics"
+    ],
+    "ci_policy": "queued/skipped/missing is not a pass",
+    "claim_policy": "No SOTA or benchmark improvement claim without pinned comparator configuration, reproducible raw records, and uncertainty intervals."
+  },
+  "external_drift_detectors": [
+    {
+      "id": "fixed-threshold",
+      "name": "Fixed-threshold PE detector",
+      "family": "fixed-threshold-control",
+      "labels_required": false,
+      "input_contract": "Univariate valid PE or standardized residual stream; omit invalid/missing measurements and report coverage.",
+      "implementation_status": "implemented-rust-reference-baseline",
+      "source": "https://doi.org/10.1007/s41060-024-00620-y",
+      "comparison_track": "valid-pe-only",
+      "implementation_path": "xtask/src/cognitive_drift_baselines.rs",
+      "implementation_scope": "Runnable valid-PE-only scalar control; not an external KDD 2026 reproduction and not a measured performance result."
+    },
+    {
+      "id": "ewma-control-chart",
+      "name": "EWMA control-chart detector",
+      "family": "smoothed-control-chart",
+      "labels_required": false,
+      "input_contract": "Univariate valid PE or standardized residual stream; freeze smoothing and alarm thresholds using a separate calibration stream.",
+      "implementation_status": "implemented-rust-reference-baseline",
+      "source": "https://doi.org/10.1007/s41060-024-00620-y",
+      "comparison_track": "valid-pe-only",
+      "implementation_path": "xtask/src/cognitive_drift_baselines.rs",
+      "implementation_scope": "Runnable valid-PE-only scalar control; not an external KDD 2026 reproduction and not a measured performance result."
+    },
+    {
+      "id": "page-hinkley",
+      "name": "Page-Hinkley detector",
+      "family": "sequential-mean-change-test",
+      "labels_required": false,
+      "input_contract": "Univariate numeric stream; use the same valid observations as the candidate and calibrate threshold away from scored seeds.",
+      "implementation_status": "implemented-rust-reference-baseline",
+      "source": "https://doi.org/10.1007/s41060-024-00620-y",
+      "comparison_track": "valid-pe-only",
+      "implementation_path": "xtask/src/cognitive_drift_baselines.rs",
+      "implementation_scope": "One-sided upward-shift Page-Hinkley control on valid PE; explicit calibration initialization and latch/rearm policy. Not a full external benchmark reproduction."
+    },
+    {
+      "id": "predictive-rank-martingale-portfolio",
+      "name": "Predictive rank martingale portfolio",
+      "family": "anytime-valid fixed-reference distribution-shift monitor",
+      "labels_required": false,
+      "input_contract": "Fixed calibration scores plus online valid-PE scores. Seeded tie randomization is recorded; anytime-valid type-I error guarantees assume IID null scores and independent tie randomization. The current Rust runner emits the first crossing per calibration epoch only.",
+      "implementation_status": "implemented-rust-reference-baseline",
+      "source": "https://arxiv.org/abs/2609.00536",
+      "comparison_track": "valid-pe-only",
+      "implementation_path": "xtask/src/cognitive_drift_baselines.rs",
+      "implementation_scope": "Order and dispersion PRM portfolio with four fixed-bet components, predictive rank null probabilities, and 1/alpha stopping boundary. Benchmark implementation uses deterministic seed-driven tie randomization; formal guarantee is interpreted over independent benchmark seeds. Not a full ONS implementation or KDD-family reproduction."
+    },
+    {
+      "id": "adwin",
+      "name": "ADWIN adaptive-window detector",
+      "family": "adaptive-window",
+      "labels_required": false,
+      "input_contract": "Univariate numeric stream; compare on identical observation cadence and count only valid measurements.",
+      "implementation_status": "planned-baseline",
+      "source": "https://riverml.xyz/latest/api/drift/ADWIN/",
+      "comparison_track": "valid-pe-only"
+    },
+    {
+      "id": "kswin",
+      "name": "KSWIN distribution-change detector",
+      "family": "two-window-statistical-test",
+      "labels_required": false,
+      "input_contract": "Univariate numeric stream; report window-size and significance-level sweeps on calibration seeds only.",
+      "implementation_status": "planned-baseline",
+      "source": "https://riverml.xyz/latest/api/drift/KSWIN/",
+      "comparison_track": "valid-pe-only"
+    },
+    {
+      "id": "discriminative-drift-detector",
+      "name": "Discriminative Drift Detector (D3)",
+      "family": "unsupervised-multivariate-feature-space",
+      "labels_required": false,
+      "input_contract": "Multivariate numeric observations or a frozen, documented feature embedding; no labels and no post-change test leakage.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://github.com/DFKI-NI/unsupervised-concept-drift-detection",
+      "comparison_track": "feature-only-unsupervised"
+    },
+    {
+      "id": "image-based-drift-detector",
+      "name": "Image-Based Drift Detector (IBDD)",
+      "family": "unsupervised-feature-window-representation",
+      "labels_required": false,
+      "input_contract": "Multivariate observations transformed by a pinned time-window-to-image adapter; report transformation cost separately.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://github.com/DFKI-NI/unsupervised-concept-drift-detection",
+      "comparison_track": "feature-only-unsupervised"
+    },
+    {
+      "id": "semi-parametric-log-likelihood",
+      "name": "Semi-Parametric Log-Likelihood (SPLL)",
+      "family": "reference-distribution-likelihood",
+      "labels_required": false,
+      "input_contract": "Numerical multivariate reference window with documented clustering/covariance assumptions; no target labels; test abrupt and non-abrupt shifts separately.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://github.com/DFKI-NI/unsupervised-concept-drift-detection",
+      "comparison_track": "feature-only-unsupervised"
+    },
+    {
+      "id": "seed",
+      "name": "SEED volatility-shift detector",
+      "family": "performance-stream-detector",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; share the same observed per-instance correctness/error stream across error-based detectors and record label delay/update order.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "stepd",
+      "name": "STEPD statistical test detector",
+      "family": "statistical-test-on-performance",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; share the same observed per-instance correctness/error stream across error-based detectors and record label delay/update order.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "abcd-feature-space",
+      "name": "ABCD feature-space detector (ABCD(X))",
+      "family": "adaptive-bernstein-high-dimensional",
+      "comparison_track": "feature-only-unsupervised",
+      "labels_required": false,
+      "input_contract": "Reproduce KDD 2026 ABCD(X): input-feature access without target labels. It should not detect a pure label/target mapping shift when the feature distribution is unchanged.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "abcd-error-stream",
+      "name": "ABCD error-stream detector",
+      "family": "adaptive-bernstein-high-dimensional",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 ABCD classifier-error-stream setting with observed per-instance error; pin classifier and prequential protocol and declare label delay.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "studd-adwin-compression",
+      "name": "STUDD with ADWIN meta-detector",
+      "family": "student-teacher-compression-loss",
+      "comparison_track": "auxiliary-loss-unsupervised",
+      "labels_required": false,
+      "input_contract": "Reproduce the KDD 2026 STUDD meta-detector coupled with ADWIN on a pinned unsupervised auxiliary compression-loss stream; do not feed class labels; report auxiliary-model compute/memory overhead.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "dynamic-threshold-dtd",
+      "name": "Dynamic Threshold Determination (DTD)",
+      "family": "adaptive-threshold-selection",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Evaluate in settings with observed outcome-derived segment performance; forbid future-outcome leakage.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1609/aaai.v40i29.39586"
+    },
+    {
+      "id": "kdd26-adwin-error-stream",
+      "name": "ADWIN in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-cusum-error-stream",
+      "name": "CUSUM in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-ddm-error-stream",
+      "name": "Drift Detection Method (DDM) in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-eddm-error-stream",
+      "name": "Early Drift Detection Method (EDDM) in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-ewma-error-stream",
+      "name": "EWMA in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-gma-error-stream",
+      "name": "GMA in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-hddma-error-stream",
+      "name": "HDDMA in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-hddmw-error-stream",
+      "name": "HDDMW in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-page-hinkley-error-stream",
+      "name": "Page–Hinkley (PH) in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    },
+    {
+      "id": "kdd26-rddm-error-stream",
+      "name": "RDDM in the KDD 2026 classifier-error-stream setting",
+      "family": "kdd-2026-error-stream-reference",
+      "comparison_track": "observed-outcome",
+      "labels_required": true,
+      "input_contract": "Reproduce the KDD 2026 classifier-error-stream setting: pin the Hoeffding Tree and prequential test-then-train protocol; the detector receives the same observed per-instance correctness/error stream as all other error-stream baselines; record label delay and update order explicitly.",
+      "implementation_status": "external-adapter-required",
+      "source": "https://doi.org/10.1145/3770855.3819070"
+    }
+  ],
+  "drift_detector_comparison_protocol": "Pin versions; tune on a disjoint calibration stream; never remap invalid/missing PE; report false alarms and detection-delay. Fixed-threshold, EWMA, one-sided Page-Hinkley, and predictive-rank martingale portfolio now have executable Rust reference implementations on the valid-PE-only track. The PRM portfolio uses a fixed calibration reference and a first-crossing 1/alpha boundary; seeded tie randomization makes runs reproducible. Published external specialist comparators and pinned public datasets are not yet implemented or measured.",
+  "drift_protocol": {
+    "protocol_id": "leave-one-dataset-out-monte-carlo-v1",
+    "monte_carlo_seeds": 50,
+    "dataset_evaluation": "Tune detector hyperparameters on all but one dataset; score once on the held-out dataset, repeating for every dataset. Freeze threshold choices before scoring held-out data.",
+    "drift_types": [
+      "class-prior",
+      "label-swap",
+      "feature-permutation",
+      "feature-filtering"
+    ],
+    "transition_modes": [
+      "abrupt",
+      "gradual"
+    ],
+    "research_extensions_not_yet_in_core_matrix": [
+      "incremental drift",
+      "recurring drift",
+      "correlated multivariate sensor drift",
+      "bursty missingness co-occurring with drift"
+    ],
+    "detector_access_tracks": [
+      {
+        "id": "valid-pe-only",
+        "description": "Consumes only finite prediction-error observations explicitly marked valid."
+      },
+      {
+        "id": "feature-only-unsupervised",
+        "description": "Consumes input features or representation statistics without target labels or outcome-derived error."
+      },
+      {
+        "id": "auxiliary-loss-unsupervised",
+        "description": "Consumes a pinned unsupervised auxiliary-loss stream, not target labels."
+      },
+      {
+        "id": "observed-outcome",
+        "description": "Consumes outcome-derived performance/errors when labels are observed; report label delay and availability."
+      }
+    ],
+    "matching_rule": "Process ground-truth events by ascending matching-window deadline (end_cycle + max_detection_delay_cycles). For each event, match the earliest unused valid-evidence alarm in [start_cycle, deadline]. One alarm matches at most one event. Unmatched alarms are false alarms; unmatched events are missed. Invalid/missing PE sentinels are not observations.",
+    "metrics": [
+      "event-precision",
+      "event-recall",
+      "event-f1",
+      "false-alarms-per-1000-valid-observations",
+      "missed-drift-rate",
+      "mean-normalized-detection-delay-penalized",
+      "p50-p95-detection-delay",
+      "post-shift-recovery-cycles",
+      "throughput",
+      "peak-memory"
+    ],
+    "tuning_policy": "Use leave-one-dataset-out hyperparameter optimization and randomized Monte Carlo onset/parameters. Hold out datasets and seeds from threshold fitting; report both default and tuned configurations.",
+    "source_paper": "https://doi.org/10.1145/3770855.3819070",
+    "claims": "This adds an auditable comparison protocol and makes no claim that Symthaea beats any comparator. The referenced KDD 2026 paper reports SEED and STEPD as strong F1 baselines and ABCD as a compelling false-alarm trade-off.",
+    "trace_contract": "Each detector trace must pin detector_version and comparison_track, record label_delay_cycles even when zero, and mark evidence_valid on every alarm. An invalid-evidence alarm is never eligible to match a drift episode; it counts as a false alarm and must fail the hard gate.",
+    "paired_comparison_contract": {
+      "protocol_id": "paired-dataset-bootstrap-v1",
+      "minimum_independent_datasets": 3,
+      "minimum_unique_seeds": 2,
+      "bootstrap_replicates_min": 1000,
+      "bootstrap_replicates_max": 100000,
+      "resampling": "paired hierarchical bootstrap: sample dataset clusters with replacement, then seeds within each selected dataset with each seed's complete paired scenario block intact; require the identical scenario panel across all datasets; give every sampled dataset equal final weight",
+      "matching_key": [
+        "dataset_id",
+        "seed",
+        "scenario_id"
+      ],
+      "required_outputs": [
+        "candidate_dataset_macro_mean",
+        "baseline_dataset_macro_mean",
+        "dataset_macro_paired_effect",
+        "median_oriented_paired_delta",
+        "paired_win_fraction",
+        "percentile_95_ci_oriented_effect",
+        "bootstrap_fraction_effect_above_zero",
+        "per_dataset",
+        "canonical_input_sha256",
+        "result_sha256",
+        "minimum_seeds_per_dataset",
+        "sota_coverage_gate_pass",
+        "sota_coverage_gate_reason"
+      ],
+      "claim_policy": "A positive interval supports a positive paired effect only for the pinned metric, dataset set, evidence-access track, and configurations. It is not a universal SOTA claim. Report costs and all per-dataset outcomes.",
+      "sota_coverage_gate": {
+        "minimum_datasets": 7,
+        "minimum_seeds_per_dataset": 50,
+        "meaning": "Coverage eligibility only, not a performance result and not evidence of superiority. A scientific claim still requires matched protocols, actual comparator runs, per-dataset reporting, costs, and uncertainty."
+      }
+    },
+    "kdd26_reference_protocol": {
+      "paper_doi": "10.1145/3770855.3819070",
+      "detector_family_count": 14,
+      "datasets_count": 7,
+      "dataset_names_to_pin": [
+        "Asfault",
+        "Electricity",
+        "Covertype",
+        "GasSensorArray",
+        "NOAA",
+        "Posture",
+        "Rialto"
+      ],
+      "monitored_classifier": "Hoeffding Tree",
+      "stream_protocol": "Prequential test-then-train; create a per-instance correctness/error stream from observed target and prediction; publish exact label timing and update order.",
+      "hyperparameter_protocol": "Leave one dataset out; tune only on the remaining datasets; pin random-search budget and seeds; evaluate the held-out dataset once per fold.",
+      "drift_types": [
+        "class-prior",
+        "label-swap",
+        "feature-permutation",
+        "feature-filtering"
+      ],
+      "transitions": [
+        "abrupt",
+        "gradual"
+      ],
+      "important_limit": "ABCD(X) and other feature-only methods cannot detect pure target-only changes without feature distribution change; do not use labels as hidden inputs.",
+      "status": "reference protocol declared; adapters and datasets are not yet implemented/pinned",
+      "method_families": [
+        "ADWIN",
+        "CUSUM",
+        "DDM",
+        "EDDM",
+        "EWMA",
+        "GMA",
+        "HDDMA",
+        "HDDMW",
+        "Page-Hinkley (PH)",
+        "RDDM",
+        "SEED",
+        "STEPD",
+        "ABCD (error stream and ABCD(X) feature stream)",
+        "STUDD+ADWIN"
+      ]
+    },
+    "adaptation_counterfactual_protocol": {
+      "protocol_id": "same-stream-three-arm-counterfactual-v1",
+      "arms": [
+        "no-adapt",
+        "detector-triggered",
+        "oracle-timed"
+      ],
+      "replay_identity_requirements": [
+        "All arms consume the same pinned exogenous stream digest.",
+        "All arms emit the same contiguous cycle panel beginning at zero.",
+        "Pin arm version, repository head SHA, and configuration digest separately.",
+        "Oracle-timed policy uses ground-truth change timing only as a reference arm; it is not a deployable detector.",
+        "Each arm carries its own observed exogenous-stream digest and must match the shared stream digest."
+      ],
+      "required_metrics": [
+        "no_adapt.mean_task_loss",
+        "detector_triggered.mean_task_loss",
+        "oracle_timed.mean_task_loss",
+        "detector_task_loss_improvement_vs_no_adapt",
+        "detector_task_loss_regret_vs_oracle_timed",
+        "detector_adaptation_cost_delta_vs_no_adapt",
+        "detector_dominated_by_no_adapt",
+        "adaptation_cost_units_per_task_loss_unit_reduced",
+        "canonical_input_sha256",
+        "result_sha256",
+        "no_adapt.exogenous_stream_sha256",
+        "detector_triggered.exogenous_stream_sha256",
+        "oracle_timed.exogenous_stream_sha256"
+      ],
+      "unit_policy": "Report task loss and adaptation resource cost as separate axes. Do not collapse them into a composite utility unless the cost conversion was preregistered.",
+      "claim_policy": "A shared stream digest and per-arm digest agreement reduce accidental mismatches but do not prove hidden-state identity or implementation correctness. Oracle-timed is not a deployable detector; report all arm-level values."
+    }
+  }
+}

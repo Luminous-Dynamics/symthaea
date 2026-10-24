@@ -2,6 +2,13 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 mod crate_status;
+mod cognitive_loop_evidence;
+mod cognitive_drift_score;
+mod cognitive_drift_compare;
+mod cognitive_adaptation_utility;
+mod cognitive_adaptation_panel;
+mod cognitive_drift_baselines;
+mod cognitive_replay_receipt;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -65,6 +72,58 @@ enum Commands {
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
+    },
+    /// Validate the cognitive-loop evidence benchmark manifest and hard-gate contracts.
+    ValidateCognitiveLoopEvidence {
+        #[arg(long, default_value = "benchmarks/cognitive-loop-evidence/scenarios.json")]
+        manifest: PathBuf,
+    },
+    /// Score alarm timestamps against ground-truth drift episodes.
+    ScoreCognitiveLoopDrift {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Compare paired detector results with a dataset-clustered bootstrap interval.
+    CompareCognitiveLoopDrift {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Score task loss and intervention cost across counterfactual adaptation policies.
+    ScoreCounterfactualAdaptationUtility {
+        #[arg(long)]
+        input: PathBuf,
+        /// Raw replay receipt to validate and bind to the score. Required for confirmatory panels.
+        #[arg(long)]
+        receipt: Option<PathBuf>,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Run the fixed-threshold or EWMA control-chart baseline on a valid PE stream.
+    RunCognitiveDriftBaseline {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+
+    /// Validate causal timing, event parity, oracle isolation, and adaptation transactions in a replay receipt.
+    ValidateCognitiveReplayReceipt {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+
+    /// Aggregate five-arm utility records across the complete preregistered dataset × seed × scenario grid.
+    CompareCognitiveAdaptationPanel {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
     },
 }
 
@@ -146,6 +205,88 @@ fn main() -> anyhow::Result<()> {
                 crate_status::report(&root, &registry_path)?;
             } else {
                 crate_status::check(&root, &registry_path, require_classified, strict)?;
+            }
+        }
+        Commands::ValidateCognitiveLoopEvidence { manifest } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            let manifest_path = if manifest.is_absolute() {
+                manifest
+            } else {
+                root.join(manifest)
+            };
+            let summary = cognitive_loop_evidence::validate_manifest(&manifest_path)?;
+            println!(
+                "OK: cognitive-loop evidence manifest has {} baselines, {} suites, {} scenarios; hard-gate and provenance contracts are complete.",
+                summary.baseline_count, summary.suite_count, summary.case_count
+            );
+        }
+        Commands::ScoreCognitiveLoopDrift { input, out } => {
+            let score = cognitive_drift_score::evaluate_file(&input)?;
+            let rendered = serde_json::to_string_pretty(&score)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote drift score to {}", path.display());
+            } else {
+                println!("{rendered}");
+            }
+        }
+        Commands::CompareCognitiveLoopDrift { input, out } => {
+            let result = cognitive_drift_compare::evaluate_file(&input)?;
+            let rendered = serde_json::to_string_pretty(&result)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote paired comparison to {}", path.display());
+            } else {
+                println!("{rendered}");
+            }
+        }
+        Commands::ScoreCounterfactualAdaptationUtility { input, receipt, out } => {
+            let result = if let Some(receipt_path) = receipt {
+                cognitive_adaptation_utility::evaluate_file_with_receipt(&input, &receipt_path)?
+            } else {
+                cognitive_adaptation_utility::evaluate_file(&input)?
+            };
+            let rendered = serde_json::to_string_pretty(&result)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote counterfactual adaptation utility score to {}", path.display());
+            } else {
+                println!("{rendered}");
+            }
+        }
+        Commands::RunCognitiveDriftBaseline { input, out } => {
+            let result = cognitive_drift_baselines::evaluate_file(&input)?;
+            let rendered = serde_json::to_string_pretty(&result)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote scalar drift baseline result to {}", path.display());
+            } else {
+                println!("{rendered}");
+            }
+        }
+
+        Commands::ValidateCognitiveReplayReceipt { input, out } => {
+            let result = cognitive_replay_receipt::evaluate_file(&input)?;
+            let rendered = serde_json::to_string_pretty(&result)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote cognitive replay receipt validation to {}", path.display());
+            } else {
+                println!("{rendered}");
+            }
+        }
+
+        Commands::CompareCognitiveAdaptationPanel { input, out } => {
+            let result = cognitive_adaptation_panel::evaluate_file(&input)?;
+            let rendered = serde_json::to_string_pretty(&result)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote cognitive adaptation panel result to {}", path.display());
+            } else {
+                println!("{rendered}");
             }
         }
     }
