@@ -108,7 +108,7 @@ def validate_receipt(receipt: Any, for_publication: bool = False) -> list[str]:
 
     suite_allowed = {
         "id", "version", "instance_id", "dimension", "objective_count",
-        "objective_direction", "objective_evaluator_sha256",
+        "objective_direction", "objective_evaluator_sha256", "ideal_point", "reference_point",
     }
     if _closed_object(receipt["suite"], suite_allowed, suite_allowed, "$.suite", errors):
         for key in ("id", "version", "instance_id"):
@@ -122,6 +122,17 @@ def validate_receipt(receipt: Any, for_publication: bool = False) -> list[str]:
         }:
             errors.append("$.suite.objective_direction: invalid direction convention")
         _check_hash(receipt["suite"]["objective_evaluator_sha256"], "$.suite.objective_evaluator_sha256", errors)
+        dimension = receipt["suite"].get("objective_count")
+        ideal = receipt["suite"].get("ideal_point")
+        reference = receipt["suite"].get("reference_point")
+        for key, point in (("ideal_point", ideal), ("reference_point", reference)):
+            if not isinstance(point, list) or not _is_int(dimension) or len(point) != dimension:
+                errors.append(f"$.suite.{key}: expected exactly objective_count finite coordinates")
+            elif not all(_is_finite_number(v) for v in point):
+                errors.append(f"$.suite.{key}: coordinates must be finite numbers")
+        if isinstance(ideal, list) and isinstance(reference, list) and len(ideal) == len(reference) and all(_is_finite_number(v) for v in ideal + reference):
+            if any(a >= b for a, b in zip(ideal, reference)):
+                errors.append("$.suite: each ideal coordinate must be strictly below its matching reference coordinate")
 
     _check_revision(receipt["source_revision"], "$.source_revision", errors)
     for key in ("protocol_sha256", "environment_lock_sha256", "analysis_lock_sha256"):
@@ -257,8 +268,8 @@ def validate_receipt(receipt: Any, for_publication: bool = False) -> list[str]:
                 if not _is_int(v) or v < 1:
                     errors.append("$.metrics.evaluations_to_target: expected null or positive integer")
 
-    artifact_allowed = {"raw_trace_sha256", "result_sha256", "log_sha256"}
-    artifact_required = {"raw_trace_sha256", "result_sha256"}
+    artifact_allowed = {"raw_trace_sha256", "result_sha256", "trace_schema_sha256", "scorer_sha256", "log_sha256"}
+    artifact_required = {"raw_trace_sha256", "result_sha256", "trace_schema_sha256", "scorer_sha256"}
     if _closed_object(receipt["artifacts"], artifact_required, artifact_allowed, "$.artifacts", errors):
         for key in artifact_required:
             _check_hash(receipt["artifacts"][key], f"$.artifacts.{key}", errors)
