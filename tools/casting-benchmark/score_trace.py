@@ -7,6 +7,7 @@ two-objective minimization traces; unsupported modes fail closed rather than bei
 from __future__ import annotations
 
 import argparse
+import bisect
 import hashlib
 import json
 import math
@@ -102,6 +103,74 @@ def hypervolume_2d_minimize(points: list[list[float]], reference: list[float]) -
     if not math.isfinite(area):
         raise TraceScoreError("hypervolume overflowed to a non-finite result")
     return area
+
+
+class HypervolumeArchive2D:
+    """Incremental exact 2D minimization archive; each inserted point is handled amortized O(n)."""
+
+    def __init__(self, reference: list[float]) -> None:
+        if len(reference) != 2 or not all(_finite_number(v) for v in reference):
+            raise TraceScoreError("reference point must contain two finite coordinates")
+        self.reference = [float(reference[0]), float(reference[1])]
+        self._front: list[tuple[float, float]] = []
+        self._xs: list[float] = []
+        self._area = 0.0
+
+    @property
+    def front(self) -> list[list[float]]:
+        return [[x, y] for x, y in self._front]
+
+    @property
+    def area(self) -> float:
+        return self._area
+
+    def observe(self, point: list[float]) -> float:
+        if len(point) != 2 or not all(_finite_number(v) for v in point):
+            raise TraceScoreError("observed point must contain two finite coordinates")
+        x, y = float(point[0]), float(point[1])
+        rx, ry = self.reference
+        if x >= rx or y >= ry:
+            return self._area
+
+        position = bisect.bisect_left(self._xs, x)
+        # A same-x point with a better/equal y, or a predecessor with better/equal y,
+        # dominates this candidate. The x-ordered front has strictly decreasing y values.
+        if position < len(self._front):
+            same_x, same_y = self._front[position]
+            if same_x == x and same_y <= y:
+                return self._area
+        if position > 0 and self._front[position - 1][1] <= y:
+            return self._area
+
+        predecessor_delta = 0.0
+        if position > 0:
+            predecessor_x, predecessor_y = self._front[position - 1]
+            old_next_x = self._xs[position] if position < len(self._xs) else rx
+            predecessor_delta = (x - old_next_x) * (ry - predecessor_y)
+
+        # The new point dominates the consecutive following points whose y is no better.
+        end = position
+        while end < len(self._front) and self._front[end][1] >= y:
+            end += 1
+
+        removed_area_parts = []
+        for index in range(position, end):
+            old_x, old_y = self._front[index]
+            old_next_x = self._xs[index + 1] if index + 1 < len(self._xs) else rx
+            removed_area_parts.append((old_next_x - old_x) * (ry - old_y))
+        removed_area = math.fsum(removed_area_parts)
+        next_survivor_x = self._xs[end] if end < len(self._xs) else rx
+        new_area_part = (next_survivor_x - x) * (ry - y)
+        updated_area = math.fsum((self._area, predecessor_delta, new_area_part, -removed_area))
+        if not math.isfinite(updated_area) or updated_area < -ABS_TOLERANCE:
+            raise TraceScoreError("incremental hypervolume invariant failed")
+        self._area = max(0.0, updated_area)
+
+        del self._front[position:end]
+        del self._xs[position:end]
+        self._front.insert(position, (x, y))
+        self._xs.insert(position, x)
+        return self._area
 
 
 def _parse_trace(trace_bytes: bytes) -> list[dict[str, Any]]:
@@ -215,7 +284,7 @@ def score_trace(
         raise TraceScoreError("budget_exhausted requires actual evaluation count to equal planned budget")
 
     counts = {status: 0 for status in TRACE_STATUSES}
-    feasible_points: list[list[float]] = []
+    archive = HypervolumeArchive2D(reference)
     hv_by_evaluation: list[float] = []
     for row in rows:
         counts[row["status"]] += 1
@@ -227,8 +296,8 @@ def score_trace(
                 )
         if row["status"] == "feasible":
             # The trace parser requires the objective vector for every feasible row.
-            feasible_points.append([float(objectives[0]), float(objectives[1])])
-        hv_by_evaluation.append(hypervolume_2d_minimize(feasible_points, reference))
+            archive.observe([float(objectives[0]), float(objectives[1])])
+        hv_by_evaluation.append(archive.area)
 
     for trace_status, receipt_key in (
         ("feasible", "feasible_evaluations"),
