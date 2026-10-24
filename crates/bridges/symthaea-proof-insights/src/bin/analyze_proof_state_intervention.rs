@@ -706,7 +706,45 @@ fn validate_semantic_gate(
     if !matches!(correspondence_status, "matches_intended_claim" | "mismatch" | "unknown") {
         bail!("{context}: invalid semantic-gate statement-correspondence status");
     }
-    let reviewers = unsigned(correspondence, "independent_reviewer_count", &gate_context)?;
+    let reviewer_rows = array(correspondence, "reviewers", &gate_context)?;
+    let mut reviewer_ids = BTreeSet::new();
+    let mut reviewer_decisions = Vec::with_capacity(reviewer_rows.len());
+    for (index, reviewer) in reviewer_rows.iter().enumerate() {
+        let reviewer_context = format!("{gate_context}.statement_correspondence.reviewers[{index}]");
+        let reviewer_id = string(reviewer, "reviewer_id", &reviewer_context)?;
+        if reviewer_id.trim().is_empty() {
+            bail!("{context}: semantic-gate reviewer ID must not be blank");
+        }
+        if !reviewer_ids.insert(reviewer_id.to_owned()) {
+            bail!("{context}: duplicate semantic-gate reviewer identity {reviewer_id:?}");
+        }
+        let decision = string(reviewer, "decision", &reviewer_context)?;
+        if !matches!(decision, "matches_intended_claim" | "mismatch" | "unknown") {
+            bail!("{context}: unsupported semantic-gate reviewer decision {decision:?}");
+        }
+        validate_sha256(
+            string(reviewer, "evidence_sha256", &reviewer_context)?,
+            &format!("{reviewer_context}.evidence_sha256"),
+        )?;
+        reviewer_decisions.push(decision);
+    }
+    let reviewers = reviewer_rows.len();
+    let derived_correspondence = if reviewers < 2 {
+        "unknown"
+    } else if reviewer_decisions.iter().all(|decision| *decision == "matches_intended_claim") {
+        "matches_intended_claim"
+    } else if reviewer_decisions.iter().all(|decision| *decision == "mismatch") {
+        "mismatch"
+    } else {
+        // Disagreement or any unresolved reviewer finding must not be majority-voted
+        // into a binary label without a separately preregistered adjudication process.
+        "unknown"
+    };
+    if correspondence_status != derived_correspondence {
+        bail!(
+            "{context}: statement-correspondence status contradicts individual reviewer decisions; expected {derived_correspondence:?}"
+        );
+    }
     validate_sha256(
         string(correspondence, "receipt_sha256", &gate_context)?,
         &format!("{gate_context}.statement_correspondence.receipt_sha256"),
@@ -1010,6 +1048,16 @@ fn validate_pair_configurations(rows: &[StateRow]) -> Result<()> {
     Ok(())
 }
 
+fn is_qualified_target_success(
+    execution_status: &str,
+    checker_result: &str,
+    semantic_gate_status: Option<&str>,
+) -> bool {
+    execution_status == "executed"
+        && checker_result == "checked_success"
+        && semantic_gate_status == Some("passed")
+}
+
 fn compute_metrics(
     rows: &[StateRow],
     split: &str,
@@ -1032,9 +1080,11 @@ fn compute_metrics(
     // independent semantic gate; raw compilation success remains separately visible.
     let qualified_target_success = selected.iter().map(|row| Point {
         component_id: row.component_id.clone(),
-        success: row.execution_status == "executed"
-            && row.checker_result == "checked_success"
-            && row.semantic_gate_status.as_deref() == Some("passed"),
+        success: is_qualified_target_success(
+            &row.execution_status,
+            &row.checker_result,
+            row.semantic_gate_status.as_deref(),
+        ),
     }).collect();
     metrics.insert(
         "exact_target_solve_rate_on_assigned_rows".into(),
@@ -1673,7 +1723,10 @@ mod tests {
             "checked_target_statement_sha256": target_digest,
             "statement_correspondence": {
                 "status": "matches_intended_claim",
-                "independent_reviewer_count": 2,
+                "reviewers": [
+                    {"reviewer_id":"reviewer-a","decision":"matches_intended_claim","evidence_sha256":"6".repeat(64)},
+                    {"reviewer_id":"reviewer-b","decision":"matches_intended_claim","evidence_sha256":"7".repeat(64)}
+                ],
                 "receipt_sha256": "1".repeat(64)
             },
             "axiom_policy": {
@@ -1750,6 +1803,15 @@ mod tests {
     }
 
     #[test]
+    fn primary_success_requires_checker_success_and_semantic_gate_pass() {
+        assert!(is_qualified_target_success("executed", "checked_success", Some("passed")));
+        assert!(!is_qualified_target_success("executed", "checked_success", Some("unknown")));
+        assert!(!is_qualified_target_success("executed", "checked_success", Some("failed")));
+        assert!(!is_qualified_target_success("executed", "checked_failure", Some("passed")));
+        assert!(!is_qualified_target_success("not_run", "not_run", None));
+    }
+
+    #[test]
     fn semantic_gate_must_bind_to_the_exact_target() {
         let target_digest = "d".repeat(64);
         let make_execution = |gate: Value| json!({
@@ -1788,7 +1850,7 @@ mod tests {
     fn semantic_gate_requires_two_independent_statement_reviews_to_pass() {
         let target_digest = "d".repeat(64);
         let mut gate = passing_semantic_gate(&target_digest);
-        gate["statement_correspondence"]["independent_reviewer_count"] = json!(1);
+        gate["statement_correspondence"]["reviewers"].as_array_mut().unwrap().pop();
         let error = validate_semantic_gate(&gate, "test-execution", &target_digest)
             .expect_err("one review cannot qualify the semantic gate");
         assert!(error.to_string().contains("contradicts component evidence"));
