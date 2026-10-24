@@ -44,6 +44,19 @@ impl Summary {
     fn xor_fec_delivery_per_mille(self) -> usize {
         self.xor_fec_successes * 1000 / self.trials
     }
+
+    /// Wilson score interval for a binomial delivery rate; displayed as a
+    /// proportion rather than presented as a confidence claim about real radios.
+    fn wilson_95(self, successes: usize) -> (f64, f64) {
+        let n = self.trials as f64;
+        let p = successes as f64 / n;
+        let z = 1.959_963_984_540_054_f64;
+        let z2 = z * z;
+        let denominator = 1.0 + z2 / n;
+        let center = (p + z2 / (2.0 * n)) / denominator;
+        let margin = z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
+        ((center - margin).max(0.0), (center + margin).min(1.0))
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -226,6 +239,8 @@ fn xor_fec_reconstructs_exact_bytes_after_every_single_frame_loss() {
 #[test]
 fn iid_loss_sweep_is_reproducible_and_fec_never_fabricates_payloads() {
     let payload = payload_of_len(2048, 0xA5);
+    let replicate_seeds = [0x1010_0001, 0x2020_0002, 0x3030_0003];
+
     for loss_per_mille in [0, 25, 50, 100, 200, 300, 400, 600] {
         let model = LossModel::Iid { loss_per_mille };
         let first = run_benchmark(&payload, model, 0x5EED_1234, 2000);
@@ -237,16 +252,45 @@ fn iid_loss_sweep_is_reproducible_and_fec_never_fabricates_payloads() {
             first.xor_fec_successes >= first.no_fec_successes,
             "under paired traces, single XOR parity must not reduce delivery"
         );
+        let no_fec_ci = first.wilson_95(first.no_fec_successes);
+        let xor_fec_ci = first.wilson_95(first.xor_fec_successes);
         eprintln!(
-            "mesh-iid loss={}‰ trials={} no_fec={}‰ xor_fec={}‰ fec_recoveries={} wire_bytes/message={}/{}",
+            "mesh-iid loss={}‰ seed=0x5eed1234 trials={} no_fec={}‰ CI95=[{:.1},{:.1}]% xor_fec={}‰ CI95=[{:.1},{:.1}]% fec_recoveries={} wire_bytes/message={}/{}",
             loss_per_mille,
             first.trials,
             first.no_fec_delivery_per_mille(),
+            no_fec_ci.0 * 100.0,
+            no_fec_ci.1 * 100.0,
             first.xor_fec_delivery_per_mille(),
+            xor_fec_ci.0 * 100.0,
+            xor_fec_ci.1 * 100.0,
             first.xor_fec_recoveries,
             first.no_fec_wire_bytes_per_message,
             first.xor_fec_wire_bytes_per_message,
         );
+
+        // Independent deterministic replicates expose seed sensitivity. CI
+        // intervals describe the synthetic model only, never field-radio truth.
+        for seed in replicate_seeds {
+            let replicate = run_benchmark(&payload, model, seed, 1000);
+            assert_eq!(replicate.xor_fec_incorrect_outputs, 0);
+            assert!(replicate.xor_fec_successes >= replicate.no_fec_successes);
+            let baseline_ci = replicate.wilson_95(replicate.no_fec_successes);
+            let fec_ci = replicate.wilson_95(replicate.xor_fec_successes);
+            eprintln!(
+                "mesh-iid-replicate loss={}‰ seed={:#010x} trials={} no_fec={}‰ CI95=[{:.1},{:.1}]% xor_fec={}‰ CI95=[{:.1},{:.1}]% fec_recoveries={}",
+                loss_per_mille,
+                seed,
+                replicate.trials,
+                replicate.no_fec_delivery_per_mille(),
+                baseline_ci.0 * 100.0,
+                baseline_ci.1 * 100.0,
+                replicate.xor_fec_delivery_per_mille(),
+                fec_ci.0 * 100.0,
+                fec_ci.1 * 100.0,
+                replicate.xor_fec_recoveries,
+            );
+        }
     }
 }
 
