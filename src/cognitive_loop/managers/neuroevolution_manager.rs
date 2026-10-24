@@ -155,9 +155,8 @@ impl NeuroevolutionManager {
 
         // Accumulate observations every cycle
         self.accumulated_psi.push(snapshot.unified_psi);
-        if snapshot.prediction_error_valid != 0 {
-            self.accumulated_prediction_error
-                .push(snapshot.prediction_error);
+        if let Some(prediction_error) = snapshot.prediction_error_sample() {
+            self.accumulated_prediction_error.push(prediction_error);
         }
         self.accumulated_confidence
             .push(snapshot.prediction_confidence);
