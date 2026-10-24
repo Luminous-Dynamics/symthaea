@@ -15,7 +15,7 @@ This is a different experimental track from qReduMIS, which uses a quantum-infor
 - mis_random_regular.rs: deterministic seeded simple d-regular graph generation using the configuration model, with whole-pairing rejection for self-loops or duplicate edges.
 - qcomp_rrg_generate binary: emits canonical DIMACS edge-format graph bytes to stdout, with configuration and generator comments embedded.
 - The generator reports seed and rejection attempts, rejects invalid degree/parity and a zero retry budget, supports degree zero for fixtures, and caps retries rather than silently returning a non-regular graph. Before allocation, it also fails closed above 100,000 vertices or 1,000,000 stubs; the published-paper-shaped maximum (N=5,000, degree 3) is 15,000 stubs. The default rejection budget is 100,000 full pairings, with a lower limit configurable per CLI/API call.
-- Unit tests cover degree counts and edge counts for 3-regular and 1-regular graphs, deterministic replay and malformed requests.
+- Unit tests cover degree and edge counts, deterministic replay, invalid requests, vertex/stub allocation ceilings and the coarse small-N distribution check. Retry-budget exhaustion errors preserve vertex count, degree, seed and attempt limit for a useful failure receipt. The CLI emits structured JSON failure metadata on stderr for parse/input/generation failures and keeps stdout free of graph records unless a valid graph was produced.
 
 The underlying XorShift64* generator is seeded and non-cryptographic. The mathematical statement that conditioning a uniform configuration-model pairing on simplicity is uniform over simple d-regular graphs assumes a uniform stub permutation; this implementation offers deterministic pseudo-random replay, not a formal randomness guarantee or proof about finite PRNG output. The graph file itself, rather than the seed alone, is the experiment's shared input artifact.
 
@@ -82,4 +82,4 @@ The canonical generator now includes a deterministic Rust test over 5,000 seeds 
 
 ## Validation boundary
 
-The generator, DIMACS export binary, and Rust unit tests are authored in the verifier workstream. They have not been compiled or executed here because cargo/rustc are unavailable. There is no generated file artifact, measured runtime, hardware execution, paper reproduction, SOTA result, or quantum advantage claim in this contribution.
+The generator, DIMACS export binary, structured failure receipt path, and Rust unit tests are authored in the verifier workstream. They have not been compiled or executed here because cargo/rustc are unavailable. The JavaScript preflight is not execution of the Rust generator; exact Rust-to-JS graph-byte parity remains an explicit release gate. There is no generated file artifact, measured runtime, hardware execution, paper reproduction, SOTA result, or quantum advantage claim in this contribution.
