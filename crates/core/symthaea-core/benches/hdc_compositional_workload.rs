@@ -74,7 +74,7 @@ fn scalar_hamming(left: &BinaryHV, right: &BinaryHV) -> u32 {
     left.0
         .iter()
         .zip(right.0.iter())
-        .map(|(a, b)| (a ^ b).count_ones())
+        .map(|(a, b)| (*a ^ *b).count_ones())
         .sum()
 }
 
