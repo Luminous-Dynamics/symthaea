@@ -4,7 +4,7 @@ Status: **140-graph independent JavaScript preflight; not Rust execution or dist
 
 ## Canonical implementation handoff
 
-The only Rust implementation is now centralized in [PR #8324](https://github.com/Luminous-Dynamics/symthaea/pull/8324): module `crates/domains/symthaea-quantum-comp/src/mis_random_regular.rs`, inspected commit `988ef2766170d6242d9aa2d99362cd7cc1020379`, blob `a51cb79f336233bf9b5e823fa05cf664402dd897`. Its CLI is `qcomp_rrg_generate` (including `max_attempts` in the DIMACS comments). It enforces 100,000 vertices, 1,000,000 stubs and 100,000 default pairing attempts. The duplicate `random_regular_mis.rs` implementation was removed from the cohort PR so there is one canonical API.
+The only Rust implementation is now centralized in [PR #8324](https://github.com/Luminous-Dynamics/symthaea/pull/8324): module `crates/domains/symthaea-quantum-comp/src/mis_random_regular.rs`, inspected commit `c1a42dea47bddbe6816d7943f762265e3a98aaf5`, blob `247414ded11cb7cb12637a56e7c2699564a6efe1`. Its CLI is `qcomp_rrg_generate` (including `max_attempts` in the DIMACS comments). It enforces 100,000 vertices, 1,000,000 stubs and 100,000 default pairing attempts. The duplicate `random_regular_mis.rs` implementation was removed from the cohort PR so there is one canonical API.
 
 The Rust source is aligned to this preflight's seed-stream semantics: XorShift64*, rejection-sampled Fisher–Yates draws and in-place re-shuffling of stubs between rejected pairings. This is an implementation alignment, not proof of parity: the Rust tests and CLI have not yet been compiled or executed, and the 140 serialized edge-list fingerprints in the JSON were produced by the independent JavaScript translation.
 
