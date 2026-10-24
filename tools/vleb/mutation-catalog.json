@@ -156,7 +156,8 @@
       "expected_equivalence": "non_equivalent",
       "required_test_ids": [
         "ledger.malformed_csv_rejected",
-        "ledger.transaction_order_invariant"
+        "ledger.transaction_order_invariant",
+        "ledger.final_line_ending_invariant"
       ],
       "oracle_observation": "CRLF is supported; bare CR is rejected; result remains stable with/without a final line ending."
     },
@@ -202,6 +203,18 @@
       "expected_equivalence": "non_equivalent",
       "required_test_ids": [],
       "oracle_observation": "Required test inventory and each raw command/test receipt must reconcile; incomplete evidence suppresses the score."
+    },
+    {
+      "mutation_id": "VLEB-LDG-014",
+      "mutation_class": "other_semantic",
+      "target": "CSV end-of-file handling",
+      "transformation": "Emit an extra empty record or reject an otherwise valid input solely because its final record separator is absent.",
+      "expected_compilable": true,
+      "expected_equivalence": "non_equivalent",
+      "required_test_ids": [
+        "ledger.final_line_ending_invariant"
+      ],
+      "oracle_observation": "Adding/removing one final LF must not change totals or the canonical report."
     }
   ]
 }
