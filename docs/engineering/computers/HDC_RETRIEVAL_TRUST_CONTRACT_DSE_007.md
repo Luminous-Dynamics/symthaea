@@ -143,3 +143,30 @@ A speed improvement is useful only if the same task-level quality and decision c
 ## 9. Evidence status
 
 This is a design specification, not a test report. The PR #8510 benchmark sources still need exact-head Rust compilation and execution. Static file presence, Python pilots and workflow states that are skipped or in progress are not passes. No SOTA, Rust runtime, device-energy or production safety claim follows from this document.
+
+
+## 10. Initial Rust contract prototype
+
+A first implementation now exists at `crates/core/symthaea-core/src/hdc/retrieval_contract.rs` and is exposed through the HDC module.
+
+It adds explicit modes for exact identity, semantic retrieval and open-set retrieval, plus decision outcomes for verified identity, accepted semantic result, tentative candidate, no match and abstention. The contract includes unit tests for:
+
+- high similarity failing to override a requested-ID mismatch;
+- exact version mismatch and missing version;
+- missing or failed content-integrity evidence;
+- semantic acceptance requiring an independent relevance-verifier status;
+- open-set low-score rejection versus high-score/low-margin abstention;
+- NaN score and invalid policy rejection;
+- empty candidate results.
+
+This module is deliberately a policy boundary, not a cryptographic implementation. The EvidenceStatus values must come from real upstream verifiers. It does not currently replace existing StatisticalRetriever call sites or prove compatibility with every consumer.
+
+**Validation status:** source and tests have been committed, but this environment has no Cargo, rustc or Nix executable, so the crate has not been compiled and the tests have not run here. The observed GitHub Actions runs for the branch ended as skipped; they are not passes. Treat API/type correctness as pending until exact-head Rust checks execute.
+
+### Next implementation gate
+
+1. Run `cargo test -p symthaea-core retrieval_contract` and `cargo clippy -p symthaea-core --all-targets -- -D warnings` at the exact PR head.
+2. Add property-based tests for all EvidenceStatus combinations and boundary values.
+3. Add a deterministic benchmark corpus that includes bit-identical observations with different external identity labels; verify that score-only input yields CandidateOnly/Abstain, never ExactIdentityVerified.
+4. Only after the API is stable, adapt one real caller behind an opt-in path and measure false acceptance, abstention/coverage and latency against its existing policy.
+5. Add receipt serialization and bind the decision to policy, corpus/index digest and source revision before production adoption.
