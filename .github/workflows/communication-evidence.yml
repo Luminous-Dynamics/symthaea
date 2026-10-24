@@ -8,6 +8,10 @@ on:
       - "crates/core/symthaea-stt/src/communication_adapter.rs"
       - "communication/**"
       - ".github/workflows/communication-evidence.yml"
+      - "docs/architecture/NEUROSEMANTIC_COMMUNICATION_PROTOCOL_V1.md"
+      - "docs/architecture/NEUROSEMANTIC_N1_EVIDENCE_CONTRACT.md"
+      - "docs/communication-capability-inventory.md"
+      - "docs/architecture/NEUROSEMANTIC_HDC_GROUNDED_IDENTITY_N0.md"
   workflow_dispatch:
 
 concurrency:
@@ -21,10 +25,403 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Pull requests run evidence against the immutable PR head, not GitHub's synthetic merge ref.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - name: Record evidence execution provenance
+        if: always()
+        env:
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+        run: |
+          mkdir -p target/communication-evidence
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          checked_out = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          provenance = {
+              "schema_version": 1,
+              "event_name": os.environ["GITHUB_EVENT_NAME"],
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "workflow": os.environ["GITHUB_WORKFLOW"],
+              "workflow_run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "workflow_run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "ref": os.environ["GITHUB_REF"],
+              "github_sha": os.environ["GITHUB_SHA"],
+              "checked_out_revision": checked_out,
+              "pr_head_sha": os.environ["PR_HEAD_SHA"],
+          }
+          if provenance["event_name"] == "pull_request":
+              assert provenance["checked_out_revision"] == provenance["pr_head_sha"]
+          Path("target/communication-evidence/execution-provenance.json").write_text(
+              json.dumps(provenance, indent=2) + "\n"
+          )
+          PY
+      - name: Verify exact checked-out revision
+        if: github.event_name == 'pull_request'
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "${PR_HEAD_SHA}"
       - uses: dtolnay/rust-toolchain@1.96.0
       - uses: Swatinem/rust-cache@v2
-      - name: Test communication contracts and CLI
-        run: cargo test -p symthaea-communication
+      - name: Test communication contracts and execute N0 evidence labs
+        run: |
+          cargo test -p symthaea-communication --features hdc-codec
+          mkdir -p target/communication-evidence
+          cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_n0 | tee target/communication-evidence/neurosemantic_n0.json
+          cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_interlingua_n0 | tee target/communication-evidence/neurosemantic_interlingua_n0.json
+          cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_codec_n0 | tee target/communication-evidence/neurosemantic_hdc_codec_n0.json
+          cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_interlingua_n0 | tee target/communication-evidence/neurosemantic_hdc_interlingua_n0.json
+          cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_n0.json
+          cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_generalization_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_generalization_n0.json
+          cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_adversarial_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_adversarial_n0.json
+          cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_calibration_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_calibration_n0.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          provenance = json.loads(Path("target/communication-evidence/execution-provenance.json").read_text())
+          assert provenance["schema_version"] == 1
+          assert provenance["repository"] == os.environ["GITHUB_REPOSITORY"]
+          assert provenance["workflow"] == os.environ["GITHUB_WORKFLOW"]
+          assert provenance["workflow_run_id"] == int(os.environ["GITHUB_RUN_ID"])
+          assert provenance["workflow_run_attempt"] == int(os.environ["GITHUB_RUN_ATTEMPT"])
+          assert provenance["workflow_run_id"] > 0
+          assert provenance["workflow_run_attempt"] > 0
+
+          expected_revision = provenance["pr_head_sha"] if provenance["event_name"] == "pull_request" else provenance["github_sha"]
+          checked_out = provenance["checked_out_revision"]
+          assert checked_out == expected_revision
+          assert len(checked_out) in (40, 64)
+          assert all(character in "0123456789abcdefABCDEF" for character in checked_out)
+          assert any(character != "0" for character in checked_out)
+
+          evidence_reports = sorted(
+              path for path in Path("target/communication-evidence").glob("*.json")
+              if path.name != "execution-provenance.json"
+          )
+          assert evidence_reports, "no communication evidence reports were produced"
+          for report_path in evidence_reports:
+              report = json.loads(report_path.read_text())
+              assert report.get("execution_revision") == checked_out, report_path
+
+          report = json.loads(Path("target/communication-evidence/neurosemantic_n0.json").read_text())
+          assert report["exact_graph_roundtrip"] is True
+          assert report["authorization_valid"] is True
+          assert report["handling_policy_provenance_present"] is True
+          assert report["handling_policy_provenance_hash_valid"] is True
+          assert report["handling_policy_provenance_reference_mismatch_blocked"] is True
+          assert report["handling_policy_provenance_mismatch_blocked"] is True
+          assert report["derivation_provenance_present"] is True
+          assert report["derivation_provenance_hash_valid"] is True
+          assert report["derivation_provenance_mismatch_blocked"] is True
+          assert report["derivation_lineage_structured"] is True
+          assert report["derivation_lineage_input_alias_blocked"] is True          assert report["derivation_lineage_output_verified"] is True
+          assert report["derivation_lineage_output_mismatch_blocked"] is True
+
+          assert report["malformed_derivation_lineage_blocked"] is True
+          assert report["derivation_input_artifact_verified"] is True
+          assert report["derivation_input_artifact_mismatch_blocked"] is True
+          assert report["derivation_input_artifact_bounds_blocked"] is True
+          assert report["lifecycle_receipt_binding_verified"] is True
+          assert report["lifecycle_independent_verification_verified"] is True
+          assert report["lifecycle_verification_scope_verified"] is True
+          assert report["lifecycle_chain_verified"] is True
+          assert report["lifecycle_skipped_stage_blocked"] is True
+          assert report["lifecycle_sequence_gap_blocked"] is True
+          assert report["lifecycle_state_regression_blocked"] is True
+          assert report["lifecycle_timestamp_regression_blocked"] is True
+          assert report["lifecycle_replacement_lineage_verified"] is True
+          assert report["lifecycle_replacement_lineage_mismatch_blocked"] is True
+          assert report["lifecycle_effect_evidence_mismatch_blocked"] is True
+          assert report["lifecycle_independent_verification_mismatch_blocked"] is True
+          assert report["lifecycle_verifier_target_mismatch_blocked"] is True
+          assert report["lifecycle_verifier_identity_required"] is True
+          assert report["lifecycle_verifier_independence_required"] is True
+          assert report["lifecycle_effect_binding_mutation_blocked"] is True
+          assert report["lifecycle_verification_scope_mismatch_blocked"] is True
+          assert report["lifecycle_verification_scope_root_mismatch_blocked"] is True
+          assert report["lifecycle_verification_scope_duplicate_blocked"] is True
+          assert report["lifecycle_verification_scope_tamper_blocked"] is True
+          assert report["lifecycle_artifact_mismatch_blocked"] is True
+          assert report["lifecycle_lineage_mismatch_blocked"] is True
+          assert report["lifecycle_future_timestamp_blocked"] is True
+          assert report["lifecycle_rectification_requires_replacement_artifact"] is True
+          assert report["lifecycle_rectification_requires_replacement_lineage"] is True
+          assert report["remediation_impact_structured"] is True
+          assert report["remediation_lifecycle_binding_verified"] is True
+          assert report["remediation_evaluation_verification_evidence_verified"] is True
+          assert report["remediation_evaluation_environment_verified"] is True
+          assert report["remediation_evaluation_manifest_verified"] is True
+          assert report["remediation_measurement_verified"] is True
+          assert report["remediation_measurement_computation_verified"] is True
+          assert report["remediation_metric_estimate_forgery_blocked"] is True
+          assert report["remediation_observation_substitution_blocked"] is True
+          assert report["remediation_observation_omission_blocked"] is True
+          assert report["remediation_observation_duplicate_blocked"] is True
+          assert report["remediation_observation_scope_substitution_blocked"] is True
+          assert report["remediation_computation_substitution_blocked"] is True
+          assert report["remediation_uncertainty_substitution_blocked"] is True
+          assert report["remediation_uncertainty_point_estimate_binding_blocked"] is True
+          assert report["remediation_uncertainty_inference_scope_blocked"] is True
+          assert report["remediation_uncertainty_proportion_domain_blocked"] is True
+          assert report["remediation_uncertainty_statistical_design_substitution_blocked"] is True
+          assert report["remediation_uncertainty_design_observation_substitution_blocked"] is True
+          assert report["remediation_uncertainty_dependence_substitution_blocked"] is True
+          assert report["remediation_uncertainty_statistical_execution_verified"] is True
+          assert report["remediation_uncertainty_selection_trace_substitution_blocked"] is True
+          assert report["remediation_uncertainty_randomness_commitment_substitution_blocked"] is True
+          assert report["remediation_uncertainty_randomization_seed_format_blocked"] is True
+          assert report["remediation_uncertainty_statistical_execution_substitution_blocked"] is True
+          assert report["remediation_uncertainty_sampling_frame_target_identity_substitution_blocked"] is True
+          assert report["remediation_uncertainty_inclusion_probability_substitution_blocked"] is True
+          assert report["remediation_uncertainty_noncanonical_probability_blocked"] is True
+          assert report["remediation_uncertainty_dependence_execution_blocked"] is True
+          assert report["remediation_uncertainty_assumptions_substitution_blocked"] is True
+          assert report["remediation_wilson_uncertainty_numerically_recomputed"] is True
+          assert report["remediation_metric_direction_mismatch_blocked"] is True
+          assert report["remediation_observation_population_substitution_blocked"] is True
+          assert report["remediation_observation_membership_cherry_pick_blocked"] is True
+          assert report["remediation_canonical_population_identity_substitution_blocked"] is True
+          assert report["remediation_uncertainty_method_substitution_blocked"] is True
+          assert report["remediation_uncertainty_target_mismatch_blocked"] is True
+          assert report["remediation_measurement_schema_v2_rejected"] is True
+          assert report["remediation_fairness_group_substitution_blocked"] is True
+          assert report["remediation_measurement_worst_case_binding_blocked"] is True
+          assert report["remediation_measurement_missingness_fail_closed"] is True
+          assert report["remediation_metric_definition_substitution_blocked"] is True
+          assert report["remediation_metric_definition_kind_mismatch_blocked"] is True
+          assert report["remediation_metric_uncertainty_substitution_blocked"] is True
+          assert report["remediation_evaluation_bundle_verified"] is True
+          assert report["remediation_pre_lineage_verified"] is True
+          assert report["remediation_post_lineage_verified"] is True
+          assert report["remediation_set_pair_verified"] is True
+          assert report["remediation_recovery_method_verified"] is True
+          assert report["remediation_representation_method_verified"] is True
+          assert report["remediation_protocol_verified"] is True
+          assert report["remediation_split_manifest_verified"] is True
+          assert report["remediation_forget_evidence_verified"] is True
+          assert report["remediation_utility_evidence_verified"] is True
+          assert report["remediation_fairness_evidence_verified"] is True
+          assert report["remediation_residual_evidence_verified"] is True
+          assert report["remediation_recovery_evidence_verified"] is True
+          assert report["remediation_representation_residual_evidence_verified"] is True
+          assert report["remediation_effect_evidence_substitution_blocked"] is True
+          assert report["remediation_lifecycle_execution_revision_mismatch_blocked"] is True
+          assert report["remediation_model_substitution_blocked"] is True
+          assert report["remediation_lineage_execution_revision_mismatch_blocked"] is True
+          assert report["remediation_lineage_substitution_blocked"] is True
+          assert report["remediation_evaluation_verifier_substitution_blocked"] is True
+          assert report["remediation_evaluation_self_verification_blocked"] is True
+          assert report["remediation_evaluation_verification_evidence_substitution_blocked"] is True
+          assert report["remediation_evaluation_environment_substitution_blocked"] is True
+          assert report["remediation_evaluation_environment_revision_mismatch_blocked"] is True
+          assert report["remediation_measurement_substitution_blocked"] is True
+          assert report["remediation_measurement_dimension_drop_blocked"] is True
+          assert report["remediation_evaluation_manifest_substitution_blocked"] is True
+          assert report["remediation_evaluation_source_dataset_mismatch_blocked"] is True
+          assert report["remediation_set_role_substitution_blocked"] is True
+          assert report["remediation_set_overlap_blocked"] is True
+          assert report["remediation_recovery_method_substitution_blocked"] is True
+          assert report["remediation_representation_method_substitution_blocked"] is True
+          assert report["remediation_recovery_evidence_substitution_blocked"] is True
+          assert report["remediation_representation_evidence_substitution_blocked"] is True
+          assert report["remediation_protocol_substitution_blocked"] is True
+          assert report["remediation_split_substitution_blocked"] is True
+          assert report["remediation_evidence_substitution_blocked"] is True
+          assert report["remediation_dimension_claim_blocked"] is True
+          assert report["remediation_schema_migration_blocked"] is True
+          assert report["remediation_bound_claim_is_narrow"] is True
+          assert report["stale_policy_provenance_binding_blocked"] is True
+          assert report["inference_escalation_blocked"] is True
+          assert report["first_packet_accepted"] is True
+          assert report["exact_replay_detected"] is True
+          assert report["expired_replay_state_reclaimed"] is True
+          assert report["scheduled_revocation_honored"] is True
+          assert report["tamper_detected"] is True
+          assert report["unauthorized_channel_blocked"] is True
+          assert report["expired_lease_blocked"] is True
+          assert report["cross_jurisdiction_blocked"] is True
+          assert report["persistence_after_expiry_blocked"] is True
+          assert report["secondary_research_blocked"] is True
+          assert report["sensitivity_escalation_blocked"] is True
+          assert report["insufficient_capability_blocked"] is True
+          assert report["revoked_authority_resolution_blocked"] is True
+          assert report["wrong_authority_resolution_context_blocked"] is True
+          assert report["authority_resolution_signature_blocked"] is True
+          assert report["authority_resolution_expiry_blocked"] is True
+          assert report["authority_resolution_predating_attestation_blocked"] is True
+          assert report["policy_freshness_expired_before_resolution_expiry"] is True
+          assert report["mutated_consent_lease_blocked"] is True
+          assert report["authority_proof_substitution_blocked"] is True
+          assert report["authority_status_source_mismatch_blocked"] is True
+
+          codec_report = json.loads(Path("target/communication-evidence/neurosemantic_hdc_codec_n0.json").read_text())
+          assert codec_report["binary_frame_roundtrip_exact"] is True
+          assert codec_report["deterministic_repeat_exact"] is True
+          assert codec_report["semantic_decoder_invoked"] is False
+          assert codec_report["codec_descriptor"]["codec_id"] == "symthaea.hdc.continuous-sign-v1"
+          assert codec_report["codec_descriptor"]["quantizer"] == "sign(value > 0)"
+          assert codec_report["codec_descriptor"]["dimension"] == 16384
+          assert len(codec_report["bit_corruption_observations"]) == 5
+          assert codec_report["bit_corruption_observations"][0]["flip_probability"] == 0.0
+          assert codec_report["metrics"]["schema_version"] == 1
+          assert codec_report["metrics"]["dimension"] == 16384
+          assert codec_report["metrics"]["binary_bytes"] == 2048
+          assert codec_report["metrics"]["continuous_bytes"] == 65536
+          assert codec_report["metrics"]["compression_ratio"] == 32.0
+          assert 0.0 <= codec_report["metrics"]["sign_disagreement_rate"] <= 1.0
+          assert -1.0 <= codec_report["metrics"]["cosine_similarity"] <= 1.0
+
+          report = json.loads(Path("target/communication-evidence/neurosemantic_interlingua_n0.json").read_text())
+          assert report["protocol_version"] == 1
+          assert report["benchmark_schema_version"] == 1
+          assert report["summary"]["cases"] == 8
+          assert report["summary"]["structurally_equivalent_cases"] == 5
+          assert report["execution_revision"] != ""
+          for case in report["cases"]:
+              metrics = case["metrics"]
+              assert 0.0 <= metrics["node_precision"] <= 1.0
+              assert 0.0 <= metrics["node_recall"] <= 1.0
+              assert 0.0 <= metrics["edge_precision"] <= 1.0
+              assert 0.0 <= metrics["edge_recall"] <= 1.0
+              assert metrics["confidence_mae"] >= 0.0
+
+          grounded_identity_generalization = json.loads(Path("target/communication-evidence/neurosemantic_hdc_grounded_identity_generalization_n0.json").read_text())
+          assert grounded_identity_generalization["benchmark_schema_version"] == 1
+          assert grounded_identity_generalization["execution_revision"] != ""
+          assert grounded_identity_generalization["adapter_id"] == "symthaea.hdc.grounded-ontology-interlingua-v1"
+          assert grounded_identity_generalization["claim_boundary"] == "held_out_known_identity_unseen_composition_distractor_load_and_topology_only"
+          assert grounded_identity_generalization["summary"]["cases"] == 8
+          assert grounded_identity_generalization["summary"]["load_cases"] == 4
+          assert grounded_identity_generalization["summary"]["topology_cases"] == 4
+          assert grounded_identity_generalization["summary"]["max_nodes"] == 9
+          assert grounded_identity_generalization["summary"]["max_edges"] == 8
+          assert grounded_identity_generalization["summary"]["all_clean_structurally_equivalent"] is True
+          assert grounded_identity_generalization["summary"]["all_concept_identity_exact"] is True
+          assert grounded_identity_generalization["summary"]["all_relation_identity_exact"] is True
+          assert grounded_identity_generalization["summary"]["all_source_groundings_preserved"] is True
+          assert grounded_identity_generalization["summary"]["all_held_out_edges_unseen_in_training"] is True
+          assert grounded_identity_generalization["summary"]["minimum_node_selection_margin"] >= 0.05
+          assert grounded_identity_generalization["summary"]["minimum_edge_selection_margin"] >= 0.05
+          for case in grounded_identity_generalization["cases"]:
+              assert case["unseen_edge_fraction"] == 1.0
+              assert case["distractor_concepts"] > 0
+              assert case["concept_identity_exact"] is True
+              assert case["relation_identity_exact"] is True
+              assert case["source_groundings_preserved"] is True
+              assert case["structural_equivalence"] is True
+              assert case["node_precision"] == 1.0
+              assert case["node_recall"] == 1.0
+              assert case["edge_precision"] == 1.0
+              assert case["edge_recall"] == 1.0
+              assert case["node_selection_margin"] >= 0.05
+              assert case["edge_selection_margin"] >= 0.05
+
+          calibration_identity = json.loads(Path("target/communication-evidence/neurosemantic_hdc_grounded_identity_calibration_n0.json").read_text())
+          assert calibration_identity["benchmark_schema_version"] == 1
+          assert calibration_identity["execution_revision"] != ""
+          assert calibration_identity["adapter_id"] == "symthaea.hdc.grounded-ontology-interlingua-v1"
+          assert calibration_identity["claim_boundary"] == "empirical_clean_calibration_disjoint_evaluation_and_null_abstention_only"
+          assert calibration_identity["calibration"]["cases"] == 3
+          assert calibration_identity["calibration"]["codebook_hash"] != ""
+          assert calibration_identity["calibration"]["lower_quantile"] == 0.10
+          assert calibration_identity["calibration"]["calibrated_min_score"] >= calibration_identity["calibration"]["baseline_min_score"]
+          assert calibration_identity["calibration"]["calibrated_min_margin"] >= calibration_identity["calibration"]["baseline_min_margin"]
+          assert calibration_identity["evaluation"]["cases"] == 2
+          assert calibration_identity["evaluation"]["all_exact"] is True
+          assert calibration_identity["null_test"]["samples"] == 4096
+          assert calibration_identity["null_test"]["generator"] == "BinaryHV::random"
+          assert calibration_identity["null_test"]["abstentions"] == 4096
+          assert calibration_identity["null_test"]["accepted"] == 0
+          assert calibration_identity["guarantee_boundary"] == "empirical_only; no distribution_free_or_conformal_coverage_claim"
+
+          grounded_identity = json.loads(Path("target/communication-evidence/neurosemantic_hdc_grounded_identity_n0.json").read_text())
+          assert grounded_identity["benchmark_schema_version"] == 1
+          assert grounded_identity["execution_revision"] != ""
+          assert grounded_identity["adapter_id"] == "symthaea.hdc.grounded-ontology-interlingua-v1"
+          assert grounded_identity["claim_boundary"] == "held_out_stable_identity_retrieval_and_grounding_provenance_separation_only"
+          assert grounded_identity["training_manifest_hash"] != grounded_identity["held_out_manifest_hash"]
+          assert grounded_identity["summary"]["same_codebook_for_held_out_groundings"] is True
+          assert grounded_identity["summary"]["same_hdc_frames_for_same_stable_structure"] is True
+          assert grounded_identity["summary"]["source_manifest_hash_rejected"] is True
+          assert grounded_identity["summary"]["source_groundings_preserved"] is True
+          assert grounded_identity["summary"]["receiver_local_ids_used"] is True
+          assert grounded_identity["summary"]["source_manifest_differs_from_receiver"] is True
+          assert grounded_identity["summary"]["concept_identity_exact"] is True
+          assert grounded_identity["summary"]["relation_identity_exact"] is True
+          assert grounded_identity["summary"]["structurally_equivalent"] is True
+          assert grounded_identity["summary"]["novel_oov_rejected"] is True
+          assert grounded_identity["summary"]["wrong_scheme_rejected"] is True
+          assert grounded_identity["summary"]["wrong_mapping_provenance_rejected"] is True
+          assert grounded_identity["summary"]["ambiguous_receiver_rejected"] is True
+          assert grounded_identity["summary"]["ambiguous_receiver_relation_rejected"] is True
+          assert grounded_identity["metrics"]["node_precision"] == 1.0
+          assert grounded_identity["metrics"]["node_recall"] == 1.0
+          assert grounded_identity["metrics"]["edge_precision"] == 1.0
+          assert grounded_identity["metrics"]["edge_recall"] == 1.0
+          assert grounded_identity["metrics"]["concept_identity_exact"] is True
+          assert grounded_identity["metrics"]["relation_identity_exact"] is True
+
+          adversarial = json.loads(Path("target/communication-evidence/neurosemantic_hdc_grounded_identity_adversarial_n0.json").read_text())
+          assert adversarial["benchmark_schema_version"] == 1
+          assert adversarial["execution_revision"] != ""
+          assert adversarial["adapter_id"] == "symthaea.hdc.grounded-ontology-interlingua-v1"
+          assert adversarial["claim_boundary"] == "identity_confusion_red_team_with_random_bit_corruption_and_boundary_interpolation_only"
+          assert adversarial["summary"]["node_correct_accepts"] >= 1
+          assert adversarial["summary"]["edge_correct_accepts"] >= 1
+          assert adversarial["summary"]["confident_wrong_accepts"] == 0
+          boundary = adversarial["summary"]["boundary_interpolation"]
+          assert boundary["weights"] == [1.0, 0.95, 0.9, 0.8, 0.7, 0.6, 0.4, 0.3, 0.2, 0.1, 0.05, 0.0]
+          assert boundary["node_correct_accepts"] >= 1
+          assert boundary["edge_correct_accepts"] >= 1
+          assert boundary["confident_wrong_accepts"] == 0
+
+          hdc_interlingua = json.loads(Path("target/communication-evidence/neurosemantic_hdc_interlingua_n0.json").read_text())
+          assert hdc_interlingua["benchmark_schema_version"] == 1
+          assert hdc_interlingua["execution_revision"] != ""
+          assert hdc_interlingua["adapter_id"] == "symthaea.hdc.semantic-interlingua-v1"
+          assert hdc_interlingua["claim_boundary"] == "held_out_synthetic_graph_retrieval_and_reconstruction_only"
+          assert hdc_interlingua["codec_id"] == "symthaea.hdc.continuous-sign-v1"
+          assert hdc_interlingua["summary"]["training_graphs"] == 4
+          assert hdc_interlingua["summary"]["held_out_graphs"] == 2
+          assert hdc_interlingua["summary"]["all_structurally_equivalent"] is True
+          assert hdc_interlingua["summary"]["same_codebook_for_all_cases"] is True
+          assert hdc_interlingua["summary"]["reordered_representation_exact"] is True
+          assert hdc_interlingua["summary"]["lexical_invariance_exact"] is True
+          assert hdc_interlingua["summary"]["identifier_invariance_exact"] is True
+          assert hdc_interlingua["summary"]["wrong_codebook_rejected"] is True
+          assert hdc_interlingua["summary"]["conservative_clean_decode"] is True
+          assert hdc_interlingua["codebook"]["descriptor"]["role_revision"] == "source-relation-target-node-v2"
+
+          # Machine-readable neurosemantic data/inference policy schema is
+          # tested in Rust; these assertions ensure the N0 artifact explicitly
+          # remains below human neural-decoding claims.
+          assert hdc_interlingua["claim_boundary"] == "held_out_synthetic_graph_retrieval_and_reconstruction_only"
+
+          assert hdc_interlingua["negative_controls"]["null_sample_count"] == 256
+          assert hdc_interlingua["negative_controls"]["unrelated_node_max_similarity"] < 0.2
+          assert hdc_interlingua["negative_controls"]["unrelated_edge_max_similarity"] < 0.2
+          assert hdc_interlingua["negative_controls"]["true_edge_similarity"] > hdc_interlingua["negative_controls"]["unrelated_node_max_similarity"]
+          assert hdc_interlingua["negative_controls"]["true_edge_similarity"] > hdc_interlingua["negative_controls"]["unrelated_edge_max_similarity"]
+          assert hdc_interlingua["negative_controls"]["true_edge_similarity"] > hdc_interlingua["negative_controls"]["swapped_edge_similarity"]
+          assert [obs["flip_probability"] for obs in hdc_interlingua["transport_corruption"]] == [0.0, 0.001, 0.01, 0.05, 0.10]
+          assert hdc_interlingua["transport_corruption"][0]["metrics"]["structural_equivalence"] is True
+          for case in hdc_interlingua["cases"]:
+              metrics = case["metrics"]
+              assert metrics["codebook_hash"] == hdc_interlingua["codebook"]["hash"]
+              assert metrics["structural_equivalence"] is True
+              assert metrics["node_precision"] == 1.0
+              assert metrics["node_recall"] == 1.0
+              assert metrics["edge_precision"] == 1.0
+              assert metrics["edge_recall"] == 1.0
+              assert metrics["node_selection_margin"] > 0.0
+              assert metrics["edge_selection_margin"] > 0.0
+          PY
       - name: Check locked offline worker and Python syntax
         run: |
           uv lock --check --project communication/worker
@@ -40,6 +437,15 @@ jobs:
           ]:
               ast.parse(path.read_text(), filename=str(path))
           PY
+      - name: Upload deterministic communication evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: communication-evidence-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          path: target/communication-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Check acoustic capability adapter
         run: cargo check -p symthaea-stt --lib
       - name: Ensure unpinned templates cannot become release evidence
