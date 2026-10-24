@@ -254,13 +254,15 @@ A clearly labelled synthetic comparison fixture exercises the CLI in CI; its per
 
 ## Counterfactual adaptation utility
 
-Drift-event F1 is not a proxy for better cognition: a detector can win on alarm timing and still trigger expensive, destabilizing or net-negative adaptation. The machine-readable `drift_protocol.adaptation_counterfactual_protocol` therefore defines a separate same-stream, three-arm replay contract:
+Drift-event F1 is not a proxy for better cognition: a detector can win on alarm timing and still trigger expensive, destabilizing or net-negative adaptation. The machine-readable `drift_protocol.adaptation_counterfactual_protocol` therefore defines a separate same-stream, five-arm policy comparison:
 
 - **No adaptation** is the task-loss baseline and must have zero adaptation cost.
-- **Detector-triggered** replays the candidate detector plus the declared adaptation policy.
-- **Oracle-timed** uses the registered ground-truth change timing with the same adaptation mechanism as an unattainable timing reference; it is not a deployable detector.
+- **Detector-triggered** adapts when the candidate detector alarms.
+- **Detector-benefit-gated** requires a registered estimated-benefit/risk rule before allowing an intervention.
+- **Staged-verify-rollback** stages a candidate, verifies it against registered evidence, and commits or restores the previous state according to the declared transition contract.
+- **Oracle-timed** uses ground-truth change timing as an unattainable diagnostic reference; it is not a deployable detector.
 
-The Rust `xtask score-counterfactual-adaptation-utility` command compares pinned per-cycle outcomes from the same exogenous stream digest. All arms must have identical contiguous cycle indices, and each arm separately pins its version, repository head, configuration digest, and digest of the exogenous stream it actually consumed. Every arm's observed stream digest must equal the shared digest or scoring fails closed. This is a useful mismatch guard, not proof of honest runner execution or identical hidden state. The evaluator reports cumulative/mean task loss, adaptation resource cost, loss improvement against no adaptation, task-loss regret relative to oracle timing, and whether no adaptation dominates the candidate on both loss and resource cost.
+The Rust `xtask score-counterfactual-adaptation-utility` command compares pinned per-cycle outcomes from all five policy arms on the same exogenous stream digest. All arms must have identical contiguous cycle indices, and each arm separately pins its version, repository head, configuration digest, and digest of the exogenous stream it actually consumed. Every arm's observed stream digest must equal the shared digest or scoring fails closed. This is a useful mismatch guard, not proof of honest runner execution or identical hidden state. The evaluator reports cumulative/mean task loss, adaptation resource cost, loss improvement against no adaptation, task-loss regret relative to oracle timing, and whether no adaptation dominates the candidate on both loss and resource cost.
 
 ```bash
 cargo run --locked -p xtask -- score-counterfactual-adaptation-utility \
@@ -273,11 +275,11 @@ Task loss and resource cost remain separate axes. The evaluator reports resource
 
 ### Counterfactual scorer v2: registered phase windows and recovery
 
-The counterfactual input schema is now version 2. It requires `evaluation_windows` with half-open pre-shift and post-shift cycle windows, a fixed absolute `recovery_loss_threshold`, and a number of consecutive below-threshold cycles required to declare recovery. The evaluator validates that the windows are non-empty, in range, and non-overlapping. It reports each arm's pre-shift mean loss, post-shift mean and cumulative loss, post-shift loss area above the registered recovery threshold, the first recovery cycle, and recovery delay. The direct detector-versus-no-adapt effect and detector-versus-oracle regret for **post-shift mean loss** are reported separately from whole-stream effects and resource cost.
+The counterfactual input schema is now version 2 and requires outcomes for all five policy arms. It requires `evaluation_windows` with half-open pre-shift and post-shift cycle windows, a fixed absolute `recovery_loss_threshold`, and a number of consecutive below-threshold cycles required to declare recovery. The evaluator validates that the windows are non-empty, in range, and non-overlapping. It reports each arm's pre-shift mean loss, post-shift mean and cumulative loss, post-shift loss area above the registered recovery threshold, the first recovery cycle, and recovery delay. The direct detector-versus-no-adapt effect and detector-versus-oracle regret for **post-shift mean loss** are reported separately from whole-stream effects and resource cost.
 
 The registered recovery threshold is part of the input digest; it must be frozen before the held-out run and expressed in the declared task-loss unit. A missing recovery cycle is emitted as null, not silently converted to the last cycle or an arbitrary penalty. If an analysis requires a finite recovery penalty, preregister that penalty and report censored/non-recovered runs separately. The schema-v1 fixtures are intentionally upgraded to v2 rather than silently assigning phase windows.
 
-The v2 CLI smoke tests assert a known synthetic recovery pattern and the no-impact-shift negative control. These values verify metric wiring only and are not evidence of performance.
+The v2 CLI smoke tests assert the preregistered staged-versus-detector post-shift contrast, recovery behavior, and the no-impact-shift negative control—including that benefit gating abstains when adaptation produces no task benefit. These values verify metric wiring only and are not evidence of performance.
 
 The synthetic fixture at `benchmarks/cognitive-loop-evidence/synthetic-counterfactual-adaptation.json` exists solely for CLI regression tests. Its values are synthetic, not benchmark results. This evaluator is a scoring primitive, not the replay engine; actual task runs, pinned datasets, cost instrumentation, and counterfactual state-isolation checks remain necessary before reporting efficacy.
 
