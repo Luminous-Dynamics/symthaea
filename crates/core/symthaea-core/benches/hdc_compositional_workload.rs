@@ -138,7 +138,12 @@ fn near_miss_unknown_query(
 ) -> BinaryHV {
     let source_value = workload.query_atoms[source_record_id].bind(&workload.role_zero);
     let unseen_value = corrupt_query(&source_value, noise_bps, source_record_id);
-    workload.role_zero.bind(&unseen_value)
+    let query = workload.role_zero.bind(&unseen_value);
+    assert!(
+        !workload.query_atoms.iter().any(|known| *known == query),
+        "near-miss negative unexpectedly aliases a stored role-bound value"
+    );
+    query
 }
 
 #[derive(Clone, Copy)]
@@ -376,6 +381,13 @@ fn correctness_contract() {
     assert!(threshold.score > 0.56 && threshold.score < 0.80);
     assert_eq!(threshold.calibration_false_reject_rate, 0.0);
     assert_eq!(threshold.calibration_false_accept_rate, 0.0);
+
+    // Overlapping classes must expose a non-zero trade-off rather than
+    // accidentally optimizing only one class. The balanced threshold rejects
+    // one of two known examples and accepts one of two absent-target examples.
+    let overlapping = calibrate_acceptance_threshold(&[0.80, 0.90], &[0.85, 0.95]);
+    assert_eq!(overlapping.calibration_false_reject_rate, 0.5);
+    assert_eq!(overlapping.calibration_false_accept_rate, 0.5);
 
     // Explicit lowest-ID tie test, including repeated exact matches.
     let query = BinaryHV::random(0x71E_001);
