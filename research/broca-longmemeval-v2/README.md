@@ -10,13 +10,13 @@ These properties make V2 a complementary target to conversation-history QA: it a
 
 ## Required experiment design
 
-The receipt gate requires a run to pin the upstream V2 commit, dataset digest, official harness digest, Symthaea commit, shared experiment config digest, reader and judge model revisions, reader/judge prompt digests, context-token cap, and the official reference-frontier digest. It requires both **web** and **enterprise** outputs for every arm and exactly 451 examples per arm across those domains. The three minimum matched arms are:
+The receipt gate requires a run to pin the upstream V2 commit, dataset-manifest digest, official harness-manifest digest, Symthaea commit, shared experiment config digest, reader and judge model revisions, reader/judge prompt file digests, context-token cap, and the official reference-frontier digest. It requires both **web** and **enterprise** outputs for every arm and exactly 451 examples per arm across those domains. The three minimum matched arms are:
 
 - **broca**: the candidate Symthaea-backed memory adapter;
 - **no_retrieval**: the official no-memory control;
 - **rag_query_to_slice**: the official raw-state retrieval baseline.
 
-Additional official arms are accepted when run. Every arm must have exactly one completed result for each domain and a completed combined aggregate. Per-domain outputs must be canonical JSONL: one object per question with a unique **case_id**. The gate verifies each output has exactly its declared number of records and that the question-ID set is identical across matched arms within each domain. Each aggregate must carry all six official numeric metrics. The dataset manifest, harness manifest, reference frontier, shared config, domain outputs, and combined aggregates are byte-level hash checked relative to the receipt directory. Partial, skipped, duplicate, unpinned, mismatched, unpaired, missing, or path-traversing artifacts fail closed.
+Additional official arms are accepted when run. Every arm must have exactly one completed result for each domain and a completed combined aggregate. Per-domain outputs must be canonical JSONL: one object per question with a unique **case_id**. The gate verifies each output has exactly its declared number of records and that the question-ID set is identical across matched arms within each domain. Each aggregate must carry all six official numeric metrics. The dataset manifest, harness manifest, reference frontier, shared config, reader/judge prompt files, domain outputs, and combined aggregates are byte-level hash checked relative to the receipt directory. Partial, skipped, duplicate, unpinned, mismatched, unpaired, missing, or path-traversing artifacts fail closed.
 
 The adapter must use the official upstream evaluation harness and leaderboard aggregator for answer scoring and latency accounting. This repository's checker does **not** reimplement LAFS, judge answers, verify that the official harness was scientifically correct, or infer memory quality from retrieval hit rates. It checks receipt structure and byte-level integrity only.
 
