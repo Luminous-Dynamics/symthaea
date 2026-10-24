@@ -65,7 +65,13 @@
       "ledger.conflict_has_no_partial_effect",
       "ledger.invalid_amount_fails_closed",
       "ledger.unknown_side_fails_closed",
-      "ledger.overflow_fails_closed"
+      "ledger.overflow_fails_closed",
+      "ledger.amount_token_canonical",
+      "ledger.maximum_credit_debit_valid",
+      "ledger.transaction_order_invariant",
+      "ledger.duplicate_multiplicity_idempotent",
+      "ledger.generated_differential_reducer",
+      "ledger.malformed_csv_rejected"
     ],
     "baseline_empty_patch_must_fail": true,
     "reference_patch_must_pass": true,
