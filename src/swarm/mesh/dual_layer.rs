@@ -815,6 +815,40 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn fragment_aead_mtu_overhead_is_rejected_before_any_write() {
+        let (transport, sent) = SharedCaptureTransport::new(LORA_MTU);
+        let mesh = DualLayerMesh::new([0; 32])
+            .with_lora(Box::new(transport))
+            .with_encryption_key([0x42; 32])
+            .with_encryption_epoch(7)
+            .with_fragment_encryption(true);
+
+        // Make the serialized packet deliberately incompressible, forcing full
+        // LoRa fragments. Wrapping one with the 12-byte nonce and 16-byte tag
+        // must exceed the transport's declared MTU and reject the whole batch.
+        let mut packet = test_packet(MeshUrgency::Cruise);
+        let mut state = 0x9e37_79b9u32;
+        for byte in &mut packet.wisdom.0 {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            *byte = state as u8;
+        }
+
+        let result = mesh.send(&packet);
+
+        assert!(matches!(
+            result,
+            Err(MeshError::MtuExceeded { frame_size, mtu }) if frame_size > mtu
+        ));
+        assert!(
+            sent.lock().unwrap_or_else(|e| e.into_inner()).is_empty(),
+            "fragment-AEAD MTU rejection must precede every radio write"
+        );
+    }
+
     // -- Loopback reassembly --
 
     #[test]
