@@ -151,7 +151,19 @@ fn scalar_component_top1(query: &BinaryHV, facts: &[BinaryHV], arity: usize) -> 
     best_record
 }
 
-type ExactFactIndex = HashMap<u64, Vec<usize>>;
+#[derive(Default)]
+struct ExactFactIndex {
+    /// One flat fact ID for the overwhelmingly common no-collision case.
+    primary: HashMap<u64, usize>,
+    /// Allocated only for fingerprints that actually collide.
+    collisions: HashMap<u64, Vec<usize>>,
+}
+
+impl ExactFactIndex {
+    fn unique_fingerprints(&self) -> usize {
+        self.primary.len()
+    }
+}
 
 fn fingerprint(vector: &BinaryHV) -> u64 {
     let digest = blake3::hash(&vector.0);
@@ -162,12 +174,26 @@ fn fingerprint(vector: &BinaryHV) -> u64 {
     )
 }
 
-/// Build a fingerprint-to-flat-fact-index map. The fingerprint only routes to
-/// candidate facts; every hit is verified against all 2,048 bytes before use.
+/// Build a fingerprint-to-flat-fact index. The common path uses one ID per
+/// fingerprint; collision buckets are allocated only when a collision occurs.
+/// The fingerprint routes to candidates; every hit is verified against all
+/// 2,048 bytes before use.
 fn build_exact_fact_index(facts: &[BinaryHV]) -> ExactFactIndex {
-    let mut index: ExactFactIndex = HashMap::with_capacity(facts.len());
+    let mut index = ExactFactIndex {
+        primary: HashMap::with_capacity(facts.len()),
+        collisions: HashMap::new(),
+    };
     for (flat_id, fact) in facts.iter().enumerate() {
-        index.entry(fingerprint(fact)).or_default().push(flat_id);
+        let key = fingerprint(fact);
+        if let Some(&first_id) = index.primary.get(&key) {
+            index
+                .collisions
+                .entry(key)
+                .or_insert_with(|| vec![first_id])
+                .push(flat_id);
+        } else {
+            index.primary.insert(key, flat_id);
+        }
     }
     index
 }
@@ -194,8 +220,12 @@ fn exact_fact_lookup(
     index: &ExactFactIndex,
     arity: usize,
 ) -> Option<usize> {
-    let candidates = index.get(&fingerprint(query))?;
-    resolve_exact_candidates(query, candidates, facts, arity)
+    let key = fingerprint(query);
+    if let Some(candidates) = index.collisions.get(&key) {
+        return resolve_exact_candidates(query, candidates, facts, arity);
+    }
+    let flat_id = *index.primary.get(&key)?;
+    resolve_exact_candidates(query, std::slice::from_ref(&flat_id), facts, arity)
 }
 
 fn hybrid_top1(
@@ -261,6 +291,21 @@ fn correctness_contract() {
 
 fn emit_quality_diagnostics(workload: &Workload, index: &ExactFactIndex) {
     let n = workload.bundles.len();
+    let bundle_payload_bytes = workload.bundles.len() * VECTOR_BYTES;
+    let fact_payload_bytes = workload.facts.len() * VECTOR_BYTES;
+    let fingerprint_id_floor_bytes = index.unique_fingerprints() * std::mem::size_of::<u64>()
+        + workload.facts.len() * std::mem::size_of::<usize>();
+    eprintln!(
+        "representation-footprint n={} arity={} bundle_payload_bytes={} component_payload_bytes={}          component_to_bundle_ratio={:.1} unique_fingerprints={} fingerprint_id_floor_bytes={}          collision_buckets={}",
+        n,
+        workload.arity,
+        bundle_payload_bytes,
+        fact_payload_bytes,
+        fact_payload_bytes as f64 / bundle_payload_bytes as f64,
+        index.unique_fingerprints(),
+        fingerprint_id_floor_bytes,
+        index.collisions.len(),
+    );
     for noise in NOISE_BPS {
         let mut bundled_hits = 0usize;
         let mut component_hits = 0usize;
