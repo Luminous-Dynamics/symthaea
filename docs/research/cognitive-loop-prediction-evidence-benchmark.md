@@ -165,13 +165,17 @@ This document defines acceptance criteria; it is not evidence that the gates hav
 
 The compatibility `repr(C)` `CycleSnapshot` remains fixed-layout, but PE-dependent consumers should not treat its float and validity byte as separate inputs. The boundary adapter `prediction_error_evidence()` must construct a `PredictionErrorEvidence` with the snapshot's observation cycle and a non-usable status for non-canonical validity bytes or non-finite values. Since the ABI has no prediction-source-cycle field, this adapter must leave that provenance unknown rather than fabricate it.
 
-The preferred cursor API, `admit_evidence(evidence, requested_observation_cycle)`, first requires a valid value for the requested observation and only then applies the consumer's monotonic exactly-once rule. The legacy `admit(cycle, Option<f32>)` remains for compatibility, but new stateful PE consumers should use the typed method.
+The preferred cursor API, `admit_evidence(evidence, requested_observation_cycle)`, first records the requested cycle in an observed high-water mark when it is not stale, then checks evidence usability before admission. The observed and admitted watermarks are intentionally separate: invalid evidence remains unadmitted but prevents a delayed older sample from entering after a newer invalid observation; a valid retry at the same cycle remains possible. The legacy `admit(cycle, Option<f32>)` follows the same cursor policy but remains for compatibility, while new stateful PE consumers should use the typed method.
+
+MemoryManager checkpoints use PEVC v2 to persist both watermarks. PEVC v1 checkpoints remain readable by using the previous admitted cycle as the observed floor; legacy nine-byte checkpoints have no cursor state and therefore restore without a cursor. Because v1 did not record invalid-only observations, it cannot reconstruct a newer watermark that was never serialized.
 
 ### Additional deterministic gates
 
 - Snapshot validity bytes `0`, `2`, and `255` never yield usable evidence, regardless of the float payload.
 - A NaN or infinity with validity byte `1` is classified as non-finite and never yields a value.
-- An evidence object requested for another observation cycle is rejected without advancing the cursor.
+- An evidence object requested for another observation cycle is rejected without advancing the admitted watermark; the requested cycle still advances the observed watermark if it is not older than the existing high-water mark.
+- A newer invalid cycle followed by a delayed valid older cycle must reject the delayed sample, while a valid retry for the newer invalid cycle remains admissible once.
+- Checkpoint/restore must preserve observed and admitted watermarks independently; legacy PEVC v1 migration must retain its known admitted-cycle floor.
 - A fixed-seed 10,000-entry mixed trace interleaves valid samples, unavailable evidence, non-canonical flags, duplicate and out-of-order cycle numbers, and requested-cycle mismatches. Each admission decision and the cursor state must match an independent reference rule.
 - This trace is a cursor/adapter contract test, not a substitute for the 15 consumer-level counterfactual cases. End-to-end state-digest comparisons across downstream learners, replay stores, safety, and checkpoint restoration remain required.
 
