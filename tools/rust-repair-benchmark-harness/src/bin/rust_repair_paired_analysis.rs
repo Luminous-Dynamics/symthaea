@@ -505,12 +505,24 @@ fn run() -> Result<(), String> {
             "arm_a_wins": wins_a,
             "arm_b_wins": wins_b,
             "ties": ties,
-            "arm_a_pass_rate": if complete_pairs > 0 { Some(complete_a_successes as f64 / complete_pairs as f64) } else { None::<f64> },
-            "arm_b_pass_rate": if complete_pairs > 0 { Some(complete_b_successes as f64 / complete_pairs as f64) } else { None::<f64> },
+            "arm_a_pass_rate": if complete_pairs > 0 {
+                Some(complete_a_successes as f64 / complete_pairs as f64)
+            } else {
+                None::<f64>
+            },
+            "arm_b_pass_rate": if complete_pairs > 0 {
+                Some(complete_b_successes as f64 / complete_pairs as f64)
+            } else {
+                None::<f64>
+            },
             "arm_a_minus_arm_b_percentage_points": complete_effect
         },
         "repository_cluster_bootstrap_95_percent_interval": {
-            "status": if cluster_count < 2 { "insufficient_repository_clusters" } else { "computed" },
+            "status": if cluster_count < 2 {
+                "insufficient_repository_clusters"
+            } else {
+                "computed"
+            },
             "lower_percentage_points": ci.map(|value| value.0),
             "upper_percentage_points": ci.map(|value| value.1),
             "excludes_zero": ci_excludes_zero,
@@ -521,11 +533,43 @@ fn run() -> Result<(), String> {
             "upper": upper_bound,
             "includes_unresolved_rows": true
         },
-        "interpretation": "The complete-pair effect is diagnostic and excludes unresolved pairs. The full-manifest bounds retain every assigned task. The bootstrap resamples repositories, not individual tasks. This report is not by itself a leaderboard or state-of-the-art claim.",
+        "interpretation": concat!(
+            "The complete-pair effect is diagnostic and excludes unresolved pairs. ",
+            "The full-manifest bounds retain every assigned task. ",
+            "The bootstrap resamples repositories, not individual tasks. ",
+            "This report is not by itself a leaderboard or state-of-the-art claim."
+        ),
         "decision_notes": [
-            if unresolved_a > 0 || unresolved_b > 0 { "Unresolved outcomes remain in the full-manifest sensitivity bounds; investigate asymmetric missingness before making a causal claim." } else { "Both arms have resolved outcomes for every locked task." },
-            if cluster_count < 20 { "Fewer than 20 repositories contributed complete pairs; treat the cluster-bootstrap interval as exploratory, not decision-grade." } else { "At least 20 repositories contributed complete pairs; still inspect task-family coverage and the preregistered analysis plan." },
-            if ci_excludes_zero == Some(true) { "The repository-cluster bootstrap interval excludes zero; this is a statistical signal, not proof of generalization or SOTA." } else { "The repository-cluster bootstrap interval does not establish a nonzero effect, or could not be computed." }
+            if unresolved_a > 0 || unresolved_b > 0 {
+                concat!(
+                    "Unresolved outcomes remain in the full-manifest sensitivity bounds; ",
+                    "investigate asymmetric missingness before making a causal claim."
+                )
+            } else {
+                "Both arms have resolved outcomes for every locked task."
+            },
+            if cluster_count < 20 {
+                concat!(
+                    "Fewer than 20 repositories contributed complete pairs; treat the ",
+                    "cluster-bootstrap interval as exploratory, not decision-grade."
+                )
+            } else {
+                concat!(
+                    "At least 20 repositories contributed complete pairs; still inspect ",
+                    "task-family coverage and the preregistered analysis plan."
+                )
+            },
+            if ci_excludes_zero == Some(true) {
+                concat!(
+                    "The repository-cluster bootstrap interval excludes zero; this is a ",
+                    "statistical signal, not proof of generalization or SOTA."
+                )
+            } else {
+                concat!(
+                    "The repository-cluster bootstrap interval does not establish a ",
+                    "nonzero effect, or could not be computed."
+                )
+            }
         ]
     });
 
