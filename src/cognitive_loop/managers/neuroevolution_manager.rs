@@ -347,6 +347,55 @@ mod tests {
     }
 
     #[test]
+    fn custom_config_path_uses_typed_fail_closed_admission() {
+        let config = NeuroevolutionConfig {
+            population_size: 5,
+            fitness_config: FepFitnessConfig {
+                warmup_steps: 2,
+                eval_steps: 5,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut manager = NeuroevolutionManager::with_config(config);
+        let mut snapshot = test_snapshot();
+        snapshot.cycle_number = 100;
+
+        // A non-canonical ABI flag is invalid and must not move the cursor.
+        snapshot.prediction_error = 9.9;
+        snapshot.prediction_error_valid = 2;
+        manager.process(&snapshot);
+        assert!(manager.accumulated_prediction_error.is_empty());
+
+        // A legitimate same-cycle retry remains admissible.
+        snapshot.prediction_error = 0.3;
+        snapshot.prediction_error_valid = 1;
+        manager.process(&snapshot);
+        assert_eq!(manager.accumulated_prediction_error, vec![0.3]);
+
+        // A second payload for that already-admitted cycle is deduplicated.
+        snapshot.prediction_error = 0.7;
+        manager.process(&snapshot);
+        assert_eq!(manager.accumulated_prediction_error, vec![0.3]);
+
+        // Out-of-order evidence is rejected.
+        snapshot.cycle_number = 99;
+        snapshot.prediction_error = 0.8;
+        manager.process(&snapshot);
+        assert_eq!(manager.accumulated_prediction_error, vec![0.3]);
+
+        // Non-finite evidence does not reserve cycle 101; a later valid retry can.
+        snapshot.cycle_number = 101;
+        snapshot.prediction_error = f32::NAN;
+        manager.process(&snapshot);
+        assert_eq!(manager.accumulated_prediction_error, vec![0.3]);
+
+        snapshot.prediction_error = 0.4;
+        manager.process(&snapshot);
+        assert_eq!(manager.accumulated_prediction_error, vec![0.3, 0.4]);
+    }
+
+    #[test]
     fn test_accumulates_observations() {
         let mut mgr = NeuroevolutionManager::new();
         let snap = test_snapshot();
