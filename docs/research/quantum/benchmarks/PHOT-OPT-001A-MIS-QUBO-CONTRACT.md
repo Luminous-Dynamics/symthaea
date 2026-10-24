@@ -22,7 +22,7 @@ Binary variable (x_i\in\{0,1\}) indicates whether vertex (i) is selected. For no
 x_u+x_v\le 1\quad\forall (u,v)\in E.
 \]
 
-For unweighted MIS set (w_i=1). The independent-set verifier—not the energy function—remains authoritative about feasibility.
+For unweighted MIS set \\(w_i=1\\). The independent-set verifier—not the energy function—remains authoritative about feasibility.
 
 ## 3. Canonical QUBO energy and penalty proof
 
@@ -35,7 +35,7 @@ E_{Q}(x)=-\sum_i w_i x_i
 
 Each undirected edge appears exactly once in the edge-list sum. The objective constant/offset is zero in this convention.
 
-For unweighted MIS, (A>1) is sufficient for every global minimum to be feasible. More generally, for finite non-negative weights, (A>\max_i w_i) is sufficient:
+For unweighted MIS, \\(A>1\\) is sufficient for every global minimum to be feasible. More generally, for finite non-negative weights, (A>\max_i w_i) is sufficient:
 
 If a candidate is infeasible, at least one selected vertex (i) has (k\ge1) selected neighbors. Removing (i) changes its energy by
 
@@ -81,22 +81,22 @@ A positive global scale \(\alpha>0\) preserves the ideal ordering of configurati
 
 ## 5. Hand-checkable fixtures
 
-Use (A=2) for unweighted examples unless otherwise stated. The cardinality is independently measured from the decoded bit vector and rechecked by the graph verifier. Energies below use the canonical minimization convention above.
+Use \\(A=2\\) for unweighted examples unless otherwise stated. The cardinality is independently measured from the decoded bit vector and rechecked by the graph verifier. Energies below use the canonical minimization convention above.
 
 | Graph | Vertices / edges | MIS cardinality | Minimum energy |
 |---|---:|---:|---:|
-| Empty graph on 3 vertices | (n=3,m=0) | 3 | -3 |
-| One edge (K_2) | (n=2,m=1) | 1 | -1 |
-| Path (P_3) | (n=3,m=2) | 2 | -2 |
-| Triangle (K_3) | (n=3,m=3) | 1 | -1 |
-| One edge plus one isolated vertex | (n=3,m=1) | 2 | -2 |
-| Weighted single edge, weights ((3,1)) | (n=2,m=1,A=4) | max weight 3 | -3 |
+| Empty graph on 3 vertices | \\(n=3,m=0\\) | 3 | -3 |
+| One edge \\(K_2\\) | \\(n=2,m=1\\) | 1 | -1 |
+| Path \\(P_3\\) | \\(n=3,m=2\\) | 2 | -2 |
+| Triangle \\(K_3\\) | \\(n=3,m=3\\) | 1 | -1 |
+| One edge plus one isolated vertex | \\(n=3,m=1\\) | 2 | -2 |
+| Weighted single edge, weights \\((3,1)\\) | \\(n=2,m=1,A=4\\) | max weight 3 | -3 |
 
 There may be multiple minimizers (for example, either endpoint of (K_2)); tests compare the set of admissible minimizers/objective values, not an arbitrarily selected vertex ordering.
 
 ### Deliberately bad-penalty negative control
 
-For (K_2) with unweighted objective and (A=0.5), selecting both endpoints has energy \(-2+0.5=-1.5\), lower than either feasible singleton at (-1). This fixture proves the test harness detects a penalty that is too small. Its expected behavior is to flag the configuration as an invalid MIS and flag the penalty contract as violated—not to silently repair the canonical mapping or count the invalid set as success.
+For \\(K_2\\) with unweighted objective and \\(A=0.5\\), selecting both endpoints has energy \(-2+0.5=-1.5\), lower than either feasible singleton at \\(-1\\). This fixture proves the test harness detects a penalty that is too small. Its expected behavior is to flag the configuration as an invalid MIS and flag the penalty contract as violated—not to silently repair the canonical mapping or count the invalid set as success.
 
 ## 6. Required independent checks
 
