@@ -28,6 +28,7 @@ struct TaskManifest {
     format_version: u32,
     protocol_id: String,
     candidate_jsonl_sha256: String,
+    eligible_task_count: usize,
     tasks: Vec<ManifestTask>,
 }
 
@@ -82,7 +83,9 @@ impl Outcome {
             "pass" => Ok(Self::Pass),
             "fail" => Ok(Self::Fail),
             "unresolved" => Ok(Self::Unresolved),
-            other => Err(format!("unknown task outcome {other:?}; expected pass, fail, or unresolved")),
+            other => Err(format!(
+                "unknown task outcome {other:?}; expected pass, fail, or unresolved"
+            )),
         }
     }
 
@@ -167,6 +170,16 @@ fn sha256(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+fn validate_manifest_task_count(expected: usize, observed: usize) -> Result<(), String> {
+    if expected == observed {
+        Ok(())
+    } else {
+        Err(format!(
+            "locked manifest eligible_task_count {expected} differs from tasks array length {observed}"
+        ))
+    }
+}
+
 fn is_hex_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -205,7 +218,10 @@ fn score_index(
     let mut index = BTreeMap::new();
     for row in &report.tasks {
         if !expected_ids.contains(&row.instance_id) {
-            return Err(format!("{label} contains task {:?} outside the locked manifest", row.instance_id));
+            return Err(format!(
+                "{label} contains task {:?} outside the locked manifest",
+                row.instance_id
+            ));
         }
         let outcome = Outcome::parse(&row.outcome)
             .map_err(|error| format!("{label} task {:?}: {error}", row.instance_id))?;
@@ -335,8 +351,11 @@ fn run() -> Result<(), String> {
         return Err("manifest protocol_id must not be empty".to_string());
     }
     if !is_hex_digest(&manifest.candidate_jsonl_sha256) {
-        return Err("manifest candidate_jsonl_sha256 must be a 64-character SHA-256 hex digest".to_string());
+        return Err(
+            "manifest candidate_jsonl_sha256 must be a 64-character SHA-256 hex digest".to_string(),
+        );
     }
+    validate_manifest_task_count(manifest.eligible_task_count, manifest.tasks.len())?;
 
     let mut expected_ids = BTreeSet::new();
     let mut repositories = BTreeMap::<String, String>::new();
@@ -539,6 +558,14 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn manifest_eligible_count_must_match_task_array() {
+        assert!(validate_manifest_task_count(3, 3).is_ok());
+        assert!(validate_manifest_task_count(3, 2)
+            .unwrap_err()
+            .contains("differs from tasks array length"));
+    }
 
     #[test]
     fn paired_delta_preserves_direction() {
