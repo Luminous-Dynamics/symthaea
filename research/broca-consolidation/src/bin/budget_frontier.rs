@@ -9,7 +9,7 @@ use std::process::{self, Command};
 
 const PROTOCOL: &str = "GMC-BUDGET-FRONTIER-V1";
 const COST_PER_TOKEN: f64 = 0.02;
-const DEFAULT_BUDGETS: &[usize] = &[32, 64, 128, 256];
+const DEFAULT_BUDGETS: &[usize] = &[32, 64, 128, 256, 512, 1024, 2048, 4096];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Action {
@@ -591,8 +591,8 @@ mod tests {
     #[test]
     fn anti_control_exposes_unsafe_promotion() {
         let candidates = build_fixture(51, 120);
-        let decisions = choose_policy(&candidates, 256, "promote_everything");
-        let summary = evaluate(&candidates, &decisions, 256, "promote_everything", 0.0, 0);
+        let decisions = choose_policy(&candidates, 4096, "promote_everything");
+        let summary = evaluate(&candidates, &decisions, 4096, "promote_everything", 0.0, 0);
         assert!(summary.bad_promoted > 0);
     }
 }
