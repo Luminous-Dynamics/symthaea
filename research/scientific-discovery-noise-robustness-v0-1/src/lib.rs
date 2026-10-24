@@ -273,6 +273,101 @@ impl DeterministicRng {
         self.spare_normal = Some(radius * sin);
         radius * cos
     }
+
+    fn shuffle<T>(&mut self, items: &mut [T]) {
+        for i in (1..items.len()).rev() {
+            let j = (self.next_u64() % ((i + 1) as u64)) as usize;
+            items.swap(i, j);
+        }
+    }
+}
+
+
+const MAX_DESIGN_POINTS: usize = 1_000_000;
+
+/// Role of a scheduled covariate in a fixed, evaluator-authored diagnostic design.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DesignRole {
+    Discovery,
+    /// Repeated reference input used to probe time/order-dependent measurement drift.
+    Anchor,
+}
+
+/// One pre-outcome measurement request in an interleaved diagnostic schedule.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DesignPoint {
+    pub block: usize,
+    pub covariate: f64,
+    pub role: DesignRole,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DesignScheduleError {
+    EmptyCandidateDesign,
+    ZeroAnchorReplicates,
+    ZeroBlocks,
+    NonFiniteCovariate,
+    TooManyDesignPoints,
+}
+
+/// Generate a reproducible, randomized fixed-design control with repeated anchor
+/// measurements interleaved into every block.
+///
+/// This is an evaluation-design helper, not an adaptive experiment policy. Each block
+/// contains every candidate covariate once and the anchor exactly anchor_replicates_per_block
+/// times; slots are shuffled before their order can be observed. A repeated anchor helps
+/// diagnose time/order drift that may otherwise be confounded with changes in covariates.
+/// It does not by itself identify the scientific law or guarantee causal attribution.
+pub fn interleaved_anchor_schedule(
+    candidate_covariates: &[f64],
+    anchor_covariate: f64,
+    anchor_replicates_per_block: usize,
+    blocks: usize,
+    seed: u64,
+) -> Result<Vec<DesignPoint>, DesignScheduleError> {
+    if candidate_covariates.is_empty() {
+        return Err(DesignScheduleError::EmptyCandidateDesign);
+    }
+    if anchor_replicates_per_block == 0 {
+        return Err(DesignScheduleError::ZeroAnchorReplicates);
+    }
+    if blocks == 0 {
+        return Err(DesignScheduleError::ZeroBlocks);
+    }
+    if !anchor_covariate.is_finite()
+        || candidate_covariates.iter().any(|value| !value.is_finite())
+    {
+        return Err(DesignScheduleError::NonFiniteCovariate);
+    }
+    let per_block = candidate_covariates
+        .len()
+        .checked_add(anchor_replicates_per_block)
+        .ok_or(DesignScheduleError::TooManyDesignPoints)?;
+    let total = per_block
+        .checked_mul(blocks)
+        .ok_or(DesignScheduleError::TooManyDesignPoints)?;
+    if total > MAX_DESIGN_POINTS {
+        return Err(DesignScheduleError::TooManyDesignPoints);
+    }
+
+    let mut rng = DeterministicRng::new(seed);
+    let mut schedule = Vec::with_capacity(total);
+    for block in 0..blocks {
+        let mut points = Vec::with_capacity(per_block);
+        points.extend(candidate_covariates.iter().map(|covariate| DesignPoint {
+            block,
+            covariate: *covariate,
+            role: DesignRole::Discovery,
+        }));
+        points.extend((0..anchor_replicates_per_block).map(|_| DesignPoint {
+            block,
+            covariate: anchor_covariate,
+            role: DesignRole::Anchor,
+        }));
+        rng.shuffle(&mut points);
+        schedule.extend(points);
+    }
+    Ok(schedule)
 }
 
 /// A stateful synthetic observation process.
@@ -600,6 +695,68 @@ mod tests {
         assert!(lag_one_correlation > 0.55, "rho1={lag_one_correlation}");
     }
 
+
+
+    #[test]
+    fn anchor_schedule_is_reproducible_and_interleaves_every_role_per_block() {
+        let candidates = [0.1, 0.4, 0.8, 1.2, 2.0];
+        let left = interleaved_anchor_schedule(&candidates, 0.25, 2, 7, 0xA11C_E55E).unwrap();
+        let right = interleaved_anchor_schedule(&candidates, 0.25, 2, 7, 0xA11C_E55E).unwrap();
+        assert_eq!(left, right);
+        assert_eq!(left.len(), 7 * (candidates.len() + 2));
+
+        for block in 0..7 {
+            let points: Vec<_> = left.iter().filter(|point| point.block == block).collect();
+            assert_eq!(points.len(), candidates.len() + 2);
+            assert_eq!(
+                points.iter().filter(|point| point.role == DesignRole::Anchor).count(),
+                2
+            );
+            for candidate in candidates {
+                assert_eq!(
+                    points
+                        .iter()
+                        .filter(|point| {
+                            point.role == DesignRole::Discovery && point.covariate == candidate
+                        })
+                        .count(),
+                    1
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn anchor_schedule_changes_order_with_a_different_seed() {
+        let candidates = [0.1, 0.4, 0.8, 1.2, 2.0];
+        let left = interleaved_anchor_schedule(&candidates, 0.25, 2, 4, 101).unwrap();
+        let right = interleaved_anchor_schedule(&candidates, 0.25, 2, 4, 202).unwrap();
+        assert_ne!(left, right);
+    }
+
+    #[test]
+    fn anchor_schedule_rejects_invalid_or_unbounded_designs() {
+        assert_eq!(
+            interleaved_anchor_schedule(&[], 0.0, 1, 1, 1).unwrap_err(),
+            DesignScheduleError::EmptyCandidateDesign
+        );
+        assert_eq!(
+            interleaved_anchor_schedule(&[1.0], 0.0, 0, 1, 1).unwrap_err(),
+            DesignScheduleError::ZeroAnchorReplicates
+        );
+        assert_eq!(
+            interleaved_anchor_schedule(&[1.0], 0.0, 1, 0, 1).unwrap_err(),
+            DesignScheduleError::ZeroBlocks
+        );
+        assert_eq!(
+            interleaved_anchor_schedule(&[f64::NAN], 0.0, 1, 1, 1).unwrap_err(),
+            DesignScheduleError::NonFiniteCovariate
+        );
+        assert_eq!(
+            interleaved_anchor_schedule(&[1.0], 0.0, MAX_DESIGN_POINTS, 2, 1).unwrap_err(),
+            DesignScheduleError::TooManyDesignPoints
+        );
+    }
 
     fn sample_variance(values: &[f64]) -> f64 {
         assert!(values.len() >= 2);
