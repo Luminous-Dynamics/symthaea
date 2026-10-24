@@ -112,6 +112,7 @@ fn make_serene() -> CognitiveSnapshot {
         persistence_cycles: vec![[0.1, 0.6]],
         thought_vector: vec![0.3, -0.1, 0.5, 0.2, -0.3, 0.1, 0.4, -0.2],
         prediction_error: 0.05,
+        prediction_error_valid: true,
         ..CognitiveSnapshot::dormant()
     }
 }
@@ -132,6 +133,7 @@ fn make_turbulent() -> CognitiveSnapshot {
         persistence_cycles: vec![[0.1, 0.5], [0.2, 0.7]],
         thought_vector: vec![0.8, -0.7, 0.9, -0.5, 0.6, -0.8, 0.3, 0.7],
         prediction_error: 0.7,
+        prediction_error_valid: true,
         ..CognitiveSnapshot::dormant()
     }
 }
@@ -152,6 +154,7 @@ fn make_playful() -> CognitiveSnapshot {
         persistence_cycles: vec![[0.2, 0.7]],
         thought_vector: vec![0.5, 0.3, -0.2, 0.6, 0.1, -0.5, 0.4, 0.2],
         prediction_error: 0.3,
+        prediction_error_valid: true,
         ..CognitiveSnapshot::dormant()
     }
 }
@@ -172,6 +175,7 @@ fn make_contemplative() -> CognitiveSnapshot {
         persistence_cycles: vec![[0.1, 0.8]],
         thought_vector: vec![0.1, 0.0, 0.1, -0.1, 0.0, 0.1, -0.1, 0.0],
         prediction_error: 0.02,
+        prediction_error_valid: true,
         ..CognitiveSnapshot::dormant()
     }
 }
