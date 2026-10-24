@@ -34,6 +34,20 @@ jobs:
       - name: Format affected crate
         run: cargo fmt --manifest-path crates/core/symthaea-core/Cargo.toml -- --check
 
+
+      - name: Diagnose required Cargo.lock reconciliation without changing test input
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.original
+          set +e
+          cargo update --workspace --offline
+          update_status=$?
+          set -e
+          echo "cargo update exit code: $update_status"
+          echo "=== lockfile diff stat ==="
+          git diff --stat -- Cargo.lock
+          echo "=== lockfile diff ==="
+          git diff -- Cargo.lock
+          cp /tmp/Cargo.lock.original Cargo.lock
       - name: Focused active-experiment score tests
         run: cargo test --locked -p symthaea-core --lib hdc::conjecture_engine::experiment_selection -- --nocapture
 
