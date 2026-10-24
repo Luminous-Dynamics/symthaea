@@ -25,20 +25,19 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Test communication contracts and CLI
         run: cargo test -p symthaea-communication
-      - name: Check locked offline worker and Python syntax
+      - name: Check checked-in voice workers and evaluation scripts
         run: |
-          uv lock --check --project communication/worker
           python - <<'PY'
           import ast
           from pathlib import Path
           for path in [
-              Path("communication/worker/seamless_worker.py"),
-              Path("communication/worker/whisper_worker.py"),
-              Path("communication/worker/provision_whisper.py"),
-              Path("communication/pilot/prepare_fleurs.py"),
-              Path("communication/pilot/test_worker_e2e.py"),
+              Path("scripts/voice_transformers_worker.py"),
+              Path("scripts/voice_pilot_outcomes_to_predictions.py"),
+              Path("scripts/voice_asr_score.py"),
+              Path("scripts/prepare_voice_asr_pilot.py"),
+              Path("scripts/voice_dataset_intake.py"),
           ]:
-              ast.parse(path.read_text(), filename=str(path))
+              ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
           PY
       - name: Check acoustic capability adapter
         run: cargo check -p symthaea-stt --lib
