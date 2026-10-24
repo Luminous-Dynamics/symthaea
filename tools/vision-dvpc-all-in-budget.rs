@@ -113,6 +113,7 @@ enum DecisionState {
     SettledCheap,
     SettledEscalated,
     RejectedAllocatorBudget,
+    RejectedRunContaminated,
     Contaminated,
 }
 
@@ -123,6 +124,7 @@ impl DecisionState {
             Self::SettledCheap => "SETTLED_CHEAP",
             Self::SettledEscalated => "SETTLED_ESCALATED",
             Self::RejectedAllocatorBudget => "REJECTED_ALLOCATOR_BUDGET",
+            Self::RejectedRunContaminated => "REJECTED_RUN_CONTAMINATED",
             Self::Contaminated => "CONTAMINATED",
         }
     }
@@ -146,6 +148,7 @@ pub struct LedgerSnapshot {
     pub settled_cheap: usize,
     pub settled_escalated: usize,
     pub rejected_allocator_budget: usize,
+    pub rejected_run_contaminated: usize,
     pub rejected_escalation_budget: usize,
     pub contaminated_decisions: usize,
 }
@@ -207,7 +210,7 @@ impl AllInBudgetLedger {
                 decision_id.to_owned(),
                 DecisionRecord {
                     action_state: ActionState::NotRequested,
-                    decision_state: DecisionState::RejectedAllocatorBudget,
+                    decision_state: DecisionState::RejectedRunContaminated,
                     allocator_actual: None,
                     escalation_actual: None,
                 },
@@ -247,9 +250,6 @@ impl AllInBudgetLedger {
     /// Reserve a full-mode escalation only after the allocator reservation
     /// exists. Returning false means the caller must not run the escalation.
     pub fn reserve_escalation(&mut self, decision_id: &str) -> Result<bool, String> {
-        if self.state == RunState::Contaminated {
-            return Ok(false);
-        }
         let record = self
             .decisions
             .get(decision_id)
@@ -259,6 +259,11 @@ impl AllInBudgetLedger {
         }
         if record.action_state != ActionState::NotRequested {
             return Err("escalation reservation may be requested only once".to_owned());
+        }
+        if self.state == RunState::Contaminated {
+            self.decisions.get_mut(decision_id).expect("record exists").action_state =
+                ActionState::RejectedBudget;
+            return Ok(false);
         }
 
         if !self.fits(self.config.escalation_upper_bound) {
@@ -388,6 +393,7 @@ impl AllInBudgetLedger {
         let mut settled_cheap = 0usize;
         let mut settled_escalated = 0usize;
         let mut rejected_allocator_budget = 0usize;
+        let mut rejected_run_contaminated = 0usize;
         let mut rejected_escalation_budget = 0usize;
         let mut contaminated_decisions = 0usize;
         for record in self.decisions.values() {
@@ -395,6 +401,7 @@ impl AllInBudgetLedger {
                 DecisionState::SettledCheap => settled_cheap += 1,
                 DecisionState::SettledEscalated => settled_escalated += 1,
                 DecisionState::RejectedAllocatorBudget => rejected_allocator_budget += 1,
+                DecisionState::RejectedRunContaminated => rejected_run_contaminated += 1,
                 DecisionState::Contaminated => contaminated_decisions += 1,
                 DecisionState::AllocatorReserved => {}
             }
@@ -419,6 +426,7 @@ impl AllInBudgetLedger {
             settled_cheap,
             settled_escalated,
             rejected_allocator_budget,
+            rejected_run_contaminated,
             rejected_escalation_budget,
             contaminated_decisions,
         }
@@ -442,6 +450,7 @@ impl AllInBudgetLedger {
         let _ = writeln!(out, "LEDGER\tsettled_cheap\t{}", snapshot.settled_cheap);
         let _ = writeln!(out, "LEDGER\tsettled_escalated\t{}", snapshot.settled_escalated);
         let _ = writeln!(out, "LEDGER\trejected_allocator_budget\t{}", snapshot.rejected_allocator_budget);
+        let _ = writeln!(out, "LEDGER\trejected_run_contaminated\t{}", snapshot.rejected_run_contaminated);
         let _ = writeln!(out, "LEDGER\trejected_escalation_budget\t{}", snapshot.rejected_escalation_budget);
         let _ = writeln!(out, "LEDGER\tcontaminated_decisions\t{}", snapshot.contaminated_decisions);
         let _ = writeln!(out, "LEDGER\tperformance_claim\tNONE");
@@ -560,7 +569,7 @@ mod tests {
         assert!(ledger.settle("d1", Some(ResourceVector::new(11, 2)), None).is_err());
         assert_eq!(ledger.snapshot().state, RunState::Contaminated);
         assert!(!ledger.reserve_allocator("d2").unwrap());
-        assert_eq!(ledger.snapshot().rejected_allocator_budget, 1);
+        assert_eq!(ledger.snapshot().rejected_run_contaminated, 1);
     }
 
     #[test]
