@@ -597,6 +597,52 @@ mod tests {
     }
 
     #[test]
+    fn every_non_retire_action_costs_no_more_than_raw_tokens() {
+        for raw_tokens in 8..=40 {
+            for action in Action::ALL {
+                assert!(action.cost(raw_tokens) <= raw_tokens || action == Action::Retire);
+            }
+        }
+    }
+
+    #[test]
+    fn oracle_matches_exhaustive_search_for_a_tiny_fixture() {
+        let candidates = build_fixture(71, 3);
+        let budget = 24;
+        let oracle = oracle_select(&candidates, budget);
+        let oracle_value: f64 = candidates.iter().zip(&oracle)
+            .map(|(candidate, decision)| candidate_net(*candidate, decision.action)).sum();
+
+        let mut best = 0.0f64;
+        for a in Action::ALL {
+            for b in Action::ALL {
+                for c in Action::ALL {
+                    let actions = [a, b, c];
+                    let tokens: usize = candidates.iter().zip(actions)
+                        .map(|(candidate, action)| action.cost(candidate.raw_tokens)).sum();
+                    if tokens <= budget {
+                        let value: f64 = candidates.iter().zip(actions)
+                            .map(|(candidate, action)| candidate_net(*candidate, action)).sum();
+                        best = best.max(value);
+                    }
+                }
+            }
+        }
+        assert!((oracle_value - best).abs() < 1e-9);
+        assert!(oracle.iter().map(|d| d.tokens).sum::<usize>() <= budget);
+    }
+
+    #[test]
+    fn raw_fit_arm_retains_every_candidate() {
+        let candidates = build_fixture(52, 120);
+        let raw_demand: usize = candidates.iter().map(|candidate| candidate.raw_tokens).sum();
+        assert!(raw_demand <= 8192);
+        let decisions = choose_policy(&candidates, 8192, "always_raw");
+        assert!(decisions.iter().all(|decision| decision.action == Action::Raw));
+        assert_eq!(decisions.iter().map(|d| d.tokens).sum::<usize>(), raw_demand);
+    }
+
+    #[test]
     fn anti_control_exposes_unsafe_promotion() {
         let candidates = build_fixture(51, 120);
         let decisions = choose_policy(&candidates, 8192, "promote_everything");
