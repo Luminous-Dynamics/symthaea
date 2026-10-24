@@ -288,6 +288,12 @@ fn counterfactual_pairs_pass(scope: &ConsentScope) -> (usize, usize) {
     no_order.order = None;
     let order_result = resolve(&[no_order], scope);
 
+    let mut question = grant.clone();
+    question.transition = ConsentTransition::Withdrawn;
+    question.modality = ConsentModality::Asked;
+    question.order = Some(2);
+    let question_result = resolve(&[grant.clone(), question], scope);
+
     let pairs = [
         (
             base == ResolutionKey::Candidate(ConsentTransition::Granted, 1)
@@ -308,6 +314,10 @@ fn counterfactual_pairs_pass(scope: &ConsentScope) -> (usize, usize) {
             order_result
                 == ResolutionKey::Unknown(ConsentResolutionUncertainty::MissingTemporalOrder),
             "remove-order-changes-to-unknown",
+        ),
+        (
+            question_result == base,
+            "question-does-not-contaminate-asserted-grant",
         ),
     ];
 
@@ -399,6 +409,11 @@ fn expected_single(
     event: &ConsentEvidenceEvent,
     fields: [FieldCase; 3],
 ) -> ResolutionKey {
+    // An interrogative event is not a claim about consent and is ignored,
+    // regardless of whether its extracted scope is complete.
+    if event.modality == ConsentModality::Asked {
+        return ResolutionKey::NoRelevantEvidence;
+    }
     if fields.contains(&FieldCase::Mismatch) {
         return ResolutionKey::NoRelevantEvidence;
     }
@@ -418,16 +433,32 @@ fn expected_single(
 }
 
 fn expected_exact_pair(events: &[ConsentEvidenceEvent; 2]) -> ResolutionKey {
-    if events.iter().any(|event| event.modality != ConsentModality::Asserted) {
+    let relevant: Vec<&ConsentEvidenceEvent> = events
+        .iter()
+        .filter(|event| event.modality != ConsentModality::Asked)
+        .collect();
+    if relevant.is_empty() {
+        return ResolutionKey::NoRelevantEvidence;
+    }
+    if relevant
+        .iter()
+        .any(|event| event.modality != ConsentModality::Asserted)
+    {
         return ResolutionKey::Unknown(ConsentResolutionUncertainty::NonAssertedEvidence);
     }
-    let [Some(left), Some(right)] = [events[0].order, events[1].order] else {
+    if relevant.len() == 1 {
+        return match relevant[0].order {
+            Some(order) => ResolutionKey::Candidate(relevant[0].transition, order),
+            None => ResolutionKey::Unknown(ConsentResolutionUncertainty::MissingTemporalOrder),
+        };
+    }
+    let [Some(left), Some(right)] = [relevant[0].order, relevant[1].order] else {
         return ResolutionKey::Unknown(ConsentResolutionUncertainty::MissingTemporalOrder);
     };
     if left == right {
         return ResolutionKey::Unknown(ConsentResolutionUncertainty::DuplicateTemporalOrder);
     }
-    let latest = if left > right { &events[0] } else { &events[1] };
+    let latest = if left > right { relevant[0] } else { relevant[1] };
     ResolutionKey::Candidate(latest.transition, latest.order.unwrap_or_default())
 }
 
@@ -511,6 +542,10 @@ fn expected_mixed_scope_pair(
     candidate: &ConsentEvidenceEvent,
     fields: [FieldCase; 3],
 ) -> ResolutionKey {
+    // Questions are not factual events. Ignore them before scope/order checks.
+    if candidate.modality == ConsentModality::Asked {
+        return ResolutionKey::Candidate(ConsentTransition::Granted, 0);
+    }
     // A known mismatch means the event is out of scope even if another scope
     // field is malformed. The exact in-scope baseline event remains applicable.
     if fields.contains(&FieldCase::Mismatch) {

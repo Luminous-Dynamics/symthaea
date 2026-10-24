@@ -82,9 +82,11 @@ pub enum ConsentTransition {
 
 /// Linguistic modality is independent of the claimed transition.
 ///
-/// Only Asserted events can produce a candidate state. A question, quotation,
-/// reported claim, condition, or hypothetical can be useful evidence for a
-/// richer dialogue model, but cannot itself update the candidate state here.
+/// Only Asserted events can produce a candidate state. Questions are not
+/// claims about current consent and are ignored by this resolver; they do not
+/// contaminate an otherwise determinate assertion. Quoted, reported,
+/// conditional, or hypothetical evidence can carry a potential conflicting
+/// claim, so it preserves uncertainty rather than updating the candidate state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ConsentModality {
     Asserted,
@@ -224,6 +226,11 @@ pub fn resolve_latest_consent_candidate(
 
     let mut exact = Vec::new();
     for (index, event) in events.iter().enumerate() {
+        // A question does not assert a transition. Ignore it before scope
+        // resolution so an incomplete question cannot contaminate the state.
+        if event.modality == ConsentModality::Asked {
+            continue;
+        }
         match scope_relation(&event.scope, requested_scope) {
             ScopeRelation::Disjoint => {}
             ScopeRelation::Ambiguous => {
@@ -390,6 +397,40 @@ mod tests {
             ConsentEvidenceResolution::Unknown(
                 ConsentResolutionUncertainty::AmbiguousEventScope
             )
+        );
+    }
+
+    #[test]
+    fn a_question_alone_is_not_consent_evidence() {
+        let scope = request();
+        let mut question = event(&scope, ConsentTransition::Granted, Some(1));
+        question.modality = ConsentModality::Asked;
+        question.scope.action_id = None;
+
+        assert_eq!(
+            resolve_latest_consent_candidate(&[question], &scope),
+            ConsentEvidenceResolution::NoRelevantEvidence
+        );
+    }
+
+    #[test]
+    fn a_question_does_not_contaminate_an_asserted_grant() {
+        let scope = request();
+        let grant = event(&scope, ConsentTransition::Granted, Some(1));
+        let mut question = event(&scope, ConsentTransition::Withdrawn, Some(2));
+        question.modality = ConsentModality::Asked;
+
+        assert_eq!(
+            resolve_latest_consent_candidate(&[grant], &scope),
+            resolve_latest_consent_candidate(&[grant.clone(), question], &scope)
+        );
+        assert_eq!(
+            resolve_latest_consent_candidate(&[grant], &scope),
+            ConsentEvidenceResolution::LatestCandidate {
+                transition: ConsentTransition::Granted,
+                event_index: 0,
+                order: 1,
+            }
         );
     }
 
