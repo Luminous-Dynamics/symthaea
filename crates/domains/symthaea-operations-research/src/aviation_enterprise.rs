@@ -564,6 +564,7 @@ pub struct RunManifest {
     pub configuration_revision: String,
     pub input_digest: String,
     pub method_id: String,
+    pub part_source: PartSource,
     pub seed: u64,
     pub declared_plan_cost: Option<u64>,
     pub recomputed_cost: Option<u64>,
@@ -590,6 +591,7 @@ impl RunManifest {
             configuration_revision: scenario.configuration_revision.clone(),
             input_digest: scenario.input_digest.clone(),
             method_id: "bounded-exact-enumerator-v1".into(),
+            part_source: plan.part_source,
             seed,
             declared_plan_cost: Some(plan.total_cost),
             recomputed_cost: verification.recomputed_cost,
@@ -620,7 +622,7 @@ impl RunManifest {
             .unwrap_or_else(|| "null".into());
 
         format!(
-            "{{\"schema_version\":{},\"benchmark_id\":{},\"scenario_id\":{},\"configuration_revision\":{},\"input_digest\":{},\"method_id\":{},\"seed\":{},\"declared_plan_cost\":{},\"recomputed_cost\":{},\"verifier_status\":{},\"violation_count\":{},\"violations\":[{}],\"assigned_flight_count\":{},\"cancelled_flight_count\":{},\"synthetic\":{}}}",
+            "{{\"schema_version\":{},\"benchmark_id\":{},\"scenario_id\":{},\"configuration_revision\":{},\"input_digest\":{},\"method_id\":{},\"part_source\":{},\"seed\":{},\"declared_plan_cost\":{},\"recomputed_cost\":{},\"verifier_status\":{},\"violation_count\":{},\"violations\":[{}],\"assigned_flight_count\":{},\"cancelled_flight_count\":{},\"synthetic\":{}}}",
             json_quote(&self.schema_version),
             json_quote(&self.benchmark_id),
             json_quote(&self.scenario_id),
@@ -630,13 +632,21 @@ impl RunManifest {
             self.seed,
             cost_json,
             recomputed_cost_json,
-            json_quote(verification_status_name(self.verifier_status))
+            json_quote(verification_status_name(self.verifier_status)),
             self.violation_count,
             violations_json,
             self.assigned_flight_count,
             self.cancelled_flight_count,
             self.synthetic,
         )
+    }
+}
+
+fn part_source_name(source: PartSource) -> &'static str {
+    match source {
+        PartSource::None => "none",
+        PartSource::QualifiedStock => "qualified_stock",
+        PartSource::QualifiedProduction => "qualified_production",
     }
 }
 
@@ -892,6 +902,7 @@ mod tests {
         assert!(json.contains("\"verifier_status\":\"verified\""));
         assert!(json.contains("\"declared_plan_cost\":40"));
         assert!(json.contains("\"recomputed_cost\":40"));
+        assert!(json.contains("\"part_source\":\"qualified_production\""));
         assert!(json.contains("\"cancelled_flight_count\":0"));
         assert!(json.contains("\"seed\":7"));
     }
