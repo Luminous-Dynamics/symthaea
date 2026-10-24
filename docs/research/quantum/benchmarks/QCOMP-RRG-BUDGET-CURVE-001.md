@@ -87,6 +87,12 @@ At k=1, randomized tie-breaking on average gains only 0.125 vertices over the de
 4. Report the incremental value relative to the best classical policy that fits the same all-in budget. Separate the QOBLIB named-instance track from random-regular graphs.
 5. Freeze the confirmatory seed list and endpoints before tuning; these post-hoc data must not be reused as an untouched test set.
 
+## Relation to the published classical reference
+
+The Marino–Kirkpatrick paper reports an asymptotic d=3 independence ratio of 0.445330(3) for its deferred-decision prioritized algorithm. That is a paper-reported large-N algorithmic ratio, not an upper bound on the optimum and not a controlled finite-N timing comparison. The QGreedy 2026 preprint uses it as its classical linear-time prioritized-search reference. See the [original Marino–Kirkpatrick paper](https://arxiv.org/abs/2003.12293) and the [QGreedy paper](https://arxiv.org/abs/2601.21923).
+
+In the stored JavaScript preflight, the mean best-of-16 randomized minimal-degree greedy ratio is 0.4380 at N=50, 0.4405 at N=100, 0.43975 at N=200, and 0.4374 at N=500. Those values are below 0.445330 and are not a matched significance test against Marino–Kirkpatrick; the cohorts and algorithmic procedures differ. The concrete conclusion is negative but useful: multi-start random-tie greedy alone has not reached the published classical reference, so our next comparison must include a faithful prioritized-search baseline and stronger eligible classical heuristics before making any claim about QAOA or quantum information.
+
 ## Limitations
 
 - This is a derived analysis of 16 stored outcomes per graph from the earlier transient JavaScript preflight. It is not Rust generator/runner output and has not been calibrated against a Rust reproduction.
