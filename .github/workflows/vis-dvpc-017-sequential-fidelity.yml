@@ -1,0 +1,35 @@
+name: VIS-DVPC-017 sequential multi-fidelity replay
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-sequential-fidelity.rs"
+      - "docs/research/VIS_DVPC_017_SEQUENTIAL_MULTIFIDELITY_V1.md"
+      - ".github/workflows/vis-dvpc-017-sequential-fidelity.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-sequential-fidelity.rs"
+      - "docs/research/VIS_DVPC_017_SEQUENTIAL_MULTIFIDELITY_V1.md"
+      - ".github/workflows/vis-dvpc-017-sequential-fidelity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run exact-source unit tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-sequential-fidelity.rs -o /tmp/vis-dvpc-017-tests
+          /tmp/vis-dvpc-017-tests
+
+      - name: Build standalone replay
+        run: rustc --edition=2024 -O tools/vision-dvpc-sequential-fidelity.rs -o /tmp/vis-dvpc-017
