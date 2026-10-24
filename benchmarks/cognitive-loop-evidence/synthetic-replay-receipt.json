@@ -87,7 +87,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 1,
@@ -99,7 +100,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 2,
@@ -112,7 +114,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 3,
@@ -126,7 +129,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 4,
@@ -141,7 +145,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         }
       ]
     },
@@ -183,7 +188,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 1,
@@ -195,7 +201,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 2,
@@ -208,7 +215,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 3,
@@ -222,7 +230,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 4,
@@ -237,7 +246,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         }
       ]
     },
@@ -279,7 +289,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 1,
@@ -291,7 +302,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 2,
@@ -304,7 +316,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 3,
@@ -318,7 +331,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 4,
@@ -333,7 +347,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         }
       ]
     },
@@ -375,7 +390,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 1,
@@ -387,7 +403,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "candidate_state_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+          "candidate_state_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 2,
@@ -400,7 +417,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "candidate_state_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+          "candidate_state_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "verification_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
         },
         {
           "decision_tick": 3,
@@ -414,7 +432,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
           "snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "candidate_state_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+          "candidate_state_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 4,
@@ -429,7 +448,8 @@
           "state_before_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "candidate_state_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+          "candidate_state_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "verification_evidence_sha256": null
         }
       ]
     },
@@ -471,7 +491,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 1,
@@ -483,7 +504,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 2,
@@ -496,7 +518,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 3,
@@ -510,7 +533,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         },
         {
           "decision_tick": 4,
@@ -525,7 +549,8 @@
           "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "snapshot_sha256": null,
-          "candidate_state_sha256": null
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
         }
       ]
     }
