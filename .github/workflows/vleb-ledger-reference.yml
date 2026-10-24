@@ -49,3 +49,13 @@ jobs:
         run: cargo test --locked --manifest-path tools/vleb/ledger-reconcile/Cargo.toml
       - name: Run strict Clippy across all targets
         run: cargo clippy --locked --manifest-path tools/vleb/ledger-reconcile/Cargo.toml --all-targets -- -D warnings
+      - name: Execute preregistered semantic mutation probes
+        run: python tools/vleb/run_mutation_campaign.py --output-dir "$RUNNER_TEMP/vleb-mutation-evidence"
+      - name: Upload semantic mutation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vleb-mutation-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/vleb-mutation-evidence/
+          if-no-files-found: warn
+          retention-days: 14
