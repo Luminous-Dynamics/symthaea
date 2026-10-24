@@ -40,6 +40,8 @@ pub struct MemoryManager {
     /// Cycles since last consolidation
     cycles_since_consolidation: u32,
     /// Exactly-once admission cursor for PE-driven pressure.
+    /// Restore this cursor only with the same monotonic cycle-number namespace;
+    /// a fresh cognitive session must begin with a fresh manager/cursor.
     prediction_error_cursor: PredictionEvidenceCursor,
 }
 
@@ -187,7 +189,8 @@ impl CognitiveSubsystem for MemoryManager {
 
     fn checkpoint(&self) -> Vec<u8> {
         // Keep the first nine bytes compatible with legacy checkpoints.
-        // The versioned extension preserves PE idempotency across restart.
+        // The extension preserves idempotency within the same logical cycle
+        // namespace. A fresh session must start from a fresh manager/cursor.
         let mut data = Vec::with_capacity(23);
         data.extend_from_slice(&self.consolidation_pressure.to_le_bytes());
         data.extend_from_slice(&self.cycles_since_consolidation.to_le_bytes());
