@@ -1,6 +1,6 @@
 # Scientific Law Discovery Under Unknown Noise and Adaptive Sampling
 
-**Protocol v0.1 — preregistration proposal only. No method-performance or SOTA claim is made.**
+**Protocol v0.1.1 — preregistration proposal only. No method-performance or SOTA claim is made.**
 
 Issue: [SCI-NOISE-001 (#8607)](https://github.com/Luminous-Dynamics/symthaea/issues/8607)  
 Parent research: [truth-absent recovery (#8536)](https://github.com/Luminous-Dynamics/symthaea/issues/8536)  
@@ -58,7 +58,7 @@ The policy receives only permitted design metadata, its past observations and it
 ## 4. Experimental protocol and anti-leakage rules
 
 1. Freeze world families, noise mechanisms, seed lists, query budgets, model candidates, calibration partitions, decision thresholds, eligibility criteria and metric code before confirmatory execution.
-2. Derive discovery designs before choosing evaluator-only law/noise labels. Use independent deterministic RNG streams for public design, target generation, noise, in-domain evaluation, marginal shifts, joint extrapolation and near-boundary tests.
+2. Derive discovery designs before choosing evaluator-only law/noise labels. Use separate deterministic RNG streams for public design, target generation, noise, in-domain evaluation, marginal shifts, joint extrapolation and near-boundary tests. In the standalone harness, derive repeatable domain-separated seeds with `derive_stream_seed_v1(master_seed, domain, world_id)` and freeze its integer behavior with known-answer vectors. This prevents accidental seed reuse under the declared domain tags; it is not cryptographic blinding and does not prove statistical independence between streams.
 3. Produce a timestamped or sequentially indexed predictive distribution before each measurement. Store the exact forecast, candidate/model digest, selected action, observable context and subsequent outcome. A post-outcome forecast reconstruction is invalid.
 4. Pair policies on the same world, seed, design opportunities, noise realization where scientifically appropriate, and declared observation/computation budget. Report when coupling noise across policies is inappropriate for a policy-dependent intervention.
 5. Separate discovery observations, method/calibration tuning data, fresh post-recovery policy-visible measurements, and evaluator-only score data. No evaluator score can affect candidate generation, fitting, ranking, stopping, monitor calibration or grammar expansion.
