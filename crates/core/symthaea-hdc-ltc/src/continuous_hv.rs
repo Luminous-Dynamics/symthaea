@@ -15,7 +15,8 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Standard HDC dimension (2^14 = 16,384).
+/// Default HDC dimension (2^14 = 16,384), not a maximum; hypervectors can use
+/// larger dimensions such as 65,536 (64K), subject to available memory.
 pub const HDC_DIMENSION: usize = 16_384;
 
 /// A continuous-valued hypervector using f32 components.

@@ -6,9 +6,10 @@
 //! Compares pure HDC snapshot encoding against HDC+CfC temporal trajectory encoding
 //! on battery degradation and spacecraft anomaly detection.
 //!
-//! The key insight: CfC neurons accumulate temporal context via closed-form LTC dynamics,
-//! capturing trajectory evolution rather than instantaneous snapshots. For degradation
-//! detection, this lets the model notice *how* discharge curves change over time.
+//! The CfC path adds a seeded, untrained continuous-time state transform to HDC snapshots.
+//! This example currently evaluates a fixed dynamical feature map, not a trained anomaly
+//! detector: it does not learn a healthy-trajectory model or calibrate thresholds on a
+//! separate validation split. Treat results as exploratory feature comparisons.
 //!
 //! Usage:
 //!   cargo run -p symthaea-physics --example hdc_cfc_eval --release
@@ -132,14 +133,12 @@ impl HdcEncoder {
         ContinuousHV::bundle(&refs)
     }
 
-    /// HDC+CfC: Temporal surprise encoding.
+    /// HDC+CfC: seeded, untrained continuous-time temporal feature transform.
     ///
-    /// The CfC neuron predicts the next input. The prediction error (surprise)
-    /// at each step is accumulated. Healthy cycles have LOW cumulative surprise
-    /// (the neuron learns the normal trajectory). Degraded cycles have HIGH
-    /// surprise (the trajectory deviates from what the neuron expects).
-    ///
-    /// Additionally, we capture multi-point snapshots of the CfC state.
+    /// The neuron resets to the same deterministic initialization for each cycle and is not
+    /// trained in this evaluation. State/input dissimilarity is a candidate temporal feature,
+    /// not a learned or calibrated one-step prediction error. We also capture multi-point
+    /// snapshots of the CfC state.
     ///
     /// Returns (cfc_surprise_profile, cfc_hybrid):
     /// - cfc_surprise_profile: accumulated surprise HVs at 4 checkpoints
@@ -171,18 +170,17 @@ impl HdcEncoder {
         let mut snapshots: Vec<ContinuousHV> = Vec::with_capacity(4);
         let mut bundle_accum = ContinuousHV::zero(DIM);
 
-        // Accumulate prediction errors (surprise)
+        // Accumulate state/input dissimilarity scores (untrained "surprise")
         let mut total_surprise = 0.0f32;
         let mut surprise_accum = ContinuousHV::zero(DIM);
 
         for (i, &sample) in subsampled.iter().enumerate() {
             let feat_hv = self.encode_sample(sample);
 
-            // Compute surprise: how different is the current input from what
-            // the CfC state predicts? The CfC state IS the prediction (it
-            // represents where the neuron "thinks" the trajectory is going).
-            let prediction = neuron.state();
-            let surprise = 1.0 - prediction.similarity(&feat_hv);
+            // State/input dissimilarity is an exploratory temporal feature. The neuron is
+            // untrained here, so this is not a calibrated prediction error.
+            let previous_state = neuron.state();
+            let surprise = 1.0 - previous_state.similarity(&feat_hv);
             total_surprise += surprise;
 
             // Weight the feature HV by surprise: high-surprise samples get
@@ -223,8 +221,8 @@ impl HdcEncoder {
         (surprise_profile, cfc_hybrid)
     }
 
-    /// Return the cumulative CfC surprise score for a cycle.
-    /// Higher = more unexpected trajectory = more likely degraded.
+    /// Return a candidate untrained-CfC state/input dissimilarity score for a cycle.
+    /// Higher scores are a hypothesis for anomaly ranking, not a calibrated probability.
     fn cfc_surprise_score(&self, samples: &[&[f32]]) -> f64 {
         if samples.len() < 2 {
             return 0.0;
@@ -335,6 +333,9 @@ fn compute_auc(roc: &[RocPoint]) -> f64 {
     auc.clamp(0.0, 1.0)
 }
 
+/// Oracle F1 for exploratory inspection: threshold selection uses the supplied labels.
+/// Do not report this as held-out performance; use a separate validation split to select
+/// a deployment threshold and then evaluate that frozen threshold on test data.
 fn find_best_f1(scored: &[(f64, bool)]) -> f64 {
     let total_pos = scored.iter().filter(|(_, l)| *l).count() as f64;
     if total_pos < 1.0 {
@@ -489,6 +490,71 @@ struct EvalResult {
     f1_fused: f64,
 }
 
+/// HDC distance calibration estimated from training-only healthy representations.
+///
+/// The tail block is held out from the HDC reference prototype, preserving temporal order
+/// for the battery/spacecraft datasets. Evaluation/test scores are never used to choose this
+/// mean or scale. With fewer than two examples, use a neutral unit scale rather than
+/// estimating calibration from the evaluation distribution.
+struct HdcScoreCalibration {
+    reference: ContinuousHV,
+    mean: f64,
+    std: f64,
+    calibration_count: usize,
+}
+
+fn fit_hdc_score_calibration(healthy_vectors: &[ContinuousHV]) -> HdcScoreCalibration {
+    match healthy_vectors.len() {
+        0 => {
+            return HdcScoreCalibration {
+                reference: ContinuousHV::zero(DIM),
+                mean: 0.0,
+                std: 1.0,
+                calibration_count: 0,
+            };
+        }
+        1 => {
+            return HdcScoreCalibration {
+                reference: healthy_vectors[0].clone(),
+                mean: 0.0,
+                std: 1.0,
+                calibration_count: 0,
+            };
+        }
+        _ => {}
+    }
+
+    // Reserve the final 20% (rounded up) as a chronological calibration block.
+    let calibration_count = ((healthy_vectors.len() + 4) / 5).min(healthy_vectors.len() - 1);
+    let fit_count = healthy_vectors.len() - calibration_count;
+    let fit_refs: Vec<&ContinuousHV> = healthy_vectors[..fit_count].iter().collect();
+    let reference = ContinuousHV::bundle(&fit_refs);
+
+    let calibration_scores: Vec<f64> = healthy_vectors[fit_count..]
+        .iter()
+        .map(|vector| 1.0 - vector.similarity(&reference) as f64)
+        .collect();
+    let mean = calibration_scores.iter().sum::<f64>() / calibration_scores.len() as f64;
+    let std = if calibration_scores.len() >= 2 {
+        let variance = calibration_scores
+            .iter()
+            .map(|score| (score - mean).powi(2))
+            .sum::<f64>()
+            / calibration_scores.len() as f64;
+        variance.sqrt().max(0.001)
+    } else {
+        // A single calibration example does not identify a reliable scale.
+        1.0
+    };
+
+    HdcScoreCalibration {
+        reference,
+        mean,
+        std,
+        calibration_count,
+    }
+}
+
 fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
     let mut by_battery: HashMap<&str, Vec<&BatteryCycle>> = HashMap::new();
     for c in cycles {
@@ -507,19 +573,21 @@ fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
     let test_batteries = &batteries[batteries.len().saturating_sub(1)..];
     eprintln!("  Train: {:?}, Test: {:?}", train_batteries, test_batteries);
 
-    // Collect features for normalization
-    let mut all_features: Vec<[f32; 3]> = Vec::new();
-    for &bat in train_batteries.iter().chain(test_batteries.iter()) {
+    // Fit feature scaling on training batteries only. Test-battery extrema must not
+    // influence the transform used to evaluate generalization to an unseen battery.
+    let mut training_features: Vec<[f32; 3]> = Vec::new();
+    for &bat in train_batteries {
         for cycle in &by_battery[bat] {
-            for s in &cycle.samples {
-                all_features.push([s.voltage, s.current, s.temperature]);
+            for sample in &cycle.samples {
+                training_features.push([sample.voltage, sample.current, sample.temperature]);
             }
         }
     }
 
-    let feat_refs: Vec<&[f32]> = all_features.iter().map(|f| f.as_slice()).collect();
+    let train_feature_refs: Vec<&[f32]> =
+        training_features.iter().map(|feature| feature.as_slice()).collect();
     let mut encoder = HdcEncoder::new(3, 0xBA7_0001);
-    encoder.fit(&feat_refs);
+    encoder.fit(&train_feature_refs);
 
     // Build healthy references
     let mut healthy_hdc: Vec<ContinuousHV> = Vec::new();
@@ -549,12 +617,21 @@ fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
         }
     }
 
-    let hdc_refs: Vec<&ContinuousHV> = healthy_hdc.iter().collect();
+    let HdcScoreCalibration {
+        reference: ref_hdc,
+        mean: hdc_calibration_mean,
+        std: hdc_calibration_std,
+        calibration_count: hdc_calibration_count,
+    } = fit_hdc_score_calibration(&healthy_hdc);
     let cfc_p_refs: Vec<&ContinuousHV> = healthy_cfc_pure.iter().collect();
     let cfc_h_refs: Vec<&ContinuousHV> = healthy_cfc_hybrid.iter().collect();
-    let ref_hdc = ContinuousHV::bundle(&hdc_refs);
     let ref_cfc_pure = ContinuousHV::bundle(&cfc_p_refs);
     let ref_cfc_hybrid = ContinuousHV::bundle(&cfc_h_refs);
+
+    eprintln!(
+        "  HDC score calibration: {} held-out healthy cycles (mean={:.4}, std={:.4})",
+        hdc_calibration_count, hdc_calibration_mean, hdc_calibration_std
+    );
 
     // Reference surprise: mean and std of healthy cycles
     let mean_fn = |v: &[f64]| v.iter().sum::<f64>() / v.len().max(1) as f64;
@@ -642,11 +719,9 @@ fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
         );
     }
 
-    // Score-level fusion: combine HDC distance + CfC surprise (z-score)
-    // Normalize HDC scores to z-scores for fair combination
-    let hdc_scores: Vec<f64> = scored_hdc.iter().map(|(s, _)| *s).collect();
-    let hdc_mean = mean_fn(&hdc_scores);
-    let hdc_std = std_fn(&hdc_scores).max(0.001);
+    // Score-level fusion uses training-only healthy calibration, never evaluation statistics.
+    let hdc_mean = hdc_calibration_mean;
+    let hdc_std = hdc_calibration_std;
 
     let scored_fused: Vec<(f64, bool)> = scored_hdc
         .iter()
@@ -672,6 +747,28 @@ fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
 
 // ── Spacecraft Data Loading & Evaluation ─────────────────────────────────────
 
+fn parse_labeled_row(record: &csv::StringRecord, max_cols: usize) -> Option<(Vec<f32>, bool)> {
+    if record.len() < max_cols + 1 {
+        return None;
+    }
+
+    let mut features = Vec::with_capacity(max_cols);
+    for index in 0..max_cols {
+        let value = record.get(index)?.parse::<f32>().ok()?;
+        if !value.is_finite() {
+            return None;
+        }
+        features.push(value);
+    }
+
+    let label = match record.get(max_cols)?.parse::<u8>().ok()? {
+        0 => false,
+        1 => true,
+        _ => return None,
+    };
+    Some((features, label))
+}
+
 fn load_csv_rows(path: &std::path::Path, max_cols: usize) -> Vec<(Vec<f32>, bool)> {
     eprintln!("Loading {:?}...", path);
     let mut rdr = csv::ReaderBuilder::new()
@@ -680,46 +777,72 @@ fn load_csv_rows(path: &std::path::Path, max_cols: usize) -> Vec<(Vec<f32>, bool
         .expect("Failed to open CSV");
 
     let mut rows: Vec<(Vec<f32>, bool)> = Vec::new();
+    let mut skipped_rows = 0usize;
     for result in rdr.records() {
-        let record = match result {
-            Ok(r) => r,
-            Err(_) => continue,
-        };
-        if record.len() < max_cols + 1 {
-            continue;
+        match result {
+            Ok(record) => match parse_labeled_row(&record, max_cols) {
+                Some(row) => rows.push(row),
+                None => skipped_rows += 1,
+            },
+            Err(_) => skipped_rows += 1,
         }
-
-        let feats: Vec<f32> = (0..max_cols)
-            .map(|i| record[i].parse::<f32>().unwrap_or(0.0))
-            .collect();
-        let label: bool = record[max_cols].parse::<u8>().unwrap_or(0) == 1;
-        rows.push((feats, label));
     }
-    eprintln!("  Loaded {} rows", rows.len());
+    eprintln!(
+        "  Loaded {} valid rows; skipped {} malformed, non-finite, short, or invalid-label rows",
+        rows.len(), skipped_rows
+    );
     rows
 }
 
-fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path) -> EvalResult {
+fn evaluate_spacecraft(
+    train_path: &std::path::Path,
+    test_path: &std::path::Path,
+) -> Option<EvalResult> {
     let n_features = 25;
 
     let train_rows = load_csv_rows(train_path, n_features);
     let test_rows = load_csv_rows(test_path, n_features);
+    if train_rows.is_empty() || test_rows.is_empty() {
+        eprintln!(
+            "[Spacecraft] Skipping evaluation: no valid labelled rows remain in train or test data."
+        );
+        return None;
+    }
 
-    // Fit normalization on all data
-    let all_refs: Vec<&[f32]> = train_rows
+    // Fit normalization on the training partition only to keep test values held out.
+    let train_refs: Vec<&[f32]> = train_rows
         .iter()
-        .chain(test_rows.iter())
-        .map(|(f, _)| f.as_slice())
+        .map(|(features, _)| features.as_slice())
         .collect();
     let mut encoder = HdcEncoder::new(n_features, 0x5C_0001);
-    encoder.fit(&all_refs);
+    encoder.fit(&train_refs);
 
-    // Group training data into windows
+    // Group training data into windows, retaining their labels so labelled anomalies do
+    // not contaminate the healthy reference or the HDC score calibration.
     eprintln!("  Grouping into windows of {}...", SPACECRAFT_WINDOW);
-    let train_windows: Vec<Vec<&[f32]>> = train_rows
+    let total_train_windows = train_rows.chunks(SPACECRAFT_WINDOW).len();
+    let normal_train_window_count = train_rows
         .chunks(SPACECRAFT_WINDOW)
-        .map(|chunk| chunk.iter().map(|(f, _)| f.as_slice()).collect())
+        .filter(|chunk| !chunk.iter().any(|(_, is_anomaly)| *is_anomaly))
+        .count();
+    let ref_windows: Vec<Vec<&[f32]>> = train_rows
+        .chunks(SPACECRAFT_WINDOW)
+        .filter(|chunk| !chunk.iter().any(|(_, is_anomaly)| *is_anomaly))
+        .take(200)
+        .map(|chunk| chunk.iter().map(|(features, _)| features.as_slice()).collect())
         .collect();
+    eprintln!(
+        "  Using {} reference windows ({} normal-labelled of {} total training windows)",
+        ref_windows.len(),
+        normal_train_window_count,
+        total_train_windows
+    );
+    if ref_windows.is_empty() {
+        eprintln!(
+            "[Spacecraft] Skipping evaluation: no normal-labelled training window is available."
+        );
+        return None;
+    }
 
     // Build healthy reference (subset for speed)
     let mut healthy_hdc: Vec<ContinuousHV> = Vec::new();
@@ -727,8 +850,7 @@ fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path
     let mut healthy_cfc_hybrid: Vec<ContinuousHV> = Vec::new();
     let mut healthy_surprise: Vec<f64> = Vec::new();
 
-    let ref_windows = &train_windows[..train_windows.len().min(200)];
-    for window in ref_windows {
+    for window in &ref_windows {
         healthy_hdc.push(encoder.encode_cycle_hdc_only(window));
         let (cp, ch) = encoder.encode_cycle_cfc(window);
         healthy_cfc_pure.push(cp);
@@ -736,12 +858,21 @@ fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path
         healthy_surprise.push(encoder.cfc_surprise_score(window));
     }
 
-    let hdc_refs: Vec<&ContinuousHV> = healthy_hdc.iter().collect();
+    let HdcScoreCalibration {
+        reference: ref_hdc,
+        mean: hdc_calibration_mean,
+        std: hdc_calibration_std,
+        calibration_count: hdc_calibration_count,
+    } = fit_hdc_score_calibration(&healthy_hdc);
     let cfc_p_refs: Vec<&ContinuousHV> = healthy_cfc_pure.iter().collect();
     let cfc_h_refs: Vec<&ContinuousHV> = healthy_cfc_hybrid.iter().collect();
-    let ref_hdc = ContinuousHV::bundle(&hdc_refs);
     let ref_cfc_pure = ContinuousHV::bundle(&cfc_p_refs);
     let ref_cfc_hybrid = ContinuousHV::bundle(&cfc_h_refs);
+
+    eprintln!(
+        "  HDC score calibration: {} held-out healthy windows (mean={:.4}, std={:.4})",
+        hdc_calibration_count, hdc_calibration_mean, hdc_calibration_std
+    );
 
     let mean_fn = |v: &[f64]| v.iter().sum::<f64>() / v.len().max(1) as f64;
     let std_fn = |v: &[f64]| {
@@ -800,10 +931,9 @@ fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path
         }
     }
 
-    // Score-level fusion: HDC + CfC surprise
-    let hdc_scores: Vec<f64> = scored_hdc.iter().map(|(s, _)| *s).collect();
-    let hdc_mean = mean_fn(&hdc_scores);
-    let hdc_std = std_fn(&hdc_scores).max(0.001);
+    // Score-level fusion uses training-only healthy calibration, never test-window statistics.
+    let hdc_mean = hdc_calibration_mean;
+    let hdc_std = hdc_calibration_std;
 
     let scored_fused: Vec<(f64, bool)> = scored_hdc
         .iter()
@@ -814,7 +944,7 @@ fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path
         })
         .collect();
 
-    EvalResult {
+    Some(EvalResult {
         auc_hdc: compute_auc(&compute_roc_curve(&scored_hdc)),
         auc_cfc: compute_auc(&compute_roc_curve(&scored_cfc)),
         auc_hybrid: compute_auc(&compute_roc_curve(&scored_hybrid)),
@@ -823,7 +953,7 @@ fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path
         f1_cfc: find_best_f1(&scored_cfc),
         f1_hybrid: find_best_f1(&scored_hybrid),
         f1_fused: find_best_f1(&scored_fused),
-    }
+    })
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -856,7 +986,7 @@ fn main() {
         eprintln!("[Battery] Done.");
 
         println!("---- Battery Degradation -----------------------------------------------");
-        println!("  Method                AUC       Best-F1");
+        println!("  Method                AUC       Best-F1*");
         println!(
             "  HDC-Only              {:.3}     {:.3}",
             r.auc_hdc, r.f1_hdc
@@ -894,51 +1024,142 @@ fn main() {
     let smap_test = base.join("data/spacecraft/smap_test.csv");
     if smap_train.exists() && smap_test.exists() {
         eprintln!("[Spacecraft] Starting evaluation...");
-        let r = evaluate_spacecraft(&smap_train, &smap_test);
-        eprintln!("[Spacecraft] Done.");
-
-        println!("---- Spacecraft (SMAP) -------------------------------------------------");
-        println!("  Method                AUC       Best-F1");
-        println!(
-            "  HDC-Only              {:.3}     {:.3}",
-            r.auc_hdc, r.f1_hdc
-        );
-        println!(
-            "  CfC Multiscale        {:.3}     {:.3}",
-            r.auc_cfc, r.f1_cfc
-        );
-        println!(
-            "  CfC Surprise+HDC HV   {:.3}     {:.3}",
-            r.auc_hybrid, r.f1_hybrid
-        );
-        println!(
-            "  HDC+CfC Score Fused   {:.3}     {:.3}",
-            r.auc_fused, r.f1_fused
-        );
-        let best_cfc = r.auc_cfc.max(r.auc_hybrid).max(r.auc_fused);
-        let delta = best_cfc - r.auc_hdc;
-        println!(
-            "  Best vs HDC           {:+.3}     {:+.3}",
-            delta,
-            [r.f1_cfc, r.f1_hybrid, r.f1_fused]
-                .iter()
-                .cloned()
-                .fold(f64::NEG_INFINITY, f64::max)
-                - r.f1_hdc
-        );
-        println!();
+        match evaluate_spacecraft(&smap_train, &smap_test) {
+            Some(r) => {
+                eprintln!("[Spacecraft] Done.");
+                println!("---- Spacecraft (SMAP) ----");
+                println!("  Method                AUC       Best-F1*");
+                println!(
+                    "  HDC-Only              {:.3}     {:.3}",
+                    r.auc_hdc, r.f1_hdc
+                );
+                println!(
+                    "  CfC Multiscale        {:.3}     {:.3}",
+                    r.auc_cfc, r.f1_cfc
+                );
+                println!(
+                    "  CfC Surprise+HDC HV   {:.3}     {:.3}",
+                    r.auc_hybrid, r.f1_hybrid
+                );
+                println!(
+                    "  HDC+CfC Score Fused   {:.3}     {:.3}",
+                    r.auc_fused, r.f1_fused
+                );
+                let best_cfc = r.auc_cfc.max(r.auc_hybrid).max(r.auc_fused);
+                let delta = best_cfc - r.auc_hdc;
+                println!(
+                    "  Best vs HDC           {:+.3}     {:+.3}",
+                    delta,
+                    [r.f1_cfc, r.f1_hybrid, r.f1_fused]
+                        .iter()
+                        .cloned()
+                        .fold(f64::NEG_INFINITY, f64::max)
+                        - r.f1_hdc
+                );
+                println!();
+            }
+            None => {
+                eprintln!(
+                    "[Spacecraft] Skipped: insufficient valid train/test calibration data."
+                );
+            }
+        }
     } else {
         eprintln!("Spacecraft data not found, skipping.");
     }
 
-    // ── Summary ─────────────────────────────────────────────────────────────
+    // ── Interpretation limits ───────────────────────────────────────────────
     println!("================================================================");
-    println!("ANALYSIS:");
-    println!("  The CfC surprise signal (prediction error accumulated over a");
-    println!("  cycle's temporal trajectory) provides 2.5x better class");
-    println!("  separation than HDC cosine distance alone for battery data.");
-    println!("  Score-level fusion (0.7*HDC + 0.3*CfC surprise) yields the");
-    println!("  best AUC, confirming that CfC temporal dynamics capture");
-    println!("  complementary degradation information beyond HDC snapshots.");
+    println!("INTERPRETATION LIMITS:");
+    println!("  CfC is a seeded, untrained temporal transform, not a learned detector.");
+    println!("  Normalization is fit on training partitions only.");
+    println!("  Best-F1 thresholds use evaluation labels and are oracle diagnostics,");
+    println!("  not deployable metrics. Select thresholds on a separate validation split.");
+    println!("  Pre-register split, seeds and tuning; repeat on independent data.");
     println!("================================================================");
+}
+
+
+#[cfg(test)]
+mod hdc_score_calibration_tests {
+    use super::*;
+
+    #[test]
+    fn spacecraft_row_parser_rejects_malformed_nonfinite_and_invalid_labels() {
+        let mut valid = csv::StringRecord::new();
+        valid.push_field("1.25");
+        valid.push_field("-2.5");
+        valid.push_field("1");
+        assert_eq!(
+            parse_labeled_row(&valid, 2),
+            Some((vec![1.25, -2.5], true))
+        );
+
+        let mut nonfinite = csv::StringRecord::new();
+        nonfinite.push_field("NaN");
+        nonfinite.push_field("0.5");
+        nonfinite.push_field("0");
+        assert!(parse_labeled_row(&nonfinite, 2).is_none());
+
+        let mut malformed = csv::StringRecord::new();
+        malformed.push_field("not-a-number");
+        malformed.push_field("0.5");
+        malformed.push_field("0");
+        assert!(parse_labeled_row(&malformed, 2).is_none());
+
+        let mut invalid_label = csv::StringRecord::new();
+        invalid_label.push_field("1.0");
+        invalid_label.push_field("0.5");
+        invalid_label.push_field("2");
+        assert!(parse_labeled_row(&invalid_label, 2).is_none());
+    }
+
+    #[test]
+    fn hdc_reference_and_scale_use_disjoint_training_calibration_block() {
+        let healthy: Vec<ContinuousHV> = (0..6)
+            .map(|index| ContinuousHV::random(DIM, 0xC411_BA7E + index))
+            .collect();
+
+        let calibration = fit_hdc_score_calibration(&healthy);
+        assert_eq!(calibration.calibration_count, 2);
+
+        let fit_refs: Vec<&ContinuousHV> = healthy[..4].iter().collect();
+        let expected_reference = ContinuousHV::bundle(&fit_refs);
+        assert!(
+            (calibration.reference.similarity(&expected_reference) - 1.0).abs() < 1.0e-6,
+            "reference must be built only from the first four training representations"
+        );
+
+        let expected_scores = [
+            1.0 - healthy[4].similarity(&expected_reference) as f64,
+            1.0 - healthy[5].similarity(&expected_reference) as f64,
+        ];
+        let expected_mean = expected_scores.iter().sum::<f64>() / expected_scores.len() as f64;
+        let expected_std = (expected_scores
+            .iter()
+            .map(|score| (score - expected_mean).powi(2))
+            .sum::<f64>()
+            / expected_scores.len() as f64)
+            .sqrt()
+            .max(0.001);
+
+        assert!((calibration.mean - expected_mean).abs() < 1.0e-12);
+        assert!((calibration.std - expected_std).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn hdc_calibration_uses_neutral_scale_when_data_is_insufficient() {
+        let one = ContinuousHV::random(DIM, 7);
+        let single = fit_hdc_score_calibration(std::slice::from_ref(&one));
+        assert_eq!(single.calibration_count, 0);
+        assert_eq!(single.mean, 0.0);
+        assert_eq!(single.std, 1.0);
+        assert!((single.reference.similarity(&one) - 1.0).abs() < 1.0e-6);
+
+        let two = vec![one, ContinuousHV::random(DIM, 8)];
+        let pair = fit_hdc_score_calibration(&two);
+        assert_eq!(pair.calibration_count, 1);
+        assert_eq!(pair.std, 1.0);
+        assert!(pair.mean.is_finite());
+    }
 }

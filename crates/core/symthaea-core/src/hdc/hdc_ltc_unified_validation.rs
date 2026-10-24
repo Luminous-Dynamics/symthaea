@@ -18,10 +18,10 @@
 //!    - ~10% error due to nonlinear equilibrium (x_inf depends on x)
 //!    - Fast O(1) computation
 //!
-//! 3. **`evolve_closed_form_iterative`**: Sub-stepped exponential decay (RECOMMENDED)
-//!    - Handles nonlinear equilibrium by sub-stepping (tau/10 per step)
-//!    - **<1% error vs RK4** - validated across all scenarios
-//!    - O(dt/tau) complexity but still faster than Euler/RK4
+//! 3. **`try_evolve_closed_form_iterative`**: Sub-stepped exponential decay
+//!    - Recomputes nonlinear equilibrium using a conservative effective-tau/10 step
+//!    - Error is scenario-dependent; this module measures it against fine-step RK4
+//!    - O(dt/tau) complexity, with an explicit budget and fail-closed overflow handling
 //!
 //! ## Key Finding: Nonlinear Equilibrium
 //!
@@ -29,13 +29,13 @@
 //! This means a single closed-form step (which assumes constant x_inf) accumulates
 //! error for large dt. The iterative method handles this by recomputing equilibrium.
 //!
-//! ## Validation Results Summary
+//! ## Validation contract
 //!
-//! | Method     | Fast tau | Medium tau | Slow tau | Long-term |
-//! |------------|----------|------------|----------|-----------|
-//! | CfC-style  | 27%      | 30%        | 30%      | 27%       |
-//! | Single-step| 27%      | 11%        | 11%      | 27%       |
-//! | Iterative  | **0.02%**| **0.85%**  | **0.85%**| **0.001%**|
+//! Numerical error depends on the effective `dt/tau` ratio, activation, and input/state
+//! scale. Historical point estimates are intentionally not presented as a universal error
+//! guarantee. `validate_iterative_closed_form_vs_rk4` compares the iterative path with a
+//! fine-step RK4 reference; `test_iterative_dt_tau_sweep_reports_finite_reference_errors`
+//! reports relative error and state similarity across a wider horizon/time-constant sweep.
 //!
 //! ## Test Scenarios
 //!
@@ -259,7 +259,9 @@ pub fn validate_iterative_closed_form_vs_rk4(config: &ValidationConfig) -> Valid
 
     // Iterative closed-form (handles nonlinear equilibrium)
     let mut neuron_iter = create_test_neuron(config.tau_base, config.dimension, 42);
-    neuron_iter.evolve_closed_form_iterative(config.total_time, &input);
+    neuron_iter
+        .try_evolve_closed_form_iterative(config.total_time, &input, 1_000_000)
+        .expect("validation scenario stays within the explicit iterative work budget");
 
     let l2 = l2_error(neuron_rk4.state(), neuron_iter.state());
     let max_err = max_component_error(neuron_rk4.state(), neuron_iter.state());
@@ -1050,6 +1052,47 @@ mod tests {
         );
     }
 
+    /// Exercise the iterative/RK4 comparison over a wider range of dt/tau ratios.
+    ///
+    /// This is a measurement harness, not a claim that every ratio satisfies a fixed
+    /// universal error bound. The printed reports provide the evidence needed to set
+    /// ratio-specific acceptance thresholds after execution on a Rust-capable host.
+    #[test]
+    fn test_iterative_dt_tau_sweep_reports_finite_reference_errors() {
+        const RATIOS: &[(&str, f32)] = &[
+            ("0.01", 0.01),
+            ("0.1", 0.1),
+            ("0.5", 0.5),
+            ("1", 1.0),
+            ("5", 5.0),
+            ("10", 10.0),
+            ("50", 50.0),
+        ];
+
+        for &(ratio_label, ratio) in RATIOS {
+            let config = ValidationConfig {
+                tau_base: 1.0,
+                scenario_name: ratio_label,
+                input_scale: 1.0,
+                total_time: ratio,
+                dimension: 256,
+            };
+            let result = validate_iterative_closed_form_vs_rk4(&config);
+            println!("dt/tau={ratio_label}: {}", result.report());
+
+            assert!(
+                result.relative_error_percent.is_finite(),
+                "relative error must be finite at dt/tau={ratio_label}: {}",
+                result.relative_error_percent
+            );
+            assert!(
+                result.similarity.is_finite(),
+                "state similarity must be finite at dt/tau={ratio_label}: {}",
+                result.similarity
+            );
+        }
+    }
+
     /// Test ITERATIVE closed-form for long-term evolution
     #[test]
 
@@ -1222,7 +1265,9 @@ mod tests {
 
         // Iterative
         let mut neuron_iter = create_test_neuron(tau, dim, 42);
-        neuron_iter.evolve_closed_form_iterative(dt, &input);
+        neuron_iter
+            .try_evolve_closed_form_iterative(dt, &input, 1_000_000)
+            .expect("validation scenario stays within the explicit iterative work budget");
 
         // Report similarities to RK4
         let cfc_sim = neuron_cfc.state().similarity(neuron_rk4.state());
@@ -1249,4 +1294,47 @@ mod tests {
             iter_sim
         );
     }
+
+    /// Smoke-test the active continuous-f32 dynamical path at the exploratory 128K/256K tiers.
+    ///
+    /// This is a bounded correctness/capability test, not a performance benchmark. It first
+    /// verifies an over-budget request is rejected without state mutation, then advances the
+    /// same high-dimensional state through a valid, explicitly budgeted update.
+    #[test]
+    fn test_exploratory_128k_256k_dynamic_smoke() {
+        for dim in [131_072usize, 262_144usize] {
+            let seed = 42u64 + dim as u64;
+            let input = ContinuousHV::random(dim, seed + 1);
+            let mut neuron = create_test_neuron(1.0, dim, seed);
+            let state_before_rejection = neuron.state().clone();
+
+            let rejected = neuron.try_evolve_closed_form_iterative(1.0, &input, 1);
+            assert!(
+                rejected.is_err(),
+                "dimension {dim}: a 1-second request must exceed a one-substep budget"
+            );
+            assert_eq!(
+                neuron.state().values,
+                state_before_rejection.values,
+                "dimension {dim}: rejected work must leave the state unchanged"
+            );
+
+            neuron
+                .try_evolve_closed_form_iterative(0.1, &input, 4)
+                .unwrap_or_else(|error| {
+                    panic!("dimension {dim}: bounded smoke update failed: {error}")
+                });
+
+            assert_eq!(neuron.state().dim(), dim);
+            assert!(
+                neuron.state().values.iter().all(|value| value.is_finite()),
+                "dimension {dim}: accepted update produced a non-finite component"
+            );
+            assert!(
+                neuron.state().norm().is_finite(),
+                "dimension {dim}: accepted update produced a non-finite state norm"
+            );
+        }
+    }
+
 }

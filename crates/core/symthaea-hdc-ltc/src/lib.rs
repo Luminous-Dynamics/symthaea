@@ -4,8 +4,8 @@
 
 //! # symthaea-hdc-ltc
 //!
-//! Hyperdimensional Liquid Time-Constant neural network with O(1) closed-form
-//! temporal evolution.
+//! Hyperdimensional Liquid Time-Constant neural network with solver-free CfC
+//! updates that cost O(D) per vector step, independent of the elapsed dt.
 //!
 //! ## Core Innovation
 //!
@@ -14,10 +14,12 @@
 //!
 //! This crate replaces both:
 //! - **Weight matrices** become weight *hypervectors* via HDC binding (element-wise multiply)
-//! - **ODE integration** becomes a closed-form exponential interpolation (O(1) per jump)
+//! - **Repeated ODE substeps** are replaced by a closed-form exponential update (O(D)
+//!   coordinate work per jump, independent of dt; not O(1) in hypervector dimension)
 //!
-//! The result: a single neuron with a 16,384-dimensional state that can jump to
-//! *any* time horizon in O(D) operations.
+//! The default state dimension is 16,384; dimensions are configurable, and the
+//! scaling benchmark samples through 65,536 (64K). A temporal jump costs O(D), so
+//! increasing D increases work even though elapsed time does not add substeps.
 //!
 //! ## Mathematical Basis
 //!
@@ -55,4 +57,4 @@ pub mod neuron;
 pub use config::{Activation, NetworkConfig, NeuronConfig};
 pub use continuous_hv::{ContinuousHV, HDC_DIMENSION};
 pub use network::{HdcLtcUnifiedNetwork, StepTimingConfig};
-pub use neuron::HdcLtcUnifiedNeuron;
+pub use neuron::{HdcLtcUnifiedNeuron, NeuronStepError};
