@@ -1144,17 +1144,32 @@ mod prediction_evidence_replay_tests {
         assert_eq!(stale.status(), Status::StaleOrOutOfOrder);
         assert_eq!(stale.value_for_observation(7), None);
 
-        let empty = CognitiveLoopService::compute_prediction_error_evidence(&[], Some(&[]), Some(6), 7);
+        let empty = CognitiveLoopService::compute_prediction_error_evidence(
+            &[],
+            Some(&[]),
+            Some(6),
+            7,
+        );
         assert_eq!(empty.status(), Status::EmptyObservation);
         assert_eq!(empty.value_for_observation(7), None);
 
         let mismatch =
-            CognitiveLoopService::compute_prediction_error_evidence(&[0.1, 0.2], Some(&[0.1]), Some(6), 7);
+            CognitiveLoopService::compute_prediction_error_evidence(
+                &[0.1, 0.2],
+                Some(&[0.1]),
+                Some(6),
+                7,
+            );
         assert_eq!(mismatch.status(), Status::DimensionMismatch);
         assert_eq!(mismatch.value_for_observation(7), None);
 
         let non_finite =
-            CognitiveLoopService::compute_prediction_error_evidence(&[f32::NAN], Some(&[0.0]), Some(6), 7);
+            CognitiveLoopService::compute_prediction_error_evidence(
+                &[f32::NAN],
+                Some(&[0.0]),
+                Some(6),
+                7,
+            );
         assert_eq!(non_finite.status(), Status::NonFiniteInput);
         assert_eq!(non_finite.value_for_observation(7), None);
 
@@ -1178,6 +1193,40 @@ mod prediction_evidence_replay_tests {
             .expect("finite, equal-dimensional states should yield comparable evidence");
         assert_eq!(mismatch_error.status(), Status::Valid);
         assert!((error - 0.01).abs() < 1e-6, "unexpected MSE: {error}");
+    }
+
+    #[test]
+    fn prediction_window_rejects_a_sample_that_crossed_a_skipped_cycle() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+        service.stats.total_cycles = 5;
+        service.last_state = Some(vec![0.1, 0.2]);
+        service.last_prediction = Some(vec![0.2, 0.3]);
+        service.last_prediction_cycle = Some(3);
+
+        let stale = CognitiveLoopService::compute_prediction_error_evidence(
+            &[0.3, 0.4],
+            service.last_prediction.as_deref(),
+            service.last_prediction_cycle,
+            5,
+        );
+        assert_eq!(
+            stale.status(),
+            crate::cognitive_loop::types::PredictionEvidenceStatus::StaleOrOutOfOrder
+        );
+        assert_eq!(stale.value_for_observation(5), None);
+
+        // The excluded transition still advances the prediction window.
+        service.create_experience_with_evidence(&[0.3, 0.4], &[0.4, 0.5], None);
+        assert_eq!(service.last_prediction_cycle, Some(5));
+        let recovered = CognitiveLoopService::compute_prediction_error_evidence(
+            &[0.4, 0.5],
+            service.last_prediction.as_deref(),
+            service.last_prediction_cycle,
+            6,
+        );
+        assert_eq!(recovered.status(), crate::cognitive_loop::types::PredictionEvidenceStatus::Valid);
+        assert_eq!(recovered.value_for_observation(6), Some(0.0));
     }
 
     #[test]
