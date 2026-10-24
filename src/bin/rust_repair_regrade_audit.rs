@@ -414,12 +414,9 @@ fn audit_pair(primary: &ScoreTask, regrade: &ScoreTask) -> Result<(), String> {
         ));
     }
     if primary.outcome.resolved() && regrade.outcome.resolved() {
-        if primary.scored_log_sha256 == regrade.scored_log_sha256 {
-            return Err(format!(
-                "task {:?} primary/regrade scored-log hashes are identical; fresh execution is unsubstantiated",
-                primary.instance_id
-            ));
-        }
+        // Test logs can be byte-identical for deterministic test suites even when
+        // the tests ran independently. Runtime evidence must differ because it binds
+        // execution-specific container/session identity.
         if primary.evaluation_evidence_sha256 == regrade.evaluation_evidence_sha256 {
             return Err(format!(
                 "task {:?} primary/regrade evidence hashes are identical; fresh execution is unsubstantiated",
@@ -901,10 +898,16 @@ mod tests {
     }
 
     #[test]
-    fn reuse_of_primary_logs_is_not_independent_regrading() {
+    fn identical_test_logs_are_allowed_but_reused_runtime_evidence_is_rejected() {
         let left = task("task-1", Outcome::Pass, "1", "2", "3");
         let right = task("task-1", Outcome::Pass, "1", "2", "4");
-        assert!(audit_pair(&left, &right).unwrap_err().contains("scored-log hashes are identical"));
+        assert!(audit_pair(&left, &right).is_ok());
+        let reused_evidence = task("task-1", Outcome::Pass, "1", "9", "3");
+        assert!(
+            audit_pair(&left, &reused_evidence)
+                .unwrap_err()
+                .contains("evidence hashes are identical")
+        );
     }
 
     #[test]
