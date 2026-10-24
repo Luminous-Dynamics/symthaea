@@ -607,6 +607,7 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                     "PRM history feature sums became non-finite"
                 );
             }
+            let stopped_at_first_crossing = !detections.is_empty();
             Ok((
                 "predictive-rank-martingale-portfolio".to_owned(),
                 detections,
@@ -616,7 +617,7 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                     final_statistic: Some(final_portfolio_wealth),
                     maximum_statistic: Some(maximum_portfolio_wealth),
                     stopping_alpha: Some(alpha),
-                    stopped_at_first_crossing: !detections.is_empty(),
+                    stopped_at_first_crossing,
                     valid_samples_processed: processed,
                 },
             ))
