@@ -169,12 +169,15 @@ The preferred cursor API, `admit_evidence(evidence, requested_observation_cycle)
 
 MemoryManager checkpoints use PEVC v2 to persist both watermarks. PEVC v1 checkpoints remain readable by using the previous admitted cycle as the observed floor; legacy nine-byte checkpoints have no cursor state and therefore restore without a cursor. Because v1 did not record invalid-only observations, it cannot reconstruct a newer watermark that was never serialized.
 
+The follow-on LearningManager admission lane uses the same typed cursor for surprise-history updates: duplicate or out-of-order PE must not add history entries or change PE-derived error trends/plasticity, while non-PE signals such as arousal and dissipative health continue to operate. LearningManager retains its legacy 13-byte checkpoint prefix and appends a PEVC v2 extension; legacy 13-byte checkpoints restore without cursor provenance. This consumer-specific gate is in addition to the MemoryManager and NeuroevolutionManager boundaries, not a claim that every PE consumer has already migrated.
+
 ### Additional deterministic gates
 
 - Snapshot validity bytes `0`, `2`, and `255` never yield usable evidence, regardless of the float payload.
 - A NaN or infinity with validity byte `1` is classified as non-finite and never yields a value.
 - An evidence object requested for another observation cycle is rejected without advancing the admitted watermark; the requested cycle still advances the observed watermark if it is not older than the existing high-water mark.
 - A newer invalid cycle followed by a delayed valid older cycle must reject the delayed sample, while a valid retry for the newer invalid cycle remains admissible once.
+- The stateful LearningManager consumer admits valid PE once per observation cycle, rejects delayed older PE after a newer invalid observation, permits a valid same-cycle retry, and persists both watermarks across its checkpoint extension.
 - Checkpoint/restore must preserve observed and admitted watermarks independently; legacy PEVC v1 migration must retain its known admitted-cycle floor.
 - A fixed-seed 10,000-entry mixed trace interleaves valid samples, unavailable evidence, non-canonical flags, duplicate and out-of-order cycle numbers, and requested-cycle mismatches. Each admission decision and the cursor state must match an independent reference rule.
 - This trace is a cursor/adapter contract test, not a substitute for the 15 consumer-level counterfactual cases. End-to-end state-digest comparisons across downstream learners, replay stores, safety, and checkpoint restoration remain required.
