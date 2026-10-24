@@ -187,19 +187,19 @@ This is an experiment proposal, not a production policy or a claim that Symthaea
 ### Candidate ablations
 
 1. **Uniform replay:** sample from the eligible buffer uniformly.
-2. **Error-prioritized replay:** conventional priority proportional to a positive offset plus absolute prediction error, raised to exponent \\(\\alpha\\).
+2. **Error-prioritized replay:** conventional priority proportional to a positive offset plus absolute prediction error, raised to exponent \(\alpha\).
 3. **Reliability-adjusted replay:** scale error priority by an independently calibrated per-sample reliability estimate, while retaining an explicit novelty/shift channel so out-of-distribution observations are not automatically suppressed.
 4. **Matched no-replay/stateless baseline:** estimate the contribution of accumulated experience itself.
 5. **Invalid-event negative control:** deliberately inject invalid evidence into the harness, but require all policies to exclude it before sampling. If any arm admits an invalid event, the entire run is disqualified.
 
 One candidate sampling mixture for eligible samples is:
 
-\\[
-P(i)=(1-\\lambda)\\,\\operatorname{Normalize}((\\epsilon+|\\delta_i|)^\\alpha r_i^\\beta)
-+\\lambda\\,\\operatorname{Normalize}(n_i)
-\\]
+\[
+P(i)=(1-\lambda)\,\operatorname{Normalize}((\epsilon+|\delta_i|)^\alpha r_i^\beta)
++\lambda\,\operatorname{Normalize}(n_i)
+\]
 
-where \\(r_i\\) is the calibrated reliability of a valid sample, \\(n_i\\) is an independently defined novelty/shift score, and \\(\\lambda\\) is fixed before evaluation. Invalid evidence is excluded by eligibility before this equation; reliability is not a substitute for validity. The formula is a test candidate, not an approved production algorithm.
+where \(r_i\) is the calibrated reliability of a valid sample, \(n_i\) is an independently defined novelty/shift score, and \(\lambda\) is fixed before evaluation. Invalid evidence is excluded by eligibility before this equation; reliability is not a substitute for validity. The formula is a test candidate, not an approved production algorithm.
 
 ### Acceptance and reporting
 
