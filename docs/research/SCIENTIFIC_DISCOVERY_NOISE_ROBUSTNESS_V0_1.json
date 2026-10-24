@@ -4,7 +4,7 @@
   "status": "proposal_only",
   "linked_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8607",
   "protocol_document": "docs/research/SCIENTIFIC_DISCOVERY_NOISE_ROBUSTNESS_V0_1.md",
-  "claim_ceiling": "Protocol and scenario manifest only; no implementation, validation, statistical guarantee, or performance result is established by this file. The interleaved anchor schedule is a fixed-design diagnostic control, not a causal attribution guarantee. Cause-discriminating action selection is a benchmark track; no diagnosis policy or comparative result is yet qualified.",
+  "claim_ceiling": "Protocol and scenario manifest only; no implementation, validation, statistical guarantee, or performance result is established by this file. The interleaved anchor schedule is a fixed-design diagnostic control, not a causal attribution guarantee. Cause-discriminating action selection is a benchmark track; no diagnosis policy or comparative result is yet qualified. Candidate-set omission and harmful-informativeness are stress-test dimensions, not a claim that a robust selector is implemented or qualified.",
   "design": {
     "unit_of_pairing": "world_seed_design_mode_noise_regime",
     "independent_rng_streams": [
@@ -147,7 +147,8 @@
         "stable_law_changed_noise",
         "changed_law_stable_noise",
         "changed_law_changed_noise",
-        "observationally_non_identifiable"
+        "observationally_non_identifiable",
+        "candidate_support_omits_true_law_or_noise_process"
       ],
       "action_candidates": [
         "repeat_anchor_later_in_randomized_block",
@@ -193,6 +194,37 @@
         "minimum_structural_families": 6,
         "paired_seeds_per_world": 20
       }
+    },
+    "candidate_set_misspecification": {
+      "hidden_truth_may_be_outside_candidate_support": true,
+      "purpose": "Test whether informative-looking experiments increase confidence among wrong models while worsening deployment-distribution prediction.",
+      "policy_must_not_receive": [
+        "omitted_candidate_family_label",
+        "true_hidden_world",
+        "oracle_best_action",
+        "evaluator_holdout"
+      ],
+      "compare_after_qualification": [
+        "existing_nominal_information_gain",
+        "existing_robust_worst_case_selector",
+        "fixed_design",
+        "seeded_random",
+        "paper_faithful_R_IDeA_from_issue_7825_only_after_independent_reproduction"
+      ],
+      "metrics": [
+        "posterior_or_confidence_change",
+        "held_out_deployment_loss_change",
+        "harmful_confidence_event_rate",
+        "evaluator_only_action_regret",
+        "benchmark_conditional_performance",
+        "generalized_world_population_performance"
+      ],
+      "constraints": [
+        "do_not_claim_R_IDeA_reproduction_without_exact_objective_and_assumptions",
+        "oracle_action_ranking_evaluator_only",
+        "world_family_level_uncertainty_or_declared_hierarchical_model",
+        "do_not_treat_seeds_within_world_as_independent_worlds"
+      ]
     }
   },
   "metrics": {
@@ -264,5 +296,10 @@
     "seeds_within_world_not_independent_worlds": true,
     "queued_skipped_stale_head_checks_are_not_passes": true,
     "published_external_results_are_not_matched_replications": true
+  },
+  "references": {
+    "robust_design_misspecification": "https://proceedings.mlr.press/v300/callahan26a.html",
+    "r_idea": "https://proceedings.mlr.press/v300/tang26d.html",
+    "benchmark_estimands_nist": "https://doi.org/10.6028/NIST.AI.800-3"
   }
 }
