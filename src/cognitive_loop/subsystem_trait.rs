@@ -4,8 +4,6 @@
 // Scaffolded for upcoming wiring — callers not yet connected
 #![allow(dead_code)]
 
-use super::types::{PredictionErrorEvidence, PredictionEvidenceStatus};
-
 //! # CognitiveSubsystem Trait — WASM-Ready Subsystem Interface
 //!
 //! Universal interface for cognitive subsystems within the cognitive loop.
@@ -41,6 +39,8 @@ use super::types::{PredictionErrorEvidence, PredictionEvidenceStatus};
 //! - `confidence_delta` → `FeedbackProposal::Add(delta)` on confidence collector
 //! - `lr_modulation`    → `FeedbackProposal::Scale(factor)` on LR collector
 //! - `exploration_delta` / `arousal_delta` → applied during Phase C integration
+
+use super::types::{PredictionErrorEvidence, PredictionEvidenceStatus};
 
 /// Maximum compressed state dimension for WASM boundary crossing.
 ///
