@@ -10,7 +10,8 @@ This directory contains benchmark-only tooling for CASTING-MO-BO-001. It is not 
 - `docs/research/CASTING_BENCHMARK_TRACE.schema.json`: versioned JSONL schema for each objective-oracle call.
 - `tools/casting-benchmark/score_trace.py`: independent exact 2D hypervolume scorer that verifies trace/schema/scorer digests and recomputes receipt metrics.
 - `tools/casting-benchmark/fixtures/success_receipt.fixture.json`: structure-only fixture, **not measured data**.
-- `tools/casting-benchmark/test_validate_receipt.py`: negative and positive checks for the validator.
+- `tools/casting-benchmark/test_validate_receipt.py`: positive and adversarial receipt-validator checks.
+- `tools/casting-benchmark/test_score_trace.py`: known-answer, hash-integrity, archive-invariant and fail-closed trace-scorer tests.
 
 ## Validate a receipt
 
@@ -79,3 +80,16 @@ The fixed-reference 2D AUC is a supplemental metric, not a substitute for COCO's
 - Brockhoff et al., *Biobjective Performance Assessment with the COCO Platform*: https://dis.ijs.si/tea/Publications/Brockhoff16Biobjective.pdf
 
 The incremental exact 2D archive is cross-checked against a batch hypervolume implementation by the scorer tests, so the optimization of metric-recomputation speed has a known-answer reference.
+
+
+## Exact v1 metric convention
+
+The v1 scorer accepts only two-objective minimization, single-fidelity traces. For each oracle call it updates an exact non-dominated archive and appends the current 2D hypervolume. For a planned budget B with n <= B actual calls, normalized AUC is
+
+    sum(HV_i for i=1..n) + (B - n) * HV_n
+    ------------------------------------------------
+             B * (reference_x - ideal_x) * (reference_y - ideal_y)
+
+The carry-forward applies only after a successful run stopped at a predeclared target; a receipt marked `budget_exhausted` must have exactly B rows. Failed/abstained/incomplete runs are accounted but never accepted as algorithm passes. The ZDT track uses fixed ideal [0,0], reference [1.1,1.1], and normalization area 1.21. The per-run receipt repeats locked ideal/reference values and the independent scorer checks them against its declared objective count and direction.
+
+Do not use this custom AUC in place of COCO's native target-reaching/ECDF analysis. For other objective counts, objective directions or multi-fidelity receipts, v1 rejects the run and requires a separately specified scorer.
