@@ -1575,7 +1575,6 @@ fn impossible_observation_falls_back_to_safe_hold() {
     assert_eq!(actions, [0, 1, 1]);
 }
 
-
 #[test]
 fn robust_allocation_value_never_increases_when_predictive_ambiguity_widens() {
     let counts = [[19, 1, 0], [1, 19, 0], [1, 19, 0]];
