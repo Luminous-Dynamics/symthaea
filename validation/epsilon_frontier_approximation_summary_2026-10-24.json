@@ -1,0 +1,81 @@
+{
+  "schema": "symthaea-epsilon-frontier-approximation-summary-v1",
+  "date": "2026-10-24",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/causal-target-subset-kernel-v1",
+  "status": "EXACT_ORACLE_EVALUATED_EPSILON_FRONTIER_PILOT_NOT_THEORETICAL_REGRET_GUARANTEE",
+  "source": {
+    "path": "validation/epsilon_frontier_approximation_benchmark.py",
+    "git_blob": "4cc98f857060d597f34524d2352fc6e0942c3089",
+    "sha256": "6b633239eb0b8db4fc4a31cb55fb1b397e860353e9454b1842a0012dd1b2e368",
+    "bytes": 14711
+  },
+  "test_source": {
+    "path": "validation/test_epsilon_frontier_approximation_benchmark.py",
+    "git_blob": "183f56efe3a77e3e837bb2059e2e62e11eff15de",
+    "sha256": "7600169767332a064d1f923e262b15048fdc9a07e1b182bf05dd147cb9157fd7",
+    "bytes": 3049,
+    "tests": 9,
+    "result": "9/9_PASS_LOCAL"
+  },
+  "artifact": {
+    "filename": "epsilon_frontier_approximation_results_exact_2026-10-24.json",
+    "rows": 180,
+    "bytes": 204196,
+    "sha256": "28b86f9dcbdf8adf233569b834ac1e7a57833f9a095ff928ca4eb85a098c9364",
+    "source_git_blob_bound": "4cc98f857060d597f34524d2352fc6e0942c3089",
+    "local_only": true
+  },
+  "protocol": {
+    "candidate_true_priors": 6,
+    "learner_priors": 6,
+    "objectives": ["graph", "kernel", "joint"],
+    "epsilons_bits": [0, 0.005, 0.01, 0.025, 0.05],
+    "horizons": [1, 2],
+    "row_count": 180,
+    "approximation": "ceil(loss/epsilon) bucket per risk-vector coordinate, deterministic representative, exact Pareto prune",
+    "evaluation": "exact fixed-prior terminal cross-entropy under every candidate prior, compared against exact frontier minimax optimum"
+  },
+  "horizon_2_kernel_frontier": [
+    {"epsilon_bits": 0, "max_internal_frontier": 450, "max_gap_bits": 0, "mean_gap_bits": 0},
+    {"epsilon_bits": 0.005, "max_internal_frontier": 287, "max_gap_bits": 0, "mean_gap_bits": 0},
+    {"epsilon_bits": 0.01, "max_internal_frontier": 131, "max_gap_bits": 0, "mean_gap_bits": 0},
+    {"epsilon_bits": 0.025, "max_internal_frontier": 38, "max_gap_bits": 0.005307106469223388, "mean_gap_bits": 0.002653553234611694},
+    {"epsilon_bits": 0.05, "max_internal_frontier": 19, "max_gap_bits": 0.005307106469224276, "mean_gap_bits": 0.002653553234612138}
+  ],
+  "horizon_2_joint_frontier": [
+    {"epsilon_bits": 0, "max_internal_frontier": 12, "max_gap_bits": 0, "mean_gap_bits": 0},
+    {"epsilon_bits": 0.005, "max_internal_frontier": 12, "max_gap_bits": 0, "mean_gap_bits": 0},
+    {"epsilon_bits": 0.01, "max_internal_frontier": 12, "max_gap_bits": 0, "mean_gap_bits": 0},
+    {"epsilon_bits": 0.025, "max_internal_frontier": 12, "max_gap_bits": 0, "mean_gap_bits": 0},
+    {"epsilon_bits": 0.05, "max_internal_frontier": 5, "max_gap_bits": 0.018871319097812034, "mean_gap_bits": 0.005684029640433241}
+  ],
+  "horizon_2_graph_frontier": [
+    {"epsilon_bits": 0, "max_internal_frontier": 4, "max_gap_bits": 0, "mean_gap_bits": 0},
+    {"epsilon_bits": 0.005, "max_internal_frontier": 4, "max_gap_bits": 0, "mean_gap_bits": 0},
+    {"epsilon_bits": 0.01, "max_internal_frontier": 4, "max_gap_bits": 0, "mean_gap_bits": 0},
+    {"epsilon_bits": 0.025, "max_internal_frontier": 4, "max_gap_bits": 0, "mean_gap_bits": 0},
+    {"epsilon_bits": 0.05, "max_internal_frontier": 2, "max_gap_bits": 0, "mean_gap_bits": 0}
+  ],
+  "validation": {
+    "combined_local_regression_tests": "70/70_PASS",
+    "source_git_blob_matches_executed_file": true,
+    "test_git_blob_matches_executed_file": true,
+    "result_source_binding": true,
+    "exact_result_recomputed_after_binding": true,
+    "external_benchmark_run": false,
+    "remote_ci": "inspect latest PR head; skipped is not pass"
+  },
+  "scientific_boundary": [
+    "16-hypothesis chain/fork model only",
+    "six candidate priors are not a calibrated ambiguity set",
+    "exact target-subset telemetry only",
+    "no action costs, telemetry missingness/noise or task disturbance",
+    "epsilon bucket pruning has no general regret theorem claimed",
+    "no external benchmark, SOTA or novelty claim"
+  ],
+  "report": {
+    "path": "docs/research/EPSILON_FRONTIER_APPROXIMATION_BENCHMARK_2026-10-24.md",
+    "git_blob": "ea5a7b9a4761ad2672e8ac2fedc7f4575756f59c"
+  }
+}
