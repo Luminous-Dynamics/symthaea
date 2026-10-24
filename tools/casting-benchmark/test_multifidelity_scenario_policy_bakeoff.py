@@ -112,6 +112,13 @@ class MultiFidelityScenarioPolicyBakeoffTests(unittest.TestCase):
             },
         )
 
+    def test_design_count_below_policy_pool_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "at least 75"):
+            run_policy_on_scenario(
+                "high_only", "smooth_stationary", 2, 1.0, 17,
+                cost_budget=200, design_count=74,
+            )
+
     def test_budget_below_policy_template_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "below the frozen template minimum"):
             run_policy_on_scenario(
