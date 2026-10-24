@@ -386,3 +386,11 @@ For quarantine, an exact duplicate, shared source artifact, formal dependency, r
 The new `analyze_family_leakage` tool re-derives the registered split assignment, checks the upstream pin, 372-family count, 70/15/15 counts and exact partition digest, rejects unknown/duplicate family links, derives cross-split connected components, and reports original plus known-quarantined family counts without changing the frozen split. Evidence and coverage-receipt hashes are references, not byte-level authentication.
 
 **Current status: not qualified.** The checked-in relationship fixture is synthetic control data only; the real independently reviewed relationship inventory is not yet present. An incomplete inventory must never certify a clean holdout. Before running model outcomes, reviewers must inspect the real evidence, complete and sign off the relationship-coverage audit, independently verify cited artifact bytes, preserve all exclusions in the run manifest, and freeze the adjusted denominator. If that leaves too few independent components, report an underpowered/exploratory result; do not reshuffle the split or relax this gate after viewing outcomes.
+
+### 2026-10-24 amendment — deterministic title-only relationship triage
+
+Added `discover_family_leakage_candidates`, which validates the same pinned 372-family partition and emits an explainable, content-addressed list of candidate cross-family relationships based on title token overlap. Its candidate report has a strict Draft 2020-12 schema, fixed tokenizer/stopword/rarity thresholds, shared-token explanations and split labels. CI runs the generator twice against the frozen manifest and byte-compares the serialized outputs, then validates the report and reconciles total, cross-split and train/test counts.
+
+**Every output remains `title_similarity_only` and `unreviewed`.** The discovery output is never auto-converted into a hard dependency edge and never changes the split. The heuristic is designed to prioritize human review; it is not proof of mathematical dependence or actual leakage, and it may miss dependencies with dissimilar titles.
+
+The generated report is produced in runner temporary storage rather than checked in as benchmark evidence. The actual dependency inventory remains incomplete; neither this new tool nor its synthetic CI controls qualify the benchmark holdout.
