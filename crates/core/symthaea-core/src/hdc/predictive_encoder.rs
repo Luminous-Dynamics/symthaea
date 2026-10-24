@@ -996,6 +996,8 @@ mod tests {
         let prediction = encoder.compress_for_ltc(&initial.hdv, 64);
         encoder.set_prediction_at(prediction, 1);
         assert_eq!(encoder.prediction_cycle(), Some(1));
+        let no_prediction_count_before =
+            encoder.stats().degenerate_no_prediction_cycles;
 
         let result = encoder.encode_at("cycle three after skipped cycle", 3);
 
@@ -1011,8 +1013,8 @@ mod tests {
         );
         assert_eq!(
             encoder.stats().degenerate_no_prediction_cycles,
-            0,
-            "stale evidence must not be counted as a cold start"
+            no_prediction_count_before,
+            "stale evidence must not be counted as another cold start"
         );
         assert_eq!(
             encoder.stats().avg_prediction_error,
