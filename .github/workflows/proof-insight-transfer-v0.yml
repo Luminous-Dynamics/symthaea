@@ -134,6 +134,7 @@ jobs:
           cargo run --locked --bin validate_transfer_contract -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/candidates/156-borsuk-nine-finite-obstruction.json"
           cargo run --locked --bin validate_transfer_contract -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/candidates/157-hadwiger-invariant-chain.json"
           cargo run --locked --bin validate_transfer_contract -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/candidates/026-eventual-subset-density-transfer.json"
+          cargo run --locked --bin analyze_family_leakage -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/family-leakage-edges.synthetic.json" "$RUNNER_TEMP/family-leakage-report.synthetic.json"
       - name: Run strict Clippy
         shell: bash
         run: |
@@ -150,6 +151,89 @@ jobs:
           set -euo pipefail
           python -m venv "$RUNNER_TEMP/jsonschema-venv"
           "$RUNNER_TEMP/jsonschema-venv/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+      - name: Validate cross-family leakage quarantine audit and negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          import os
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          root = Path("data/benchmarks/proof-insight-transfer-v0")
+          edge_schema = json.loads((root / "family-leakage-edges.schema.json").read_text())
+          report_schema = json.loads((root / "family-leakage-report.schema.json").read_text())
+          Draft202012Validator.check_schema(edge_schema)
+          Draft202012Validator.check_schema(report_schema)
+          edge_validator = Draft202012Validator(edge_schema, format_checker=FormatChecker())
+          report_validator = Draft202012Validator(report_schema, format_checker=FormatChecker())
+
+          fixture = json.loads((root / "fixtures/family-leakage-edges.synthetic.json").read_text())
+          edge_validator.validate(fixture)
+          report_path = Path(os.environ["RUNNER_TEMP"]) / "family-leakage-report.synthetic.json"
+          report = json.loads(report_path.read_text())
+          report_validator.validate(report)
+
+          if report["relationship_inventory_status"] != "incomplete":
+              raise ValueError("synthetic relationship inventory must remain incomplete")
+          if report["certification_status"] != "not_certified_incomplete_inventory":
+              raise ValueError("an incomplete inventory must never certify a clean holdout")
+          if report["source_partition_digest_sha256"] != fixture["source_partition_digest_sha256"]:
+              raise ValueError("report must bind to the exact frozen split digest")
+          if report["cross_split_components"] != [{
+              "family_ids": ["001", "005", "012"],
+              "split_names": ["test", "train", "validation"],
+              "edge_ids": [
+                  "synthetic-confirmed-train-test-formal-dependency",
+                  "synthetic-unresolved-train-validation-reused-lemma"
+              ],
+              "confirmed_edge_ids": ["synthetic-confirmed-train-test-formal-dependency"],
+              "unresolved_edge_ids": ["synthetic-unresolved-train-validation-reused-lemma"]
+          }]:
+              raise ValueError("confirmed plus unresolved hard edges must form one deterministic cross-split component")
+          quarantined = {row["family_id"] for row in report["quarantined_families"]}
+          if quarantined != {"001", "005", "012"}:
+              raise ValueError(f"expected only the synthetic hard-edge component to be quarantined, got {sorted(quarantined)}")
+          if "008" in quarantined:
+              raise ValueError("conceptual similarity alone must not contaminate a split")
+          if report["original_family_counts"] != {"train": 260, "validation": 56, "test": 56}:
+              raise ValueError("unexpected original frozen split counts")
+          if report["remaining_family_counts_after_known_quarantine"] != {"train": 259, "validation": 55, "test": 55}:
+              raise ValueError("known quarantine counts are not preserved by split")
+
+          bad = copy.deepcopy(fixture)
+          bad["edges"][0]["reviewer_ids"] = ["only-one-reviewer"]
+          try:
+              edge_validator.validate(bad)
+          except ValidationError:
+              pass
+          else:
+              raise ValueError("resolved relationship with fewer than two reviewers was accepted")
+
+          bad = copy.deepcopy(fixture)
+          bad["coverage_status"] = "independently_reviewed_complete"
+          bad["coverage_receipt_sha256"] = None
+          try:
+              edge_validator.validate(bad)
+          except ValidationError:
+              pass
+          else:
+              raise ValueError("complete inventory without a coverage receipt was accepted")
+
+          bad_report = copy.deepcopy(report)
+          bad_report["certification_status"] = "no_cross_split_hard_relationships_in_declared_inventory"
+          try:
+              report_validator.validate(bad_report)
+          except ValidationError:
+              pass
+          else:
+              raise ValueError("report schema allowed an incomplete inventory to claim no cross-split leakage")
+
+          print("PITB_FAMILY_LEAKAGE_SCHEMA_PASS: pinned partition, quarantine component, reviewer and completeness controls verified")
+          PY
+
       - name: Validate counterfactual mutation qualification schema and controls
         shell: bash
         run: |
