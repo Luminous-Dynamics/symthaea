@@ -41,6 +41,22 @@ Means below are across graph instances, not across all vertices or all repeated 
 
 For N <= 200, one-for-two improvement applied to the deterministic greedy set yielded mean ratios of 0.4210, 0.4270 and 0.43175 respectively, with mean cardinality gains of 0.15, 0.10 and 0.20 vertices per graph. Every local-improvement run completed its pair search and was labelled locally optimal under this particular 1-for-2 neighborhood; this is not a global-optimality statement. This weak move alone did not materially close the gap from greedy.
 
+## Post-hoc graph-level uncertainty diagnostic
+
+To make the descriptive differences more transparent, the JSON companion now also records a graph-level stratified bootstrap over the 70-instance JavaScript cohort. The 16 random-tie trajectories remain nested within a graph: the bootstrap resamples graph instances within each N stratum and never treats the 1,120 restart records as additional independent graph samples.
+
+| N | Graphs | Mean objective gain: best-of-16 minus single greedy | Paired win / tie / loss |
+|---:|---:|---:|---:|
+| 50 | 20 | 1.00 | 15 / 5 / 0 |
+| 100 | 20 | 1.45 | 16 / 4 / 0 |
+| 200 | 20 | 1.80 | 17 / 2 / 1 |
+| 500 | 10 | 3.90 | 9 / 1 / 0 |
+| All | 70 | 1.77 | 57 / 12 / 1 |
+
+The post-hoc stratified graph bootstrap gives a 95% percentile interval of [1.46, 2.09] vertices for the overall mean objective gain. For the local 1-for-2 improvement, which was run only at N≤200 (60 graphs), mean gain is 0.15 vertices; the corresponding post-hoc stratified bootstrap interval is [0.067, 0.25], with 9 wins, 51 ties, 0 losses.
+
+**Interpretation boundary:** these intervals were calculated after inspecting this exploratory data and are not preregistered confirmatory inference. Best-of-16 costs 16 randomized greedy trajectories versus one deterministic trajectory, so the objective gain cannot be called an efficiency improvement. No wall-clock timing was measured. The important design implication is to compare quantum-informed methods against best-of-budget randomized greedy and strong local-search/prioritized-search baselines under a matched total budget.
+
 ## What this changes about the research plan
 
 1. **Random tie-breaking is a necessary paid baseline.** In this small cohort, choosing the best of 16 random-tie trajectories raises average independence ratio relative to a single deterministic greedy run. That gain costs 16 full greedy runs. Any QAOA-informed comparison that reports a win against only one deterministic tie-break is incomplete unless it also reports equal-budget controls.
