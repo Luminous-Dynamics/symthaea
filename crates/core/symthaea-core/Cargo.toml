@@ -124,6 +124,34 @@ name = "hdc_simd_compare"
 harness = false
 
 [[bench]]
+name = "hdc_fused_argmax"
+harness = false
+
+[[bench]]
+name = "hdc_batch_search"
+harness = false
+
+[[bench]]
+name = "hdc_tiled_batch_search"
+harness = false
+
+[[bench]]
+name = "hdc_pivot_bound_search"
+harness = false
+
+[[bench]]
+name = "hdc_ordered_early_abandon"
+harness = false
+
+[[bench]]
+name = "hdc_compositional_workload"
+harness = false
+
+[[bench]]
+name = "hdc_representation_tradeoff"
+harness = false
+
+[[bench]]
 name = "hdc_ltc_learning"
 harness = false
 
