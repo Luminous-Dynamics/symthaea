@@ -445,14 +445,27 @@ fn structured_correction_basis(
             // This family is only enabled in the operator-held-out track. Construct a
             // dimensionally valid oscillatory expression and subtract the rejected base so the
             // fitted coefficient can replace the old structure when it is identifiable.
-            let energy_term =
-                random_expr_with_dimension(rng, DimensionalSignature::ENERGY, &units, GEN_MAX_DEPTH);
-            let phase = random_expr_with_dimension(
-                rng,
-                DimensionalSignature::DIMENSIONLESS,
-                &units,
-                GEN_MAX_DEPTH,
+            // The proposal uses a public dimensionless invariant basis: q=v*t/r or q^-1.
+            // This is deliberately a narrow operator-holdout task, not a claim of arbitrary
+            // new-operator invention or unrestricted grammar expansion.
+            let velocity_time = Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("v".to_string())),
+                Box::new(Expr::Var("t".to_string())),
             );
+            let phase = if rand_index(rng, 2) == 0 {
+                Expr::BinOp(
+                    BinOp::Div,
+                    Box::new(velocity_time),
+                    Box::new(Expr::Var("r".to_string())),
+                )
+            } else {
+                Expr::BinOp(
+                    BinOp::Div,
+                    Box::new(Expr::Var("r".to_string())),
+                    Box::new(velocity_time),
+                )
+            };
             let unary = if rand_index(rng, 2) == 0 {
                 UnaryFn::Sin
             } else {
@@ -460,7 +473,7 @@ fn structured_correction_basis(
             };
             let oscillatory = Expr::BinOp(
                 BinOp::Mul,
-                Box::new(energy_term),
+                Box::new(base.clone()),
                 Box::new(Expr::Func(unary, Box::new(phase))),
             );
             Expr::BinOp(BinOp::Sub, Box::new(oscillatory), Box::new(base.clone()))
