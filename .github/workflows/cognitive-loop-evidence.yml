@@ -153,3 +153,22 @@ jobs:
             (.configuration_digest | length) == 64 and
             (.result_sha256 | length) == 64
           ' "$RUNNER_TEMP/scalar-drift-baseline.json"
+
+      - name: Run the Page-Hinkley baseline against the synthetic fixture
+        run: |
+          cargo run --locked -p xtask -- run-cognitive-drift-baseline --input benchmarks/cognitive-loop-evidence/synthetic-page-hinkley-run.json --out "$RUNNER_TEMP/page-hinkley-baseline.json"
+          jq -e '
+            .metric_version == "scalar-drift-baselines-v1" and
+            .detector_id == "page-hinkley" and
+            .comparison_track == "valid-pe-only" and
+            .valid_evaluation_observation_count == 7 and
+            .evaluation_cycle_count == 8 and
+            .score.true_positive_events == 2 and
+            .score.false_positive_alarms == 0 and
+            .score.missed_events == 0 and
+            .score.hard_gate_pass == true and
+            (.detections | map(.cycle_index)) == [1, 6] and
+            (.canonical_input_sha256 | length) == 64 and
+            (.configuration_digest | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/page-hinkley-baseline.json"
