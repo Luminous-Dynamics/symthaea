@@ -1,10 +1,10 @@
 //! Counterfactual utility scoring for adaptation policies.
 //!
 //! Drift-event F1 measures alarms, not whether acting on those alarms helps the task.
-//! This evaluator compares three replay arms on the same pinned exogenous stream:
-//! no adaptation, detector-triggered adaptation, and ground-truth-timed adaptation.
-//! It reports task loss and intervention cost separately; it never hides the trade-off
-//! inside an unregistered weighted aggregate.
+//! This evaluator compares five policy arms on a declared common cycle panel:
+//! no adaptation, detector-triggered, benefit-gated, staged-verify-rollback, and oracle-timed.
+//! It reports whole-stream and registered phase-window loss, recovery, and intervention cost
+//! separately; it never hides the trade-off inside an unregistered weighted aggregate.
 
 use anyhow::{ensure, Context};
 use serde::{Deserialize, Serialize};
@@ -596,6 +596,8 @@ mod tests {
         assert_eq!(result.detector_triggered.recovery_cycle, Some(2));
         assert_eq!(result.detector_triggered.recovery_delay_cycles, Some(1));
         assert_eq!(result.oracle_timed.recovery_cycle, Some(1));
+        assert!((result.detector_benefit_gated_post_shift_task_loss_improvement_vs_no_adapt - (23.0 / 60.0)).abs() < 1e-12);
+        assert!((result.staged_post_shift_task_loss_improvement_vs_no_adapt - (13.0 / 30.0)).abs() < 1e-12);
         assert!((result.staged_post_shift_task_loss_improvement_vs_detector_triggered - (1.0 / 15.0)).abs() < 1e-12);
         assert!((result.staged_post_shift_task_loss_regret_vs_oracle_timed - (1.0 / 15.0)).abs() < 1e-12);
         assert!((result.staged_verify_rollback.post_shift_mean_task_loss - (4.0 / 15.0)).abs() < 1e-12);
@@ -641,6 +643,18 @@ mod tests {
         input.detector_triggered.exogenous_stream_sha256 = "d".repeat(64);
         let error = score_counterfactual_utility(input).unwrap_err().to_string();
         assert!(error.contains("must match shared_stream_sha256"));
+    }
+
+    #[test]
+    fn rejects_mismatched_stream_or_cycle_panel_in_new_policy_arms() {
+        let mut mismatched_stream = fixture();
+        mismatched_stream.detector_benefit_gated.exogenous_stream_sha256 = "d".repeat(64);
+        assert!(score_counterfactual_utility(mismatched_stream)
+            .unwrap_err().to_string().contains("must match shared_stream_sha256"));
+
+        let mut mismatched_panel = fixture();
+        mismatched_panel.staged_verify_rollback.observations[3].cycle_index = 99;
+        assert!(score_counterfactual_utility(mismatched_panel).is_err());
     }
 
     #[test]
