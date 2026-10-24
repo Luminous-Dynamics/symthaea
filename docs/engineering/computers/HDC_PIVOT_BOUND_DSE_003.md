@@ -75,3 +75,18 @@ https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/
 ## Evidence boundary
 
 No Rust compilation, Criterion timing, physical cache/DRAM traffic, energy, RTL, FPGA or SOTA evidence is claimed by this authored change. Expected speedup is deliberately unspecified until measurements exist.
+
+## Independent mathematical reference pilot (not Rust execution)
+
+An independent Python integer-bit model used 16,384-bit vectors, the same eight-anchor clustered construction, the same evenly spaced pivot policy, and exhaustive exact Hamming top-1 as oracle. The model verified identical winner ID and distance for every pivot count. At 16,384 candidates:
+
+| Corpus profile | Pivots | Full-vector evaluations | Signature payload |
+|---|---:|---:|---:|
+| Random control | 2 | 16,382 / 16,384 (99.99%) | 64 KiB |
+| Random control | 4 | 16,381 / 16,384 (99.98%) | 128 KiB |
+| Random control | 8 | 16,376 / 16,384 (99.95%) | 256 KiB |
+| Eight-cluster fixture | 2 | 3,525 / 16,384 (21.51%) | 64 KiB |
+| Eight-cluster fixture | 4 | 468 / 16,384 (2.86%) | 128 KiB |
+| Eight-cluster fixture | 8 | 32 / 16,384 (0.20%) | 256 KiB |
+
+This is a candidate-vector evaluation count, not elapsed time, physical memory traffic or energy. The random control is deliberately negative: nearly every candidate still needs full evaluation, so metadata scanning is likely overhead there. The synthetic clustered case demonstrates that pivot count and data geometry can dramatically change the amount of exact work, but it is not representative proof for production traces. Python's PRNG generated the reference vectors, so the model does not test Rust `BinaryHV::random`, Rust source correctness or a compiled benchmark. The Rust target must reproduce equivalent results and then show actual latency improvement before any win can be claimed.
