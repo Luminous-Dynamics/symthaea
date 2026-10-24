@@ -14,6 +14,7 @@ from dataclasses import asdict, dataclass
 from typing import Iterable
 
 FIDELITY_COSTS = {"low": 1, "medium": 5, "high": 25}
+FIDELITY_NAMES = ("low", "medium", "high")
 OBJECTIVE_COUNT = 2
 REFERENCE_POINT = (1.2, 1.2)
 IDEAL_POINT = (0.0, 0.0)
@@ -55,13 +56,19 @@ class EvaluationRecord:
 class SyntheticCastingWorld:
     """Finite deterministic design pool with three deliberately mismatched fidelities."""
 
-    def __init__(self, grid_size: int = DEFAULT_GRID_SIZE, severity: float = 1.0) -> None:
+    def __init__(
+        self,
+        grid_size: int = DEFAULT_GRID_SIZE,
+        severity: float = 1.0,
+        fidelity_costs: dict[str, int] | None = None,
+    ) -> None:
         if grid_size < 5:
             raise ValueError("grid_size must be at least 5")
         if not math.isfinite(severity) or severity < 0.0:
             raise ValueError("severity must be finite and non-negative")
         self.grid_size = grid_size
         self.severity = severity
+        self._fidelity_costs = normalize_fidelity_costs(fidelity_costs)
         self._designs = tuple(
             Design(i * grid_size + j, i / (grid_size - 1), j / (grid_size - 1))
             for i in range(grid_size)
@@ -76,6 +83,10 @@ class SyntheticCastingWorld:
     @property
     def candidate_ids(self) -> tuple[int, ...]:
         return tuple(d.candidate_id for d in self._designs)
+
+    @property
+    def fidelity_costs(self) -> dict[str, int]:
+        return dict(self._fidelity_costs)
 
     def design(self, candidate_id: int) -> Design:
         try:
@@ -94,7 +105,7 @@ class SyntheticCastingWorld:
         return (f0, f1), margin
 
     def _response(self, candidate_id: int, fidelity: str) -> Observation:
-        if fidelity not in FIDELITY_COSTS:
+        if fidelity not in self._fidelity_costs:
             raise ValueError(f"unsupported fidelity: {fidelity}")
         design = self.design(candidate_id)
         (hf0, hf1), hfm = self._high_truth(design)
@@ -123,7 +134,7 @@ class SyntheticCastingWorld:
 
         if not all(math.isfinite(v) for v in (*objectives, margin)):
             raise ArithmeticError("synthetic evaluator emitted a non-finite value")
-        return Observation(candidate_id, fidelity, objectives, margin, FIDELITY_COSTS[fidelity])
+        return Observation(candidate_id, fidelity, objectives, margin, self._fidelity_costs[fidelity])
 
     def truth_for_audit_only(self, candidate_id: int) -> Observation:
         """Benchmark auditor only. Do not give this object to candidate policies."""
@@ -175,7 +186,7 @@ class PolicyEvaluator:
         return self._world.design(candidate_id)
 
     def evaluate(self, candidate_id: int, fidelity: str) -> Observation:
-        cost = FIDELITY_COSTS.get(fidelity)
+        cost = self._world.fidelity_costs.get(fidelity)
         if cost is None:
             raise ValueError(f"unsupported fidelity: {fidelity}")
         if self._cost_spent + cost > self._cost_budget:
@@ -200,6 +211,30 @@ class PolicyEvaluator:
 
 class BudgetExceeded(RuntimeError):
     pass
+
+
+def normalize_fidelity_costs(costs: dict[str, int] | None = None) -> dict[str, int]:
+    if costs is None:
+        return dict(FIDELITY_COSTS)
+    if set(costs) != set(FIDELITY_NAMES):
+        raise ValueError("fidelity costs must define exactly low, medium, and high")
+    normalized: dict[str, int] = {}
+    for name in FIDELITY_NAMES:
+        value = costs[name]
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(f"fidelity cost for {name} must be a positive integer")
+        normalized[name] = value
+    return normalized
+
+
+def required_policy_costs(costs: dict[str, int] | None = None) -> dict[str, int]:
+    c = normalize_fidelity_costs(costs)
+    return {
+        "high_only": 8 * c["high"],
+        "low_screen": 75 * c["low"] + 5 * c["high"],
+        "fixed_top_k": 50 * c["low"] + 10 * c["medium"] + 4 * c["high"],
+        "discrepancy_aware": 55 * c["low"] + 4 * c["medium"] + 5 * c["high"],
+    }
 
 
 def record_to_observation(record: EvaluationRecord) -> Observation:
@@ -394,9 +429,17 @@ POLICIES = {
 }
 
 
-def _validate_run_configuration(cost_budget: int, grid_size: int, severity: float) -> None:
-    if cost_budget < MIN_POLICY_COST_BUDGET:
-        raise ValueError(f"cost_budget must be at least {MIN_POLICY_COST_BUDGET} for the frozen policy templates")
+def _validate_run_configuration(
+    cost_budget: int,
+    grid_size: int,
+    severity: float,
+    fidelity_costs: dict[str, int] | None = None,
+    required_budget: int | None = None,
+) -> None:
+    costs = normalize_fidelity_costs(fidelity_costs)
+    minimum = required_budget if required_budget is not None else max(required_policy_costs(costs).values())
+    if cost_budget < minimum:
+        raise ValueError(f"cost_budget must be at least {minimum} for the frozen policy templates and fidelity costs")
     if grid_size < 9 or grid_size * grid_size < MIN_POLICY_CANDIDATES:
         raise ValueError(f"grid_size must expose at least {MIN_POLICY_CANDIDATES} candidate designs")
     if not math.isfinite(severity) or severity < 0.0:
@@ -409,11 +452,13 @@ def run_policy(
     cost_budget: int = DEFAULT_COST_BUDGET,
     grid_size: int = DEFAULT_GRID_SIZE,
     severity: float = 1.0,
+    fidelity_costs: dict[str, int] | None = None,
 ) -> dict:
-    _validate_run_configuration(cost_budget, grid_size, severity)
     if policy_name not in POLICIES:
         raise ValueError(f"unknown policy: {policy_name}")
-    world = SyntheticCastingWorld(grid_size=grid_size, severity=severity)
+    costs = normalize_fidelity_costs(fidelity_costs)
+    _validate_run_configuration(cost_budget, grid_size, severity, costs, required_policy_costs(costs)[policy_name])
+    world = SyntheticCastingWorld(grid_size=grid_size, severity=severity, fidelity_costs=costs)
     evaluator = PolicyEvaluator(world, cost_budget=cost_budget)
     POLICIES[policy_name](evaluator, seed)
 
@@ -449,6 +494,7 @@ def run_policy(
         "seed": seed,
         "grid_size": grid_size,
         "severity": severity,
+        "fidelity_costs": costs,
         "cost_budget": cost_budget,
         "cost_spent": evaluator.cost_spent,
         "unused_cost": cost_budget - evaluator.cost_spent,
@@ -470,11 +516,14 @@ def run_policy(
     }
 
 
-def run_suite(seed: int = 17, cost_budget: int = DEFAULT_COST_BUDGET, grid_size: int = DEFAULT_GRID_SIZE,
-              severity: float = 1.0) -> dict:
-    _validate_run_configuration(cost_budget, grid_size, severity)
+def run_suite(seed: int = 17, cost_budget: int | None = None, grid_size: int = DEFAULT_GRID_SIZE,
+              severity: float = 1.0, fidelity_costs: dict[str, int] | None = None) -> dict:
+    costs = normalize_fidelity_costs(fidelity_costs)
+    if cost_budget is None:
+        cost_budget = max(required_policy_costs(costs).values())
+    _validate_run_configuration(cost_budget, grid_size, severity, costs)
     results = [
-        run_policy(name, seed=seed, cost_budget=cost_budget, grid_size=grid_size, severity=severity)
+        run_policy(name, seed=seed, cost_budget=cost_budget, grid_size=grid_size, severity=severity, fidelity_costs=costs)
         for name in POLICIES
     ]
     return {
@@ -484,6 +533,7 @@ def run_suite(seed: int = 17, cost_budget: int = DEFAULT_COST_BUDGET, grid_size:
         "cost_budget": cost_budget,
         "grid_size": grid_size,
         "severity": severity,
+        "fidelity_costs": costs,
         "policy_results": results,
         "warning": "Synthetic known-truth stress fixture only; no foundry/physical or SOTA claim.",
     }
@@ -506,8 +556,9 @@ def _percentile(values: list[float], q: float) -> float:
 def run_sweep(
     seeds: Iterable[int] = (17, 23, 29, 31, 37, 41, 43, 47, 53, 59),
     severities: Iterable[float] = (0.0, 0.5, 1.0, 1.5, 2.0),
-    cost_budget: int = DEFAULT_COST_BUDGET,
+    cost_budget: int | None = None,
     grid_size: int = DEFAULT_GRID_SIZE,
+    fidelity_costs: dict[str, int] | None = None,
 ) -> dict:
     """Paired seed x severity sweep; all policies see the same deterministic candidate pool."""
     seed_values = tuple(seeds)
@@ -516,12 +567,15 @@ def run_sweep(
         raise ValueError("sweep seeds must be non-empty and unique")
     if not severity_values or any(not math.isfinite(v) or v < 0.0 for v in severity_values):
         raise ValueError("sweep severities must be non-empty finite non-negative values")
-    _validate_run_configuration(cost_budget, grid_size, max(severity_values))
+    costs = normalize_fidelity_costs(fidelity_costs)
+    if cost_budget is None:
+        cost_budget = max(required_policy_costs(costs).values())
+    _validate_run_configuration(cost_budget, grid_size, max(severity_values), costs)
 
     runs: list[dict] = []
     for severity in severity_values:
         for seed in seed_values:
-            suite = run_suite(seed=seed, cost_budget=cost_budget, grid_size=grid_size, severity=severity)
+            suite = run_suite(seed=seed, cost_budget=cost_budget, grid_size=grid_size, severity=severity, fidelity_costs=costs)
             runs.extend(suite["policy_results"])
 
     summaries = []
@@ -556,6 +610,7 @@ def run_sweep(
         "benchmark_id": "CASTING-MF-STRESS-001",
         "synthetic_fixture_only": True,
         "cost_budget": cost_budget,
+        "fidelity_costs": costs,
         "grid_size": grid_size,
         "seeds": list(seed_values),
         "severities": list(severity_values),
@@ -571,20 +626,32 @@ def run_sweep(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=17)
-    parser.add_argument("--cost-budget", type=int, default=DEFAULT_COST_BUDGET)
+    parser.add_argument("--cost-budget", type=int, default=None,
+                        help="maximum cost units; defaults to the maximum cost of the fixed policy templates")
     parser.add_argument("--grid-size", type=int, default=DEFAULT_GRID_SIZE)
     parser.add_argument("--severity", type=float, default=1.0)
+    parser.add_argument("--fidelity-costs", type=str, default="low=1,medium=5,high=25",
+                        help="comma-separated positive integer costs, e.g. low=1,medium=10,high=50")
     parser.add_argument("--sweep-seeds", type=str, default=None,
                         help="comma-separated paired seeds; enables severity sweep")
     parser.add_argument("--sweep-severities", type=str, default="0,0.5,1,1.5,2",
                         help="comma-separated non-negative discrepancy severity values")
     args = parser.parse_args()
+    parsed_costs: dict[str, int] = {}
+    for entry in args.fidelity_costs.split(","):
+        if "=" not in entry:
+            raise ValueError("each fidelity cost must use name=integer format")
+        name, raw_value = entry.split("=", 1)
+        if name.strip() in parsed_costs:
+            raise ValueError(f"duplicate fidelity cost: {name.strip()}")
+        parsed_costs[name.strip()] = int(raw_value.strip())
+    costs = normalize_fidelity_costs(parsed_costs)
     if args.sweep_seeds is not None:
         seeds = [int(value.strip()) for value in args.sweep_seeds.split(",") if value.strip()]
         severities = [float(value.strip()) for value in args.sweep_severities.split(",") if value.strip()]
-        result = run_sweep(seeds, severities, args.cost_budget, args.grid_size)
+        result = run_sweep(seeds, severities, args.cost_budget, args.grid_size, costs)
     else:
-        result = run_suite(args.seed, args.cost_budget, args.grid_size, args.severity)
+        result = run_suite(args.seed, args.cost_budget, args.grid_size, args.severity, costs)
     print(json.dumps(result, sort_keys=True, indent=2, allow_nan=False))
     return 0
 
