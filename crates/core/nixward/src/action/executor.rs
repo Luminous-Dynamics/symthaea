@@ -929,7 +929,11 @@ mod tests {
         .unwrap();
         let mut ledger = ExecutionAuthorizationLedger::default();
         let permit = ledger.issue(request).unwrap();
-        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let runner = std::sync::Arc::new(CountingRunner {
+            invocations: std::sync::Arc::clone(&invocations),
+        });
+        let mut executor = NixOSExecutor::new().with_runner(runner);
 
         let result = executor
             .execute_with_permit(
@@ -942,6 +946,7 @@ mod tests {
             )
             .await;
         assert!(matches!(result, ExecutionResult::Success { .. }));
+        assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 1);
 
         let replay = executor
             .execute_with_permit(
@@ -983,7 +988,11 @@ mod tests {
         .unwrap();
         let mut ledger = ExecutionAuthorizationLedger::default();
         let permit = ledger.issue(request).unwrap();
-        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let runner = std::sync::Arc::new(CountingRunner {
+            invocations: std::sync::Arc::clone(&invocations),
+        });
+        let mut executor = NixOSExecutor::new().with_runner(runner);
         let substituted = NixOSCommand::RebuildSwitch {
             flake: Some(".#attacker-controlled".to_string()),
             extra_args: vec![],
@@ -1030,7 +1039,11 @@ mod tests {
         .unwrap();
         let mut ledger = ExecutionAuthorizationLedger::default();
         let permit = ledger.issue(request).unwrap();
-        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let runner = std::sync::Arc::new(CountingRunner {
+            invocations: std::sync::Arc::clone(&invocations),
+        });
+        let mut executor = NixOSExecutor::new().with_runner(runner);
 
         let result = executor
             .execute_with_permit(
