@@ -133,21 +133,30 @@ fn deterministic_splits(ids: &[String]) -> Result<BTreeMap<String, String>> {
     }
     let mut ranked: Vec<(String, String)> = ids
         .iter()
-        .map(|id| (sha256(format!("{SPLIT_SEED}\0{id}").as_bytes()), id.clone()))
+        .map(|id| {
+            (
+                sha256(format!("{SPLIT_SEED}\\0{id}").as_bytes()),
+                id.clone(),
+            )
+        })
         .collect();
     ranked.sort_unstable();
     let train_end = ranked.len() * 70 / 100;
     let validation_end = ranked.len() * 85 / 100;
-    Ok(ranked.into_iter().enumerate().map(|(index, (_, id))| {
-        let split = if index < train_end {
-            "train"
-        } else if index < validation_end {
-            "validation"
-        } else {
-            "test"
-        };
-        (id, split.to_owned())
-    }).collect())
+    Ok(ranked
+        .into_iter()
+        .enumerate()
+        .map(|(index, (_, id))| {
+            let split = if index < train_end {
+                "train"
+            } else if index < validation_end {
+                "validation"
+            } else {
+                "test"
+            };
+            (id, split.to_owned())
+        })
+        .collect())
 }
 
 fn partition_digest(splits: &BTreeMap<String, String>) -> String {
@@ -162,7 +171,8 @@ fn partition_digest(splits: &BTreeMap<String, String>) -> String {
 }
 
 fn validate_catalogue(doc: &Value) -> Result<(String, Vec<Family>, SplitCounts)> {
-    if doc["schema_version"].as_str() != Some("symthaea.proof-insight-transfer.splits.v0")
+    if doc["schema_version"].as_str()
+        != Some("symthaea.proof-insight-transfer.splits.v0")
         || doc["upstream"]["commit"].as_str() != Some(UPSTREAM_COMMIT)
     {
         bail!("catalogue does not identify the pinned PITB v0 source snapshot");
@@ -180,8 +190,14 @@ fn validate_catalogue(doc: &Value) -> Result<(String, Vec<Family>, SplitCounts)>
     let rows = doc["families"].as_array().context("families must be an array")?;
     let mut splits = BTreeMap::new();
     for row in rows {
-        let id = row["family_id"].as_str().context("family_id missing")?.to_owned();
-        let split = row["split"].as_str().context("split missing")?.to_owned();
+        let id = row["family_id"]
+            .as_str()
+            .context("family_id missing")?
+            .to_owned();
+        let split = row["split"]
+            .as_str()
+            .context("split missing")?
+            .to_owned();
         let _title = row["title"].as_str().context("title missing")?;
         if !matches!(split.as_str(), "train" | "validation" | "test")
             || id.trim().is_empty()
@@ -191,7 +207,9 @@ fn validate_catalogue(doc: &Value) -> Result<(String, Vec<Family>, SplitCounts)>
         }
     }
 
-    if splits != deterministic_splits(&splits.keys().cloned().collect::<Vec<_>>())? {
+    if splits
+        != deterministic_splits(&splits.keys().cloned().collect::<Vec<_>>())?
+    {
         bail!("family assignments differ from the registered deterministic split");
     }
     let digest = partition_digest(&splits);
@@ -202,7 +220,11 @@ fn validate_catalogue(doc: &Value) -> Result<(String, Vec<Family>, SplitCounts)>
         bail!("catalogue does not match the exact frozen partition digest and size");
     }
 
-    let mut counts = SplitCounts { train: 0, validation: 0, test: 0 };
+    let mut counts = SplitCounts {
+        train: 0,
+        validation: 0,
+        test: 0,
+    };
     for split in splits.values() {
         match split.as_str() {
             "train" => counts.train += 1,
@@ -226,7 +248,8 @@ fn validate_catalogue(doc: &Value) -> Result<(String, Vec<Family>, SplitCounts)>
 
     let tag_re = Regex::new(r"<[^>]*>").context("compile HTML-tag tokenizer")?;
     let entity_re = Regex::new(r"&[A-Za-z]+;").context("compile entity tokenizer")?;
-    let token_re = Regex::new(r"(?u)[\p{L}\p{N}]{3,}").context("compile Unicode tokenizer")?;
+    let token_re = Regex::new(r"(?u)[\\p{L}\\p{N}]{3,}")
+        .context("compile Unicode tokenizer")?;
     let stop = stopwords();
     let mut families = Vec::with_capacity(rows.len());
     for row in rows {
@@ -237,7 +260,12 @@ fn validate_catalogue(doc: &Value) -> Result<(String, Vec<Family>, SplitCounts)>
         if tokens.is_empty() {
             bail!("family {id} has no meaningful title tokens");
         }
-        families.push(Family { id, title, split, tokens });
+        families.push(Family {
+            id,
+            title,
+            split,
+            tokens,
+        });
     }
     families.sort_by(|a, b| a.id.cmp(&b.id));
     Ok((digest, families, counts))
@@ -256,11 +284,19 @@ fn discover(families: &[Family]) -> Vec<Candidate> {
         for right in (left + 1)..families.len() {
             let a = &families[left];
             let b = &families[right];
-            let shared: Vec<String> = a.tokens.intersection(&b.tokens).cloned().collect();
-            let rare: Vec<String> = shared.iter().filter(|token| {
-                document_frequency.get(*token).copied().unwrap_or(usize::MAX)
-                    <= RARE_TOKEN_MAX_DOCUMENT_FREQUENCY
-            }).cloned().collect();
+            let shared: Vec<String> = a
+                .tokens
+                .intersection(&b.tokens)
+                .cloned()
+                .collect();
+            let rare: Vec<String> = shared
+                .iter()
+                .filter(|token| {
+                    document_frequency.get(*token).copied().unwrap_or(usize::MAX)
+                        <= RARE_TOKEN_MAX_DOCUMENT_FREQUENCY
+                })
+                .cloned()
+                .collect();
             if rare.len() < MIN_RARE_SHARED_TOKENS {
                 continue;
             }
@@ -311,18 +347,25 @@ fn discover(families: &[Family]) -> Vec<Candidate> {
         }
     }
     candidates.sort_by(|a, b| {
-        b.rare_token_rarity_score.total_cmp(&a.rare_token_rarity_score)
-            .then_with(|| b.title_token_jaccard.total_cmp(&a.title_token_jaccard))
+        b.rare_token_rarity_score
+            .total_cmp(&a.rare_token_rarity_score)
+            .then_with(|| {
+                b.title_token_jaccard
+                    .total_cmp(&a.title_token_jaccard)
+            })
             .then_with(|| a.source_family_id.cmp(&b.source_family_id))
             .then_with(|| a.target_family_id.cmp(&b.target_family_id))
     });
-    candidates
+        candidates
 }
 
 fn counts(candidates: &[Candidate]) -> CandidateCounts {
     CandidateCounts {
         candidate_pairs: candidates.len(),
-        cross_split_pairs: candidates.iter().filter(|c| c.source_split != c.target_split).count(),
+        cross_split_pairs: candidates
+            .iter()
+            .filter(|c| c.source_split != c.target_split)
+            .count(),
         train_test_pairs: candidates.iter().filter(|c| {
             (c.source_split == "train" && c.target_split == "test")
                 || (c.source_split == "test" && c.target_split == "train")
@@ -351,7 +394,10 @@ fn make_report(
             min_rare_shared_tokens: MIN_RARE_SHARED_TOKENS,
             min_jaccard: MIN_JACCARD,
             min_rarity_score: MIN_RARITY_SCORE,
-            note: "title-only lexical candidate generation; never a hard-leakage or mathematical-dependency decision",
+            note: concat!(
+                "title-only lexical candidate generation; never a hard-leakage or ",
+                "mathematical-dependency decision",
+            ),
         },
         counts,
         candidates,
@@ -361,11 +407,15 @@ fn make_report(
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() != 2 {
-        bail!("usage: discover_family_leakage_candidates <frozen-splits.json> <candidate-report.json>");
+        bail!(concat!(
+            "usage: discover_family_leakage_candidates <frozen-splits.json> ",
+            "<candidate-report.json>"
+        ));
     }
     let doc: Value = serde_json::from_slice(
         &fs::read(&args[0]).with_context(|| format!("cannot read {}", args[0]))?,
-    ).context("frozen split manifest is not valid JSON")?;
+    )
+    .context("frozen split manifest is not valid JSON")?;
     let (digest, families, split_counts) = validate_catalogue(&doc)?;
     let candidates = discover(&families);
     let report = make_report(digest, &families, split_counts, candidates);
@@ -399,8 +449,16 @@ mod tests {
         let entity = Regex::new(r"&[A-Za-z]+;").unwrap();
         let token = Regex::new(r"(?u)[\p{L}\p{N}]{3,}").unwrap();
         let stop = stopwords();
-        let mut a = family("001", "Iitaka subadditivity and logarithmic additivity", "train");
-        let mut b = family("002", "Log abundance under logarithmic Iitaka subadditivity", "test");
+        let mut a = family(
+            "001",
+            "Iitaka subadditivity and logarithmic additivity",
+            "train",
+        );
+        let mut b = family(
+            "002",
+            "Log abundance under logarithmic Iitaka subadditivity",
+            "test",
+        );
         a.tokens = token_set(&a.title, &tag, &entity, &token, &stop);
         b.tokens = token_set(&b.title, &tag, &entity, &token, &stop);
         let candidates = discover(&[a, b]);
