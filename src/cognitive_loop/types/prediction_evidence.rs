@@ -523,6 +523,65 @@ mod tests {
     }
 
     #[test]
+    fn deterministic_10k_mixed_trace_never_admits_invalid_duplicate_or_stale_evidence() {
+        use super::PredictionEvidenceCursor;
+
+        let mut cursor = PredictionEvidenceCursor::default();
+        let mut bits = 0x7A31_9D45u32;
+        let mut last_admitted = None;
+        let mut admitted = 0usize;
+
+        for _ in 0..10_000 {
+            // Reproducible stream with cycles deliberately repeated and shuffled.
+            bits ^= bits << 13;
+            bits ^= bits >> 17;
+            bits ^= bits << 5;
+
+            let cycle = u64::from(bits % 512);
+            let value = (bits as f32) / (u32::MAX as f32);
+            let evidence = match bits % 4 {
+                0 => PredictionErrorEvidence::invalid(
+                    PredictionEvidenceStatus::InvalidValidityFlag,
+                    None,
+                    cycle,
+                )
+                .unwrap(),
+                1 => PredictionErrorEvidence::invalid(
+                    PredictionEvidenceStatus::SourceUnavailable,
+                    None,
+                    cycle,
+                )
+                .unwrap(),
+                _ => PredictionErrorEvidence::valid(value, None, cycle).unwrap(),
+            };
+            let requested_cycle = if bits & 0x100 != 0 {
+                cycle.saturating_add(1)
+            } else {
+                cycle
+            };
+
+            let expected = match (
+                evidence.value_for_observation(requested_cycle),
+                last_admitted,
+            ) {
+                (Some(value), Some(last)) if cycle > last => Some(value),
+                (Some(value), None) => Some(value),
+                _ => None,
+            };
+            let actual = cursor.admit_evidence(&evidence, requested_cycle);
+            assert_eq!(actual, expected, "trace mismatch at observation {cycle}");
+
+            if actual.is_some() {
+                admitted += 1;
+                last_admitted = Some(cycle);
+            }
+            assert_eq!(cursor.last_admitted_observation_cycle(), last_admitted);
+        }
+
+        assert!(admitted > 0, "generated trace should contain valid admissions");
+    }
+
+    #[test]
     fn serde_round_trip_preserves_valid_evidence() {
         let evidence = PredictionErrorEvidence::valid(0.75, Some(8), 9).unwrap();
         let json = serde_json::to_string(&evidence).unwrap();
