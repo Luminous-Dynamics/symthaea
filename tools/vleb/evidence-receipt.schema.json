@@ -389,6 +389,7 @@
           "verifier": {
             "properties": {
               "receipt_recomputed": {"const": true},
+              "required_test_coverage": {"const": 1},
               "environment_match": {"const": "match"},
               "verdict": {"const": "pass"}
             }
