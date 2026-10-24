@@ -50,7 +50,11 @@ pub struct ScalarDetectorConfig {
     pub ewma_threshold_sigma: Option<f64>,
     /// Required only for EWMA; prevents a zero-variance calibration window from zeroing the limit.
     pub calibration_stddev_floor: Option<f64>,
-    /// EWMA suppresses alarms until this many valid evaluation samples have been seen.
+    /// Required only for Page-Hinkley. Tolerated mean movement per valid sample.
+    pub page_hinkley_delta: Option<f64>,
+    /// Required only for Page-Hinkley. Positive cumulative-deviation alarm limit.
+    pub page_hinkley_threshold: Option<f64>,
+    /// Suppress alarms until this many valid evaluation samples have been seen.
     pub warmup_valid_observations: usize,
 }
 
@@ -59,6 +63,7 @@ pub struct ScalarDetectorConfig {
 pub enum ScalarDetectorMethod {
     FixedThreshold,
     EwmaControlChart,
+    PageHinkley,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -212,8 +217,10 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
             ensure!(
                 input.detector.ewma_alpha.is_none()
                     && input.detector.ewma_threshold_sigma.is_none()
-                    && input.detector.calibration_stddev_floor.is_none(),
-                "EWMA parameters must be absent for fixed-threshold"
+                    && input.detector.calibration_stddev_floor.is_none()
+                    && input.detector.page_hinkley_delta.is_none()
+                    && input.detector.page_hinkley_threshold.is_none(),
+                "EWMA and Page-Hinkley parameters must be absent for fixed-threshold"
             );
             let mut detections = Vec::new();
             let mut latched = false;
@@ -241,8 +248,10 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
         }
         ScalarDetectorMethod::EwmaControlChart => {
             ensure!(
-                input.detector.fixed_threshold.is_none(),
-                "fixed_threshold must be absent for ewma-control-chart"
+                input.detector.fixed_threshold.is_none()
+                    && input.detector.page_hinkley_delta.is_none()
+                    && input.detector.page_hinkley_threshold.is_none(),
+                "fixed-threshold and Page-Hinkley parameters must be absent for ewma-control-chart"
             );
             let alpha = input
                 .detector
@@ -300,6 +309,84 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                 }
             }
             Ok(("ewma-control-chart".to_owned(), detections))
+        }
+        ScalarDetectorMethod::PageHinkley => {
+            ensure!(
+                input.detector.fixed_threshold.is_none()
+                    && input.detector.ewma_alpha.is_none()
+                    && input.detector.ewma_threshold_sigma.is_none()
+                    && input.detector.calibration_stddev_floor.is_none(),
+                "fixed-threshold and EWMA parameters must be absent for Page-Hinkley"
+            );
+            let delta = input
+                .detector
+                .page_hinkley_delta
+                .context("page_hinkley_delta is required for Page-Hinkley")?;
+            let threshold = input
+                .detector
+                .page_hinkley_threshold
+                .context("page_hinkley_threshold is required for Page-Hinkley")?;
+            ensure!(
+                delta.is_finite() && delta >= 0.0,
+                "page_hinkley_delta must be finite and non-negative"
+            );
+            ensure!(
+                threshold.is_finite() && threshold > 0.0,
+                "page_hinkley_threshold must be finite and positive"
+            );
+            let (calibration_mean, _) = mean_stddev(&input.calibration_values)?;
+            let rearm_level = calibration_mean + delta;
+            ensure!(rearm_level.is_finite(), "Page-Hinkley rearm level overflowed");
+
+            // Page-Hinkley on upward shifts in valid PE. Calibration mean initializes
+            // the sequential mean; an alarm is latched until valid PE returns near the
+            // calibration regime, avoiding repeated alarms during one sustained shift.
+            let mut running_mean = calibration_mean;
+            let mut running_count = input.calibration_values.len();
+            let mut cumulative = 0.0_f64;
+            let mut minimum_cumulative = 0.0_f64;
+            let mut detections = Vec::new();
+            let mut valid_count = 0usize;
+            let mut latched = false;
+            for observation in &input.observations {
+                if !observation.evidence_valid {
+                    continue;
+                }
+                let value = observation.value.expect("validated numeric PE");
+                valid_count += 1;
+                running_count += 1;
+                let delta_mean = value - running_mean;
+                ensure!(delta_mean.is_finite(), "Page-Hinkley mean deviation overflowed");
+                running_mean += delta_mean / running_count as f64;
+                ensure!(running_mean.is_finite(), "Page-Hinkley running mean became non-finite");
+
+                if latched {
+                    if value <= rearm_level {
+                        latched = false;
+                        cumulative = 0.0;
+                        minimum_cumulative = 0.0;
+                    }
+                    continue;
+                }
+
+                cumulative += value - running_mean - delta;
+                ensure!(cumulative.is_finite(), "Page-Hinkley cumulative statistic overflowed");
+                minimum_cumulative = minimum_cumulative.min(cumulative);
+                let deviation = cumulative - minimum_cumulative;
+                ensure!(deviation.is_finite(), "Page-Hinkley deviation overflowed");
+                if valid_count >= input.detector.warmup_valid_observations
+                    && deviation > threshold
+                {
+                    detections.push(Detection {
+                        cycle_index: observation.cycle_index,
+                        evidence_valid: true,
+                    });
+                    latched = true;
+                    cumulative = 0.0;
+                    minimum_cumulative = 0.0;
+                }
+            }
+            Ok(("page-hinkley".to_owned(), detections))
         }
     }
 }
@@ -364,6 +451,8 @@ mod tests {
                 ewma_alpha: None,
                 ewma_threshold_sigma: None,
                 calibration_stddev_floor: None,
+                page_hinkley_delta: None,
+                page_hinkley_threshold: None,
                 warmup_valid_observations: 1,
             },
             ScalarDetectorMethod::EwmaControlChart => ScalarDetectorConfig {
@@ -372,6 +461,18 @@ mod tests {
                 ewma_alpha: Some(0.5),
                 ewma_threshold_sigma: Some(3.0),
                 calibration_stddev_floor: Some(0.01),
+                page_hinkley_delta: None,
+                page_hinkley_threshold: None,
+                warmup_valid_observations: 1,
+            },
+            ScalarDetectorMethod::PageHinkley => ScalarDetectorConfig {
+                method,
+                fixed_threshold: None,
+                ewma_alpha: None,
+                ewma_threshold_sigma: None,
+                calibration_stddev_floor: None,
+                page_hinkley_delta: Some(0.05),
+                page_hinkley_threshold: Some(0.15),
                 warmup_valid_observations: 1,
             },
         };
@@ -422,6 +523,19 @@ mod tests {
             .expect("EWMA should run");
         assert!(result.detections.iter().any(|d| d.cycle_index == 1));
         assert_eq!(result.score.invalid_evidence_alarms, 0);
+    }
+
+    #[test]
+    fn page_hinkley_detects_separate_upward_shifts_without_repeated_alarm_storms() {
+        let result = run_scalar_detector(fixture(ScalarDetectorMethod::PageHinkley))
+            .expect("Page-Hinkley should run");
+        assert_eq!(
+            result.detections.iter().map(|d| d.cycle_index).collect::<Vec<_>>(),
+            vec![1, 6]
+        );
+        assert_eq!(result.score.true_positive_events, 2);
+        assert_eq!(result.score.false_positive_alarms, 0);
+        assert_eq!(result.score.missed_events, 0);
     }
 
     #[test]
