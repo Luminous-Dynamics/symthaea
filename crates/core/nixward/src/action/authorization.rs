@@ -712,6 +712,26 @@ mod tests {
     }
 
     #[test]
+    fn permit_lifetime_is_bounded_by_ledger_policy() {
+        let mut ledger =
+            ExecutionAuthorizationLedger::new(Duration::from_millis(10)).unwrap();
+        let request = AuthorizationRequest::new(
+            binding(&["switch"]),
+            "operator:alice",
+            ActionScope::SystemCritical,
+            AuthorizationAuthority::HumanOperator,
+            "decision-011",
+            Duration::from_millis(11),
+        )
+        .unwrap();
+
+        assert_eq!(
+            ledger.issue(request).unwrap_err(),
+            AuthorizationError::LifetimeTooLong
+        );
+    }
+
+    #[test]
     fn invalid_executable_arguments_and_lifetimes_are_rejected() {
         assert_eq!(
             CommandBinding::new("  ", Vec::<String>::new()),
