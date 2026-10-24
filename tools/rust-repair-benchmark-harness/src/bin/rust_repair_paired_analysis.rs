@@ -44,6 +44,11 @@ struct ScoreReport {
     task_manifest_sha256: String,
     candidate_jsonl_sha256: String,
     task_count: usize,
+    success_count: usize,
+    failure_count: usize,
+    unresolved_count: usize,
+    lockable: bool,
+    pass_at_1: Option<f64>,
     tasks: Vec<ScoreTask>,
 }
 
@@ -197,8 +202,33 @@ fn score_index(
             return Err(format!("{label} contains duplicate task {:?}", row.instance_id));
         }
     }
-    if index.keys().cloned().collect::<BTreeSet<_>>() != *expected_ids {
+    let observed_ids = index.keys().cloned().collect::<BTreeSet<_>>();
+    if &observed_ids != expected_ids {
         return Err(format!("{label} is missing one or more locked task IDs"));
+    }
+
+    let successes = index.values().filter(|outcome| **outcome == Outcome::Pass).count();
+    let failures = index.values().filter(|outcome| **outcome == Outcome::Fail).count();
+    let unresolved = index.values().filter(|outcome| **outcome == Outcome::Unresolved).count();
+    if report.success_count != successes
+        || report.failure_count != failures
+        || report.unresolved_count != unresolved
+    {
+        return Err(format!("{label} top-level outcome counts disagree with its task rows"));
+    }
+    let expected_lockable = unresolved == 0 && successes + failures == expected_ids.len();
+    if report.lockable != expected_lockable {
+        return Err(format!("{label} lockable flag disagrees with its task rows"));
+    }
+    let expected_pass_at_1 = if expected_lockable {
+        Some(successes as f64 / expected_ids.len() as f64)
+    } else {
+        None
+    };
+    match (report.pass_at_1, expected_pass_at_1) {
+        (Some(observed), Some(expected)) if (observed - expected).abs() <= f64::EPSILON => {}
+        (None, None) => {}
+        _ => return Err(format!("{label} pass_at_1 disagrees with its task rows")),
     }
     Ok(index)
 }
