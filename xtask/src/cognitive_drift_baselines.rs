@@ -71,6 +71,17 @@ pub enum ScalarDetectorMethod {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct DetectorDiagnostics {
+    pub statistic_name: String,
+    pub threshold_or_boundary: Option<f64>,
+    pub final_statistic: Option<f64>,
+    pub maximum_statistic: Option<f64>,
+    pub stopping_alpha: Option<f64>,
+    pub stopped_at_first_crossing: bool,
+    pub valid_samples_processed: usize,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct ScalarDriftRunResult {
     pub result_schema_version: u32,
     pub metric_version: String,
@@ -89,6 +100,7 @@ pub struct ScalarDriftRunResult {
     pub valid_evaluation_observation_count: usize,
     pub detections: Vec<Detection>,
     pub score: DriftScore,
+    pub diagnostics: DetectorDiagnostics,
     pub interpretation_guard: String,
 }
 
@@ -156,7 +168,7 @@ pub fn run_scalar_detector(mut input: ScalarDriftRunInput) -> anyhow::Result<Sca
     });
     let input_digest = sha256(&serde_json::to_vec(&input)?);
     let configuration_digest = sha256(&serde_json::to_vec(&input.detector)?);
-    let (detector_id, detections) = detect(&input)?;
+    let (detector_id, detections, diagnostics) = detect(&input)?;
     let valid_count = input
         .observations
         .iter()
@@ -198,13 +210,14 @@ pub fn run_scalar_detector(mut input: ScalarDriftRunInput) -> anyhow::Result<Sca
         valid_evaluation_observation_count: valid_count,
         detections,
         score,
+        diagnostics,
         interpretation_guard: "Fixed threshold, EWMA, Page-Hinkley, and predictive-rank martingale are reference controls for the valid-PE-only track, not a complete KDD 2026 reproduction or SOTA claim. Calibration observations must be disjoint from the scored evaluation stream. Invalid evidence is skipped and cannot update detector state. Detection F1 must be reported alongside false alarms, delay, task impact, and adaptation cost. The PRM first-crossing martingale interpretation assumes an IID null and independent tie randomization; this implementation uses a deterministic seed-derived PRNG, so do not claim a formal guarantee conditional on a fixed seed. It emits one alarm per calibration epoch.".to_owned(),
     };
     result.result_sha256 = Some(result_digest(&result)?);
     Ok(result)
 }
 
-fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>)> {
+fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>, DetectorDiagnostics)> {
     ensure!(
         input.detector.warmup_valid_observations > 0,
         "warmup_valid_observations must be positive"
@@ -231,12 +244,17 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
             let mut detections = Vec::new();
             let mut latched = false;
             let mut valid_count = 0usize;
+            let mut final_value = None;
+            let mut maximum_value = f64::NEG_INFINITY;
             for observation in &input.observations {
                 if !observation.evidence_valid {
                     continue;
                 }
                 valid_count += 1;
-                let above = observation.value.expect("validated numeric PE") > threshold;
+                let value = observation.value.expect("validated numeric PE");
+                final_value = Some(value);
+                maximum_value = maximum_value.max(value);
+                let above = value > threshold;
                 if valid_count >= input.detector.warmup_valid_observations && above && !latched {
                     detections.push(Detection {
                         cycle_index: observation.cycle_index,
@@ -250,7 +268,19 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                     latched = true;
                 }
             }
-            Ok(("fixed-threshold".to_owned(), detections))
+            Ok((
+                "fixed-threshold".to_owned(),
+                detections,
+                DetectorDiagnostics {
+                    statistic_name: "prediction-error".to_owned(),
+                    threshold_or_boundary: Some(threshold),
+                    final_statistic: final_value,
+                    maximum_statistic: if valid_count > 0 { Some(maximum_value) } else { None },
+                    stopping_alpha: None,
+                    stopped_at_first_crossing: false,
+                    valid_samples_processed: valid_count,
+                },
+            ))
         }
         ScalarDetectorMethod::EwmaControlChart => {
             ensure!(
@@ -292,6 +322,8 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
             let mut detections = Vec::new();
             let mut latched = false;
             let mut valid_count = 0usize;
+            let mut final_deviation = None;
+            let mut maximum_deviation = 0.0_f64;
             for observation in &input.observations {
                 if !observation.evidence_valid {
                     continue;
@@ -302,6 +334,8 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                 ensure!(ewma.is_finite(), "EWMA state became non-finite");
                 let deviation = (ewma - center).abs();
                 ensure!(deviation.is_finite(), "EWMA deviation overflowed");
+                final_deviation = Some(deviation);
+                maximum_deviation = maximum_deviation.max(deviation);
                 let outside = deviation > limit;
                 if valid_count >= input.detector.warmup_valid_observations && outside && !latched {
                     detections.push(Detection {
@@ -315,7 +349,19 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                     latched = true;
                 }
             }
-            Ok(("ewma-control-chart".to_owned(), detections))
+            Ok((
+                "ewma-control-chart".to_owned(),
+                detections,
+                DetectorDiagnostics {
+                    statistic_name: "absolute-ewma-deviation".to_owned(),
+                    threshold_or_boundary: Some(limit),
+                    final_statistic: final_deviation,
+                    maximum_statistic: if valid_count > 0 { Some(maximum_deviation) } else { None },
+                    stopping_alpha: None,
+                    stopped_at_first_crossing: false,
+                    valid_samples_processed: valid_count,
+                },
+            ))
         }
         ScalarDetectorMethod::PageHinkley => {
             ensure!(
@@ -355,6 +401,8 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
             let mut minimum_cumulative = 0.0_f64;
             let mut detections = Vec::new();
             let mut valid_count = 0usize;
+            let mut final_deviation = None;
+            let mut maximum_deviation = 0.0_f64;
             let mut latched = false;
             for observation in &input.observations {
                 if !observation.evidence_valid {
@@ -382,6 +430,8 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                 minimum_cumulative = minimum_cumulative.min(cumulative);
                 let deviation = cumulative - minimum_cumulative;
                 ensure!(deviation.is_finite(), "Page-Hinkley deviation overflowed");
+                final_deviation = Some(deviation);
+                maximum_deviation = maximum_deviation.max(deviation);
                 if valid_count >= input.detector.warmup_valid_observations
                     && deviation > threshold
                 {
@@ -394,7 +444,19 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                     minimum_cumulative = 0.0;
                 }
             }
-            Ok(("page-hinkley".to_owned(), detections))
+            Ok((
+                "page-hinkley".to_owned(),
+                detections,
+                DetectorDiagnostics {
+                    statistic_name: "page-hinkley-cumulative-deviation".to_owned(),
+                    threshold_or_boundary: Some(threshold),
+                    final_statistic: final_deviation,
+                    maximum_statistic: if valid_count > 0 { Some(maximum_deviation) } else { None },
+                    stopping_alpha: None,
+                    stopped_at_first_crossing: false,
+                    valid_samples_processed: valid_count,
+                },
+            ))
         }
         ScalarDetectorMethod::PredictiveRankMartingalePortfolio => {
             ensure!(
@@ -463,6 +525,8 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
             let mut wealth = [1.0_f64; 4];
             let mut detections = Vec::new();
             let mut processed = 0usize;
+            let mut final_portfolio_wealth = 1.0_f64;
+            let mut maximum_portfolio_wealth = 1.0_f64;
 
             for observation in &input.observations {
                 // Consume a tie key at every cycle so later randomization is reproducible
@@ -523,6 +587,9 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                 }
                 let portfolio_wealth = wealth.iter().sum::<f64>() / 4.0;
                 ensure!(portfolio_wealth.is_finite(), "PRM portfolio wealth overflowed");
+                final_portfolio_wealth = portfolio_wealth;
+                maximum_portfolio_wealth = maximum_portfolio_wealth.max(portfolio_wealth);
+                processed = processed.checked_add(1).context("PRM processed count overflowed")?;
                 if portfolio_wealth >= wealth_threshold {
                     detections.push(Detection {
                         cycle_index: observation.cycle_index,
@@ -539,9 +606,20 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                     history_order_sum.is_finite() && history_dispersion_sum.is_finite(),
                     "PRM history feature sums became non-finite"
                 );
-                processed = processed.checked_add(1).context("PRM processed count overflowed")?;
             }
-            Ok(("predictive-rank-martingale-portfolio".to_owned(), detections))
+            Ok((
+                "predictive-rank-martingale-portfolio".to_owned(),
+                detections,
+                DetectorDiagnostics {
+                    statistic_name: "predictive-rank-martingale-portfolio-wealth".to_owned(),
+                    threshold_or_boundary: Some(wealth_threshold),
+                    final_statistic: Some(final_portfolio_wealth),
+                    maximum_statistic: Some(maximum_portfolio_wealth),
+                    stopping_alpha: Some(alpha),
+                    stopped_at_first_crossing: !detections.is_empty(),
+                    valid_samples_processed: processed,
+                },
+            ))
         }
     }
 }
