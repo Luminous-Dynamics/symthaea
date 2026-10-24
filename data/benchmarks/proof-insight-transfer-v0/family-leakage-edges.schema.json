@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb.family-leakage-edges.v0.json",
+  "title": "PITB cross-family relationship inventory",
+  "description": "Curated candidate relationships between frozen result families. Evidence digests are references only; they do not authenticate reviewer identities or prove inventory completeness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_partition_digest_sha256",
+    "coverage_status",
+    "coverage_receipt_sha256",
+    "edges"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.family-leakage-edges.v0"
+    },
+    "source_partition_digest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "coverage_status": {
+      "enum": [
+        "incomplete",
+        "independently_reviewed_complete"
+      ]
+    },
+    "coverage_receipt_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/edge"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "edge_id",
+        "source_family_id",
+        "target_family_id",
+        "relation_kind",
+        "assessment_status",
+        "evidence_sha256",
+        "reviewer_ids"
+      ],
+      "properties": {
+        "edge_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation_kind": {
+          "enum": [
+            "exact_duplicate",
+            "shared_source_artifact",
+            "formal_dependency",
+            "reused_lemma",
+            "equivalent_statement",
+            "conceptual_similarity",
+            "citation_only"
+          ]
+        },
+        "assessment_status": {
+          "enum": [
+            "confirmed",
+            "dismissed",
+            "unresolved"
+          ]
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reviewer_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "assessment_status": {
+                "enum": [
+                  "confirmed",
+                  "dismissed"
+                ]
+              }
+            },
+            "required": [
+              "assessment_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reviewer_ids": {
+                "minItems": 2
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "coverage_status": {
+            "const": "incomplete"
+          }
+        },
+        "required": [
+          "coverage_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "coverage_receipt_sha256": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "coverage_status": {
+            "const": "independently_reviewed_complete"
+          }
+        },
+        "required": [
+          "coverage_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "coverage_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    }
+  ]
+}
