@@ -104,7 +104,7 @@ pub struct Plan {
     pub total_cost: u64,
 }
 
-/// Independent verification outcome.
+/// Verification outcome from the separate stable-ID checking path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerificationStatus {
     /// Every declared constraint passed and the recomputed cost matches.
