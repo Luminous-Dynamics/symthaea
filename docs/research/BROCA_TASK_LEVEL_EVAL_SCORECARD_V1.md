@@ -55,7 +55,25 @@ output_sha256=<sha256 of the complete CSV bytes>
 
 All rows must agree with those receipt hashes. The output hash detects accidental corruption; it is not a signature or proof that the benchmark runner was honest. Preserve the original run logs and evaluator receipts as separately archived evidence.
 
-The checker is a conformance/data-integrity gate and descriptive scorecard, not a significance test or leaderboard evaluator. It rejects observed governance violations. Compute uncertainty separately using a preregistered grouped paired bootstrap (at least 10,000 resamples for final claims, seed recorded) or an appropriate paired estimator. Report exact counts and confidence intervals so zero-event claims have a meaningful denominator.
+The shell checker is a conformance/data-integrity gate and descriptive scorecard, not a significance test or leaderboard evaluator. It rejects observed governance violations.
+
+### Group-aware paired uncertainty tool
+
+The dependency-free Rust tool in `research/broca-task-eval-v1/` computes percentile-bootstrap 95% intervals for paired task-success lift versus both `no_memory` and `exact_hdc`. It samples whole groups (for example, a user or a source conversation) with replacement, keeping all cases from each sampled group together. This avoids pretending correlated tasks from one conversation are independent rows.
+
+First verify the CSV receipt and governance/data invariants, then run the inference tool:
+
+```sh
+bash scripts/check_broca_task_eval.sh artifacts/broca-task-eval/heldout.csv
+cargo test --manifest-path research/broca-task-eval-v1/Cargo.toml
+cargo run --manifest-path research/broca-task-eval-v1/Cargo.toml --release -- \
+  --input artifacts/broca-task-eval/heldout.csv \
+  --resamples 10000 --seed 20261024 --min-cases 100 --min-groups 10
+```
+
+The output gives per-contrast paired wins/losses/ties, mean task-success lift in percentage points, confidence limits, group count, resample count and seed. Fewer than 30 groups triggers an exploratory-interpretation warning; for confirmatory comparisons, collect more independent groups and pin the inferential plan before opening the held-out results. The interval is a descriptive percentile-bootstrap interval, not by itself proof of causality, benchmark validity, or SOTA. Do not use the tool on a failed checker result.
+
+Report exact counts and confidence intervals so zero-event claims have a meaningful denominator. Safety/governance event rates need a separately preregistered upper confidence bound and an adequate independent sample; this task-success bootstrap does not certify a zero-risk rate.
 
 ## Proposed decision thresholds — targets, not achieved results
 
