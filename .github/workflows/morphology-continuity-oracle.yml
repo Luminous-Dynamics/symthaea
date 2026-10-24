@@ -75,6 +75,9 @@ jobs:
       - name: Verify frozen joint prior-shift robustness request digest
         run: echo "7f0310b7887d4d8e9def76887d761df475aafba87ef3b662848e063e71b81944  tools/morphology-continuity-oracle/joint_prior_confusion_robustness_v1_4.txt" | sha256sum --check -
 
+      - name: Verify frozen active calibration allocation request digest
+        run: echo "a2d9c47b5ae6f8663512f371252e1183c1be8f7d9037eb86c32c46f2c922bedb  tools/morphology-continuity-oracle/active_calibration_allocation_v1_5.txt" | sha256sum --check -
+
       - name: Formatting
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
 
