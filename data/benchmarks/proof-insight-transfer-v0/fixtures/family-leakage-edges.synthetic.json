@@ -1,0 +1,41 @@
+{
+  "schema_version": "pitb.family-leakage-edges.v0",
+  "source_partition_digest_sha256": "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970",
+  "coverage_status": "incomplete",
+  "coverage_receipt_sha256": null,
+  "edges": [
+    {
+      "edge_id": "synthetic-confirmed-train-test-formal-dependency",
+      "source_family_id": "001",
+      "target_family_id": "005",
+      "relation_kind": "formal_dependency",
+      "assessment_status": "confirmed",
+      "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "reviewer_ids": [
+        "synthetic-reviewer-a",
+        "synthetic-reviewer-b"
+      ]
+    },
+    {
+      "edge_id": "synthetic-unresolved-train-validation-reused-lemma",
+      "source_family_id": "001",
+      "target_family_id": "012",
+      "relation_kind": "reused_lemma",
+      "assessment_status": "unresolved",
+      "evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reviewer_ids": []
+    },
+    {
+      "edge_id": "synthetic-nonblocking-conceptual-similarity",
+      "source_family_id": "005",
+      "target_family_id": "008",
+      "relation_kind": "conceptual_similarity",
+      "assessment_status": "confirmed",
+      "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "reviewer_ids": [
+        "synthetic-reviewer-a",
+        "synthetic-reviewer-b"
+      ]
+    }
+  ]
+}
