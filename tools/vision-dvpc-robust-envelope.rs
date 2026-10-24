@@ -285,8 +285,9 @@ fn parse_envelopes(text:&str,conf:&ConfidenceReceipt,conf_sha:&str,expected_infe
     if utility_c+c-1.0+1e-12<0.95{return Err(invalid("combined utility/envelope coverage lower bound is below 0.95; use jointly calibrated bands or allocate alpha so the union bound reaches 95%"));}
     let expected_sha=validate_sha(&meta["source_confidence_receipt_sha256"],"source_confidence_receipt_sha256")?;
     if expected_sha!=conf_sha{return Err(invalid("envelope does not bind the exact confidence-receipt bytes"));}
-    if validate_sha(&meta["inference_receipt_sha256"],"envelope inference_receipt_sha256")?!=expected_inference{
-        return Err(invalid("envelope inference receipt digest differs from caller-pinned digest"));
+    if validate_sha(&meta["inference_receipt_sha256"],"envelope inference_receipt_sha256")?!=expected_inference
+        || validate_sha(&conf.meta["inference_receipt_sha256"],"confidence inference_receipt_sha256")?!=expected_inference {
+        return Err(invalid("confidence and envelope must bind the same caller-pinned inference receipt digest"));
     }
     for (mk,ck) in [("experiment_id","experiment_id"),("dataset_id","dataset_id"),("dataset_revision","dataset_revision"),("split","split"),("bundle_lock_sha256","bundle_lock_sha256"),("paired_unit_set_sha256","paired_unit_set_sha256"),("source_sweep_sha256","sweep_input_sha256")]{
         if meta[mk]!=conf.meta[ck]{return Err(invalid(format!("envelope {mk} differs from confidence receipt")));}
