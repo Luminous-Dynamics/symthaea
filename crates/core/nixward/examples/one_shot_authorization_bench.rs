@@ -27,17 +27,21 @@ enum Scenario {
     PrincipalMismatch,
     ScopeMismatch,
     AuthorityMismatch,
+    ArgumentBoundaryMismatch,
+    WrongLedger,
     Revoked,
     Replay,
 }
 
 impl Scenario {
-    const ALL: [Self; 7] = [
+    const ALL: [Self; 9] = [
         Self::Valid,
         Self::CommandMismatch,
         Self::PrincipalMismatch,
         Self::ScopeMismatch,
         Self::AuthorityMismatch,
+        Self::ArgumentBoundaryMismatch,
+        Self::WrongLedger,
         Self::Revoked,
         Self::Replay,
     ];
@@ -49,6 +53,8 @@ impl Scenario {
             Self::PrincipalMismatch => "principal_mismatch",
             Self::ScopeMismatch => "scope_mismatch",
             Self::AuthorityMismatch => "authority_mismatch",
+            Self::ArgumentBoundaryMismatch => "argument_boundary_mismatch",
+            Self::WrongLedger => "wrong_ledger",
             Self::Revoked => "revoked",
             Self::Replay => "replay",
         }
@@ -75,11 +81,16 @@ fn percentile(sorted_ns: &[u64], percentile: usize) -> u64 {
 fn main() {
     let mut ledger = ExecutionAuthorizationLedger::new(Duration::from_secs(3_600))
         .expect("benchmark ledger lifetime is valid");
+    // A separate ledger exercises the wrong-ledger defense. Such a denial
+    // cannot burn the permit in its owning ledger, which is intentionally
+    // outside the rejecting ledger's authority.
+    let mut wrong_ledger = ExecutionAuthorizationLedger::new(Duration::from_secs(3_600))
+        .expect("benchmark foreign ledger lifetime is valid");
 
     let mut latencies_ns = Vec::with_capacity(CASES);
-    let mut scenario_latencies_ns: [Vec<u64>; 7] =
-        std::array::from_fn(|_| Vec::with_capacity(CASES / 7 + 1));
-    let mut scenario_counts = [0usize; 7];
+    let mut scenario_latencies_ns: [Vec<u64>; 9] =
+        std::array::from_fn(|_| Vec::with_capacity(CASES / 9 + 1));
+    let mut scenario_counts = [0usize; 9];
     let mut false_permits = 0usize;
     let mut false_blocks = 0usize;
     let mut allowed = 0usize;
@@ -91,8 +102,16 @@ fn main() {
         scenario_counts[scenario_index] += 1;
 
         let decision_id = format!("microbench-decision-{index:05}");
+        let request_binding = match scenario {
+            Scenario::ArgumentBoundaryMismatch => CommandBinding::new(
+                "nixos-rebuild",
+                ["switch", "--flake", ".#bench-host", "--option", "a b"],
+            )
+            .expect("benchmark argument-boundary binding is valid"),
+            _ => binding(".#bench-host"),
+        };
         let request = AuthorizationRequest::new(
-            binding(".#bench-host"),
+            request_binding,
             "operator:alice",
             ActionScope::SystemCritical,
             AuthorizationAuthority::HumanOperator,
@@ -150,13 +169,33 @@ fn main() {
                 ActionScope::SystemCritical,
                 AuthorizationAuthority::WatchdogOperator,
             ),
+            Scenario::ArgumentBoundaryMismatch => AuthorizationAttempt::new(
+                CommandBinding::new(
+                    "nixos-rebuild",
+                    ["switch", "--flake", ".#bench-host", "--option", "a", "b"],
+                )
+                .expect("split argv binding is valid"),
+                "operator:alice",
+                ActionScope::SystemCritical,
+                AuthorizationAuthority::HumanOperator,
+            ),
+            Scenario::WrongLedger => AuthorizationAttempt::new(
+                binding(".#bench-host"),
+                "operator:alice",
+                ActionScope::SystemCritical,
+                AuthorizationAuthority::HumanOperator,
+            ),
         }
         .expect("well-formed benchmark attempt");
 
         // Measure only the ledger consume operation. Issuance and scenario
         // setup are outside this timer, so this is not end-to-end latency.
         let start = Instant::now();
-        let outcome = ledger.consume(&permit, &attempt);
+        let outcome = if matches!(scenario, Scenario::WrongLedger) {
+            wrong_ledger.consume(&permit, &attempt)
+        } else {
+            ledger.consume(&permit, &attempt)
+        };
         let elapsed_ns = start.elapsed().as_nanos().min(u64::MAX as u128) as u64;
         latencies_ns.push(elapsed_ns);
         scenario_latencies_ns[scenario_index].push(elapsed_ns);
