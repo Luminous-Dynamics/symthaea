@@ -481,6 +481,11 @@ fn validate_arm(arm: &mut CounterfactualArm, context: &str) -> anyhow::Result<()
                 && observation.adaptation_cost_units >= 0.0,
             "{context} adaptation cost must be finite and non-negative"
         );
+        if let Some(available_at) = observation.task_loss_available_at_tick {
+            ensure!(available_at >= observation.cycle_index,
+                "{context} task_loss_available_at_tick cannot precede cycle_index {}",
+                observation.cycle_index);
+        }
     }
     arm.observations.sort_by_key(|o| o.cycle_index);
     for pair in arm.observations.windows(2) {
