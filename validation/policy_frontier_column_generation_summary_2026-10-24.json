@@ -5,8 +5,15 @@
     "rows": 36,
     "candidate_priors": 6,
     "learner_priors": 6,
-    "objectives": ["graph", "kernel", "joint"],
-    "horizons": [1, 2],
+    "objectives": [
+      "graph",
+      "kernel",
+      "joint"
+    ],
+    "horizons": [
+      1,
+      2
+    ],
     "all_rows_certified_locally": true
   },
   "certificate": {
@@ -15,8 +22,16 @@
     "requested_tolerance_bits": 1e-8
   },
   "frontier_compression": {
-    "horizon_two_kernel_frontier_sizes": {"min": 29, "mean": 104.83333333333333, "max": 450},
-    "horizon_two_kernel_column_counts": {"min": 1, "mean": 1.8333333333333333, "max": 2},
+    "horizon_two_kernel_frontier_sizes": {
+      "min": 29,
+      "mean": 104.83333333333333,
+      "max": 450
+    },
+    "horizon_two_kernel_column_counts": {
+      "min": 1,
+      "mean": 1.8333333333333333,
+      "max": 2
+    },
     "largest_frontier_case": {
       "objective": "kernel",
       "learner_prior": "graph_kernel_correlated",
@@ -37,9 +52,11 @@
     "python": "3.13.5",
     "numpy": "2.3.5",
     "scipy": "1.17.0",
-    "tests_passed": 77,
+    "tests_passed": 78,
     "tests_failed": 0,
-    "exact_head_integration_tested": false
+    "exact_head_integration_tested": false,
+    "test_source_sha256": "a304df823802f6fa6b2a120eb6c3f67a4f69999a13766447394b885f4fef28d6",
+    "test_source_git_blob": "e99ce5c1c5a994c4646e190470a8fdb156371e49"
   },
   "provenance": {
     "local_executed_source_sha256": "08371649907d5a3252036789a7f774f3f01b9ff57143467c0001d15c3d116409",
@@ -69,5 +86,28 @@
     "https://arxiv.org/abs/2609.11897",
     "https://tcd-arena.github.io/",
     "https://proceedings.mlr.press/v238/choo24a.html"
-  ]
+  ],
+  "horizon_three_pricing_only_slice": {
+    "rows": 6,
+    "learner_priors": [
+      "uniform",
+      "graph_kernel_correlated"
+    ],
+    "objectives": [
+      "graph",
+      "kernel",
+      "joint"
+    ],
+    "horizon": 3,
+    "certified_rows": 6,
+    "max_primal_to_pricing_gap_bits": 2.0294876890147862e-13,
+    "max_policy_tree_columns": 7,
+    "total_runtime_seconds": 20.157435336999924,
+    "exact_frontier_oracle_used": false,
+    "result_path_local_only": "policy_frontier_column_generation_horizon3_2026-10-24.json",
+    "result_sha256": "fd809bf5bdaaadfee6f15ae03c682099227259313dd48843c3cdd2868dd8a1a1",
+    "executed_local_source_git_blob": "1f2656c5f49a375043ffe42155df11952a27217a",
+    "matches_committed_source": false,
+    "qualifier": "Pricing-certificate slice only; no full horizon-three grid or exhaustive-frontier comparison."
+  }
 }
