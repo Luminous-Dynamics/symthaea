@@ -87,7 +87,7 @@ At 16,384 candidates:
 |---|---|---:|---:|---:|
 | Random control | Evenly spaced | 2 | 16,382 / 16,384 (99.99%) | 64 KiB |
 | Random control | Farthest-first | 2 | 16,383 / 16,384 (99.99%) | 64 KiB |
-| Random control | Evenly spaced | 4 | 16,381 / 16,384 (99.98%) | 128 KiB |
+| Random control | Evenly spaced | 4 | 16,380 / 16,384 (99.98%) | 128 KiB |
 | Random control | Farthest-first | 4 | 16,380 / 16,384 (99.98%) | 128 KiB |
 | Random control | Evenly spaced | 8 | 16,376 / 16,384 (99.95%) | 256 KiB |
 | Random control | Farthest-first | 8 | 16,376 / 16,384 (99.95%) | 256 KiB |
@@ -110,3 +110,7 @@ Triangle-inequality pivot bounds and pivot-selection algorithms are established 
 - FAISS binary index families, including exact flat, IVF, HNSW and multi-index hashing: https://github.com/facebookresearch/faiss/wiki/Binary-Indexes
 
 The research contribution being tested is narrower: can compact Hamming signatures plus a build-cost-aware pivot selector reduce end-to-end exact retrieval cost for Symthaea's 16,384-bit hypervectors on real, production-relevant HDC corpora? A synthetic clustered win or lower full-vector count alone is not a novelty, SOTA, or latency claim.
+
+### Random-control seed independence
+
+A source audit caught a seed collision before treating the random control as evidence: the original query seed differed from the corpus base seed by exactly 8,028, so the query was an exact copy of candidate 8,028. The Rust benchmark now uses query seed `0xDEAD_BEEF_9876`, outside the corpus seed range. Re-running the independent integer-bit model with a distinct query (zero exact corpus matches) yields 16,382/16,384 full-vector evaluations for both 2-pivot selectors, 16,380 for both 4-pivot selectors, and 16,376 for both 8-pivot selectors. The random negative-control conclusion is supported by a non-colliding generated query. This correction is a reminder to explicitly audit generated test-data independence; exact Rust generation still needs execution.
