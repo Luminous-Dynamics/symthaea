@@ -1342,8 +1342,6 @@ mod tests {
         state.coherence = 0.0;
         state.prediction_evidence =
             PredictionErrorEvidence::valid(0.0, None, 1).expect("finite fixture evidence");
-        state.prediction_evidence =
-            PredictionErrorEvidence::valid(0.0, None, 1).expect("finite fixture evidence");
         let mut timings = super::super::ModuleTimings::default();
         let m = s.compute_consciousness_metrics(&state, &mut timings);
         assert!(m.primitive_psi.is_finite());
@@ -1358,8 +1356,6 @@ mod tests {
         let output = vec![0.5f32; 64];
         let hv = symthaea_core::hdc::BinaryHV::random(7);
         let mut state = make_cycle_state(&compressed, &output, &hv, "high error");
-        state.prediction_evidence =
-            PredictionErrorEvidence::valid(1.0, Some(0), 1).expect("finite fixture evidence");
         state.prediction_evidence =
             PredictionErrorEvidence::valid(1.0, Some(0), 1).expect("finite fixture evidence");
         let mut timings = super::super::ModuleTimings::default();
