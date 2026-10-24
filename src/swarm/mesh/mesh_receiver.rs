@@ -154,6 +154,10 @@ pub struct MeshReceiver {
     /// Whether to decrypt individual LoRa fragments (fragment-level AEAD).
     #[cfg(feature = "mesh-encryption")]
     fragment_encryption: bool,
+    /// Reject all plaintext when encrypted-only operation is required.
+    /// Kept separate from key availability so key loss cannot imply downgrade.
+    #[cfg(feature = "mesh-encryption")]
+    encryption_required: bool,
 }
 
 impl MeshReceiver {
@@ -174,6 +178,8 @@ impl MeshReceiver {
             encryption_key: None,
             #[cfg(feature = "mesh-encryption")]
             fragment_encryption: false,
+            #[cfg(feature = "mesh-encryption")]
+            encryption_required: false,
         }
     }
 
@@ -198,6 +204,26 @@ impl MeshReceiver {
     pub fn with_fragment_encryption(mut self, enabled: bool) -> Self {
         self.fragment_encryption = enabled;
         self
+    }
+
+    /// Configure whether this receiver requires authenticated encryption.
+    ///
+    /// When enabled, missing key material is a configuration failure, not
+    /// permission to accept legacy plaintext. The default is false solely
+    /// for backward compatibility with deployments that intentionally allow
+    /// unencrypted packets.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn with_encryption_required(mut self, required: bool) -> Self {
+        self.encryption_required = required;
+        self
+    }
+
+    /// Update the encrypted-only policy without changing key material.
+    ///
+    /// In particular, setting the key to None does not disable this policy.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn set_encryption_required(&mut self, required: bool) {
+        self.encryption_required = required;
     }
 
     /// Set the timeout for incomplete assemblies.
@@ -228,6 +254,14 @@ impl MeshReceiver {
     /// reassembly. Returns `None` if more fragments are needed, the fragment
     /// was corrupt, or it was a duplicate.
     pub fn receive_fragment(&mut self, source: [u8; 8], raw: &[u8]) -> Option<WisdomPacket> {
+        // Fail before fragment parsing/reassembly if an encrypted-only receiver
+        // has lost or has not yet received its key material.
+        #[cfg(feature = "mesh-encryption")]
+        if self.encryption_required && self.encryption_key.is_none() {
+            self.stats.packets_decrypt_failed += 1;
+            return None;
+        }
+
         // Decrypt fragment-level AEAD if enabled
         #[cfg(feature = "mesh-encryption")]
         let decrypted_buf: zeroize::Zeroizing<Vec<u8>>;
@@ -448,6 +482,12 @@ impl MeshReceiver {
     /// format (1-byte version prefix), then standard ChaCha20-Poly1305,
     /// then XChaCha20-Poly1305. If all fail, the packet is rejected.
     fn decode_envelope(&mut self, data: &[u8]) -> Option<WisdomPacket> {
+        #[cfg(feature = "mesh-encryption")]
+        if self.encryption_required && self.encryption_key.is_none() {
+            self.stats.packets_decrypt_failed += 1;
+            return None;
+        }
+
         #[cfg(feature = "mesh-encryption")]
         if let Some(ref key) = self.encryption_key {
             // Try versioned format: [version (1) | nonce (12) | ciphertext+tag]
@@ -753,6 +793,65 @@ mod tests {
 
         assert_eq!(receiver.stats().packets_complete, 2);
         assert_eq!(receiver.peer_count(), 2);
+    }
+
+    // -- Encrypted-only policy --
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn encrypted_only_policy_rejects_plaintext_whole_packet_without_key() {
+        let packet = test_packet(39, PEER_A, 0x39);
+        let mut receiver = MeshReceiver::new().with_encryption_required(true);
+
+        assert!(receiver.receive_whole(&packet.to_bytes()).is_none());
+        assert_eq!(receiver.stats().whole_packets, 0);
+        assert_eq!(receiver.stats().packets_complete, 0);
+        assert_eq!(receiver.stats().packets_decrypt_failed, 1);
+        assert_eq!(receiver.peer_count(), 0);
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn encrypted_only_policy_rejects_plaintext_fragments_before_assembly() {
+        let packet = test_packet(40, PEER_A, 0x40);
+        let wire = to_wire(&packet.fragment());
+        let mut receiver = MeshReceiver::new().with_encryption_required(true);
+
+        for raw in &wire {
+            assert!(receiver.receive_fragment(PEER_A, raw).is_none());
+        }
+
+        assert_eq!(receiver.pending_count(), 0);
+        assert_eq!(receiver.stats().fragments_received, 0);
+        assert_eq!(receiver.stats().packets_complete, 0);
+        assert_eq!(receiver.stats().packets_decrypt_failed, wire.len() as u64);
+        assert_eq!(receiver.peer_count(), 0);
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn encrypted_only_policy_accepts_authenticated_ciphertext() {
+        let key = [0x5A; 32];
+        let packet = test_packet(42, PEER_A, 0x42);
+        let compressed = crate::swarm::mesh::compress_packet(&packet.to_bytes());
+        let ciphertext = crate::swarm::mesh::encrypt_packet_typed(
+            &compressed,
+            &key,
+            &packet.source_id,
+            packet.payload_type as u8,
+            7,
+            packet.sequence,
+        );
+        let mut receiver = MeshReceiver::new()
+            .with_encryption_key(key)
+            .with_encryption_required(true);
+
+        let recovered = receiver
+            .receive_whole(&ciphertext)
+            .expect("valid authenticated ciphertext remains accepted");
+        assert_eq!(recovered.sequence, packet.sequence);
+        assert_eq!(recovered.wisdom.0, packet.wisdom.0);
+        assert_eq!(receiver.stats().packets_complete, 1);
     }
 
     // -- Whole packet reception --
