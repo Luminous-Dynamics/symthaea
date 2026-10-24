@@ -66,6 +66,23 @@ The policy receives only permitted design metadata, its past observations and it
 7. A selected measurement can be invalid, censored, missing or numerically unevaluable. Preserve each category as a separate outcome. Do not silently discard it and reduce the denominator.
 8. Once confirmatory evaluation opens, do not change a gate or threshold in response to results. Any repair becomes a new version and uses a fresh evaluation manifest.
 
+## 5. Designed identifiability controls: crossed anchors and randomized order
+
+A purely observational residual trace can confound a covariate-dependent law error with a covariate-dependent noise scale. It can also confound a time-varying noise process with a covariate shift if the adaptive policy chooses similar covariates at similar times. This is a design problem, not just a better-scoring problem.
+
+For the fixed-design diagnostic arm, use a preregistered **interleaved anchor schedule**:
+
+- Every block contains every declared candidate covariate once and a fixed number of repeated observations at an anchor covariate.
+- Randomize the within-block order with a recorded seed; do not schedule all anchors at the start or end.
+- Keep the same observation budget across policies and account for anchor observations as paid measurements.
+- Report anchor residuals by block and randomized within-block position, alongside residuals by covariate.
+- Include a matched clean-law control and a noise-drift control. A changed anchor distribution supports the presence of observation-process drift, but does not by itself identify whether the scientific law is wrong.
+- For a policy-adaptive arm, use only predeclared, budgeted audit anchors at a fixed cadence or randomized cadence. Do not let an evaluator silently inject hidden controls into one method only.
+
+The current standalone Rust harness includes a bounded deterministic schedule helper that emits the same candidate covariates once per block and the anchor the declared number of times. It is an infrastructure fixture, not an adaptive policy, causal estimator, or guarantee of identifiability.
+
+Treat attribution as a *partially identified diagnosis*: report the set of causes consistent with observed evidence whenever structural shift and measurement shift cannot be separated under the frozen design.
+
 ## 5. Comparators
 
 Use a layered comparison rather than pretending every published algorithm solves the same task.
@@ -87,7 +104,7 @@ Use a layered comparison rather than pretending every published algorithm solves
 
 Do not compare a policy's best-of-many run with a baseline's single run. Publish all attempted runs and resource accounting.
 
-## 6. Endpoints
+## 7. Endpoints
 
 Report each endpoint overall and by structural family × noise regime × design mode, with full denominators and uncertainty intervals.
 
@@ -112,7 +129,7 @@ Report each endpoint overall and by structural family × noise regime × design 
 
 Do not hide a high false-alarm rate, increased abstention, or a weak regime behind a pooled average. Use paired intervals and account for clustering by world; seeds from one world are not independent scientific worlds.
 
-## 7. Proposed acceptance gates (not results)
+## 8. Proposed acceptance gates (not results)
 
 - Known-answer tests verify every noise generator, its moments or declared quantiles, dependency behavior, reproducibility and invalid-input handling.
 - The observation generator is independently testable from candidate search. No search/monitor API receives evaluator-only truth.
@@ -125,7 +142,7 @@ Do not hide a high false-alarm rate, increased abstention, or a weak regime behi
 - Report comparative superiority only if an agreed primary endpoint improves against the strongest compatible matched baseline without violating false-confidence and unresolved-rate guardrails.
 - Exact-head executable tests and CI are required for implementation qualification. Queued, skipped or stale-head checks are not passes.
 
-## 8. Scope boundary and research references
+## 9. Scope boundary and research references
 
 This protocol is not a claim that all observation shifts can be statistically distinguished from law misspecification. Some worlds are fundamentally non-identifiable from the allowed observations; the correct output there is an equivalence class or unresolved result.
 
