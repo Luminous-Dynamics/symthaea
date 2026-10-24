@@ -872,6 +872,65 @@ mod tests {
         }
     }
 
+    fn manifest() -> LockedTaskManifest {
+        let task = ManifestTask {
+            instance_id: "task-a".to_string(),
+            candidate_row_sha256: "1".repeat(64),
+            repo: "example/repo".to_string(),
+            base_commit: "2".repeat(40),
+            repo_head_sha: "3".repeat(40),
+            runtime_platform: "linux".to_string(),
+            docker_image: "example/image:pin".to_string(),
+            problem_statement_sha256: "4".repeat(64),
+            gold_patch_sha256: "5".repeat(64),
+            test_patch_sha256: "6".repeat(64),
+            validation_status_sha256: "7".repeat(64),
+            baseline_validation_log_sha256: "8".repeat(64),
+            gold_validation_log_sha256: "9".repeat(64),
+            runtime_evidence_sha256: "a".repeat(64),
+            container_image_id: format!("sha256:{}", "d".repeat(64)),
+            network_mode: "none".to_string(),
+            workspace_clean: true,
+            container_ids: vec!["container-1".to_string()],
+            fail_to_pass_count: 1,
+            pass_to_pass_count: 0,
+        };
+        let tasks = vec![task];
+        let task_records_sha256 = sha256_bytes(&serde_json::to_vec(&tasks).unwrap());
+        LockedTaskManifest {
+            format_version: 1,
+            protocol_id: PROTOCOL_ID.to_string(),
+            task_records_sha256,
+            candidate_jsonl_sha256: "b".repeat(64),
+            eligible_task_count: tasks.len(),
+            tasks,
+        }
+    }
+
+    #[test]
+    fn pinned_manifest_checks_file_and_canonical_record_digests() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("manifest.json");
+        let manifest = manifest();
+        let bytes = serde_json::to_vec(&manifest).unwrap();
+        fs::write(&path, &bytes).unwrap();
+        let pinned = read_pinned_manifest(&path, &sha256_bytes(&bytes)).unwrap();
+        assert_eq!(pinned.eligible_task_count, 1);
+        assert_eq!(pinned.tasks[0].instance_id, "task-a");
+
+        assert!(read_pinned_manifest(&path, &"0".repeat(64))
+            .unwrap_err()
+            .contains("manifest digest mismatch"));
+
+        let mut corrupted = manifest;
+        corrupted.task_records_sha256 = "f".repeat(64);
+        let corrupted_bytes = serde_json::to_vec(&corrupted).unwrap();
+        fs::write(&path, &corrupted_bytes).unwrap();
+        assert!(read_pinned_manifest(&path, &sha256_bytes(&corrupted_bytes))
+            .unwrap_err()
+            .contains("task_records_sha256 differs"));
+    }
+
     #[test]
     fn sha256_uses_standard_vector() {
         assert_eq!(
