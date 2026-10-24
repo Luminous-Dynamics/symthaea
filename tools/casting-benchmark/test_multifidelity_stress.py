@@ -125,6 +125,12 @@ class MultiFidelityStressTests(unittest.TestCase):
         second = run_policy("discrepancy_aware", seed=29, cost_budget=200, grid_size=13, severity=0.8)
         self.assertEqual(first, second)
 
+    def test_policy_templates_reject_incompatible_budget_or_grid(self) -> None:
+        with self.assertRaisesRegex(ValueError, "at least 200"):
+            run_suite(seed=1, cost_budget=199, grid_size=21)
+        with self.assertRaisesRegex(ValueError, "at least 75"):
+            run_suite(seed=1, cost_budget=200, grid_size=8)
+
     def test_invalid_grid_severity_and_policy_are_rejected(self) -> None:
         with self.assertRaises(ValueError):
             SyntheticCastingWorld(grid_size=4)
