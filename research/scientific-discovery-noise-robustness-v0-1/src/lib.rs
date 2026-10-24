@@ -313,12 +313,14 @@ impl NoiseProcess {
         }
 
         let residual = match &self.model {
-            NoiseModel::GaussianHomoscedastic { sigma } => self.rng.standard_normal() * sigma,
+            NoiseModel::GaussianHomoscedastic { sigma } => {
+                self.rng.standard_normal() * *sigma
+            }
             NoiseModel::GaussianHeteroscedastic {
                 sigma_floor,
                 sigma_per_abs_covariate,
             } => {
-                let scale = sigma_floor + sigma_per_abs_covariate * covariate.abs();
+                let scale = *sigma_floor + *sigma_per_abs_covariate * covariate.abs();
                 if !scale.is_finite() {
                     return Err(NoiseError::ScaleOverflow);
                 }
