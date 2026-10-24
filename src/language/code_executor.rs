@@ -70,10 +70,19 @@ pub struct ExecutionResult {
     pub test_failures: Vec<TestFailure>,
 }
 
+const UNSUPPORTED_LANGUAGE_ERROR_PREFIX: &str = "unsupported_execution_language:";
+
 impl ExecutionResult {
     /// Whether the code is fully successful (compiled + all tests passed)
     pub fn is_success(&self) -> bool {
         !self.simulated && self.compiled && self.tests_failed == 0
+    }
+
+    /// True when no execution backend is registered for the requested language.
+    pub fn is_unsupported_language(&self) -> bool {
+        self.runtime_error
+            .as_deref()
+            .is_some_and(|message| message.starts_with("unsupported_execution_language:"))
     }
 
     /// Parse test failures from the raw test output, populating `test_failures`.
@@ -100,7 +109,13 @@ impl ExecutionResult {
     }
 
     /// Convert to an FEP surprise signal in [0.0, 1.0].
+    ///
+    /// Unsupported languages are a capability/configuration gap, not a failed
+    /// code prediction, so they are explicitly excluded from surprise updates.
     pub fn to_surprise(&self) -> f32 {
+        if self.is_unsupported_language() {
+            return 0.0;
+        }
         if !self.compiled {
             let error_factor = (self.compile_errors.len() as f32 / 10.0).min(1.0);
             0.8 + 0.2 * error_factor
@@ -113,6 +128,25 @@ impl ExecutionResult {
             }
         } else {
             0.0
+        }
+    }
+
+    /// Create a fail-closed result when a language has no execution backend.
+    fn unsupported_language(language: &str) -> Self {
+        let message = format!(
+            "No execution backend is registered for language '{language}'. Supported execution languages: rust, python, nix."
+        );
+        Self {
+            compiled: false,
+            compile_errors: Vec::new(),
+            tests_passed: 0,
+            tests_failed: 0,
+            test_output: message.clone(),
+            runtime_error: Some(format!("{UNSUPPORTED_LANGUAGE_ERROR_PREFIX} {message}")),
+            elapsed: Duration::ZERO,
+            simulated: false,
+            binary_path: None,
+            test_failures: Vec::new(),
         }
     }
 
@@ -180,6 +214,39 @@ impl CodeExecutor {
 
     pub fn work_dir(&self) -> &PathBuf {
         &self.work_dir
+    }
+
+    /// Whether this executor has a real command path for a language.
+    ///
+    /// Parsing/generation support is not execution support. Keep this list
+    /// fail-closed until a language has a real executor and independent tests.
+    pub fn supports_language(language: &str) -> bool {
+        matches!(
+            language.trim().to_ascii_lowercase().as_str(),
+            "rust" | "python" | "nix"
+        )
+    }
+
+    /// Execute code using a registered language backend.
+    ///
+    /// Unknown languages return an explicit unsupported result; they are never
+    /// sent to the Rust compiler as a fallback. A result marked unsupported is
+    /// neither a compile failure nor a successful verification and contributes
+    /// no prediction-error signal.
+    pub fn execute_language(
+        &mut self,
+        language: &str,
+        source: &str,
+        test_source: Option<&str>,
+    ) -> ExecutionResult {
+        let normalized = language.trim().to_ascii_lowercase();
+        match normalized.as_str() {
+            "rust" if source.contains("#[test]") => self.execute_rust_with_inline_tests(source),
+            "rust" => self.execute_rust(source, test_source),
+            "python" => self.execute_python(source),
+            "nix" => self.evaluate_nix(source),
+            _ => ExecutionResult::unsupported_language(&normalized),
+        }
     }
 
     pub fn apply_patch(
