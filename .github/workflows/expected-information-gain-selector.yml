@@ -100,6 +100,10 @@ jobs:
         run: cargo test -p symthaea-physics-bridge truth_absent_candidate_generation_exhaustion_returns_none_without_panicking --lib
       - name: Test truth-absent generator exhaustion is fail-closed
         run: cargo test -p symthaea-physics-bridge truth_absent_candidate_generation_exhaustion_returns_none_without_panicking --lib
+      - name: Test operator-held-out truth is absent from the initial typed grammar
+        run: cargo test -p symthaea-physics-bridge unary_heldout_truth_is_dimensionally_valid_but_absent_from_typed_initial_candidates --lib
+      - name: Benchmark operator-held-out recovery separately
+        run: cargo test -p symthaea-physics-bridge operator_heldout_recovery_is_reported_separately_from_in_grammar_recovery --lib -- --nocapture
       - name: Benchmark truth-absent recovery without oracle candidates
         run: cargo test -p symthaea-physics-bridge truth_absent_recovery_is_reported_separately_from_oracle_present_discrimination --lib -- --nocapture
       - name: Run robust noise-envelope pilot
