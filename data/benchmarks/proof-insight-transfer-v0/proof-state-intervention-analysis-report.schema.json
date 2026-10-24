@@ -93,7 +93,10 @@
         "expected_not_applicable_rows",
         "uncertain_judgments",
         "checked_success_rows",
-        "checked_failure_rows"
+        "checked_failure_rows",
+        "semantic_gate_pass_rows",
+        "semantic_gate_failed_rows",
+        "semantic_gate_unknown_rows"
       ],
       "properties": {
         "cases_in_split": {
@@ -129,6 +132,18 @@
           "minimum": 0
         },
         "checked_failure_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "semantic_gate_pass_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "semantic_gate_failed_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "semantic_gate_unknown_rows": {
           "type": "integer",
           "minimum": 0
         }
