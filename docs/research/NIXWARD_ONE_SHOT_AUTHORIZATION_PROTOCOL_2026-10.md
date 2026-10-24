@@ -1,13 +1,13 @@
 # Nixward one-shot execution authorization: contract and evaluation plan
 
 Date: 2026-10-24  
-Status: **primitive only; not yet wired into process dispatch**
+Status: **partially integrated for typed built-in commands; legacy bypass paths remain**
 
 ## Why this boundary matters
 
 A scalar confidence, Phi value, model verdict, caller boolean, or log entry is not an authorization artifact. A privileged dispatcher needs evidence for the *specific action it is about to execute*. The minimum binding is the exact executable plus ordered argument vector, principal, action scope, authority kind, unique decision ID, freshness, revocation state, and one-shot consumption.
 
-This implementation adds a process-local typed ledger in `crates/core/nixward/src/action/authorization.rs`. It intentionally does not change existing executor behavior yet. The next integration stage must route every governed process invocation through permit consumption, then remove or narrow unguarded confirmed-execution APIs only after every call site—including rollback, recovery, daemon, CLI, and legacy executor paths—has explicit semantics.
+This implementation adds a process-local typed ledger in `crates/core/nixward/src/action/authorization.rs` and a permit-checked `NixOSExecutor::execute_with_permit` path for typed built-in commands. The executor now supports an injectable process runner, enabling tests to assert that denied permits never invoke the process boundary and valid permits invoke it exactly once. This is still partial integration: ordinary `execute`, public `execute_confirmed`, generation capture, the daemon, rollback and the legacy executor remain separate paths. The next stage must route every governed process invocation through an enforced common boundary and remove or narrow unguarded confirmed-execution APIs only after every caller has explicit authority semantics.
 
 ## Implemented primitive
 
@@ -57,8 +57,8 @@ Before treating this as production enforcement:
 - Consume authorization immediately before dispatch, after command construction and after all plan/approval updates, closing the approval-to-dispatch TOCTOU window.
 - Check the authority required by the action at the dispatcher, not merely the authority string supplied by the caller.
 - Treat rollback and recovery as explicit bounded policies with their own permitted commands and reason codes.
-- Inject a mock process runner and assert **zero calls** for denied, mismatched, stale, revoked, replayed, unauthenticated, and policy-error cases.
-- Assert exactly one call for valid positive controls. A deny-everything implementation must fail the benchmark.
+- Use the injectable process runner to assert **zero calls** for denied, mismatched, stale, revoked, replayed, unauthenticated, custom-command, and policy-error cases.
+- Assert exactly one call for valid positive controls, including a valid typed built-in command. A deny-everything implementation must fail the benchmark.
 - Exercise concurrent consumption and cancellation; if a permit is consumed before a process spawn fails, it remains consumed and needs a new decision.
 - Record exact source SHA, toolchain, test command, test output, and independent review. Queued/skipped checks are not passes.
 
