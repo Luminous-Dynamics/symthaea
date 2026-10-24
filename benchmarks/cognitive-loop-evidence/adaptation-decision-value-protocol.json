@@ -274,7 +274,8 @@
       "candidate": "staged-verify-rollback",
       "reference": "detector-triggered",
       "metric": "post_shift_mean_task_loss",
-      "direction": "lower-is-better"
+      "direction": "lower-is-better",
+      "output_effect_field": "staged_post_shift_task_loss_improvement_vs_detector_triggered"
     },
     "alpha": 0.05,
     "selection_rule": "Freeze the primary policy, metric, direction, and interpretation rule before examining held-out outcomes.",
@@ -313,8 +314,33 @@
       "recovery_delay_cycles",
       "total_adaptation_cost_units",
       "detector_post_shift_task_loss_improvement_vs_no_adapt",
-      "detector_post_shift_task_loss_regret_vs_oracle_timed"
+      "detector_benefit_gated_post_shift_task_loss_improvement_vs_no_adapt",
+      "staged_post_shift_task_loss_improvement_vs_no_adapt",
+      "staged_post_shift_task_loss_improvement_vs_detector_triggered",
+      "staged_post_shift_task_loss_regret_vs_oracle_timed",
+      "detector_adaptation_cost_delta_vs_no_adapt",
+      "detector_benefit_gated_adaptation_cost_delta_vs_no_adapt",
+      "staged_adaptation_cost_delta_vs_no_adapt",
+      "staged_adaptation_cost_delta_vs_detector_triggered",
+      "detector_dominated_by_no_adapt",
+      "detector_benefit_gated_dominated_by_no_adapt",
+      "staged_dominated_by_no_adapt",
+      "staged_dominated_by_detector_triggered"
     ],
-    "claim_guard": "These v2 phase-specific metrics are computed from supplied per-cycle arm summaries. They do not establish causal replay execution or validate outcomes independently."
+    "claim_guard": "These v2 phase-specific metrics are computed from supplied per-cycle arm summaries. They do not establish causal replay execution or validate outcomes independently.",
+    "required_arms": [
+      "no-adapt",
+      "detector-triggered",
+      "detector-benefit-gated",
+      "staged-verify-rollback",
+      "oracle-timed"
+    ],
+    "primary_effect_field": "staged_post_shift_task_loss_improvement_vs_detector_triggered",
+    "required_input_validation": [
+      "All five arms pin a version, repository revision, configuration digest, and the shared exogenous stream digest.",
+      "Every arm contains the same contiguous cycle panel.",
+      "No-adapt has zero adaptation cost at every cycle.",
+      "All evaluation windows and recovery criteria are validated before scoring."
+    ]
   }
 }
