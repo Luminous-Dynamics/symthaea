@@ -1440,7 +1440,8 @@ pub(crate) fn snapshot_from_cycle(
 
     CognitiveSnapshot {
         consciousness_level: cs.unified_psi,
-        prediction_error: cs.prediction_error,
+        prediction_error: cs.prediction_error_sample().unwrap_or(0.0),
+        prediction_error_valid: cs.prediction_error_sample().is_some(),
         living_mind_vitality: cs.dissipative_health,
         living_mind_coherence: cs.coherence as f64,
         dopamine: bath.dopamine.effective(),
