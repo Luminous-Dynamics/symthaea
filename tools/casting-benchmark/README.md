@@ -172,3 +172,42 @@ python3 tools/casting-benchmark/multifidelity_stress.py \
 If no `--cost-budget` is supplied, the runner chooses one common absolute cap large enough for the most expensive frozen policy template across every supplied cost schedule (800 units for the three examples above). Each run records actual cost, unused budget and per-fidelity calls. Fixed-count baselines may leave budget unused when ratios change; this is measured, not silently treated as equal spend.
 
 The paired bootstrap intervals use the same seed pairing within each schedule and severity. They are unadjusted exploratory intervals; the default ten seeds are too few for strong superiority claims. The cost ratios are controlled parameters rather than calibrated foundry economics. No cost-schedule sweep is physical validation.
+
+
+## Adversarial multi-fidelity scenario family
+
+The initial CASTING-MF-STRESS-001 fixture uses one analytical discrepancy landscape and compares policy quality on it. A policy can overfit that landscape. The separate CASTING-MF-SCENARIOS-001 diagnostic suite adds six controlled failure mechanisms across dimensions 2, 5 and 10:
+
+- `smooth_stationary`: smooth additive bias as the correlated control.
+- `local_bias_island`: large discrepancy concentrated in one input region.
+- `warped_coordinates`: the cheap evaluator effectively sees a displaced design.
+- `constraint_boundary`: margin error grows near the high-fidelity feasibility boundary.
+- `discontinuous_step`: low and medium fidelity use different step thresholds.
+- `heteroscedastic_noise`: deterministic, seed-indexed perturbations grow near boundaries and domain edges.
+
+The scenario registry and formulas are frozen in `docs/research/CASTING_MULTIFIDELITY_SCENARIO_SUITE_V1.json`. The runner compares low/medium outputs with analytic high-fidelity truth and reports per-objective pairwise rank-inversion fractions, feasibility flips, false-feasible rates and mean absolute errors. This diagnoses *what kind of mismatch exists*; it does not run any optimizer policy or establish SOTA.
+
+Default sweep (6 scenarios × 3 dimensions × 3 severities × 3 paired seeds = 162 runs; 108 stratified summaries):
+
+```sh
+python3 tools/casting-benchmark/multifidelity_scenario_suite.py \
+  --scenarios smooth_stationary,local_bias_island,warped_coordinates,constraint_boundary,discontinuous_step,heteroscedastic_noise \
+  --dimensions 2,5,10 \
+  --severities 0.5,1,2 \
+  --seeds 17,23,29 \
+  --design-count 128
+```
+
+Run the targeted unit tests:
+
+```sh
+python3 -m unittest discover -s tools/casting-benchmark -p 'test_multifidelity_scenario_suite.py' -v
+```
+
+The severity-zero check acts as a negative control: all fidelity levels must equal analytic truth exactly. All results are labelled synthetic-only. In the next phase, the optimizer policies must be wired to the *same* scenario pools and evaluated under matched oracle budgets; do not infer algorithm superiority from fidelity-diagnostic scores alone.
+
+Research motivation: the 2026 MFO survey highlights that many current benchmark relationships use overly simple transformations, restrict dimensions and provide limited variation in fidelity correlations; a 2026 foundry digital-twin review separately notes missing shared datasets, limited cross-alloy generalization, and underdeveloped uncertainty quantification and validation. These references motivate wider stress coverage but do not validate the synthetic equations as foundry physics.
+
+- Li & Li, *Multi-Fidelity Methods for Optimization: A Survey* (ACM Computing Surveys, 2026): https://doi.org/10.1145/3801959
+- Mainini et al., *Analytical benchmark problems and methodological framework for the assessment and comparison of multifidelity optimization methods* (published 2025; volume 2026): https://doi.org/10.1007/s11831-025-10392-8
+- Essam et al., *A review of computational modeling, artificial intelligence, and digital twins in metal casting and foundry operations* (2026): https://link.springer.com/article/10.1007/s43939-026-00685-5
