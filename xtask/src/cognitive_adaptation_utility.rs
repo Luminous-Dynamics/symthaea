@@ -67,6 +67,9 @@ pub struct ArmObservation {
     pub task_loss: f64,
     /// Observed adaptation resource cost, in the manifest-declared cost unit.
     pub adaptation_cost_units: f64,
+    /// Optional task-outcome availability tick; required when binding to an executed replay receipt.
+    #[serde(default)]
+    pub task_loss_available_at_tick: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -243,6 +246,9 @@ fn bind_replay_receipt(
                     arm.name, observation.cycle_index);
                 ensure!(decision.adaptation_cost_units == Some(observation.adaptation_cost_units),
                     "replay receipt adaptation_cost_units differs from scored cost for arm {} at tick {}",
+                    arm.name, observation.cycle_index);
+                ensure!(decision.task_loss_available_at_tick == observation.task_loss_available_at_tick,
+                    "replay receipt task_loss_available_at_tick differs from scored observation for arm {} at tick {}",
                     arm.name, observation.cycle_index);
             }
         }
@@ -650,6 +656,7 @@ mod tests {
                     cycle_index: index as u64,
                     task_loss,
                     adaptation_cost_units,
+                    task_loss_available_at_tick: Some(index as u64),
                 })
                 .collect(),
         }
@@ -883,6 +890,7 @@ mod tests {
             for (decision, observation) in receipt_arm.decisions.iter_mut().zip(&scored.observations) {
                 decision.task_loss = Some(observation.task_loss);
                 decision.adaptation_cost_units = Some(observation.adaptation_cost_units);
+                decision.task_loss_available_at_tick = observation.task_loss_available_at_tick;
             }
         }
 
