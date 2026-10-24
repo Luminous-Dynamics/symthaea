@@ -152,14 +152,17 @@ Example (synthetic planning assumptions only; 20 cluster sizes shown):
 cargo run --locked --bin plan_pitb_power -- \
   0.35 0.15 0.10 0.05 0.05 0.5 \
   2,3,1,4,2,2,3,1,4,2,3,1,2,4,1,3,2,2,4,1 \
-  10000 12345 power-plan.json
+  10000 1000 12345 power-plan.json
 ```
 
 The output is governed by `power-planning-report.schema.json`. The parameters after ICC are the standard deviation of a family-level treatment-effect deviation on the probability scale and a pair-association fraction: 0 means independent potential outcomes conditional on family success probabilities, while 1 reaches the Frechet upper bound on joint success. This association fraction is not a Pearson correlation. The treatment effect can vary by family and can be negative; success probabilities are clipped to [0,1], so the report exposes the generated marginal gain rather than assuming it equals the input.
 
-Repeat across a predeclared sensitivity grid over baseline success, expected gain, ICC, family-effect heterogeneity, and pair association; use the real eligible connected-component sizes once the relationship audit is complete. The model is a planning sensitivity analysis, not an estimate of PITB's effect distribution or pair correlation. Do not use synthetic assumptions to claim that the benchmark is powered, and do not tune assumptions after observing held-out outcomes.
+Repeat across a predeclared sensitivity grid over baseline success, expected gain, ICC, family-effect heterogeneity, and pair association; use the real eligible connected-component sizes once the relationship audit is complete. The component-percentile interval uses the supplied number of bootstrap replicates (minimum 1,000) and resamples whole components; it follows the paired-delta interval procedure used by PITB's success-cost frontier analyzer. The model is a planning sensitivity analysis, not an estimate of PITB's effect distribution or pair correlation. Do not use synthetic assumptions to claim that the benchmark is powered, and do not tune assumptions after observing held-out outcomes.
 
 
 ### Exploratory power sensitivity
 
 See [the 24 October sensitivity illustration](../../../docs/research/pitb-power-planning-sensitivity-illustration-2026-10-24.md). It uses a separate exploratory Monte Carlo implementation—not the Rust binary or CI—to show that the 20-component floor is not a power guarantee. Under one synthetic setup, the configured +15-point gain reached roughly 80% gate power only around 50 independent components. This is conditional planning evidence only; it is not a target sample size for the real benchmark. Recompute after the audited eligible-component distribution is frozen, using a preregistered sensitivity grid and independent statistical review.
+
+
+The planner's decision gate now uses a paired, component-percentile-bootstrap interval rather than the earlier t-interval approximation. Its bootstrap replicate count is an explicit CLI parameter, is recorded in the report, and is checked by the report schema. This aligns the interval method with the benchmark's paired frontier analysis; the planning model remains approximate because the generative assumptions are unestimated and the finite number of bootstrap replicates adds Monte Carlo variability.
