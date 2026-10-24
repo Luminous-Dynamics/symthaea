@@ -250,14 +250,28 @@ def score_trace(
     analysis_lock = _strict_json_loads(analysis_lock_bytes.decode("utf-8", errors="strict"))
     if not isinstance(protocol, dict) or protocol.get("protocol_id") != receipt["protocol_id"]:
         raise TraceScoreError("protocol lock does not identify the receipt protocol")
-    if protocol.get("raw_trace_contract", {}).get("schema_version") != TRACE_SCHEMA_VERSION:
+    raw_trace_contract = protocol.get("raw_trace_contract")
+    if not isinstance(raw_trace_contract, dict):
+        raise TraceScoreError("protocol lock is missing its raw-trace contract")
+    if raw_trace_contract.get("schema_version") != TRACE_SCHEMA_VERSION:
         raise TraceScoreError("protocol lock does not declare the frozen trace schema version")
-    if protocol.get("raw_trace_contract", {}).get("analysis_lock_file") != "docs/research/CASTING_BENCHMARK_ANALYSIS_LOCK_V1.json":
+    if raw_trace_contract.get("analysis_lock_file") != "docs/research/CASTING_BENCHMARK_ANALYSIS_LOCK_V1.json":
         raise TraceScoreError("protocol lock does not point to the frozen analysis lock")
     if not isinstance(analysis_lock, dict) or analysis_lock.get("protocol_id") != receipt["protocol_id"]:
         raise TraceScoreError("analysis lock does not identify the receipt protocol")
     if analysis_lock.get("analysis_lock_version") != "1.0.0":
         raise TraceScoreError("unsupported analysis-lock version")
+    lock_scorer = analysis_lock.get("scorer")
+    if not isinstance(lock_scorer, dict):
+        raise TraceScoreError("analysis lock is missing its scorer contract")
+    if lock_scorer.get("path") != "tools/casting-benchmark/score_trace.py":
+        raise TraceScoreError("scorer path differs from immutable analysis lock")
+    if lock_scorer.get("trace_schema_path") != raw_trace_contract.get("trace_schema_file"):
+        raise TraceScoreError("trace schema path differs between protocol and analysis lock")
+    if lock_scorer.get("supported_evaluation_modes") != ["single_fidelity"]:
+        raise TraceScoreError("unsupported evaluation modes in analysis lock")
+    if lock_scorer.get("supported_objective_count") != 2 or lock_scorer.get("supported_objective_direction") != "minimize_all":
+        raise TraceScoreError("unsupported objective contract in analysis lock")
 
     if receipt["evaluation_mode"] != "single_fidelity":
         raise TraceScoreError("v1 trace scorer only supports single_fidelity receipts")
@@ -302,7 +316,9 @@ def score_trace(
         trace_schema = _strict_json_loads(trace_schema_bytes.decode("utf-8", errors="strict"))
     except UnicodeDecodeError as exc:
         raise TraceScoreError(f"trace schema is not valid UTF-8: {exc}") from exc
-    if not isinstance(trace_schema, dict) or trace_schema.get("properties", {}).get("schema_version", {}).get("const") != TRACE_SCHEMA_VERSION:
+    schema_properties = trace_schema.get("properties") if isinstance(trace_schema, dict) else None
+    schema_version_contract = schema_properties.get("schema_version") if isinstance(schema_properties, dict) else None
+    if not isinstance(schema_version_contract, dict) or schema_version_contract.get("const") != TRACE_SCHEMA_VERSION:
         raise TraceScoreError("trace schema is missing the frozen v1.0.0 version contract")
 
     expected_normalization_area = (
@@ -414,8 +430,15 @@ def score_trace(
         "analysis_lock_sha256": sha256_hex(analysis_lock_bytes),
         "algorithm_id": receipt["algorithm"]["id"],
         "algorithm_version": receipt["algorithm"]["version"],
+        "algorithm_configuration_sha256": receipt["algorithm"]["configuration_sha256"],
         "suite_id": suite["id"],
+        "suite_version": suite["version"],
         "suite_instance_id": suite["instance_id"],
+        "objective_evaluator_sha256": suite["objective_evaluator_sha256"],
+        "source_revision": receipt["source_revision"],
+        "environment_lock_sha256": receipt["environment_lock_sha256"],
+        "analysis_lock_sha256": sha256_hex(analysis_lock_bytes),
+        "planned_budget": receipt["budget"]["objective_evaluations"],
         "seed": receipt["seed"],
         "metrics_recomputed": recomputed,
         "reported_metrics_match": receipt["status"] == "success",
