@@ -288,3 +288,19 @@ cargo test --locked -p xtask cognitive_drift_baselines
 Invalid samples must be encoded as `evidence_valid: false, value: null`; they are skipped and cannot change detector state or re-arm an alarm latch. Valid samples must contain finite values. The fixed-threshold detector emits one alarm per above-threshold excursion, re-arming only after a valid below-threshold sample. The EWMA control chart estimates its center and sample standard deviation from calibration values, uses a declared standard-deviation floor, and applies a two-sided threshold. Threshold/configuration selection must occur outside the scored evaluation stream; the input digest captures the exact calibration data, evaluation sequence, ground-truth episodes, and detector config.
 
 The CI fixture is synthetic and only tests execution/scoring integrity. These are minimal reference controls, not a full implementation of the 14-family KDD 2026 protocol. They do not include the public datasets, held-out-dataset tuning, classifier-error adapters, feature-space baselines, or actual Symthaea cognitive-loop replay. A benchmark result requires pinned detector revisions/configurations, actual held-out runs, raw per-cycle traces, and uncertainty/cost reporting.
+
+
+## Third executable reference control: Page-Hinkley
+
+The scalar baseline runner now also supports a **one-sided, upward-shift Page-Hinkley detector** for valid prediction-error streams. It initializes its sequential mean from the disjoint calibration observations, declares the tolerated mean movement `page_hinkley_delta`, and declares the cumulative-deviation threshold `page_hinkley_threshold`. An alarm is latched until a later valid PE returns at or below the calibration mean plus delta; invalid/missing observations neither change the statistic nor rearm the alarm.
+
+The synthetic CLI fixture `benchmarks/cognitive-loop-evidence/synthetic-page-hinkley-run.json` exercises two separated upward shifts and asserts the alarm cycles. The fixture is labelled not measured; its exact outcomes test the implementation contract only.
+
+```bash
+cargo run --locked -p xtask -- run-cognitive-drift-baseline \
+  --input benchmarks/cognitive-loop-evidence/synthetic-page-hinkley-run.json \
+  --out reports/page-hinkley-smoke.json
+cargo test --locked -p xtask cognitive_drift_baselines
+```
+
+This is deliberately described as a reference variant, not as a bit-for-bit reproduction of every Page-Hinkley library implementation. It is upward-shift-only for the PE use case, and the latch/rearm rule is part of the detector contract. Report its parameters and false alarms, delay, and task-level impact. The published KDD 2026 comparison still requires its independently pinned detector implementations, datasets, fold/tuning protocol, and shared classifier-error stream; this PE-only variant cannot substitute for that track.
