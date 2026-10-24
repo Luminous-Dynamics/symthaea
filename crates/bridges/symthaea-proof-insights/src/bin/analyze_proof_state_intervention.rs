@@ -567,15 +567,30 @@ fn analyze(
     );
     counts.insert(
         "semantic_gate_pass_rows".into(),
-        json!(selected.iter().filter(|row| row.semantic_gate_status.as_deref() == Some("passed")).count()),
+        json!(
+            selected
+                .iter()
+                .filter(|row| row.semantic_gate_status.as_deref() == Some("passed"))
+                .count()
+        ),
     );
     counts.insert(
         "semantic_gate_failed_rows".into(),
-        json!(selected.iter().filter(|row| row.semantic_gate_status.as_deref() == Some("failed")).count()),
+        json!(
+            selected
+                .iter()
+                .filter(|row| row.semantic_gate_status.as_deref() == Some("failed"))
+                .count()
+        ),
     );
     counts.insert(
         "semantic_gate_unknown_rows".into(),
-        json!(selected.iter().filter(|row| row.semantic_gate_status.as_deref() == Some("unknown")).count()),
+        json!(
+            selected
+                .iter()
+                .filter(|row| row.semantic_gate_status.as_deref() == Some("unknown"))
+                .count()
+        ),
     );
 
     let mut resource_usage = Map::new();
@@ -1904,7 +1919,11 @@ mod tests {
             Value::String("mismatch".into());
         let error = validate_semantic_gate(&gate, "test-execution", &target_digest)
             .expect_err("reviewer disagreement must not become a passing correspondence label");
-        assert!(error.to_string().contains("statement-correspondence status contradicts individual reviewer decisions"));
+        assert!(
+            error
+                .to_string()
+                .contains("statement-correspondence status contradicts individual reviewer decisions")
+        );
     }
 
     #[test]
