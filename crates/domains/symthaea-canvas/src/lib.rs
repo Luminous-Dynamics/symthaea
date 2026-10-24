@@ -35,7 +35,9 @@ pub use color::{Color, Palette};
 pub use geometry::build_scene;
 pub use scene_features::{SceneFeatures, extract_scene_features};
 pub use scene_graph::SceneNode;
-pub use svg_renderer::{SvgRenderOptions, render_svg, render_svg_with_options};
+pub use svg_renderer::{
+    SvgRenderOptions, render_svg, render_svg_for_remote_projection, render_svg_with_options,
+};
 pub use validation::{SnapshotLimits, SnapshotSanitization};
 
 /// Lightweight snapshot of cognitive state, decoupled from CycleMetadata.
