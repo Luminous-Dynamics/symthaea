@@ -353,7 +353,8 @@ impl CognitiveLoopService {
             {
                 (PredictionEvidenceStatus::Valid, Some(prediction_error))
             }
-            symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::Genuine => {
+            symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::Genuine
+            | symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::NonFinitePrediction => {
                 (PredictionEvidenceStatus::NonFiniteInput, None)
             }
             symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::NoPrediction => {
@@ -362,11 +363,14 @@ impl CognitiveLoopService {
             symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::ZeroPrediction => {
                 (PredictionEvidenceStatus::ZeroNormPrediction, None)
             }
+            symthaea_core::hdc::predictive_encoder::PredictionDegeneracy::StalePrediction => {
+                (PredictionEvidenceStatus::StaleOrOutOfOrder, None)
+            }
         };
         let prediction_evidence = PredictionErrorEvidence::from_comparison(
             evidence_status,
             evidence_value,
-            None,
+            self.encoder.last_compared_prediction_cycle(),
             observation_cycle,
         );
         let prediction_error_valid =
