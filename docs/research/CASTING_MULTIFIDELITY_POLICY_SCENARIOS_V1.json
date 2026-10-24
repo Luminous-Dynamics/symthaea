@@ -20,7 +20,9 @@
       1
     ],
     "pairing_rule": "Within each scenario, dimension, severity and seed, every policy receives the same candidate-ID set and high-fidelity truth. Across seed values, the candidate pool changes deterministically.",
-    "ground_truth": "High-fidelity analytic truth from the scenario registry; audit queries are performed after each policy returns."
+    "ground_truth": "High-fidelity analytic truth from the scenario registry; audit queries are performed after each policy returns.",
+    "minimum_design_count": 75,
+    "reason_for_minimum": "Largest frozen low-fidelity sampling count among current internal policies."
   },
   "objective_and_scoring": {
     "objective_count": 2,
@@ -31,7 +33,8 @@
       1.2
     ],
     "primary_metric": "observed high-fidelity feasible archive hypervolume divided by the finite-pool high-fidelity feasible archive hypervolume",
-    "caveat": "Finite-pool normalized hypervolume is a controlled synthetic diagnostic, not a COCO-native score and not physical casting quality."
+    "caveat": "Finite-pool normalized hypervolume is a controlled synthetic diagnostic, not a COCO-native score and not physical casting quality.",
+    "independent_scoring_status": "Post-policy analytic truth audit is performed by this runner; this result JSON is not yet re-scored by the separate immutable-trace scorer. This remains a diagnostic comparison, not publication-grade evidence."
   },
   "fidelity_costs_default": {
     "low": 1,
@@ -136,7 +139,8 @@
     "failure_accounting": "Invalid and failed high-fidelity evaluations, when supported by future adapters, must still consume budget and be retained in the result record.",
     "inferential_claims": "The three-seed default is diagnostic only. Use at least 20 paired seeds (target 30), predeclared multiple-comparison handling and per-cell/task effects before inferential superiority claims.",
     "external_sota": "No SOTA claim until pinned BoTorch MF-HVKG/MOMF and suitable single-fidelity baselines have been executed under matched budgets and the external lock protocol is satisfied.",
-    "physical_validation": "No foundry claim until a frozen casting simulator and held-out physical validation data exist."
+    "physical_validation": "No foundry claim until a frozen casting simulator and held-out physical validation data exist.",
+    "independent_trace_score": "Before publication, export an immutable trace/receipt pair and verify metrics with a separate scorer and digest lock; the in-process audit here is not an independent scoring path."
   },
   "limitations": [
     "The suite runs repository-internal policies only; it does not run external BoTorch, COCO, NSGA-II or physical casting models.",
