@@ -1,0 +1,13 @@
+{
+  "schema_version": "nano-selection-input-v1",
+  "policy": "maximin",
+  "budget": 2,
+  "seed": 7,
+  "already_selected": [],
+  "candidates": [
+    {"id": "a", "features": [0.0]},
+    {"id": "b", "features": [0.1]},
+    {"id": "c", "features": [0.9]},
+    {"id": "d", "features": [1.0]}
+  ]
+}
