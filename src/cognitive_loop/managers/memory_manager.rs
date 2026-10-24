@@ -456,7 +456,10 @@ mod tests {
         // effect as a missing sample; both still receive ordinary pressure decay.
         restored.process(&valid);
         control.process(&invalid_retry);
-        assert_eq!(restored.consolidation_pressure(), control.consolidation_pressure());
+        assert_eq!(
+            restored.consolidation_pressure(),
+            control.consolidation_pressure()
+        );
 
         let next = CycleSnapshot {
             cycle_number: 78,
@@ -466,7 +469,10 @@ mod tests {
         };
         restored.process(&next);
         control.process(&next);
-        assert_eq!(restored.consolidation_pressure(), control.consolidation_pressure());
+        assert_eq!(
+            restored.consolidation_pressure(),
+            control.consolidation_pressure()
+        );
     }
 
     #[test]
@@ -483,9 +489,10 @@ mod tests {
         let legacy = checkpoint[..9].to_vec();
 
         let mut restored = MemoryManager::default();
-        restored
-            .prediction_error_cursor
-            .admit(999, Some(0.9));
+        assert_eq!(
+            restored.prediction_error_cursor.admit(999, Some(0.9)),
+            Some(0.9)
+        );
         restored.restore(&legacy).unwrap();
 
         assert_eq!(
