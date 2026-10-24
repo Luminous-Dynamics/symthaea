@@ -88,6 +88,7 @@ Primary replication anchor:
 - N=60, alpha=0.8 Wishart-planted instances.
 - Compare pure Ising, pure XY, and the paper's monotone XY-to-Ising schedule.
 - Freeze Chook generator/version, all generator parameters, planted ground state, coupling-matrix construction, solver parameters, initial conditions, number of instances, total trials and success rule from the paper and its supplement.
+- Candidate upstream audit pin for planning: `dilinanp/chook` current master commit `7f124bdfac44f1a6c26a21f00059bff12d52c22e`; the repository declares Apache-2.0. This is a source-provenance starting point, **not proof** that this exact revision matches the paper's run. Confirm the paper/supplement/package version and defaults first; then freeze the configuration bytes and hashes of generated instance/coupling/ground-truth records. Do not vendor Chook code merely to establish a source pin.
 - Use the article's time-to-solution definition to reproduce published metrics. The article uses a 99% aggregate success target and selects run duration to minimize TTS.
 - Start with a small implementation smoke cohort to validate arithmetic and output schemas; only call it a replication after the source-matched cohort and analysis rule have been run.
 
