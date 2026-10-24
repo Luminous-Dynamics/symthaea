@@ -124,7 +124,23 @@ Use a layered comparison rather than pretending every published algorithm solves
 
 Do not compare a policy's best-of-many run with a baseline's single run. Publish all attempted runs and resource accounting.
 
-## 8. Endpoints
+## 8. Candidate omission and harmful-informativeness stress
+
+The challenge must include worlds where the true generator is **outside the candidate models or their assumed observation-process family**. Otherwise a nominal expected-information-gain policy can look sound merely because the evaluator guarantees its candidate set is complete.
+
+Under model/inference misspecification, an action that sharply separates the supplied candidates can still be harmful: it can concentrate confidence among wrong candidates while increasing error on the deployment distribution. This failure mode is discussed in Callahan & Catanach, *On the Misinformation in a Statistical Experiment* (AISTATS 2026), which shows that classical informativeness rankings can amplify bias under misspecification and proposes robust criteria; and in Tang, Sloman & Kaski, *Representative, Informative, and De-Amplifying* (AISTATS 2026), which motivates evaluating representativeness and error de-amplification in addition to informativeness. [Callahan & Catanach](https://proceedings.mlr.press/v300/callahan26a.html) · [Tang et al.](https://proceedings.mlr.press/v300/tang26d.html).
+
+For this scientific-law specialization:
+- Include evaluator-only worlds whose true law/noise combination is omitted from the policy's candidate support. Do not reveal which candidate family is omitted.
+- Compare qualified existing nominal and robust selectors, fixed/random baselines, and the paper-faithful R-IDeA implementation from #7825 only when its exact objective and assumptions are independently reproduced. Do not invent a new "R-IDeA-like" score and report it as a reproduction.
+- Measure whether the selected action improves subsequent *deployment-distribution* predictive loss or instead sharpens belief while making that loss worse. Report confidence change and held-out loss change jointly, including harmful-confidence events.
+- Score evaluator-only action regret against the best feasible action under the hidden world, but do not expose that oracle ranking to the policy.
+- Distinguish performance on the fixed benchmark suite from expected performance over the broader population of scientific worlds. NIST AI 800-3 formalizes these as benchmark accuracy versus generalized accuracy and warns that uncertainty estimates depend on assumptions. [NIST AI 800-3](https://doi.org/10.6028/NIST.AI.800-3).
+- Estimate uncertainty at the world/family level (or with a declared hierarchical model); seeds within one generated world do not become independent worlds because they are numerous.
+
+This adds a misspecification axis to the fault-attribution suite. It does not claim that any robust acquisition method is already integrated or superior.
+
+## 9. Endpoints
 
 Report each endpoint overall and by structural family × noise regime × design mode, with full denominators and uncertainty intervals.
 
@@ -149,7 +165,7 @@ Report each endpoint overall and by structural family × noise regime × design 
 
 Do not hide a high false-alarm rate, increased abstention, or a weak regime behind a pooled average. Use paired intervals and account for clustering by world; seeds from one world are not independent scientific worlds.
 
-## 9. Proposed acceptance gates (not results)
+## 10. Proposed acceptance gates (not results)
 
 - Known-answer tests verify every noise generator, its moments or declared quantiles, dependency behavior, reproducibility and invalid-input handling.
 - The observation generator is independently testable from candidate search. No search/monitor API receives evaluator-only truth.
@@ -162,7 +178,7 @@ Do not hide a high false-alarm rate, increased abstention, or a weak regime behi
 - Report comparative superiority only if an agreed primary endpoint improves against the strongest compatible matched baseline without violating false-confidence and unresolved-rate guardrails.
 - Exact-head executable tests and CI are required for implementation qualification. Queued, skipped or stale-head checks are not passes.
 
-## 10. Scope boundary and research references
+## 11. Scope boundary and research references
 
 This protocol is not a claim that all observation shifts can be statistically distinguished from law misspecification. Some worlds are fundamentally non-identifiable from the allowed observations; the correct output there is an equivalence class or unresolved result.
 
