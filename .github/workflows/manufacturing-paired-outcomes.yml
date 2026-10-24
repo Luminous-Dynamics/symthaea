@@ -1,0 +1,51 @@
+name: Manufacturing Paired Outcome Evaluator
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-fabrication-kernel/src/production_value.rs"
+      - "crates/domains/symthaea-fabrication-kernel/src/paired_inference.rs"
+      - "crates/domains/symthaea-fabrication-kernel/src/lib.rs"
+      - "crates/domains/symthaea-fabrication-kernel/docs/PRODUCTION_VALUE_BENCHMARK_PROTOCOL.md"
+      - ".github/workflows/manufacturing-paired-outcomes.yml"
+  push:
+    paths:
+      - "crates/domains/symthaea-fabrication-kernel/src/production_value.rs"
+      - "crates/domains/symthaea-fabrication-kernel/src/paired_inference.rs"
+      - "crates/domains/symthaea-fabrication-kernel/src/lib.rs"
+      - "crates/domains/symthaea-fabrication-kernel/docs/PRODUCTION_VALUE_BENCHMARK_PROTOCOL.md"
+      - ".github/workflows/manufacturing-paired-outcomes.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manufacturing-paired-outcomes-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  paired-outcome-evaluator:
+    name: Paired Outcome Evaluator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format changed modules
+        run: |
+          rustfmt --check --edition 2024 crates/domains/symthaea-fabrication-kernel/src/production_value.rs
+          rustfmt --check --edition 2024 crates/domains/symthaea-fabrication-kernel/src/paired_inference.rs
+      - name: Production outcome evaluator tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-fabrication-kernel/Cargo.toml --lib production_value
+      - name: Paired cluster inference tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-fabrication-kernel/Cargo.toml --lib paired_inference
+      - name: Clippy with warnings denied
+        run: cargo clippy --locked --manifest-path crates/domains/symthaea-fabrication-kernel/Cargo.toml --lib -- -D warnings

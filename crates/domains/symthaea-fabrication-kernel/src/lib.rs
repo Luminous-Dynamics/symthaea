@@ -66,6 +66,7 @@ pub mod post_rollback_requalification_tracker;
 pub mod primitives;
 pub mod printer_control;
 pub mod process;
+pub mod production_value;
 pub mod promotion_replay;
 pub mod provenance;
 pub mod qualification;
@@ -135,6 +136,7 @@ pub mod operational_replay;
 pub mod operator_command;
 pub mod operator_command_tracker;
 pub mod package;
+pub mod paired_inference;
 pub mod step_import;
 
 pub use automatic_rollback::{

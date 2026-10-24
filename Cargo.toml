@@ -22,6 +22,10 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
+    # This directory is present in the checkout but has no Cargo.toml. Keep it
+    # out of glob-driven workspace resolution until a valid crate manifest is
+    # restored; do not add fake manifests merely to satisfy workspace loading.
+    "crates/core/symthaea-observation-attestation",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
@@ -31,6 +35,9 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # The REA evidence receipt directory currently has no Cargo.toml. Keep it
+    # out of glob-driven workspace discovery until its crate manifest exists.
+    "crates/domains/symthaea-rea-evidence-verifier",
 ]
 default-members = [
     "xtask",
