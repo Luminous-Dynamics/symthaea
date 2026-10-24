@@ -421,7 +421,7 @@ mod tests {
         question.modality = ConsentModality::Asked;
 
         assert_eq!(
-            resolve_latest_consent_candidate(&[grant], &scope),
+            resolve_latest_consent_candidate(&[grant.clone()], &scope),
             resolve_latest_consent_candidate(&[grant.clone(), question], &scope)
         );
         assert_eq!(
