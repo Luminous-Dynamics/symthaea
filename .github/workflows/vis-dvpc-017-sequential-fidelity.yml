@@ -33,3 +33,11 @@ jobs:
 
       - name: Build standalone replay
         run: rustc --edition=2024 -O tools/vision-dvpc-sequential-fidelity.rs -o /tmp/vis-dvpc-017
+
+      - name: Exercise frozen smoke bundle end to end
+        run: |
+          input_sha="$(sha256sum tests/fixtures/vision-dvpc-017-smoke.tsv | cut -d ' ' -f1)"
+          /tmp/vis-dvpc-017 tests/fixtures/vision-dvpc-017-smoke.tsv "$input_sha" > /tmp/vis-dvpc-017-receipt.tsv
+          grep -q '^SCOPE.*EVALUATION_ONLY_NOT_A_CERTIFICATE' /tmp/vis-dvpc-017-receipt.tsv
+          grep -q '^POLICY[[:space:]]sequential[[:space:]]5[[:space:]]' /tmp/vis-dvpc-017-receipt.tsv
+          grep -q '^DECISION[[:space:]]t01[[:space:]]full' /tmp/vis-dvpc-017-receipt.tsv
