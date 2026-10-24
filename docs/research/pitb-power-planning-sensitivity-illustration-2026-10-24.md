@@ -43,7 +43,7 @@ Fixed assumptions: baseline 0.35, ICC 0.05, family effect SD 0.05, pair-associat
 
 | Independent components | Total targets | Estimated gate power | Monte Carlo Wilson 95% interval |
 |---:|---:|---:|---:|
-| 20 | 47 | 45.69% | 44.72–46.67% |
+| 20 | 47 | 45.83% | 44.86–46.81% |
 | 30 | 71 | 61.16% | 60.20–62.11% |
 | 40 | 94 | 73.62% | 72.75–74.47% |
 | 50 | 118 | 82.21% | 81.45–82.95% |
