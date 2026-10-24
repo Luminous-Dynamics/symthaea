@@ -274,9 +274,22 @@ impl DeterministicRng {
         radius * cos
     }
 
+    /// Uniform integer in 0..upper_exclusive, using rejection sampling to avoid
+    /// modulo bias in Fisher–Yates shuffling.
+    fn below(&mut self, upper_exclusive: u64) -> u64 {
+        debug_assert!(upper_exclusive > 0);
+        let rejection_floor = upper_exclusive.wrapping_neg() % upper_exclusive;
+        loop {
+            let value = self.next_u64();
+            if value >= rejection_floor {
+                return value % upper_exclusive;
+            }
+        }
+    }
+
     fn shuffle<T>(&mut self, items: &mut [T]) {
         for i in (1..items.len()).rev() {
-            let j = (self.next_u64() % ((i + 1) as u64)) as usize;
+            let j = self.below((i + 1) as u64) as usize;
             items.swap(i, j);
         }
     }
