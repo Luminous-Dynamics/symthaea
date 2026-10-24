@@ -37,7 +37,7 @@ After the runs finish, evaluate every CSV with the fail-closed proposed-gate che
 bash scripts/check_broca_ann_gates.sh artifacts/broca-ann/*.csv
 ```
 
-It verifies source/receipt metadata, CSV completeness, three-stratum coverage, at least ten near-neighbor source groups, and every proposed low-noise Recall@K/candidate/fallback/p95-speedup gate. It fails on missing metrics or incomplete raw rows. It **never certifies hard-neighbor routing**: that needs a preregistered unsafe event and an independent risk qualification step. The gate thresholds are research decision rules, not published industry standards.
+It first verifies the sidecar records exit status 0 and that the CSV SHA-256, stderr SHA-256, and source SHA match their receipts; then it checks CSV completeness, three-stratum coverage, at least ten near-neighbor source groups, and every proposed low-noise Recall@K/candidate/fallback/p95-speedup gate. It fails on missing metrics or incomplete raw rows. It **never certifies hard-neighbor routing**: that needs a preregistered unsafe event and an independent risk qualification step. The gate thresholds are research decision rules, not published industry standards.
 
 For a single controlled arm or an explicit candidate-multiplier sweep, use the direct `cargo run` command above. Keep the same seed, query plan, vector dimension, top-K and cache protocol across matched arms.
 
