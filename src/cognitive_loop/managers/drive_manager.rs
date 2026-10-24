@@ -23,6 +23,7 @@ use super::super::subsystem_trait::{
     CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 use super::super::thresholds;
+use crate::cognitive_loop::types::PredictionEvidenceCursor;
 
 /// Drive Manager — consolidates curiosity, boredom, flow, and exploration drives.
 ///
@@ -53,6 +54,8 @@ pub struct DriveManager {
     // ── Exploration state ─────────────────────────────────────────────
     /// Adaptive exploration threshold (surprise must exceed this)
     exploration_threshold: f32,
+    /// Prevents duplicate, stale, or out-of-order PE samples from changing drive state.
+    prediction_error_cursor: PredictionEvidenceCursor,
 }
 
 impl Default for DriveManager {
@@ -67,6 +70,7 @@ impl Default for DriveManager {
             in_flow: false,
             flow_intensity: 0.0,
             exploration_threshold: 0.3,
+            prediction_error_cursor: PredictionEvidenceCursor::default(),
         }
     }
 }
@@ -160,7 +164,9 @@ impl CognitiveSubsystem for DriveManager {
         let mut output = SubsystemOutput::NEUTRAL;
 
         // ── 1. Record prediction error ────────────────────────────────────
-        let prediction_error_sample = snapshot.prediction_error_sample();
+        let prediction_error_sample = self
+            .prediction_error_cursor
+            .admit_evidence(&snapshot.prediction_error_evidence(), snapshot.cycle_number);
         let prediction_error_valid = prediction_error_sample.is_some();
         let pe = prediction_error_sample.unwrap_or(0.0);
         if prediction_error_valid {
@@ -277,29 +283,98 @@ impl CognitiveSubsystem for DriveManager {
     }
 
     fn checkpoint(&self) -> Vec<u8> {
-        // Serialize drive state for checkpoint/migration
-        let mut data = Vec::with_capacity(128);
-        // Format: [boredom:f32][flow_intensity:f32][exploration_threshold:f32]
-        //         [_reserved:f32][in_flow:u8][low_error_streak:u32][flow_streak:u32]
-        // Note: _reserved (bytes 12..16) was exploration_urge, kept as zero padding
-        // for backward-compatible deserialization of existing checkpoints.
+        // Preserve the legacy 25-byte state prefix. PEVC v2 appends both cycle
+        // watermarks so invalid newer observations still block delayed older PE
+        // after restart while allowing a valid retry at that same cycle.
+        let mut data = Vec::with_capacity(48);
         data.extend_from_slice(&self.boredom.to_le_bytes());
         data.extend_from_slice(&self.flow_intensity.to_le_bytes());
         data.extend_from_slice(&self.exploration_threshold.to_le_bytes());
-        data.extend_from_slice(&0.0f32.to_le_bytes()); // reserved (was exploration_urge)
+        data.extend_from_slice(&0.0f32.to_le_bytes()); // reserved legacy slot
         data.push(self.in_flow as u8);
         data.extend_from_slice(&self.low_error_streak.to_le_bytes());
         data.extend_from_slice(&self.flow_streak.to_le_bytes());
+        data.extend_from_slice(b"PEVC");
+        data.push(2); // extension version
+        let observed_cycle = self
+            .prediction_error_cursor
+            .last_observed_observation_cycle();
+        data.push(u8::from(observed_cycle.is_some()));
+        data.extend_from_slice(&observed_cycle.unwrap_or_default().to_le_bytes());
+        let admitted_cycle = self
+            .prediction_error_cursor
+            .last_admitted_observation_cycle();
+        data.push(u8::from(admitted_cycle.is_some()));
+        data.extend_from_slice(&admitted_cycle.unwrap_or_default().to_le_bytes());
         data
     }
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
-        if data.len() < 25 {
+        if data.len() != 25 && data.len() != 48 {
             return Err(format!(
-                "DriveManager checkpoint too short: {} < 25",
+                "DriveManager checkpoint has unsupported length: {}",
                 data.len()
             ));
         }
+
+        // Validate the extension before mutating manager state. Legacy 25-byte
+        // checkpoints contain no cursor, so restore an empty cursor rather than
+        // retaining a watermark from this manager instance.
+        let (restored_observed_cycle, restored_admitted_cycle) = if data.len() == 25 {
+            (None, None)
+        } else {
+            if &data[25..29] != b"PEVC" {
+                return Err("DriveManager: invalid PE cursor checkpoint magic".to_string());
+            }
+            if data[29] != 2 {
+                return Err(format!(
+                    "DriveManager: unsupported PE cursor checkpoint version {}",
+                    data[29]
+                ));
+            }
+            let has_observed = data[30];
+            let observed_value = u64::from_le_bytes(
+                data[31..39]
+                    .try_into()
+                    .map_err(|_| "DriveManager: corrupt observed-cycle bytes".to_string())?,
+            );
+            let has_admitted = data[39];
+            let admitted_value = u64::from_le_bytes(
+                data[40..48]
+                    .try_into()
+                    .map_err(|_| "DriveManager: corrupt admitted-cycle bytes".to_string())?,
+            );
+            if has_observed > 1 || has_admitted > 1 {
+                return Err("DriveManager: invalid PE cursor presence flag".to_string());
+            }
+            let observed = match has_observed {
+                1 => Some(observed_value),
+                0 if observed_value == 0 => None,
+                0 => {
+                    return Err(
+                        "DriveManager: absent observed cycle must encode zero".to_string()
+                    );
+                }
+                _ => unreachable!("presence flag was checked above"),
+            };
+            let admitted = match has_admitted {
+                1 => Some(admitted_value),
+                0 if admitted_value == 0 => None,
+                0 => {
+                    return Err(
+                        "DriveManager: absent admitted cycle must encode zero".to_string()
+                    );
+                }
+                _ => unreachable!("presence flag was checked above"),
+            };
+            if admitted.is_some_and(|cycle| observed.is_none_or(|observed_cycle| cycle > observed_cycle)) {
+                return Err(
+                    "DriveManager: admitted PE cycle exceeds observed high-water mark".to_string(),
+                );
+            }
+            (observed, admitted)
+        };
+
         self.boredom = f32::from_le_bytes(
             data[0..4]
                 .try_into()
@@ -327,6 +402,8 @@ impl CognitiveSubsystem for DriveManager {
                 .try_into()
                 .map_err(|_| "DriveManager: corrupt checkpoint bytes [21..25]".to_string())?,
         );
+        self.prediction_error_cursor
+            .restore_cycles(restored_observed_cycle, restored_admitted_cycle);
         Ok(())
     }
 }
@@ -351,6 +428,21 @@ mod tests {
         }
     }
 
+    fn process_cycles(
+        manager: &mut DriveManager,
+        snapshot: &CycleSnapshot,
+        start_cycle: u64,
+        count: usize,
+    ) -> SubsystemOutput {
+        let mut output = SubsystemOutput::NEUTRAL;
+        for cycle in start_cycle..start_cycle + count as u64 {
+            let mut current = *snapshot;
+            current.cycle_number = cycle;
+            output = manager.process(&current);
+        }
+        output
+    }
+
     #[test]
     fn test_drive_manager_defaults() {
         let dm = DriveManager::default();
@@ -372,9 +464,7 @@ mod tests {
         let snapshot = snapshot_with(0.01, 0.5, 0.5, 0.0);
 
         // Run enough cycles to trigger boredom
-        for _ in 0..30 {
-            dm.process(&snapshot);
-        }
+        process_cycles(&mut dm, &snapshot, 0, 30);
 
         assert!(
             dm.boredom > 0.0,
@@ -389,11 +479,9 @@ mod tests {
         let snapshot = snapshot_with(0.01, 0.5, 0.5, 0.0);
 
         // Accumulate boredom
-        for _ in 0..50 {
-            dm.process(&snapshot);
-        }
+        process_cycles(&mut dm, &snapshot, 0, 50);
 
-        let output = dm.process(&snapshot);
+        let output = process_cycles(&mut dm, &snapshot, 50, 1);
         assert!(
             output.exploration_delta > 0.0,
             "Boredom should drive exploration: {}",
@@ -411,17 +499,13 @@ mod tests {
 
         // Build up boredom
         let boring = snapshot_with(0.01, 0.5, 0.5, 0.0);
-        for _ in 0..50 {
-            dm.process(&boring);
-        }
+        process_cycles(&mut dm, &boring, 0, 50);
         let boredom_peak = dm.boredom;
         assert!(boredom_peak > 0.0);
 
         // Hit with surprise
         let surprising = snapshot_with(0.5, 0.5, 0.5, 0.0);
-        for _ in 0..10 {
-            dm.process(&surprising);
-        }
+        process_cycles(&mut dm, &surprising, 50, 10);
 
         assert!(
             dm.boredom < boredom_peak,
@@ -438,9 +522,7 @@ mod tests {
         let flow_snapshot = snapshot_with(0.05, 0.8, 0.5, 0.3);
 
         // Need FLOW_ONSET_CYCLES (5) consecutive cycles
-        for _ in 0..10 {
-            dm.process(&flow_snapshot);
-        }
+        process_cycles(&mut dm, &flow_snapshot, 0, 10);
 
         assert!(dm.in_flow, "Should enter flow state");
         assert!(dm.flow_intensity > 0.0, "Flow intensity should be positive");
@@ -452,12 +534,10 @@ mod tests {
         let flow_snapshot = snapshot_with(0.05, 0.8, 0.5, 0.3);
 
         // Enter flow
-        for _ in 0..10 {
-            dm.process(&flow_snapshot);
-        }
+        process_cycles(&mut dm, &flow_snapshot, 0, 10);
         assert!(dm.in_flow);
 
-        let output = dm.process(&flow_snapshot);
+        let output = process_cycles(&mut dm, &flow_snapshot, 10, 1);
         assert!(
             output.exploration_delta < 0.0,
             "Flow should suppress exploration: {}",
@@ -476,16 +556,12 @@ mod tests {
         let flow_snapshot = snapshot_with(0.05, 0.8, 0.5, 0.3);
 
         // Enter flow
-        for _ in 0..10 {
-            dm.process(&flow_snapshot);
-        }
+        process_cycles(&mut dm, &flow_snapshot, 0, 10);
         assert!(dm.in_flow);
 
         // Disrupt with high error
         let disruption = snapshot_with(0.5, 0.3, 0.8, -0.2);
-        for _ in 0..20 {
-            dm.process(&disruption);
-        }
+        process_cycles(&mut dm, &disruption, 10, 20);
 
         assert!(!dm.in_flow, "Should exit flow on disruption");
         assert_eq!(dm.flow_intensity, 0.0);
@@ -516,9 +592,7 @@ mod tests {
 
         // Repeated surprising input → threshold should rise (habituation)
         let surprising = snapshot_with(0.8, 0.5, 0.5, 0.0);
-        for _ in 0..20 {
-            dm.process(&surprising);
-        }
+        process_cycles(&mut dm, &surprising, 0, 20);
 
         assert!(
             dm.exploration_threshold > initial_threshold,
@@ -592,6 +666,138 @@ mod tests {
         assert_eq!(manager.low_error_streak, 0);
         assert_eq!(manager.flow_streak, 0);
         assert_eq!(manager.exploration_threshold, initial_threshold);
+    }
+
+    #[test]
+    fn duplicate_and_out_of_order_pe_do_not_advance_drive_streaks() {
+        let mut manager = DriveManager::default();
+        let mut valid = snapshot_with(0.01, 0.8, 0.5, 0.0);
+        valid.cycle_number = 10;
+        manager.process(&valid);
+        let initial_count = manager.error_count;
+        let initial_low_streak = manager.low_error_streak;
+        let initial_flow_streak = manager.flow_streak;
+        let initial_threshold = manager.exploration_threshold;
+
+        // A changed PE payload with the same cycle must be ignored.
+        valid.prediction_error = 0.9;
+        manager.process(&valid);
+        // An older cycle must not rewind the evidence stream either.
+        valid.cycle_number = 9;
+        manager.process(&valid);
+
+        assert_eq!(manager.error_count, initial_count);
+        assert_eq!(manager.low_error_streak, initial_low_streak);
+        assert_eq!(manager.flow_streak, initial_flow_streak);
+        assert_eq!(manager.exploration_threshold, initial_threshold);
+    }
+
+    #[test]
+    fn invalid_newer_pe_blocks_delayed_older_but_allows_same_cycle_recovery() {
+        let mut manager = DriveManager::default();
+        let mut invalid = snapshot_with(0.02, 0.8, 0.5, 0.0);
+        invalid.cycle_number = 12;
+        invalid.prediction_error_valid = 0;
+        manager.process(&invalid);
+        assert_eq!(manager.error_count, 0);
+        assert_eq!(
+            manager.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(12)
+        );
+
+        let mut delayed = snapshot_with(0.02, 0.8, 0.5, 0.0);
+        delayed.cycle_number = 11;
+        manager.process(&delayed);
+        assert_eq!(manager.error_count, 0);
+
+        let mut retry = delayed;
+        retry.cycle_number = 12;
+        manager.process(&retry);
+        assert_eq!(manager.error_count, 1);
+        manager.process(&retry);
+        assert_eq!(manager.error_count, 1);
+    }
+
+    #[test]
+    fn checkpoint_roundtrip_preserves_drive_pe_watermarks() {
+        let mut manager = DriveManager::default();
+        let mut valid = snapshot_with(0.02, 0.8, 0.5, 0.0);
+        valid.cycle_number = 10;
+        manager.process(&valid);
+        let mut invalid = valid;
+        invalid.cycle_number = 12;
+        invalid.prediction_error_valid = 0;
+        manager.process(&invalid);
+
+        let checkpoint = manager.checkpoint();
+        assert_eq!(checkpoint.len(), 48);
+        let mut restored = DriveManager::default();
+        restored.restore(&checkpoint).unwrap();
+        assert_eq!(
+            restored.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(12)
+        );
+        assert_eq!(
+            restored.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(10)
+        );
+
+        let mut delayed = valid;
+        delayed.cycle_number = 11;
+        restored.process(&delayed);
+        assert_eq!(restored.error_count, 1);
+
+        let mut retry = valid;
+        retry.cycle_number = 12;
+        restored.process(&retry);
+        assert_eq!(restored.error_count, 2);
+        restored.process(&retry);
+        assert_eq!(restored.error_count, 2);
+    }
+
+    #[test]
+    fn legacy_drive_checkpoint_restore_clears_cursor() {
+        let mut manager = DriveManager::default();
+        let mut prior = snapshot_with(0.3, 0.5, 0.5, 0.0);
+        prior.cycle_number = 90;
+        manager.process(&prior);
+        let legacy = manager.checkpoint()[..25].to_vec();
+
+        let mut restored = DriveManager::default();
+        let mut later = prior;
+        later.cycle_number = 100;
+        restored.process(&later);
+        restored.restore(&legacy).unwrap();
+        assert_eq!(
+            restored.prediction_error_cursor.last_observed_observation_cycle(),
+            None
+        );
+        let mut cycle_one = prior;
+        cycle_one.cycle_number = 1;
+        restored.process(&cycle_one);
+        assert_eq!(restored.error_count, 2); // ring buffer was not part of legacy state
+    }
+
+    #[test]
+    fn malformed_drive_pe_checkpoint_is_rejected_atomically() {
+        let mut manager = DriveManager::default();
+        let mut sample = snapshot_with(0.2, 0.5, 0.5, 0.0);
+        sample.cycle_number = 12;
+        manager.process(&sample);
+        let before_boredom = manager.boredom;
+        let mut checkpoint = manager.checkpoint();
+        checkpoint[0..4].copy_from_slice(&0.0_f32.to_le_bytes());
+        checkpoint[40..48].copy_from_slice(&13_u64.to_le_bytes());
+        assert!(manager.restore(&checkpoint).is_err());
+        assert_eq!(manager.boredom, before_boredom);
+        assert_eq!(
+            manager.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(12)
+        );
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(12)
+        );
     }
 
     #[test]
