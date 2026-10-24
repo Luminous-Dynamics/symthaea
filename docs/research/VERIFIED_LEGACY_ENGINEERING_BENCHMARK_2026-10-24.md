@@ -164,6 +164,8 @@ Each task's evaluator receipt should carry:
 
 The evaluator must independently recompute aggregates from raw evidence. It must reject evidence whose hashes, IDs, required test inventories, immutable image IDs, checkout identities or exit statuses disagree. Do not trust a task-supplied summary JSON as the score oracle.
 
+The machine-readable receipt contract is `tools/vleb/evidence-receipt.schema.json`. It binds the task and protocol digests, patch identity, model/scaffold/tool policy, environment and checkout identity, per-command log hashes and exits, required test inventory, mutation results, differential checks, verifier build identity, outcome and cost. The `trust_boundary` field distinguishes runtime-reported telemetry from independent inspection and external attestation; schema validation alone never certifies a pass. For a pass receipt, the independent auditor must recompute required-test coverage, check environment identity and confirm that no unresolved reason remains.
+
 One attempt per task is the primary pass@1 condition. Retries, repair loops, multi-sample selection, network-enabled runs and hidden-test-aware runs are separate conditions, explicitly preregistered and reported.
 
 ### Four outcomes, not one green check
