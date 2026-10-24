@@ -1,0 +1,145 @@
+name: PGx Research Contract
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-neuromodulators/src/pgx_health_equity.rs"
+      - "crates/domains/symthaea-neuromodulators/src/pharmacogenomics.rs"
+      - "crates/domains/symthaea-neuromodulators/examples/pgx_equity_analysis.rs"
+      - "crates/domains/symthaea-neuromodulators/examples/pgx_sensitivity_analysis.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "papers/applications/pgx-health-equity/**"
+      - "docs/research/PGX_RESEARCH_ONLY_BOUNDARY_V0.md"
+      - ".github/workflows/pgx-research-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-neuromodulators/src/pgx_health_equity.rs"
+      - "crates/domains/symthaea-neuromodulators/src/pharmacogenomics.rs"
+      - "crates/domains/symthaea-neuromodulators/examples/pgx_equity_analysis.rs"
+      - "crates/domains/symthaea-neuromodulators/examples/pgx_sensitivity_analysis.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "papers/applications/pgx-health-equity/**"
+      - "docs/research/PGX_RESEARCH_ONLY_BOUNDARY_V0.md"
+      - ".github/workflows/pgx-research-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pgx-research-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact pull-request head or pushed revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup default 1.96.0
+          rustc --version
+          cargo --version
+
+      - name: Check PGx source formatting
+        id: format
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-neuromodulators/src/pgx_health_equity.rs crates/domains/symthaea-neuromodulators/examples/pgx_equity_analysis.rs crates/domains/symthaea-neuromodulators/examples/pgx_sensitivity_analysis.rs
+
+      - name: Run PGx research module tests
+        id: pgx-tests
+        run: cargo test -p symthaea-neuromodulators pgx_health_equity::tests -- --nocapture
+
+      - name: Compile PGx report examples
+        id: pgx-examples
+        run: cargo check -p symthaea-neuromodulators --examples
+
+      - name: Write exact-head software-contract receipt
+        id: receipt
+        if: always()
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          FORMAT_OUTCOME: ${{ steps.format.outcome }}
+          TEST_OUTCOME: ${{ steps.pgx-tests.outcome }}
+          EXAMPLES_OUTCOME: ${{ steps.pgx-examples.outcome }}
+        run: |
+          set -euo pipefail
+          tested_head="$(git rev-parse HEAD)"
+          source_sha="$(sha256sum crates/domains/symthaea-neuromodulators/src/pgx_health_equity.rs | awk '{print $1}')"
+          pharmacogenomics_sha="$(sha256sum crates/domains/symthaea-neuromodulators/src/pharmacogenomics.rs | awk '{print $1}')"
+          manuscript_sha="$(sha256sum papers/applications/pgx-health-equity/DRAFT.md | awk '{print $1}')"
+          outline_sha="$(sha256sum papers/applications/pgx-health-equity/OUTLINE.md | awk '{print $1}')"
+          boundary_sha="$(sha256sum docs/research/PGX_RESEARCH_ONLY_BOUNDARY_V0.md | awk '{print $1}')"
+          manifest_sha="$(sha256sum Cargo.toml | awk '{print $1}')"
+          equity_example_sha="$(sha256sum crates/domains/symthaea-neuromodulators/examples/pgx_equity_analysis.rs | awk '{print $1}')"
+          sensitivity_example_sha="$(sha256sum crates/domains/symthaea-neuromodulators/examples/pgx_sensitivity_analysis.rs | awk '{print $1}')"
+          workflow_sha="$(sha256sum .github/workflows/pgx-research-contract.yml | awk '{print $1}')"
+          receipt_status=PASS
+          if [[ "$tested_head" != "$EXPECTED_HEAD" || "$FORMAT_OUTCOME" != "success" || "$TEST_OUTCOME" != "success" || "$EXAMPLES_OUTCOME" != "success" ]]; then
+            receipt_status=FAIL
+          fi
+          mkdir -p target/pgx-research
+          jq -n \
+            --arg status "$receipt_status" \
+            --arg tested_head "$tested_head" \
+            --arg format_outcome "$FORMAT_OUTCOME" \
+            --arg test_outcome "$TEST_OUTCOME" \
+            --arg examples_outcome "$EXAMPLES_OUTCOME" \
+            --arg source_sha256 "$source_sha" \
+            --arg pharmacogenomics_sha256 "$pharmacogenomics_sha" \
+            --arg manuscript_sha256 "$manuscript_sha" \
+            --arg outline_sha256 "$outline_sha" \
+            --arg boundary_sha256 "$boundary_sha" \
+            --arg manifest_sha256 "$manifest_sha" \
+            --arg equity_example_sha256 "$equity_example_sha" \
+            --arg sensitivity_example_sha256 "$sensitivity_example_sha" \
+            --arg workflow_sha256 "$workflow_sha" \
+            '{
+              schema_version: "pgx-research-contract-receipt-v0.1",
+              status: $status,
+              tested_head: $tested_head,
+              checks: {
+                rustfmt: $format_outcome,
+                pgx_module_tests: $test_outcome,
+                report_examples: $examples_outcome
+              },
+              input_sha256: {
+                pgx_health_equity_rs: $source_sha256,
+                pharmacogenomics_rs: $pharmacogenomics_sha256,
+                manuscript: $manuscript_sha256,
+                outline: $outline_sha256,
+                qualification_boundary: $boundary_sha256,
+                cargo_manifest: $manifest_sha256,
+                pgx_equity_example: $equity_example_sha256,
+                pgx_sensitivity_example: $sensitivity_example_sha256,
+                contract_workflow: $workflow_sha256
+              },
+              claim_ceiling: "Exact-head software contract only; no pharmacogenomic phenotype accuracy, patient-level inference, clinical utility, or prescribing claim."
+            }' > target/pgx-research/receipt.json
+          cat target/pgx-research/receipt.json
+
+      - name: Require exact-head PASS receipt
+        if: success()
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          jq -e --arg expected "$EXPECTED_HEAD" '
+            .status == "PASS" and
+            .tested_head == $expected and
+            .schema_version == "pgx-research-contract-receipt-v0.1" and
+            ([.input_sha256[]] | all(test("^[0-9a-f]{64}$"))) and
+            .claim_ceiling == "Exact-head software contract only; no pharmacogenomic phenotype accuracy, patient-level inference, clinical utility, or prescribing claim."
+          ' target/pgx-research/receipt.json
+
+      - name: Publish PGx research receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pgx-research-contract-receipt
+          path: target/pgx-research/receipt.json
+          if-no-files-found: warn

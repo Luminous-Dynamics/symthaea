@@ -1,4 +1,8 @@
-# Quantifying Pharmacogenomic Health Inequity: An Open-Source Equity Scoring Engine for Ancestry-Aware Drug Dosing
+# Quantifying Pharmacogenomic Evidence Gaps: An Exploratory Population-Level Equity Analysis
+
+ 
+> **Research status:** This manuscript describes population-level, hypothesis-generating analysis only. The current Hardy–Weinberg/functional-bin approximation has material discrepancies against published phenotype estimates, and clinically relevant alleles/structural variants are missing. Do not use these outputs for individual genotype interpretation, medication selection, prescribing, dose adjustment, or clinical decision support. Numeric claims remain subject to independent data and methods re-audit.
+
 
 **Tristan Stoltz**
 
@@ -12,7 +16,12 @@ Correspondence: tristan.stoltz@evolvingresonantcocreationism.com
 
 ## Abstract
 
-Pharmacogenomic (PGx) guidelines from the Clinical Pharmacogenetics Implementation Consortium (CPIC) represent a major advance toward precision drug therapy, yet they are predominantly validated in European-ancestry populations. This creates a measurable equity gap for patients of non-European descent, who collectively represent the majority of the world's population. We present the Pharmacogenomic Health Equity Engine, an open-source tool that quantifies this gap by computing expected metabolizer phenotype distributions from published allele frequencies across six ancestry groups using Hardy-Weinberg equilibrium, then deriving per-drug, per-gene, per-population equity gap scores. Across 11 CPIC Level A drug-gene pairs spanning 6 pharmacogenes (CYP2D6, CYP2C19, CYP2C9, CYP2B6, CYP3A5, CYP3A4), 7 clinical domains, and 32 guideline recommendations, we flag multiple potentially underserved population-drug combinations where current guideline applicability falls below 85%. The largest inter-ancestry disparities emerge for tacrolimus/CYP3A5, where the CYP3A5*3 loss-of-function allele frequency differs from 94% in European to 18% in African populations, and for efavirenz/CYP2B6, where the slow-metabolizer CYP2B6*6 allele reaches 38% in African versus 26% in European populations. We extend the engine with admixed population modeling for four clinically relevant populations (African American, US Latino/Hispanic, Brazilian, South African Coloured) using linear allele blending with HWE applied to blended frequencies. Sensitivity analysis demonstrates perfect rank stability across +/-20% allele frequency perturbations, and external validation against gnomAD v4 confirms 26/32 allele-population comparisons within 30% relative agreement. Using US Census population data, we estimate tens of millions of individuals carry actionable phenotypes that may be inadequately addressed by European-calibrated guidelines. All code, reference data, and allele frequency tables are released under AGPL-3.0.
+Pharmacogenomic guidelines can be harder to apply equitably when the underlying evidence and reference data represent populations unevenly. We describe an open-source, exploratory engine that calculates population-level phenotype-frequency approximations from curated allele frequencies under simplified Hardy–Weinberg assumptions and reports per-drug, per-gene, per-group disparity measures. The intended research use is to identify evidence gaps for further investigation, not to interpret an individual's genotype or recommend medication.
+
+The current implementation aggregates alleles into broad functional categories and omits clinically material alleles and structural variants. Its own comparison against published phenotype estimates reveals substantial errors for some gene/population combinations, including severe CYP2D6 discrepancies. Consequently, the computed scores and estimated impacts are hypothesis-generating, not measurements of clinical harm or evidence of dosing validity. Population categories are not genotypes; blending population allele frequencies does not resolve individual diplotypes, phase, copy number, structural variation, or within-group diversity.
+
+Selected allele-frequency comparisons against reference resources can check source consistency, but do not validate phenotype estimates, clinical utility, or patient outcomes. The next qualification steps are independent gene-specific reference annotations, comprehensive variant handling for each supported gene, explicit indeterminate results, external evaluation with prespecified metrics, and—only after those gates—study of any defined clinical use. The project is research-only.
+
 
 ---
 
@@ -36,13 +45,11 @@ The consequences of ancestry-biased pharmacogenomic guidelines are not hypotheti
 
 In transplant medicine, approximately 82% of African-ancestry individuals are CYP3A5 expressors (carrying at least one *1 allele) compared with roughly 6% of European-ancestry individuals [9]. Standard tacrolimus dosing, calibrated to the European-predominant non-expressor phenotype, systematically underdoses African-ancestry transplant recipients, contributing to higher rates of graft rejection [9]. In HIV treatment, the standard 600 mg efavirenz dose produces plasma concentrations 3-4 times higher in CYP2B6 poor metabolizers---a phenotype approximately twice as common in African populations as in European populations---causing debilitating central nervous system toxicity including dizziness, insomnia, and psychosis [10,17].
 
-### 1.4 The Gap We Fill
+### 1.4 Research Question and Intended Contribution
 
-Existing pharmacogenomic tools address individual-level genotype interpretation. PharmCAT, the open-source CPIC-endorsed tool, converts individual patient VCF files into phenotype calls and guideline-matched recommendations [18]. PGxDB, PharmVIP, and ePGA provide annotation and database exploration [6,19]. None of these tools systematically quantifies the population-level equity gap between the populations for which guidelines are calibrated and those to which they are applied. No published tool computes a per-drug, per-gene, per-population equity gap score from allele frequency data, nor do existing tools model admixed populations explicitly.
+Published tools such as PharmCAT support genotype interpretation and guideline reporting for defined inputs; pharmacogenomic databases provide allele and guideline resources. The intended research question here is narrower: can a transparent, reproducible population-level audit help identify where allele-frequency sources and guideline reference populations may require further study?
 
-We present the Pharmacogenomic Health Equity Engine, an open-source scoring tool that fills this gap. Our contributions are: (1) a formalized equity gap scoring methodology applicable to any drug-gene pair with published allele frequency data; (2) an open-source Rust implementation covering 6 genes, 16 alleles, 32 CPIC guideline recommendations across 11 drug-gene pairs in 7 clinical domains; (3) ancestry-stratified equity analyses with population-level clinical impact estimates; (4) ancestry-adjusted dosing recommendations with underserved population flags; (5) admixed population modeling using linear allele blending with HWE for four clinically relevant populations; and (6) external validation against gnomAD v4 and empirical phenotype frequencies from clinical genotyping studies. CPIC has articulated a goal of global implementation [1]; we provide a tool to assess how far current guidelines are from achieving equitable coverage.
-
----
+We have not completed a systematic landscape review sufficient to claim that no other tool implements similar analyses or that this is the first open-source tool of its kind. Nor has the current implementation demonstrated clinical impact or superiority over established tools. The present contribution is an exploratory Rust implementation, a record of its assumptions and observed discrepancies, and a qualification plan. Its scores and model-derived group flags are hypothesis-generating only.
 
 ## 2. Methods
 
@@ -92,39 +99,39 @@ In the absence of population-level individual genotype data, we used Hardy-Weinb
    The IM formula captures all diplotypes containing at least one decreased- or no-function allele that do not qualify as PM or UM: no-function/normal heterozygotes, no-function/decreased heterozygotes, decreased/decreased homozygotes, and decreased/normal heterozygotes. An earlier version of the formula omitted the 2 * *f*_df * *f*_n term (decreased/normal heterozygotes), which caused IM frequencies to be underestimated and NM frequencies to be correspondingly inflated. This was corrected prior to the analyses presented here.
 5. Validate: confirm that phenotype fractions sum to 1.0 within a tolerance of 0.01.
 
-We state the limitations of this approach explicitly. HWE assumes random mating, no natural selection, no migration, and no genetic drift within the defined population. Continental-scale ancestry groupings violate all of these assumptions to varying degrees. Admixed populations, which are increasingly common globally and especially in the Americas, cannot be accurately modeled with discrete ancestry bins; we address this limitation with explicit admixed modeling (Section 2.7). For CYP2D6 specifically, the complex gene locus with structural variants, copy number changes, and hybrid alleles makes HWE-based phenotype prediction less reliable than for simpler loci [14]. Despite these limitations, HWE-derived phenotype distributions provide useful population-level estimates that are broadly consistent with directly measured distributions from biobank studies [21], and directional equity conclusions are robust to the systematic biases introduced by this approach (Section 3.8).
+We state the limitations of this approach explicitly. HWE assumes random mating, no natural selection, no migration, and no genetic drift within the defined population. Continental-scale ancestry groupings violate all of these assumptions to varying degrees. Admixed populations, which are increasingly common globally and especially in the Americas, cannot be accurately modeled with discrete ancestry bins; we address this limitation with explicit admixed modeling (Section 2.7). For CYP2D6 specifically, the complex gene locus with structural variants, copy number changes, and hybrid alleles makes HWE-based phenotype prediction less reliable than for simpler loci [14]. The validation comparison in Section 3.8 shows that the current outputs can materially disagree with published phenotype estimates. This implementation therefore does not provide validated phenotype-frequency estimates, and it is not known whether derived score rankings preserve the direction or magnitude of any real-world disparity.
 
-### 2.3 Equity Gap Scoring Methodology
+### 2.3 Heuristic Population-Score Methodology
 
-For each drug-gene-ancestry triple, we computed a risk profile consisting of three components:
+For each drug–gene–population tuple, the prototype calculates three **heuristic features** from its simplified phenotype-frequency outputs. None is a clinical probability, calibrated risk estimate, or measure of observed outcomes.
 
-**Adverse event risk.** For prodrugs (codeine, clopidogrel, tamoxifen), where the parent compound requires metabolic activation, ultra-rapid metabolizers face the greatest toxicity risk from excessive active metabolite formation. We computed adverse event risk as: UM_fraction * 0.8 + PM_fraction * 0.3. For active drugs (warfarin, sertraline, efavirenz, voriconazole, phenytoin, tacrolimus, atomoxetine, ondansetron), where the parent compound is pharmacologically active, poor metabolizers face the greatest accumulation risk. We computed: PM_fraction * 0.8 + UM_fraction * 0.2.
+**Toxicity-oriented heuristic index.** For tuples classified in this implementation as prodrugs (codeine, clopidogrel, tamoxifen), the code applies: UM_fraction × 0.8 + PM_fraction × 0.3. For tuples classified as active drugs, it applies: PM_fraction × 0.8 + UM_fraction × 0.2. These fixed weights encode a simplified hypothesis about directions of concern; they do not estimate a patient's adverse-event probability.
 
-**Efficacy risk.** For prodrugs, poor metabolizers produce inadequate active metabolite: PM_fraction * 0.9. For active drugs, ultra-rapid metabolizers clear the drug too quickly, and poor metabolizers may experience toxicity-driven dose reductions: UM_fraction * 0.7 + PM_fraction * 0.3.
+**Efficacy-oriented heuristic index.** For the prototype's prodrug class, the code applies PM_fraction × 0.9. For its active-drug class, it applies UM_fraction × 0.7 + PM_fraction × 0.3. This is a designed score, not a validated estimate of therapeutic failure or treatment benefit.
 
-**Guideline applicability.** We computed the total variation distance (TVD) between each ancestry group's phenotype distribution and the European reference distribution: TVD = (1/2) * sum(|*p*_i - *p*_i,EUR|) across phenotype categories. Guideline applicability was defined as 1 - TVD. European populations were used as the reference because CPIC guidelines are predominantly validated in European-ancestry cohorts; this is a statement about guideline calibration, not an assertion of biological normativity.
+**Reference-distribution similarity proxy.** The prototype calculates total variation distance (TVD) between each population-labeled phenotype vector and the European-labeled reference vector: TVD = (1/2) × sum(|p_i − p_i,ref|). It then stores 1 − TVD in a field named `guideline_applicability`. That field name is not evidence that the resulting quantity measures clinical guideline applicability. The choice of reference group is an analytical convention; applicability would need to be established separately for each guideline and defined context.
 
-The **aggregate equity gap score** was computed as the mean of the inter-population ranges for adverse event risk and efficacy risk: equity_gap = mean(max_adverse - min_adverse, max_efficacy - min_efficacy), clamped to [0, 1]. A score of 0 indicates identical risk profiles across all ancestry groups; a score of 1 indicates maximal disparity.
+The **aggregate equity-gap score** is the mean of the across-group ranges of the two heuristic indices, clamped to [0, 1]. It measures variation in the current code's outputs, not inequity, clinical harm, guideline fit, or observed differences in outcomes.
 
-A population was **flagged as underserved** if: (a) guideline applicability fell below 0.85, OR (b) adverse event risk exceeded the population minimum by more than 0.15, AND the population was not European (since guidelines are calibrated to European distributions).
+The prototype labels a population group when its own threshold rules fire: reference-similarity proxy below 0.85, or toxicity-oriented index more than 0.15 above the minimum under an additional population-label rule. These labels are therefore called **model flags** throughout this manuscript; they do not establish that a population is clinically underserved or that a treatment should change.
 
-We acknowledge that the risk weights (0.8, 0.3, 0.9, 0.7, 0.2) are pharmacologically motivated heuristics, not empirically calibrated values. The 0.8 weight for the primary risk phenotype reflects the strong clinical signal for dose-phenotype relationships; the lower weights for secondary risk phenotypes reflect attenuated but non-negligible effects. Sensitivity analysis (Section 3.6) demonstrates that equity gap score rankings are stable across +/-20% perturbations of all allele frequencies and risk weights.
+The weights (0.8, 0.3, 0.9, 0.7, 0.2) are analyst-selected heuristics and have not been calibrated against observed outcomes or independently justified for every listed drug–gene pair. Sensitivity analysis perturbs included values and weights; it can describe internal score stability, but cannot validate the assumptions, resolve omitted variants, or prove that model-derived rankings are correct.
 
-### 2.4 Clinical Impact Estimation
+### 2.4 Exploratory Population Scenario Arithmetic
 
-We estimated the number of patients at risk in the United States using the following formula: at-risk count = population_by_ancestry * actionable_phenotype_fraction. Population denominators were derived from US Census Bureau 2024 estimates: European 195 million, African 47 million, East Asian 7 million, South Asian 6 million, Native American 4 million, and Mixed/multiracial 72 million (total approximately 331 million).
+For descriptive examples only, the notebook-like report multiplies a broad population denominator by the current model's phenotype-frequency fraction. The product is an arithmetic scenario, not a count of patients at risk, people prescribed a drug, adverse events, or patients requiring a change in therapy.
 
-For prodrugs, the actionable phenotype fraction was defined as PM + UM (patients for whom standard dosing is suboptimal). For tacrolimus/CYP3A5, expressors (NM + IM, carrying at least one functional *1 allele) represent the actionable population requiring dose increase. For all other active drugs, PM + UM constituted the at-risk fraction.
+The broad denominators used in the prototype are rounded estimates drawn from the cited US population categories. They should not be interpreted as genotype cohorts or exact genetic-ancestry counts. The underlying phenotype fractions inherit all limitations of the simplified Hardy–Weinberg/functional-bin model, including omitted alleles, copy-number and structural variation, and activity-score mismatches.
 
-These estimates are explicitly framed as modeled projections, not epidemiological measurements. They do not account for drug prescription rates, indication prevalence, clinical setting, insurance coverage, or the fraction of patients who already receive genotype-guided therapy. They represent an upper bound on the population carrying pharmacogenomically actionable phenotypes.
+Accordingly, these products must not be described as epidemiological measurements, clinical impact estimates, or an upper bound on actionable patients without an independently validated phenotype method, defensible population denominators, prescription/indication data, uncertainty intervals, and an explicitly defined context of use.
 
 ### 2.5 CPIC Guideline Integration
 
 We encoded 32 CPIC guideline recommendations across 11 drug-gene pairs in 7 clinical domains (Table 2). Each recommendation specifies: drug name, gene name, metabolizer phenotype, dosing action (StandardDose, ReduceDose, IncreaseDose, AvoidDrug, UseAlternative, or TherapeuticDrugMonitoring), dose adjustment factor, alternative drug where applicable, monitoring instructions, evidence level (Strong or Moderate), and source population (European for all encoded guidelines, reflecting the predominant validation population).
 
-**Table 2. Drug-gene pairs with encoded CPIC guidelines.**
+**Table 2. Selected guideline-reference records included in the research fixture.**
 
-| Drug | Gene | Clinical Domain | Evidence | Phenotypes Covered | Key Action |
+| Drug | Gene | Clinical Domain | Evidence | Phenotypes Covered | Example reference action in cited guideline |
 |------|------|----------------|----------|-------------------|------------|
 | Codeine | CYP2D6 | Pain | Strong | UM, NM, PM | Avoid (UM), Alternative (PM) |
 | Clopidogrel | CYP2C19 | Cardiology | Strong | PM, NM | Alternative (PM) |
@@ -138,34 +145,27 @@ We encoded 32 CPIC guideline recommendations across 11 drug-gene pairs in 7 clin
 | Tacrolimus | CYP3A5 | Transplant | Strong | NM, IM, PM | Increase 2x (NM), 1.5x (IM) |
 | Phenytoin | CYP2C9 | Epilepsy | Strong | PM, IM, NM | Reduce (PM/IM) |
 
-Ancestry-adjusted recommendations augment the base CPIC recommendation for patients belonging to flagged underserved populations by appending a therapeutic drug monitoring advisory with the computed equity gap score.
+The action descriptions above summarize selected published guideline records; they are not actions produced by the current research-projection API. The API returns only reference metadata and an exploratory aggregate flag, with no dose, medication choice, contraindication, or monitoring instruction. The population model is not qualified to interpret individual genotype/diplotype or to augment a patient's care plan.
 
 ### 2.6 Implementation
 
-The engine is implemented in Rust (approximately 2,200 lines of code including admixed modeling and validation infrastructure), released under the AGPL-3.0 license. The implementation includes 16 validated allele frequency entries, 32 CPIC guideline recommendations, Hardy-Weinberg phenotype derivation, equity gap scoring, clinical impact estimation, admixed population modeling, and ancestry-adjusted dosing recommendation generation. Over 20 unit tests validate allele frequency accuracy, phenotype distribution summation, equity flag correctness, admixed composition validity, and dosing adjustment logic. The public API provides five primary methods: `equity_analysis(drug, gene)` for population-level equity assessment, `adjusted_recommendation(drug, ancestry, phenotype)` for individual patient dosing with equity context, `population_report(gene)` for formatted metabolizer distribution summaries, `admixed_metabolizer_distribution(gene, population)` for admixed phenotype computation, and `admixed_equity_analysis(drug, gene, populations)` for equity assessment of admixed populations.
+The engine is implemented in Rust (approximately 2,200 lines of code including admixed modeling and validation infrastructure), released under the AGPL-3.0 license. The implementation includes exploratory population allele-frequency entries, CPIC guideline reference records, Hardy–Weinberg phenotype approximations, equity-gap scoring, modeled impact estimates, and admixed-population calculations. These outputs have documented discrepancies and missing-variant limitations and are research-only. The public API includes `equity_analysis(drug, gene)` for aggregate population analysis, `research_guideline_projection(drug, gene, population_context, phenotype_context)` for non-actionable guideline-reference metadata, `population_report(gene)` for modeled distributions, `admixed_metabolizer_distribution(gene, population)` for exploratory admixture calculations, and `admixed_equity_analysis(drug, gene, populations)` for aggregate comparison. The projection type contains no dose, medication choice, contraindication, or treatment instruction; unsupported drug/gene/phenotype tuples return `Indeterminate`. The aggregate model is not qualified for patient-level phenotype interpretation, prescribing, or clinical decision support. Passing software tests does not establish pharmacogenomic accuracy or clinical validity.
 
-### 2.7 Admixed Population Modeling
+### 2.7 Exploratory Admixed-Frequency Approximation
 
-To address the limitation that continental ancestry bins poorly represent admixed populations, we extended the engine with a linear admixture model. Four clinically relevant admixed populations were modeled using published ancestry proportions:
+Four illustrative population mixtures were encoded from published average ancestry proportions to test how a simple weighted-frequency calculation behaves. These rounded mixtures are heterogeneous group averages and must not be used as individual ancestry estimates.
 
-- **African American** (80% African + 20% European): Based on Bryc et al. (2015), who found average African ancestry of 73.2% and European ancestry of 24.0% among self-identified African Americans [30]. Tishkoff et al. (2009) reports 78-82% African for most US regions. We use 80/20 as a representative round figure.
-- **US Latino/Hispanic** (50% European + 40% Native American + 10% African): Based on Bryc et al. (2015), reflecting the Mexican-American majority of US Latinos (Mexican Americans average ~45% European, ~47% Native American, ~8% African) [30].
-- **Brazilian** (60% European + 25% African + 15% Native American): Based on Salzano & Sans (2014), who found average genomic ancestry of ~62% European, ~21% African, ~17% Native American across Brazil, with substantial regional variation [31].
-- **South African Coloured** (32% African + 29% European + 25% East Asian + 14% South Asian): Based on de Wit et al. (2010), reflecting the complex five-way admixture history of this population [32].
-
-Allele frequencies for each admixed population were computed as weighted averages of the ancestral group frequencies from Table 1. HWE was then applied to the blended allele frequencies to derive phenotype distributions. Importantly, HWE is nonlinear: blending allele frequencies before applying Hardy-Weinberg gives different phenotype distributions than linearly interpolating phenotype frequencies from the ancestral groups. This means admixed phenotype frequencies may fall outside the range defined by the ancestral extremes---a genuine biological phenomenon reflecting the interaction of alleles from different ancestral backgrounds in admixed genotypes.
-
----
+For each illustrative mixture, the prototype forms weighted averages of the reference allele frequencies and then applies its existing Hardy–Weinberg/functional-bin approximation. This is a computational scenario, not individual-level admixture inference. It does not model individual genotypes, local ancestry, linkage disequilibrium, phase, the Wahlund effect, or gene-specific diplotype translation. The resulting phenotype-frequency tables are exploratory outputs, not evidence that the true phenotype distribution of a named population has been estimated accurately.
 
 ## 3. Results
 
-We distinguish three levels of evidence quality in our analyses. Allele frequency data is externally validated (gnomAD v4, PharmGKB, published cohort studies; see Supplementary Table S4). Phenotype derivation uses simplified Hardy-Weinberg assumptions validated against empirical phenotype studies (see Supplementary Table S5), with known conservative biases. Clinical risk scoring uses heuristic weights that have not been calibrated against clinical outcome data. These three levels carry different degrees of uncertainty, and our conclusions should be interpreted accordingly: allele frequencies are the most reliable input, equity gap rankings are robust (demonstrated by sensitivity analysis), and absolute clinical impact estimates are order-of-magnitude approximations.
+These components have distinct evidence status. Some selected allele-frequency inputs were compared with public resources and published cohort reports (Supplementary Table S4); those source-consistency checks do not validate completeness or representativeness of the entire allele set. The simplified Hardy–Weinberg/functional-bin phenotype approximation was compared with published estimates (Supplementary Table S5), and those comparisons expose material errors for some gene/population combinations; the model is not phenotype-validated. The heuristic risk weights have not been calibrated against observed clinical outcomes. Perturbing included numerical inputs measures internal sensitivity only and cannot establish that a disparity score or ranking is correct. All derived phenotype, equity, and population scenario outputs remain exploratory pending independent, gene-specific evaluation.
 
 ### 3.1 Metabolizer Phenotype Distributions Across Ancestry Groups
 
-Table 3 presents the corrected HWE-derived metabolizer phenotype distributions for all six genes across six ancestry groups. These values incorporate the corrected IM formula (including the previously omitted decreased/normal heterozygote term) and the corrected CYP3A4*22 South Asian allele frequency (0.01, revised from 0.03). Exact values are generated by the open-source engine; the values below are representative outputs rounded to one decimal place.
+Table 3 lists outputs produced by the prototype's simplified HWE/functional-bin calculation for six genes and six broad population labels. The corrected arithmetic term and the CYP3A4*22 source correction address implementation/input consistency; they do not validate the phenotype model. The shown values are model outputs, not observed prevalence, independently validated phenotype estimates, or individual genotype calls. The repository's reference comparison documents material discrepancies and missing-variant limitations.
 
-**Table 3. HWE-derived metabolizer phenotype distributions (%).**
+**Table 3. Simplified model phenotype-frequency outputs (%; not validated prevalence).**
 
 | Gene | Ancestry | UM | NM | IM | PM |
 |------|----------|----|----|----|----|
@@ -200,84 +200,65 @@ Table 3 presents the corrected HWE-derived metabolizer phenotype distributions f
 | | Native Am. | 0.0 | 4.0 | 32.0 | 64.0 |
 | | Mixed | 0.0 | 16.0 | 48.0 | 36.0 |
 
-*Values are HWE-derived estimates from the corrected engine, rounded to one decimal place. UM = ultra-rapid metabolizer, NM = normal metabolizer, IM = intermediate metabolizer, PM = poor metabolizer. CYP2C9 and CYP3A5 have no increased-function alleles in our dataset, hence UM = 0%. CYP3A4 distributions are omitted for brevity (single low-frequency *22 allele produces minimal phenotype variation).*
+*Values are outputs of this prototype's simplified model, rounded to one decimal place; they are not independent prevalence estimates. UM = ultra-rapid, NM = normal, IM = intermediate, PM = poor under the prototype's own functional-bin approximation, which does not reproduce complete gene-specific CPIC phenotype semantics. CYP2C9 and CYP3A5 show UM = 0% because no increased-function alleles are encoded in this dataset, not because an independent reference established a zero population frequency. CYP3A4 is omitted for brevity.*
 
-Several patterns merit attention. For **CYP2D6**, the corrected IM formula produces IM frequencies that include decreased/normal heterozygotes, yielding IM values of 31.2% in Europeans (driven by *41 at 9%) and 15.1% in Africans. The PM frequency (3.6% European) underestimates the empirically observed ~5.4% [14,24] due to the absence of no-function alleles *3, *5, and *6 from our model (see Section 3.8).
+These values show how the current implementation responds to its selected inputs. For **CYP2D6**, the model output includes the decreased/normal heterozygote term and reports 31.2% IM for the European-labeled inputs and 15.1% for the African-labeled inputs. The same model reports 3.6% PM for the European-labeled inputs versus a cited reference around 5.4%; the mismatch is consistent with known missing no-function alleles (*3, *5, *6) and other CYP2D6 coverage gaps. These numbers are a discrepancy diagnostic, not a validated group prevalence comparison.
 
-For **CYP2C19**, inter-ancestry variation exceeds 3-fold for the poor metabolizer phenotype: 2.2% European, 8.4% East Asian, and 10.2% South Asian. This has direct implications for clopidogrel non-response risk: East Asian cardiovascular patients face a 3.8-fold higher prevalence of the CYP2C19 PM phenotype relative to the population in which clopidogrel guidelines were calibrated.
+For **CYP2C19**, the prototype outputs differ across labels (2.2% PM for European-labeled inputs, 8.4% for East Asian-labeled inputs, and 10.2% for South Asian-labeled inputs). The missing *3 allele and simplified phenotype mapping are known limitations. These figures do not establish the true prevalence in those populations, the comparative risk of clopidogrel non-response, or the calibration population for every clopidogrel guideline.
 
-For **CYP3A5**, the phenotype distributions are nearly inverted between European and African populations. In European populations, 88.4% are non-expressors (PM, *3/*3) and only 0.4% are full expressors (NM, *1/*1). In African populations, 47.6% are full expressors and only 10.3% are non-expressors. Standard tacrolimus dosing is calibrated to the European-predominant non-expressor phenotype; the majority of African-ancestry transplant patients require substantially higher doses.
+For **CYP3A5**, the simplified model gives substantially different outputs for the two input labels, largely reflecting its encoded *3 frequencies. Those outputs should not be described as observed expressor/non-expressor prevalence: the model's genotype/phenotype semantics, allele completeness, population mapping, and external comparability have not been qualified. The current numbers cannot estimate an individual transplant recipient's phenotype or tacrolimus dose requirement.
 
-For **CYP2B6**, African populations carry a markedly higher PM frequency (17.6%) compared with European (6.8%) or East Asian (3.2%) populations. This is driven by the combined burden of CYP2B6*6 (38% African, 26% European) and the African-specific *18 no-function allele (4% in African populations, absent elsewhere). Among African patients receiving standard-dose efavirenz, approximately one in six is a poor metabolizer at elevated risk for CNS toxicity.
+For **CYP2B6**, the prototype reports PM fractions of 17.6% for African-labeled inputs, 6.8% for European-labeled inputs, and 3.2% for East Asian-labeled inputs, based on the particular *6/*18 records encoded. These are simplified model outputs whose accuracy has not been independently established; they must not be converted into estimates of patients with CNS toxicity or the performance of standard-dose efavirenz.
 
 ### 3.2 Equity Gap Analysis
 
-Table 4 presents the equity analysis results for all 11 drug-gene pairs.
+Table 4 reports classifications produced by the current model and its chosen heuristic weights/thresholds for all 11 drug-gene pairs. They are internal outputs, not validated clinical disparities or a rank of real-world patient harm.
 
-**Table 4. Equity gap analysis across drug-gene pairs.**
+**Table 4. Exploratory model flags across selected drug-gene pairs (not clinical risk estimates).**
 
-| Drug | Gene | Domain | Equity Gap | Underserved Populations | Most Severe Disparity |
-|------|------|--------|------------|------------------------|----------------------|
-| Tacrolimus | CYP3A5 | Transplant | High | African, East Asian, South Asian, Mixed | 82% African expressors vs 6% European |
-| Efavirenz | CYP2B6 | HIV | High | African, South Asian | 17.6% African PM vs 6.8% European |
-| Codeine | CYP2D6 | Pain | Moderate-High | African, East Asian, South Asian | UM + IM divergence across groups |
-| Clopidogrel | CYP2C19 | Cardiology | Moderate-High | East Asian, South Asian, Mixed | 8.4% East Asian PM vs 2.2% European |
-| Voriconazole | CYP2C19 | Infectious disease | Moderate-High | East Asian, South Asian, Mixed | Same CYP2C19 disparity |
-| Sertraline | CYP2C19 | Psychiatry | Moderate | East Asian, South Asian | PM accumulation risk |
-| Tamoxifen | CYP2D6 | Oncology | Moderate | East Asian, South Asian | IM-driven reduced efficacy |
-| Atomoxetine | CYP2D6 | Psychiatry | Moderate | East Asian, South Asian | PM accumulation risk |
-| Ondansetron | CYP2D6 | Supportive care | Moderate | African | UM-driven treatment failure |
-| Warfarin | CYP2C9 | Cardiology | Moderate | South Asian | 5.3% South Asian PM vs 4.9% European |
-| Phenytoin | CYP2C9 | Epilepsy | Moderate | South Asian | Same CYP2C9 disparity |
+| Drug | Gene | Domain | Model score tier | Population labels crossing prototype thresholds | Method/coverage warning |
+|------|------|--------|----------------|-----------------------------------------------|-------------------------|
+| Tacrolimus | CYP3A5 | Transplant | High | African, East Asian, South Asian, Mixed | Expressor interpretation and *3/*6 coverage require independent qualification |
+| Efavirenz | CYP2B6 | HIV | High | African, South Asian | Functional-bin PM fraction not independently validated |
+| Codeine | CYP2D6 | Pain | Moderate-High | African, East Asian, South Asian | CYP2D6 copy-number/structural variants and diplotype rules incomplete |
+| Clopidogrel | CYP2C19 | Cardiology | Moderate-High | East Asian, South Asian, Mixed | *3 and complete star-allele/activity-score interpretation not represented |
+| Voriconazole | CYP2C19 | Infectious disease | Moderate-High | East Asian, South Asian, Mixed | Same CYP2C19 coverage and phenotype-definition limits |
+| Sertraline | CYP2C19 | Psychiatry | Moderate | East Asian, South Asian | Heuristic weights not outcome-calibrated |
+| Tamoxifen | CYP2D6 | Oncology | Moderate | East Asian, South Asian | Model flag is not a treatment or dosing recommendation |
+| Atomoxetine | CYP2D6 | Psychiatry | Moderate | East Asian, South Asian | CYP2D6 structural and allele-translation gaps |
+| Ondansetron | CYP2D6 | Supportive care | Moderate | African | Prototype UM category does not establish treatment failure |
+| Warfarin | CYP2C9 | Cardiology | Moderate | South Asian | Model output omits full multigene dosing context |
+| Phenytoin | CYP2C9 | Epilepsy | Moderate | South Asian | Model output omits complete allele coverage and clinical context |
 
-The largest equity gaps concentrate in two clinical domains: transplant medicine and HIV treatment. For **tacrolimus/CYP3A5**, the disparity is driven by the near-complete inversion of expressor/non-expressor ratios between European and African populations. African-ancestry transplant patients require dose increases of 1.5-2x to achieve therapeutic trough levels [9], yet standard protocols are calibrated to the European-predominant non-expressor phenotype. East Asian, South Asian, and Mixed populations occupy intermediate positions, with expressor frequencies of approximately 50%, 55%, and 64% respectively---all substantially higher than the 6% European reference.
+These tiers and flags depend on the present allele list, broad functional bins, heuristic weights, thresholds, and population references. Several phenotype estimates are known to disagree substantially with published comparisons (Section 3.8). The labels therefore mean only that the current code crossed its own threshold; they do not establish that a population is clinically underserved, that a dose is wrong, or that one drug–gene pair causes more harm than another.
+### 3.3 Modeled Population Scenario Estimates (Not Clinical Impact)
 
-For **efavirenz/CYP2B6**, African populations carry a disproportionate burden of poor-metabolizer phenotypes. The CYP2B6*6 allele at 38% combined with the African-specific *18 no-function allele at 4% produces a PM frequency of approximately 17.6% in African populations---2.6 times the European estimate. Given that sub-Saharan Africa carries the world's highest HIV burden, this pharmacogenomic inequity compounds an existing health disparity: the populations most affected by HIV are also the most poorly served by standard efavirenz dosing guidelines.
+The table below reproduces aggregate arithmetic from the current exploratory model and population denominators. These are **not estimates of patients who need a dose change, observed adverse events, clinical impact, or treatment benefit**. The phenotype fractions inherit the documented HWE/functional-bin errors and missing-variant limitations described in Sections 3.8 and 4.4. The population denominators are broad modeled categories, not a genotype dataset, and the model does not incorporate indication, actual prescribing, co-medications, organ function, individual genotype, or current clinical context.
 
-For **clopidogrel/CYP2C19**, East Asian and South Asian populations face substantially elevated risk of treatment failure. The CYP2C19*2 poor-metabolizer allele produces PM frequencies of 8.4% (East Asian) and 10.2% (South Asian), compared with 2.2% for European populations. For a prodrug like clopidogrel, where poor metabolizers cannot generate the active antiplatelet compound, this translates directly into elevated risk of recurrent cardiovascular events.
+| Drug | Gene | Population label | Model denominator (M) | Model phenotype fraction | Arithmetic product (M) |
+|------|------|----------------|-----------------------|--------------------------|------------------------|
+| Tacrolimus | CYP3A5 | African | 47.0 | 0.897 (expressors) | ~42.2 |
+| Tacrolimus | CYP3A5 | European | 195.0 | 0.117 (expressors) | ~22.8 |
+| Efavirenz | CYP2B6 | African | 47.0 | 0.193 (PM + UM) | ~9.1 |
+| Efavirenz | CYP2B6 | European | 195.0 | 0.138 (PM + UM) | ~26.9 |
+| Clopidogrel | CYP2C19 | East Asian | 7.0 | 0.134 (PM + UM) | ~0.9 |
+| Clopidogrel | CYP2C19 | South Asian | 6.0 | 0.298 (PM + UM) | ~1.8 |
+| Codeine | CYP2D6 | African | 47.0 | 0.068 (PM + UM) | ~3.2 |
+| Codeine | CYP2D6 | East Asian | 7.0 | 0.011 (PM + UM) | ~0.1 |
 
-African populations are flagged as underserved across the broadest range of drug-gene pairs (codeine, efavirenz, tacrolimus, ondansetron), reflecting both the general underrepresentation of African genetic diversity in pharmacogenomic research and the existence of African-specific alleles (CYP2D6*17, CYP2B6*18, CYP3A5*6) that are poorly characterized or absent from many reference panels.
+The products in the final column are arithmetic outputs only: denominator multiplied by the modeled fraction. They must not be called “at risk,” “actionable patients,” or estimates of people who need a different treatment until both the phenotype model and the population denominator are independently qualified for a defined use.
 
-### 3.3 Clinical Impact Estimates
+### 3.4 Modelled Variation by Drug–Gene Pair
 
-Table 5 presents population-level clinical impact estimates for selected drug-gene pairs in the US population.
+Under the selected allele inputs, broad functional bins, risk weights, and thresholds, the implementation yields different aggregate scores across drug–gene pairs. This is a description of **the model's behaviour**, not evidence that a clinical domain has a measured equity burden or that a population requires a specific intervention.
 
-**Table 5. Estimated US patients with actionable PGx phenotypes, selected drug-gene pairs.**
+- **Transplant-related example:** CYP3A5 allele frequency differences motivate careful comparison with independently annotated diplotype distributions. This model's expressor/non-expressor fractions are not qualified to estimate clinical need or dose.
+- **HIV-treatment example:** CYP2B6 is relevant to efavirenz pharmacogenomics, but the current allele coverage and simplified phenotype mapping do not establish population prevalence or treatment failure.
+- **Pain-management example:** CYP2D6 is relevant to codeine metabolism; missing CYP2D6 alleles and structural/copy-number variation limit this implementation's aggregate phenotype approximation.
+- **Cardiovascular example:** CYP2C19 and CYP2C9 are relevant to some antiplatelet and anticoagulation decisions. The model omits variants important to some populations, so the current cross-population outputs are incomplete.
+- **Other drug classes:** scores for psychiatry, oncology, and epilepsy remain exploratory and should be treated as prompts for source and method review, not as a clinical ranking.
 
-| Drug | Gene | Ancestry | Population (M) | Actionable Fraction | Estimated At-Risk |
-|------|------|----------|----------------|--------------------|--------------------|
-| Tacrolimus | CYP3A5 | African | 47.0 | 0.897 (expressors) | ~42.2 M |
-| Tacrolimus | CYP3A5 | European | 195.0 | 0.117 (expressors) | ~22.8 M |
-| Efavirenz | CYP2B6 | African | 47.0 | 0.193 (PM + UM) | ~9.1 M |
-| Efavirenz | CYP2B6 | European | 195.0 | 0.138 (PM + UM) | ~26.9 M |
-| Clopidogrel | CYP2C19 | East Asian | 7.0 | 0.134 (PM + UM) | ~0.9 M |
-| Clopidogrel | CYP2C19 | South Asian | 6.0 | 0.298 (PM + UM) | ~1.8 M |
-| Codeine | CYP2D6 | African | 47.0 | 0.068 (PM + UM) | ~3.2 M |
-| Codeine | CYP2D6 | East Asian | 7.0 | 0.011 (PM + UM) | ~0.1 M |
-
-*These estimates represent the population carrying actionable phenotypes, not the population actually prescribed these drugs. Actual affected patient counts depend on prescription rates, which are not modeled. Estimates are derived from HWE-based phenotype frequencies applied to 2024 US Census population denominators.*
-
-Several observations warrant emphasis. For tacrolimus/CYP3A5, approximately 89.7% of the African-ancestry US population (roughly 42 million individuals) carries at least one functional CYP3A5 allele, making them expressors who would require dose adjustment. In contrast, only 11.7% of the European-ancestry population carries this phenotype. When a transplant program uses standard tacrolimus dosing protocols calibrated to a European-predominant non-expressor population, the vast majority of its African-ancestry patients receive subtherapeutic initial doses.
-
-For efavirenz/CYP2B6, while the absolute actionable-phenotype count is larger in the European-ancestry population (due to its larger population size), the per-capita burden is substantially higher in the African-ancestry population: 19.3% versus 13.8% carry PM or UM phenotypes requiring dose adjustment. Combined with the higher prevalence of HIV in African-American communities, the per-capita clinical impact is disproportionate.
-
-These estimates represent upper-bound counts of individuals carrying actionable pharmacogenomic phenotypes, not patients currently receiving the drugs in question. Actual clinical impact depends on prescription prevalence, indication rates, healthcare utilization, and implementation of PGx testing---factors not modeled here. We present these figures as measures of the population-level *potential* for guideline-ancestry mismatch, not as epidemiological incidence estimates.
-
-We reiterate that these are modeled estimates, not epidemiological measurements. They do not account for drug prescription rates, the proportion of patients already receiving genotype-guided therapy, or the clinical context in which dosing decisions are made. They should be interpreted as quantifying the scale of the pharmacogenomic equity challenge, not as precise predictions of adverse events.
-
-### 3.4 Drug Class Comparison
-
-Across the seven clinical domains, equity gaps vary considerably.
-
-**Transplant medicine** exhibits the most severe equity gap, driven entirely by the CYP3A5 expressor frequency inversion between European and African populations. This is a clear case where ancestry-aware dosing is not optional but essential for adequate therapeutic coverage.
-
-**HIV treatment** presents the second-largest gap. The CYP2B6*6 allele's elevated frequency in African populations, compounded by the African-specific *18 allele, creates a significant pharmacogenomic burden in the populations most affected by the HIV epidemic. The shift away from efavirenz toward dolutegravir-based regimens in many settings has reduced but not eliminated this concern, as efavirenz remains widely used in resource-limited settings.
-
-**Pain management** shows moderate-to-high equity gaps, primarily for codeine/CYP2D6. African populations face elevated ultra-rapid metabolizer risk (codeine toxicity), while East Asian populations face elevated intermediate metabolizer prevalence (codeine inefficacy). Both represent suboptimal outcomes that could be mitigated by ancestry-aware prescribing or by avoiding codeine in favor of non-CYP2D6-dependent analgesics.
-
-**Cardiology** shows moderate gaps for clopidogrel/CYP2C19 and warfarin/CYP2C9. For clopidogrel, East Asian and South Asian populations bear disproportionate PM-driven non-response risk. For warfarin, the equity picture is complicated by the absence of CYP2C9*8 and *11 from our allele set---alleles that are common in African populations and contribute to decreased warfarin metabolism. Our analysis likely underestimates the equity gap for warfarin in African-ancestry patients.
-
-**Psychiatry** (sertraline/CYP2C19, atomoxetine/CYP2D6), **oncology** (tamoxifen/CYP2D6), and **epilepsy** (phenytoin/CYP2C9) show moderate gaps, with East Asian and South Asian populations most consistently flagged.
+No model-produced population flag may be converted into an individual inference or prescribing recommendation.
 
 ### 3.5 Admixed Population Analysis
 
@@ -306,72 +287,51 @@ To address the limitation that continental ancestry bins poorly represent admixe
 | | *African (ref)* | *0.0* | *47.6* | *42.1* | *10.3* |
 | | *European (ref)* | *0.0* | *0.4* | *11.3* | *88.4* |
 
-*Admixed values are computed by blending ancestral allele frequencies according to published ancestry proportions, then applying HWE to the blended frequencies. Ancestral reference values shown in italics for comparison. Exact values are generated by the open-source engine.*
+*Admixed values are synthetic outputs of the weighted-frequency/HWE approximation, using rounded published group proportions. Ancestral reference values are shown in italics. These values are not independently validated phenotype-frequency estimates for the named populations.*
 
-The admixed analysis suggests several clinically actionable findings. For **CYP3A5/tacrolimus**, the African American CYP3A5 expressor frequency (NM + IM ~72%) is intermediate between African (~90%) and European (~12%) reference populations, confirming that tacrolimus dosing for African Americans requires adjustment from European guidelines but that continental African dosing recommendations would also be suboptimal. The South African Coloured population, with its four-way admixture, shows ~53% expressor frequency---intermediate and distinct from all individual ancestral groups.
-
-For **CYP2C19/clopidogrel**, the South African Coloured population shows a notably elevated PM frequency (5.9%), reflecting the contribution of East Asian ancestry (25%) where CYP2C19*2 reaches 29%. This illustrates how admixed populations can harbor unexpected pharmacogenomic risk from minority ancestral contributions.
+These outputs demonstrate the behaviour of the weighted-frequency calculation under the chosen assumptions. They do not establish a named population's true expressor/phenotype frequency, imply an individual person's genotype, or justify ancestry-adjusted dosing. The method's errors from omitted alleles and collapsed diplotype semantics remain, and simple frequency blending cannot resolve the biological structure of admixture. The next evaluation should compare these results with independent population-specific genotype/diplotype references, where available, report uncertainty and missingness, and retain disagreements rather than tuning the estimates to expected values.
 
 ### 3.6 Sensitivity Analysis
 
-To assess robustness to allele frequency uncertainty, we perturbed all allele frequencies by +/-10% and +/-20% (multiplicative, clamped to [0,1]) and recomputed equity gap rankings for all 11 drug-gene pairs. Rankings were perfectly stable: all 11 drugs maintained their exact equity gap rank across all five perturbation levels (-20%, -10%, baseline, +10%, +20%). Of 24 underserved-population flags across the original drug-gene pairs, 23 (96%) remained consistent across all perturbations. The single unstable flag involved a borderline case where a population's adverse event risk crossed the 0.15 threshold under one perturbation direction.
+The current analysis perturbs the allele-frequency numbers present in the model by bounded multiplicative changes and recalculates its aggregate scores. The script reports rank stability under those tested perturbations. This is an **internal sensitivity check**, not external validation, a calibration result, or proof that the rankings are true.
 
-This demonstrates that our equity conclusions are robust to the known uncertainty in population-level allele frequency estimates. Even if individual allele frequencies in our reference table are off by 20% (a larger error than observed in the gnomAD validation for most alleles), the relative ranking of drugs by equity gap severity and the identification of underserved populations remain stable.
+The perturbations do not simulate the structural uncertainty created by omitted alleles, missing copy-number/structural variants, uncertain star-allele translation, loss of diplotype/phase information, imprecise population sampling, or model misspecification. Because these omissions may change both the magnitude and ordering of results, we do not infer that equity conclusions are robust merely from bounded perturbations of the included numbers. The next benchmark should vary allele coverage and functional assignments using independently curated alternative reference sets, preserving all disagreements and reporting rank changes.
 
-### 3.7 External Validation Against gnomAD v4
+### 3.7 Selected allele-frequency reference comparison (not clinical validation)
 
-We cross-referenced 8 key pharmacogene alleles (32 population-allele comparisons) against gnomAD v4.1 (~149K whole genomes, 7 ancestry groups; Chen et al. 2024 [33]). Of 32 comparisons, 26 (81%) fell within 30% relative agreement with gnomAD population-stratified frequencies. The 6 divergences decompose as follows:
+We conducted an exploratory source-consistency check for 8 selected pharmacogene alleles (32 population/allele comparisons) against gnomAD v4.1 (~149K whole genomes, 7 ancestry groups; Chen et al. 2024 [33]). Of 32 comparisons, 26 (81%) fell within a chosen 30% relative-difference band. This is an allele-frequency source comparison only—not independent validation of our phenotype model, equity scores, treatment actions, or clinical utility. The six divergences decompose as follows:
 
 - **4 African-ancestry divergences** (CYP2D6*4, CYP3A5*3, CYP3A4*22, and CYP2C19*17 in the African group): These are explained by gnomAD's "African/African American" category representing a predominantly African American population (~75-80% from US biobanks) with ~20% European genetic admixture, while our engine targets continental African frequencies from primary literature. For health equity purposes, continental African frequencies better represent the populations most underserved by current pharmacogenomic guidelines.
 - **1 low-frequency flag** (CYP2C19*17 East Asian: our 0.04 vs gnomAD 0.010): Our value from the Ionova 2020 meta-analysis [7] is more conservative (slightly overestimates rapid metabolizer risk, the safer clinical direction). Absolute difference is only 0.03.
 - **1 code correction** (CYP3A4*22 South Asian: 0.03 corrected to 0.01): gnomAD v4 SAS showed 0.009 (n=4,810 genomes), a >3x discrepancy. The original value had no supporting literature and was corrected in the engine.
 
-Full validation details, including per-allele comparison tables and gnomAD query methodology, are provided in Supplementary Material S4.
+Per-allele comparison tables and query methodology are provided in Supplementary Material S4. These checks need independent reproduction against exact source versions and must not be presented as validation of patient-level phenotype predictions.
 
 ### 3.8 HWE vs Empirical Phenotype Comparison
 
-We compared our HWE-derived phenotype frequencies against empirically measured values from clinical genotyping studies (Gaedigk et al. 2017 [14]; Bradford 2002 [24]; Ionova et al. 2020 [7]). The comparison exposes systematic biases inherent to our model:
+The comparison recorded in the repository's HWE validation note exposes material mismatches between the current HWE/functional-bin model and published phenotype estimates. The examples below are diagnostics of model limitations, not a new clinical validation result.
 
-**CYP2D6 PM** is underestimated by approximately 30-50% in Europeans (our 3.6% vs empirical 5.4%) due to the absence of no-function alleles *3, *5, and *6, which together contribute ~5% additional no-function allele frequency. In African populations, PM underestimation is more severe (~10x: our 0.2% vs empirical 2.3-2.8%) due to missing African-specific no-function alleles (*40, *42, *56) and the gene deletion allele *5.
+**CYP2D6 poor metabolizers.** The model reports approximately 3.6% for European-labelled inputs versus a cited empirical estimate of 5.4%, and approximately 0.2% for African-labelled inputs versus cited estimates around 2.3–2.8%. Missing no-function alleles (*3, *5, *6), CYP2D6 deletion and structural variation contribute to this discrepancy.
 
-**CYP2C19 PM** is underestimated in East Asian populations (our 8.4% vs empirical 13-23%) due to the absence of the *3 no-function allele, which reaches 5-9% frequency in East Asians. Adding *3 would approximately double the East Asian PM estimate to ~15%, matching empirical data.
+**CYP2C19 poor metabolizers.** The model's East Asian estimate is below several cited empirical/reference estimates. The absence of the no-function *3 allele is one known source of undercoverage; the precise impact requires a gene-specific reference set rather than a hand-adjusted frequency.
 
-**CYP2D6 IM** exhibits a definitional mismatch: our formula classifies all decreased-function heterozygotes (including *1/*10 and *1/*41) as IM, while CPIC activity score rules classify many of these as NM (activity score >= 1.0). This produces IM overestimates in Europeans (~31% vs empirical 10-11%) but underestimates in African populations (~15% vs empirical 30-38%) where missing decreased-function alleles (*29 at ~20%) deflate the decreased-function pool.
+**CYP2D6 intermediate/normal boundary.** Grouping alleles into broad functional bins does not reproduce CPIC activity-score phenotype assignment. The model can overcount intermediate phenotypes for some groups and undercount them for others, depending on the included alleles and rules.
 
-Despite these absolute discrepancies, **the directional equity conclusions are preserved**:
-
-1. Europeans maintain the highest CYP2D6 PM frequency---correct in both our model and empirical data.
-2. East/South Asians face the highest CYP2C19 PM frequency---correct, and the true gap is larger than we estimate.
-3. African populations carry the highest CYP2D6 UM frequency---correct.
-4. African populations are the most underserved by European-calibrated guidelines---correct across multiple drug-gene pairs.
-
-Despite systematic underestimation of PM frequencies (30-50% for CYP2D6 due to missing *3, *5, and *6 alleles; up to 50% for CYP2C19 in East Asians due to missing *3), the directional equity conclusions are preserved across all genes examined. Europeans maintain the highest CYP2D6 PM frequency, East and South Asians the highest CYP2C19 PM frequency, and African populations the highest CYP2D6 UM frequency in both HWE-derived and empirically measured distributions. This directional robustness means the equity gap *rankings*---which populations are most underserved by which guidelines---are reliable even when absolute phenotype frequencies carry meaningful uncertainty. Moreover, because missing alleles predominantly increase PM and IM estimates, our current equity gaps are conservative: the true magnitude of population-level guideline mismatch is likely larger than reported here.
-
-Full HWE validation details are provided in Supplementary Material S5.
-
----
+These differences mean the present model cannot be treated as a calibrated phenotype estimator. We do not claim that the direction or ordering of all population-level disparities is preserved, nor that missing variants always cause conservative estimates. Rankings and any derived impact counts require independent re-evaluation after gene-specific allele, structural-variant, diplotype, phase, and phenotype logic are corrected.
 
 ## 4. Discussion
 
-### 4.1 Clinical Implications
+### 4.1 Interpretation Boundaries
 
-The equity analysis indicates three drug-gene pairs where ancestry-biased guidelines create the most consequential clinical disparities.
+Established pharmacogenomic resources describe clinically relevant gene–drug relationships, and population variation can motivate questions about representation and evidence transfer. However, this manuscript's simplified aggregate model does not establish clinical outcome disparities, estimate the number of patients who will be harmed, or determine how any individual should be treated.
 
-**Tacrolimus/CYP3A5** presents the starkest case. The CYP3A5*3 loss-of-function allele reaches 94% in European populations but only 18% in African populations---the largest inter-ancestry frequency gap for any pharmacogenomically actionable allele in our dataset. The clinical consequence is that approximately 82% of African-ancestry transplant recipients are CYP3A5 expressors who metabolize tacrolimus more rapidly and require 1.5-2 times the standard dose to achieve therapeutic trough concentrations. Standard protocols calibrated to European non-expressor pharmacokinetics systematically underdose these patients, contributing to higher rates of acute rejection in the critical post-transplant period [9]. The CPIC guideline for tacrolimus/CYP3A5 [9] does recommend genotype-guided dosing, but pre-emptive CYP3A5 genotyping is not yet standard practice in most transplant programs, and the population-level scope of the disparity is rarely quantified. Our admixed population analysis (Section 3.5) further indicates that African American transplant patients, with ~72% expressor frequency, require dosing intermediate between European and continental African recommendations.
-
-**Efavirenz/CYP2B6** is the paradigmatic case of pharmacogenomic inequity intersecting with global health disparities. Efavirenz remains a backbone of antiretroviral therapy in many resource-limited settings, particularly in sub-Saharan Africa. CYP2B6 poor metabolizers experience plasma concentrations 3-4 times higher than normal metabolizers at standard doses, causing CNS toxicity severe enough to drive treatment discontinuation [10,17]. Our analysis estimates that approximately 17.6% of African-ancestry patients carry the PM phenotype (CYP2B6*6 homozygotes plus *6/*18 compound heterozygotes), compared with 6.8% of European-ancestry patients. The 200-400 mg reduced dose recommended by CPIC for poor metabolizers [17] is evidence-based and effective, but it requires genotyping that is rarely available in the settings where efavirenz is most prescribed.
-
-**Codeine/CYP2D6** illustrates a different facet of pharmacogenomic inequity. For codeine, the risk is bidirectional: ultra-rapid metabolizers face toxicity from excessive morphine formation, while poor metabolizers receive no analgesic benefit. African populations carry elevated UM risk (driven by gene duplications at approximately 5% pan-African frequency), while East Asian populations carry dramatically elevated IM prevalence driven by CYP2D6*10 at 43%. CPIC guidelines appropriately recommend avoiding codeine in both UMs and PMs, but the population-level data reveal that the fraction of patients requiring alternative analgesics differs substantially across ancestry groups.
+The tacrolimus/CYP3A5, efavirenz/CYP2B6, and codeine/CYP2D6 examples are retained as **candidate areas for independent evaluation**, because they connect to established pharmacogenomic literature. The frequencies and derived totals calculated by this model should not be used to infer an individual's genotype or phenotype, to recommend a dose or alternative medication, or to estimate graft rejection, toxicity, or treatment failure. Such claims require validated gene-specific interpretation, suitable cohort data, prespecified outcomes, confounder handling, and independent review.
 
 ### 4.2 Comparison to Existing Tools
 
-The Pharmacogenomic Health Equity Engine occupies a distinct niche in the PGx tool landscape. PharmCAT [18], the most widely used open-source PGx tool, operates at the individual patient level: it takes a VCF file as input, calls diplotypes, and generates CPIC-matched recommendations. It is an essential tool for clinical PGx implementation, but it does not compute population-level equity metrics. Our engine is complementary: PharmCAT tells a clinician what to do for this patient; our engine tells a health system which populations need additional attention.
+PharmCAT is an established open-source tool for supported genotype interpretation and CPIC report generation. PharmVar maintains allele definitions, and CPIC publishes gene–drug guideline recommendations. These are essential comparison points, not competitors to be dismissed. This repository's present population-frequency approximation does not perform equivalent individual diplotype interpretation.
 
-PGxDB [19], PharmVIP, and ePGA are annotation and database tools that provide access to pharmacogenomic variant information but do not perform equity scoring. The 2025 scoping review that cataloged 40 PGx tools [6] found none that included systematic equity assessment as a core function.
-
-The 2026 RELIVAF initiative proposes Latin American-specific PGx guidelines [22], representing an important regional effort. Our engine is ancestry-agnostic and extensible: any allele frequency dataset for any ancestry grouping can be loaded to produce equity analyses. The admixed population modeling capability (Section 3.5) provides direct relevance to Latin American populations, which are among the most genetically admixed in the world.
-
-To our knowledge, the Pharmacogenomic Health Equity Engine is the first open-source tool for population-level pharmacogenomic equity assessment. We emphasize that this is a scoring and flagging tool, not a clinical decision support system. It quantifies a known problem and provides an actionable framework for identifying where guideline implementation efforts should be prioritized.
+The tentative research niche is a reproducible aggregate analysis of possible differences between population reference inputs and the evidence base underlying guideline development. The current implementation has not demonstrated improved accuracy, utility, or coverage compared with established tools. We also have not completed a systematic landscape review sufficient to substantiate a “first” claim. A defensible novelty and SOTA comparison requires a reproducible tool search, matched input definitions, a frozen independent corpus, and reported failure cases—not only the existence of an equity score.
 
 ### 4.3 The European Reference as Guideline Calibration Baseline
 
@@ -379,53 +339,49 @@ Our use of the European-ancestry metabolizer distribution as the reference again
 
 ### 4.4 Limitations
 
-We detail the limitations of this work thoroughly, as honest characterization of uncertainty is essential for tools that may inform clinical and policy decisions.
+**Simplified phenotype model.** The model applies Hardy–Weinberg calculations after aggregating alleles into broad functional categories. This loses allele-specific pairing, CPIC activity-score semantics, phase, linkage, and gene-specific interpretation rules. The empirical comparisons above show that the errors can be material and vary by gene and population.
 
-**IM formula correction.** An earlier version of the HWE phenotype derivation omitted the 2 * *f*_df * *f*_n term from the intermediate metabolizer formula, causing IM frequencies to be underestimated by approximately 10-15 percentage points for genes with significant decreased-function allele burden (e.g., CYP2D6 in Europeans where *41 reaches 9%). This was identified and corrected prior to the analyses presented in this paper. All results reflect the corrected formula.
+**Variant and structural coverage.** The dataset covers only a small subset of known pharmacogene alleles. Clinically relevant rare and population-enriched alleles, gene deletion/duplication, hybrid alleles, and other structural variants are not comprehensively represented. Missing coverage must produce an indeterminate state in any future individual-interpretation API, not an assumed reference allele or normal phenotype.
 
-**Hardy-Weinberg assumptions.** HWE assumes random mating within defined populations---a condition violated by all real human populations and especially by our continental-scale ancestry groupings. The admixed population modeling (Section 2.7) partially addresses this limitation for four specific populations, but uses linear allele blending which does not account for the Wahlund effect from recent admixture, linkage disequilibrium between loci, or population substructure within admixed groups. Continuous ancestry modeling using genetic principal components would be preferable but requires individual-level genotype data that is not available at population scale for most pharmacogenes.
+**Population modelling.** Broad population labels conceal substantial within-group variation and are not proxies for an individual's genotype or genetic ancestry. Linear mixing of allele frequencies followed by HWE is a first-order approximation that does not reproduce individual admixture, linkage, the Wahlund effect, or population substructure. Estimated denominators are not genotype cohorts.
 
-**HWE-derived phenotype accuracy.** Comparison against empirically measured phenotype frequencies (Section 3.8) indicates that HWE-derived PM frequencies are systematically underestimated by 30-50% for CYP2D6 (due to missing no-function alleles *3, *5, *6) and by 40-60% for CYP2C19 in East Asians (due to missing *3). The IM/NM boundary is distorted by the use of functional-bin aggregation rather than CPIC activity score-based phenotype assignment. However, directional equity conclusions and relative population rankings are preserved (Section 3.8), and the underestimates are conservative---the true equity gaps are likely larger than reported.
+**Risk and impact calculations.** Risk weights are heuristic and not calibrated against clinical outcome data. Multiplying population denominators by the model's phenotype fractions does not estimate observed adverse events, prescriptions, clinical need, or treatment benefit. No clinical outcome validation has been performed.
 
-**Allele coverage.** We include 16 alleles across 6 genes. CYP2D6 alone has over 150 defined star alleles in PharmVar. Population-specific alleles of clinical significance are underrepresented in our dataset. CYP2C9*8 (8% in African populations) and *11 (3% in African populations) are decreased-function alleles not yet included; their absence systematically underestimates the equity gap for warfarin and phenytoin in African-ancestry patients [23]. CYP2D6*29 (decreased function, primarily African) and CYP2D6*10-like suballeles in East Asian populations are similarly absent. Most consequentially, the absence of CYP2C19*3 (rs4986893)---a no-function allele present at 5-9% in East Asian populations but rare in Europeans---approximately halves our East Asian CYP2C19 PM estimate (8.4% vs. empirical 13-23%). This specific gap means our engine underestimates the clopidogrel and voriconazole equity burden for East Asian patients. Expanding allele coverage, particularly for under-studied populations, is a priority for future versions.
+**Reference comparison.** Checking selected allele-frequency values against gnomAD or literature is a source-consistency exercise. It does not establish allele completeness, phenotype accuracy, representativeness, calibration, transportability, or clinical utility. The relative-difference threshold is a chosen comparison rule, not a validated accuracy criterion.
 
-**Risk weight heuristics.** The risk weights used in equity gap scoring (0.8, 0.3, 0.9, 0.7, 0.2) are pharmacologically motivated but not derived from clinical outcome data. The relative contribution of PM versus UM phenotypes to adverse events and efficacy failure varies by drug, dose, indication, and patient factors that our model does not capture. Sensitivity analysis (Section 3.6) demonstrates that equity gap rankings are robust to moderate weight perturbations, but the absolute magnitude of equity gap scores should not be interpreted as calibrated risk probabilities.
+**Sensitivity and ranking.** Stability under perturbations of existing input numbers does not resolve omitted variants or structural model errors. We have not established that model-derived ranks reflect a true ordering of clinical inequity. Missing variants can change ranking and magnitude in either direction.
 
-**No clinical outcome validation.** All risk estimates in this analysis are derived from allele frequency data and pharmacokinetic principles. We have not validated our equity gap scores against observed rates of adverse drug reactions or therapeutic failure in ancestry-stratified clinical cohorts. Prospective clinical validation, ideally using data from All of Us, UK Biobank, or H3Africa, is essential before these scores are used to guide clinical policy.
+**Reproducibility and independent evaluation.** Before publishing quantitative conclusions, every source value should be pinned to an exact publication/data release, license/usage terms, query or extraction method, population definition, uncertainty estimate, and digest. An independent team should rebuild the inputs and outcome oracle; held-out external references should be reserved before tuning. All numerical claims must be re-audited from those artifacts.
 
-**Gene-gene interactions.** Each gene is modeled independently. In practice, many drugs are metabolized by multiple CYP enzymes: sertraline is primarily a CYP2C19 substrate but is also metabolized by CYP2D6 and CYP3A4. Our model does not capture the compensatory metabolism that may mitigate the clinical impact of a single-gene poor metabolizer phenotype.
+### 4.5 Research Questions for Guideline and Health-System Stakeholders
 
-**Ancestry self-identification.** In clinical practice, patient ancestry is typically self-reported and may not correspond to genetic ancestry. The NIH All of Us program has demonstrated substantial discordance between self-reported race/ethnicity and genetic ancestry for pharmacogene variation [12]. Our tool assumes concordance between self-reported ancestry and the population-level allele frequencies used for scoring. The admixed modeling capability partially mitigates this limitation for populations where ancestry proportions are well characterized.
+The current prototype is not sufficient to support clinical policy recommendations. After independent source and method validation, qualified stakeholders could investigate whether:
 
-**Sample size limitations.** Allele frequency estimates for Native American and some South Asian sub-populations are derived from small cohorts with wide confidence intervals. These values should be treated as approximate.
+1. Guideline-development programs would benefit from reporting the population coverage and uncertainty of the allele/diplotype evidence used for each gene–drug recommendation.
+2. Health systems can safely audit their own consented, clinically valid genotype/reference datasets for gaps in representation without substituting population labels for individual genotype.
+3. Pharmacovigilance datasets can support privacy-preserving, appropriately governed analyses of subgroup performance and adverse-event patterns while reporting confounding and missingness.
+4. Open reference corpora and reproducible evaluations can reduce the cost of identifying under-studied variants and populations.
 
-### 4.5 Policy Recommendations
-
-Our analysis supports four policy recommendations.
-
-First, **CPIC guideline development should incorporate systematic equity impact assessment**. For each new or updated guideline, the development process should include a quantitative analysis of how metabolizer phenotype distributions vary across ancestry groups and whether the guideline's dosing recommendations adequately serve populations beyond the primary validation cohort. The methodology presented here provides a template for such assessment.
-
-Second, **hospital PGx programs should report ancestry-stratified phenotype distributions**. Institutions implementing clinical PGx programs should track and report the ancestry distribution of their patient populations alongside phenotype frequencies, enabling comparison with guideline calibration populations and identification of local equity gaps.
-
-Third, **pharmacovigilance databases should stratify adverse event reporting by genetic ancestry**. Current adverse event reporting systems (FDA FAERS, WHO VigiBase) do not systematically capture genetic ancestry. Without this information, ancestry-specific adverse event signals---such as elevated efavirenz CNS toxicity in CYP2B6 PM-enriched populations---are difficult to detect at population scale.
-
-Fourth, **open-source equity tools should be prioritized for global adoption**. The 2025 scoping review finding that all 40 published PGx tools originated in high-income countries [6] underscores a development gap. Open-source tools with permissive licensing lower the barrier for adaptation and deployment in low- and middle-income countries, where the burden of ancestry-biased prescribing may be greatest and resources for local tool development are most constrained.
+These are prospective research questions, not conclusions established by the current scores. Any analysis using patient data requires separate privacy, ethics, licensing, and governance review.
 
 ### 4.6 Future Work
 
-Near-term priorities include expanding allele coverage to include African-specific variants (CYP2C9*8, *11; CYP2D6*29), extending gene coverage to all 28 active CPIC guidelines, and refining admixed modeling with region-specific ancestry proportions and empirical validation. Adopting CPIC activity score-based phenotype assignment (replacing the four-bin HWE formula) would eliminate the IM/NM boundary distortion documented in Section 3.8. Validation against All of Us clinical outcome data would enable calibration of risk weights against observed adverse event rates. Integration with PharmCAT could provide a seamless individual-to-population context bridge, where individual genotype results are presented alongside population-level equity context. Extension to DPWG (Dutch Pharmacogenetics Working Group) guidelines would enable European-focused comparison. Finally, a web-based interface would make the tool accessible to clinicians, pharmacists, and policymakers who may not have Rust development environments.
+The next work should target correctness and evaluability before expansion:
 
----
+1. Build a source-pinned, gene-specific allele/diplotype reference corpus with explicit copy-number and structural-variant cases, phase ambiguity, unsupported variants, and independent expected phenotypes.
+2. Replace broad functional-bin formulas with validated, versioned gene-specific interpretation semantics where scope permits; unsupported or ambiguous inputs remain indeterminate.
+3. Compare against CPIC, PharmVar, PharmCAT, and independent expert annotations under matched, prespecified test conditions. Separate allele-frequency source consistency from phenotype agreement, calibration, and clinical utility.
+4. Quantify uncertainty in population inputs and report coverage/missingness per subgroup; do not infer that stability under simple numerical perturbation validates ranking.
+5. Keep the research projection API non-actionable. Any future interoperability with PharmCAT or a clinical system requires a separately reviewed evidence-bound contract and must not turn an aggregate score into individual advice.
+6. Consider external clinical-outcome studies only after the methods, reference corpus, endpoints, governance, and intended context of use have been independently qualified.
 
 ## 5. Conclusion
 
-Pharmacogenomic guidelines are among the most evidence-based tools in precision medicine, yet their predominantly European calibration creates a quantifiable equity gap. We present the Pharmacogenomic Health Equity Engine, an open-source tool that makes this gap visible and actionable. Across 11 CPIC Level A drug-gene pairs, 6 pharmacogenes, and 6 ancestry groups, we find systematic disparities in metabolizer phenotype distributions that translate into differential adverse event risk and therapeutic efficacy. The most severe disparities concentrate in transplant medicine (tacrolimus/CYP3A5, where 82% of African individuals carry expressor phenotypes versus 6% of Europeans), HIV treatment (efavirenz/CYP2B6, where PM frequency in African populations is 2.6 times the European estimate), and antiplatelet therapy (clopidogrel/CYP2C19, where East Asian PM frequency is 3.8 times the European reference). Across these and other drug-gene pairs, tens of millions of individuals in the US alone carry actionable phenotypes where current guidelines may not optimally serve their ancestry group.
+This work is an exploratory software study of population-level allele-frequency inputs and simplified phenotype-frequency approximations, not a clinically validated pharmacogenomic model. The main reproducible finding is that the current broad functional-bin/HWE method has material limitations: clinically relevant alleles and structural variants are missing, individual diplotype/activity-score information is lost, and derived phenotype estimates disagree with some published references.
 
-External validation against gnomAD v4 confirms the accuracy of our allele frequency inputs (81% of comparisons within 30% relative agreement), and sensitivity analysis demonstrates perfect rank stability of equity conclusions across +/-20% allele frequency perturbations. Comparison against empirical phenotype frequencies suggests that our HWE-derived estimates are conservative: the true equity gaps are likely larger than reported, as missing alleles systematically underestimate PM frequencies in underrepresented populations. Extension to four admixed populations indicates that admixed-specific dosing considerations fall outside the range addressable by any single continental ancestry bin.
+Population-frequency differences may motivate research into representation and evidence gaps, but the current implementation does not establish individual phenotype status, observed adverse-event burden, treatment failure, clinical utility, or the number of people who would benefit from a treatment change. The gnomAD comparison is not clinical validation, and input-perturbation stability is not proof that a score or ranking is correct. All population-derived phenotype, equity, and impact estimates remain hypothesis-generating until independently reproduced with source-pinned allele definitions, complete gene-specific interpretation rules, separate expected-outcome annotations, and held-out external data.
 
-This tool does not replace CPIC guidelines. It provides an equity lens through which to evaluate them. All code and reference data are released openly under AGPL-3.0. Systematic equity quantification should become a standard component of pharmacogenomic guideline development and implementation.
-
----
+The API now exposes only non-actionable reference metadata from its research projection helper. It contains no patient-specific dose or medication action. This API boundary does not qualify the underlying model or any downstream use for clinical care. Code and research fixtures are released under AGPL-3.0 for replication and critique, with known gaps and negative findings retained.
 
 ## References
 
@@ -469,11 +425,11 @@ This tool does not replace CPIC guidelines. It provides an equity lens through w
 
 **Figure 1.** Metabolizer phenotype distributions across ancestry groups for CYP2D6, CYP2C19, CYP2B6, and CYP3A5. Grouped bar charts showing the proportion of ultra-rapid (UM), normal (NM), intermediate (IM), and poor (PM) metabolizers in six ancestry groups. Key visual: the near-inversion of CYP3A5 expressor/non-expressor ratios between African and European populations, and the dramatically elevated CYP2D6 IM frequency in European populations (reflecting the corrected IM formula).
 
-**Figure 2.** Equity gap heatmap. Rows: 11 drug-gene pairs. Columns: 6 ancestry groups. Cell color: composite risk score (mean of adverse event risk and efficacy risk). Asterisks mark populations flagged as underserved. Right margin shows aggregate equity gap score per drug-gene pair.
+**Figure 2.** Exploratory model-output heatmap. Rows: 11 drug-gene pairs. Columns: 6 broad population labels. Cell colour represents the prototype's heuristic output; it is not a calibrated risk probability. Any flag or aggregate score must be labelled exploratory and accompanied by variant-coverage limitations.
 
-**Figure 3.** Clinical impact estimates (US population). Horizontal bar chart showing estimated number of individuals carrying actionable pharmacogenomic phenotypes per drug-gene pair, stratified by ancestry group. Prominently labeled: "Modeled estimates based on HWE-derived phenotype frequencies and US Census population data. Not epidemiological measurements."
+**Figure 3.** Illustrative population scenario arithmetic. Horizontal bars show the product of a broad population denominator and the prototype's modelled phenotype fraction. Label the result as arithmetic under unvalidated assumptions; do not call it clinical impact, an at-risk count, or an estimate of people requiring intervention.
 
-**Figure 4.** Admixed population phenotype distributions for CYP3A5 and CYP2C19. Side-by-side comparison of metabolizer frequencies for four admixed populations (African American, US Latino/Hispanic, Brazilian, South African Coloured) alongside ancestral reference populations. Illustrates how admixed phenotype frequencies are intermediate between---but not simple linear interpolations of---ancestral values.
+**Figure 4.** Outputs from illustrative weighted-frequency scenarios for four population mixtures. Any differences from broad reference groups demonstrate the chosen calculation's behaviour only; they do not validate phenotype prevalence in those populations or describe individual ancestry/genotypes.
 
 ---
 
@@ -481,11 +437,11 @@ This tool does not replace CPIC guidelines. It provides an equity lens through w
 
 **Table S1.** Complete allele frequency table with literature ranges, confidence intervals where available, and source annotations for each value. Includes documentation of values interpolated from limited data (Native American, Mixed categories).
 
-**Table S2.** Sensitivity analysis of risk weights. Equity gap scores recomputed with risk weight perturbations of +/-10%, +/-20%, and +/-50%. Ranking stability assessed using Spearman rank correlation.
+**Table S2.** Internal sensitivity checks under bounded perturbations of included numbers/weights. Report rank changes and flag stability; explicitly state that the test does not account for missing alleles, structural variants, or model misspecification and is not validation of rankings.
 
 **Table S3.** Comparison of HWE-derived phenotype frequencies with directly measured values from All of Us (V8), UK Biobank, and published cohort studies, where available.
 
-**Table S4.** gnomAD v4.1 validation: per-allele, per-population comparison table with relative errors, pass/fail status, and explanatory notes for divergences. Includes gnomAD query methodology and population mapping.
+**Table S4.** Selected allele-frequency source-consistency comparison against gnomAD v4.1: per-allele/per-population values, relative differences, and query/population-mapping methodology. Do not label this clinical or phenotype-model validation.
 
 **Table S5.** HWE vs empirical phenotype frequency comparison for CYP2D6 and CYP2C19 across 4 ancestry groups, with root cause analysis of systematic biases.
 

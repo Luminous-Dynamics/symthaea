@@ -4,10 +4,10 @@
 
 //! PGx Health Equity: Allele Frequency Sensitivity Analysis
 //!
-//! Perturbs all population allele frequencies by -20% to +20% and checks
-//! whether equity gap rankings remain stable. Demonstrates that our equity
-//! conclusions are robust to the known uncertainty in population-level
-//! allele frequency estimates.
+//! Perturbs the included population allele-frequency values by -20% to +20%
+//! and reports changes in prototype heuristic scores and threshold flags.
+//! This is an internal sensitivity check only; it does not validate phenotype
+//! estimates, score rankings, clinical equity, or any treatment conclusion.
 //!
 //! Run:
 //! ```bash
@@ -48,8 +48,8 @@ fn run_analyses() -> Vec<(f64, Vec<(String, String, f64, Vec<AncestryGroup>)>)> 
                     (
                         drug.clone(),
                         gene.clone(),
-                        a.equity_gap_score,
-                        a.underserved_populations.clone(),
+                        a.model_gap_score,
+                        a.model_flagged_populations.clone(),
                     )
                 })
                 .collect();
@@ -79,8 +79,8 @@ fn main() {
     );
 
     // ===== Section 1: Rankings by perturbation =====
-    println!("=== EQUITY GAP RANKINGS BY PERTURBATION LEVEL ===");
-    println!("(Do the most inequitable drugs stay the same?)\n");
+    println!("=== PROTOTYPE MODEL-SCORE RANKINGS BY PERTURBATION LEVEL ===");
+    println!("(Do the same prototype model scores remain ordered under these perturbations?)\n");
 
     // For each perturbation, sort by gap descending to get rankings.
     let mut ranked: Vec<Vec<usize>> = Vec::new(); // ranked[pert_idx][rank] = pair_idx
@@ -133,7 +133,7 @@ fn main() {
         }
     }
     println!(
-        "Rank stability: {}/{} drugs maintain their exact rank across all perturbation levels.",
+        "Internal score-rank stability: {}/{} pairs maintain exact rank across the tested numeric perturbations.",
         stable_count, n_drugs
     );
 
@@ -206,8 +206,8 @@ fn main() {
     println!();
 
     // ===== Section 3: Underserved population stability =====
-    println!("=== UNDERSERVED POPULATION STABILITY ===");
-    println!("(Do the same populations get flagged as underserved?)\n");
+    println!("=== MODEL-THRESHOLD FLAG STABILITY ===");
+    println!("(Do the same broad population labels cross the prototype thresholds?)\n");
 
     // Show -20%, Base, +20% columns.
     let col_indices = [0usize, base_idx, PERTURBATIONS.len() - 1];
@@ -251,7 +251,7 @@ fn main() {
         }
         println!();
 
-        // Count stability: does the base set of underserved populations persist?
+        // Count stability: do the prototype's threshold-crossing labels persist?
         let base_set = &analyses[base_idx].1[pair_idx].3;
         for &(anc, _) in ANCESTRY_ORDER {
             let in_base = base_set.contains(&anc);
@@ -272,7 +272,7 @@ fn main() {
     println!();
 
     // ===== Key Finding =====
-    println!("=== KEY FINDING ===\n");
+    println!("=== INTERNAL SENSITIVITY SUMMARY ===\n");
 
     // Determine the top-3 drugs by base gap.
     let top3_names: Vec<String> = base_ranking
@@ -298,19 +298,21 @@ fn main() {
         };
 
     println!(
-        "Equity gap rankings are {} to +/-20% allele frequency uncertainty.",
+        "Prototype model-score rankings are {} under +/-20% perturbations of included frequency inputs.",
         stability_word
     );
     println!(
-        "The largest gaps ({}) remain the largest regardless of perturbation.",
+        "The top model scores in this calculation ({}) retain their relative position under this limited perturbation set.",
         top3_names.join(", ")
     );
     println!(
         "Maximum gap score delta across all perturbations: {:.3}",
         max_delta_overall
     );
-    println!("This demonstrates that our conclusions are robust to the known uncertainty");
-    println!("in population-level allele frequency estimates.");
+    println!(
+        "This does not validate the model assumptions, omitted variants, phenotype estimates, or the validity"
+    );
+    println!("of any clinical equity conclusion. It is only an internal sensitivity report.");
 
     println!(
         "\n[Analysis: {} drug-gene pairs x {} perturbation levels = {} equity analyses]\n",
