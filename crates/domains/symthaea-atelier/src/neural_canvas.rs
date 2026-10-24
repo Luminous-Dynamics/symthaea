@@ -334,6 +334,23 @@ mod tests {
     }
 
     #[test]
+    fn invalid_prediction_error_does_not_change_neural_canvas_encoding() {
+        let genesis = test_genesis();
+        let mut low = CognitiveSnapshot::dormant();
+        low.prediction_error = 0.0;
+        low.prediction_error_valid = false;
+        let mut sentinel = low.clone();
+        sentinel.prediction_error = 1.0;
+
+        let low_hv = NeuralCanvas::encode_snapshot(&low, &genesis);
+        let sentinel_hv = NeuralCanvas::encode_snapshot(&sentinel, &genesis);
+        assert_eq!(
+            low_hv.values, sentinel_hv.values,
+            "invalid PE payload must be omitted from neural canvas HDC encoding"
+        );
+    }
+
+    #[test]
     fn neural_canvas_generates_elements() {
         let genesis = test_genesis();
         let mut canvas = NeuralCanvas::new(&genesis);
