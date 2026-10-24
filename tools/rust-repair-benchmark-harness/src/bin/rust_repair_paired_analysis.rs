@@ -129,7 +129,7 @@ fn parse_cli() -> Result<Cli, String> {
         }
     }
 
-    if iterations == 0 || iterations > MAX_BOOTSTRAP_ITERATIONS {
+    if !(1..=MAX_BOOTSTRAP_ITERATIONS).contains(&iterations) {
         return Err(format!("--iterations must be in 1..={MAX_BOOTSTRAP_ITERATIONS}"));
     }
     if arm_a_label.trim().is_empty() || arm_b_label.trim().is_empty() {
@@ -361,8 +361,8 @@ fn run() -> Result<(), String> {
 
         if let Some(delta) = paired_delta(a, b) {
             complete_pairs += 1;
-            complete_a_successes += usize::from(a == Outcome::Pass);
-            complete_b_successes += usize::from(b == Outcome::Pass);
+            complete_a_successes += if a == Outcome::Pass { 1 } else { 0 };
+            complete_b_successes += if b == Outcome::Pass { 1 } else { 0 };
             match delta.cmp(&0) {
                 std::cmp::Ordering::Greater => wins_a += 1,
                 std::cmp::Ordering::Less => wins_b += 1,
