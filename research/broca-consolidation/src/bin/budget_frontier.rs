@@ -289,7 +289,7 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
     }
     let sha = sha.ok_or_else(|| "--source-sha is required".to_string())?;
     if !valid_sha(&sha) { return Err("--source-sha must be 40 hexadecimal characters".to_string()); }
-    if !(30..=1000).contains(&candidates) { return Err("--candidates must be in 30..=1000".to_string()); }
+    if !(30..=200).contains(&candidates) { return Err("--candidates must be in 30..=200 so raw evidence always fits the 8192-unit budget".to_string()); }
 
     for args in [&["diff", "--quiet"][..], &["diff", "--cached", "--quiet"][..]] {
         let check = Command::new("git").args(args).status()
