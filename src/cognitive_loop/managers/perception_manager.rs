@@ -183,9 +183,9 @@ impl CognitiveSubsystem for PerceptionManager {
 
         // ── 4. Vigilance mode ─────────────────────────────────────────────
         // Enter vigilant mode on low coherence + high prediction error
-        if snapshot.prediction_error_valid != 0 {
+        if let Some(prediction_error) = snapshot.prediction_error_sample() {
             let should_be_vigilant = coherence < PERCEPTION_VIGILANCE_COHERENCE
-                && snapshot.prediction_error > PERCEPTION_VIGILANCE_PE;
+                && prediction_error > PERCEPTION_VIGILANCE_PE;
             if should_be_vigilant && !self.vigilant {
                 self.vigilant = true;
                 self.attention_sensitivity = (self.attention_sensitivity
