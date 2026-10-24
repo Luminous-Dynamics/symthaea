@@ -195,8 +195,14 @@ fn validate_catalogue(doc: &Value) -> Result<(String, Vec<Family>, SplitCounts)>
     let rows = doc["families"].as_array().context("families must be an array")?;
     let mut splits = BTreeMap::new();
     for row in rows {
-        let id = row["family_id"].as_str().context("family_id missing")?.to_owned();
-        let split = row["split"].as_str().context("split missing")?.to_owned();
+        let id = row["family_id"]
+            .as_str()
+            .context("family_id missing")?
+            .to_owned();
+        let split = row["split"]
+            .as_str()
+            .context("split missing")?
+            .to_owned();
         let _title = row["title"].as_str().context("title missing")?;
         if !matches!(split.as_str(), "train" | "validation" | "test")
             || id.trim().is_empty()
@@ -243,9 +249,12 @@ fn validate_catalogue(doc: &Value) -> Result<(String, Vec<Family>, SplitCounts)>
         }
     }
 
-    let tag_re = Regex::new(r"<[^>]*>").context("compile HTML-tag tokenizer")?;
-    let entity_re = Regex::new(r"&[A-Za-z]+;").context("compile entity tokenizer")?;
-    let token_re = Regex::new(r"(?u)[\p{L}\p{N}]{3,}").context("compile Unicode tokenizer")?;
+    let tag_re = Regex::new(r"<[^>]*>")
+        .context("compile HTML-tag tokenizer")?;
+    let entity_re = Regex::new(r"&[A-Za-z]+;")
+        .context("compile entity tokenizer")?;
+    let token_re = Regex::new(r"(?u)[\p{L}\p{N}]{3,}")
+        .context("compile Unicode tokenizer")?;
     let stop = stopwords();
     let mut families = Vec::with_capacity(rows.len());
     for row in rows {
@@ -288,7 +297,10 @@ fn discover(families: &[Family]) -> Vec<Candidate> {
             let rare: Vec<String> = shared
                 .iter()
                 .filter(|token| {
-                    document_frequency.get(*token).copied().unwrap_or(usize::MAX)
+                    document_frequency
+                        .get(*token)
+                        .copied()
+                        .unwrap_or(usize::MAX)
                         <= RARE_TOKEN_MAX_DOCUMENT_FREQUENCY
                 })
                 .cloned()
@@ -409,7 +421,8 @@ fn main() -> Result<()> {
         ));
     }
     let doc: Value = serde_json::from_slice(
-        &fs::read(&args[0]).with_context(|| format!("cannot read {}", args[0]))?,
+        &fs::read(&args[0])
+            .with_context(|| format!("cannot read {}", args[0]))?,
     )
     .context("frozen split manifest is not valid JSON")?;
     let (digest, families, split_counts) = validate_catalogue(&doc)?;
@@ -498,8 +511,16 @@ mod tests {
         let entity = Regex::new(r"&[A-Za-z]+;").unwrap();
         let token = Regex::new(r"(?u)[\p{L}\p{N}]{3,}").unwrap();
         let stop = stopwords();
-        let mut a = family("001", "Iitaka subadditivity and logarithmic additivity", "train");
-        let mut b = family("002", "Log abundance under logarithmic Iitaka subadditivity", "test");
+        let mut a = family(
+            "001",
+            "Iitaka subadditivity and logarithmic additivity",
+            "train",
+        );
+        let mut b = family(
+            "002",
+            "Log abundance under logarithmic Iitaka subadditivity",
+            "test",
+        );
         a.tokens = token_set(&a.title, &tag, &entity, &token, &stop);
         b.tokens = token_set(&b.title, &tag, &entity, &token, &stop);
         let first = discover(&[a.clone(), b.clone()]);
