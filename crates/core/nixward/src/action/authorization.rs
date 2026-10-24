@@ -720,6 +720,49 @@ mod tests {
     }
 
     #[test]
+    fn concurrent_consumers_can_use_a_permit_at_most_once() {
+        use std::sync::{Arc, Mutex};
+
+        let command = binding(&["switch", "--flake", ".#host"]);
+        let mut initial_ledger = ExecutionAuthorizationLedger::default();
+        let permit = initial_ledger
+            .issue(request(
+                command.clone(),
+                "decision-concurrent",
+                AuthorizationAuthority::HumanOperator,
+                ActionScope::SystemCritical,
+            ))
+            .unwrap();
+        let ledger = Arc::new(Mutex::new(initial_ledger));
+        let permit = Arc::new(permit);
+
+        let workers = (0..16)
+            .map(|_| {
+                let ledger = Arc::clone(&ledger);
+                let permit = Arc::clone(&permit);
+                let command = command.clone();
+                std::thread::spawn(move || {
+                    let attempt = AuthorizationAttempt::new(
+                        command,
+                        "operator:alice",
+                        ActionScope::SystemCritical,
+                        AuthorizationAuthority::HumanOperator,
+                    )
+                    .unwrap();
+                    ledger.lock().unwrap().consume(permit.as_ref(), &attempt).is_ok()
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let successes = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .filter(|success| *success)
+            .count();
+        assert_eq!(successes, 1);
+    }
+
+    #[test]
     fn stale_authorization_request_cannot_gain_a_fresh_lifetime_when_issued() {
         let mut ledger = ExecutionAuthorizationLedger::default();
         let mut stale = request(
