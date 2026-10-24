@@ -392,3 +392,8 @@ Methodological basis: simulation-based planning is appropriate when binary outco
 
 
 See also [PITB's exploratory power-planning sensitivity illustration](pitb-power-planning-sensitivity-illustration-2026-10-24.md). It shows under synthetic assumptions that the 20-component floor may have low probability of meeting the combined +10-point observed-effect and positive-interval gate. The finding is not a measured PITB result or final sample-size prescription; it motivates sensitivity planning on the real eligible component sizes once the relationship audit is complete.
+
+
+### 24 October correction: align the planned interval to the registered paired estimator
+
+The power-planning implementation has since been corrected to use the paired component-percentile-bootstrap interval from PITB's success-cost frontier analysis, not the t-interval approximation described in an earlier section above. The bootstrap replicate count is an explicit, schema-bound input. The linked sensitivity note's tables were refreshed under that component-bootstrap rule using a separate exploratory Monte Carlo implementation; they are not Rust output or measured PITB performance. The next design gate remains the real component-size distribution after the independently reviewed relationship/quarantine audit, followed by a preregistered grid and independent statistical review.
