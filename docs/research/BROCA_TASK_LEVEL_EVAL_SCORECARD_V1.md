@@ -12,7 +12,7 @@ For each held-out task, run matched arms against identical case IDs and grouped 
 - `no_memory`: same answer policy with persistent memory disabled.
 - `exact_hdc`: current HDC/MemoryBridge exact-search reference.
 - `approx_hdc`: proposed approximate retrieval policy.
-- At least one external/retrieval baseline: `bm25`, `dense_retriever`, `strong_retriever`, `full_context`, `kv_memory`, or `summary_memory`. Prefer more than one. Record each arm's model, prompt, index, context, and resource budget in a hashed config manifest.
+- At least one external retrieval baseline required by the checker: `bm25`, `dense_retriever`, or `strong_retriever`. Also add `full_context`, `kv_memory`, and `summary_memory` as alternative-memory arms where feasible; those do not substitute for an external retrieval comparator. Record each arm's model, prompt, index, context, and resource budget in a hashed config manifest.
 
 The primary estimand is **paired incremental memory value**: for each candidate arm, report task-success accuracy and its paired difference against `no_memory` on the exact same cases. Count wins (candidate succeeds and no-memory fails), losses (the reverse), and ties. Do not claim that recall or a higher raw accuracy alone proves memory caused the improvement. Use session/user/source-group bootstrap intervals, not an independent-row bootstrap, when cases share histories or users.
 
