@@ -144,12 +144,13 @@ impl CognitiveSubsystem for ThermodynamicManager {
         self.input.coherence = snapshot.coherence;
         // Hold the last admitted PE rather than converting a missing comparison
         // into either a maximum-energy event or an invented zero observation.
-        if snapshot.prediction_error_valid != 0 {
-            self.input.prediction_error = snapshot.prediction_error;
+        let prediction_error_sample = snapshot.prediction_error_sample();
+        if let Some(prediction_error) = prediction_error_sample {
+            self.input.prediction_error = prediction_error;
         }
         // Validity is per-cycle even while the retained numeric value is held for
         // diagnostics; downstream thermodynamic PE consumers must not replay it.
-        self.input.prediction_error_valid = snapshot.prediction_error_valid != 0;
+        self.input.prediction_error_valid = prediction_error_sample.is_some();
         self.input.attention_sensitivity = snapshot.phi_attention_weight;
         self.input.metabolic_stress = snapshot.thermodynamic_load;
 
