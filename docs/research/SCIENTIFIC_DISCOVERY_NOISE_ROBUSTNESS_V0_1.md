@@ -83,7 +83,27 @@ The current standalone Rust harness includes a bounded deterministic schedule he
 
 Treat attribution as a *partially identified diagnosis*: report the set of causes consistent with observed evidence whenever structural shift and measurement shift cannot be separated under the frozen design.
 
-## 5. Comparators
+## 6. Cause-discriminating experiment challenge
+
+The factorial noise suite alone measures monitor behavior under known evaluation conditions; it does not establish that a discovery policy can choose measurements that distinguish competing explanations. The follow-on [SCI-DIAG-001 (#8628)](https://github.com/Luminous-Dynamics/symthaea/issues/8628) adds that distinct question.
+
+Freeze five evaluator-only world classes:
+
+1. **Stable law / stable noise** — clean control.
+2. **Stable law / changed noise** — tests whether the policy incorrectly diagnoses a law transition.
+3. **Changed law / stable noise** — tests detection of structural misspecification.
+4. **Changed law / changed noise** — combined and attribution-hard condition.
+5. **Observationally non-identifiable** — the allowed experiment actions cannot separate two or more explanations within the declared budget.
+
+Offer the same paid action space to every policy: repeat an anchor covariate later in a randomized block; measure a different covariate at comparable time/order; probe just below or above a candidate transition region; repeat the same covariate at predeclared times; make an ordinary exploratory observation; or stop as unresolved. The evaluator draws hidden classes only after the public action design and seeds are frozen.
+
+Compare fixed-grid, seeded-random, anchor-only, maximum-predicted-disagreement, stop-as-unresolved, and the existing qualified model-separation selector where its contract applies. Reuse the selector from #8034 only after qualification. Do not introduce another EIG or model-ranking API here.
+
+Score *cause-set coverage*, unique diagnosis accuracy on identifiable worlds, false-unique-diagnosis rate on non-identifiable worlds, unresolved/not-evaluable rates, detection delay, paid observations, recovery after diagnosis, and independent marginal/joint OOD prediction separately. Every anchor consumes the same measurement budget as any other query. A proposed test only earns credit after its resulting observation and independently recomputed score are assessed.
+
+The accepted answer may be a set of compatible causes. If the available observations do not identify the cause, the system must not be forced to emit a single label. Model-disagreement ranking is an experiment-selection aid, not a posterior, calibration guarantee, or scientific evidence.
+
+## 7. Comparators
 
 Use a layered comparison rather than pretending every published algorithm solves the same task.
 
@@ -104,7 +124,7 @@ Use a layered comparison rather than pretending every published algorithm solves
 
 Do not compare a policy's best-of-many run with a baseline's single run. Publish all attempted runs and resource accounting.
 
-## 7. Endpoints
+## 8. Endpoints
 
 Report each endpoint overall and by structural family × noise regime × design mode, with full denominators and uncertainty intervals.
 
@@ -129,7 +149,7 @@ Report each endpoint overall and by structural family × noise regime × design 
 
 Do not hide a high false-alarm rate, increased abstention, or a weak regime behind a pooled average. Use paired intervals and account for clustering by world; seeds from one world are not independent scientific worlds.
 
-## 8. Proposed acceptance gates (not results)
+## 9. Proposed acceptance gates (not results)
 
 - Known-answer tests verify every noise generator, its moments or declared quantiles, dependency behavior, reproducibility and invalid-input handling.
 - The observation generator is independently testable from candidate search. No search/monitor API receives evaluator-only truth.
@@ -142,7 +162,7 @@ Do not hide a high false-alarm rate, increased abstention, or a weak regime behi
 - Report comparative superiority only if an agreed primary endpoint improves against the strongest compatible matched baseline without violating false-confidence and unresolved-rate guardrails.
 - Exact-head executable tests and CI are required for implementation qualification. Queued, skipped or stale-head checks are not passes.
 
-## 9. Scope boundary and research references
+## 10. Scope boundary and research references
 
 This protocol is not a claim that all observation shifts can be statistically distinguished from law misspecification. Some worlds are fundamentally non-identifiable from the allowed observations; the correct output there is an equivalence class or unresolved result.
 
