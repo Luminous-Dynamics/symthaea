@@ -135,6 +135,9 @@ jobs:
           cargo run --locked --bin validate_transfer_contract -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/candidates/157-hadwiger-invariant-chain.json"
           cargo run --locked --bin validate_transfer_contract -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/candidates/026-eventual-subset-density-transfer.json"
           cargo run --locked --bin analyze_family_leakage -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/family-leakage-edges.synthetic.json" "$RUNNER_TEMP/family-leakage-report.synthetic.json"
+          cargo run --locked --bin discover_family_leakage_candidates -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json" "$RUNNER_TEMP/family-leakage-candidates-a.json"
+          cargo run --locked --bin discover_family_leakage_candidates -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json" "$RUNNER_TEMP/family-leakage-candidates-b.json"
+          cmp "$RUNNER_TEMP/family-leakage-candidates-a.json" "$RUNNER_TEMP/family-leakage-candidates-b.json"
       - name: Run strict Clippy
         shell: bash
         run: |
@@ -165,10 +168,29 @@ jobs:
           root = Path("data/benchmarks/proof-insight-transfer-v0")
           edge_schema = json.loads((root / "family-leakage-edges.schema.json").read_text())
           report_schema = json.loads((root / "family-leakage-report.schema.json").read_text())
+          candidate_schema = json.loads((root / "family-leakage-candidate-discovery.schema.json").read_text())
           Draft202012Validator.check_schema(edge_schema)
           Draft202012Validator.check_schema(report_schema)
+          Draft202012Validator.check_schema(candidate_schema)
           edge_validator = Draft202012Validator(edge_schema, format_checker=FormatChecker())
           report_validator = Draft202012Validator(report_schema, format_checker=FormatChecker())
+          candidate_validator = Draft202012Validator(candidate_schema, format_checker=FormatChecker())
+          candidate_path = Path(os.environ["RUNNER_TEMP"]) / "family-leakage-candidates-a.json"
+          candidates = json.loads(candidate_path.read_text())
+          candidate_validator.validate(candidates)
+          pairs = candidates["candidates"]
+          if len(pairs) != candidates["counts"]["candidate_pairs"]:
+              raise ValueError("candidate count does not match candidate rows")
+          if sum(row["source_split"] != row["target_split"] for row in pairs) != candidates["counts"]["cross_split_pairs"]:
+              raise ValueError("cross-split candidate count does not reconcile")
+          if sum({row["source_split"], row["target_split"]} == {"train", "test"} for row in pairs) != candidates["counts"]["train_test_pairs"]:
+              raise ValueError("train/test candidate count does not reconcile")
+          if len({(row["source_family_id"], row["target_family_id"]) for row in pairs}) != len(pairs):
+              raise ValueError("duplicate candidate family pairs")
+          if any(row["candidate_relation"] != "title_similarity_only" or row["candidate_status"] != "unreviewed" for row in pairs):
+              raise ValueError("title similarity was incorrectly upgraded to a reviewed leakage decision")
+          if any(not row["shared_tokens"] or not row["rare_shared_tokens"] for row in pairs):
+              raise ValueError("candidate lacks a traceable shared-token explanation")
 
           fixture = json.loads((root / "fixtures/family-leakage-edges.synthetic.json").read_text())
           edge_validator.validate(fixture)
@@ -231,7 +253,7 @@ jobs:
           else:
               raise ValueError("report schema allowed an incomplete inventory to claim no cross-split leakage")
 
-          print("PITB_FAMILY_LEAKAGE_SCHEMA_PASS: pinned partition, quarantine component, reviewer and completeness controls verified")
+          print("PITB_FAMILY_LEAKAGE_SCHEMA_PASS: " + str(len(pairs)) + " deterministic title candidates; incomplete inventory fail-closed; synthetic quarantine controls verified")
           PY
 
       - name: Validate counterfactual mutation qualification schema and controls
