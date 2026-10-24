@@ -1,0 +1,14 @@
+[package]
+name = "vleb-ledger-reconcile"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Dependency-free reference implementation for the VLEB synthetic ledger task"
+
+[lib]
+name = "vleb_ledger_reconcile"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ledger-reconcile"
+path = "src/main.rs"
