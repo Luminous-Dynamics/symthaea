@@ -82,6 +82,7 @@
     "base_solver_git_blob_matches_executed_file": true,
     "result_json_binds_to_source_blob": true,
     "max_primal_dual_gap_bits": 8.881784197001252e-16,
+    "remote_ci": "At code/artifact commit 125933b2e6446fa913fe9702a9d201b6b1eebc78, combined statuses and PR-triggered workflow runs were empty; no remote pass claimed",
     "external_benchmark_run": false
   },
   "scientific_boundary": [
