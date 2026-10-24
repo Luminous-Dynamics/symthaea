@@ -8075,5 +8075,70 @@
     "No runtimes were collected; no comparison can claim wall-clock or all-in-cost superiority.",
     "No SOTA improvement or quantum advantage is claimed.",
     "To reproduce graph bytes cryptographically, regenerate and record SHA-256 of the emitted DIMACS; the stored FNV values are only quick identity checks."
-  ]
+  ],
+  "posthoc_uncertainty_analysis": {
+    "status": "exploratory-posthoc-not-preregistered-or-confirmatory",
+    "analysis_unit": "one graph instance; the 16 restart rows are nested within their graph and are not counted as 16 independent graph samples",
+    "best_of_16_minus_single_deterministic_greedy": {
+      "graph_instances": 70,
+      "by_size": [
+        {
+          "vertex_count": 50,
+          "graph_instances": 20,
+          "mean_objective_delta": 1,
+          "paired_win_tie_loss": "15/5/0"
+        },
+        {
+          "vertex_count": 100,
+          "graph_instances": 20,
+          "mean_objective_delta": 1.45,
+          "paired_win_tie_loss": "16/4/0"
+        },
+        {
+          "vertex_count": 200,
+          "graph_instances": 20,
+          "mean_objective_delta": 1.8,
+          "paired_win_tie_loss": "17/2/1"
+        },
+        {
+          "vertex_count": 500,
+          "graph_instances": 10,
+          "mean_objective_delta": 3.9,
+          "paired_win_tie_loss": "9/1/0"
+        }
+      ],
+      "overall": {
+        "mean_objective_delta": 1.7714285714285714,
+        "mean_normalized_ratio_delta": 0.013542857142857148,
+        "paired_win_tie_loss": "57/12/1",
+        "stratified_graph_bootstrap_95_percentile_interval_for_mean_delta": [
+          1.457142857142857,
+          2.085714285714286
+        ],
+        "bootstrap_replicates": 20000,
+        "seed": "0x51434f4d",
+        "method": "For each bootstrap replicate, resample graph instances with replacement separately within each N stratum, keep the original stratum sizes, then compute the instance-weighted mean objective delta. The percentile interval is post-hoc and does not account for choosing the portfolio after looking at results."
+      },
+      "cost_caveat": "Best-of-16 uses 16 random-tie greedy trajectories against one deterministic greedy trajectory. This is not an equal-compute comparison and no timing was measured."
+    },
+    "one_for_two_local_improvement_minus_single_greedy": {
+      "graph_instances": 60,
+      "scope": "N=50,100,200 only; no local-improvement result was run at N=500",
+      "mean_objective_delta": 0.15,
+      "paired_win_tie_loss": "9/51/0",
+      "stratified_graph_bootstrap_95_percentile_interval_for_mean_delta": [
+        0.06666666666666667,
+        0.25
+      ],
+      "bootstrap_replicates": 20000,
+      "seed": "0x51434f4d",
+      "method": "Resample graph instances within each applicable N stratum, retaining stratum sizes; calculate one paired delta per graph.",
+      "interpretation": "The one-for-two neighborhood gives small gains for some graphs and no gain for most. Its local-optimality certificate applies only to this neighborhood, not global MIS optimality."
+    },
+    "caution": [
+      "All values derive from an independent JavaScript preflight, not the Rust generator or runner.",
+      "Graph cohorts use newly derived seeds, not the authors' exact instances; this is not a graph-for-graph QGreedy reproduction.",
+      "These post-hoc summaries motivate fair resource-matched classical controls; they do not measure quantum advantage."
+    ]
+  }
 }
