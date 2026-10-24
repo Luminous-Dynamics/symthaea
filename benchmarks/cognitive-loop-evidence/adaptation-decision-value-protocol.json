@@ -307,6 +307,7 @@
       "area_metric_interpretation": "Discrete per-cycle sum of positive excess loss above recovery_loss_threshold; all stream ticks have equal weight in this scorer."
     },
     "output_fields": [
+      "comparison_track",
       "mean_task_loss",
       "pre_shift_mean_task_loss",
       "post_shift_mean_task_loss",
