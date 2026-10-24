@@ -1,0 +1,154 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark_id": "CASTING-MF-SCENARIOS-001",
+  "title": "Adversarial multi-fidelity discrepancy diagnostics for casting optimization",
+  "status": "synthetic_diagnostic_suite_not_optimizer_bakeoff",
+  "implementation": "tools/casting-benchmark/multifidelity_scenario_suite.py",
+  "tests": "tools/casting-benchmark/test_multifidelity_scenario_suite.py",
+  "objective_direction": "minimize_all",
+  "design_space": {
+    "dimensions_supported": [
+      2,
+      5,
+      10
+    ],
+    "coordinate_domain": [
+      0,
+      1
+    ],
+    "default_design_count": 128,
+    "design_generator": "Seed-offset deterministic Halton sequence; candidate IDs are shared within a scenario-seed across all fidelity levels."
+  },
+  "high_fidelity_truth": {
+    "target0": "target0_i = 0.22 + 0.035*sin(i+1)",
+    "target1": "target1_i = 0.78 - 0.035*cos(i+1)",
+    "f0": "0.08 + mean_i((x_i-target0_i)^2) + 0.012*sin(4*pi*x_0)*cos(2*pi*x_(d-1))",
+    "f1": "0.08 + mean_i((x_i-target1_i)^2) + 0.012*cos(3*pi*x_0)*sin(2*pi*x_(d-1))",
+    "constraint_center": "center_i = 0.48 + 0.035*sin(0.7*(i+1))",
+    "constraint_margin": "0.075 - mean_i((x_i-center_i)^2)",
+    "feasibility_rule": "constraint_margin >= 0",
+    "truth_is_analytic": true
+  },
+  "fidelity_costs_default": {
+    "low": 1,
+    "medium": 5,
+    "high": 25
+  },
+  "fidelity_semantics": {
+    "high": "Exact analytic high-fidelity truth at original x.",
+    "medium": "Scenario-specific discrepancy scaled by 0.38*severity for additive/noise terms, with explicit smaller coordinate warping in warped_coordinates.",
+    "low": "Full scenario-specific discrepancy at configured severity.",
+    "zero_severity_invariant": "All fidelity outputs exactly equal the high-fidelity truth when severity=0."
+  },
+  "scenarios": [
+    {
+      "id": "smooth_stationary",
+      "failure_mode": "Smooth additive objective and constraint bias.",
+      "purpose": "Correlated but biased low-fidelity control case.",
+      "objective_bias": {
+        "f0": "severity*(0.12*x_0 + 0.045*sin(2*pi*(x_0+x_last)))",
+        "f1": "severity*(-0.09*x_last + 0.035*cos(2*pi*x_0))"
+      },
+      "constraint_bias": "severity*(0.11*sin(3*pi*x_0+2*pi*x_last)-0.018)"
+    },
+    {
+      "id": "local_bias_island",
+      "failure_mode": "Localized high-amplitude bias in an input region.",
+      "purpose": "Test local discrepancy that a global correction can miss.",
+      "island_center": "center_i=0.72 if i is even, else 0.28",
+      "island_kernel": "bump=exp(-mean_i((x_i-center_i)^2)/(2*0.16^2))",
+      "objective_bias": {
+        "f0": "severity*0.32*bump",
+        "f1": "-severity*0.24*bump"
+      },
+      "constraint_bias": "severity*(-0.34*bump+0.015*sin(5*pi*x_0))"
+    },
+    {
+      "id": "warped_coordinates",
+      "failure_mode": "Low/medium evaluator sees a displaced input.",
+      "purpose": "Test input-dependent nonlinear fidelity mismatch.",
+      "low_warp": "warp_i=0.15*severity*sin(2*pi*(x_(i+1 mod d)+i/7)) then clamp x_i+warp_i to [0,1]",
+      "medium_warp": "warp_i=0.045*severity*sin(2*pi*(x_(i+1 mod d)+i/7)) then clamp x_i+warp_i to [0,1]",
+      "additional_bias": "f0 += severity*scale*0.025*sin(2*pi*x_0); f1 -= severity*scale*0.02*cos(2*pi*x_last); scale=1 for low, 0.38 for medium"
+    },
+    {
+      "id": "constraint_boundary",
+      "failure_mode": "Constraint error amplified near feasibility boundary.",
+      "purpose": "Measure false-feasible and false-infeasible labels where decisions are sensitive.",
+      "boundary_weight": "exp(-abs(true_constraint_margin)/0.055)",
+      "constraint_bias": "severity*scale*0.28*sin(5*pi*x_0+3*pi*x_last)*boundary_weight"
+    },
+    {
+      "id": "discontinuous_step",
+      "failure_mode": "Fidelity-specific step thresholds and sign changes.",
+      "purpose": "Probe failure of smooth/global discrepancy corrections across discontinuities.",
+      "low_threshold": 0.48,
+      "medium_threshold": 0.61,
+      "step": "1 if x_0>=threshold else -0.25",
+      "objective_step_amplitude": {
+        "low": 0.3,
+        "medium": 0.16
+      },
+      "constraint_bias": "severity*scale*(0.20 if x_0>=threshold else -0.11)"
+    },
+    {
+      "id": "heteroscedastic_noise",
+      "failure_mode": "Seed-indexed deterministic perturbations amplify near boundary/domain edges.",
+      "purpose": "Reproducible heteroscedastic stress; not a calibrated stochastic process.",
+      "phase": "(seed mod 997)*0.013",
+      "boundary_weight": "1+2*exp(-abs(true_margin)/0.05)",
+      "edge_weight": "1+0.8*(abs(x_0-0.5)+abs(x_last-0.5))",
+      "noise_amplitude": "severity*scale*0.035*boundary_weight*edge_weight"
+    }
+  ],
+  "diagnostics": [
+    "Pairwise objective rank-inversion fraction, computed separately per objective against analytic truth.",
+    "Feasibility label flip count and fraction.",
+    "False-feasible count and fraction among low/medium predicted-feasible points.",
+    "Mean absolute objective error.",
+    "Mean absolute constraint-margin error.",
+    "All diagnostics stratified by scenario, dimension, severity, fidelity and seed."
+  ],
+  "default_sweep": {
+    "scenarios": [
+      "smooth_stationary",
+      "local_bias_island",
+      "warped_coordinates",
+      "constraint_boundary",
+      "discontinuous_step",
+      "heteroscedastic_noise"
+    ],
+    "dimensions": [
+      2,
+      5,
+      10
+    ],
+    "severities": [
+      0.5,
+      1,
+      2
+    ],
+    "seeds": [
+      17,
+      23,
+      29
+    ],
+    "design_count": 128,
+    "run_count": 162,
+    "summary_count": 108,
+    "reporting": "Preserve all 162 raw scenario runs; report median and interquartile range across three paired seeds for each scenario/dimension/severity/fidelity."
+  },
+  "limitations": [
+    "This is a fidelity diagnostic suite, not an end-to-end optimizer comparison.",
+    "No policy, BoTorch baseline, foundry solver or physical casting process is run by this module.",
+    "The scenario equations are synthetic controlled stressors, not calibrated physics or foundry cost estimates.",
+    "The seed-indexed heteroscedastic term is deterministic conditional on seed and coordinates; it is not a full stochastic replicate model.",
+    "A future optimizer bake-off must use fixed, identical candidate pools, objective-call budgets, known reference/ideal conventions, independent trace scoring, and separate reporting for COCO-native metrics.",
+    "Scenario families are a challenge taxonomy, not evidence that every real foundry process exhibits these exact discrepancy patterns."
+  ],
+  "research_references": [
+    "https://doi.org/10.1145/3801959",
+    "https://doi.org/10.1007/s11831-025-10392-8",
+    "https://link.springer.com/article/10.1007/s43939-026-00685-5"
+  ]
+}
