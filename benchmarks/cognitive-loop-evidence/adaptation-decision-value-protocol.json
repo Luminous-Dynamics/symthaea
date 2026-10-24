@@ -155,7 +155,8 @@
     "verification_and_rollback_events",
     "raw_trace_sha256",
     "result_sha256",
-    "verification_evidence_sha256_on_every_verify_action"
+    "verification_evidence_sha256_on_every_verify_action",
+    "comparison_track"
   ],
   "replay_fail_closed_conditions": [
     "Missing, duplicated, reordered, early, or altered exogenous event",
@@ -342,6 +343,17 @@
       "Every arm contains the same contiguous cycle panel.",
       "No-adapt has zero adaptation cost at every cycle.",
       "All evaluation windows and recovery criteria are validated before scoring."
-    ]
+    ],
+    "information_access": {
+      "field": "comparison_track",
+      "allowed_values": [
+        "valid-pe-only",
+        "feature-only-unsupervised",
+        "auxiliary-loss-unsupervised",
+        "observed-outcome"
+      ],
+      "rule": "Each scored five-arm panel declares exactly one track. Never pool or directly compare scores from different access tracks in one confirmatory effect.",
+      "validation": "Unknown tracks fail closed."
+    }
   }
 }
