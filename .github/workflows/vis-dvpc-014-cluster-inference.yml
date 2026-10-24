@@ -5,12 +5,14 @@ on:
     paths:
       - "tools/vision-dvpc-cluster-inference.rs"
       - "docs/research/VIS_DVPC_014_CLUSTER_LEVEL_INFERENCE_V1.md"
+      - "docs/research/VIS_DVPC_013_PREREGISTRATION_TEMPLATE_V1.md"
       - ".github/workflows/vis-dvpc-014-cluster-inference.yml"
   push:
     branches: ["main"]
     paths:
       - "tools/vision-dvpc-cluster-inference.rs"
       - "docs/research/VIS_DVPC_014_CLUSTER_LEVEL_INFERENCE_V1.md"
+      - "docs/research/VIS_DVPC_013_PREREGISTRATION_TEMPLATE_V1.md"
       - ".github/workflows/vis-dvpc-014-cluster-inference.yml"
 
 permissions:
