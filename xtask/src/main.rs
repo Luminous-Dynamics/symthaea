@@ -7,6 +7,7 @@ mod cognitive_drift_score;
 mod cognitive_drift_compare;
 mod cognitive_adaptation_utility;
 mod cognitive_drift_baselines;
+mod cognitive_replay_receipt;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -99,6 +100,14 @@ enum Commands {
     },
     /// Run the fixed-threshold or EWMA control-chart baseline on a valid PE stream.
     RunCognitiveDriftBaseline {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+
+    /// Validate causal timing, event parity, oracle isolation, and adaptation transactions in a replay receipt.
+    ValidateCognitiveReplayReceipt {
         #[arg(long)]
         input: PathBuf,
         #[arg(long)]
@@ -238,6 +247,17 @@ fn main() -> anyhow::Result<()> {
             if let Some(path) = out {
                 std::fs::write(&path, rendered.as_bytes())?;
                 println!("Wrote scalar drift baseline result to {}", path.display());
+            } else {
+                println!("{rendered}");
+            }
+        }
+
+        Commands::ValidateCognitiveReplayReceipt { input, out } => {
+            let result = cognitive_replay_receipt::evaluate_file(&input)?;
+            let rendered = serde_json::to_string_pretty(&result)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote cognitive replay receipt validation to {}", path.display());
             } else {
                 println!("{rendered}");
             }
