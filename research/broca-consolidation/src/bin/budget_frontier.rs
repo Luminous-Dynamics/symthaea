@@ -544,6 +544,12 @@ mod tests {
         let first = build_fixture(17, 120);
         assert_eq!(first, build_fixture(17, 120));
         let second = build_fixture(18, 120);
+        assert!(first.iter().zip(&second).all(|(a, b)| {
+            a.id == b.id
+                && a.kind == b.kind
+                && a.raw_tokens == b.raw_tokens
+                && a.future_queries == b.future_queries
+        }), "seed changed the latent workload instead of only observed features");
         assert!(first.iter().zip(&second).any(|(a, b)| a.observed.repeats != b.observed.repeats));
     }
 
