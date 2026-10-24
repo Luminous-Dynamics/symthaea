@@ -743,6 +743,22 @@ const fn anatomy(
     }
 }
 
+/// Traditions whose repertoire labels require qualified human review before
+/// the catalog can make any claim of style fidelity or authenticity.
+const fn constellation_requires_expert_review(constellation: Constellation) -> bool {
+    matches!(
+        constellation,
+        Constellation::BluesGospelSoul
+            | Constellation::JazzImprovisatory
+            | Constellation::LatinCaribbeanCycles
+            | Constellation::EuropeanNorthAtlanticFolk
+            | Constellation::MediterraneanMiddleEasternNorthAfrican
+            | Constellation::SouthAsianRagaTala
+            | Constellation::EastSoutheastAsian
+            | Constellation::AfricanDiasporicGroove
+    )
+}
+
 macro_rules! style {
     ($id:literal, $name:literal, $constellation:ident) => {
         CanonicalStyle {
@@ -752,7 +768,9 @@ macro_rules! style {
             constellation: Constellation::$constellation,
             status: StyleStatus::Research,
             composer_style: None,
-            requires_expert_review: false,
+            requires_expert_review: constellation_requires_expert_review(
+                Constellation::$constellation,
+            ),
         }
     };
     ($id:literal, $name:literal, $constellation:ident, $composer:literal, $status:ident) => {
@@ -763,7 +781,9 @@ macro_rules! style {
             constellation: Constellation::$constellation,
             status: StyleStatus::$status,
             composer_style: Some($composer),
-            requires_expert_review: matches!(
+            requires_expert_review: constellation_requires_expert_review(
+                Constellation::$constellation,
+            ) || matches!(
                 StyleStatus::$status,
                 StyleStatus::ExpertReviewRequired
             ),
@@ -777,7 +797,9 @@ macro_rules! style {
             constellation: Constellation::$constellation,
             status: StyleStatus::$status,
             composer_style: Some($composer),
-            requires_expert_review: matches!(
+            requires_expert_review: constellation_requires_expert_review(
+                Constellation::$constellation,
+            ) || matches!(
                 StyleStatus::$status,
                 StyleStatus::ExpertReviewRequired
             ),
@@ -826,16 +848,28 @@ pub const CATALOG: [CanonicalStyle; 152] = [
         "BaroqueSuite",
         Developing
     ),
-    style!(10, "Minuet and Trio", BaroqueEarlyDance),
+    style!(10, "Minuet and Trio", BaroqueEarlyDance, "MinuetAndTrio", Developing),
     style!(11, "Gavotte", BaroqueEarlyDance),
-    style!(12, "Sarabande", BaroqueEarlyDance),
+    style!(12, "Sarabande", BaroqueEarlyDance, "Sarabande", Developing),
     style!(13, "Gigue", BaroqueEarlyDance),
     style!(14, "Allemande", BaroqueEarlyDance),
     style!(15, "Toccata", BaroqueEarlyDance),
     style!(16, "French Overture", BaroqueEarlyDance),
     style!(17, "Sonata", DevelopmentalLargeForms, "Sonata", Developing),
-    style!(18, "Rondo", DevelopmentalLargeForms),
-    style!(19, "Theme and Variations", DevelopmentalLargeForms),
+    style!(
+        18,
+        "Rondo",
+        DevelopmentalLargeForms,
+        "Rondo",
+        Developing
+    ),
+    style!(
+        19,
+        "Theme and Variations",
+        DevelopmentalLargeForms,
+        "ThemeAndVariations",
+        Developing
+    ),
     style!(20, "Scherzo", DevelopmentalLargeForms),
     style!(21, "Symphonic Poem", DevelopmentalLargeForms),
     style!(22, "Concerto Movement", DevelopmentalLargeForms),
@@ -877,8 +911,20 @@ pub const CATALOG: [CanonicalStyle; 152] = [
     style!(36, "Folia Variations", GroundOstinatoTransformation),
     style!(37, "Romanesca", GroundOstinatoTransformation),
     style!(38, "Ostinato Variations", GroundOstinatoTransformation),
-    style!(39, "Erosion", GroundOstinatoTransformation),
-    style!(40, "Lineage", GroundOstinatoTransformation),
+    style!(
+        39,
+        "Erosion",
+        GroundOstinatoTransformation,
+        "Erosion",
+        Developing
+    ),
+    style!(
+        40,
+        "Lineage",
+        GroundOstinatoTransformation,
+        "Lineage",
+        Developing
+    ),
     style!(41, "Folk", SongNarrative, "Folk", Developing),
     style!(42, "Modal Folk", SongNarrative, "ModalFolk", Developing),
     style!(43, "Folk Ballad", SongNarrative),
@@ -1162,17 +1208,65 @@ mod tests {
     #[test]
     fn all_current_composer_styles_are_mapped_once() {
         let implemented: Vec<_> = implemented_catalog().collect();
-        assert_eq!(implemented.len(), 29);
+        assert_eq!(implemented.len(), 35);
         let names: HashSet<_> = implemented
             .iter()
             .filter_map(|entry| entry.composer_style)
             .collect();
-        assert_eq!(names.len(), 29);
+        assert_eq!(names.len(), 35);
         assert!(
             implemented
                 .iter()
                 .all(|entry| entry.status != StyleStatus::Foundation)
         );
+    }
+
+    #[test]
+    fn culturally_rooted_constellations_require_expert_review() {
+        let culturally_rooted = CATALOG
+            .iter()
+            .filter(|entry| {
+                matches!(
+                    entry.constellation,
+                    Constellation::BluesGospelSoul
+                        | Constellation::JazzImprovisatory
+                        | Constellation::LatinCaribbeanCycles
+                        | Constellation::EuropeanNorthAtlanticFolk
+                        | Constellation::MediterraneanMiddleEasternNorthAfrican
+                        | Constellation::SouthAsianRagaTala
+                        | Constellation::EastSoutheastAsian
+                        | Constellation::AfricanDiasporicGroove
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(culturally_rooted.len(), 64);
+        for entry in culturally_rooted {
+            assert!(
+                entry.requires_expert_review,
+                "catalog entry {} ({}) must not imply style authenticity without qualified review",
+                entry.id,
+                entry.name
+            );
+            assert!(
+                entry.research_gaps().contains(&"review by knowledgeable musicians"),
+                "catalog entry {} must expose the review gate in its research gaps",
+                entry.id
+            );
+        }
+    }
+
+    #[test]
+    fn new_composer_styles_are_mapped_to_their_matching_routes() {
+        assert_eq!(catalog_entry(10).unwrap().composer_style, Some("MinuetAndTrio"));
+        assert_eq!(catalog_entry(12).unwrap().composer_style, Some("Sarabande"));
+        assert_eq!(catalog_entry(18).unwrap().composer_style, Some("Rondo"));
+        assert_eq!(
+            catalog_entry(19).unwrap().composer_style,
+            Some("ThemeAndVariations")
+        );
+        assert_eq!(catalog_entry(39).unwrap().composer_style, Some("Erosion"));
+        assert_eq!(catalog_entry(40).unwrap().composer_style, Some("Lineage"));
     }
 
     #[test]
