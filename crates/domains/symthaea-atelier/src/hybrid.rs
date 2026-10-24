@@ -276,6 +276,7 @@ mod tests {
             noradrenaline: 0.4,
             harmony_activations: [0.5, 0.6, 0.4, 0.7, 0.3, 0.5, 0.8, 0.2],
             prediction_error: 0.1,
+            prediction_error_valid: true,
             thought_vector: vec![0.3, -0.2, 0.5, 0.1],
             ..CognitiveSnapshot::dormant()
         }
