@@ -90,6 +90,8 @@ jobs:
 
       - name: Test scalar drift baseline failure modes
         run: cargo test --locked -p xtask cognitive_drift_baselines
+      - name: Test replay receipt validation failure modes
+        run: cargo test --locked -p xtask cognitive_replay_receipt
 
       - name: Run the drift scorer CLI against the synthetic fixture
         run: |
@@ -182,6 +184,14 @@ jobs:
           jq '.arms[0].oracle_channel_access = true' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-oracle-leak.json"
           if cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input "$RUNNER_TEMP/replay-oracle-leak.json" --out "$RUNNER_TEMP/replay-oracle-leak-output.json"; then
             echo "::error::Replay receipt accepted oracle access by a deployable arm."
+            exit 1
+          fi
+
+      - name: Reject verify action without an evidence digest
+        run: |
+          jq '.arms[3].decisions[2].verification_evidence_sha256 = null' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-verify-without-evidence.json"
+          if cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input "$RUNNER_TEMP/replay-verify-without-evidence.json" --out "$RUNNER_TEMP/replay-verify-without-evidence-output.json"; then
+            echo "::error::Replay receipt accepted verification without an evidence digest."
             exit 1
           fi
 
