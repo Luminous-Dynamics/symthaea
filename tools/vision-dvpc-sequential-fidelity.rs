@@ -80,7 +80,6 @@ const TRACE_HEADER: &[&str] = &[
 
 #[derive(Debug, Clone)]
 struct Meta {
-    values: BTreeMap<String, String>,
     expected_trace_count: usize,
     expected_cluster_count: usize,
     latency_budget_us: u64,
@@ -167,8 +166,11 @@ fn sha256_hex(bytes: &[u8]) -> String {
         0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
         0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
         0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
-        0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0x81c2c92e,
-        0x92722c85, 0xa2c85c97, 0xc76c51a3,
+        0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
+        0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+        0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
     ];
     let bit_len = (bytes.len() as u64).wrapping_mul(8);
     let mut message = bytes.to_vec();
@@ -386,7 +388,6 @@ fn parse_meta(table: &Table) -> Result<Meta, String> {
         }
     }
     Ok(Meta {
-        values: m.clone(),
         expected_trace_count,
         expected_cluster_count,
         latency_budget_us,
@@ -512,31 +513,8 @@ fn actual_cost(t: &Trace, mode: &str) -> (u64, u64, bool) {
         "cheap" => (t.cheap_latency, t.cheap_energy, t.cheap_cost_complete),
         "medium" => (t.medium_latency, t.medium_energy, t.medium_cost_complete),
         "full" => (t.full_latency, t.full_energy, t.full_cost_complete),
-        "sequential" => {
-            let latency = t.allocator_latency
-                .checked_add(t.cheap_latency)
-                .and_then(|v| if matches!(route_tier(t), Tier::Medium | Tier::Full) { v.checked_add(t.medium_latency) } else { Some(v) })
-                .and_then(|v| if route_tier(t) == Tier::Full { v.checked_add(t.full_latency) } else { Some(v) })
-                .unwrap_or(u64::MAX);
-            let energy = t.allocator_energy
-                .checked_add(t.cheap_energy)
-                .and_then(|v| if matches!(route_tier(t), Tier::Medium | Tier::Full) { v.checked_add(t.medium_energy) } else { Some(v) })
-                .and_then(|v| if route_tier(t) == Tier::Full { v.checked_add(t.full_energy) } else { Some(v) })
-                .unwrap_or(u64::MAX);
-            let decision = route_tier(t);
-            let complete = t.allocator_cost_complete && t.cheap_cost_complete
-                && (decision == Tier::Cheap || t.medium_cost_complete)
-                && (decision != Tier::Full || t.full_cost_complete);
-            (latency, energy, complete)
-        }
-        _ => unreachable!("known policy name"),
+        _ => unreachable!("known fixed-policy name"),
     }
-}
-
-// Tests use a synthetic risk-admissible Meta; production meta is validated by parser.
-fn route_tier(t: &Trace) -> Tier {
-    let m = test_meta();
-    route(t, &m).tier
 }
 
 fn utility_for(t: &Trace, tier: Tier) -> (f64, bool) {
