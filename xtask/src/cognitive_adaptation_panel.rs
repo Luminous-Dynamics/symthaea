@@ -70,7 +70,9 @@ pub struct AdaptationPanelResult {
     pub missing_cells: Vec<MissingPanelCell>,
     /// True only when every registered dataset × seed × scenario cell is present exactly once.
     pub complete_coverage_gate_pass: bool,
-    /// No comparison is emitted unless the entire preregistered grid is complete.
+    /// True only for a complete grid whose every score is linked to a validated replay receipt marked run_kind=replay.
+    pub receipt_linkage_gate_pass: bool,
+    /// No comparison is emitted unless coverage and receipt-linkage gates both pass.
     pub primary_comparison: Option<crate::cognitive_drift_compare::ComparisonResult>,
     pub interpretation_guard: String,
 }
@@ -130,6 +132,7 @@ pub fn evaluate(mut input: AdaptationPanelInput) -> anyhow::Result<AdaptationPan
     let mut observed_stream_ids = BTreeSet::new();
     let mut task_loss_metric_id: Option<String> = None;
     let mut task_loss_unit: Option<String> = None;
+    let mut all_scores_replay_linked = true;
 
     for (index, score) in input.runs.iter().enumerate() {
         ensure!(
@@ -157,6 +160,9 @@ pub fn evaluate(mut input: AdaptationPanelInput) -> anyhow::Result<AdaptationPan
         ensure!(!score.task_loss_metric_id.trim().is_empty(), "runs[{index}] task_loss_metric_id must not be empty");
         ensure!(!score.task_loss_unit.trim().is_empty(), "runs[{index}] task_loss_unit must not be empty");
         validate_digest(&score.shared_stream_sha256, "shared_stream_sha256")?;
+        if !validate_score_receipt_linkage(score, index)? {
+            all_scores_replay_linked = false;
+        }
         validate_score_digest(score, index)?;
         validate_score_values(score, index)?;
 
@@ -237,8 +243,9 @@ pub fn evaluate(mut input: AdaptationPanelInput) -> anyhow::Result<AdaptationPan
     let complete_coverage_gate_pass = missing_cells.is_empty() && input.runs.len() == expected_run_count;
     let metric_id = "post_shift_mean_task_loss".to_owned();
     let metric_unit = task_loss_unit.unwrap_or_else(|| "unavailable-no-run-records".to_owned());
+    let receipt_linkage_gate_pass = complete_coverage_gate_pass && all_scores_replay_linked;
 
-    let primary_comparison = if complete_coverage_gate_pass {
+    let primary_comparison = if complete_coverage_gate_pass && receipt_linkage_gate_pass {
         let staged_registry = arm_registry.get("staged-verify-rollback")
             .context("complete panel is missing staged-verify-rollback arm metadata")?;
         let detector_registry = arm_registry.get("detector-triggered")
@@ -302,8 +309,9 @@ pub fn evaluate(mut input: AdaptationPanelInput) -> anyhow::Result<AdaptationPan
         missing_cell_count: missing_cells.len(),
         missing_cells,
         complete_coverage_gate_pass,
+        receipt_linkage_gate_pass,
         primary_comparison,
-        interpretation_guard: "The primary comparison is emitted only for the complete registered dataset × seed × scenario grid. Incomplete panels report missing cells and no confirmatory effect estimate. A complete-coverage pass is necessary, not sufficient, for SOTA claims. Scores are summary artifacts; this aggregator does not prove causal replay execution or scientific validity.".to_owned(),
+        interpretation_guard: "The primary comparison is emitted only for a complete registered dataset × seed × scenario grid with every score carrying a validated-receipt linkage marked run_kind=replay. Missing coverage or synthetic receipt linkage suppresses the effect estimate. Digests establish artifact consistency, not honest runner execution, oracle sandboxing, or scientific validity; a complete panel is necessary, not sufficient, for SOTA claims.".to_owned(),
     };
     result.result_sha256 = Some(panel_result_digest(&result)?);
     Ok(result)
@@ -317,6 +325,25 @@ fn arm_views(score: &CounterfactualUtilityScore) -> [(&ArmUtilityMetrics, &'stat
         (&score.staged_verify_rollback, "staged-verify-rollback"),
         (&score.oracle_timed, "oracle-timed"),
     ]
+}
+
+fn validate_score_receipt_linkage(score: &CounterfactualUtilityScore, index: usize) -> anyhow::Result<bool> {
+    let receipt_sha256 = score.source_replay_receipt_sha256.as_deref()
+        .context(format!("runs[{index}] source_replay_receipt_sha256 is required; rescore with --receipt"))?;
+    validate_digest(receipt_sha256, "source_replay_receipt_sha256")?;
+    let validation_sha256 = score.source_replay_receipt_validation_sha256.as_deref()
+        .context(format!("runs[{index}] source_replay_receipt_validation_sha256 is required; rescore with --receipt"))?;
+    validate_digest(validation_sha256, "source_replay_receipt_validation_sha256")?;
+    let run_id = score.source_replay_run_id.as_deref()
+        .context(format!("runs[{index}] source_replay_run_id is required; rescore with --receipt"))?;
+    ensure!(!run_id.trim().is_empty(), "runs[{index}] source_replay_run_id must not be empty");
+    let run_kind = score.source_replay_run_kind.as_deref()
+        .context(format!("runs[{index}] source_replay_run_kind is required; rescore with --receipt"))?;
+    ensure!(
+        ["replay", "synthetic-not-measured"].contains(&run_kind),
+        "runs[{index}] source_replay_run_kind is invalid"
+    );
+    Ok(run_kind == "replay")
 }
 
 fn validate_score_digest(score: &CounterfactualUtilityScore, index: usize) -> anyhow::Result<()> {
@@ -503,7 +530,11 @@ mod tests {
             staged_dominated_by_no_adapt: false,
             detector_dominated_by_no_adapt: false,
             adaptation_cost_units_per_task_loss_unit_reduced: Some(7.0 / 0.3),
-            interpretation_guard: "synthetic test record".to_owned(),
+            source_replay_receipt_sha256: Some(hash(&format!("{dataset_id}:{seed}:{scenario_id}:receipt"))),
+            source_replay_receipt_validation_sha256: Some(hash(&format!("{dataset_id}:{seed}:{scenario_id}:validation"))),
+            source_replay_run_id: Some(format!("run-{dataset_id}-{seed}-{scenario_id}")),
+            source_replay_run_kind: Some("replay".to_owned()),
+            interpretation_guard: "synthetic test record for panel arithmetic only".to_owned(),
         };
         let mut copy = result.clone();
         copy.result_sha256 = None;
@@ -535,6 +566,7 @@ mod tests {
         }
         let result = evaluate(input).expect("complete panel passes structural checks");
         assert!(result.complete_coverage_gate_pass);
+        assert!(result.receipt_linkage_gate_pass);
         assert_eq!(result.observed_run_count, 2_800);
         assert_eq!(result.missing_cell_count, 0);
         let comparison = result.primary_comparison.expect("complete panel emits primary comparison");
@@ -543,6 +575,27 @@ mod tests {
         assert!(comparison.sota_coverage_gate_pass);
         assert!((comparison.dataset_macro_paired_effect - 0.1).abs() < 1e-12);
         assert!(comparison.interval_supports_positive_effect);
+    }
+
+    #[test]
+    fn complete_grid_with_synthetic_receipts_suppresses_confirmatory_comparison() {
+        let mut input = empty_panel();
+        for dataset_id in input.expected_dataset_ids.clone() {
+            for seed in input.expected_seed_ids.clone() {
+                for scenario_id in input.expected_scenario_ids.clone() {
+                    let mut record = score(&dataset_id, seed, &scenario_id);
+                    record.source_replay_run_kind = Some("synthetic-not-measured".to_owned());
+                    let mut copy = record.clone();
+                    copy.result_sha256 = None;
+                    record.result_sha256 = Some(sha256_hex(&serde_json::to_vec(&copy).unwrap()));
+                    input.runs.push(record);
+                }
+            }
+        }
+        let result = evaluate(input).expect("synthetic complete grid returns a guarded report");
+        assert!(result.complete_coverage_gate_pass);
+        assert!(!result.receipt_linkage_gate_pass);
+        assert!(result.primary_comparison.is_none());
     }
 
     #[test]
