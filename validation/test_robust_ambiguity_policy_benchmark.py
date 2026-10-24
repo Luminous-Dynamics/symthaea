@@ -4,7 +4,8 @@ import unittest
 from robust_ambiguity_policy_benchmark import (
     eval_policy, robust_action, run_benchmark, self_test,
 )
-from objective_matched_oracle_benchmark import ACTIONS, HYPOTHESES
+from objective_matched_oracle_benchmark import ACTIONS, HYPOTHESES, predictive, update
+from prior_misspecification_benchmark import terminal_cross_entropy
 from prior_shift_oracle_benchmark import PRIOR_NAMES, build_prior
 
 
@@ -19,6 +20,23 @@ class RobustAmbiguityPolicyTests(unittest.TestCase):
     def test_robust_policy_returns_valid_action(self):
         scenarios = tuple((n, tuple(build_prior(n))) for n in PRIOR_NAMES)
         self.assertIn(robust_action(scenarios, tuple(build_prior("uniform")), "joint"), ACTIONS)
+
+    def test_robust_action_minimizes_worst_case_one_step_score(self):
+        scenarios = tuple((n, tuple(build_prior(n))) for n in ("uniform", "high_spill_biased", "chain_biased"))
+        p = tuple(build_prior("uniform"))
+        expected_actions = []
+        for action in ACTIONS:
+            scenario_scores = []
+            for _, q in scenarios:
+                expected = 0.0
+                for obs, prob in predictive(q, action):
+                    if prob > 0.0:
+                        expected += prob * terminal_cross_entropy(
+                            update(q, action, obs), update(p, action, obs), "joint"
+                        )
+                scenario_scores.append(expected)
+            expected_actions.append((max(scenario_scores), sum(scenario_scores) / len(scenario_scores), action))
+        self.assertEqual(robust_action(scenarios, p, "joint"), min(expected_actions)[2])
 
     def test_action_deterministic_for_fixed_ambiguity_set_and_posterior(self):
         scenarios = tuple((n, tuple(build_prior(n))) for n in ("uniform", "high_spill_biased", "chain_biased"))
