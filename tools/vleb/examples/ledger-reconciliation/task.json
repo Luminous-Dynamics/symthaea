@@ -26,7 +26,7 @@
     "toolchains": [
       {
         "name": "rustc",
-        "version": "1.96.0 (target version; execution not yet verified)",
+        "version": "1.96.0",
         "role": "compiler"
       }
     ],
