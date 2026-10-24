@@ -158,8 +158,23 @@ def validate_lock(document: Any, for_execution: bool = False) -> list[str]:
             "source_pinned_environment_unlocked", "locked_for_execution"
         }:
             errors.append(f"{label}.pin_status is not a supported status")
+        if pin["track"] not in {"single_fidelity", "multi_fidelity", "non_bayesian", "repository_baseline", "test_fixture"}:
+            errors.append(f"{label}.track is not a supported track")
         if not isinstance(pin["execution_eligible"], bool):
             errors.append(f"{label}.execution_eligible must be a boolean")
+        if pin["pin_status"] == "source_pinned_environment_unlocked" and pin["execution_eligible"] is not False:
+            errors.append(f"{label} cannot be execution-eligible while its environment is unlocked")
+        if pin["pin_status"] == "locked_for_execution" and pin["execution_eligible"] is not True:
+            errors.append(f"{label} marked locked_for_execution must be execution-eligible")
+        release = document["candidate_release"]
+        if isinstance(release, dict) and pin["package"] == release.get("distribution"):
+            for pin_key, release_key in (
+                ("package_version", "version"),
+                ("source_tag", "source_tag"),
+                ("source_commit", "source_commit"),
+            ):
+                if pin[pin_key] != release.get(release_key):
+                    errors.append(f"{label}.{pin_key} must match candidate_release.{release_key}")
         pin_ids.append(pin["baseline_id"])
 
     if len(set(pin_ids)) != len(pin_ids):
