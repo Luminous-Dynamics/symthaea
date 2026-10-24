@@ -321,9 +321,14 @@ fn feasibility(p:&Point,e:&Envelope,t:&EnvelopeTable)->(&'static str,Vec<&'stati
     check(e.cvar95,t.meta["cvar95_loss_limit"].parse().unwrap_or(f64::NAN),"CVAR95_LIMIT_EXCEEDED","CVAR95_INTERVAL_CROSSES_LIMIT",&mut definite,&mut unresolved);
     let max=t.meta["safety_violations_max"].parse::<u64>().unwrap_or(u64::MAX);
     if e.safety_lower>max{definite.push("SAFETY_COUNT_LIMIT_EXCEEDED");}else if e.safety_upper>max{unresolved.push("SAFETY_COUNT_INTERVAL_CROSSES_LIMIT");}
-    if !definite.is_empty(){("ROBUST_INFEASIBLE",definite)}
-    else if !unresolved.is_empty(){("ROBUST_UNRESOLVED_FEASIBILITY",unresolved)}
-    else {("ROBUST_FEASIBLE_PENDING_FRONTIER",vec![])}
+    if !definite.is_empty(){
+        definite.extend(unresolved);
+        ("ROBUST_INFEASIBLE",definite)
+    } else if !unresolved.is_empty(){
+        ("ROBUST_UNRESOLVED_FEASIBILITY",unresolved)
+    } else {
+        ("ROBUST_FEASIBLE_PENDING_FRONTIER",vec![])
+    }
 }
 
 fn certainly_dominates(a:&Point,ae:&Envelope,b:&Point,be:&Envelope)->bool{
@@ -336,7 +341,7 @@ fn possibly_dominates(a:&Point,ae:&Envelope,b:&Point,be:&Envelope)->bool{
 }
 fn exact_equivalent(a:&Point,ae:&Envelope,b:&Point,be:&Envelope)->bool{
     a.utility_estimate==b.utility_estimate&&a.utility_lcb==b.utility_lcb&&a.utility_ucb==b.utility_ucb&&
-    ae.latency.lo==be.latency.lo&&ae.latency.hi==be.latency.hi&&ae.energy.lo==be.energy.lo&&ae.energy.hi==be.energy.hi
+    ae.latency.hi==be.latency.hi&&ae.energy.hi==be.energy.hi
 }
 
 fn classify(conf:&ConfidenceReceipt,env:&EnvelopeTable)->Vec<Classified>{
