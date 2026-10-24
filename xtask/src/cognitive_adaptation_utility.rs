@@ -238,6 +238,19 @@ pub fn score_counterfactual_utility(
         detector_triggered.total_adaptation_cost_units - no_adapt.total_adaptation_cost_units;
     let staged_cost_delta =
         staged_verify_rollback.total_adaptation_cost_units - detector_triggered.total_adaptation_cost_units;
+    let staged_dominated_by_detector_triggered =
+        staged_verify_rollback.post_shift_mean_task_loss
+            >= detector_triggered.post_shift_mean_task_loss
+            && staged_verify_rollback.total_adaptation_cost_units
+                > detector_triggered.total_adaptation_cost_units;
+    let staged_dominated_by_no_adapt =
+        staged_verify_rollback.mean_task_loss >= no_adapt.mean_task_loss
+            && staged_verify_rollback.total_adaptation_cost_units
+                > no_adapt.total_adaptation_cost_units;
+    let detector_dominated_by_no_adapt =
+        detector_triggered.mean_task_loss >= no_adapt.mean_task_loss
+            && detector_triggered.total_adaptation_cost_units
+                > no_adapt.total_adaptation_cost_units;
     ensure!(
         improvement.is_finite()
             && regret.is_finite()
@@ -288,18 +301,9 @@ pub fn score_counterfactual_utility(
         staged_post_shift_task_loss_regret_vs_oracle_timed: staged_post_shift_regret,
         detector_adaptation_cost_delta_vs_no_adapt: cost_delta,
         staged_adaptation_cost_delta_vs_detector_triggered: staged_cost_delta,
-        staged_dominated_by_detector_triggered: staged_verify_rollback.post_shift_mean_task_loss
-            >= detector_triggered.post_shift_mean_task_loss
-            && staged_verify_rollback.total_adaptation_cost_units
-                > detector_triggered.total_adaptation_cost_units,
-        staged_dominated_by_no_adapt: staged_verify_rollback.mean_task_loss
-            >= no_adapt.mean_task_loss
-            && staged_verify_rollback.total_adaptation_cost_units
-                > no_adapt.total_adaptation_cost_units,
-        detector_dominated_by_no_adapt: detector_triggered.mean_task_loss
-            >= no_adapt.mean_task_loss
-            && detector_triggered.total_adaptation_cost_units
-                > no_adapt.total_adaptation_cost_units,
+        staged_dominated_by_detector_triggered,
+        staged_dominated_by_no_adapt,
+        detector_dominated_by_no_adapt,
         adaptation_cost_units_per_task_loss_unit_reduced,
         interpretation_guard: "Counterfactual task-loss and resource-cost results only; oracle-timed is a ground-truth-timing reference, not a deployable detector. Shared-stream digest and paired arms do not by themselves prove identical hidden state or implementation correctness. Do not collapse metrics into a composite score without a preregistered cost conversion.".to_owned(),
     };
