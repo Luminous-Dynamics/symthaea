@@ -101,5 +101,63 @@
     "post_shift_end_cycle": 4,
     "recovery_loss_threshold": 0.35,
     "recovery_consecutive_cycles": 2
+  },
+  "detector_benefit_gated": {
+    "name": "detector-benefit-gated",
+    "version": "fixture-v1",
+    "repository_head_sha": "1212121212121212121212121212121212121212",
+    "configuration_digest": "abababababababababababababababababababababababababababababababab",
+    "exogenous_stream_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "observations": [
+      {
+        "cycle_index": 0,
+        "task_loss": 0.1,
+        "adaptation_cost_units": 0
+      },
+      {
+        "cycle_index": 1,
+        "task_loss": 0.45,
+        "adaptation_cost_units": 0.1
+      },
+      {
+        "cycle_index": 2,
+        "task_loss": 0.25,
+        "adaptation_cost_units": 0.2
+      },
+      {
+        "cycle_index": 3,
+        "task_loss": 0.25,
+        "adaptation_cost_units": 0.05
+      }
+    ]
+  },
+  "staged_verify_rollback": {
+    "name": "staged-verify-rollback",
+    "version": "fixture-v1",
+    "repository_head_sha": "1313131313131313131313131313131313131313",
+    "configuration_digest": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "exogenous_stream_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "observations": [
+      {
+        "cycle_index": 0,
+        "task_loss": 0.1,
+        "adaptation_cost_units": 0
+      },
+      {
+        "cycle_index": 1,
+        "task_loss": 0.4,
+        "adaptation_cost_units": 0.1
+      },
+      {
+        "cycle_index": 2,
+        "task_loss": 0.2,
+        "adaptation_cost_units": 0.1
+      },
+      {
+        "cycle_index": 3,
+        "task_loss": 0.2,
+        "adaptation_cost_units": 0.05
+      }
+    ]
   }
 }
