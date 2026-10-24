@@ -584,6 +584,6 @@ mod tests {
     fn rejects_rollback_that_does_not_restore_the_exact_snapshot() {
         let mut receipt = valid_receipt();
         receipt.arms[3].decisions[4].state_after_sha256 = digest('3');
-        assert!(validate_receipt(receipt).unwrap_err().to_string().contains("state digest chain"));
+        assert!(validate_receipt(receipt).unwrap_err().to_string().contains("post-commit rollback must restore"));
     }
 }
