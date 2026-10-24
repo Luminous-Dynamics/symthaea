@@ -79,6 +79,12 @@ pub struct ReplayDecision {
     pub candidate_state_sha256: Option<String>,
     /// Digest of the evidence artifact used to authorize a verify decision.
     pub verification_evidence_sha256: Option<String>,
+    /// Realized per-cycle task loss attached by the replay driver, for post-hoc scoring.
+    #[serde(default)]
+    pub task_loss: Option<f64>,
+    /// Realized per-cycle adaptation cost, in the registered cost unit.
+    #[serde(default)]
+    pub adaptation_cost_units: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -126,7 +132,7 @@ pub fn evaluate_file(path: &Path) -> anyhow::Result<ReplayReceiptValidation> {
 }
 
 pub fn validate_receipt(receipt: ReplayReceipt) -> anyhow::Result<ReplayReceiptValidation> {
-    ensure!(receipt.schema_version == 1, "replay receipt schema_version must be 1");
+    ensure!(receipt.schema_version == 2, "replay receipt schema_version must be 2");
     nonempty(&receipt.run_id, "run_id")?;
     ensure!(
         ["synthetic-not-measured", "replay"].contains(&receipt.run_kind.as_str()),
@@ -218,6 +224,22 @@ pub fn validate_receipt(receipt: ReplayReceipt) -> anyhow::Result<ReplayReceiptV
             reference_deliveries = Some(arm.deliveries.as_slice());
         }
         let summary = validate_arm_decisions(arm, &event_by_id, receipt.stream_length_ticks)?;
+        for decision in &arm.decisions {
+            if let Some(task_loss) = decision.task_loss {
+                ensure!(task_loss.is_finite() && task_loss >= 0.0,
+                    "arm {} task_loss must be finite and non-negative", arm.arm_id);
+            }
+            if let Some(adaptation_cost) = decision.adaptation_cost_units {
+                ensure!(adaptation_cost.is_finite() && adaptation_cost >= 0.0,
+                    "arm {} adaptation_cost_units must be finite and non-negative", arm.arm_id);
+            }
+            if receipt.run_kind == "replay" {
+                ensure!(decision.task_loss.is_some(),
+                    "replay arm {} is missing task_loss at tick {}", arm.arm_id, decision.decision_tick);
+                ensure!(decision.adaptation_cost_units.is_some(),
+                    "replay arm {} is missing adaptation_cost_units at tick {}", arm.arm_id, decision.decision_tick);
+            }
+        }
         total_decisions = total_decisions.checked_add(summary.decision_count)
             .ok_or_else(|| anyhow::anyhow!("total decision count overflow"))?;
         summaries.push(summary);
@@ -225,7 +247,7 @@ pub fn validate_receipt(receipt: ReplayReceipt) -> anyhow::Result<ReplayReceiptV
 
     let canonical_receipt_sha256 = sha256(&serde_json::to_vec(&receipt)?);
     let mut report = ReplayReceiptValidation {
-        metric_version: "cognitive-replay-receipt-v1".to_owned(),
+        metric_version: "cognitive-replay-receipt-v2".to_owned(),
         canonical_receipt_sha256,
         result_sha256: None,
         run_id: receipt.run_id,
@@ -519,6 +541,8 @@ pub(crate) mod tests {
                     snapshot_sha256,
                     candidate_state_sha256,
                     verification_evidence_sha256: if action == "verify" { Some(digest('3')) } else { None },
+                    task_loss: None,
+                    adaptation_cost_units: None,
                 });
             }
             arms.push(ReplayArm {
@@ -534,7 +558,7 @@ pub(crate) mod tests {
             });
         }
         ReplayReceipt {
-            schema_version: 1,
+            schema_version: 2,
             run_id: "synthetic-replay-receipt-not-measured".to_owned(),
             run_kind: "synthetic-not-measured".to_owned(),
             dataset_id: "synthetic-dataset-not-measured".to_owned(),
