@@ -158,8 +158,6 @@ impl AuthorizationAttempt {
         if principal.trim().is_empty() {
             return Err(AuthorizationError::EmptyPrincipal);
         }
-        validate_authority_scope(authority, scope)?;
-
         Ok(Self {
             binding,
             principal,
@@ -838,16 +836,16 @@ mod tests {
             .unwrap_err(),
             AuthorizationError::AuthorityScopeMismatch
         );
-        assert_eq!(
-            AuthorizationAttempt::new(
-                command,
-                "operator:alice",
-                ActionScope::Rollback,
-                AuthorizationAuthority::HumanOperator,
-            )
-            .unwrap_err(),
-            AuthorizationError::AuthorityScopeMismatch
-        );
+        // Attempts must be constructible even when authority and scope do not
+        // align, so the ledger can consume/burn the permit on the mismatch
+        // rather than leaving it available for a later retry.
+        assert!(AuthorizationAttempt::new(
+            command,
+            "operator:alice",
+            ActionScope::Rollback,
+            AuthorizationAuthority::HumanOperator,
+        )
+        .is_ok());
     }
 
     #[test]
