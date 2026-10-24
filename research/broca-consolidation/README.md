@@ -70,3 +70,32 @@ The seeded feature perturbation now varies repeat count, distinct episodes, cont
 The FNV-1a fixture fingerprint is non-cryptographic and is not a dataset-integrity proof. Replace it with the repository's canonical cryptographic digest when integrating with production benchmark tooling.
 
 This slice does not test real user conversations, semantic retrieval, HDC embeddings, asynchronous consolidation, physical erasure, reversal logs, poisoning beyond its fixed controls, or cross-benchmark transfer. Those belong in subsequent phases. The published [ConsolidationBench paper](https://arxiv.org/abs/2609.33013) remains a separate external work; do not claim reproduction without reproducing its specification and evaluation.
+
+## Budget-matched consolidation frontier (GMC-BUDGET-FRONTIER-V1)
+
+The companion binary models an additional question: **does consolidation help once every policy has the same memory-token budget, including an unconstrained regime where raw evidence fits?** This extends the synthetic instrument; it does not reproduce external results and does not claim real task accuracy.
+
+Run it from the exact checked-out commit with Rust installed:
+
+```sh
+cargo test --manifest-path research/broca-consolidation/Cargo.toml
+cargo run --manifest-path research/broca-consolidation/Cargo.toml --release --bin budget_frontier -- \
+  --source-sha "$(git rev-parse HEAD)" --seed 17 --candidates 120 \
+  > budget-frontier.jsonl
+```
+
+The run emits a JSONL header and one row per policy and budget. It sweeps abstract token-capacity budgets 32, 64, 128, 256, 512, 1024, 2048 and 4096. With the default generator, the final budget can exceed the full raw evidence demand, giving an unconstrained-retention comparison rather than testing only the tight-budget regime. Do not compare different seeds as paired results unless candidate IDs and latent task realizations are deliberately matched; within one seed, policies share the exact candidate stream.
+
+Arms are no-memory/retire-all, always-raw, always-summary, fixed-interval summary, dedup-and-merge, observable-feature threshold, budget-adaptive, promote-everything negative control, and a separate oracle dynamic-programming diagnostic. The oracle sees synthetic ground truth only and is never a candidate policy. Every non-oracle policy receives only observed counts, provenance diversity, recency, corrections and contradictions, and a capacity-pressure bit.
+
+Each output reports expected query accuracy under the synthetic reward table, utility, net utility after an explicit token storage penalty, oracle regret, load-bearing coverage, unsafe/stale items retained and promoted, compression ratio, and utility per token. All budget units, query utilities, and token costs are toy definitions; they are not model tokens billed by a provider, product memory bytes, or measured task outcomes. The oracle is an upper bound for this fixture, not evidence that a learnable policy can attain it.
+
+### Why this extension matters
+
+Recent relevant research supports three hard requirements for our experiments, while not proving any specific Broca design wins:
+
+- [Retain or Consolidate? (arXiv:2607.17545)](https://arxiv.org/abs/2607.17545) reports a budget-dependent crossover: consolidation can improve answer accuracy under tight evidence budgets, while raw retention can be preferable when evidence fits. Therefore the protocol includes both tight and unconstrained budgets and reports each budget, not a single average.
+- [The Epistemics of Agent Memory (arXiv:2609.33013)](https://arxiv.org/abs/2609.33013) reports a negative external-validity result: its synthetic consolidation-quality score did not predict transfer accuracy across the studied real benchmark cells. This is a warning not to mistake an oracle-by-construction score for real generalization.
+- [Are Online Skill and Memory Modules Always Worth Their Tokens? (EMNLP 2026)](https://www.servicenow.com/research/publication/sina-hajimiri-are-emnlp2026.html) reports that augmentation benefits may disappear against a token-matched actor baseline. Every future real-task comparison must therefore account for memory's write/search/consolidation overhead and compare it with equal-budget alternatives.
+
+This synthetic frontier is a source-level instrument check. It cannot establish those papers' hypotheses, reproduce their numbers, or answer whether Broca improves a real agent. It is useful because the full trade-off is explicit and the benchmark can fail visibly before any expensive model run.
