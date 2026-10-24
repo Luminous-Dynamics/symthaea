@@ -74,6 +74,13 @@ impl<'de> Deserialize<'de> for PredictionErrorEvidence {
                         "valid prediction evidence must contain a finite value",
                     ));
                 }
+                if wire.prediction_cycle.is_some()
+                    && wire.observation_cycle.checked_sub(1) != wire.prediction_cycle
+                {
+                    return Err(D::Error::custom(
+                        "prediction cycle must immediately precede observation cycle",
+                    ));
+                }
                 if let Some(prediction_cycle) = wire.prediction_cycle {
                     if wire.observation_cycle.checked_sub(1) != Some(prediction_cycle) {
                         return Err(D::Error::custom(
@@ -414,6 +421,9 @@ mod tests {
         let invalid_with_value =
             r#"{"status":"source_unavailable","value":1.0,"prediction_cycle":1,"observation_cycle":2}"#;
         assert!(serde_json::from_str::<PredictionErrorEvidence>(invalid_with_value).is_err());
+
+        let skipped_cycle = r#"{"status":"valid","value":0.5,"prediction_cycle":3,"observation_cycle":5}"#;
+        assert!(serde_json::from_str::<PredictionErrorEvidence>(skipped_cycle).is_err());
 
         let non_finite =
             r#"{"status":"valid","value":1e999,"prediction_cycle":1,"observation_cycle":2}"#;
