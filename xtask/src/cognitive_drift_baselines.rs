@@ -149,6 +149,7 @@ pub fn run_scalar_detector(mut input: ScalarDriftRunInput) -> anyhow::Result<Sca
 
     // Ground-truth events are a set of intervals, not an ordered stream. Normalize
     // their serialization before hashing while preserving calibration/sample order.
+    input.calibration_values.sort_by(f64::total_cmp);
     input.drift_events.sort_by(|left, right| {
         (left.start_cycle, left.end_cycle, &left.id)
             .cmp(&(right.start_cycle, right.end_cycle, &right.id))
@@ -410,6 +411,10 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                 alpha.is_finite() && alpha > 0.0 && alpha < 1.0,
                 "prm_alpha must be finite and in (0, 1)"
             );
+            ensure!(
+                input.detector.warmup_valid_observations == 1,
+                "PRM warmup_valid_observations must be 1; delayed monitoring requires a separate alpha contract"
+            );
             let wealth_threshold = 1.0 / alpha;
             ensure!(wealth_threshold.is_finite(), "PRM 1/alpha threshold overflowed");
 
@@ -460,6 +465,10 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                     continue;
                 }
                 let value = observation.value.expect("validated numeric PE");
+                ensure!(
+                    !reference.iter().any(|item| item.value == value && item.tie_key == tie_key),
+                    "PRM tie-break collision; rerun with a different independent benchmark seed"
+                );
                 let rank_index = reference.partition_point(|item| {
                     item.value < value || (item.value == value && item.tie_key < tie_key)
                 });
@@ -710,7 +719,7 @@ mod tests {
     fn predictive_rank_martingale_detects_sustained_upward_shift_at_anytime_threshold() {
         let mut input = fixture(ScalarDetectorMethod::PredictiveRankMartingalePortfolio);
         input.calibration_values = (0..20).map(|i| 0.1 + i as f64 * 0.001).collect();
-        input.observations = (0..600)
+        input.observations = (0..40)
             .map(|cycle_index| ScalarObservation {
                 cycle_index,
                 value: Some(0.9),
@@ -720,16 +729,41 @@ mod tests {
         input.drift_events = vec![DriftEvent {
             id: "sustained-upward-shift".to_owned(),
             start_cycle: 0,
-            end_cycle: 599,
+            end_cycle: 39,
         }];
         let result = run_scalar_detector(input).expect("PRM should run");
         assert_eq!(result.detector_id, "predictive-rank-martingale-portfolio");
         assert_eq!(result.detections.len(), 1);
-        assert!(result.detections[0].cycle_index < 600);
+        assert!(result.detections[0].cycle_index < 40);
         assert_eq!(result.score.true_positive_events, 1);
         assert_eq!(result.score.false_positive_alarms, 0);
         assert_eq!(result.score.missed_events, 0);
         assert!(result.score.hard_gate_pass);
+    }
+
+    #[test]
+    fn predictive_rank_martingale_input_digest_is_invariant_to_calibration_order() {
+        let mut first = fixture(ScalarDetectorMethod::PredictiveRankMartingalePortfolio);
+        first.calibration_values = (0..20).map(|i| 0.1 + i as f64 * 0.001).collect();
+        first.observations = (0..40)
+            .map(|cycle_index| ScalarObservation {
+                cycle_index,
+                value: Some(0.9),
+                evidence_valid: true,
+            })
+            .collect();
+        first.drift_events = vec![DriftEvent {
+            id: "sustained-upward-shift".to_owned(),
+            start_cycle: 0,
+            end_cycle: 39,
+        }];
+        let mut second = first.clone();
+        second.calibration_values.reverse();
+        let a = run_scalar_detector(first).expect("first PRM run");
+        let b = run_scalar_detector(second).expect("reordered calibration PRM run");
+        assert_eq!(a.canonical_input_sha256, b.canonical_input_sha256);
+        assert_eq!(a.result_sha256, b.result_sha256);
+        assert_eq!(a.detections, b.detections);
     }
 
     #[test]
