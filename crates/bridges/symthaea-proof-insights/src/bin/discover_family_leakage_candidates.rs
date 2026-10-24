@@ -18,8 +18,12 @@ use sha2::{Digest, Sha256};
 
 const UPSTREAM_COMMIT: &str = "1581d4cbdd69a0faf34b2089614fe2a814316a6a";
 const SPLIT_SEED: &str = "pitb-v0-openai-math-2026-10-19";
-const SPLIT_ALGORITHM: &str = "sha256(seed || NUL || family_id), sort by digest then family ID, floor 70% train and floor 85% train+validation";
-const EXPECTED_PARTITION_DIGEST: &str = "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970";
+const SPLIT_ALGORITHM: &str = concat!(
+    "sha256(seed || NUL || family_id), sort by digest then family ID, ",
+    "floor 70% train and floor 85% train+validation"
+);
+const EXPECTED_PARTITION_DIGEST: &str =
+    "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970";
 const EXPECTED_FAMILY_COUNTS: (usize, usize, usize) = (260, 56, 56);
 const RARE_TOKEN_MAX_DOCUMENT_FREQUENCY: usize = 15;
 const MIN_RARE_SHARED_TOKENS: usize = 2;
@@ -112,9 +116,10 @@ fn token_set(
 fn stopwords() -> BTreeSet<&'static str> {
     concat!(
         "the a an and or nor but of on in to for from with by at as is are was were be been being ",
-        "not does do did every each any all some over under into beyond across between within without ",
-        "against after before through during result results family families conjecture conjectures ",
-        "theorem theorems lemma lemmas proof proofs bound bounds formula formulas problem problems ",
+        "not does do did every each any all some over under into beyond ",
+        "across between within without against after before through during ",
+        "result results family families conjecture conjectures theorem theorems ",
+        "lemma lemmas proof proofs bound bounds formula formulas problem problems ",
         "new related general using its their this that"
     )
     .split_whitespace()
@@ -190,14 +195,8 @@ fn validate_catalogue(doc: &Value) -> Result<(String, Vec<Family>, SplitCounts)>
     let rows = doc["families"].as_array().context("families must be an array")?;
     let mut splits = BTreeMap::new();
     for row in rows {
-        let id = row["family_id"]
-            .as_str()
-            .context("family_id missing")?
-            .to_owned();
-        let split = row["split"]
-            .as_str()
-            .context("split missing")?
-            .to_owned();
+        let id = row["family_id"].as_str().context("family_id missing")?.to_owned();
+        let split = row["split"].as_str().context("split missing")?.to_owned();
         let _title = row["title"].as_str().context("title missing")?;
         if !matches!(split.as_str(), "train" | "validation" | "test")
             || id.trim().is_empty()
@@ -207,9 +206,7 @@ fn validate_catalogue(doc: &Value) -> Result<(String, Vec<Family>, SplitCounts)>
         }
     }
 
-    if splits
-        != deterministic_splits(&splits.keys().cloned().collect::<Vec<_>>())?
-    {
+    if splits != deterministic_splits(&splits.keys().cloned().collect::<Vec<_>>())? {
         bail!("family assignments differ from the registered deterministic split");
     }
     let digest = partition_digest(&splits);
@@ -248,8 +245,7 @@ fn validate_catalogue(doc: &Value) -> Result<(String, Vec<Family>, SplitCounts)>
 
     let tag_re = Regex::new(r"<[^>]*>").context("compile HTML-tag tokenizer")?;
     let entity_re = Regex::new(r"&[A-Za-z]+;").context("compile entity tokenizer")?;
-    let token_re = Regex::new(r"(?u)[\p{L}\p{N}]{3,}")
-        .context("compile Unicode tokenizer")?;
+    let token_re = Regex::new(r"(?u)[\p{L}\p{N}]{3,}").context("compile Unicode tokenizer")?;
     let stop = stopwords();
     let mut families = Vec::with_capacity(rows.len());
     for row in rows {
@@ -422,7 +418,10 @@ fn main() -> Result<()> {
     fs::write(&args[1], serde_json::to_vec_pretty(&report)?)
         .with_context(|| format!("cannot write {}", args[1]))?;
     println!(
-        "PITB_FAMILY_LEAKAGE_CANDIDATES: pairs={} cross_split={} train_test={} relation=title_similarity_only",
+        concat!(
+            "PITB_FAMILY_LEAKAGE_CANDIDATES: pairs={} cross_split={} ",
+            "train_test={} relation=title_similarity_only"
+        ),
         report.counts.candidate_pairs,
         report.counts.cross_split_pairs,
         report.counts.train_test_pairs
