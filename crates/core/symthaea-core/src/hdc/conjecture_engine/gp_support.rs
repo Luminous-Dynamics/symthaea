@@ -50,44 +50,57 @@ pub(crate) fn macro_usage_key(expr: &Expr) -> String {
 /// (not `pub(crate)`) so external crates can reuse the exact same scoring
 /// function the real search uses, e.g. for noise-robustness benchmarking
 /// against the true fitness landscape rather than an approximation of it.
-pub fn lie_derivative_variance(
+pub fn lie_derivative_variance_with_work(
     expr: &Expr,
     rhs: fn(&[f64], f64) -> Vec<f64>,
     trajectory: &[Vec<f64>],
     var_names: &[&str],
-) -> f64 {
+) -> (f64, u64) {
+    let mut rhs_calls = 0u64;
     let mut lie_vals = Vec::with_capacity(trajectory.len());
     let mut grad_sq_vals = Vec::with_capacity(trajectory.len());
 
     for state in trajectory {
         let grad = fd_gradient(expr, state, var_names);
         if grad.iter().any(|g| !g.is_finite()) {
-            return f64::MAX;
+            return (f64::MAX, rhs_calls);
         }
+        rhs_calls = rhs_calls.saturating_add(1);
         let flow = rhs(state, 0.0);
         if flow.len() != grad.len() {
-            return f64::MAX;
+            return (f64::MAX, rhs_calls);
         }
         let lie: f64 = grad.iter().zip(flow.iter()).map(|(g, f)| g * f).sum();
         let grad_sq: f64 = grad.iter().map(|g| g * g).sum();
         if !lie.is_finite() || !grad_sq.is_finite() {
-            return f64::MAX;
+            return (f64::MAX, rhs_calls);
         }
         lie_vals.push(lie);
         grad_sq_vals.push(grad_sq);
     }
 
     if lie_vals.is_empty() {
-        return f64::MAX;
+        return (f64::MAX, rhs_calls);
     }
 
     let mean_lie_sq = lie_vals.iter().map(|v| v * v).sum::<f64>() / lie_vals.len() as f64;
     let mean_grad_sq = grad_sq_vals.iter().sum::<f64>() / grad_sq_vals.len() as f64;
     const MIN_GRADIENT_MAG_SQ: f64 = 1e-12;
     if mean_grad_sq < MIN_GRADIENT_MAG_SQ {
-        return f64::MAX;
+        return (f64::MAX, rhs_calls);
     }
-    mean_lie_sq / mean_grad_sq
+    (mean_lie_sq / mean_grad_sq, rhs_calls)
+}
+
+/// Score Lie-derivative variance while preserving how many RHS evaluations
+/// were spent, including calls before a rejected/non-finite score.
+pub fn lie_derivative_variance(
+    expr: &Expr,
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    trajectory: &[Vec<f64>],
+    var_names: &[&str],
+) -> f64 {
+    lie_derivative_variance_with_work(expr, rhs, trajectory, var_names).0
 }
 
 /// Central-difference gradient of `expr` at `state` w.r.t. `var_names`.
@@ -116,8 +129,12 @@ pub fn fd_gradient(expr: &Expr, state: &[f64], var_names: &[&str]) -> Vec<f64> {
     grad
 }
 
-/// Fraction of `trajectory` samples where `expr`'s gradient magnitude clears
-/// a threshold relative to the trajectory's own peak gradient magnitude.
+/// Relative floor on squared gradient magnitude used by the informative-fraction metric.
+/// A value of 0.01 means 10% of peak gradient amplitude.
+pub const GRADIENT_INFORMATIVENESS_RELATIVE_SQUARED_FLOOR: f64 = 0.01;
+
+/// Fraction of `trajectory` samples where the squared gradient magnitude of
+/// `expr` reaches a fraction of the trajectory's peak squared gradient magnitude.
 ///
 /// [`lie_derivative_variance`] normalizes by the *mean* squared gradient,
 /// which a degenerate high-power monomial of a single variable can game: if
@@ -153,12 +170,10 @@ pub fn gradient_informativeness_fraction(
     if max_grad_sq <= 0.0 || !max_grad_sq.is_finite() {
         return 0.0;
     }
-    // 1% of the trajectory's own peak -- relative, not absolute, so it
-    // applies regardless of the candidate's overall scale.
-    const INFORMATIVE_RELATIVE_FLOOR: f64 = 0.01;
+    // The relative threshold applies regardless of the candidate's scale.
     let informative = grad_sq_vals
         .iter()
-        .filter(|&&g| g >= INFORMATIVE_RELATIVE_FLOOR * max_grad_sq)
+        .filter(|&&g| g >= GRADIENT_INFORMATIVENESS_RELATIVE_SQUARED_FLOOR * max_grad_sq)
         .count();
     informative as f64 / grad_sq_vals.len() as f64
 }
@@ -699,4 +714,34 @@ fn lcg_step(state: u64) -> u64 {
     state
         .wrapping_mul(6364136223846793005)
         .wrapping_add(1442695040888963407)
+}
+
+
+#[cfg(test)]
+mod lie_derivative_work_tests {
+    use super::{Expr, lie_derivative_variance_with_work};
+
+    fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+        vec![state[1], -state[0]]
+    }
+
+    #[test]
+    fn lie_score_counts_one_rhs_call_per_scored_state() {
+        let candidate = Expr::Var("x".to_string());
+        let trajectory = vec![vec![1.0, 0.0], vec![0.9, 0.1], vec![0.8, 0.2]];
+        let (score, rhs_calls) =
+            lie_derivative_variance_with_work(&candidate, harmonic_rhs, &trajectory, &["x", "v"]);
+        assert!(score.is_finite());
+        assert_eq!(rhs_calls, trajectory.len() as u64);
+    }
+
+    #[test]
+    fn rejected_non_finite_gradient_preserves_zero_rhs_calls() {
+        let candidate = Expr::Var("x".to_string());
+        let trajectory = vec![vec![f64::NAN, 0.0], vec![1.0, 0.0]];
+        let (score, rhs_calls) =
+            lie_derivative_variance_with_work(&candidate, harmonic_rhs, &trajectory, &["x", "v"]);
+        assert_eq!(score, f64::MAX);
+        assert_eq!(rhs_calls, 0);
+    }
 }
