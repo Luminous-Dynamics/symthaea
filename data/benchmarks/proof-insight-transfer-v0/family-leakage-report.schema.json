@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb.family-leakage-report.v0.json",
+  "title": "PITB family leakage audit report",
+  "description": "Deterministic quarantine report derived from the pinned family split and a declared relationship inventory. It does not independently verify relationship receipt bytes or the truth of the inventory's coverage assertion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_partition_digest_sha256",
+    "relationship_inventory_status",
+    "coverage_receipt_sha256",
+    "total_family_count",
+    "original_family_counts",
+    "known_quarantined_family_count",
+    "known_quarantined_family_counts",
+    "remaining_family_counts_after_known_quarantine",
+    "edge_counts",
+    "cross_split_components",
+    "quarantined_families",
+    "certification_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.family-leakage-report.v0"
+    },
+    "source_partition_digest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "relationship_inventory_status": {
+      "enum": [
+        "incomplete",
+        "independently_reviewed_complete"
+      ]
+    },
+    "coverage_receipt_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "total_family_count": {
+      "type": "integer",
+      "minimum": 3
+    },
+    "original_family_counts": {
+      "$ref": "#/$defs/splitCounts"
+    },
+    "known_quarantined_family_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "known_quarantined_family_counts": {
+      "$ref": "#/$defs/splitCounts"
+    },
+    "remaining_family_counts_after_known_quarantine": {
+      "$ref": "#/$defs/splitCounts"
+    },
+    "edge_counts": {
+      "$ref": "#/$defs/edgeCounts"
+    },
+    "cross_split_components": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/component"
+      }
+    },
+    "quarantined_families": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/quarantinedFamily"
+      }
+    },
+    "certification_status": {
+      "enum": [
+        "not_certified_incomplete_inventory",
+        "cross_split_hard_relationships_require_quarantine",
+        "no_cross_split_hard_relationships_in_declared_inventory"
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "splitCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "train",
+        "validation",
+        "test"
+      ],
+      "properties": {
+        "train": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "validation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "test": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "edgeCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_edges",
+        "confirmed_hard_edges",
+        "unresolved_hard_edges",
+        "dismissed_hard_edges",
+        "non_hard_edges",
+        "confirmed_cross_split_hard_edges",
+        "unresolved_cross_split_hard_edges"
+      ],
+      "properties": {
+        "total_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confirmed_hard_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_hard_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dismissed_hard_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "non_hard_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confirmed_cross_split_hard_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_cross_split_hard_edges": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family_ids",
+        "split_names",
+        "edge_ids",
+        "confirmed_edge_ids",
+        "unresolved_edge_ids"
+      ],
+      "properties": {
+        "family_ids": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "split_names": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "train",
+              "validation",
+              "test"
+            ]
+          }
+        },
+        "edge_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "confirmed_edge_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "unresolved_edge_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "quarantinedFamily": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family_id",
+        "split",
+        "reason_edge_ids"
+      ],
+      "properties": {
+        "family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "enum": [
+            "train",
+            "validation",
+            "test"
+          ]
+        },
+        "reason_edge_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "relationship_inventory_status": {
+            "const": "incomplete"
+          }
+        },
+        "required": [
+          "relationship_inventory_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "certification_status": {
+            "const": "not_certified_incomplete_inventory"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "certification_status": {
+            "const": "no_cross_split_hard_relationships_in_declared_inventory"
+          }
+        },
+        "required": [
+          "certification_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cross_split_components": {
+            "maxItems": 0
+          },
+          "known_quarantined_family_count": {
+            "const": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "certification_status": {
+            "const": "cross_split_hard_relationships_require_quarantine"
+          }
+        },
+        "required": [
+          "certification_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cross_split_components": {
+            "minItems": 1
+          },
+          "known_quarantined_family_count": {
+            "minimum": 1
+          }
+        }
+      }
+    }
+  ]
+}
