@@ -29,6 +29,14 @@ The target is not to rebuild Skywise, airline operations research, predictive-ma
 
 No claim of industry novelty or superiority is permitted until a reproducible public benchmark and fair baselines support it.
 
+### Two additional paradigm shifts
+
+**Decision-value-of-information (VOI), not uncertainty chasing.** The coordinator should decide whether to inspect an asset, request supplier confirmation, rerun a test, or ask an expert based on the expected change in downstream decisions and losses—not uncertainty magnitude alone. Compare the VOI policy against fixed-interval inspection, highest-uncertainty-first, and no-additional-information baselines. Measure total cost including the cost/time of obtaining the information, avoided disruption, false alarms, and decisions delayed by inspection. The estimate itself must be calibrated on held-out cases; do not label a heuristic uncertainty score as expected economic value.
+
+**Constraint-preserving cognition, not a single AI reward.** Symthaea should propose hypotheses and coordinate established solvers; it should not replace mathematical optimization, formal checks, or domain physics with an opaque learned score. No internal consciousness proxy (including Phi), HDC similarity, predicted free energy, or moral-vote score is an aviation-performance KPI by default. Treat such signals as research features only. Require preregistered ablations and causal/mechanistic evidence that a signal improves held-out operational outcomes; remove it if the benefit fails to replicate. Hard safety, legality, qualification, and evidence requirements remain non-compensable constraints rather than weighted penalties.
+
+These are falsifiable design principles: the integrated cognitive layer only earns a production role if it adds a measured advantage over the strongest relevant conventional solver, while keeping its failure and abstention behavior explicit.
+
 ## Public evaluation ladder and dataset caveats
 
 AECB's integrated schedule/maintenance/production scenario is necessarily synthetic at first: public datasets rarely contain the linked passenger, crew legality, aircraft configuration, maintenance task cards, parts inventory, supplier contracts, production capacity, cost ledger, and operator interventions required for a fair end-to-end airline backtest. Do not fill these gaps with invented data and then describe the outcome as field evidence.
