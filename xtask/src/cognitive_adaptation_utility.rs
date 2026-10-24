@@ -790,4 +790,66 @@ mod tests {
         duplicate.no_adapt.observations[1].cycle_index = 0;
         assert!(score_counterfactual_utility(duplicate).is_err());
     }
+
+    #[test]
+    fn binds_score_to_validated_receipt_and_rejects_receipt_identity_or_policy_drift() {
+        let mut input = fixture();
+        let mut receipt = crate::cognitive_replay_receipt::tests::valid_receipt();
+        receipt.run_kind = "replay".to_owned();
+        receipt.dataset_id = input.dataset_id.clone();
+        receipt.stream_id = input.stream_id.clone();
+        receipt.environment_seed = input.seed;
+
+        let stream_digest = hex_sha256(&serde_json::to_vec(&receipt.events).expect("serialize event ledger"));
+        receipt.event_ledger_sha256 = stream_digest.clone();
+        input.shared_stream_sha256 = stream_digest.clone();
+        for arm in [
+            &mut input.no_adapt,
+            &mut input.detector_triggered,
+            &mut input.detector_benefit_gated,
+            &mut input.staged_verify_rollback,
+            &mut input.oracle_timed,
+        ] {
+            arm.exogenous_stream_sha256 = stream_digest.clone();
+        }
+
+        for receipt_arm in &mut receipt.arms {
+            let scored_arm = match receipt_arm.arm_id.as_str() {
+                "no-adapt" => &input.no_adapt,
+                "detector-triggered" => &input.detector_triggered,
+                "detector-benefit-gated" => &input.detector_benefit_gated,
+                "staged-verify-rollback" => &input.staged_verify_rollback,
+                "oracle-timed" => &input.oracle_timed,
+                other => panic!("unexpected receipt arm {other}"),
+            };
+            receipt_arm.repository_head_sha = scored_arm.repository_head_sha.clone();
+            receipt_arm.configuration_digest = scored_arm.configuration_digest.clone();
+        }
+
+        let mut score = score_counterfactual_utility(input).expect("score fixture");
+        bind_replay_receipt(&mut score, receipt.clone()).expect("matching receipt binds");
+        assert_eq!(score.source_replay_run_kind.as_deref(), Some("replay"));
+        assert_eq!(
+            score.source_replay_receipt_sha256.as_ref().map(String::len),
+            Some(64)
+        );
+        assert_eq!(
+            score.source_replay_receipt_validation_sha256.as_ref().map(String::len),
+            Some(64)
+        );
+        assert_eq!(score.result_sha256.as_ref().map(String::len), Some(64));
+
+        let mut wrong_identity = receipt.clone();
+        wrong_identity.stream_id = "different-stream".to_owned();
+        let error = bind_replay_receipt(&mut score.clone(), wrong_identity)
+            .expect_err("receipt from another stream must fail closed");
+        assert!(error.to_string().contains("stream_id differs"));
+
+        let mut wrong_policy = receipt;
+        wrong_policy.arms[0].configuration_digest = "9".repeat(64);
+        let error = bind_replay_receipt(&mut score.clone(), wrong_policy)
+            .expect_err("policy configuration mismatch must fail closed");
+        assert!(error.to_string().contains("configuration differs"));
+    }
+
 }
