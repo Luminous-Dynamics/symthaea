@@ -151,8 +151,8 @@ impl CognitiveSubsystem for VisionManager {
         // Combine compressed state variance with prediction error for visual surprise.
         // P6-A: Imagination surprise amplifies the signal — when reality violates
         // the mental model, surprise is boosted by up to 30%.
-        let base_surprise = if snapshot.prediction_error_valid != 0 {
-            state_variance * 0.4 + snapshot.prediction_error * 0.6
+        let base_surprise = if let Some(prediction_error) = snapshot.prediction_error_sample() {
+            state_variance * 0.4 + prediction_error * 0.6
         } else {
             // Still process observable state variance, but don't substitute the
             // PE compatibility sentinel for sensory surprise.
