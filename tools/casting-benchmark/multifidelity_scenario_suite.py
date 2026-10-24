@@ -183,6 +183,10 @@ class MultiFidelityScenario:
         objectives, margin = self._truth_at(design.x)
         return Observation(candidate_id, "high", objectives, margin, self._costs["high"])
 
+    def _response(self, candidate_id: int, fidelity: str) -> Observation:
+        """Policy-evaluator adapter: return one fidelity response without exposing audit truth."""
+        return self.evaluate(candidate_id, fidelity)
+
     def evaluate(self, candidate_id: int, fidelity: str) -> Observation:
         if fidelity not in self._costs:
             raise ValueError(f"unsupported fidelity: {fidelity}")

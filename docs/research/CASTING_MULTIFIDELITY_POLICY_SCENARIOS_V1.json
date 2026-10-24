@@ -1,0 +1,158 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark_id": "CASTING-MF-POLICY-SCENARIOS-001",
+  "title": "Internal policy comparison across adversarial multi-fidelity scenarios",
+  "status": "synthetic_policy_diagnostic_not_external_sota_benchmark",
+  "implementation": "tools/casting-benchmark/multifidelity_scenario_policy_bakeoff.py",
+  "tests": "tools/casting-benchmark/test_multifidelity_scenario_policy_bakeoff.py",
+  "scenario_registry": "docs/research/CASTING_MULTIFIDELITY_SCENARIO_SUITE_V1.json",
+  "source_policy_module": "tools/casting-benchmark/multifidelity_stress.py",
+  "candidate_pool": {
+    "source": "MultiFidelityScenario deterministic seed-offset Halton sequence",
+    "design_count": 128,
+    "dimensions": [
+      2,
+      5,
+      10
+    ],
+    "domain": [
+      0,
+      1
+    ],
+    "pairing_rule": "Within each scenario, dimension, severity and seed, every policy receives the same candidate-ID set and high-fidelity truth. Across seed values, the candidate pool changes deterministically.",
+    "ground_truth": "High-fidelity analytic truth from the scenario registry; audit queries are performed after each policy returns.",
+    "minimum_design_count": 75,
+    "reason_for_minimum": "Largest frozen low-fidelity sampling count among current internal policies."
+  },
+  "objective_and_scoring": {
+    "objective_count": 2,
+    "direction": "minimize_all",
+    "constraints": "constraint_margin >= 0",
+    "reference_point": [
+      1.2,
+      1.2
+    ],
+    "primary_metric": "observed high-fidelity feasible archive hypervolume divided by the finite-pool high-fidelity feasible archive hypervolume",
+    "caveat": "Finite-pool normalized hypervolume is a controlled synthetic diagnostic, not a COCO-native score and not physical casting quality.",
+    "independent_scoring_status": "Post-policy analytic truth audit is performed by this runner; this result JSON is not yet re-scored by the separate immutable-trace scorer. This remains a diagnostic comparison, not publication-grade evidence."
+  },
+  "fidelity_costs_default": {
+    "low": 1,
+    "medium": 5,
+    "high": 25
+  },
+  "default_cost_budget": 200,
+  "policies": [
+    {
+      "id": "high_only",
+      "calls": {
+        "low": 0,
+        "medium": 0,
+        "high": 8
+      },
+      "cost_units": 200,
+      "role": "high-fidelity sampling sanity baseline"
+    },
+    {
+      "id": "low_screen",
+      "calls": {
+        "low": 75,
+        "medium": 0,
+        "high": 5
+      },
+      "cost_units": 200,
+      "role": "low-fidelity screen and promote"
+    },
+    {
+      "id": "fixed_top_k",
+      "calls": {
+        "low": 50,
+        "medium": 10,
+        "high": 4
+      },
+      "cost_units": 200,
+      "role": "fixed top-k multi-stage promotion"
+    },
+    {
+      "id": "discrepancy_aware",
+      "calls": {
+        "low": 55,
+        "medium": 4,
+        "high": 5
+      },
+      "cost_units": 200,
+      "role": "paired discrepancy correction with high-fidelity anchors"
+    },
+    {
+      "id": "adaptive_budget",
+      "calls": {
+        "low": 60,
+        "medium": 8,
+        "high": 4
+      },
+      "cost_units": 200,
+      "role": "budget-responsive transparent heuristic with correction and promotion"
+    }
+  ],
+  "diagnostics": [
+    "Normalized finite-pool high-fidelity hypervolume fraction",
+    "False-feasible promotion count and fraction",
+    "Fidelity evaluation counts and actual cost units",
+    "Unused budget",
+    "Per-policy high-fidelity call count",
+    "Paired-seed mean/median hypervolume delta versus high_only",
+    "Exploratory percentile-bootstrap confidence interval, wins/ties/losses"
+  ],
+  "default_sweep": {
+    "scenario_ids": [
+      "smooth_stationary",
+      "local_bias_island",
+      "warped_coordinates",
+      "constraint_boundary",
+      "discontinuous_step",
+      "heteroscedastic_noise"
+    ],
+    "dimensions": [
+      2,
+      5,
+      10
+    ],
+    "severities": [
+      0.5,
+      1,
+      2
+    ],
+    "seeds": [
+      17,
+      23,
+      29
+    ],
+    "design_count": 128,
+    "policies_per_cell": 5,
+    "policy_run_count": 810,
+    "summary_count": 270,
+    "paired_comparison_count": 216
+  },
+  "acceptance_gates": {
+    "cost_accounting": "Every policy run must satisfy sum(fidelity_cost_units_by_level) == cost_spent <= cost_budget.",
+    "pairing": "All policy comparisons are paired by identical scenario, dimension, severity, seed and candidate pool.",
+    "failure_accounting": "Invalid and failed high-fidelity evaluations, when supported by future adapters, must still consume budget and be retained in the result record.",
+    "inferential_claims": "The three-seed default is diagnostic only. Use at least 20 paired seeds (target 30), predeclared multiple-comparison handling and per-cell/task effects before inferential superiority claims.",
+    "external_sota": "No SOTA claim until pinned BoTorch MF-HVKG/MOMF and suitable single-fidelity baselines have been executed under matched budgets and the external lock protocol is satisfied.",
+    "physical_validation": "No foundry claim until a frozen casting simulator and held-out physical validation data exist.",
+    "independent_trace_score": "Before publication, export an immutable trace/receipt pair and verify metrics with a separate scorer and digest lock; the in-process audit here is not an independent scoring path."
+  },
+  "limitations": [
+    "The suite runs repository-internal policies only; it does not run external BoTorch, COCO, NSGA-II or physical casting models.",
+    "The scenario equations are synthetic challenge cases and may not represent every real foundry discrepancy.",
+    "Default paired-seed percentile-bootstrap intervals are exploratory and unadjusted for multiple comparisons.",
+    "The source policy API is a capability-limited interface, not a sandbox against same-process Python introspection.",
+    "Finite candidate-pool hypervolume cannot substitute for continuous-domain or COCO-native assessment.",
+    "Wall-clock, memory and optimizer overhead are not measured by this runner and must be reported in a later controlled environment."
+  ],
+  "research_references": [
+    "https://doi.org/10.1145/3801959",
+    "https://doi.org/10.1007/s11831-025-10392-8",
+    "https://link.springer.com/article/10.1007/s43939-026-00685-5"
+  ]
+}
