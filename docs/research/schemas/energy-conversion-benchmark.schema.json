@@ -1,0 +1,675 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:energy-conversion-benchmark:1",
+  "title": "Symthaea Energy-Conversion Benchmark Run",
+  "description": "A reproducible, boundary-explicit energy-conversion run. Schema validation is necessary but does not replace independent physical or evidence review.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "evidence_class",
+    "not_for_decision",
+    "mission",
+    "boundary",
+    "candidate",
+    "solver",
+    "intervals",
+    "evaluation_policy",
+    "uncertainty",
+    "data_provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,95}$"
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic_fixture",
+        "published_data",
+        "measured",
+        "simulated",
+        "mixed"
+      ]
+    },
+    "not_for_decision": {
+      "type": "boolean"
+    },
+    "mission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mission_id",
+        "description",
+        "platform",
+        "duty_cycle_id",
+        "expected_duration_s",
+        "required_phases"
+      ],
+      "properties": {
+        "mission_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform": {
+          "type": "string",
+          "minLength": 1
+        },
+        "duty_cycle_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile_source_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "expected_duration_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "ambient_temperature_k": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "ambient_pressure_pa": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "required_phases": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "startup",
+              "warmup",
+              "loaded",
+              "part_load",
+              "idle",
+              "transient",
+              "shutdown",
+              "soak"
+            ]
+          },
+          "allOf": [
+            {
+              "contains": {
+                "const": "startup"
+              }
+            },
+            {
+              "contains": {
+                "const": "shutdown"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boundary_id",
+        "input_definition",
+        "useful_output_definition",
+        "auxiliary_treatment",
+        "storage_treatment",
+        "upstream_scope",
+        "energy_unit"
+      ],
+      "properties": {
+        "boundary_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "useful_output_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "auxiliary_treatment": {
+          "const": "separate_nonuseful_energy"
+        },
+        "storage_treatment": {
+          "const": "signed_change_in_stored_energy"
+        },
+        "upstream_scope": {
+          "enum": [
+            "device_only",
+            "tank_to_useful_output",
+            "well_to_useful_output",
+            "cradle_to_grave",
+            "custom"
+          ]
+        },
+        "custom_scope_definition": {
+          "type": "string"
+        },
+        "energy_unit": {
+          "const": "J"
+        },
+        "power_unit": {
+          "const": "W"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "architecture_family",
+        "description"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "architecture_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mass_kg": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "rated_useful_power_w": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "solver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "version",
+        "code_revision",
+        "model_fidelity"
+      ],
+      "properties": {
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "code_revision": {
+          "$ref": "#/$defs/gitRevision"
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "model_fidelity": {
+          "enum": [
+            "analytical",
+            "reduced_order",
+            "calibrated_simulation",
+            "high_fidelity_simulation",
+            "measured_system",
+            "mixed"
+          ]
+        },
+        "random_seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "calibration_dataset_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "intervals": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "index",
+          "phase",
+          "start_s",
+          "end_s",
+          "energy_j",
+          "standard_uncertainty_j"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "phase": {
+            "enum": [
+              "startup",
+              "warmup",
+              "loaded",
+              "part_load",
+              "idle",
+              "transient",
+              "shutdown",
+              "soak"
+            ]
+          },
+          "start_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "end_s": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "energy_j": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "external_input",
+              "net_useful_output",
+              "auxiliary",
+              "rejected_or_loss",
+              "stored_energy_change"
+            ],
+            "properties": {
+              "external_input": {
+                "type": "number",
+                "minimum": 0
+              },
+              "net_useful_output": {
+                "type": "number",
+                "minimum": 0
+              },
+              "auxiliary": {
+                "type": "number",
+                "minimum": 0
+              },
+              "rejected_or_loss": {
+                "type": "number",
+                "minimum": 0
+              },
+              "stored_energy_change": {
+                "type": "number"
+              }
+            }
+          },
+          "standard_uncertainty_j": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "external_input",
+              "net_useful_output",
+              "auxiliary",
+              "rejected_or_loss",
+              "stored_energy_change"
+            ],
+            "properties": {
+              "external_input": {
+                "type": "number",
+                "minimum": 0
+              },
+              "net_useful_output": {
+                "type": "number",
+                "minimum": 0
+              },
+              "auxiliary": {
+                "type": "number",
+                "minimum": 0
+              },
+              "rejected_or_loss": {
+                "type": "number",
+                "minimum": 0
+              },
+              "stored_energy_change": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "source_artifact_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quantity_type",
+        "coverage_factor",
+        "correlation_model",
+        "method"
+      ],
+      "properties": {
+        "quantity_type": {
+          "const": "combined_standard_uncertainty"
+        },
+        "coverage_factor": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "correlation_model": {
+          "enum": [
+            "independent",
+            "covariance_matrix_artifact",
+            "monte_carlo_propagation",
+            "unknown"
+          ],
+          "description": "Correlation assumptions for primitive energy quantities. The current Rust comparator only computes a result for independent, mutually uncorrelated interval/channel/candidate-baseline inputs; unknown or correlated cases are indeterminate until covariance or Monte Carlo propagation is implemented."
+        },
+        "covariance_matrix_artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "monte_carlo_artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "correlation_model": {
+                "const": "covariance_matrix_artifact"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "covariance_matrix_artifact_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "correlation_model": {
+                "const": "monte_carlo_propagation"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "monte_carlo_artifact_id"
+            ]
+          }
+        }
+      ]
+    },
+    "data_provenance": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifact_id",
+          "kind",
+          "description"
+        ],
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "synthetic_fixture",
+              "published_reference",
+              "raw_measurement",
+              "processed_measurement",
+              "simulation_input",
+              "simulation_output",
+              "calibration_record",
+              "other"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "license_or_access_terms": {
+            "type": "string"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "published_reference",
+                    "raw_measurement",
+                    "processed_measurement",
+                    "simulation_input",
+                    "simulation_output",
+                    "calibration_record"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "sha256"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "computed_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "total_external_input_j": {
+          "type": "number",
+          "minimum": 0
+        },
+        "total_net_useful_output_j": {
+          "type": "number",
+          "minimum": 0
+        },
+        "net_stored_energy_change_j": {
+          "type": "number"
+        },
+        "net_cycle_efficiency": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "uncertainty_bound_method": {
+          "type": "string"
+        },
+        "candidate_beats_baseline": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evaluation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "registered_before_search",
+        "preregistered_at",
+        "relative_balance_tolerance",
+        "time_continuity_tolerance_s",
+        "minimum_superiority_margin",
+        "maximum_unmodeled_differential_bias_efficiency",
+        "differential_bias_bound_basis",
+        "differential_bias_calibration_artifact_id",
+        "differential_bias_calibration_artifact_sha256",
+        "baseline_id",
+        "selection_rule",
+        "search_started_at",
+        "comparison_metric_id"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "registered_before_search": {
+          "const": true,
+          "description": "Self-declared flag that must be true. It is not proof by itself; actual preregistration must be independently anchored to an immutable pre-search commit or signed append-only registry."
+        },
+        "preregistered_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "relative_balance_tolerance": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "time_continuity_tolerance_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimum_superiority_margin": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum absolute efficiency-fraction improvement required after subtracting expanded measurement uncertainty and the registered worst-case differential-bias bound (0.02 means two percentage points). Registered before candidate search."
+        },
+        "maximum_unmodeled_differential_bias_efficiency": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Registered worst-case absolute bound on unmodeled differential systematic bias between candidate and baseline efficiency, expressed as an efficiency fraction. Subtracted linearly from the conservative lower bound; not a standard uncertainty. A zero bound requires documented justification."
+        },
+        "differential_bias_bound_basis": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Recorded evidence and reasoning behind the differential-bias bound. Text aids audit but does not independently authenticate the evidence."
+        },
+        "baseline_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selection_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "search_started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "comparison_metric_id": {
+          "const": "net_cycle_efficiency",
+          "description": "Metric implemented by benchmark contract v1. Other metrics (e.g. heat-pump COP, specific fuel consumption, thrust-specific metrics) require their own registered metric definition and comparison implementation."
+        },
+        "differential_bias_calibration_artifact_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Artifact ID for the calibration record; must match a data_provenance entry."
+        },
+        "differential_bias_calibration_artifact_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "SHA-256 digest of the referenced calibration artifact. Record consistency is checked, but the verifier does not retrieve the artifact bytes."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence_class": {
+            "const": "synthetic_fixture"
+          }
+        },
+        "required": [
+          "evidence_class"
+        ]
+      },
+      "then": {
+        "properties": {
+          "not_for_decision": {
+            "const": true
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "gitRevision": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    }
+  }
+}

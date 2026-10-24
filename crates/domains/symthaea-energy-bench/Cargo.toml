@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-energy-bench"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Independent validation primitives for reproducible Symthaea energy-conversion benchmark records"
+
+[dependencies]
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
