@@ -14,9 +14,8 @@ use super::prediction_evidence::PredictionErrorEvidence;
 pub(crate) struct CycleState<'a> {
     pub compressed_state: &'a [f32],
     pub output: &'a [f32],
-    pub prediction_error: f32,
-    pub prediction_error_valid: bool,
-    /// Explicit status and cycle provenance for PE-dependent consumers.
+    /// Explicit status, finite value (when usable), and cycle provenance.
+    /// This is the sole PE contract passed to downstream cognitive phases.
     pub prediction_evidence: PredictionErrorEvidence,
     pub coherence: f32,
     pub unified_psi: f64,
