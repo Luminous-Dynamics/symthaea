@@ -184,8 +184,8 @@ fn random_corpus(count: usize) -> Vec<BinaryHV> {
         .collect()
 }
 
-/// Eight coherent clusters, stored contiguously. Each cluster's first member
-/// is its anchor; later members flip a deterministic subset of its bits.
+/// Eight coherent clusters, interleaved by member rank. This prevents a
+/// corpus-order shortcut from selecting one representative per cluster.
 fn clustered_corpus(count: usize) -> Vec<BinaryHV> {
     assert_eq!(count % CLUSTER_COUNT, 0);
     let per_cluster = count / CLUSTER_COUNT;
@@ -193,19 +193,30 @@ fn clustered_corpus(count: usize) -> Vec<BinaryHV> {
         .map(|cluster| BinaryHV::random(CORPUS_SEED.wrapping_add(10_000 + cluster as u64)))
         .collect();
 
-    let mut corpus = Vec::with_capacity(count);
+    let mut members_by_cluster: Vec<Vec<BinaryHV>> = Vec::with_capacity(CLUSTER_COUNT);
     for (cluster, anchor) in anchors.iter().enumerate() {
-        corpus.push(*anchor);
+        let mut members = Vec::with_capacity(per_cluster);
+        members.push(*anchor);
         for local_index in 1..per_cluster {
             let flips = 32 + (local_index * 37) % 2048;
             let offset = cluster * 2039 + local_index * 131;
-            corpus.push(perturb(anchor, flips, offset));
+            members.push(perturb(anchor, flips, offset));
+        }
+        members_by_cluster.push(members);
+    }
+
+    let mut corpus = Vec::with_capacity(count);
+    for local_index in 0..per_cluster {
+        for members in &members_by_cluster {
+            corpus.push(members[local_index]);
         }
     }
     corpus
 }
 
-fn pivot_ids(corpus_len: usize, pivot_count: usize) -> Vec<usize> {
+/// Cheap order-sensitive control. On an interleaved corpus, these positions may
+/// select multiple pivots from the same cluster.
+fn evenly_spaced_pivot_ids(corpus_len: usize, pivot_count: usize) -> Vec<usize> {
     assert!(pivot_count > 0 && pivot_count <= CLUSTER_COUNT);
     assert_eq!(corpus_len % CLUSTER_COUNT, 0);
     let per_cluster = corpus_len / CLUSTER_COUNT;
@@ -214,11 +225,47 @@ fn pivot_ids(corpus_len: usize, pivot_count: usize) -> Vec<usize> {
         .collect()
 }
 
+/// Deterministic farthest-first (maximin) selection. Each new pivot maximizes
+/// distance to its nearest selected pivot. This can cover separated clusters,
+/// but its extra exact distance work is included in index-build timing.
+fn farthest_first_pivot_ids(corpus: &[BinaryHV], pivot_count: usize) -> Vec<usize> {
+    assert!(!corpus.is_empty());
+    assert!(pivot_count > 0 && pivot_count <= CLUSTER_COUNT.min(corpus.len()));
+
+    let mut selected = vec![0usize];
+    let mut nearest_distance: Vec<u32> = corpus
+        .iter()
+        .map(|candidate| candidate.hamming_distance(&corpus[0]))
+        .collect();
+
+    while selected.len() < pivot_count {
+        let mut next_id = None;
+        let mut farthest_distance = 0u32;
+        for (candidate_id, &distance) in nearest_distance.iter().enumerate() {
+            if selected.contains(&candidate_id) {
+                continue;
+            }
+            if next_id.is_none() || distance > farthest_distance {
+                next_id = Some(candidate_id);
+                farthest_distance = distance;
+            }
+        }
+        let next_id = next_id.expect("pivot count is bounded by corpus length");
+        selected.push(next_id);
+        let pivot = &corpus[next_id];
+
+        for (candidate_id, candidate) in corpus.iter().enumerate() {
+            let distance = candidate.hamming_distance(pivot);
+            nearest_distance[candidate_id] = nearest_distance[candidate_id].min(distance);
+        }
+    }
+    selected
+}
 fn verify_correctness() {
     let query = BinaryHV::random(QUERY_SEED);
     let corpus = random_corpus(257);
     for pivot_count in PIVOT_COUNTS {
-        let ids = pivot_ids(256, pivot_count);
+        let ids = evenly_spaced_pivot_ids(256, pivot_count);
         // Use a non-power-of-two query corpus and choose valid pivot IDs for it.
         let ids: Vec<usize> = ids.into_iter().filter(|&id| id < corpus.len()).collect();
         let index = PivotIndex::build(&corpus, &ids);
@@ -293,10 +340,7 @@ fn bench_pivot_exact_search(c: &mut Criterion) {
             };
             let query = match profile {
                 "random" => BinaryHV::random(QUERY_SEED),
-                "clustered" => {
-                    let per_cluster = corpus_size / CLUSTER_COUNT;
-                    perturb(&corpus[5 * per_cluster], 32, 491)
-                }
+                "clustered" => perturb(&corpus[5], 32, 491)
                 _ => unreachable!(),
             };
             let expected = exact_argmin(&query, &corpus);
@@ -311,42 +355,48 @@ fn bench_pivot_exact_search(c: &mut Criterion) {
             );
 
             for pivot_count in PIVOT_COUNTS {
-                let ids = pivot_ids(corpus_size, pivot_count);
-                let index = PivotIndex::build(&corpus, &ids);
-                let actual = pivot_exact_argmin::<true>(&query, &corpus, &index);
-                assert_eq!((actual.0, actual.1), expected);
+                let selections = [
+                    ("evenly_spaced", evenly_spaced_pivot_ids(corpus_size, pivot_count)),
+                    ("farthest_first", farthest_first_pivot_ids(&corpus, pivot_count)),
+                ];
 
-                // Untimed evidence counters: exact full-vector evaluations and
-                // compact signature size. Not a claim about physical DRAM reads.
-                let (_, _, full_evaluations) =
-                    pivot_exact_argmin::<true>(&query, &corpus, &index);
-                let metadata_bytes = index.signatures.len() * std::mem::size_of::<u16>();
-                eprintln!(
-                    "pivot-diagnostic profile={profile} n={corpus_size} pivots={pivot_count} \
-                     exact_vectors={full_evaluations}/{} signature_bytes={} result_id={} distance={}",
-                    corpus_size,
-                    metadata_bytes,
-                    actual.0,
-                    actual.1,
-                );
+                for (selector, ids) in selections {
+                    let index = PivotIndex::build(&corpus, &ids);
+                    let actual = pivot_exact_argmin::<true>(&query, &corpus, &index);
+                    assert_eq!((actual.0, actual.1), expected);
 
-                group.throughput(Throughput::Elements(corpus_size as u64));
-                group.bench_with_input(
-                    BenchmarkId::new(
-                        format!("{profile}_pivot{pivot_count}_n{corpus_size}"),
+                    // Untimed evidence counters: exact full-vector evaluations and
+                    // compact signature size. Not physical DRAM-read measurements.
+                    let (_, _, full_evaluations) =
+                        pivot_exact_argmin::<true>(&query, &corpus, &index);
+                    let metadata_bytes = index.signatures.len() * std::mem::size_of::<u16>();
+                    eprintln!(
+                        "pivot-diagnostic profile={profile} selector={selector} n={corpus_size} pivots={pivot_count} \\
+                         exact_vectors={full_evaluations}/{} signature_bytes={} result_id={} distance={}",
                         corpus_size,
-                    ),
-                    &corpus_size,
-                    |bencher, _| {
-                        bencher.iter(|| {
-                            black_box(pivot_exact_argmin::<false>(
-                                black_box(&query),
-                                black_box(&corpus),
-                                black_box(&index),
-                            ))
-                        })
-                    },
-                );
+                        metadata_bytes,
+                        actual.0,
+                        actual.1,
+                    );
+
+                    group.throughput(Throughput::Elements(corpus_size as u64));
+                    group.bench_with_input(
+                        BenchmarkId::new(
+                            format!("{profile}_{selector}_pivot{pivot_count}_n{corpus_size}"),
+                            corpus_size,
+                        ),
+                        &corpus_size,
+                        |bencher, _| {
+                            bencher.iter(|| {
+                                black_box(pivot_exact_argmin::<false>(
+                                    black_box(&query),
+                                    black_box(&corpus),
+                                    black_box(&index),
+                                ))
+                            })
+                        },
+                    );
+                }
             }
         }
     }
@@ -361,17 +411,30 @@ fn bench_pivot_exact_search(c: &mut Criterion) {
     for corpus_size in CORPUS_SIZES {
         let corpus = random_corpus(corpus_size);
         for pivot_count in PIVOT_COUNTS {
-            let ids = pivot_ids(corpus_size, pivot_count);
-            build_group.throughput(Throughput::Elements(corpus_size as u64));
-            build_group.bench_with_input(
-                BenchmarkId::new(format!("n{corpus_size}_p{pivot_count}"), corpus_size),
-                &corpus_size,
-                |bencher, _| {
-                    bencher.iter(|| {
-                        black_box(PivotIndex::build(black_box(&corpus), black_box(&ids)))
-                    })
-                },
-            );
+            for selector in ["evenly_spaced", "farthest_first"] {
+                build_group.throughput(Throughput::Elements(corpus_size as u64));
+                build_group.bench_with_input(
+                    BenchmarkId::new(
+                        format!("n{corpus_size}_p{pivot_count}_{selector}"),
+                        corpus_size,
+                    ),
+                    &corpus_size,
+                    |bencher, _| {
+                        bencher.iter(|| {
+                            let ids = match selector {
+                                "evenly_spaced" => {
+                                    evenly_spaced_pivot_ids(corpus.len(), pivot_count)
+                                }
+                                "farthest_first" => {
+                                    farthest_first_pivot_ids(&corpus, pivot_count)
+                                }
+                                _ => unreachable!(),
+                            };
+                            black_box(PivotIndex::build(black_box(&corpus), black_box(&ids)))
+                        })
+                    },
+                );
+            }
         }
     }
     build_group.finish();
