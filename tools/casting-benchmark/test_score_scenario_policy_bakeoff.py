@@ -121,6 +121,24 @@ class ScenarioPolicyReplayScorerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duplicate JSON key"):
             loads_no_duplicate_keys('{"trace":{"seed":17,"seed":23}}')
 
+    def test_malformed_cost_type_is_rejected_without_crashing(self) -> None:
+        result = copy.deepcopy(self.result)
+        result["paired_runs"][0]["evaluations"][0]["cost_units"] = "one"
+        _, errors = self._score(result)
+        self.assertTrue(any("cost_units does not match" in error for error in errors))
+
+    def test_unhashable_scenario_identifier_is_rejected_without_crashing(self) -> None:
+        result = copy.deepcopy(self.result)
+        result["scenario_ids"] = [["smooth_stationary"]]
+        _, errors = self._score(result)
+        self.assertTrue(any("unique list of strings" in error for error in errors))
+
+    def test_invalid_top_level_budget_is_rejected_without_crashing(self) -> None:
+        result = copy.deepcopy(self.result)
+        result["cost_budget"] = ["200"]
+        _, errors = self._score(result)
+        self.assertTrue(any("top-level cost_budget must be a positive integer" in error for error in errors))
+
     def test_unknown_run_fields_fail_closed(self) -> None:
         result = copy.deepcopy(self.result)
         result["paired_runs"][0]["trust_me"] = True
