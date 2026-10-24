@@ -9,8 +9,7 @@
 //! This is test-only research machinery, not a production authority.
 
 use symthaea_operations_research::aviation_enterprise::{
-    reference_scenario, solve_exact, Aircraft, Flight, FlightAssignment, PartSource, Plan,
-    ProductionOption, Scenario,
+    reference_scenario, solve_exact, Flight, FlightAssignment, PartSource, Plan, Scenario,
 };
 
 fn evaluate_independently(scenario: &Scenario, plan: &Plan) -> Option<u64> {
