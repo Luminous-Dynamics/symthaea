@@ -100,6 +100,7 @@ pub struct AuthorizationRequest {
     authority: AuthorizationAuthority,
     decision_id: String,
     lifetime: Duration,
+    created_at: Instant,
 }
 
 impl AuthorizationRequest {
@@ -131,6 +132,7 @@ impl AuthorizationRequest {
             authority,
             decision_id,
             lifetime,
+            created_at: Instant::now(),
         })
     }
 }
@@ -275,9 +277,15 @@ impl ExecutionAuthorizationLedger {
             return Err(AuthorizationError::DuplicateDecision);
         }
 
-        let expires_at = Instant::now()
+        // Freshness starts when the trusted decision is represented, not
+        // when a delayed caller eventually asks the ledger to mint a handle.
+        let expires_at = request
+            .created_at
             .checked_add(request.lifetime)
             .ok_or(AuthorizationError::LifetimeOverflow)?;
+        if Instant::now() >= expires_at {
+            return Err(AuthorizationError::Expired);
+        }
         let permit_id = self.next_permit_id;
         let next_permit_id = permit_id
             .checked_add(1)
@@ -708,6 +716,23 @@ mod tests {
                 ),
             ),
             Err(AuthorizationError::WrongLedger)
+        );
+    }
+
+    #[test]
+    fn stale_authorization_request_cannot_gain_a_fresh_lifetime_when_issued() {
+        let mut ledger = ExecutionAuthorizationLedger::default();
+        let mut stale = request(
+            binding(&["switch"]),
+            "decision-012",
+            AuthorizationAuthority::HumanOperator,
+            ActionScope::SystemCritical,
+        );
+        stale.created_at = Instant::now() - Duration::from_secs(6);
+
+        assert_eq!(
+            ledger.issue(stale).unwrap_err(),
+            AuthorizationError::Expired
         );
     }
 
