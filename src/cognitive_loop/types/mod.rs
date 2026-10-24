@@ -13,7 +13,9 @@ mod scheduling;
 pub(crate) mod telemetry;
 
 pub use output::*;
-pub use prediction_evidence::{PredictionErrorEvidence, PredictionEvidenceStatus};
+pub use prediction_evidence::{
+    PredictionErrorEvidence, PredictionEvidenceCursor, PredictionEvidenceStatus,
+};
 pub use scheduling::*;
 pub use telemetry::*;
 
