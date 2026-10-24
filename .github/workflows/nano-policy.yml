@@ -1,0 +1,29 @@
+name: NANO Policy Prototype
+
+on:
+  pull_request:
+    paths:
+      - "tools/nano-policy/**"
+      - ".github/workflows/nano-policy.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/nano-policy/**"
+      - ".github/workflows/nano-policy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run deterministic policy tests
+        run: cargo test --locked --manifest-path tools/nano-policy/Cargo.toml
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path tools/nano-policy/Cargo.toml --all-targets -- -D warnings

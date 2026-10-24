@@ -1,0 +1,768 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:oc22-is2re-pair-manifest:v1",
+  "title": "OC22 IS2RE pair-admission manifest",
+  "description": "Evidence contract for reconciling a frozen OC22 source representation into official initial-structure to relaxed-total-energy examples. Schema validity never by itself admits a dataset or establishes scientific validity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_state",
+    "generated_at_utc",
+    "source_contract",
+    "artifacts",
+    "split_inventory",
+    "pairs",
+    "checks",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "oc22-is2re-pair-manifest-v1"
+    },
+    "manifest_state": {
+      "enum": [
+        "not_downloaded",
+        "artifact_identity_pending",
+        "artifact_integrity_verified",
+        "schema_review_pending",
+        "pair_crosswalk_pending",
+        "split_reconciliation_pending",
+        "admission_blocked",
+        "eligible_for_human_review"
+      ],
+      "description": "No automatic scientifically-admitted state exists in this schema."
+    },
+    "generated_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset",
+        "official_task",
+        "task_definition_url",
+        "task_definition_commit",
+        "dataset_license_uri",
+        "target_name",
+        "target_units",
+        "input_role",
+        "target_role",
+        "source_reader_revision"
+      ],
+      "properties": {
+        "dataset": {
+          "const": "Open Catalyst 2022 (OC22)"
+        },
+        "official_task": {
+          "const": "IS2RE-Total"
+        },
+        "task_definition_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "task_definition_commit": {
+          "type": "string",
+          "minLength": 7
+        },
+        "dataset_license_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "target_name": {
+          "const": "relaxed total energy"
+        },
+        "target_units": {
+          "const": "eV"
+        },
+        "input_role": {
+          "const": "initial structure"
+        },
+        "target_role": {
+          "const": "relaxed structure total energy"
+        },
+        "source_reader_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "split_inventory": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/split"
+      },
+      "description": "Provider claims, observed counts, and independently reconciled counts must remain distinct."
+    },
+    "pairs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pair"
+      },
+      "description": "Include unresolved/excluded SIDs; never silently drop ambiguous pairs."
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_identity",
+        "archive_structure",
+        "schema_semantics",
+        "split_integrity",
+        "pair_mapping",
+        "license_and_attribution",
+        "independent_review"
+      ],
+      "properties": {
+        "artifact_identity": {
+          "$ref": "#/$defs/check"
+        },
+        "archive_structure": {
+          "$ref": "#/$defs/check"
+        },
+        "schema_semantics": {
+          "$ref": "#/$defs/check"
+        },
+        "split_integrity": {
+          "$ref": "#/$defs/check"
+        },
+        "pair_mapping": {
+          "$ref": "#/$defs/check"
+        },
+        "license_and_attribution": {
+          "$ref": "#/$defs/check"
+        },
+        "independent_review": {
+          "$ref": "#/$defs/check"
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "source_url",
+        "source_revision",
+        "revision_basis",
+        "identity_state",
+        "byte_size",
+        "sha256",
+        "provider_reported_sha256",
+        "upstream_md5",
+        "hash_provenance",
+        "local_path_redacted"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "official_is2re_archive",
+            "official_metadata_map",
+            "colabfit_train_original",
+            "colabfit_train_parquet",
+            "colabfit_validation_id_original",
+            "colabfit_validation_ood_original",
+            "colabfit_validation_ood_parquet",
+            "other"
+          ]
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision_basis": {
+          "enum": [
+            "immutable_commit",
+            "dataset_doi",
+            "provider_current_state",
+            "unknown"
+          ]
+        },
+        "identity_state": {
+          "enum": [
+            "not_downloaded",
+            "provider_metadata_only",
+            "downloaded_not_verified",
+            "sha256_verified",
+            "upstream_checksum_mismatch",
+            "unavailable"
+          ]
+        },
+        "byte_size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Locally computed SHA-256 of exact bytes; never copy a web-card hash into this field."
+        },
+        "provider_reported_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "upstream_md5": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]{32}$"
+        },
+        "hash_provenance": {
+          "enum": [
+            "not_available",
+            "provider_reported",
+            "locally_computed"
+          ]
+        },
+        "local_path_redacted": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional pseudonymous path/storage label; never a user home path or secret."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "hash_provenance": {
+                "const": "locally_computed"
+              }
+            },
+            "required": [
+              "hash_provenance"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "byte_size": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "sha256",
+              "byte_size"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "identity_state": {
+                "const": "sha256_verified"
+              }
+            },
+            "required": [
+              "identity_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "hash_provenance": {
+                "const": "locally_computed"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "byte_size": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split",
+        "source_representation",
+        "provider_reported_configurations",
+        "provider_reported_unique_systems",
+        "observed_rows",
+        "observed_unique_sids",
+        "independently_reconciled",
+        "evidence"
+      ],
+      "properties": {
+        "split": {
+          "enum": [
+            "train",
+            "validation_id",
+            "validation_ood",
+            "test"
+          ]
+        },
+        "source_representation": {
+          "enum": [
+            "official_lmdb",
+            "colabfit_original",
+            "colabfit_parquet",
+            "other"
+          ]
+        },
+        "provider_reported_configurations": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "provider_reported_unique_systems": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "observed_rows": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "observed_unique_sids": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "independently_reconciled": {
+          "type": "boolean"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "independently_reconciled": {
+                "const": true
+              }
+            },
+            "required": [
+              "independently_reconciled"
+            ]
+          },
+          "then": {
+            "properties": {
+              "observed_rows": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "observed_unique_sids": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "observed_rows",
+              "observed_unique_sids"
+            ]
+          }
+        }
+      ]
+    },
+    "structure_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_artifact_role",
+        "source_record_id",
+        "configuration_id",
+        "structure_hash",
+        "evidence"
+      ],
+      "properties": {
+        "source_artifact_role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_record_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "configuration_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "structure_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sid",
+        "official_split",
+        "initial_input",
+        "relaxed_target",
+        "pair_status",
+        "exclusion_reason",
+        "independent_crosswalk",
+        "evidence"
+      ],
+      "properties": {
+        "sid": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "official_split": {
+          "enum": [
+            "train",
+            "validation_id",
+            "validation_ood",
+            "test",
+            "unresolved"
+          ]
+        },
+        "initial_input": {
+          "$ref": "#/$defs/structure_reference"
+        },
+        "relaxed_target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_artifact_role",
+            "source_record_id",
+            "configuration_id",
+            "structure_hash",
+            "energy_eV",
+            "evidence"
+          ],
+          "properties": {
+            "source_artifact_role": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source_record_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "configuration_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "structure_hash": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "energy_eV": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "pair_status": {
+          "enum": [
+            "unresolved",
+            "verified",
+            "ambiguous",
+            "missing_endpoint",
+            "excluded"
+          ],
+          "description": "Verified requires non-null input and target identities, energy in eV, per-SID endpoint evidence, and independent_crosswalk=passed."
+        },
+        "exclusion_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "independent_crosswalk": {
+          "enum": [
+            "not_run",
+            "passed",
+            "failed"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "pair_status": {
+                "const": "verified"
+              }
+            },
+            "required": [
+              "pair_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "official_split": {
+                "enum": [
+                  "train",
+                  "validation_id",
+                  "validation_ood",
+                  "test"
+                ]
+              },
+              "initial_input": {
+                "required": [
+                  "source_artifact_role",
+                  "source_record_id",
+                  "configuration_id",
+                  "structure_hash",
+                  "evidence"
+                ],
+                "properties": {
+                  "source_artifact_role": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source_record_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "configuration_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "structure_hash": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                }
+              },
+              "relaxed_target": {
+                "required": [
+                  "source_artifact_role",
+                  "source_record_id",
+                  "configuration_id",
+                  "structure_hash",
+                  "energy_eV",
+                  "evidence"
+                ],
+                "properties": {
+                  "source_artifact_role": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source_record_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "configuration_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "structure_hash": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "energy_eV": {
+                    "type": "number"
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                }
+              },
+              "independent_crosswalk": {
+                "const": "passed"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "evidence"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_run",
+            "passed",
+            "failed",
+            "blocked",
+            "inconclusive"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "manifest_state": {
+            "const": "eligible_for_human_review"
+          }
+        },
+        "required": [
+          "manifest_state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "checks": {
+            "properties": {
+              "artifact_identity": {
+                "properties": {
+                  "status": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "archive_structure": {
+                "properties": {
+                  "status": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "schema_semantics": {
+                "properties": {
+                  "status": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "split_integrity": {
+                "properties": {
+                  "status": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "pair_mapping": {
+                "properties": {
+                  "status": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "license_and_attribution": {
+                "properties": {
+                  "status": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "independent_review": {
+                "properties": {
+                  "status": {
+                    "const": "passed"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
