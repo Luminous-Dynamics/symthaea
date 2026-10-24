@@ -248,13 +248,15 @@ fn build_fixture(seed: u64, count: usize) -> Vec<Candidate> {
     let mut rng = Rng::new(seed);
     (0..count)
         .map(|id| {
-            let kind = Kind::ALL[(id + rng.below(Kind::ALL.len())) % Kind::ALL.len()];
+            // Keep the latent class, raw length and future query demand fixed by
+            // candidate ID across seeds; only policy-visible feature noise varies.
+            let kind = Kind::ALL[id % Kind::ALL.len()];
             Candidate {
                 id,
                 kind,
                 observed: base_observed(kind, &mut rng),
-                raw_tokens: 8 + rng.below(33),
-                future_queries: 1 + rng.below(6),
+                raw_tokens: 8 + ((id * 13 + 5) % 33),
+                future_queries: 1 + ((id * 7 + 3) % 6),
             }
         })
         .collect()
