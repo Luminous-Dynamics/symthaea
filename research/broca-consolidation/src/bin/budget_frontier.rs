@@ -151,7 +151,7 @@ struct Observed {
     procedure_successes: usize,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Candidate {
     id: usize,
     kind: Kind, // evaluator-only; never passed to a policy
