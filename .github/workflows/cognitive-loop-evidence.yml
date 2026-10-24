@@ -5,6 +5,7 @@ on:
     paths:
       - "benchmarks/cognitive-loop-evidence/**"
       - "Cargo.toml"
+      - "Cargo.lock"
       - "scripts/check-workspace-targets.sh"
       - "xtask/src/cognitive_loop_evidence.rs"
       - "xtask/src/cognitive_drift_score.rs"
@@ -19,6 +20,7 @@ on:
     paths:
       - "benchmarks/cognitive-loop-evidence/**"
       - "Cargo.toml"
+      - "Cargo.lock"
       - "scripts/check-workspace-targets.sh"
       - "xtask/src/cognitive_loop_evidence.rs"
       - "xtask/src/cognitive_drift_score.rs"
@@ -47,6 +49,32 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
       - name: Verify workspace targets are tracked
         run: bash scripts/check-workspace-targets.sh
+      - name: Diagnose Cargo.lock consistency without relaxing the gate
+        id: lock-diagnostic
+        run: |
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          cargo update --workspace
+          if cmp -s "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Cargo.lock is consistent with the current workspace manifests."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            diff -u "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock > "$RUNNER_TEMP/Cargo.lock.diff" || true
+            cat "$RUNNER_TEMP/Cargo.lock.diff"
+            echo "::error::Cargo.lock requires a committed workspace dependency update; all locked test commands remain fail-closed."
+            exit 1
+          fi
+      - name: Upload Cargo.lock diagnostic artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cognitive-loop-cargo-lock-diagnostic-${{ github.run_id }}
+          path: |
+            Cargo.lock
+            ${{ runner.temp }}/Cargo.lock.before
+            ${{ runner.temp }}/Cargo.lock.diff
+          if-no-files-found: ignore
+          retention-days: 3
       - name: Validate manifest and hard-gate invariants
         run: cargo run --locked -p xtask -- validate-cognitive-loop-evidence
       - name: Test validator failure modes
