@@ -396,11 +396,9 @@ impl MuseManager {
             consciousness_level: snapshot.unified_psi as f32,
             // The synthesizer has no validity channel of its own. Hold the
             // last admitted PE rather than sonifying the missing-comparison sentinel.
-            prediction_error: if snapshot.prediction_error_valid != 0 {
-                snapshot.prediction_error
-            } else {
-                self.last_musical_state.prediction_error
-            },
+            prediction_error: snapshot
+                .prediction_error_sample()
+                .unwrap_or(self.last_musical_state.prediction_error),
         }
     }
 
