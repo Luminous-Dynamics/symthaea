@@ -50,6 +50,8 @@ The corpus and query cues are fully resident during query timing. The build grou
 
 ## Independent model and evidence boundary
 
+A separate NumPy-based Python pilot (not Rust execution) tested N = 256, eight sampled query/target pairs, and the same role-bind / majority-bundle workload semantics. The sampled semantic hit@1 was 8/8 for each arity. The minimum target-versus-strongest-impostor similarity margin across those eight queries was 0.23383 for K = 3, 0.13812 for K = 7, and 0.08746 for K = 15. The margin declines as more facts are bundled, consistent with stronger superposition interference. This is a small synthetic pilot only: it does not estimate population-level recall, does not cover the 1,024–16,384 corpus sizes, and uses NumPy-generated data rather than the Rust branch's BLAKE3-based seed generator. It is not a Rust source test or a performance measurement.
+
 No performance result is claimed by authoring this benchmark. The benchmark source has not been compiled or executed here because the authoring environment lacks Cargo/Rust. A successful source fetch and manifest registration establish only that the files exist at the named revision. Exact nearest-neighbor oracle checks are encoded in the target but remain unexecuted until the Rust target is run.
 
 ## How this changes the research program
