@@ -30,6 +30,12 @@ Successful execution writes deterministic JSON to stdout. Invalid CSV, a conflic
 
 The implementation is deliberately narrow. It does not perform postings to a database, handle currencies/exchange rates, implement bank controls, or claim equivalence to COBOL, IBM Db2, z/OS, JCL, or a production system.
 
+## Fixture integrity gate
+
+Before the reference tests run, CI executes `bash tools/vleb/check-fixture-integrity.sh`. It checks the three fixture file hashes against reviewed constants, checks those constants against `task.json`, and checks that mutation IDs are unique and mutation test references are registered by the task contract. The gate is intended to catch accidental fixture/contract drift early.
+
+This is a consistency gate, not an independent semantic audit: it does not prove that the reference implementation is correct, that a negative control was actually executed, or that any cataloged mutant was compiled and killed. Those remain separate admission requirements.
+
 ## Validation status
 
 The reference crate currently contains 17 unit tests and 4 CLI integration tests, including a seeded differential reducer over 64 generated ledgers, permutation invariance, arbitrary duplicate multiplicity, maximum-value arithmetic, strict integer-token syntax and malformed CSV cases. These tests were authored but have not been compiled or executed in this environment because rustc and cargo are unavailable. CI results must be checked at the exact PR head. The fixture is not score-eligible until those tests execute, an independent reviewer approves the oracle, and adversarial task admission is complete.
