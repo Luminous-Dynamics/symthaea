@@ -701,7 +701,7 @@ impl NixOSExecutor {
 
         let elapsed = start.elapsed().as_millis() as u64;
 
-        match result {
+        let exec_result = match result {
             Ok(output) if output.status.success() => ExecutionResult::Success {
                 stdout: String::from_utf8_lossy(&output.stdout).to_string(),
                 stderr: String::from_utf8_lossy(&output.stderr).to_string(),
@@ -715,7 +715,13 @@ impl NixOSExecutor {
                 error: e.to_string(),
                 rollback_error: None,
             },
-        }
+        };
+
+        // Confirmed live execution is still execution evidence, even though
+        // the caller supplied the upstream authorization. Keep dry-run out of
+        // this history until its outcome has a distinct non-execution type.
+        self.record_execution(&command, phi, &exec_result);
+        exec_result
     }
 
     fn record_execution(&mut self, command: &NixOSCommand, phi: f32, result: &ExecutionResult) {
@@ -951,6 +957,11 @@ mod tests {
             .await;
         assert!(matches!(result, ExecutionResult::Success { .. }));
         assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(executor.history().len(), 1);
+        assert!(matches!(
+            executor.history().back().map(|entry| &entry.result),
+            Some(ExecutionResult::Success { .. })
+        ));
 
         let replay = executor
             .execute_with_permit(
@@ -967,6 +978,7 @@ mod tests {
             ExecutionResult::Blocked { ref reason, .. } if reason.contains("already consumed")
         ));
         assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(executor.history().len(), 1);
     }
 
     #[cfg(unix)]
