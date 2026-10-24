@@ -217,6 +217,31 @@ fn test_invalid_pe_does_not_trigger_surprise_or_exploration() {
 
 #[test]
 #[allow(clippy::field_reassign_with_default)]
+fn stale_pe_evidence_does_not_trigger_surprise_or_exploration() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_surprise_exploration = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+    let compressed = vec![0.5f32; 128];
+    service.last_state = Some(compressed.clone());
+    service.last_prediction = Some(vec![0.0f32; 128]);
+    let initial_urge = service.behavior.curiosity_drive.exploration_urge;
+
+    // The measurement belongs to a different observation cycle; it must not
+    // be replayed as a fresh surprise just because the value is large.
+    let stale = PredictionErrorEvidence::valid(1.0, Some(1), 2).unwrap();
+    let (triggered, action) = service.run_surprise_exploration(&compressed, &stale, 1);
+
+    assert!(!triggered, "stale evidence must not become surprise");
+    assert!(action.is_none(), "stale evidence must not create an action");
+    assert_eq!(
+        service.behavior.curiosity_drive.exploration_urge,
+        initial_urge,
+        "stale evidence must not change the exploration drive"
+    );
+}
+
+#[test]
+#[allow(clippy::field_reassign_with_default)]
 fn test_run_surprise_exploration_with_bridge() {
     let mut config = CognitiveLoopConfig::default();
     config.enable_surprise_exploration = true;
