@@ -376,6 +376,22 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_from_cycle_does_not_promote_invalid_pe_to_canvas_evidence() {
+        let bath = crate::cognitive_loop::neuromodulators::NeuromodulatorBath::default();
+        let mut invalid = crate::cognitive_loop::subsystem_trait::CycleSnapshot::default();
+        invalid.prediction_error = 1.0;
+        invalid.prediction_error_valid = 0;
+        let missing = snapshot_from_cycle(&invalid, &bath);
+        assert_eq!(missing.prediction_error_sample(), None);
+
+        let mut valid = invalid;
+        valid.prediction_error = 0.25;
+        valid.prediction_error_valid = 1;
+        let measured = snapshot_from_cycle(&valid, &bath);
+        assert_eq!(measured.prediction_error_sample(), Some(0.25));
+    }
+
+    #[test]
     fn snapshot_from_cycle_maps_bath_and_state() {
         let cs = crate::cognitive_loop::subsystem_trait::CycleSnapshot::default();
         let bath = crate::cognitive_loop::neuromodulators::NeuromodulatorBath::default();
