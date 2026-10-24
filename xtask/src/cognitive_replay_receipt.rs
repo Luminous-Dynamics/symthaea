@@ -153,7 +153,6 @@ pub fn validate_receipt(receipt: ReplayReceipt) -> anyhow::Result<ReplayReceiptV
     );
 
     let mut event_by_id = BTreeMap::new();
-    let mut prior_available: Option<(u64, u64)> = None;
     for (index, event) in receipt.events.iter().enumerate() {
         ensure!(event.sequence_index == index as u64,
             "event sequence_index must be contiguous and match ledger order");
@@ -175,14 +174,11 @@ pub fn validate_receipt(receipt: ReplayReceipt) -> anyhow::Result<ReplayReceiptV
             event_by_id.insert(event.event_id.as_str(), event).is_none(),
             "event_id values must be unique"
         );
-        let order = (event.available_at_tick, event.sequence_index);
-        if let Some(prior) = prior_available {
-            ensure!(prior <= order, "canonical event ledger must be ordered by availability tick then sequence index");
-        }
-        prior_available = Some(order);
     }
 
-    let expected_deliveries: Vec<DeliveryRecord> = receipt.events.iter()
+    let mut delivery_events: Vec<&ExogenousEvent> = receipt.events.iter().collect();
+    delivery_events.sort_by_key(|event| (event.available_at_tick, event.sequence_index));
+    let expected_deliveries: Vec<DeliveryRecord> = delivery_events.iter()
         .map(|event| DeliveryRecord {
             event_id: event.event_id.clone(),
             delivered_at_tick: event.available_at_tick,
@@ -298,6 +294,14 @@ fn validate_arm_decisions(
             );
         }
 
+        if arm.arm_id == "no-adapt" {
+            ensure!(
+                decision.action == "no-op" || decision.action == "abstain",
+                "no-adapt arm cannot execute adaptation action {}",
+                decision.action
+            );
+        }
+
         match decision.action.as_str() {
             "no-op" | "abstain" => {
                 ensure!(
@@ -309,10 +313,6 @@ fn validate_arm_decisions(
                     decision.snapshot_sha256.is_none() && decision.candidate_state_sha256.is_none(),
                     "{} action must not carry adaptation transaction hashes",
                     decision.action
-                );
-                ensure!(
-                    arm.arm_id != "no-adapt" || decision.action == "no-op" || decision.action == "abstain",
-                    "no-adapt arm cannot adapt"
                 );
             }
             "stage" => {
@@ -501,11 +501,6 @@ mod tests {
                     snapshot_sha256,
                     candidate_state_sha256,
                 });
-                let decision = decisions.last_mut().unwrap();
-                // Keep the declared chain honest in this constructed example.
-                if tick > 0 && action != "commit" && action != "rollback" {
-                    decision.state_before_sha256 = decisions[(tick - 1) as usize].state_after_sha256.clone();
-                }
             }
             arms.push(ReplayArm {
                 arm_id: arm_id.to_owned(),
