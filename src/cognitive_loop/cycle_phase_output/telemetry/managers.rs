@@ -10,6 +10,10 @@ impl CognitiveLoopService {
         metadata: &mut CycleMetadata,
         feedback: &FeedbackPhaseResult,
     ) {
+        // Preserve validated timing evidence in serialized cycle output; a debug
+        // log alone is not sufficient for replay or qualification receipts.
+        metadata.plant_step_timing = self.sensorimotor.plant_step_timing_this_cycle.clone();
+
         {
             let voice_summary = self.language_comm.voice_coherence.voice.summary();
             metadata.voice_articulation_quality = self

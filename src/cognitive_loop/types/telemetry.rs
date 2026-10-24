@@ -1154,6 +1154,10 @@ pub struct CycleMetadata {
     /// Number of actuators in the active embodiment platform.
     #[serde(default)]
     pub embodiment_num_actuators: u32,
+    /// Validated plant-time evidence for the embodiment step accepted this cycle.
+    /// None when no authorized step occurred or timing evidence was rejected.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plant_step_timing: Option<symthaea_core::embodiment::PlantStepTimingV1>,
 
     // ── Radio/Spectrum Manager Telemetry ───────────────────────────────────
     /// Network health: 0=AllUp, 1=LocalDown, 2=MetroOnly, 3=Blackout.
@@ -1492,4 +1496,46 @@ pub struct CycleMetadata {
     #[cfg(feature = "neural_validation")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cortical_activation: Option<symthaea_core::hdc::cortical_activation::CorticalActivationMap>,
+}
+
+
+#[cfg(test)]
+mod plant_timing_telemetry_tests {
+    use super::CycleMetadata;
+    use symthaea_core::embodiment::{PlantStepTimingV1, PlantStepTimeSourceV1};
+
+    #[test]
+    fn cycle_metadata_round_trips_validated_plant_timing() {
+        let timing = PlantStepTimingV1::measured_interval(
+            23,
+            PlantStepTimeSourceV1::MeasuredDeviceClock,
+            "device-ptp",
+            "session-4",
+            1_000_000,
+            6_000_000,
+        )
+        .unwrap();
+        let mut metadata = CycleMetadata::default();
+        metadata.plant_step_timing = Some(timing.clone());
+
+        let encoded = serde_json::to_value(&metadata).expect("serialize CycleMetadata");
+        assert_eq!(
+            encoded.get("plant_step_timing"),
+            Some(&serde_json::to_value(&timing).unwrap())
+        );
+
+        let decoded: CycleMetadata =
+            serde_json::from_value(encoded).expect("deserialize CycleMetadata");
+        assert_eq!(decoded.plant_step_timing, Some(timing));
+    }
+
+    #[test]
+    fn cycle_metadata_omits_plant_timing_when_no_authorized_step_was_recorded() {
+        let metadata = CycleMetadata::default();
+        let encoded = serde_json::to_value(&metadata).expect("serialize CycleMetadata");
+        assert!(
+            encoded.get("plant_step_timing").is_none(),
+            "absence of an accepted timing record should remain explicit in the schema"
+        );
+    }
 }
