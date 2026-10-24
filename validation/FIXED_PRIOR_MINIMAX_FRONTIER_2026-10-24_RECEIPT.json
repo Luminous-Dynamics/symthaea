@@ -40,7 +40,7 @@
   },
   "status": "EXACT_LOCAL_FIXED_PRIOR_MINIMAX_PILOT_NOT_EXTERNAL_QUALIFICATION",
   "summary": {
-    "git_blob": "2dc4869ed2c0c1c66c756a9da10ce9206c57cb04",
+    "git_blob": "68b47c85a82e8034dc9869b08276d5739a41910d",
     "path": "validation/fixed_prior_minimax_frontier_summary_2026-10-24.json"
   },
   "test_source": {
