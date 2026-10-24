@@ -524,31 +524,40 @@ mod tests {
 
     #[test]
     fn path_candidate_order_is_deterministic() {
-        let one = Candidate {
-            source_family_id: "001".to_owned(),
-            target_family_id: "002".to_owned(),
-            source_split: "train".to_owned(),
-            target_split: "test".to_owned(),
-            source_title: "A".to_owned(),
-            target_title: "B".to_owned(),
-            source_matching_paths: vec!["a.pdf".to_owned()],
-            target_matching_paths: vec!["b.pdf".to_owned()],
-            shared_path_tokens: vec!["alpha".to_owned(), "beta".to_owned()],
-            rare_shared_path_tokens: vec!["alpha".to_owned(), "beta".to_owned()],
-            path_token_jaccard: 0.5,
-            rare_token_rarity_score: 3.0,
-            candidate_relation: "artifact_path_similarity_only",
-            candidate_status: "unreviewed",
-            evidence_sha256: "a".repeat(64),
+        let token_re = Regex::new(r"(?u)[\\p{L}]{3,}").unwrap();
+        let stop = stopwords();
+        let make_family = |id: &str, title: &str, split: &str, path: &str| Family {
+            id: id.to_owned(),
+            title: title.to_owned(),
+            split: split.to_owned(),
+            paths: vec![path.to_owned()],
+            path_tokens: path_token_set(path, &token_re, &stop),
         };
-        let mut rows = vec![one];
-        rows.sort_by(|a, b| {
-            b.rare_token_rarity_score
-                .total_cmp(&a.rare_token_rarity_score)
-                .then_with(|| b.path_token_jaccard.total_cmp(&a.path_token_jaccard))
-                .then_with(|| a.source_family_id.cmp(&b.source_family_id))
-                .then_with(|| a.target_family_id.cmp(&b.target_family_id))
-        });
-        assert_eq!(rows[0].source_family_id, "001");
+        let a = make_family(
+            "001",
+            "Torus packets",
+            "train",
+            "preprints/Equidistribution-of-Prime-Degree-Torus-Packets.pdf",
+        );
+        let b = make_family(
+            "002",
+            "Polynomial differences",
+            "test",
+            "preprints/Power-Saving-for-Prime-Degree-Arguments.pdf",
+        );
+        let c = make_family(
+            "003",
+            "Prime degree cohomology",
+            "validation",
+            "preprints/Prime-Degree-Cohomology.pdf",
+        );
+        let first = discover(&[a.clone(), b.clone(), c.clone()]);
+        let second = discover(&[c, a, b]);
+        assert!(!first.is_empty());
+        assert_eq!(
+            serde_json::to_value(first).unwrap(),
+            serde_json::to_value(second).unwrap()
+        );
     }
+}
 }
