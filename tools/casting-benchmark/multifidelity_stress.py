@@ -456,9 +456,12 @@ def run_policy(
 ) -> dict:
     if policy_name not in POLICIES:
         raise ValueError(f"unknown policy: {policy_name}")
-    costs = normalize_fidelity_costs(fidelity_costs)
-    _validate_run_configuration(cost_budget, grid_size, severity, costs, required_policy_costs(costs)[policy_name])
-    world = SyntheticCastingWorld(grid_size=grid_size, severity=severity, fidelity_costs=costs)
+    configured_costs = normalize_fidelity_costs(fidelity_costs)
+    _validate_run_configuration(
+        cost_budget, grid_size, severity, configured_costs,
+        required_policy_costs(configured_costs)[policy_name],
+    )
+    world = SyntheticCastingWorld(grid_size=grid_size, severity=severity, fidelity_costs=configured_costs)
     evaluator = PolicyEvaluator(world, cost_budget=cost_budget)
     POLICIES[policy_name](evaluator, seed)
 
@@ -470,10 +473,10 @@ def run_policy(
     observed_hv = hypervolume_2d([obs.objectives for obs in observed_high])
 
     counts = {fidelity: 0 for fidelity in FIDELITY_COSTS}
-    costs = {fidelity: 0 for fidelity in FIDELITY_COSTS}
+    cost_totals = {fidelity: 0 for fidelity in FIDELITY_COSTS}
     for record in evaluator.records:
         counts[record.fidelity] += 1
-        costs[record.fidelity] += record.cost_units
+        cost_totals[record.fidelity] += record.cost_units
 
     basis = evaluator.promotion_basis
     high_by_id = {obs.candidate_id: obs for obs in evaluator.high_observations}
@@ -494,13 +497,13 @@ def run_policy(
         "seed": seed,
         "grid_size": grid_size,
         "severity": severity,
-        "fidelity_costs": costs,
+        "fidelity_costs": configured_costs,
         "cost_budget": cost_budget,
         "cost_spent": evaluator.cost_spent,
         "unused_cost": cost_budget - evaluator.cost_spent,
         "evaluation_count": len(evaluator.records),
         "fidelity_evaluations": counts,
-        "fidelity_cost_units_by_level": costs,
+        "fidelity_cost_units_by_level": cost_totals,
         "high_fidelity_call_count": counts["high"],
         "true_finite_pool_hypervolume": true_hv,
         "observed_high_fidelity_hypervolume": observed_hv,
