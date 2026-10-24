@@ -125,6 +125,15 @@ def run_policy_on_scenario(
             false_promotions / predicted_feasible_promotions
             if predicted_feasible_promotions else None
         ),
+        "promotion_records": [
+            {
+                "candidate_id": candidate_id,
+                "predicted_margin": predicted_margin,
+                "method": method,
+                "observed_high_margin": actual.constraint_margin,
+            }
+            for candidate_id, predicted_margin, method, actual in audited_promotions
+        ],
         "evaluations": [asdict(record) for record in evaluator.records],
     }
 
