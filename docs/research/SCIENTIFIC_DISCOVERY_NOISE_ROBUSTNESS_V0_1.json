@@ -1,6 +1,6 @@
 {
   "protocol_id": "SCI-NOISE-001",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "status": "proposal_only",
   "linked_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8607",
   "protocol_document": "docs/research/SCIENTIFIC_DISCOVERY_NOISE_ROBUSTNESS_V0_1.md",
@@ -301,7 +301,8 @@
     "random_query_selection",
     "fixed_grid_or_round_robin",
     "current_typed_residual_guided_recovery",
-    "compatible_pinned_pysr_ai_feynman_erbench_srbench_tracks"
+    "compatible_pinned_pysr_ai_feynman_erbench_srbench_tracks",
+    "compatible_pinned_flash_ansr_simplipy_fast_srb_track"
   ],
   "reporting_rules": {
     "no_single_composite_score": true,
@@ -309,12 +310,14 @@
     "seeds_within_world_not_independent_worlds": true,
     "queued_skipped_stale_head_checks_are_not_passes": true,
     "published_external_results_are_not_matched_replications": true,
-    "per_cell_false_alarm_claim_requires_cellwise_denominator": true
+    "per_cell_false_alarm_claim_requires_cellwise_denominator": true,
+    "published_static_track_results_not_transferable_to_active_noise_robust_task": true
   },
   "references": {
     "robust_design_misspecification": "https://proceedings.mlr.press/v300/callahan26a.html",
     "r_idea": "https://proceedings.mlr.press/v300/tang26d.html",
-    "benchmark_estimands_nist": "https://doi.org/10.6028/NIST.AI.800-3"
+    "benchmark_estimands_nist": "https://doi.org/10.6028/NIST.AI.800-3",
+    "flash_ansr_simplipy": "https://proceedings.mlr.press/v306/saegert26a.html"
   },
   "seed_derivation": {
     "algorithm": "derive_stream_seed_v1",
