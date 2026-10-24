@@ -270,12 +270,17 @@ def select_diverse(
     return selected[:count]
 
 
-def pareto_front(points: Iterable[tuple[float, float]]) -> list[tuple[float, float]]:
+def pareto_front(
+    points: Iterable[tuple[float, float]],
+    reference: tuple[float, float] = REFERENCE_POINT,
+) -> list[tuple[float, float]]:
+    if len(reference) != 2 or not all(math.isfinite(v) for v in reference):
+        raise ValueError("reference point must contain two finite values")
     unique = sorted(set((float(a), float(b)) for a, b in points))
     front: list[tuple[float, float]] = []
     best_y = math.inf
     for x, y in unique:
-        if x >= REFERENCE_POINT[0] or y >= REFERENCE_POINT[1]:
+        if x >= reference[0] or y >= reference[1]:
             continue
         if y < best_y:
             front.append((x, y))
@@ -283,12 +288,17 @@ def pareto_front(points: Iterable[tuple[float, float]]) -> list[tuple[float, flo
     return front
 
 
-def hypervolume_2d(points: Iterable[tuple[float, float]]) -> float:
-    front = pareto_front(points)
+def hypervolume_2d(
+    points: Iterable[tuple[float, float]],
+    reference: tuple[float, float] = REFERENCE_POINT,
+) -> float:
+    front = pareto_front(points, reference=reference)
     area = 0.0
     for i, (x, y) in enumerate(front):
-        next_x = front[i + 1][0] if i + 1 < len(front) else REFERENCE_POINT[0]
-        area += max(0.0, next_x - x) * max(0.0, REFERENCE_POINT[1] - y)
+        next_x = front[i + 1][0] if i + 1 < len(front) else reference[0]
+        area += max(0.0, next_x - x) * max(0.0, reference[1] - y)
+    if not math.isfinite(area):
+        raise ArithmeticError("hypervolume became non-finite")
     return area
 
 
