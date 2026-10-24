@@ -106,14 +106,14 @@ fn record_to_log_event(data: &serde_json::Value) -> Option<LogEvent> {
 
 fn extract_u32(v: &serde_json::Value) -> Option<u32> {
     if let Some(n) = v.as_u64() {
-        return Some(n as u32);
+        return u32::try_from(n).ok();
     }
     if let Some(obj) = v.as_object() {
         if let Some(inner) = obj.get("#text").and_then(|x| x.as_u64()) {
-            return Some(inner as u32);
+            return u32::try_from(inner).ok();
         }
     }
-    v.as_str().and_then(|s| s.parse().ok())
+    v.as_str().and_then(|s| s.parse::<u32>().ok())
 }
 
 fn flatten_event_data(v: &serde_json::Value, prefix: &str, out: &mut BTreeMap<String, String>) {
@@ -139,6 +139,26 @@ fn flatten_event_data(v: &serde_json::Value, prefix: &str, out: &mut BTreeMap<St
         other => {
             out.insert(prefix.to_string(), other.to_string());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_u32_rejects_values_that_would_wrap() {
+        let overflow = u32::MAX as u64 + 4624;
+        assert_eq!(extract_u32(&serde_json::json!(4624)), Some(4624));
+        assert_eq!(extract_u32(&serde_json::json!({"#text": 4624})), Some(4624));
+        assert_eq!(extract_u32(&serde_json::json!("4624")), Some(4624));
+        assert_eq!(extract_u32(&serde_json::json!(overflow)), None);
+        assert_eq!(
+            extract_u32(&serde_json::json!({"#text": overflow})),
+            None
+        );
+        assert_eq!(extract_u32(&serde_json::json!(overflow.to_string())), None);
+        assert_eq!(extract_u32(&serde_json::json!(u32::MAX)), Some(u32::MAX));
     }
 }
 
