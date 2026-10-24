@@ -376,6 +376,9 @@ fn parse_meta(table: &Table) -> Result<Meta, String> {
         return Err(invalid("latency and energy budgets must be positive"));
     }
     let min_gain_lcb = parse_f64(&m["min_gain_lcb"], "min_gain_lcb", 0)?;
+    if min_gain_lcb < 0.0 {
+        return Err(invalid("min_gain_lcb must be non-negative"));
+    }
     let harm_rate_limit = parse_f64(&m["harm_rate_limit"], "harm_rate_limit", 0)?;
     if !(0.0..=1.0).contains(&harm_rate_limit) {
         return Err(invalid("harm_rate_limit must be in [0,1]"));
@@ -444,6 +447,9 @@ fn route(t: &Trace, m: &Meta) -> Decision {
     }
     if after_medium_latency > m.latency_budget_us || after_medium_energy > m.energy_budget_uj {
         return Decision { tier: Tier::Medium, reason: "medium_actual_overrun_stop" };
+    }
+    if t.medium_latency > t.medium_latency_upper || t.medium_energy > t.medium_energy_upper {
+        return Decision { tier: Tier::Medium, reason: "medium_cost_reservation_underestimated_stop" };
     }
     if m.full_risk_state != "CERTIFIED" {
         return Decision { tier: Tier::Medium, reason: "full_risk_not_certified" };
@@ -615,6 +621,7 @@ fn receipt(table: &Table, meta: &Meta, input_sha: &str) -> String {
     let _ = writeln!(out, "FORMAT\t{RECEIPT_VERSION}");
     let _ = writeln!(out, "INPUT_SHA256\t{input_sha}");
     let _ = writeln!(out, "UNIT_SET_SHA256\t{}", table.meta["paired_unit_set_sha256"]);
+    let _ = writeln!(out, "RISK_CERTIFICATE_BUNDLE_SHA256\t{}", table.meta["risk_certificate_bundle_sha256"]);
     let _ = writeln!(out, "EXPERIMENT_ID\t{}", table.meta["experiment_id"]);
     let _ = writeln!(out, "DATASET\t{}\t{}\t{}", table.meta["dataset_id"], table.meta["dataset_revision"], table.meta["split"]);
     let _ = writeln!(out, "SCOPE\tEVALUATION_ONLY_NOT_A_CERTIFICATE");
