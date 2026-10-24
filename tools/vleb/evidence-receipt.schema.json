@@ -391,7 +391,150 @@
               "receipt_recomputed": {"const": true},
               "required_test_coverage": {"const": 1},
               "environment_match": {"const": "match"},
-              "verdict": {"const": "pass"}
+              "verdict": {"const": "pass"},
+              "auditor_output_sha256": {"$ref": "#/$defs/sha256"}
+            }
+          },
+          "environment": {
+            "properties": {
+              "trust_boundary": {"enum": ["independently_inspected", "externally_attested"]},
+              "runtime_identity": {
+                "properties": {
+                  "network_mode_observed": {"const": true}
+                }
+              },
+              "checkout_identity": {
+                "properties": {
+                  "observed_revision": {"type": "string", "minLength": 1},
+                  "clean_worktree": {"const": true}
+                }
+              },
+              "sanitization": {
+                "properties": {
+                  "git_metadata_exit_code": {"const": 0},
+                  "hooks_disabled": {"const": true},
+                  "unexpected_refs_checked": {"const": true},
+                  "unreachable_objects_checked": {"const": true},
+                  "ignored_cache_policy": {
+                    "enum": ["removed", "inspected_and_preserved", "not_applicable"]
+                  }
+                }
+              }
+            }
+          },
+          "commands": {
+            "items": {
+              "properties": {
+                "exit_code": {"type": "integer"},
+                "timed_out": {"const": false},
+                "stdout_sha256": {"$ref": "#/$defs/sha256"},
+                "stderr_sha256": {"$ref": "#/$defs/sha256"}
+              }
+            }
+          },
+          "test_results": {
+            "items": {
+              "properties": {
+                "status": {"const": "passed"},
+                "log_sha256": {"$ref": "#/$defs/sha256"},
+                "exit_code": {"type": "integer"}
+              }
+            }
+          },
+          "mutation_results": {
+            "minItems": 1,
+            "items": {
+              "allOf": [
+                {
+                  "not": {
+                    "properties": {
+                      "equivalence_status": {"enum": ["uncertain", "unreviewed"]}
+                    },
+                    "required": ["equivalence_status"]
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {"equivalence_status": {"const": "non_equivalent"}},
+                    "required": ["equivalence_status"]
+                  },
+                  "then": {
+                    "properties": {
+                      "observed_verdict": {"const": "rejected"},
+                      "evidence_sha256": {"$ref": "#/$defs/sha256"}
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {"equivalence_status": {"const": "equivalent"}},
+                    "required": ["equivalence_status"]
+                  },
+                  "then": {
+                    "properties": {
+                      "observed_verdict": {"const": "accepted"},
+                      "review_notes": {"type": "string", "minLength": 1},
+                      "evidence_sha256": {"$ref": "#/$defs/sha256"}
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {"mutation_class": {"enum": ["evidence_tampering", "environment_mismatch"]}},
+                    "required": ["mutation_class"]
+                  },
+                  "then": {"properties": {"compilable": {"type": "null"}}}
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "mutation_class": {
+                        "not": {"enum": ["evidence_tampering", "environment_mismatch"]}
+                      }
+                    },
+                    "required": ["mutation_class"]
+                  },
+                  "then": {"properties": {"compilable": {"const": true}}}
+                }
+              ]
+            }
+          },
+          "differential_checks": {
+            "minItems": 1,
+            "items": {
+              "properties": {
+                "status": {"enum": ["equal", "not_applicable"]}
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {"status": {"const": "equal"}},
+                    "required": ["status"]
+                  },
+                  "then": {
+                    "properties": {
+                      "expected_sha256": {"$ref": "#/$defs/sha256"},
+                      "observed_sha256": {"$ref": "#/$defs/sha256"},
+                      "mismatch_count": {"const": 0}
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "timing": {
+            "properties": {
+              "started_at": {"type": "string", "format": "date-time"},
+              "ended_at": {"type": "string", "format": "date-time"},
+              "wall_clock_ms": {"type": "integer", "minimum": 0}
+            }
+          },
+          "cost": {
+            "properties": {
+              "model_cost_usd": {"type": "number", "minimum": 0},
+              "tool_cost_usd": {"type": "number", "minimum": 0},
+              "compute_cost_usd": {"type": "number", "minimum": 0},
+              "cost_accounting_complete": {"const": true}
             }
           }
         }
