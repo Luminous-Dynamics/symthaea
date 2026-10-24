@@ -20,6 +20,8 @@ const BUILD_BENCH_SIZES: [usize; 3] = [256, 1024, 4096];
 const METRIC_QUERY_COUNT: usize = 8;
 const OPEN_SET_CALIBRATION_COUNT: usize = 8;
 const OPEN_SET_TEST_COUNT: usize = 8;
+const NEAR_MISS_QUERY_COUNT: usize = 4;
+const NEAR_MISS_NOISE_BPS: [usize; 4] = [1000, 2000, 3000, 4000];
 const QUERY_NOISE_BPS: [usize; 5] = [0, 100, 200, 500, 1000];
 const ROLE_SEED: u64 = 0xA11C_E000_0000;
 const VALUE_SEED: u64 = 0xC0DE_0000_0000;
@@ -125,6 +127,20 @@ fn unknown_query(workload: &CompositionalWorkload, unknown_index: usize) -> Bina
     workload.role_zero.bind(&value)
 }
 
+/// Construct an absent-value cue deliberately close to a stored cue. Since
+/// binding is XOR and self-inverse, recover the source value, flip a fixed
+/// fraction of its bits, and bind it to the same role. This is a hard-negative
+/// identity test, not a claim that bitwise proximity determines human meaning.
+fn near_miss_unknown_query(
+    workload: &CompositionalWorkload,
+    source_record_id: usize,
+    noise_bps: usize,
+) -> BinaryHV {
+    let source_value = workload.query_atoms[source_record_id].bind(&workload.role_zero);
+    let unseen_value = corrupt_query(&source_value, noise_bps, source_record_id);
+    workload.role_zero.bind(&unseen_value)
+}
+
 #[derive(Clone, Copy)]
 struct AcceptanceThreshold {
     score: f32,
@@ -215,6 +231,34 @@ fn open_set_diagnostics(workload: &CompositionalWorkload, arity: usize) {
         .iter()
         .filter(|&&score| score >= threshold.score)
         .count();
+
+    // These hard negatives encode absent values intentionally close to stored
+    // values. They are evaluated against the same frozen threshold so the
+    // diagnostic exposes false accepts missed by independent random negatives.
+    for noise_bps in NEAR_MISS_NOISE_BPS {
+        let near_miss_scores: Vec<f32> = (0..NEAR_MISS_QUERY_COUNT)
+            .map(|i| {
+                let source_id = ((i + 128) * 9973 + 17) % n;
+                let query = near_miss_unknown_query(workload, source_id, noise_bps);
+                exact_top1(&query, &workload.corpus).1
+            })
+            .collect();
+        let near_miss_false_accepts = near_miss_scores
+            .iter()
+            .filter(|&&score| score >= threshold.score)
+            .count();
+        eprintln!(
+            "open-set-near-miss arity={} n={} near_miss_noise_bps={} \
+             threshold_similarity={:.6} false_accepts={}/{} false_accept_rate={:.3}",
+            arity,
+            n,
+            noise_bps,
+            threshold.score,
+            near_miss_false_accepts,
+            NEAR_MISS_QUERY_COUNT,
+            near_miss_false_accepts as f32 / NEAR_MISS_QUERY_COUNT as f32,
+        );
+    }
 
     for noise_bps in QUERY_NOISE_BPS {
         let false_rejects = known_test_ids
