@@ -267,7 +267,7 @@ fn bind_replay_receipt(
 pub fn score_counterfactual_utility(
     mut input: CounterfactualUtilityInput,
 ) -> anyhow::Result<CounterfactualUtilityScore> {
-    ensure!(input.schema_version == 2, "counterfactual utility schema_version must be 2");
+    ensure!(input.schema_version == 3, "counterfactual utility schema_version must be 2");
     nonempty(&input.dataset_id, "dataset_id")?;
     nonempty(&input.stream_id, "stream_id")?;
     nonempty(&input.scenario_id, "scenario_id")?;
@@ -421,7 +421,7 @@ pub fn score_counterfactual_utility(
         };
 
     let mut result = CounterfactualUtilityScore {
-        metric_version: "counterfactual-adaptation-utility-v2".to_owned(),
+        metric_version: "counterfactual-adaptation-utility-v3".to_owned(),
         canonical_input_sha256,
         result_sha256: None,
         dataset_id: input.dataset_id,
@@ -669,7 +669,7 @@ mod tests {
 
     fn fixture() -> CounterfactualUtilityInput {
         CounterfactualUtilityInput {
-            schema_version: 2,
+            schema_version: 3,
             dataset_id: "dataset-a".to_owned(),
             stream_id: "stream-17".to_owned(),
             scenario_id: "gradual-drift-recovery".to_owned(),
