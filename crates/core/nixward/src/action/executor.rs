@@ -9,10 +9,18 @@
 //! - Command classification and safety scoring
 //! - JSON output mode for structured results
 
+use super::authorization::{
+    ActionScope, AuthorizationAttempt, AuthorizationAuthority, CommandBinding,
+    ExecutionAuthorizationLedger, ExecutionPermit,
+};
 use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::process::Stdio;
+use std::future::Future;
+use std::io;
+use std::pin::Pin;
+use std::process::{Output, Stdio};
+use std::sync::Arc;
 use tokio::process::Command;
 use tracing::{info, warn};
 
@@ -369,12 +377,44 @@ pub enum ExecutionResult {
     },
 }
 
+/// Injectable boundary for external process invocation.
+///
+/// Production uses Tokio's process runner. Tests can provide a mock to prove
+/// denied authorization decisions never invoke the process boundary.
+pub trait NixOSCommandRunner: Send + Sync {
+    fn run<'a>(
+        &'a self,
+        executable: &'a str,
+        args: &'a [String],
+    ) -> Pin<Box<dyn Future<Output = io::Result<Output>> + Send + 'a>>;
+}
+
+struct TokioNixOSCommandRunner;
+
+impl NixOSCommandRunner for TokioNixOSCommandRunner {
+    fn run<'a>(
+        &'a self,
+        executable: &'a str,
+        args: &'a [String],
+    ) -> Pin<Box<dyn Future<Output = io::Result<Output>> + Send + 'a>> {
+        Box::pin(async move {
+            Command::new(executable)
+                .args(args)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .await
+        })
+    }
+}
+
 /// NixOS-aware command executor with Φ integration
 pub struct NixOSExecutor {
     current_generation: Option<u32>,
     thresholds: ConsciousnessThresholds,
     history: VecDeque<ExecutionRecord>,
     dry_run: bool,
+    runner: Arc<dyn NixOSCommandRunner>,
 }
 
 /// Record of an execution for learning
@@ -399,7 +439,14 @@ impl NixOSExecutor {
             thresholds: ConsciousnessThresholds::default(),
             history: VecDeque::with_capacity(1000),
             dry_run: false,
+            runner: Arc::new(TokioNixOSCommandRunner),
         }
+    }
+
+    /// Replace the process runner. Primarily useful for deterministic tests.
+    pub fn with_runner(mut self, runner: Arc<dyn NixOSCommandRunner>) -> Self {
+        self.runner = runner;
+        self
     }
 
     pub fn with_dry_run(mut self, dry_run: bool) -> Self {
@@ -414,12 +461,17 @@ impl NixOSExecutor {
 
     /// Capture the current NixOS generation for rollback
     pub async fn capture_generation(&mut self) -> anyhow::Result<u32> {
-        let output = Command::new("nixos-rebuild")
-            .args(["list-generations"])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .await?;
+        // Route even observational subprocesses through the injectable runner
+        // so tests can qualify the complete executor process boundary.
+        let args = vec!["list-generations".to_owned()];
+        let output = self.runner.run("nixos-rebuild", &args).await?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!(
+                "nixos-rebuild list-generations exited unsuccessfully: {}",
+                stderr.trim()
+            ));
+        }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -487,12 +539,7 @@ impl NixOSExecutor {
 
         let start = std::time::Instant::now();
 
-        let result = Command::new(&cmd)
-            .args(&args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .await;
+        let result = self.runner.run(&cmd, &args).await;
 
         let elapsed = start.elapsed().as_millis() as u64;
 
@@ -513,12 +560,7 @@ impl NixOSExecutor {
 
                 if let Some(rollback_cmd) = command.rollback_command() {
                     let (rb_cmd, rb_args) = rollback_cmd.to_command();
-                    let rb_result = Command::new(&rb_cmd)
-                        .args(&rb_args)
-                        .stdout(Stdio::piped())
-                        .stderr(Stdio::piped())
-                        .output()
-                        .await;
+                    let rb_result = self.runner.run(&rb_cmd, &rb_args).await;
 
                     match rb_result {
                         Ok(rb_output) if rb_output.status.success() => {
@@ -569,6 +611,67 @@ impl NixOSExecutor {
         }
     }
 
+    /// Execute a typed NixOS command only after consuming a matching one-shot permit.
+    ///
+    /// This is the permit-checked path for typed built-in commands. The action
+    /// scope is derived from this command's safety tier; callers cannot supply a
+    /// weaker scope. Custom commands are rejected here until a separate
+    /// command-classification policy can validate them independently.
+    ///
+    /// IMPORTANT: this method does not remove the legacy `execute_confirmed`
+    /// escape hatch. Until all real dispatch call sites are migrated or the
+    /// escape hatch is narrowed, the repository is not globally fail-closed.
+    pub async fn execute_with_permit(
+        &mut self,
+        command: NixOSCommand,
+        phi: f32,
+        ledger: &mut ExecutionAuthorizationLedger,
+        permit: &ExecutionPermit,
+        principal: &str,
+        authority: AuthorizationAuthority,
+    ) -> ExecutionResult {
+        let safety_level = command.safety_level();
+
+        if matches!(&command, NixOSCommand::Custom { .. }) {
+            let _ = ledger.burn(permit);
+            return ExecutionResult::Blocked {
+                reason: "custom command requires a separately audited authorization policy"
+                    .to_string(),
+                safety_level,
+            };
+        }
+
+        let scope = match safety_level {
+            SafetyLevel::ReadOnly => ActionScope::ReadOnly,
+            SafetyLevel::UserModify => ActionScope::UserModify,
+            SafetyLevel::SystemModify => ActionScope::SystemModify,
+            SafetyLevel::SystemCritical => ActionScope::SystemCritical,
+            SafetyLevel::Destructive => ActionScope::Destructive,
+        };
+        let (executable, args) = command.to_command();
+
+        let authorization = CommandBinding::new(executable, args)
+            .and_then(|binding| {
+                AuthorizationAttempt::new(binding, principal.to_owned(), scope, authority)
+            })
+            .and_then(|attempt| ledger.consume(permit, &attempt));
+
+        if let Err(error) = authorization {
+            // consume() already burns a permit on ledger-level denials; this
+            // also burns it when binding/attempt construction failed earlier.
+            let _ = ledger.burn(permit);
+            return ExecutionResult::Blocked {
+                reason: format!("one-shot authorization denied before dispatch: {error}"),
+                safety_level,
+            };
+        }
+
+        // No await or command transformation occurs between capability
+        // consumption and entering the dispatch routine. The immutable command
+        // value used to verify argv is the same value handed to the runner.
+        self.execute_confirmed(command, phi).await
+    }
+
     /// Execute unconditionally, bypassing the tier-threshold check in
     /// `execute()`. `phi` is recorded for telemetry only (`ExecutionRecord`),
     /// not checked. Only call this when the command was already confirmed by
@@ -595,16 +698,15 @@ impl NixOSExecutor {
 
         let start = std::time::Instant::now();
 
-        let result = Command::new(&cmd)
-            .args(&args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .await;
+        // Keep the confirmed path on the same injectable process boundary as
+        // ordinary execution. Permit-path tests must never fall through to a
+        // real OS process, and every dispatch seam must be observable by the
+        // runner used for enforcement qualification.
+        let result = self.runner.run(&cmd, &args).await;
 
         let elapsed = start.elapsed().as_millis() as u64;
 
-        match result {
+        let exec_result = match result {
             Ok(output) if output.status.success() => ExecutionResult::Success {
                 stdout: String::from_utf8_lossy(&output.stdout).to_string(),
                 stderr: String::from_utf8_lossy(&output.stderr).to_string(),
@@ -618,7 +720,13 @@ impl NixOSExecutor {
                 error: e.to_string(),
                 rollback_error: None,
             },
-        }
+        };
+
+        // Confirmed live execution is still execution evidence, even though
+        // the caller supplied the upstream authorization. Keep dry-run out of
+        // this history until its outcome has a distinct non-execution type.
+        self.record_execution(&command, phi, &exec_result);
+        exec_result
     }
 
     fn record_execution(&mut self, command: &NixOSCommand, phi: f32, result: &ExecutionResult) {
@@ -665,6 +773,120 @@ impl NixOSExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+#[cfg(unix)]
+    #[derive(Clone)]
+    struct CountingRunner {
+        invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    #[cfg(unix)]
+    impl NixOSCommandRunner for CountingRunner {
+        fn run<'a>(
+            &'a self,
+            _executable: &'a str,
+            _args: &'a [String],
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = std::io::Result<std::process::Output>,
+                    > + Send
+                    + 'a,
+            >,
+        > {
+            self.invocations
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Box::pin(async {
+                use std::os::unix::process::ExitStatusExt;
+                Ok(std::process::Output {
+                    status: std::process::ExitStatus::from_raw(0),
+                    stdout: Vec::new(),
+                    stderr: Vec::new(),
+                })
+            })
+        }
+    }
+
+
+    #[cfg(unix)]
+    struct StaticOutputRunner {
+        invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        success: bool,
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+    }
+
+    #[cfg(unix)]
+    impl NixOSCommandRunner for StaticOutputRunner {
+        fn run<'a>(
+            &'a self,
+            executable: &'a str,
+            args: &'a [String],
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = std::io::Result<std::process::Output>,
+                    > + Send
+                    + 'a,
+            >,
+        > {
+            assert_eq!(executable, "nixos-rebuild");
+            assert_eq!(args, &["list-generations".to_owned()]);
+            self.invocations
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let success = self.success;
+            let stdout = self.stdout.clone();
+            let stderr = self.stderr.clone();
+            Box::pin(async move {
+                use std::os::unix::process::ExitStatusExt;
+                let status = if success {
+                    std::process::ExitStatus::from_raw(0)
+                } else {
+                    std::process::ExitStatus::from_raw(1 << 8)
+                };
+                Ok(std::process::Output {
+                    status,
+                    stdout,
+                    stderr,
+                })
+            })
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn capture_generation_uses_runner_and_rejects_failed_command_output() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+
+        let valid_invocations = Arc::new(AtomicUsize::new(0));
+        let valid_runner = Arc::new(StaticOutputRunner {
+            invocations: Arc::clone(&valid_invocations),
+            success: true,
+            stdout: b"42 2026-10-24 12:00:00 (current) NixOS\n".to_vec(),
+            stderr: Vec::new(),
+        });
+        let mut valid_executor = NixOSExecutor::new().with_runner(valid_runner);
+        assert_eq!(valid_executor.capture_generation().await.unwrap(), 42);
+        assert_eq!(valid_executor.current_generation, Some(42));
+        assert_eq!(valid_invocations.load(Ordering::SeqCst), 1);
+
+        // A failed subprocess must not be accepted as fresh pre-state even
+        // if stdout happens to contain a parseable '(current)' row.
+        let failed_invocations = Arc::new(AtomicUsize::new(0));
+        let failed_runner = Arc::new(StaticOutputRunner {
+            invocations: Arc::clone(&failed_invocations),
+            success: false,
+            stdout: b"99 2026-10-24 12:00:00 (current) NixOS\n".to_vec(),
+            stderr: b"failed to inspect generations".to_vec(),
+        });
+        let mut failed_executor = NixOSExecutor::new().with_runner(failed_runner);
+        let error = failed_executor.capture_generation().await.unwrap_err();
+        assert!(error.to_string().contains("exited unsuccessfully"));
+        assert_eq!(failed_executor.current_generation, None);
+        assert_eq!(failed_invocations.load(Ordering::SeqCst), 1);
+    }
 
     #[test]
     fn test_command_safety_levels() {
@@ -775,6 +997,238 @@ mod tests {
             }
             _ => panic!("Expected pending confirmation"),
         }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_execute_with_permit_accepts_exact_typed_command_once() {
+        use super::super::authorization::{
+            ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
+            ExecutionAuthorizationLedger,
+        };
+        use std::time::Duration;
+
+        let command = NixOSCommand::RebuildSwitch {
+            flake: Some(".#host".to_string()),
+            extra_args: vec![],
+        };
+        let (executable, args) = command.to_command();
+        let binding = CommandBinding::new(executable, args).unwrap();
+        let request = AuthorizationRequest::new(
+            binding,
+            "operator:alice",
+            ActionScope::SystemCritical,
+            AuthorizationAuthority::HumanOperator,
+            "exec-test-001",
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        let mut ledger = ExecutionAuthorizationLedger::default();
+        let permit = ledger.issue(request).unwrap();
+        let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let runner = std::sync::Arc::new(CountingRunner {
+            invocations: std::sync::Arc::clone(&invocations),
+        });
+        let mut executor = NixOSExecutor::new().with_runner(runner);
+
+        let result = executor
+            .execute_with_permit(
+                command.clone(),
+                0.0,
+                &mut ledger,
+                &permit,
+                "operator:alice",
+                AuthorizationAuthority::HumanOperator,
+            )
+            .await;
+        assert!(matches!(result, ExecutionResult::Success { .. }));
+        assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(executor.history().len(), 1);
+        assert!(matches!(
+            executor.history().back().map(|entry| &entry.result),
+            Some(ExecutionResult::Success { .. })
+        ));
+
+        let replay = executor
+            .execute_with_permit(
+                command,
+                0.0,
+                &mut ledger,
+                &permit,
+                "operator:alice",
+                AuthorizationAuthority::HumanOperator,
+            )
+            .await;
+        assert!(matches!(
+            replay,
+            ExecutionResult::Blocked { ref reason, .. } if reason.contains("already consumed")
+        ));
+        assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(executor.history().len(), 1);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_execute_with_permit_blocks_command_substitution() {
+        use super::super::authorization::{
+            ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
+            ExecutionAuthorizationLedger,
+        };
+        use std::time::Duration;
+
+        let approved = NixOSCommand::RebuildSwitch {
+            flake: Some(".#approved".to_string()),
+            extra_args: vec![],
+        };
+        let (executable, args) = approved.to_command();
+        let request = AuthorizationRequest::new(
+            CommandBinding::new(executable, args).unwrap(),
+            "operator:alice",
+            ActionScope::SystemCritical,
+            AuthorizationAuthority::HumanOperator,
+            "exec-test-002",
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        let mut ledger = ExecutionAuthorizationLedger::default();
+        let permit = ledger.issue(request).unwrap();
+        let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let runner = std::sync::Arc::new(CountingRunner {
+            invocations: std::sync::Arc::clone(&invocations),
+        });
+        let mut executor = NixOSExecutor::new().with_runner(runner);
+        let substituted = NixOSCommand::RebuildSwitch {
+            flake: Some(".#attacker-controlled".to_string()),
+            extra_args: vec![],
+        };
+
+        let result = executor
+            .execute_with_permit(
+                substituted,
+                1.0,
+                &mut ledger,
+                &permit,
+                "operator:alice",
+                AuthorizationAuthority::HumanOperator,
+            )
+            .await;
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked { ref reason, .. } if reason.contains("differ from the permit")
+        ));
+        assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_execute_with_permit_rejects_unclassified_custom_command() {
+        use super::super::authorization::{
+            ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
+            ExecutionAuthorizationLedger,
+        };
+        use std::time::Duration;
+
+        let command = NixOSCommand::Custom {
+            command: "sh".to_string(),
+            args: vec!["-c".to_string(), "touch /tmp/should-not-run".to_string()],
+            safety_level: SafetyLevel::ReadOnly,
+        };
+        let (executable, args) = command.to_command();
+        let request = AuthorizationRequest::new(
+            CommandBinding::new(executable, args).unwrap(),
+            "operator:alice",
+            ActionScope::ReadOnly,
+            AuthorizationAuthority::ReadOnlyPolicy,
+            "exec-test-003",
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        let mut ledger = ExecutionAuthorizationLedger::default();
+        let permit = ledger.issue(request).unwrap();
+        let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let runner = std::sync::Arc::new(CountingRunner {
+            invocations: std::sync::Arc::clone(&invocations),
+        });
+        let mut executor = NixOSExecutor::new().with_runner(runner);
+
+        let result = executor
+            .execute_with_permit(
+                command,
+                1.0,
+                &mut ledger,
+                &permit,
+                "operator:alice",
+                AuthorizationAuthority::ReadOnlyPolicy,
+            )
+            .await;
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked { ref reason, .. } if reason.contains("separately audited")
+        ));
+        assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_malformed_identity_attempt_burns_the_permit() {
+        use super::super::authorization::{
+            ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
+            ExecutionAuthorizationLedger,
+        };
+        use std::time::Duration;
+
+        let command = NixOSCommand::RebuildSwitch {
+            flake: Some(".#host".to_string()),
+            extra_args: vec![],
+        };
+        let (executable, args) = command.to_command();
+        let request = AuthorizationRequest::new(
+            CommandBinding::new(executable, args).unwrap(),
+            "operator:alice",
+            ActionScope::SystemCritical,
+            AuthorizationAuthority::HumanOperator,
+            "exec-test-004",
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        let mut ledger = ExecutionAuthorizationLedger::default();
+        let permit = ledger.issue(request).unwrap();
+        let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let runner = std::sync::Arc::new(CountingRunner {
+            invocations: std::sync::Arc::clone(&invocations),
+        });
+        let mut executor = NixOSExecutor::new().with_runner(runner);
+
+        let malformed = executor
+            .execute_with_permit(
+                command.clone(),
+                1.0,
+                &mut ledger,
+                &permit,
+                "",
+                AuthorizationAuthority::HumanOperator,
+            )
+            .await;
+        assert!(matches!(
+            malformed,
+            ExecutionResult::Blocked { ref reason, .. } if reason.contains("principal")
+        ));
+
+        let replay = executor
+            .execute_with_permit(
+                command,
+                1.0,
+                &mut ledger,
+                &permit,
+                "operator:alice",
+                AuthorizationAuthority::HumanOperator,
+            )
+            .await;
+        assert!(matches!(
+            replay,
+            ExecutionResult::Blocked { ref reason, .. } if reason.contains("already consumed")
+        ));
+        assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
