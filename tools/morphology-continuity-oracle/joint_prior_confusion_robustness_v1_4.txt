@@ -14,6 +14,7 @@ prior_feasibility=sum-prior-equals-1000
 prior_robustification=enumerate-all-feasible-simplex-polytope-vertices
 matrix_robustification=enumerate-all-row-polytope-vertices-from-cell-intervals
 joint_robustification=enumerate-prior-vertices-cross-matrix-row-vertices
+metamorphic.class_relabeling=all-six-class-permutations-preserve-baseline-risk-worst-policy-risk-and-net-value
 policy=restore-chair-on-chair-like-output;safe-hold-on-other-or-impossible-assumed-output
 decision.restore-chair.loss=0,100,100
 decision.safe-hold.loss=4,4,4
