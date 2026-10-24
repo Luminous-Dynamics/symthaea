@@ -319,7 +319,7 @@
   "counterfactual_metric_schema": {
     "schema_version": 2,
     "command": "score-counterfactual-adaptation-utility",
-    "metric_version": "counterfactual-adaptation-utility-v2",
+    "metric_version": "counterfactual-adaptation-utility-v3",
     "cycle_windows": {
       "convention": "half-open [start_cycle, end_cycle)",
       "pre_shift": "evaluation_windows.pre_shift_start_cycle to pre_shift_end_cycle",
@@ -387,7 +387,7 @@
   },
   "panel_aggregation": {
     "command": "compare-cognitive-adaptation-panel",
-    "input_artifact": "array of counterfactual-adaptation-utility-v2 result records",
+    "input_artifact": "array of counterfactual-adaptation-utility-v3 result records",
     "complete_grid": {
       "dataset_count": 7,
       "seeds_per_dataset": 50,
