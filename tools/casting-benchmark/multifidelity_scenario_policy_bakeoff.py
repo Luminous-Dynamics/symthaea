@@ -25,7 +25,7 @@ from multifidelity_stress import (
 from multifidelity_scenario_suite import (
     DEFAULT_DESIGN_COUNT,
     DEFAULT_DIMENSIONS,
-    DEFAULT_SCENARIOS if False else SUPPORTED_SCENARIOS,
+    SUPPORTED_SCENARIOS,
     DEFAULT_SEEDS,
     DEFAULT_SEVERITIES,
     MultiFidelityScenario,
