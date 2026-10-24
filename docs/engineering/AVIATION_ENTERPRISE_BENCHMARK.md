@@ -33,7 +33,7 @@ The associated public demonstrator repository is https://github.com/purohit0208/
 
 A separate Mendeley Data record, published 20 October 2026, provides 19 model-parameter fields for a study of aircraft-health information under limited recovery capacity. It is licensed CC BY 4.0, but the landing page says the JSON contains experimental model assumptions—not observed airline/maintenance/financial records—and does not itself include the complete simulation implementation or numerical results. Freeze exact version, download checksum, field mapping and attribution before using it: https://data.mendeley.com/datasets/67bs35wpzs/1.
 
-**Benchmark implication:** do not optimize a heuristic readiness score or claim novelty merely because multiple signals are fused. Add monotonicity/metamorphic properties, explicit constraint validity, counterfactual decision cost, false-safe/false-alert measures where labels support them, and out-of-regime tests. Report readiness/action diversity as architecture behavior only. This new comparison is tracked in [AVIATION-ENTERPRISE-003 #8616](https://github.com/Luminous-Dynamics/symthaea/issues/8616).
+**Benchmark implication:** do not optimize a heuristic readiness score or claim novelty merely because multiple signals are fused. Add monotonicity/metamorphic properties, explicit constraint validity, counterfactual decision cost, false-safe/false-alert measures where labels support them, and out-of-regime tests. Report readiness/action diversity as architecture behavior only. This new comparison is tracked in [AVIATION-ENTERPRISE-003 #8625](https://github.com/Luminous-Dynamics/symthaea/issues/8616).
 
 ### Differentiation thesis
 
