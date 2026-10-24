@@ -219,7 +219,7 @@ jobs:
         run: |
           cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json --out "$RUNNER_TEMP/replay-receipt-validation.json"
           jq -e '
-            .metric_version == "cognitive-replay-receipt-v1" and
+            .metric_version == "cognitive-replay-receipt-v2" and
             .run_kind == "synthetic-not-measured" and
             .event_count == 5 and
             .arm_count == 5 and
