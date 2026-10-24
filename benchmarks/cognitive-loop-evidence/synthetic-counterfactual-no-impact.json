@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "dataset_id": "synthetic-no-impact-fixture-not-measured",
   "stream_id": "synthetic-nuisance-shift-fixture-not-measured",
   "scenario_id": "nuisance-shift-no-task-impact-adaptation-harms",
