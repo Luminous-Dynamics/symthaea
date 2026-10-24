@@ -559,6 +559,12 @@ impl CognitiveLoopService {
             });
         }
 
+        let observation_cycle = self.stats.total_cycles as u64;
+        metadata.prediction_evidence = Some(super::types::PredictionEvidenceTelemetry::from_evidence(
+            &perception.urgency.prediction_evidence,
+            observation_cycle,
+        ));
+
         CycleResult {
             output,
             prediction_error: dynamics.core.prediction_error,
@@ -677,6 +683,7 @@ impl CognitiveLoopService {
 #[cfg(test)]
 mod tests {
     use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+    use crate::cognitive_loop::types::PredictionEvidenceStatus;
 
     fn make_service() -> CognitiveLoopService {
         CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
@@ -688,6 +695,18 @@ mod tests {
         let result = svc.cycle("metadata check");
         assert!(result.metadata.cycle_duration_us > 0);
         assert!(!result.metadata.selected_strategy.is_empty());
+
+        let evidence = result
+            .metadata
+            .prediction_evidence
+            .as_ref()
+            .expect("cycle telemetry must expose PE provenance");
+        assert_eq!(evidence.observation_cycle, svc.stats.total_cycles as u64);
+        assert_eq!(
+            evidence.status == PredictionEvidenceStatus::Valid,
+            result.prediction_error_valid,
+            "typed evidence status must agree with the public validity bit"
+        );
     }
 
     #[test]
