@@ -629,6 +629,7 @@ impl RunManifest {
             json_quote(&self.configuration_revision),
             json_quote(&self.input_digest),
             json_quote(&self.method_id),
+            json_quote(part_source_name(self.part_source)),
             self.seed,
             cost_json,
             recomputed_cost_json,
