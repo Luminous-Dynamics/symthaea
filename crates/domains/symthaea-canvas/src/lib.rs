@@ -47,6 +47,10 @@ pub struct CognitiveSnapshot {
     pub consciousness_level: f64,
     /// Current prediction error magnitude.
     pub prediction_error: f32,
+    /// Whether prediction_error represents a genuine finite comparison.
+    /// Missing by default when loading legacy serialized snapshots.
+    #[serde(default)]
+    pub prediction_error_valid: bool,
     /// Living mind vitality measure.
     pub living_mind_vitality: f64,
     /// Living mind coherence measure.
@@ -95,11 +99,22 @@ pub struct CognitiveSnapshot {
 }
 
 impl CognitiveSnapshot {
+    /// Read PE only when it is explicitly marked valid and finite.
+    #[inline]
+    pub fn prediction_error_sample(&self) -> Option<f32> {
+        if self.prediction_error_valid && self.prediction_error.is_finite() {
+            Some(self.prediction_error)
+        } else {
+            None
+        }
+    }
+
     /// Create a default/dormant snapshot (minimal consciousness).
     pub fn dormant() -> Self {
         Self {
             consciousness_level: 0.05,
             prediction_error: 0.0,
+            prediction_error_valid: false,
             living_mind_vitality: 0.0,
             living_mind_coherence: 0.0,
             dopamine: 0.1,
@@ -156,6 +171,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn prediction_error_sample_fails_closed() {
+        let mut snapshot = CognitiveSnapshot::dormant();
+        for value in [0.0, 1.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            snapshot.prediction_error = value;
+            snapshot.prediction_error_valid = false;
+            assert_eq!(snapshot.prediction_error_sample(), None);
+        }
+
+        snapshot.prediction_error = 0.25;
+        snapshot.prediction_error_valid = true;
+        assert_eq!(snapshot.prediction_error_sample(), Some(0.25));
+
+        snapshot.prediction_error = f32::NAN;
+        assert_eq!(snapshot.prediction_error_sample(), None);
+    }
+
+    #[test]
     fn dormant_snapshot_renders() {
         let snap = CognitiveSnapshot::dormant();
         let (svg, state) = render_snapshot(&snap);
@@ -169,6 +201,7 @@ mod tests {
         let snap = CognitiveSnapshot {
             consciousness_level: 0.7,
             prediction_error: 0.15,
+            prediction_error_valid: true,
             living_mind_vitality: 0.6,
             living_mind_coherence: 0.5,
             dopamine: 0.6,
