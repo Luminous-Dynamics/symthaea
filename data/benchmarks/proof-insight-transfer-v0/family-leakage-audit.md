@@ -35,3 +35,15 @@ The checked-in synthetic edge fixture is deliberately invented CI test data. Its
 ## Stop conditions and next benchmark gates
 
 Before confirmatory use, require a complete reviewed edge inventory, independent byte-level verification of every cited receipt, split-isolation checks for source/target insight records, and a preserved exposure/quarantine ledger. If too few independent components remain after known exclusions, report the study as underpowered rather than reshuffling families or relaxing the gate.
+
+## Automated candidate triage (not adjudication)
+
+Run:
+
+    cargo run --locked --bin discover_family_leakage_candidates -- \
+      data/benchmarks/proof-insight-transfer-v0/splits.json \
+      /tmp/family-leakage-candidate-report.json
+
+This generator reads only family titles in the frozen manifest. It strips HTML markup/entities, tokenizes Unicode words, removes a fixed stopword list, computes title-token Jaccard overlap plus rarity-weighted overlap, and records candidate-level shared tokens and a digest of the compared title evidence. The threshold configuration is part of the emitted report, so the screen can be reproduced.
+
+All rows are labelled `title_similarity_only` and `unreviewed`, regardless of score. It is a review-queue heuristic, not a semantic dependency detector, leakage finding, or benchmark result. Do not promote candidates to hard edges without inspecting source artifacts and recording independent adjudication. The generator deliberately does not emit the relationship inventory consumed by the quarantine analyzer; that conversion is a separate, reviewed decision.
