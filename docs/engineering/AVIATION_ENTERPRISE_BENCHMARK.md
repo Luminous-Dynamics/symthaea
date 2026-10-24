@@ -241,3 +241,26 @@ Proceed beyond the synthetic benchmark only if:
 5. an engineering review confirms the work composes existing owners rather than creating a duplicate solver.
 
 Otherwise, simplify the coordinator, improve its data contracts, or stop the integration experiment.
+
+
+## Additional SOTA comparator update (24 October 2026)
+
+### Large-scale crew recovery with mixed-integer optimization and supervised learning
+
+Hızır, Barnhart and Vaze, *Large-Scale Airline Crew Recovery Using Mixed-Integer Optimization and Supervised Machine Learning*, Transportation Science (published online 23 December 2025; 2026 volume 60(2), pp. 177–196), is a particularly important comparator: https://doi.org/10.1287/trsc.2025.0105.
+
+The published abstract reports experiments using actual flight and crew schedules from a major U.S. airline operating more than 2,800 daily flights. Its method combines mixed-integer optimization with supervised learning to shrink the solution space, supports a runtime/quality tradeoff, and is reported to be more robust to delay-prediction uncertainty than direct optimization. The authors estimate tens of millions of dollars in annual operating-cost reduction in their airline setting. Those estimates are specific to that carrier and problem; they are not a transferable baseline result for AECB.
+
+**Benchmark consequence:** direct optimization alone is not a sufficient strong baseline. Where crew-level data and a comparable model are available, AECB should compare the proposed coordinator against:
+- a direct MIP/MILP recovery optimizer;
+- a learning-guided restricted search/solution-space reduction method;
+- a robust or uncertainty-aware policy under the same forecast-error distribution;
+- a rolling-horizon method with an identical compute budget.
+
+A public-data implementation that lacks actual crew legality, pairings, and recovery costs must not claim to reproduce this crew-recovery result. Instead, mark the comparison as literature-only until compatible authorized data and a defensible problem mapping exist.
+
+### Benchmark standardization is itself a contribution
+
+A 2026 systematic review covering flight-delay prediction research reports that uncertainty modeling, consistent task definitions, and deployment feasibility remain underdeveloped, with results difficult to compare across inconsistent datasets and metrics: https://doi.org/10.1016/j.asoc.2026.115761. That supports treating dataset/split/objective manifests, leakage tests, tail-risk accounting, runtime and auditability as first-class benchmark outputs—not supplementary documentation.
+
+A separate public resilience dataset (Mendeley Data v1, CC BY 4.0, published 12 September 2026) covers 134 airline-year observations for 22 Indian passenger airlines across FY2015–16 to FY2024–25. It can support strategic post-shock resilience analyses but is not event-level operations-control evidence and must not be used to infer flight-level dispatch or intervention effects: https://doi.org/10.17632/tms24w69w6.1.
