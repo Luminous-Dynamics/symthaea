@@ -1,21 +1,12 @@
 {
   "protocol_id": "SCI-NOISE-001",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "status": "proposal_only",
   "linked_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8607",
   "protocol_document": "docs/research/SCIENTIFIC_DISCOVERY_NOISE_ROBUSTNESS_V0_1.md",
   "claim_ceiling": "Protocol and scenario manifest only; no implementation, validation, statistical guarantee, or performance result is established by this file. The interleaved anchor schedule is a fixed-design diagnostic control, not a causal attribution guarantee. Cause-discriminating action selection is a benchmark track; no diagnosis policy or comparative result is yet qualified. Candidate-set omission and harmful-informativeness are stress-test dimensions, not a claim that a robust selector is implemented or qualified.",
   "design": {
     "unit_of_pairing": "world_seed_design_mode_noise_regime",
-    "independent_rng_streams": [
-      "public_design",
-      "target_law",
-      "noise_process",
-      "in_domain_evaluation",
-      "marginal_shift_evaluation",
-      "joint_extrapolation_evaluation",
-      "near_boundary_evaluation"
-    ],
     "hidden_from_policy": [
       "target_law",
       "noise_regime_label",
@@ -118,7 +109,19 @@
       "minimum_structural_families": 6,
       "paired_seeds_per_world": 20,
       "noise_regime_precision_target_required": true,
-      "full_factorial_denominators_required": true
+      "full_factorial_denominators_required": true,
+      "false_alarm_precision": {
+        "target_rate": 0.05,
+        "one_sided_confidence": 0.95,
+        "zero_event_minimum_independent_worlds_per_cell": 59,
+        "bound": "p_upper = 1 - 0.05^(1/n)",
+        "method": "one-sided exact binomial upper confidence bound",
+        "applies_per_declared_cell": true,
+        "zero_event_shortcut_only": true,
+        "freeze_sample_plan_before_unblinding": true,
+        "seeds_within_world_count_as_independent_worlds": false,
+        "pooling_noise_regimes_to_meet_gate_allowed": false
+      }
     },
     "diagnostic_controls": {
       "fixed_design": "interleaved_anchor_schedule",
@@ -225,7 +228,16 @@
         "world_family_level_uncertainty_or_declared_hierarchical_model",
         "do_not_treat_seeds_within_world_as_independent_worlds"
       ]
-    }
+    },
+    "rng_stream_domains": [
+      "public_design",
+      "target_law",
+      "noise_process",
+      "in_domain_evaluation",
+      "marginal_shift_evaluation",
+      "joint_extrapolation_evaluation",
+      "near_boundary_evaluation"
+    ]
   },
   "metrics": {
     "discovery": [
@@ -274,7 +286,8 @@
     "false_alarm_rate_target": 0.05,
     "false_alarm_confidence_level": 0.95,
     "false_alarm_upper_bound_must_meet_target": true,
-    "exact_head_tests_required_for_implementation_qualification": true
+    "exact_head_tests_required_for_implementation_qualification": true,
+    "seed_domain_derivation_known_answer_vectors_required": true
   },
   "comparators": [
     "fixed_gaussian_prequential_pit_where_contract_applies",
@@ -288,18 +301,42 @@
     "random_query_selection",
     "fixed_grid_or_round_robin",
     "current_typed_residual_guided_recovery",
-    "compatible_pinned_pysr_ai_feynman_erbench_srbench_tracks"
+    "compatible_pinned_pysr_ai_feynman_erbench_srbench_tracks",
+    "compatible_pinned_flash_ansr_simplipy_fast_srb_track"
   ],
   "reporting_rules": {
     "no_single_composite_score": true,
     "never_drop_non_evaluable_worlds_without_reporting": true,
     "seeds_within_world_not_independent_worlds": true,
     "queued_skipped_stale_head_checks_are_not_passes": true,
-    "published_external_results_are_not_matched_replications": true
+    "published_external_results_are_not_matched_replications": true,
+    "per_cell_false_alarm_claim_requires_cellwise_denominator": true,
+    "published_static_track_results_not_transferable_to_active_noise_robust_task": true
   },
   "references": {
     "robust_design_misspecification": "https://proceedings.mlr.press/v300/callahan26a.html",
     "r_idea": "https://proceedings.mlr.press/v300/tang26d.html",
-    "benchmark_estimands_nist": "https://doi.org/10.6028/NIST.AI.800-3"
+    "benchmark_estimands_nist": "https://doi.org/10.6028/NIST.AI.800-3",
+    "flash_ansr_simplipy": "https://proceedings.mlr.press/v306/saegert26a.html"
+  },
+  "seed_derivation": {
+    "algorithm": "derive_stream_seed_v1",
+    "mix": "fixed 64-bit SplitMix64-style finalizer after master-seed, domain-tag, and world-id combination",
+    "domains": [
+      "public_design",
+      "target_law",
+      "noise_process",
+      "in_domain_evaluation",
+      "marginal_shift_evaluation",
+      "joint_extrapolation_evaluation",
+      "near_boundary_evaluation"
+    ],
+    "guarantee": "Repeatable domain-separated deterministic seeds with frozen known-answer vectors.",
+    "limitations": [
+      "not cryptographically secure",
+      "does not conceal evaluator labels",
+      "does not mathematically guarantee statistical independence of streams"
+    ],
+    "versioning_rule": "Any change to the derivation function or domain tags requires a new seed-contract version and fresh confirmatory manifest."
   }
 }
