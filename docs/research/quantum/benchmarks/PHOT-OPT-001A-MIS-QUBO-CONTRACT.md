@@ -77,7 +77,7 @@ J_{ij}=\frac{A}{4}\quad ((i,j)\in E).
 
 Only existing graph edges receive couplings in this ideal mapping. If a target device requires additional couplers, embedding, dense completion, gauge transforms, or coefficient rescaling, that is a separate transformation with separate provenance and cost; it must not overwrite the canonical source problem.
 
-A positive global scale \(\alpha>0\) preserves the ideal ordering of configurations but changes the relationship between coefficients, analog noise, precision, and device range. Record it. If an API maximizes energy or defines (s_i) with the opposite sign, implement an explicit boundary conversion and verify the result against the canonical energy oracle.
+A positive global scale \(\alpha>0\) preserves the ideal ordering of configurations but changes the relationship between coefficients, analog noise, precision, and device range. Record it. If an API maximizes energy or defines \(s_i\) with the opposite sign, implement an explicit boundary conversion and verify the result against the canonical energy oracle.
 
 ## 5. Hand-checkable fixtures
 
@@ -116,7 +116,7 @@ Before an external or simulated backend is integrated, the run manifest should p
 - schema and mapping version;
 - canonical graph bytes digest and vertex-index mapping;
 - sorted unique edge-list digest;
-- weight-vector digest and penalty (A), including the proof/selection rule;
+- weight-vector digest and penalty \(A\), including the proof/selection rule;
 - energy convention, offset, QUBO/Ising coefficients and positive scale;
 - backend class: digital simulation, photonic simulation/emulation, optical analog device, or photonic quantum circuit;
 - exact solver/device/software version and source/license reference where applicable;
