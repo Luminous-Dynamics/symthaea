@@ -1,0 +1,53 @@
+{
+  "schema": "cp-04-compute-dependency-graph-v1",
+  "nodes": [
+    "requirement",
+    "representation",
+    "model",
+    "runtime",
+    "accelerator",
+    "deployment",
+    "execution",
+    "observation",
+    "statistics",
+    "disposition"
+  ],
+  "edges": [
+    [
+      "requirement",
+      "representation"
+    ],
+    [
+      "representation",
+      "model"
+    ],
+    [
+      "model",
+      "runtime"
+    ],
+    [
+      "runtime",
+      "accelerator"
+    ],
+    [
+      "accelerator",
+      "deployment"
+    ],
+    [
+      "deployment",
+      "execution"
+    ],
+    [
+      "execution",
+      "observation"
+    ],
+    [
+      "observation",
+      "statistics"
+    ],
+    [
+      "statistics",
+      "disposition"
+    ]
+  ]
+}

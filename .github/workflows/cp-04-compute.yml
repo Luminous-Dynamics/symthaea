@@ -1,0 +1,25 @@
+name: CP-04 compute evidence
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "docs/engineering/contracts/cp-04-compute-evidence-contract-v1.md"
+      - "docs/engineering/data/cp-04-compute-corpus-v1.json"
+      - "docs/engineering/data/cp-04-compute-mutation-manifest-v1.json"
+      - "docs/engineering/data/cp-04-compute-dependency-graph-v1.json"
+      - "scripts/qualifiers/cp_04_compute_qualifier.py"
+      - ".github/workflows/cp-04-compute.yml"
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Require exact revision
+        run: test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
+      - name: Run independent CP-04 qualifier
+        run: python3 scripts/qualifiers/cp_04_compute_qualifier.py
+      - name: Verify qualified inputs are immutable during qualification
+        run: git diff --exit-code -- docs/engineering/contracts/cp-04-compute-evidence-contract-v1.md docs/engineering/data/cp-04-compute-corpus-v1.json scripts/qualifiers/cp_04_compute_qualifier.py docs/engineering/data/cp-04-compute-mutation-manifest-v1.json docs/engineering/data/cp-04-compute-dependency-graph-v1.json .github/workflows/cp-04-compute.yml
