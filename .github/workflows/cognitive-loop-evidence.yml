@@ -197,7 +197,7 @@ jobs:
 
       - name: Reject commit without verified staged candidate
         run: |
-          jq '.arms[3].decisions[2].action = "commit"' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-unverified-commit.json"
+          jq '.arms[3].decisions[2].action = "commit" | .arms[3].decisions[2].verification_evidence_sha256 = null' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-unverified-commit.json"
           if cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input "$RUNNER_TEMP/replay-unverified-commit.json" --out "$RUNNER_TEMP/replay-unverified-commit-output.json"; then
             echo "::error::Replay receipt accepted a commit without verification."
             exit 1
