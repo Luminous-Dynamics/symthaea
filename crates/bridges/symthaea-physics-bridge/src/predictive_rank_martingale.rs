@@ -676,8 +676,7 @@ mod tests {
         reference_count: usize,
         audit_index: usize,
     ) -> usize {
-        let target = next_unit_interval(state)
-            * (reference_count as f64 + audit_index as f64);
+        let target = next_unit_interval(state) * (reference_count as f64 + audit_index as f64);
         let mut cumulative_mass = 0.0;
         for (category, count) in prior_rank_counts.iter().copied().enumerate() {
             cumulative_mass += 1.0 + count as f64;
