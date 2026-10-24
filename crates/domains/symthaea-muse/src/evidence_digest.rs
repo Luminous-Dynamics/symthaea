@@ -2,6 +2,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Canonical evidence encoding with RustCrypto SHA-256 commitments.
 
+#[path = "prog_suite_contextual_harmony_audio_evidence.rs"]
+pub mod prog_suite_contextual_harmony_audio_evidence;
+#[path = "prog_suite_contextual_harmony_audio_panel.rs"]
+pub mod prog_suite_contextual_harmony_audio_panel;
+#[path = "prog_suite_contextual_harmony_audio_protocol.rs"]
+pub mod prog_suite_contextual_harmony_audio_protocol;
+#[path = "prog_suite_contextual_harmony_section_audio.rs"]
+pub mod prog_suite_contextual_harmony_section_audio;
+#[path = "prog_suite_contextual_harmony_section_pitch_class.rs"]
+pub mod prog_suite_contextual_harmony_section_pitch_class;
+#[path = "prog_suite_contextual_harmony_section_spectral.rs"]
+pub mod prog_suite_contextual_harmony_section_spectral;
+#[path = "prog_suite_contextual_harmony_symbolic_acoustic_tonal.rs"]
+pub mod prog_suite_contextual_harmony_symbolic_acoustic_tonal;
+#[path = "prog_suite_contextual_harmony_tonal_survival_panel.rs"]
+pub mod prog_suite_contextual_harmony_tonal_survival_panel;
+
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fmt::Write as _;
