@@ -22,6 +22,7 @@ use super::super::subsystem_trait::{
     CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 use super::super::thresholds;
+use crate::cognitive_loop::types::PredictionEvidenceCursor;
 
 /// Learning Manager — meta-level learning rate gating and plasticity control.
 ///
@@ -45,6 +46,8 @@ pub struct LearningManager {
     reputation_lr_modifier: f64,
     last_peer_wisdom_hash: [u8; 32],
     federated_wisdom_acc: f32,
+    /// Prevents duplicate, stale, or out-of-order PE samples entering surprise history.
+    prediction_error_cursor: PredictionEvidenceCursor,
 }
 
 impl Default for LearningManager {
@@ -61,6 +64,7 @@ impl Default for LearningManager {
             reputation_lr_modifier: 1.0,
             last_peer_wisdom_hash: [0u8; 32],
             federated_wisdom_acc: 0.0, // neutral default
+            prediction_error_cursor: PredictionEvidenceCursor::default(),
         }
     }
 }
@@ -188,7 +192,9 @@ impl CognitiveSubsystem for LearningManager {
         let mut output = SubsystemOutput::NEUTRAL;
 
         // ── 1. Surprise tracking ──────────────────────────────────────────
-        let prediction_error_sample = snapshot.prediction_error_sample();
+        let prediction_error_sample = self
+            .prediction_error_cursor
+            .admit_evidence(&snapshot.prediction_error_evidence(), snapshot.cycle_number);
         let prediction_error_valid = prediction_error_sample.is_some();
         let surprise = prediction_error_sample.unwrap_or(0.0);
         if prediction_error_valid {
@@ -271,21 +277,96 @@ impl CognitiveSubsystem for LearningManager {
     }
 
     fn checkpoint(&self) -> Vec<u8> {
-        let mut data = Vec::with_capacity(32);
+        // Preserve the legacy 13-byte prefix. PEVC v2 stores observed and
+        // admitted watermarks separately so invalid newer cycles still block
+        // delayed older samples after restart, while same-cycle retry remains possible.
+        let mut data = Vec::with_capacity(36);
         data.extend_from_slice(&self.plasticity.to_le_bytes());
         data.extend_from_slice(&self.error_trend.to_le_bytes());
         data.extend_from_slice(&self.low_arousal_streak.to_le_bytes());
         data.push(self.in_dream_phase as u8);
+        data.extend_from_slice(b"PEVC");
+        data.push(2); // extension version
+        let observed_cycle = self
+            .prediction_error_cursor
+            .last_observed_observation_cycle();
+        data.push(u8::from(observed_cycle.is_some()));
+        data.extend_from_slice(&observed_cycle.unwrap_or_default().to_le_bytes());
+        let admitted_cycle = self
+            .prediction_error_cursor
+            .last_admitted_observation_cycle();
+        data.push(u8::from(admitted_cycle.is_some()));
+        data.extend_from_slice(&admitted_cycle.unwrap_or_default().to_le_bytes());
         data
     }
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
-        if data.len() < 13 {
+        if data.len() != 13 && data.len() != 36 {
             return Err(format!(
-                "LearningManager checkpoint too short: {} < 13",
+                "LearningManager checkpoint has unsupported length: {}",
                 data.len()
             ));
         }
+
+        // Decode and validate the extension before mutating manager state.
+        // Legacy 13-byte checkpoints contain no cursor and therefore restore
+        // with a cleared cursor rather than inheriting state from this instance.
+        let (restored_observed_cycle, restored_admitted_cycle) = if data.len() == 13 {
+            (None, None)
+        } else {
+            if &data[13..17] != b"PEVC" {
+                return Err("LearningManager: invalid PE cursor checkpoint magic".to_string());
+            }
+            if data[17] != 2 {
+                return Err(format!(
+                    "LearningManager: unsupported PE cursor checkpoint version {}",
+                    data[17]
+                ));
+            }
+            let has_observed = data[18];
+            let observed_value = u64::from_le_bytes(
+                data[19..27]
+                    .try_into()
+                    .map_err(|_| "LearningManager: corrupt observed-cycle bytes".to_string())?,
+            );
+            let has_admitted = data[27];
+            let admitted_value = u64::from_le_bytes(
+                data[28..36]
+                    .try_into()
+                    .map_err(|_| "LearningManager: corrupt admitted-cycle bytes".to_string())?,
+            );
+            if has_observed > 1 || has_admitted > 1 {
+                return Err("LearningManager: invalid PE cursor presence flag".to_string());
+            }
+            let observed = match has_observed {
+                1 => Some(observed_value),
+                0 if observed_value == 0 => None,
+                0 => {
+                    return Err(
+                        "LearningManager: absent observed cycle must encode zero".to_string()
+                    );
+                }
+                _ => unreachable!("presence flag was checked above"),
+            };
+            let admitted = match has_admitted {
+                1 => Some(admitted_value),
+                0 if admitted_value == 0 => None,
+                0 => {
+                    return Err(
+                        "LearningManager: absent admitted cycle must encode zero".to_string()
+                    );
+                }
+                _ => unreachable!("presence flag was checked above"),
+            };
+            if admitted.is_some_and(|cycle| observed.is_none_or(|observed_cycle| cycle > observed_cycle)) {
+                return Err(
+                    "LearningManager: admitted PE cycle exceeds observed high-water mark"
+                        .to_string(),
+                );
+            }
+            (observed, admitted)
+        };
+
         self.plasticity = f32::from_le_bytes(
             data[0..4]
                 .try_into()
@@ -302,6 +383,8 @@ impl CognitiveSubsystem for LearningManager {
                 .map_err(|_| "LearningManager: corrupt checkpoint bytes [8..12]".to_string())?,
         );
         self.in_dream_phase = data[12] != 0;
+        self.prediction_error_cursor
+            .restore_cycles(restored_observed_cycle, restored_admitted_cycle);
         Ok(())
     }
 }
@@ -342,8 +425,10 @@ mod tests {
         let mut lm = LearningManager::default();
         let surprising = snapshot(0.7, 0.5, 0.8);
 
-        for _ in 0..20 {
-            lm.process(&surprising);
+        for cycle in 1..=20 {
+            let mut current = surprising;
+            current.cycle_number = cycle;
+            lm.process(&current);
         }
 
         assert!(
@@ -358,8 +443,10 @@ mod tests {
         let mut lm = LearningManager::default();
         let boring = snapshot(0.02, 0.5, 0.8);
 
-        for _ in 0..30 {
-            lm.process(&boring);
+        for cycle in 1..=30 {
+            let mut current = boring;
+            current.cycle_number = cycle;
+            lm.process(&current);
         }
 
         assert!(
@@ -422,6 +509,146 @@ mod tests {
 
         assert_eq!(manager.surprise_count, 0);
         assert_eq!(manager.plasticity, initial_plasticity);
+    }
+
+    #[test]
+    fn duplicate_and_out_of_order_pe_do_not_mutate_surprise_history() {
+        let mut manager = LearningManager::default();
+        let mut valid = snapshot(0.8, 0.5, 0.8);
+        valid.cycle_number = 10;
+        manager.process(&valid);
+        let count_after_first = manager.surprise_count;
+        let trend_after_first = manager.error_trend;
+        let plasticity_after_first = manager.plasticity;
+
+        // Same-cycle duplicate and out-of-order cycle 9 must not enter PE history.
+        valid.prediction_error = 0.1;
+        manager.process(&valid);
+        valid.cycle_number = 9;
+        valid.prediction_error = 0.05;
+        manager.process(&valid);
+        assert_eq!(manager.surprise_count, count_after_first);
+        assert_eq!(manager.error_trend, trend_after_first);
+        assert_eq!(manager.plasticity, plasticity_after_first);
+    }
+
+    #[test]
+    fn invalid_pe_allows_same_cycle_recovery_but_not_delayed_older_cycle() {
+        let mut manager = LearningManager::default();
+        let mut invalid = snapshot(0.9, 0.5, 0.8);
+        invalid.cycle_number = 12;
+        invalid.prediction_error_valid = 0;
+        manager.process(&invalid);
+        assert_eq!(manager.surprise_count, 0);
+        assert_eq!(
+            manager.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(12)
+        );
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            None
+        );
+
+        let mut delayed = snapshot(0.3, 0.5, 0.8);
+        delayed.cycle_number = 11;
+        manager.process(&delayed);
+        assert_eq!(manager.surprise_count, 0);
+
+        // Valid same-cycle retry should be admitted exactly once.
+        let mut retry = snapshot(0.4, 0.5, 0.8);
+        retry.cycle_number = 12;
+        manager.process(&retry);
+        assert_eq!(manager.surprise_count, 1);
+        manager.process(&retry);
+        assert_eq!(manager.surprise_count, 1);
+    }
+
+    #[test]
+    fn checkpoint_roundtrip_preserves_pe_watermarks() {
+        let mut manager = LearningManager::default();
+        let mut valid = snapshot(0.6, 0.5, 0.8);
+        valid.cycle_number = 10;
+        manager.process(&valid);
+        let mut invalid = valid;
+        invalid.cycle_number = 12;
+        invalid.prediction_error_valid = 0;
+        manager.process(&invalid);
+
+        let checkpoint = manager.checkpoint();
+        assert_eq!(checkpoint.len(), 36);
+        let mut restored = LearningManager::default();
+        restored.restore(&checkpoint).unwrap();
+        assert_eq!(
+            restored.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(12)
+        );
+        assert_eq!(
+            restored.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(10)
+        );
+
+        let mut delayed = valid;
+        delayed.cycle_number = 11;
+        restored.process(&delayed);
+        assert_eq!(restored.surprise_count, 1);
+
+        let mut retry = valid;
+        retry.cycle_number = 12;
+        restored.process(&retry);
+        assert_eq!(restored.surprise_count, 2);
+        restored.process(&retry);
+        assert_eq!(restored.surprise_count, 2);
+    }
+
+    #[test]
+    fn legacy_checkpoint_restore_clears_prior_pe_cursor() {
+        let mut manager = LearningManager::default();
+        let mut prior = snapshot(0.6, 0.5, 0.8);
+        prior.cycle_number = 99;
+        manager.process(&prior);
+        let legacy = manager.checkpoint()[..13].to_vec();
+
+        let mut restored = LearningManager::default();
+        let mut future = prior;
+        future.cycle_number = 100;
+        restored.process(&future);
+        restored.restore(&legacy).unwrap();
+        assert_eq!(
+            restored.prediction_error_cursor.last_observed_observation_cycle(),
+            None
+        );
+        assert_eq!(
+            restored.prediction_error_cursor.last_admitted_observation_cycle(),
+            None
+        );
+        let mut cycle_one = prior;
+        cycle_one.cycle_number = 1;
+        restored.process(&cycle_one);
+        assert_eq!(restored.surprise_count, 1);
+    }
+
+    #[test]
+    fn malformed_pe_watermark_checkpoint_is_rejected_atomically() {
+        let mut manager = LearningManager::default();
+        let mut valid = snapshot(0.6, 0.5, 0.8);
+        valid.cycle_number = 12;
+        manager.process(&valid);
+        let before_plasticity = manager.plasticity;
+        let before_error_trend = manager.error_trend;
+        let mut checkpoint = manager.checkpoint();
+        checkpoint[0..4].copy_from_slice(&0.0_f32.to_le_bytes());
+        checkpoint[28..36].copy_from_slice(&13_u64.to_le_bytes());
+        assert!(manager.restore(&checkpoint).is_err());
+        assert_eq!(manager.plasticity, before_plasticity);
+        assert_eq!(manager.error_trend, before_error_trend);
+        assert_eq!(
+            manager.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(12)
+        );
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(12)
+        );
     }
 
     #[test]
