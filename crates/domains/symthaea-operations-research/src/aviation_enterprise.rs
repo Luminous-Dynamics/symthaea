@@ -11,9 +11,10 @@
 //! A verified plan establishes only feasibility under this scenario's declared
 //! synthetic constraints. It does not establish aircraft safety, regulatory
 //! compliance, or commercial savings. The planner and verifier have separate
-//! compliance, or commercial savings. The planner and verifier have separate
-//! feasibility/cost paths; the verifier resolves stable IDs and recomputes constraints
-//! This is a separate code path in the same crate, not an independently maintained
+//! feasibility/cost paths; the verifier resolves stable IDs and recomputes
+//! constraints and objective cost. This is a separate code path in the same
+//! crate, not yet an independently maintained checker; that stronger check
+//! remains required before a benchmark release.
 
 /// Upper bound keeps exact enumeration appropriate for unit tests and tiny oracles.
 pub const MAX_EXACT_FLIGHTS: usize = 6;
