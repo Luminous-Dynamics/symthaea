@@ -137,7 +137,7 @@ pub fn evaluate(mut input: AdaptationPanelInput) -> anyhow::Result<AdaptationPan
 
     for (index, score) in input.runs.iter().enumerate() {
         ensure!(
-            score.metric_version == "counterfactual-adaptation-utility-v2",
+            score.metric_version == "counterfactual-adaptation-utility-v3",
             "runs[{index}] metric_version must be counterfactual-adaptation-utility-v2"
         );
         ensure!(
@@ -498,7 +498,7 @@ mod tests {
         let staged_verify_rollback = arm_metrics("staged-verify-rollback", dataset_id, &stream, 0.3, 0.25);
         let oracle_timed = arm_metrics("oracle-timed", dataset_id, &stream, 0.2, 0.9);
         let mut result = CounterfactualUtilityScore {
-            metric_version: "counterfactual-adaptation-utility-v2".to_owned(),
+            metric_version: "counterfactual-adaptation-utility-v3".to_owned(),
             canonical_input_sha256: hash(&format!("{dataset_id}:{seed}:{scenario_id}:input")),
             result_sha256: None,
             dataset_id: dataset_id.to_owned(),
