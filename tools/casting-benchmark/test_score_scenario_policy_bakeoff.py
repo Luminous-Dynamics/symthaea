@@ -88,7 +88,8 @@ class ScenarioPolicyReplayScorerTests(unittest.TestCase):
 
     def test_promotion_margin_tampering_is_rejected(self) -> None:
         result = copy.deepcopy(self.result)
-        promotion = result["paired_runs"][0]["promotion_records"][0]
+        run = next(row for row in result["paired_runs"] if row["promotion_records"])
+        promotion = run["promotion_records"][0]
         promotion["observed_high_margin"] += 0.1
         _, errors = self._score(result)
         self.assertTrue(any("observed_high_margin differs" in error for error in errors))
