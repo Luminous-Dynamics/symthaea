@@ -54,6 +54,9 @@ pub struct ScalarDetectorConfig {
     pub page_hinkley_delta: Option<f64>,
     /// Required only for Page-Hinkley. Positive cumulative-deviation alarm limit.
     pub page_hinkley_threshold: Option<f64>,
+    /// Required only for predictive-rank martingale; global alpha for first crossing.
+    #[serde(default)]
+    pub prm_alpha: Option<f64>,
     /// Suppress alarms until this many valid evaluation samples have been seen.
     pub warmup_valid_observations: usize,
 }
@@ -64,6 +67,7 @@ pub enum ScalarDetectorMethod {
     FixedThreshold,
     EwmaControlChart,
     PageHinkley,
+    PredictiveRankMartingalePortfolio,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -219,7 +223,8 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                     && input.detector.ewma_threshold_sigma.is_none()
                     && input.detector.calibration_stddev_floor.is_none()
                     && input.detector.page_hinkley_delta.is_none()
-                    && input.detector.page_hinkley_threshold.is_none(),
+                    && input.detector.page_hinkley_threshold.is_none()
+                    && input.detector.prm_alpha.is_none(),
                 "EWMA and Page-Hinkley parameters must be absent for fixed-threshold"
             );
             let mut detections = Vec::new();
@@ -250,7 +255,8 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
             ensure!(
                 input.detector.fixed_threshold.is_none()
                     && input.detector.page_hinkley_delta.is_none()
-                    && input.detector.page_hinkley_threshold.is_none(),
+                    && input.detector.page_hinkley_threshold.is_none()
+                    && input.detector.prm_alpha.is_none(),
                 "fixed-threshold and Page-Hinkley parameters must be absent for ewma-control-chart"
             );
             let alpha = input
@@ -315,8 +321,9 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                 input.detector.fixed_threshold.is_none()
                     && input.detector.ewma_alpha.is_none()
                     && input.detector.ewma_threshold_sigma.is_none()
-                    && input.detector.calibration_stddev_floor.is_none(),
-                "fixed-threshold and EWMA parameters must be absent for Page-Hinkley"
+                    && input.detector.calibration_stddev_floor.is_none()
+                    && input.detector.prm_alpha.is_none(),
+                "fixed-threshold, EWMA, and PRM parameters must be absent for Page-Hinkley"
             );
             let delta = input
                 .detector
@@ -388,6 +395,153 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
             }
             Ok(("page-hinkley".to_owned(), detections))
         }
+        ScalarDetectorMethod::PredictiveRankMartingalePortfolio => {
+            ensure!(
+                input.detector.fixed_threshold.is_none()
+                    && input.detector.ewma_alpha.is_none()
+                    && input.detector.ewma_threshold_sigma.is_none()
+                    && input.detector.calibration_stddev_floor.is_none()
+                    && input.detector.page_hinkley_delta.is_none()
+                    && input.detector.page_hinkley_threshold.is_none(),
+                "fixed-threshold, EWMA, and Page-Hinkley parameters must be absent for PRM"
+            );
+            let alpha = input.detector.prm_alpha.context("prm_alpha is required for PRM")?;
+            ensure!(
+                alpha.is_finite() && alpha > 0.0 && alpha < 1.0,
+                "prm_alpha must be finite and in (0, 1)"
+            );
+            let wealth_threshold = 1.0 / alpha;
+            ensure!(wealth_threshold.is_finite(), "PRM 1/alpha threshold overflowed");
+
+            // Predictive rank martingale (PRM) portfolio from Kuang & Xia (2026):
+            // fixed calibration ranks with exact Polya-urn predictive probabilities
+            // under the IID null. Equal-weight four processes target location changes
+            // in both directions plus dispersion changes in both directions.
+            // A seeded pseudorandom tie-break makes the run reproducible. The exact
+            // anytime-valid theorem assumes independent continuous tie randomization;
+            // interpret this implementation's guarantee under the benchmark's
+            // randomized-seed model, not conditional on a single fixed seed.
+            let n = input.calibration_values.len();
+            ensure!(n >= 2, "PRM requires at least two calibration values");
+            let mut rng = SplitMix64::new(input.seed ^ 0x72616e6b5f70726d);
+            let mut reference: Vec<RankedCalibrationValue> = input
+                .calibration_values
+                .iter()
+                .map(|value| RankedCalibrationValue {
+                    value: *value,
+                    tie_key: rng.next_u64(),
+                })
+                .collect();
+            reference.sort_by(|left, right| {
+                left.value
+                    .partial_cmp(&right.value)
+                    .expect("validated finite calibration values")
+                    .then_with(|| left.tie_key.cmp(&right.tie_key))
+            });
+
+            let order_feature: Vec<f64> = (0..=n)
+                .map(|j| j as f64 / n as f64 - 0.5)
+                .collect();
+            let dispersion_feature: Vec<f64> = (0..=n)
+                .map(|j| (2.0 * j as f64 / n as f64 - 1.0).abs() - 0.5)
+                .collect();
+            let mut rank_counts = vec![0usize; n + 1];
+            // order+, order-, dispersion+, dispersion-
+            let betting_lambdas = [0.5_f64, -0.5, 0.5, -0.5];
+            let mut wealth = [1.0_f64; 4];
+            let mut detections = Vec::new();
+            let mut processed = 0usize;
+
+            for observation in &input.observations {
+                // Consume a tie key at every cycle so later randomization is reproducible
+                // even when an explicit missing-evidence cycle is skipped.
+                let tie_key = rng.next_u64();
+                if !observation.evidence_valid {
+                    continue;
+                }
+                let value = observation.value.expect("validated numeric PE");
+                let rank_index = reference.partition_point(|item| {
+                    item.value < value || (item.value == value && item.tie_key < tie_key)
+                });
+                ensure!(rank_index <= n, "PRM rank index is outside the calibration grid");
+                let denominator = n
+                    .checked_add(processed)
+                    .and_then(|value| value.checked_add(1))
+                    .context("PRM predictive denominator overflowed")? as f64;
+                ensure!(denominator.is_finite() && denominator > 0.0, "PRM denominator invalid");
+
+                let mut expected_order = 0.0_f64;
+                let mut expected_dispersion = 0.0_f64;
+                for j in 0..=n {
+                    let pi = (1.0 + rank_counts[j] as f64) / denominator;
+                    expected_order += pi * order_feature[j];
+                    expected_dispersion += pi * dispersion_feature[j];
+                }
+                ensure!(
+                    expected_order.is_finite() && expected_dispersion.is_finite(),
+                    "PRM predictive feature expectation became non-finite"
+                );
+                let z_order = order_feature[rank_index] - expected_order;
+                let z_dispersion = dispersion_feature[rank_index] - expected_dispersion;
+                ensure!(
+                    z_order.is_finite() && z_dispersion.is_finite(),
+                    "PRM centered rank feature became non-finite"
+                );
+
+                let z_values = [z_order, z_order, z_dispersion, z_dispersion];
+                for index in 0..4 {
+                    let factor = 1.0 + betting_lambdas[index] * z_values[index];
+                    ensure!(
+                        factor.is_finite() && factor > 0.0,
+                        "PRM betting factor must be finite and positive"
+                    );
+                    wealth[index] *= factor;
+                    ensure!(wealth[index].is_finite(), "PRM wealth overflowed");
+                }
+                let portfolio_wealth = wealth.iter().sum::<f64>() / 4.0;
+                ensure!(portfolio_wealth.is_finite(), "PRM portfolio wealth overflowed");
+                processed += 1;
+                if portfolio_wealth >= wealth_threshold {
+                    detections.push(Detection {
+                        cycle_index: observation.cycle_index,
+                        evidence_valid: true,
+                    });
+                    // A single e-process controls the probability of ever crossing.
+                    // Repeated detection episodes require a new independent calibration
+                    // epoch or a separately validated alpha-spending construction.
+                    break;
+                }
+                rank_counts[rank_index] = rank_counts[rank_index]
+                    .checked_add(1)
+                    .context("PRM rank count overflowed")?;
+            }
+            Ok(("predictive-rank-martingale-portfolio".to_owned(), detections))
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RankedCalibrationValue {
+    value: f64,
+    tie_key: u64,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SplitMix64 {
+    state: u64,
+}
+
+impl SplitMix64 {
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9e3779b97f4a7c15);
+        let mut value = self.state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94d049bb133111eb);
+        value ^ (value >> 31)
     }
 }
 
@@ -453,6 +607,7 @@ mod tests {
                 calibration_stddev_floor: None,
                 page_hinkley_delta: None,
                 page_hinkley_threshold: None,
+                prm_alpha: None,
                 warmup_valid_observations: 1,
             },
             ScalarDetectorMethod::EwmaControlChart => ScalarDetectorConfig {
@@ -463,6 +618,7 @@ mod tests {
                 calibration_stddev_floor: Some(0.01),
                 page_hinkley_delta: None,
                 page_hinkley_threshold: None,
+                prm_alpha: None,
                 warmup_valid_observations: 1,
             },
             ScalarDetectorMethod::PageHinkley => ScalarDetectorConfig {
@@ -473,6 +629,18 @@ mod tests {
                 calibration_stddev_floor: None,
                 page_hinkley_delta: Some(0.05),
                 page_hinkley_threshold: Some(0.15),
+                prm_alpha: None,
+                warmup_valid_observations: 1,
+            },
+            ScalarDetectorMethod::PredictiveRankMartingalePortfolio => ScalarDetectorConfig {
+                method,
+                fixed_threshold: None,
+                ewma_alpha: None,
+                ewma_threshold_sigma: None,
+                calibration_stddev_floor: None,
+                page_hinkley_delta: None,
+                page_hinkley_threshold: None,
+                prm_alpha: Some(0.2),
                 warmup_valid_observations: 1,
             },
         };
@@ -536,6 +704,43 @@ mod tests {
         assert_eq!(result.score.true_positive_events, 2);
         assert_eq!(result.score.false_positive_alarms, 0);
         assert_eq!(result.score.missed_events, 0);
+    }
+
+    #[test]
+    fn predictive_rank_martingale_detects_sustained_upward_shift_at_anytime_threshold() {
+        let mut input = fixture(ScalarDetectorMethod::PredictiveRankMartingalePortfolio);
+        input.calibration_values = (0..20).map(|i| 0.1 + i as f64 * 0.001).collect();
+        input.observations = (0..600)
+            .map(|cycle_index| ScalarObservation {
+                cycle_index,
+                value: Some(0.9),
+                evidence_valid: true,
+            })
+            .collect();
+        input.drift_events = vec![DriftEvent {
+            id: "sustained-upward-shift".to_owned(),
+            start_cycle: 0,
+            end_cycle: 599,
+        }];
+        let result = run_scalar_detector(input).expect("PRM should run");
+        assert_eq!(result.detector_id, "predictive-rank-martingale-portfolio");
+        assert_eq!(result.detections.len(), 1);
+        assert!(result.detections[0].cycle_index < 600);
+        assert_eq!(result.score.true_positive_events, 1);
+        assert_eq!(result.score.false_positive_alarms, 0);
+        assert_eq!(result.score.missed_events, 0);
+        assert!(result.score.hard_gate_pass);
+    }
+
+    #[test]
+    fn predictive_rank_martingale_rejects_invalid_alpha_and_incompatible_parameters() {
+        let mut bad_alpha = fixture(ScalarDetectorMethod::PredictiveRankMartingalePortfolio);
+        bad_alpha.detector.prm_alpha = Some(0.0);
+        assert!(run_scalar_detector(bad_alpha).is_err());
+
+        let mut bad_params = fixture(ScalarDetectorMethod::PredictiveRankMartingalePortfolio);
+        bad_params.detector.fixed_threshold = Some(0.4);
+        assert!(run_scalar_detector(bad_params).is_err());
     }
 
     #[test]
