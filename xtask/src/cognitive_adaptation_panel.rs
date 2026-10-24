@@ -138,7 +138,7 @@ pub fn evaluate(mut input: AdaptationPanelInput) -> anyhow::Result<AdaptationPan
     for (index, score) in input.runs.iter().enumerate() {
         ensure!(
             score.metric_version == "counterfactual-adaptation-utility-v3",
-            "runs[{index}] metric_version must be counterfactual-adaptation-utility-v2"
+            "runs[{index}] metric_version must be counterfactual-adaptation-utility-v3"
         );
         ensure!(
             score.comparison_track == input.comparison_track,
