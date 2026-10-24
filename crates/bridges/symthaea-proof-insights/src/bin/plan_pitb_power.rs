@@ -26,6 +26,8 @@ struct Config {
     expected_gain: f64,
     minimum_observed_gain: f64,
     icc: f64,
+    cluster_effect_sd: f64,
+    pair_association: f64,
     cluster_sizes: Vec<usize>,
     simulations: usize,
     seed: u64,
@@ -115,9 +117,9 @@ impl Rng {
 }
 
 fn parse_config(args: &[String]) -> Result<Config> {
-    if args.len() != 9 || args.get(1).is_some_and(|x| x == "--help" || x == "-h") {
+    if args.len() != 11 || args.get(1).is_some_and(|x| x == "--help" || x == "-h") {
         bail!(
-            "usage: {} <baseline_rate> <expected_gain> <minimum_observed_gain> <icc_0_to_lt_1> <cluster_sizes_csv> <simulations>=1000 <seed> <output.json>",
+            "usage: {} <baseline_rate> <expected_gain> <minimum_observed_gain> <icc_0_to_lt_1> <cluster_effect_sd_0_to_1> <pair_association_0_to_1> <cluster_sizes_csv> <simulations>=1000 <seed> <output.json>",
             args.first().map(String::as_str).unwrap_or("plan_pitb_power")
         );
     }
@@ -126,7 +128,9 @@ fn parse_config(args: &[String]) -> Result<Config> {
     let expected_gain = parse_f64(&args[2], "expected_gain")?;
     let minimum_observed_gain = parse_f64(&args[3], "minimum_observed_gain")?;
     let icc = parse_f64(&args[4], "icc")?;
-    let cluster_sizes = args[5]
+    let cluster_effect_sd = parse_f64(&args[5], "cluster_effect_sd")?;
+    let pair_association = parse_f64(&args[6], "pair_association")?;
+    let cluster_sizes = args[7]
         .split(',')
         .map(|item| {
             let size = item.trim().parse::<usize>().context("parse cluster size")?;
@@ -136,8 +140,8 @@ fn parse_config(args: &[String]) -> Result<Config> {
             Ok(size)
         })
         .collect::<Result<Vec<_>>>()?;
-    let simulations = args[6].parse::<usize>().context("parse simulations")?;
-    let seed = args[7].parse::<u64>().context("parse seed")?;
+    let simulations = args[8].parse::<usize>().context("parse simulations")?;
+    let seed = args[9].parse::<u64>().context("parse seed")?;
 
     if !(0.0..1.0).contains(&baseline_rate) {
         bail!("baseline_rate must be strictly between 0 and 1");
@@ -153,6 +157,12 @@ fn parse_config(args: &[String]) -> Result<Config> {
     }
     if !(0.0..1.0).contains(&icc) {
         bail!("icc must be in [0, 1)");
+    }
+    if !(0.0..=1.0).contains(&cluster_effect_sd) {
+        bail!("cluster_effect_sd must be in [0, 1]");
+    }
+    if !(0.0..=1.0).contains(&pair_association) {
+        bail!("pair_association must be in [0, 1]");
     }
     if icc > 0.0 {
         let concentration = (1.0 - icc) / icc;
@@ -174,10 +184,13 @@ fn parse_config(args: &[String]) -> Result<Config> {
     if total_targets == 0 {
         bail!("cluster-size vector must contain at least one target");
     }
-    let alpha = baseline_rate * (1.0 - icc) / icc.max(f64::MIN_POSITIVE);
-    let beta = (1.0 - baseline_rate) * (1.0 - icc) / icc.max(f64::MIN_POSITIVE);
-    if icc > 0.0 && (!alpha.is_finite() || !beta.is_finite() || alpha <= 0.0 || beta <= 0.0) {
-        bail!("icc and baseline_rate produce invalid beta-binomial shape parameters");
+    if icc > 0.0 {
+        let concentration = (1.0 - icc) / icc;
+        let alpha = baseline_rate * concentration;
+        let beta = (1.0 - baseline_rate) * concentration;
+        if !alpha.is_finite() || !beta.is_finite() || alpha <= 0.0 || beta <= 0.0 {
+            bail!("icc and baseline_rate produce invalid beta-binomial shape parameters");
+        }
     }
     if simulations < MIN_SIMULATIONS {
         bail!("simulations must be at least {MIN_SIMULATIONS}");
@@ -188,6 +201,8 @@ fn parse_config(args: &[String]) -> Result<Config> {
         expected_gain,
         minimum_observed_gain,
         icc,
+        cluster_effect_sd,
+        pair_association,
         cluster_sizes,
         simulations,
         seed,
@@ -213,6 +228,33 @@ fn t_critical_975(df: usize) -> f64 {
         + (5.0 * z.powi(5) + 16.0 * z.powi(3) + 3.0 * z) / (96.0 * v.powi(2))
         + (3.0 * z.powi(7) + 19.0 * z.powi(5) + 17.0 * z.powi(3) - 15.0 * z)
             / (384.0 * v.powi(3))
+}
+
+fn paired_bernoulli(
+    rng: &mut Rng,
+    p_control: f64,
+    p_treatment: f64,
+    positive_association_fraction: f64,
+) -> (bool, bool) {
+    // A valid bivariate Bernoulli coupling. The association parameter scales
+    // the available positive joint-success covariance from independence (0)
+    // to the Frechet upper bound (1); it is not a Pearson correlation.
+    let independent_joint = p_control * p_treatment;
+    let joint_success = independent_joint
+        + positive_association_fraction * (p_control.min(p_treatment) - independent_joint);
+    let draw = rng.uniform();
+    let both_success = joint_success;
+    let control_only = p_control - joint_success;
+    let treatment_only = p_treatment - joint_success;
+    if draw < both_success {
+        (true, true)
+    } else if draw < both_success + control_only {
+        (true, false)
+    } else if draw < both_success + control_only + treatment_only {
+        (false, true)
+    } else {
+        (false, false)
+    }
 }
 
 fn simulate_trial(config: &Config, rng: &mut Rng) -> Trial {
@@ -244,19 +286,24 @@ fn simulate_trial(config: &Config, rng: &mut Rng) -> Trial {
         } else {
             config.baseline_rate
         };
-        let p_treatment = (p_control + config.expected_gain).min(1.0);
+        // Each family receives its own treatment-effect deviation, modelling
+        // cross-family heterogeneity rather than assuming an identical gain.
+        let family_gain = config.expected_gain + config.cluster_effect_sd * rng.normal();
+        let p_treatment = (p_control + family_gain).clamp(0.0, 1.0);
         generated_baseline_probability += p_control * n as f64;
         generated_treatment_probability += p_treatment * n as f64;
 
         let mut control_successes = 0usize;
         let mut treatment_successes = 0usize;
         for _ in 0..n {
-            if rng.uniform() < p_control {
-                control_successes += 1;
-            }
-            if rng.uniform() < p_treatment {
-                treatment_successes += 1;
-            }
+            let (control_success, treatment_success) = paired_bernoulli(
+                rng,
+                p_control,
+                p_treatment,
+                config.pair_association,
+            );
+            control_successes += usize::from(control_success);
+            treatment_successes += usize::from(treatment_success);
         }
         differences.push((n, treatment_successes as i64 - control_successes as i64));
         control_total += control_successes;
@@ -349,6 +396,8 @@ fn build_report(config: &Config) -> Value {
             "expected_gain_input": config.expected_gain,
             "minimum_observed_gain_gate": config.minimum_observed_gain,
             "icc": config.icc,
+            "cluster_effect_sd": config.cluster_effect_sd,
+            "pair_association": config.pair_association,
             "cluster_count": config.cluster_sizes.len(),
             "cluster_sizes": config.cluster_sizes,
             "total_targets_per_simulated_study": config.cluster_sizes.iter().sum::<usize>(),
@@ -358,9 +407,11 @@ fn build_report(config: &Config) -> Value {
         },
         "generative_model": {
             "cluster_difficulty": if config.icc == 0.0 { "fixed_baseline_probability" } else { "beta_binomial_shared_family_difficulty" },
-            "treatment_probability": "min(cluster_control_probability + expected_gain_input, 1)",
-            "within_cluster_outcomes": "independent Bernoulli conditional on cluster probabilities",
-            "pairing": "same simulated target clusters receive both control and treatment",
+            "treatment_probability": "clamp(cluster_control_probability + expected_gain_input + family_specific_normal_deviation, 0, 1)",
+            "family_treatment_effect_heterogeneity": "normal family-level effect deviation with configured probability-scale standard deviation; outcomes are clipped to [0,1]",
+            "paired_target_outcomes": "bivariate Bernoulli potential outcomes using configured fraction of maximum feasible positive joint-success association",
+            "pair_association_semantics": "0 means independent potential outcomes conditional on family probabilities; 1 means the Frechet upper bound on joint successes; this parameter is not a Pearson correlation",
+            "pairing": "control and treatment potential outcomes are simulated on the same target inside each shared family",
             "interval": "cluster-level paired difference t interval with Cornish-Fisher critical-value approximation",
             "gate": "estimated gain >= minimum_observed_gain_gate AND 95% lower bound > 0; degenerate intervals do not pass"
         },
@@ -379,8 +430,9 @@ fn build_report(config: &Config) -> Value {
         },
         "limitations": [
             "Planning model only; these values are not PITB results or proof of real benchmark power.",
-            "The beta-binomial family effect is a sensitivity model, not an estimate of PITB's unknown intracluster correlation.",
-            "Probability clipping at 1 can make the generated marginal gain smaller than the configured expected_gain_input; inspect mean_generated_marginal_gain.",
+            "The beta-binomial family effect and family-specific treatment-effect variation are sensitivity assumptions, not estimates from PITB.",
+            "Family treatment-effect deviations can be negative or positive; the resulting target probabilities are clipped to [0,1], so inspect mean_generated_marginal_gain.",
+            "Pair association is a sensitivity parameter that scales feasible positive joint-success association, not an empirically estimated Pearson correlation.",
             "The interval is approximate and is not a substitute for the preregistered final analysis or an independently reviewed power plan.",
             "Use actual eligible family/component sizes and a range of plausible baseline rates, gains, and ICC values; do not tune the assumptions after inspecting test outcomes."
         ]
@@ -398,14 +450,14 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() == 2 && (args[1] == "--help" || args[1] == "-h") {
         println!(
-            "usage: {} <baseline_rate> <expected_gain> <minimum_observed_gain> <icc_0_to_lt_1> <cluster_sizes_csv> <simulations>=1000 <seed> <output.json>\nExample: 0.35 0.15 0.10 0.05 2,3,1,4,... 10000 12345 power.json",
+            "usage: {} <baseline_rate> <expected_gain> <minimum_observed_gain> <icc_0_to_lt_1> <cluster_effect_sd_0_to_1> <pair_association_0_to_1> <cluster_sizes_csv> <simulations>=1000 <seed> <output.json>\nExample: 0.35 0.15 0.10 0.05 0.05 0.5 2,3,1,4,... 10000 12345 power.json",
             args.first().map(String::as_str).unwrap_or("plan_pitb_power")
         );
         return Ok(());
     }
 
     let config = parse_config(&args)?;
-    let output = Path::new(&args[8]);
+    let output = Path::new(&args[10]);
     let report = run(&config, output)?;
     println!(
         "PITB_POWER_PLAN_WRITTEN: clusters={} targets={} simulations={} gate_power={:.4} gate_passes={}/{}",
@@ -429,6 +481,8 @@ mod tests {
             expected_gain: 0.15,
             minimum_observed_gain: 0.10,
             icc: 0.05,
+            cluster_effect_sd: 0.05,
+            pair_association: 0.5,
             cluster_sizes: vec![2, 3, 1, 4, 2, 2, 3, 1, 4, 2, 3, 1, 2, 4, 1, 3, 2, 2, 4, 1],
             simulations,
             seed,
@@ -485,6 +539,8 @@ mod tests {
             "0.15".to_owned(),
             "0.10".to_owned(),
             "0.05".to_owned(),
+            "0.05".to_owned(),
+            "0.5".to_owned(),
             vec!["2"; MIN_CLUSTERS].join(","),
             "1000".to_owned(),
             "123".to_owned(),
@@ -501,10 +557,47 @@ mod tests {
             "0.15".to_owned(),
             "0.10".to_owned(),
             "0.05".to_owned(),
+            "0.05".to_owned(),
+            "0.5".to_owned(),
             "2,3,1".to_owned(),
             "1000".to_owned(),
             "123".to_owned(),
             "power.json".to_owned(),
+        ];
+        assert!(parse_config(&args).is_err());
+    }
+
+    #[test]
+    fn paired_sampler_respects_frechet_upper_bound_at_full_association() {
+        let mut rng = Rng::new(901);
+        for _ in 0..10_000 {
+            let (control, treatment) = paired_bernoulli(&mut rng, 0.3, 0.6, 1.0);
+            assert!(!control || treatment);
+        }
+    }
+
+    #[test]
+    fn paired_sampler_matches_marginals_at_extreme_associations() {
+        let mut rng = Rng::new(77);
+        let mut control_successes = 0usize;
+        let mut treatment_successes = 0usize;
+        let n = 50_000;
+        for _ in 0..n {
+            let (control, treatment) = paired_bernoulli(&mut rng, 0.25, 0.4, 0.5);
+            control_successes += usize::from(control);
+            treatment_successes += usize::from(treatment);
+        }
+        assert!((control_successes as f64 / n as f64 - 0.25).abs() < 0.015);
+        assert!((treatment_successes as f64 / n as f64 - 0.4).abs() < 0.015);
+    }
+
+    #[test]
+    fn parser_rejects_out_of_range_pair_association() {
+        let args = vec![
+            "plan_pitb_power".to_owned(), "0.35".to_owned(), "0.15".to_owned(),
+            "0.10".to_owned(), "0.05".to_owned(), "0.05".to_owned(),
+            "1.01".to_owned(), vec!["2"; MIN_CLUSTERS].join(","),
+            "1000".to_owned(), "123".to_owned(), "power.json".to_owned(),
         ];
         assert!(parse_config(&args).is_err());
     }
