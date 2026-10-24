@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -104,11 +105,11 @@ def credit_debit_swap(source: str) -> str:
     return replace_exactly_once(source, old, swapped, "VLEB-LDG-007 credit/debit swap")
 
 
-MUTANTS: list[tuple[str, str, Callable[[str], str]]] = [
-    ("VLEB-LDG-001", "duplicate_processing", duplicate_processing),
-    ("VLEB-LDG-002", "other_semantic", conflicting_duplicate_accepted),
-    ("VLEB-LDG-004", "rounding_or_truncation", unchecked_overflow),
-    ("VLEB-LDG-007", "other_semantic", credit_debit_swap),
+MUTANTS: list[tuple[str, str, Callable[[str], str], str]] = [
+    ("VLEB-LDG-001", "duplicate_processing", duplicate_processing, "repeated_exact_duplicate_is_idempotent_for_arbitrary_multiplicity"),
+    ("VLEB-LDG-002", "other_semantic", conflicting_duplicate_accepted, "conflicting_transaction_id_is_rejected"),
+    ("VLEB-LDG-004", "rounding_or_truncation", unchecked_overflow, "arithmetic_overflow_is_rejected"),
+    ("VLEB-LDG-007", "other_semantic", credit_debit_swap, "deterministic_generated_ledgers_match_independent_reference_reducer"),
 ]
 
 
@@ -201,10 +202,12 @@ def main() -> int:
     write_report(output_dir / "mutation-results.json", report)
     all_killed = True
 
-    for mutation_id, mutation_class, transform in MUTANTS:
+    for mutation_id, mutation_class, transform, expected_killer_test in MUTANTS:
         record: dict[str, object] = {
             "mutation_id": mutation_id,
             "mutation_class": mutation_class,
+            "expected_killer_tests": [expected_killer_test],
+            "failed_test_names": [],
             "compilable": None,
             "equivalence_status": "non_equivalent",
             "observed_verdict": "unresolved",
@@ -276,16 +279,40 @@ def main() -> int:
             record["timeout"] = test_timed_out
             record["evidence_sha256"] = sha256(compile_output + b"\0" + test_output)
 
-            if not test_timed_out and test_code is not None and test_code != 0 and b"test result: FAILED" in test_output:
+            output_text = test_output.decode("utf-8", errors="replace")
+            failure_pattern = re.compile(
+                r"^\\s*test\\s+(?:[A-Za-z0-9_]+::)*([A-Za-z0-9_]+)\\s+\\.\\.\\.\\s+FAILED\\s*$"
+            )
+            failed_names = sorted(
+                {
+                    match.group(1)
+                    for line in output_text.splitlines()
+                    if (match := failure_pattern.match(line)) is not None
+                }
+            )
+            record["failed_test_names"] = failed_names
+
+            if (
+                not test_timed_out
+                and test_code is not None
+                and test_code != 0
+                and expected_killer_test in failed_names
+            ):
                 record["observed_verdict"] = "rejected"
-                record["notes"] = "compilable mutant rejected by the locked test suite"
+                record["notes"] = (
+                    f"compilable mutant rejected by preregistered killer test "
+                    f"{expected_killer_test}"
+                )
             elif test_code == 0:
                 record["observed_verdict"] = "accepted"
                 record["notes"] = "BUG: semantically incorrect mutant survived the locked test suite"
                 all_killed = False
             else:
                 record["observed_verdict"] = "unresolved"
-                record["notes"] = "test command timed out or failed without an explicit failed-test summary"
+                record["notes"] = (
+                    f"expected killer test {expected_killer_test} did not fail, "
+                    "or the test command timed out/failed without a matching test failure"
+                )
                 all_killed = False
 
             write_report(output_dir / "mutation-results.json", report)
