@@ -18,6 +18,8 @@ REFERENCE_POINT = (1.2, 1.2)
 IDEAL_POINT = (0.0, 0.0)
 DEFAULT_COST_BUDGET = 200
 DEFAULT_GRID_SIZE = 21
+MIN_POLICY_COST_BUDGET = 200
+MIN_POLICY_CANDIDATES = 75
 
 
 @dataclass(frozen=True)
@@ -391,6 +393,15 @@ POLICIES = {
 }
 
 
+def _validate_run_configuration(cost_budget: int, grid_size: int, severity: float) -> None:
+    if cost_budget < MIN_POLICY_COST_BUDGET:
+        raise ValueError(f"cost_budget must be at least {MIN_POLICY_COST_BUDGET} for the frozen policy templates")
+    if grid_size < 9 or grid_size * grid_size < MIN_POLICY_CANDIDATES:
+        raise ValueError(f"grid_size must expose at least {MIN_POLICY_CANDIDATES} candidate designs")
+    if not math.isfinite(severity) or severity < 0.0:
+        raise ValueError("severity must be finite and non-negative")
+
+
 def run_policy(
     policy_name: str,
     seed: int = 17,
@@ -398,6 +409,7 @@ def run_policy(
     grid_size: int = DEFAULT_GRID_SIZE,
     severity: float = 1.0,
 ) -> dict:
+    _validate_run_configuration(cost_budget, grid_size, severity)
     if policy_name not in POLICIES:
         raise ValueError(f"unknown policy: {policy_name}")
     world = SyntheticCastingWorld(grid_size=grid_size, severity=severity)
@@ -459,6 +471,7 @@ def run_policy(
 
 def run_suite(seed: int = 17, cost_budget: int = DEFAULT_COST_BUDGET, grid_size: int = DEFAULT_GRID_SIZE,
               severity: float = 1.0) -> dict:
+    _validate_run_configuration(cost_budget, grid_size, severity)
     results = [
         run_policy(name, seed=seed, cost_budget=cost_budget, grid_size=grid_size, severity=severity)
         for name in POLICIES
