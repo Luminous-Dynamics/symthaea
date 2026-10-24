@@ -1,0 +1,37 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luminousdynamics.org/schemas/multi-horizon-trajectory-divergence-1.0.0.schema.json",
+  "title":"Multi-Horizon Trajectory Divergence",
+  "description":"Computational divergence across an explicit shared horizon grid. It is not falsification, evidence, truth, confidence, or independence.",
+  "type":"object",
+  "required":["pairs"],
+  "properties":{
+    "pairs":{
+      "type":"array",
+      "items":{
+        "type":"object",
+        "required":["left_model_id","right_model_id","left_lineage","right_lineage","horizons","divergences","max_divergence","mean_divergence","horizon_at_max_divergence"],
+        "properties":{
+          "left_model_id":{"type":"string","minLength":1},
+          "right_model_id":{"type":"string","minLength":1},
+          "left_lineage":{"type":"string","minLength":1},
+          "right_lineage":{"type":"string","minLength":1},
+          "horizons":{"type":"array","items":{"type":"number","exclusiveMinimum":0},"minItems":1},
+          "divergences":{"type":"array","items":{"type":"number"},"minItems":1},
+          "max_divergence":{"type":"number"},
+          "mean_divergence":{"type":"number"},
+          "horizon_at_max_divergence":{"type":"number","exclusiveMinimum":0}
+        },
+        "additionalProperties":false
+      }
+    }
+  },
+  "additionalProperties":false,
+  "x-authority":"computational_discrimination_only",
+  "x-non-equivalences":[
+    "trajectory_divergence_is_not_falsification",
+    "maximum_divergence_is_not_confidence",
+    "shared_lineage_is_not_independence",
+    "computational_separation_is_not_experimental_evidence"
+  ]
+}

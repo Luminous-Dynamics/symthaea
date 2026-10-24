@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"symthaea.research.scientific_discovery.active_inference.1.0.0",
+  "title":"Scientific Active Inference Test Selection",
+  "type":"object","additionalProperties":false,
+  "properties":{
+    "schema":{"const":"symthaea.research.scientific_discovery.active_inference"},
+    "schema_version":{"const":"1.0.0"},
+    "authority":{"const":"decision_support_only"},
+    "inputs":{"type":"array","items":{"enum":["temporal_trajectory_forecast","model_prior","model_lineage","test_outcome_likelihood","test_cost","outcome_utility"]}},
+    "outputs":{"type":"array","items":{"enum":["epistemic_value_bits","pragmatic_risk","expected_free_energy","eig_per_cost","distinct_model_lineages"]}},
+    "non_equivalences":{"type":"array","items":{"type":"string"}}
+  },
+  "required":["schema","schema_version","authority","inputs","outputs","non_equivalences"]
+}
