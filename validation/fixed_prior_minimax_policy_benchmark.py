@@ -7,9 +7,9 @@ as a vector of expected terminal cross-entropies, one component per candidate pr
 Pareto-dominated risk vectors are pruned. The selected policy minimizes worst-case
 risk across the original fixed scenarios, with mean risk and stable ordering as ties.
 
-This avoids the branchwise scenario switching of rectangular robust Bellman planning.
-The exact frontier can grow rapidly; horizon 1-2 is the primary supported scope.
-Research pilot only: 16 hypotheses, chain/fork, exact realized-subset telemetry.
+Unlike rectangular robust Bellman planning, this does not allow the adversary to
+switch scenario identity independently at each branch. Exact frontiers can still
+grow quickly; the code reports frontier size/state counts as part of the benchmark.
 """
 from __future__ import annotations
 import argparse
@@ -21,7 +21,7 @@ from pathlib import Path
 
 from objective_matched_oracle_benchmark import ACTIONS, HYPOTHESES, OBJECTIVES, predictive, update
 from prior_shift_oracle_benchmark import PRIOR_NAMES, build_prior
-from prior_misspecification_benchmark import terminal_cross_entropy, terminal_brier_risk
+from prior_misspecification_benchmark import terminal_cross_entropy
 from robust_ambiguity_policy_benchmark import robust_action, update_scenarios
 
 SCHEMA = "symthaea-fixed-prior-minimax-frontier-v1"
@@ -34,13 +34,14 @@ TOL = 1e-12
 
 
 def dominates(a, b, tol=TOL):
+    """Return true iff risk vector a weakly dominates b in every scenario."""
     no_worse = all(x <= y + tol for x, y in zip(a, b))
     strictly = any(x < y - tol for x, y in zip(a, b))
     return no_worse and strictly
 
 
 def prune_frontier(candidates):
-    """Keep deterministic representatives of nondominated risk vectors."""
+    """Keep deterministic representatives of nondominated scenario-risk vectors."""
     ordered = sorted(candidates, key=lambda item: (max(item[0]), sum(item[0]), item[0]))
     kept = []
     for candidate in ordered:
@@ -73,10 +74,12 @@ def make_frontier_solver(objective, candidate_prior_names):
         all_candidates = []
         for action in ACTIONS:
             predictive_by_scenario = [dict(predictive(q, action)) for q in scenarios]
-            observations = tuple(obs for obs, _ in predictive(scenarios[0], action))
+            # Important: include the union of observations possible under any candidate
+            # world, not only observations possible under scenario 0.
+            observations = tuple(sorted(set().union(*(set(pred) for pred in predictive_by_scenario)), key=repr))
             partial = [((0.0,) * len(scenarios), ())]
             for obs in observations:
-                probabilities = tuple(pred[obs] for pred in predictive_by_scenario)
+                probabilities = tuple(pred.get(obs, 0.0) for pred in predictive_by_scenario)
                 if not any(prob > 0.0 for prob in probabilities):
                     continue
                 next_scenarios = tuple(
@@ -107,26 +110,6 @@ def make_frontier_solver(objective, candidate_prior_names):
     return initial_scenarios, frontier, best_policy, frontier_peak
 
 
-def evaluate_fixed_policy_tree(policy_tree, objective, true_prior_name, learner_prior_name, horizon):
-    """Re-evaluate a selected tree under a specific fixed true-prior scenario."""
-    q0, p0 = tuple(build_prior(true_prior_name)), tuple(build_prior(learner_prior_name))
-    if horizon == 0:
-        return terminal_cross_entropy(q0, p0, objective)
-    action, branches = policy_tree
-    branch_map = dict(branches)
-    value = 0.0
-    for obs, prob in predictive(q0, action):
-        if prob <= 0.0:
-            continue
-        q_next, p_next = update(q0, action, obs), update(p0, action, obs)
-        child = branch_map.get(obs)
-        if horizon - 1 == 0 or child is None:
-            value += prob * terminal_cross_entropy(q_next, p_next, objective)
-        else:
-            value += prob * evaluate_tree_from_posteriors(child, q_next, p_next, objective, horizon - 1)
-    return value
-
-
 def evaluate_tree_from_posteriors(policy_tree, q_true, learner_posterior, objective, remaining):
     if remaining == 0 or policy_tree is None:
         return terminal_cross_entropy(q_true, learner_posterior, objective)
@@ -145,7 +128,6 @@ def evaluate_tree_from_posteriors(policy_tree, q_true, learner_posterior, object
 def evaluate_baseline(policy, objective, true_prior_name, learner_prior_name, horizon, candidate_prior_names=PRIOR_NAMES):
     q0, p0 = tuple(build_prior(true_prior_name)), tuple(build_prior(learner_prior_name))
     scenario0 = tuple((n, tuple(build_prior(n))) for n in candidate_prior_names)
-    oracle_cache = {}
 
     @lru_cache(maxsize=None)
     def rec(q_true, p, scenarios, remaining, history):
@@ -176,12 +158,13 @@ def run_benchmark(max_horizon=2, candidate_prior_names=PRIOR_NAMES,
                   learner_prior_names=PRIOR_NAMES, objectives=OBJECTIVES):
     if max_horizon not in (1, 2, 3):
         raise ValueError("horizon must be 1, 2, or 3")
-    if not candidate_prior_names or any(n not in PRIOR_NAMES for n in candidate_prior_names):
-        raise ValueError("unknown candidate prior list")
-    if not learner_prior_names or any(n not in PRIOR_NAMES for n in learner_prior_names):
-        raise ValueError("unknown learner prior list")
-    if not objectives or any(o not in OBJECTIVES for o in objectives):
-        raise ValueError("unknown objective list")
+    for names in (candidate_prior_names, learner_prior_names, objectives):
+        if not names:
+            raise ValueError("lists must not be empty")
+    if any(n not in PRIOR_NAMES for n in candidate_prior_names + learner_prior_names):
+        raise ValueError("unknown candidate or learner prior")
+    if any(o not in OBJECTIVES for o in objectives):
+        raise ValueError("unknown objective")
     rows, solvers = [], {}
     for objective in objectives:
         solver = make_frontier_solver(objective, candidate_prior_names)
@@ -194,7 +177,7 @@ def run_benchmark(max_horizon=2, candidate_prior_names=PRIOR_NAMES,
                 for i, true_name in enumerate(candidate_prior_names):
                     score = evaluate_tree_from_posteriors(tree, tuple(build_prior(true_name)), p, objective, horizon)
                     if abs(score - vector[i]) > 1e-8:
-                        raise AssertionError(f"frontier vector mismatch {score} vs {vector[i]}")
+                        raise AssertionError(f"frontier vector mismatch for {true_name}: {score} vs {vector[i]}")
                     rows.append({
                         "policy": "fixed_prior_minimax_frontier", "objective": objective,
                         "true_prior": true_name, "learner_prior": learner_name,
@@ -225,7 +208,7 @@ def run_benchmark(max_horizon=2, candidate_prior_names=PRIOR_NAMES,
             "uncertainty_semantics": "candidate true-prior identity is fixed for a full episode; policy branches only on observable histories",
             "algorithm": "Pareto frontier of scenario-wise expected terminal cross-entropies; combine child-policy frontiers, prune dominated risk vectors, minimize maximum root risk",
             "score": "exact expected terminal categorical cross-entropy under each fixed candidate prior",
-            "limitations": ["finite 16-hypothesis chain/fork game", "exact realized subset telemetry", "finite candidate prior set is not calibrated", "frontier growth can be exponential with horizon and scenario count", "no external benchmarks run"]
+            "limitations": ["finite 16-hypothesis chain/fork game", "exact realized subset telemetry", "finite candidate prior set is not calibrated", "frontier growth can be exponential with horizon and scenario count", "no external benchmarks run"],
         },
         "frontier_stats": {obj: {"max_frontier": solvers[obj][3]["max"], "states": solvers[obj][3]["states"]} for obj in objectives},
         "rows": rows,
@@ -233,11 +216,11 @@ def run_benchmark(max_horizon=2, candidate_prior_names=PRIOR_NAMES,
 
 
 def self_test():
-    a, b = (0.1, 0.2, 0.4), (0.2, 0.3, 0.5)
-    assert dominates(a, b)
-    assert not dominates(b, a)
+    assert dominates((0.1, 0.2, 0.4), (0.2, 0.3, 0.5))
+    assert not dominates((0.2, 0.3, 0.5), (0.1, 0.2, 0.4))
+    assert not dominates((0.1, 0.3), (0.2, 0.2))
     result = run_benchmark(1, ("uniform", "high_spill_biased"), ("uniform", "chain_biased"), ("joint",))
-    assert len(result["rows"]) == 2 * 2 * (1 + 4)  # one robust tree plus four baselines
+    assert len(result["rows"]) == 2 * 2 * (1 + 4)  # learner x policy x candidate true prior
     robust = [r for r in result["rows"] if r["policy"] == "fixed_prior_minimax_frontier"]
     for learner in ("uniform", "chain_biased"):
         for row in [x for x in robust if x["learner_prior"] == learner]:
