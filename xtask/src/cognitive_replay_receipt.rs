@@ -85,6 +85,9 @@ pub struct ReplayDecision {
     /// Realized per-cycle adaptation cost, in the registered cost unit.
     #[serde(default)]
     pub adaptation_cost_units: Option<f64>,
+    /// Earliest tick when this task-loss outcome was actually available to the evaluator.
+    #[serde(default)]
+    pub task_loss_available_at_tick: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -233,11 +236,18 @@ pub fn validate_receipt(receipt: ReplayReceipt) -> anyhow::Result<ReplayReceiptV
                 ensure!(adaptation_cost.is_finite() && adaptation_cost >= 0.0,
                     "arm {} adaptation_cost_units must be finite and non-negative", arm.arm_id);
             }
+            if let Some(available_at) = decision.task_loss_available_at_tick {
+                ensure!(available_at >= decision.decision_tick,
+                    "arm {} task_loss_available_at_tick cannot precede decision_tick at tick {}",
+                    arm.arm_id, decision.decision_tick);
+            }
             if receipt.run_kind == "replay" {
                 ensure!(decision.task_loss.is_some(),
                     "replay arm {} is missing task_loss at tick {}", arm.arm_id, decision.decision_tick);
                 ensure!(decision.adaptation_cost_units.is_some(),
                     "replay arm {} is missing adaptation_cost_units at tick {}", arm.arm_id, decision.decision_tick);
+                ensure!(decision.task_loss_available_at_tick.is_some(),
+                    "replay arm {} is missing task_loss_available_at_tick at tick {}", arm.arm_id, decision.decision_tick);
             }
         }
         total_decisions = total_decisions.checked_add(summary.decision_count)
@@ -543,6 +553,7 @@ pub(crate) mod tests {
                     verification_evidence_sha256: if action == "verify" { Some(digest('3')) } else { None },
                     task_loss: None,
                     adaptation_cost_units: None,
+                    task_loss_available_at_tick: None,
                 });
             }
             arms.push(ReplayArm {
