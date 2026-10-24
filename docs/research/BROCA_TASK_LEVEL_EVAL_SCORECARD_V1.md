@@ -88,7 +88,7 @@ These are project decision rules, not industry standards or published SOTA thres
 | Governance | Zero observed unauthorized cross-scope exposures and deletion-resurrection events; stale-memory error rate reported per stratum, with a preregistered upper confidence bound |
 | Reproducibility | Source/dataset/config hashes and exact evaluator/run receipts retained; independent rerun on a fresh process before a performance claim |
 
-For the safety gate, choose the maximum tolerable event rate before observing outcomes. A zero-event sample needs enough independent cases to bound that rate; merely observing zero events is insufficient. The strict limit can be stricter for security/privacy incidents than for ordinary task errors.
+For the safety gate, choose the maximum tolerable event rate before observing outcomes. A zero-event sample needs enough independent cases to bound that rate; merely observing zero events is insufficient. The strict limit can be stricter for security/privacy incidents than for ordinary task errors. With zero observed events, the one-sided 95% exact upper bound is (1 - 0.05^{1/n}): roughly 299 independent cases are needed to put the bound below 1%, and roughly 2,995 to put it below 0.1%. These examples assume independent, representative trials; correlated cases from the same user/session reduce effective evidence, so governance evaluation must count independent groups or use a validated clustered-risk method.
 
 ## Comparison to industry and state of evidence
 
@@ -103,6 +103,8 @@ The field now has several complementary benchmarks; no single one is a complete 
 | [Agent Memory Leaderboard / Cycle 2](https://agentmemories.ai/docs) | Textual, coding and multimodal tracks, with distinct measures including temporal reasoning, memory governance, context execution, and safety/privacy | Candidate external submission after API conformance and model/license requirements are verified; page checked 2026-10-24 lists materials due 2026-10-31 at 23:59 UTC+8, so recheck dates before acting |
 
 The LongMemEval-V2 results page currently lists very different accuracy/latency points, including 1.3% for a no-retrieval reader, 42.8% for query-to-slice RAG, 51.0% for RAG with notes, and 74.9% for AgentRunbook-C on the published Small configuration. These are the benchmark's reported rows, not HDC targets or automatically fair head-to-head comparisons: model, agent, budget, and latency differ. Use them to motivate a frontier, not to claim superiority by placing one raw number beside another. The official results page and evaluator version must be pinned in any actual report.
+
+The official Agent Memory Leaderboard's Cycle 1 public preview lists MemoraX at 58.02 overall, with explicit fact recall at 89.89 but context learning/execution at 29.99; other dimensions include temporal reasoning, governance, personalization and safety/privacy. This is a useful reminder that strong recall does not imply strong execution. Those leaderboard scores belong to its own versioned pipeline and are not numerically comparable to our percentage-point lift or store-level Recall@K. Open-source Methods and Commercial Products are separate tracks; compare within the same track and evaluation cycle. See the [official leaderboard](https://agentmemories.ai/) and [Cycle 2 guide](https://agentmemoryleaderboard.ai/home), checked 2026-10-24.
 
 ### Matched industry baseline matrix
 
