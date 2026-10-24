@@ -507,8 +507,11 @@ fn structured_correction_basis(
             } else {
                 UnaryFn::Cos
             };
-            let oscillatory =
-                Expr::BinOp(BinOp::Mul, Box::new(energy_scale), Box::new(Expr::Func(unary, Box::new(phase))));
+            let oscillatory = Expr::BinOp(
+                BinOp::Mul,
+                Box::new(energy_scale),
+                Box::new(Expr::Func(unary, Box::new(phase))),
+            );
             Expr::BinOp(BinOp::Sub, Box::new(oscillatory), Box::new(base.clone()))
         }
         RecoveryProposalFamily::GenericTyped => return None,
