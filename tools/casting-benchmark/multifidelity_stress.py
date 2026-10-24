@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import random
 import statistics
 from dataclasses import asdict, dataclass
 from typing import Iterable
@@ -158,6 +159,18 @@ class PolicyEvaluator:
         self._promotion_basis: dict[int, tuple[float, str]] = {}
 
     @property
+    def cost_budget(self) -> int:
+        return self._cost_budget
+
+    @property
+    def remaining_budget(self) -> int:
+        return self._cost_budget - self._cost_spent
+
+    @property
+    def fidelity_costs(self) -> dict[str, int]:
+        return self._world.fidelity_costs
+
+    @property
     def candidate_ids(self) -> tuple[int, ...]:
         return self._world.candidate_ids
 
@@ -233,6 +246,8 @@ def required_policy_costs(costs: dict[str, int] | None = None) -> dict[str, int]
         "low_screen": 75 * c["low"] + 5 * c["high"],
         "fixed_top_k": 50 * c["low"] + 10 * c["medium"] + 4 * c["high"],
         "discrepancy_aware": 55 * c["low"] + 4 * c["medium"] + 5 * c["high"],
+        # Minimum viable adaptive allocation: five screens, two medium probes, two high calls.
+        "adaptive_budget": 5 * c["low"] + 2 * c["medium"] + 2 * c["high"],
     }
 
 
@@ -420,11 +435,114 @@ def discrepancy_aware_policy(evaluator: PolicyEvaluator, seed: int) -> None:
         evaluator.evaluate(candidate_id, "high")
 
 
+def adaptive_budget_policy(evaluator: PolicyEvaluator, seed: int) -> None:
+    """Allocate a fixed cost cap dynamically across low/medium/high fidelity.
+
+    The policy reserves two high-fidelity calls for paired discrepancy anchors, then
+    uses a fixed cost-share heuristic for screening and medium-fidelity probes. It is
+    a transparent engineering baseline, not a Bayesian-optimization SOTA method.
+    """
+    costs = evaluator.fidelity_costs
+    budget = evaluator.cost_budget
+    low_target = min(75, max(5, int((budget * 0.30) // costs["low"])))
+    low_target = min(low_target, len(evaluator.candidate_ids))
+    low_ids = deterministic_sample(evaluator.candidate_ids, low_target, seed)
+    low = _evaluate_sample(evaluator, low_ids, "low")
+
+    reserved_high_calls = min(2, budget // costs["high"])
+    reserved_high_cost = reserved_high_calls * costs["high"]
+    medium_target = min(10, max(2, int((budget * 0.20) // costs["medium"])))
+    medium_target = min(medium_target, len(low))
+    affordable_medium = max(
+        0,
+        (budget - len(low) * costs["low"] - reserved_high_cost) // costs["medium"],
+    )
+    medium_target = min(medium_target, affordable_medium)
+    if medium_target < 1:
+        # The fixed policy-budget precondition should prevent this for supported runs.
+        raise ValueError("budget cannot afford a medium-fidelity probe after reservations")
+
+    nearest_boundary = sorted(low, key=lambda obs: abs(obs.constraint_margin))
+    low_f0 = min(low, key=lambda obs: obs.objectives[0])
+    low_f1 = min(low, key=lambda obs: obs.objectives[1])
+    medium_ids: list[int] = []
+    for candidate_id in (
+        [obs.candidate_id for obs in nearest_boundary[:2]]
+        + [low_f0.candidate_id, low_f1.candidate_id]
+    ):
+        if candidate_id not in medium_ids and len(medium_ids) < medium_target:
+            medium_ids.append(candidate_id)
+    for candidate_id, _ in select_diverse(
+        low, min(medium_target, len(low)), weights=(0.0, 0.25, 0.5, 0.75, 1.0)
+    ):
+        if candidate_id not in medium_ids and len(medium_ids) < medium_target:
+            medium_ids.append(candidate_id)
+    medium = _evaluate_sample(evaluator, medium_ids, "medium")
+    medium_by_id = {obs.candidate_id: obs for obs in medium}
+    low_by_id = {obs.candidate_id: obs for obs in low}
+
+    high_slots = min(len(low), evaluator.remaining_budget // costs["high"])
+    if high_slots < 1 or not medium:
+        return
+    anchor_count = min(2, high_slots, len(medium))
+    anchors = select_diverse(medium, anchor_count)
+    high_anchors: list[Observation] = []
+    for candidate_id, margin in anchors:
+        evaluator.record_promotion_basis(candidate_id, margin, "adaptive_discrepancy_anchor")
+        high_anchors.append(evaluator.evaluate(candidate_id, "high"))
+
+    # Paired low->medium and medium->high corrections are estimated only from observed pairs.
+    delta_f0 = statistics.fmean(
+        high.objectives[0] - medium_by_id[high.candidate_id].objectives[0]
+        for high in high_anchors
+    )
+    delta_f1 = statistics.fmean(
+        high.objectives[1] - medium_by_id[high.candidate_id].objectives[1]
+        for high in high_anchors
+    )
+    delta_margin = statistics.fmean(
+        high.constraint_margin - medium_by_id[high.candidate_id].constraint_margin
+        for high in high_anchors
+    )
+    mean_d0 = statistics.fmean(
+        medium_obs.objectives[0] - low_by_id[medium_obs.candidate_id].objectives[0]
+        for medium_obs in medium
+    )
+    mean_d1 = statistics.fmean(
+        medium_obs.objectives[1] - low_by_id[medium_obs.candidate_id].objectives[1]
+        for medium_obs in medium
+    )
+    mean_dm = statistics.fmean(
+        medium_obs.constraint_margin - low_by_id[medium_obs.candidate_id].constraint_margin
+        for medium_obs in medium
+    )
+    corrected = {
+        obs.candidate_id: (
+            obs.objectives[0] + mean_d0 + delta_f0,
+            obs.objectives[1] + mean_d1 + delta_f1,
+            obs.constraint_margin + mean_dm + delta_margin,
+        )
+        for obs in low
+    }
+
+    anchor_ids = {obs.candidate_id for obs in high_anchors}
+    promotion_candidates = [obs for obs in low if obs.candidate_id not in anchor_ids]
+    promotion_count = min(max(0, high_slots - len(high_anchors)), len(promotion_candidates))
+    promotions = select_diverse(
+        promotion_candidates, promotion_count,
+        weights=(0.0, 0.25, 0.5, 0.75, 1.0), corrected=corrected,
+    )
+    for candidate_id, margin in promotions:
+        evaluator.record_promotion_basis(candidate_id, margin, "adaptive_cost_aware_corrected")
+        evaluator.evaluate(candidate_id, "high")
+
+
 POLICIES = {
     "high_only": high_only_policy,
     "low_screen": low_screen_policy,
     "fixed_top_k": fixed_top_k_policy,
     "discrepancy_aware": discrepancy_aware_policy,
+    "adaptive_budget": adaptive_budget_policy,
 }
 
 
@@ -555,16 +673,81 @@ def _percentile(values: list[float], q: float) -> float:
     return ordered[lower] * (1.0 - fraction) + ordered[upper] * fraction
 
 
+def _paired_bootstrap_mean_interval(
+    differences: list[float], bootstrap_samples: int = 2000, seed: int = 1729,
+) -> tuple[float, float]:
+    """Percentile bootstrap interval for the mean of seed-paired policy differences."""
+    if not differences:
+        raise ValueError("paired bootstrap requires at least one difference")
+    if bootstrap_samples < 100:
+        raise ValueError("bootstrap_samples must be at least 100")
+    rng = random.Random(seed)
+    count = len(differences)
+    bootstrap_means = [
+        statistics.fmean(differences[rng.randrange(count)] for _ in range(count))
+        for _ in range(bootstrap_samples)
+    ]
+    return _percentile(bootstrap_means, 0.025), _percentile(bootstrap_means, 0.975)
+
+
+def _paired_comparisons(
+    runs: list[dict], seeds: tuple[int, ...], severities: tuple[float, ...],
+    fidelity_costs: dict[str, int], bootstrap_samples: int,
+) -> list[dict]:
+    indexed = {
+        (float(row["severity"]), int(row["seed"]), str(row["policy"])): row
+        for row in runs
+    }
+    comparisons: list[dict] = []
+    for severity in severities:
+        for policy in POLICIES:
+            if policy == "high_only":
+                continue
+            differences = [
+                float(indexed[(severity, seed, policy)]["normalized_hypervolume_fraction"])
+                - float(indexed[(severity, seed, "high_only")]["normalized_hypervolume_fraction"])
+                for seed in seeds
+            ]
+            bootstrap_seed = (
+                1729 + int(round(severity * 1_000_000))
+                + sum(ord(char) for char in policy) + sum(fidelity_costs.values())
+            )
+            ci_low, ci_high = _paired_bootstrap_mean_interval(
+                differences, bootstrap_samples=bootstrap_samples, seed=bootstrap_seed
+            )
+            comparisons.append({
+                "reference_policy": "high_only",
+                "policy": policy,
+                "severity": severity,
+                "paired_seed_count": len(differences),
+                "mean_paired_hypervolume_fraction_delta": statistics.fmean(differences),
+                "median_paired_hypervolume_fraction_delta": statistics.median(differences),
+                "bootstrap_95_ci_mean_delta": {"lower": ci_low, "upper": ci_high},
+                "wins": sum(value > 1e-12 for value in differences),
+                "ties": sum(abs(value) <= 1e-12 for value in differences),
+                "losses": sum(value < -1e-12 for value in differences),
+                "bootstrap_samples": bootstrap_samples,
+                "uncertainty_note": (
+                    "Exploratory paired-seed percentile-bootstrap interval; not adjusted for "
+                    "multiple comparisons and not evidence of SOTA or physical casting validity."
+                ),
+            })
+    return comparisons
+
+
 def run_sweep(
     seeds: Iterable[int] = (17, 23, 29, 31, 37, 41, 43, 47, 53, 59),
     severities: Iterable[float] = (0.0, 0.5, 1.0, 1.5, 2.0),
     cost_budget: int | None = None,
     grid_size: int = DEFAULT_GRID_SIZE,
     fidelity_costs: dict[str, int] | None = None,
+    bootstrap_samples: int = 2000,
 ) -> dict:
     """Paired seed x severity sweep; all policies see the same deterministic candidate pool."""
     seed_values = tuple(seeds)
     severity_values = tuple(float(v) for v in severities)
+    if bootstrap_samples < 100:
+        raise ValueError("bootstrap_samples must be at least 100")
     if not seed_values or len(set(seed_values)) != len(seed_values):
         raise ValueError("sweep seeds must be non-empty and unique")
     if not severity_values or any(not math.isfinite(v) or v < 0.0 for v in severity_values):
@@ -617,12 +800,118 @@ def run_sweep(
         "seeds": list(seed_values),
         "severities": list(severity_values),
         "summary_by_policy_and_severity": summaries,
+        "paired_comparisons_vs_high_only": _paired_comparisons(
+            runs, seed_values, severity_values, costs, bootstrap_samples
+        ),
         "paired_runs": runs,
+        "bootstrap_samples": bootstrap_samples,
         "warning": (
-            "Synthetic finite-pool stress test only. Policy comparisons are descriptive until "
-            "repeated-seed uncertainty analysis and locked MF-HVKG/MOMF baselines are included."
+            "Synthetic finite-pool stress test only. Paired bootstrap intervals are exploratory "
+            "and unadjusted; external MF-HVKG/MOMF baselines and physical validation are absent."
         ),
     }
+
+
+DEFAULT_COST_SCHEDULES = (
+    {"low": 1, "medium": 5, "high": 25},
+    {"low": 1, "medium": 10, "high": 50},
+    {"low": 1, "medium": 20, "high": 100},
+)
+
+
+def _cost_schedule_id(costs: dict[str, int]) -> str:
+    return "_".join(f"{name}_{costs[name]}" for name in FIDELITY_NAMES)
+
+
+def run_cost_sweep(
+    seeds: Iterable[int] = (17, 23, 29, 31, 37, 41, 43, 47, 53, 59),
+    severities: Iterable[float] = (0.0, 0.5, 1.0, 1.5, 2.0),
+    cost_schedules: Iterable[dict[str, int]] = DEFAULT_COST_SCHEDULES,
+    cost_budget: int | None = None,
+    grid_size: int = DEFAULT_GRID_SIZE,
+    bootstrap_samples: int = 2000,
+) -> dict:
+    """Compare fidelity-cost schedules under one common absolute cost cap."""
+    seed_values = tuple(seeds)
+    severity_values = tuple(float(value) for value in severities)
+    schedule_values = tuple(normalize_fidelity_costs(value) for value in cost_schedules)
+    if not seed_values or len(set(seed_values)) != len(seed_values):
+        raise ValueError("cost sweep seeds must be non-empty and unique")
+    if not severity_values or any(not math.isfinite(v) or v < 0.0 for v in severity_values):
+        raise ValueError("cost sweep severities must be non-empty finite non-negative values")
+    if not schedule_values:
+        raise ValueError("cost_schedules must be non-empty")
+    schedule_ids = [_cost_schedule_id(costs) for costs in schedule_values]
+    if len(set(schedule_ids)) != len(schedule_ids):
+        raise ValueError("cost_schedules must be unique")
+    if bootstrap_samples < 100:
+        raise ValueError("bootstrap_samples must be at least 100")
+
+    required_budget = max(max(required_policy_costs(costs).values()) for costs in schedule_values)
+    if cost_budget is None:
+        cost_budget = required_budget
+    if cost_budget < required_budget:
+        raise ValueError(
+            f"cost_budget must be at least {required_budget} to accommodate every cost schedule"
+        )
+
+    scenarios: list[dict] = []
+    all_runs: list[dict] = []
+    all_summaries: list[dict] = []
+    all_comparisons: list[dict] = []
+    for schedule_id, costs in zip(schedule_ids, schedule_values):
+        result = run_sweep(
+            seeds=seed_values, severities=severity_values, cost_budget=cost_budget,
+            grid_size=grid_size, fidelity_costs=costs, bootstrap_samples=bootstrap_samples,
+        )
+        scenarios.append({
+            "id": schedule_id,
+            "fidelity_costs": costs,
+            "cost_budget": cost_budget,
+            "fixed_policy_template_costs": required_policy_costs(costs),
+        })
+        all_runs.extend({**row, "cost_schedule_id": schedule_id} for row in result["paired_runs"])
+        all_summaries.extend({
+            **row, "cost_schedule_id": schedule_id, "fidelity_costs": costs,
+            "cost_budget": cost_budget,
+        } for row in result["summary_by_policy_and_severity"])
+        all_comparisons.extend({
+            **row, "cost_schedule_id": schedule_id, "fidelity_costs": costs,
+            "cost_budget": cost_budget,
+        } for row in result["paired_comparisons_vs_high_only"])
+
+    return {
+        "benchmark_id": "CASTING-MF-STRESS-001",
+        "synthetic_fixture_only": True,
+        "cost_budget": cost_budget,
+        "budget_rule": "One common absolute maximum cost cap across every supplied fidelity-cost schedule.",
+        "grid_size": grid_size,
+        "seeds": list(seed_values),
+        "severities": list(severity_values),
+        "cost_schedules": scenarios,
+        "summary_by_schedule_severity_policy": all_summaries,
+        "paired_comparisons_vs_high_only": all_comparisons,
+        "paired_runs": all_runs,
+        "bootstrap_samples": bootstrap_samples,
+        "warning": (
+            "Synthetic finite-pool stress test only. Fixed-template baselines may leave budget unused "
+            "under changed cost ratios; report actual costs and high-fidelity calls. Paired intervals "
+            "are exploratory and unadjusted. No external SOTA baseline or physical validation is included."
+        ),
+    }
+
+
+def parse_fidelity_costs(raw: str) -> dict[str, int]:
+    parsed: dict[str, int] = {}
+    for entry in raw.split(","):
+        if "=" not in entry:
+            raise ValueError("each fidelity cost must use name=integer format")
+        name, raw_value = entry.split("=", 1)
+        name = name.strip()
+        if name in parsed:
+            raise ValueError(f"duplicate fidelity cost: {name}")
+        parsed[name] = int(raw_value.strip())
+    return normalize_fidelity_costs(parsed)
 
 
 def main() -> int:
@@ -638,20 +927,38 @@ def main() -> int:
                         help="comma-separated paired seeds; enables severity sweep")
     parser.add_argument("--sweep-severities", type=str, default="0,0.5,1,1.5,2",
                         help="comma-separated non-negative discrepancy severity values")
+    parser.add_argument(
+        "--sweep-cost-schedules", type=str, default=None,
+        help=("semicolon-separated fidelity-cost maps; each map is comma-separated, e.g. "
+              "'low=1,medium=5,high=25;low=1,medium=10,high=50'"),
+    )
+    parser.add_argument("--bootstrap-samples", type=int, default=2000,
+                        help="paired mean-difference percentile-bootstrap resamples (minimum 100)")
     args = parser.parse_args()
-    parsed_costs: dict[str, int] = {}
-    for entry in args.fidelity_costs.split(","):
-        if "=" not in entry:
-            raise ValueError("each fidelity cost must use name=integer format")
-        name, raw_value = entry.split("=", 1)
-        if name.strip() in parsed_costs:
-            raise ValueError(f"duplicate fidelity cost: {name.strip()}")
-        parsed_costs[name.strip()] = int(raw_value.strip())
-    costs = normalize_fidelity_costs(parsed_costs)
-    if args.sweep_seeds is not None:
+    costs = parse_fidelity_costs(args.fidelity_costs)
+    severities = [float(value.strip()) for value in args.sweep_severities.split(",") if value.strip()]
+    if args.sweep_cost_schedules is not None:
+        schedule_strings = [value.strip() for value in args.sweep_cost_schedules.split(";") if value.strip()]
+        if not schedule_strings:
+            raise ValueError("--sweep-cost-schedules requires at least one schedule")
+        schedules = [parse_fidelity_costs(value) for value in schedule_strings]
+        seeds = (
+            [17, 23, 29, 31, 37, 41, 43, 47, 53, 59]
+            if args.sweep_seeds is None else
+            [int(value.strip()) for value in args.sweep_seeds.split(",") if value.strip()]
+        )
+        result = run_cost_sweep(
+            seeds=seeds, severities=severities, cost_schedules=schedules,
+            cost_budget=args.cost_budget, grid_size=args.grid_size,
+            bootstrap_samples=args.bootstrap_samples,
+        )
+    elif args.sweep_seeds is not None:
         seeds = [int(value.strip()) for value in args.sweep_seeds.split(",") if value.strip()]
-        severities = [float(value.strip()) for value in args.sweep_severities.split(",") if value.strip()]
-        result = run_sweep(seeds, severities, args.cost_budget, args.grid_size, costs)
+        result = run_sweep(
+            seeds=seeds, severities=severities, cost_budget=args.cost_budget,
+            grid_size=args.grid_size, fidelity_costs=costs,
+            bootstrap_samples=args.bootstrap_samples,
+        )
     else:
         result = run_suite(args.seed, args.cost_budget, args.grid_size, args.severity, costs)
     print(json.dumps(result, sort_keys=True, indent=2, allow_nan=False))
