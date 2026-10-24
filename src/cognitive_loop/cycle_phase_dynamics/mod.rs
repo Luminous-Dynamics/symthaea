@@ -373,8 +373,14 @@ impl CognitiveLoopService {
         cycle_start: Instant,
         module_timings: &mut super::ModuleTimings,
     ) -> DynamicsPhaseResult {
-        let prediction_error = perception.urgency.prediction_error;
-        let prediction_error_valid = perception.urgency.prediction_error_valid;
+        // Preserve the compatibility numeric payload for diagnostics, but
+        // derive PE usability only from the typed evidence for this cycle.
+        let prediction_error = perception.encoding.encoding_result.prediction_error;
+        let prediction_error_valid = perception
+            .urgency
+            .prediction_evidence
+            .value_for_observation(self.stats.total_cycles as u64)
+            .is_some();
         let urgency = perception.urgency.urgency;
         let phi_attention_weight = perception.encoding.phi_attention_weight;
         let surprise_triggered = perception.exploration.surprise_triggered;
