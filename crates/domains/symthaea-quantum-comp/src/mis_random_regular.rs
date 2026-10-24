@@ -225,6 +225,30 @@ mod tests {
     }
 
     #[test]
+    fn seeded_graph_matches_independent_javascript_reference_fixture() {
+        // Frozen from QCOMP-RRG-CLASSICAL-PREFLIGHT-001.json:
+        // N=50, degree=3, seed=202660230150, accepted pairing attempt=5.
+        // FNV-1a is a regression fingerprint only, not cryptographic provenance.
+        let config = MisRandomRegularConfig::new(50, 3, 202_660_230_150);
+        let (graph, report) = generate_mis_random_regular(config).unwrap();
+        assert_eq!(report.attempts, 5);
+        assert_eq!(graph.vertex_count(), 50);
+        assert_eq!(graph.edges().len(), 75);
+        assert!(degrees(&graph).iter().all(|&degree| degree == 3));
+
+        let mut canonical = format!("p edge {} {}\n", graph.vertex_count(), graph.edges().len()).into_bytes();
+        for &(u, v) in graph.edges() {
+            canonical.extend_from_slice(format!("e {} {}\n", u + 1, v + 1).as_bytes());
+        }
+        let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+        for byte in canonical {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        assert_eq!(format!("{hash:016x}"), "5ef6d3ec4c3dea16");
+    }
+
+    #[test]
     fn same_seed_replays_identical_graph_and_report() {
         let config = MisRandomRegularConfig::new(100, 3, 123_456);
         assert_eq!(generate_mis_random_regular(config).unwrap(),
