@@ -21,6 +21,8 @@ fi
 SOURCE_SHA="$(git rev-parse HEAD)"
 SIZES_TEXT="${SIZES:-1000 10000 50000}"
 read -r -a SIZES_ARRAY <<< "$SIZES_TEXT"
+SEEDS_TEXT="${SEEDS:-42 43 44}"
+read -r -a SEEDS_ARRAY <<< "$SEEDS_TEXT"
 QUERIES="${QUERIES:-200}"
 ROUNDS="${ROUNDS:-5}"
 TOP_K="${TOP_K:-10}"
@@ -38,6 +40,16 @@ if [[ ${#SIZES_ARRAY[@]} -eq 0 ]]; then
   echo "SIZES must contain at least one positive store size" >&2
   exit 2
 fi
+if [[ ${#SEEDS_ARRAY[@]} -eq 0 ]]; then
+  echo "SEEDS must contain at least one non-negative integer" >&2
+  exit 2
+fi
+for seed_value in "${SEEDS_ARRAY[@]}"; do
+  if [[ ! "$seed_value" =~ ^[0-9]+$ ]]; then
+    echo "SEEDS entries must be non-negative integers; got '$seed_value'" >&2
+    exit 2
+  fi
+done
 for value in "$QUERIES" "$ROUNDS" "$TOP_K" "$CLUSTERS" "$CLUSTER_NOISE_BITS" "$NOISE_BITS" "$HARD_NOISE_BITS" "$CANDIDATE_MULTIPLIER"; do
   if [[ ! "$value" =~ ^[0-9]+$ ]]; then
     echo "numeric sweep settings must be non-negative integers; got '$value'" >&2
@@ -87,8 +99,9 @@ write_environment_receipt() {
 }
 
 for SIZE in "${SIZES_ARRAY[@]}"; do
+  for RUN_SEED in "${SEEDS_ARRAY[@]}"; do
   for FALLBACK in true false; do
-    STEM="broca-ann-sha-${SOURCE_SHA}-n${SIZE}-q${QUERIES}-r${ROUNDS}-k${TOP_K}-seed${SEED}-empty-fallback-${FALLBACK}"
+    STEM="broca-ann-sha-${SOURCE_SHA}-n${SIZE}-q${QUERIES}-r${ROUNDS}-k${TOP_K}-seed${RUN_SEED}-empty-fallback-${FALLBACK}"
     OUTPUT="$OUT_DIR/$STEM.csv"
     STDERR="$OUT_DIR/$STEM.stderr.log"
     RECEIPT="$OUT_DIR/$STEM.receipt.txt"
@@ -102,7 +115,7 @@ for SIZE in "${SIZES_ARRAY[@]}"; do
       "--queries=$QUERIES"
       "--rounds=$ROUNDS"
       "--top-k=$TOP_K"
-      "--seed=$SEED"
+      "--seed=$RUN_SEED"
       "--candidate-multiplier=$CANDIDATE_MULTIPLIER"
       "--fallback-on-empty=$FALLBACK"
       "--lsh-configs=$LSH_CONFIGS"
@@ -130,6 +143,7 @@ for SIZE in "${SIZES_ARRAY[@]}"; do
     fi
     echo "wrote $OUTPUT"
   done
+  done
 done
 
-echo "Sweep complete. Preserve CSVs, receipts, exact source SHA, and full command output together."
+echo "Sweep complete. Preserve CSVs, stderr logs, receipts, exact source SHA, and full command output together."
