@@ -1,0 +1,18 @@
+META	action_count	9
+META	dataset_id	synthetic-dvpc-020
+META	dataset_revision	v1
+META	experiment_id	dvpc020-synthetic-v1
+META	format	VIS-DVPC-020-ORACLE-001-v1
+META	oracle_scope	SYNTHETIC_ONLY_POST_SELECTION_SCORING
+META	source_actions_sha256	54d3d4352af0501297faeff8eeb7176a2afbadd31531bf604b0247e894593f30
+META	split	EVALUATOR_PRIVATE
+ORACLE_HEADER	action_id	realized_regret_reduction	actual_latency_us	actual_energy_uj	terminal_state
+ORACLE	irrelevant-high-uncertainty	0	80	80	SUCCESS
+ORACLE	targeted-boundary	0.25	20	20	SUCCESS
+ORACLE	paired-cluster	0.20	25	25	SUCCESS
+ORACLE	calibrate-meter	0	15	22	FAILED
+ORACLE	low-cost-replay	0	10	10	SUCCESS
+ORACLE	shift-replication	-0.15	20	30	SUCCESS
+ORACLE	unauthorized-source	0	1	1	SUCCESS
+ORACLE	sealed-test	0	1	1	SUCCESS
+ORACLE	no-info-action	0	10	10	SUCCESS
