@@ -450,7 +450,14 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
             let dispersion_feature: Vec<f64> = (0..=n)
                 .map(|j| (2.0 * j as f64 / n as f64 - 1.0).abs() - 0.5)
                 .collect();
-            let mut rank_counts = vec![0usize; n + 1];
+            let base_order_sum = order_feature.iter().sum::<f64>();
+            let base_dispersion_sum = dispersion_feature.iter().sum::<f64>();
+            ensure!(
+                base_order_sum.is_finite() && base_dispersion_sum.is_finite(),
+                "PRM base feature sums became non-finite"
+            );
+            let mut history_order_sum = 0.0_f64;
+            let mut history_dispersion_sum = 0.0_f64;
             // order+, order-, dispersion+, dispersion-
             let betting_lambdas = [0.5_f64, -0.5, 0.5, -0.5];
             let mut wealth = [1.0_f64; 4];
@@ -465,27 +472,34 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                     continue;
                 }
                 let value = observation.value.expect("validated numeric PE");
-                ensure!(
-                    !reference.iter().any(|item| item.value == value && item.tie_key == tie_key),
-                    "PRM tie-break collision; rerun with a different independent benchmark seed"
-                );
                 let rank_index = reference.partition_point(|item| {
                     item.value < value || (item.value == value && item.tie_key < tie_key)
                 });
                 ensure!(rank_index <= n, "PRM rank index is outside the calibration grid");
+                // A tie-key collision can only be adjacent to the lower-bound rank in
+                // the sorted reference; check those neighbors instead of rescanning n.
+                let tie_collision = (rank_index > 0
+                    && reference[rank_index - 1].value == value
+                    && reference[rank_index - 1].tie_key == tie_key)
+                    || (rank_index < n
+                        && reference[rank_index].value == value
+                        && reference[rank_index].tie_key == tie_key);
+                ensure!(
+                    !tie_collision,
+                    "PRM tie-break collision; rerun with a different independent benchmark seed"
+                );
                 let denominator = n
                     .checked_add(processed)
                     .and_then(|value| value.checked_add(1))
                     .context("PRM predictive denominator overflowed")? as f64;
                 ensure!(denominator.is_finite() && denominator > 0.0, "PRM denominator invalid");
 
-                let mut expected_order = 0.0_f64;
-                let mut expected_dispersion = 0.0_f64;
-                for j in 0..=n {
-                    let pi = (1.0 + rank_counts[j] as f64) / denominator;
-                    expected_order += pi * order_feature[j];
-                    expected_dispersion += pi * dispersion_feature[j];
-                }
+                // E[h(R_t) | past ranks] = (sum_j h(j) + sum_{s<t} h(R_s)) / (n+t).
+                // Maintaining the history sums makes each update O(log n) for ranking
+                // plus O(1) arithmetic, rather than rescanning the full calibration grid.
+                let expected_order = (base_order_sum + history_order_sum) / denominator;
+                let expected_dispersion =
+                    (base_dispersion_sum + history_dispersion_sum) / denominator;
                 ensure!(
                     expected_order.is_finite() && expected_dispersion.is_finite(),
                     "PRM predictive feature expectation became non-finite"
@@ -509,7 +523,6 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                 }
                 let portfolio_wealth = wealth.iter().sum::<f64>() / 4.0;
                 ensure!(portfolio_wealth.is_finite(), "PRM portfolio wealth overflowed");
-                processed += 1;
                 if portfolio_wealth >= wealth_threshold {
                     detections.push(Detection {
                         cycle_index: observation.cycle_index,
@@ -520,9 +533,13 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                     // epoch or a separately validated alpha-spending construction.
                     break;
                 }
-                rank_counts[rank_index] = rank_counts[rank_index]
-                    .checked_add(1)
-                    .context("PRM rank count overflowed")?;
+                history_order_sum += order_feature[rank_index];
+                history_dispersion_sum += dispersion_feature[rank_index];
+                ensure!(
+                    history_order_sum.is_finite() && history_dispersion_sum.is_finite(),
+                    "PRM history feature sums became non-finite"
+                );
+                processed = processed.checked_add(1).context("PRM processed count overflowed")?;
             }
             Ok(("predictive-rank-martingale-portfolio".to_owned(), detections))
         }
