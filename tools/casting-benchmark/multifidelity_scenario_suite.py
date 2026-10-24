@@ -120,6 +120,7 @@ class MultiFidelityScenario:
         severity: float = 1.0,
         seed: int = 17,
         fidelity_costs: dict[str, int] | None = None,
+        design_count: int = DEFAULT_DESIGN_COUNT,
     ) -> None:
         if scenario_id not in SUPPORTED_SCENARIOS:
             raise ValueError(f"unknown scenario_id: {scenario_id}")
@@ -127,6 +128,8 @@ class MultiFidelityScenario:
             raise ValueError(f"dimension must be one of {SUPPORTED_DIMENSIONS}")
         if not math.isfinite(severity) or severity < 0.0:
             raise ValueError("severity must be finite and non-negative")
+        if design_count < 8:
+            raise ValueError("design_count must be at least 8")
         if isinstance(seed, bool) or not isinstance(seed, int):
             raise ValueError("seed must be an integer")
         costs = dict(FIDELITY_COSTS) if fidelity_costs is None else dict(fidelity_costs)
@@ -139,7 +142,7 @@ class MultiFidelityScenario:
         self.severity = severity
         self.seed = seed
         self._costs = costs
-        self._designs = halton_designs(DEFAULT_DESIGN_COUNT, dimension, seed)
+        self._designs = halton_designs(design_count, dimension, seed)
         self._by_id = {design.candidate_id: design for design in self._designs}
 
     @property
@@ -275,8 +278,12 @@ def audit_scenario(
     fidelity_costs: dict[str, int] | None = None,
 ) -> dict:
     """Measure fidelity mismatch against known truth; no optimizer is run by this function."""
-    world = MultiFidelityScenario(scenario_id, dimension, severity, seed, fidelity_costs)
-    designs = halton_designs(design_count, dimension, seed)
+    if design_count < 8:
+        raise ValueError("design_count must be at least 8")
+    world = MultiFidelityScenario(
+        scenario_id, dimension, severity, seed, fidelity_costs, design_count=design_count
+    )
+    designs = world.designs
     high = [world.truth_for_audit_only(design.candidate_id) for design in designs]
     reports: dict[str, dict] = {}
 
@@ -284,7 +291,6 @@ def audit_scenario(
         observations = [world.evaluate(design.candidate_id, fidelity) for design in designs]
         rank_total = 0
         rank_inversions = 0
-        pair_count = design_count * (design_count - 1) // 2
         for i, j in itertools.combinations(range(design_count), 2):
             for objective_index in range(2):
                 lhs = observations[i].objectives[objective_index] - observations[j].objectives[objective_index]
