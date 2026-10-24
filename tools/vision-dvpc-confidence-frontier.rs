@@ -464,16 +464,14 @@ fn classify(receipt: &Receipt, bands: &Bands) -> Vec<Classified> {
         }
         let mut certified_dominators = Vec::new();
         let mut possible_dominators = Vec::new();
-        let mut equivalent_predecessor = None;
+        let mut equivalent_points = Vec::new();
         for other in &points {
             if other.key() == point.key() || !other.eligible() {
                 continue;
             }
             let other_band = bands.values[&other.key()];
             if exact_equivalent(other, other_band, point, band) {
-                if other.key() < point.key() {
-                    equivalent_predecessor = Some(other.label());
-                }
+                equivalent_points.push(other.label());
                 continue;
             }
             if certainly_dominates(other, other_band, point, band) {
@@ -488,8 +486,9 @@ fn classify(receipt: &Receipt, bands: &Bands) -> Vec<Classified> {
             ("BAND_DOMINATED", "SIMULTANEOUS_UTILITY_BANDS_AND_RESOURCES_ESTABLISH_DOMINANCE", first.clone())
         } else if !possible_dominators.is_empty() {
             ("UNRESOLVED", "POTENTIAL_DOMINATOR_CANNOT_BE_CONFIRMED_OR_EXCLUDED_FROM_INTERVALS", possible_dominators.join(";"))
-        } else if let Some(first) = equivalent_predecessor {
-            ("DUPLICATE_EQUIVALENT", "IDENTICAL_INTERVALS_AND_RESOURCE_VALUES;LEXICOGRAPHIC_REPRESENTATIVE_RETAINED", first)
+        } else if !equivalent_points.is_empty() {
+            equivalent_points.sort();
+            ("DUPLICATE_EQUIVALENT", "IDENTICAL_ESTIMATE_INTERVAL_AND_RESOURCE_CLASS;NO_UNIQUE_WINNER_CLAIMED", equivalent_points.join(";"))
         } else {
             ("BAND_NONDOMINATED", "NO_ELIGIBLE_POINT_CAN_DOMINATE_UNDER_SUPPLIED_SIMULTANEOUS_BANDS", "-".to_owned())
         };
