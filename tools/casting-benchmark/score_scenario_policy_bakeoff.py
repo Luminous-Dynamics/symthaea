@@ -465,6 +465,27 @@ def score_document(
         errors.append("scenario manifest benchmark id mismatch")
     if policy_manifest.get("benchmark_id") != "CASTING-MF-POLICY-SCENARIOS-001":
         errors.append("policy manifest benchmark id mismatch")
+    locked_scenarios = [
+        item.get("id") for item in scenario_manifest.get("scenarios", [])
+        if isinstance(item, dict)
+    ]
+    if locked_scenarios != list(SUPPORTED_SCENARIOS):
+        errors.append("scenario registry order/content differs from supported scenario code")
+    locked_dimensions = scenario_manifest.get("design_space", {}).get("dimensions_supported")
+    if locked_dimensions != list(SUPPORTED_DIMENSIONS):
+        errors.append("scenario dimension contract differs from supported dimension code")
+    locked_reference = policy_manifest.get("objective_and_scoring", {}).get("reference_point")
+    if locked_reference != list(REFERENCE_POINT):
+        errors.append("hypervolume reference point differs from frozen scoring contract")
+    required_policy_order = [
+        "high_only", "low_screen", "fixed_top_k", "discrepancy_aware", "adaptive_budget"
+    ]
+    required_policies_from_manifest = [
+        item.get("id") for item in policy_manifest.get("policies", [])
+        if isinstance(item, dict)
+    ]
+    if required_policies_from_manifest != required_policy_order:
+        errors.append("policy manifest order/content differs from the scorer's frozen call templates")
 
     scenarios = document["scenario_ids"]
     dimensions = document["dimensions"]
