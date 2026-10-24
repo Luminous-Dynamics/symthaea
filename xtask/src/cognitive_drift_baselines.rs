@@ -417,6 +417,10 @@ fn detect(input: &ScalarDriftRunInput) -> anyhow::Result<(String, Vec<Detection>
                 ensure!(running_mean.is_finite(), "Page-Hinkley running mean became non-finite");
 
                 if latched {
+                    // A latched alarm has reset the running statistic to zero; expose
+                    // that actual terminal state in diagnostics rather than the last
+                    // pre-alarm threshold-crossing value.
+                    final_deviation = Some(0.0);
                     if value <= rearm_level {
                         latched = false;
                         cumulative = 0.0;
