@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cropfoundry-nutrition-portfolio-input-v0.schema.json",
+  "title": "CropFoundry nutrition portfolio input v0",
+  "description": "Multiple options compared on a declared basis. Each record conforms to the row-level nutrition accounting contract; resource ledgers are checked and counted once per batch.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "portfolio_id",
+    "comparison_basis",
+    "expected_nutrient_ids",
+    "options",
+    "comparison_basis_evidence_uri"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cropfoundry-nutrition-portfolio-input-v0"
+    },
+    "portfolio_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "comparison_basis": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_nutrient_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "options": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "option_id",
+          "records"
+        ],
+        "properties": {
+          "option_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "records": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "nutrition-accounting-input-v1.schema.json"
+            }
+          }
+        }
+      }
+    },
+    "comparison_basis_evidence_uri": {
+      "type": "string",
+      "minLength": 1,
+      "description": "URI to a preregistered study protocol, allocation/comparison definition, or other evidence supporting that options share the stated comparison basis."
+    }
+  }
+}

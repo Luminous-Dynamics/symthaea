@@ -1,0 +1,399 @@
+{
+  "manifest": "CropFoundryDataSourceInventory",
+  "version": "0.1.0-proposal",
+  "snapshot_date": "2026-10-19",
+  "status": "discovery_only",
+  "policy": {
+    "default_ingestion_state": "quarantined",
+    "no_source_is_training_authorized": true,
+    "authorize_training_requires": [
+      "verified_artifact_specific_license_or_explicit_permission",
+      "verified_access_terms",
+      "retrieval_timestamp",
+      "content_digest_sha256",
+      "citation_and_source_identity",
+      "documented_intended_use",
+      "dataset_structure_and_schema_review",
+      "privacy_and_material_transfer_review_when_applicable"
+    ],
+    "principle": "A public landing page is not blanket permission to redistribute or train on every linked artifact. Source availability, source license, artifact license, and intended-use permission are distinct."
+  },
+  "sources": [
+    {
+      "id": "DS-001",
+      "title": "Evaluation of tomato breeding lines under organic and low-input conditions in Portugal (2023)",
+      "source_uri": "https://zenodo.org/records/21789988",
+      "source_type": "trial_dataset",
+      "reported_content": [
+        "agronomic traits",
+        "phenology",
+        "yield-related traits",
+        "fruit morphology",
+        "sensory and quality characteristics"
+      ],
+      "observed_metadata": "The record describes a downloadable XLSX trial workbook. The rendered record has no clearly populated license field.",
+      "license_status": "unresolved",
+      "access_status": "public_metadata_visible_artifact_not_reviewed",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Inspect exact record metadata and artifact terms; if authorized, download and pin the file digest before inspecting workbook schema."
+    },
+    {
+      "id": "DS-002",
+      "title": "Tomato shuttle-breeding, sensory and ideotype-selection trials in Portugal (2024–2025)",
+      "source_uri": "https://zenodo.org/records/22008471",
+      "source_type": "trial_dataset",
+      "reported_content": [
+        "agronomic traits",
+        "morphology",
+        "yield-related traits",
+        "fruit sensory characteristics"
+      ],
+      "observed_metadata": "The record describes a downloadable XLSX. The rendered Rights/License fields do not clearly specify an artifact license.",
+      "license_status": "unresolved",
+      "access_status": "public_metadata_visible_artifact_not_reviewed",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Inspect exact record metadata, related study terms and artifact terms; download only after use is authorized."
+    },
+    {
+      "id": "DS-003",
+      "title": "Horti-M3-Tomato multi-year multimodal cultivation dataset",
+      "source_uri": "https://doi.org/10.5281/zenodo.17217565",
+      "source_type": "multimodal_crop_dataset",
+      "reported_content": [
+        "RGB plant images",
+        "environmental sensor logs",
+        "soil/environment data",
+        "phenotypic records",
+        "yield and management records"
+      ],
+      "observed_metadata": "The 2026 article describes a public dataset and states research/educational reuse; verify the Zenodo artifact's own license, subfile terms, and third-party content before processing or redistribution. The 2026 paper describes the source as a greenhouse study in Northeast China with one integrated monitoring station; treat it as a temporal/multimodal evaluation candidate, not independent geographic replication or evidence of South African transfer.",
+      "license_status": "publication_reports_research_educational_reuse_dataset_terms_not_pinned",
+      "access_status": "public_landing_page_artifact_terms_not_pinned",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Fetch dataset-specific API metadata, inspect files/licenses/README, and record exact terms and SHA-256 digests for the authorized subset.",
+      "initial_intended_role": "Multimodal sensor/image/phenotype alignment; assess held-out planting cycles or seasons only if experimental grouping supports it. Geography-transfer claim is out of scope."
+    },
+    {
+      "id": "DS-004",
+      "title": "TomatoMAP multi-angle / multi-pose tomato phenotyping dataset and paper",
+      "source_uri": "https://www.nature.com/articles/s41597-026-06926-9",
+      "source_type": "phenotyping_imagery",
+      "reported_content": [
+        "tomato imaging",
+        "phenotyping annotations"
+      ],
+      "observed_metadata": "Article metadata reports open licensing; dataset files and possible third-party exceptions must be verified independently.",
+      "license_status": "article_license_reported_artifact_terms_unverified",
+      "access_status": "metadata_visible_artifact_not_reviewed",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Inspect article data availability, downloadable artifact license and any third-party annotation/image restrictions."
+    },
+    {
+      "id": "DS-005",
+      "title": "South African Agricultural Research Council indigenous/traditional leafy-vegetable research programme",
+      "source_uri": "https://arc.agric.za/arc-vopi/Pages/Crop%20Science/Indigenous-Crops.aspx",
+      "source_type": "research_program_context",
+      "reported_content": [
+        "species/programme context",
+        "agronomic research areas",
+        "potential institutional partner path"
+      ],
+      "observed_metadata": "Program page establishes research scope, not the existence of a freely downloadable raw trial dataset.",
+      "license_status": "not_applicable_to_programme_summary_raw_dataset_access_not_established",
+      "access_status": "public_programme_page_only",
+      "ingestion_status": "context_only",
+      "permitted_current_use": [
+        "citation",
+        "partner_and_data_access_discovery"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Contact through official institutional channels to ask about relevant trial records, terms, crop priorities, and collaboration."
+    },
+    {
+      "id": "DS-006",
+      "title": "Genesys Plant Genetic Resources database",
+      "source_uri": "https://www.genesys-pgr.org/",
+      "source_type": "germplasm_discovery",
+      "reported_content": [
+        "accession passport metadata",
+        "available descriptors and trait data, depending on collection"
+      ],
+      "observed_metadata": "API documentation describes token-based access; collection terms and material-transfer conditions remain accession/collection-specific.",
+      "license_status": "per-record_and_collection_terms_required",
+      "access_status": "authorized_api_access_not_established",
+      "ingestion_status": "discovery_only",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Establish API access and terms, then inspect accession-level records and provider-specific restrictions."
+    },
+    {
+      "id": "DS-007",
+      "title": "FAOSTAT food and agriculture statistics",
+      "source_uri": "https://www.fao.org/faostat/",
+      "source_type": "aggregate_agricultural_statistics",
+      "reported_content": [
+        "country-level agricultural production",
+        "trade",
+        "prices and other published series, dependent on dataset"
+      ],
+      "observed_metadata": "Useful for context and macro-level baselines, not cultivar-level replicated trial outcomes. Each series needs units, geography, vintage and definition.",
+      "license_status": "verify_current_FAO_terms_and_series_metadata_at_acquisition",
+      "access_status": "public_portal",
+      "ingestion_status": "context_only",
+      "permitted_current_use": [
+        "citation",
+        "contextual_analysis_after_metadata_review"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Record exact dataset series, data vintage, units, geography, terms and file digest before using it in a scored run."
+    },
+    {
+      "id": "DS-008",
+      "title": "Plant Phenotyping Datasets portal",
+      "source_uri": "https://www.plant-phenotyping.org/datasets-home",
+      "source_type": "phenotyping_dataset_catalogue",
+      "reported_content": [
+        "links to plant image / annotation datasets and tasks"
+      ],
+      "observed_metadata": "This is a catalogue; each linked dataset has its own license, annotation protocol, and split rules.",
+      "license_status": "per_dataset_terms_required",
+      "access_status": "catalogue_visible",
+      "ingestion_status": "discovery_only",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Choose one concrete dataset only after per-dataset license, annotation/split rules, and applicability are reviewed."
+    },
+    {
+      "id": "DS-009",
+      "title": "Mycelix ProductiveLoop and lettuce/DWC cultivar-admission project contracts",
+      "source_uri": "https://github.com/Luminous-Dynamics/mycelix/issues/3303",
+      "source_type": "internal_project_contract_reference",
+      "reported_content": [
+        "useful-output evidence semantics",
+        "lettuce/DWC reference profile",
+        "cultivar admission boundary",
+        "sensor/evidence invariants"
+      ],
+      "observed_metadata": "Implementation/design references for integration; not third-party biological outcome observations.",
+      "license_status": "repository_license_applies_to_project_artifacts_external_biology_not_included",
+      "access_status": "public_issue_reference",
+      "ingestion_status": "integration_only",
+      "permitted_current_use": [
+        "crosswalk_contracts",
+        "integration_tests"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Crosswalk canonical types and invariant IDs; never count these contracts as crop-performance data."
+    },
+    {
+      "id": "DS-010",
+      "title": "Mobile and Manual Dataset for Greenhouse Tomato Crop (UdeA)",
+      "source_uri": "https://zenodo.org/records/16745911",
+      "source_type": "structured_repeated_measures_greenhouse_trial",
+      "reported_content": [
+        "weekly observations of 135 tomato plants",
+        "27 treatment combinations",
+        "20 weekly collection sessions",
+        "environmental sensor measurements",
+        "manual measurements",
+        "yield-related variables",
+        "CSV record"
+      ],
+      "observed_metadata": "Canonical Zenodo v1 record states CC BY 4.0, 2,666 rows × 40 columns, 135 plants, 27 treatment combinations and 20 weekly sessions. It lists MD5 432b5ff9f552d79e2fccae9a5f6a095b for the 303 kB CSV. The public GitHub mirror README says 2,664 records × 44 columns and CC BY 4.0, while the mirror LICENSE file is CC0 1.0; therefore do not mix the mirror with the canonical Zenodo version. The row/column discrepancy and the record's reference to missing associated documentation require resolving the exact artifact and schema before scoring. Presence of 27 treatment combinations does not itself establish randomization, blocking, or causal identification.",
+      "license_status": "verified_cc-by-4.0_from_zenodo_record",
+      "access_status": "public_open_record_artifact_not_downloaded",
+      "ingestion_status": "ingestion_authorized",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation",
+        "schema_audit"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Download only the canonical Zenodo record for local schema audit; verify Zenodo's published MD5 against the acquired file, compute and pin a local SHA-256, document the retrieval method and timestamp, inspect exact header/units/missingness, and keep model_training unauthorized until a separate explicit review. Obtain the referenced data dictionary/processing documentation and verify allocation/blocking before any causal analysis.",
+      "initial_intended_role": "Local schema audit; plant-disjoint and forward-in-time split design; descriptive QA and baseline feasibility only after field/unit/missingness metadata review. Do not treat as genotype/pedigree evidence or as a causally identifiable treatment experiment until allocation/design documentation is acquired and reviewed. It provides no validation for South African geographic transfer."
+    },
+    {
+      "id": "DS-011",
+      "title": "AerialYield-T2M dual-modality greenhouse tomato ripeness, masks and fruit-count dataset",
+      "source_uri": "https://zenodo.org/records/22071809",
+      "source_type": "annotated_phenotyping_imagery",
+      "reported_content": [
+        "677 RGB greenhouse tomato frames: 535 close-range and 142 drone frames",
+        "14,303 annotated tomato instances across six ripeness stages",
+        "binary and semantic masks, polygons, bounding boxes and image-level visible-fruit counts",
+        "metadata archive and SHA-256 checksums file",
+        "deterministic block-grouped train/validation/test split",
+        "COCO and YOLO exports"
+      ],
+      "observed_metadata": "Zenodo record published 2026-08-23 and identifies a 3.6 GB package. Its separately listed LICENSE file states Creative Commons Attribution 4.0 International and permits sharing/adaptation with attribution. Images were collected in one commercial indoor greenhouse in the UAE; this is a phenotyping/vision task candidate, not yield, breeding, or South African geographic-transfer evidence.",
+      "license_status": "verified_cc-by-4.0_from_bundled_license_file",
+      "access_status": "public_open_artifact_not_downloaded",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Review README and artifact terms; download only selected authorized components; verify provided SHA-256 checksums against bytes; inspect split grouping, duplicate/near-duplicate frames, annotation audit, and privacy; then pin exact artifact digests before any model training."
+    },
+    {
+      "id": "DS-012",
+      "title": "Thermal infrared and hyperspectral image based transpiration rate modelling, Part 1",
+      "source_uri": "https://zenodo.org/records/7807989",
+      "source_type": "multimodal_thermal_hyperspectral_maize_drought",
+      "reported_content": [
+        "raw thermal infrared data and processed thermal data",
+        "raw and processed hyperspectral imaging from maize drought-severity experiments",
+        "RGB segmentation filters, image preprocessing and empirical/physical modelling files",
+        "hyperspectral transferability data involving new genotypes, with related parts on linked Zenodo records"
+      ],
+      "observed_metadata": "The Zenodo record describes maize drought experiments and thermal/hyperspectral data; it lists a 14.4 GB package for this record version and links related hyperspectral parts. The rendered Rights/License area does not show a populated license. Individual code/data archives and related records may have different terms. The page provides MD5 values for listed artifacts, not an acquired local SHA-256 pin.",
+      "license_status": "unresolved_license_field_not_populated_on_record",
+      "access_status": "public_landing_page_artifact_terms_not_verified",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Resolve license and access terms for each exact data/code artifact and any related-part dependency before download; if authorized, retrieve only the minimum relevant subset, record retrieval timestamp, verify provider-listed MD5, calculate SHA-256, inspect README/units/calibration/experimental grouping, and preserve genotype/site/time holdouts.",
+      "initial_intended_role": "Candidate for CF-020 thermal/spectral modality evaluation and genotype-transfer methodology after rights and schema review. Automated phenotyping platform data do not establish farm-scale or South African transfer."
+    },
+    {
+      "id": "DS-013",
+      "title": "Canopy-level hyperspectral, chlorophyll fluorescence and pigment dataset of tomato under heat stress in darkness",
+      "source_uri": "https://zenodo.org/records/19883527",
+      "source_type": "controlled_environment_tomato_spectral_fluorescence_heat",
+      "reported_content": [
+        "canopy-level VNIR spectral reflectance from 380–900 nm at multiple measuring points",
+        "PAM chlorophyll fluorescence parameters and derived measurements",
+        "HPLC-based chlorophyll and xanthophyll-cycle pigment measurements",
+        "controlled heat exposure from 20°C to 35°C in darkness, with a 22°C control and post-reillumination measurements"
+      ],
+      "observed_metadata": "The Zenodo record was published 2026-04-29 and lists three XLSX artifacts totalling about 253 kB on the file table. The record describes multiple time points and paired physiology-related modalities, but the rendered Rights/License area does not show a populated license. The experiment is controlled-environment and performed under dark heat conditions; it is not field-scale thermal imaging or evidence of local transfer.",
+      "license_status": "unresolved_license_field_not_populated_on_record",
+      "access_status": "public_landing_page_artifacts_not_reviewed",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Confirm artifact-specific license/access terms and any linked paper/data terms. If authorized, download the three listed workbooks, pin SHA-256 hashes and retrieval time, inspect units/replicate/time-point structure and missingness, and determine whether time points support a predeclared chronological evaluation.",
+      "initial_intended_role": "Small-scale CF-020 feasibility candidate for spectral/fluorescence/physiological alignment under controlled heat. It cannot establish thermal-camera performance, early warning before visible symptoms, field efficacy, or South African geographic transfer."
+    },
+    {
+      "id": "DS-014",
+      "title": "Dataset on tackling postharvest tomato losses in tropical climates using a passive cooling blanket",
+      "source_uri": "https://zenodo.org/records/15856413",
+      "source_type": "postharvest_tomato_storage_and_transport_experiment",
+      "reported_content": [
+        "multiple XLSX workbooks associated with published tomato passive-cooling-blanket work",
+        "reported measures include produce weight, firmness, color, soluble solids content and acidity",
+        "reported comparisons include charcoal cooling blanket and ambient shade/storage conditions",
+        "potential data for batch/stage-specific mass loss and quality-retention audit"
+      ],
+      "observed_metadata": "The Zenodo v3 record was published 2025-07-10 and lists eight XLSX files totalling about 2.3 MB. Its visible Rights/License section has no populated license value. The linked work describes a Uganda tomato supply-chain pilot; published aggregate findings are not local South African efficacy evidence. The files have not been downloaded, parsed or audited, and their batch/replicate semantics, intervention assignment, exact units, data dictionary and missingness have not yet been verified.",
+      "license_status": "unresolved_license_field_not_populated_on_record",
+      "access_status": "public_open_record_artifact_terms_not_verified",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Verify rights for the exact eight XLSX artifacts and linked publication terms; if authorized, retrieve the minimum subset, record retrieval time and file digests, inspect workbook structures, units, batches, treatment allocation, loss-stage definitions, replicates, quality criteria and missingness, then design a leakage-resistant baseline audit. Keep training disabled until artifact-specific authorization is explicitly reviewed.",
+      "initial_intended_role": "Candidate for CF-023 mass-balance and postharvest-quality schema audit after rights review. Do not infer freshness or food safety from appearance alone; do not treat reported paper summaries as independent row-level data or local South African validation."
+    },
+    {
+      "id": "DS-015",
+      "title": "South African Food Data System (SAFOODS): national food composition reference",
+      "source_uri": "https://safoods.mrc.ac.za/",
+      "source_type": "national_food_composition_reference",
+      "reported_content": [
+        "SAFOODS v.2023 online database describes 1,857 food items and shows energy, carbohydrate, protein, fat and fibre on the free web view",
+        "SAFOODS products page lists Food Composition Tables for South Africa, 6th Edition (2024), with 36 nutrients across 16 food groups, as a paid electronic publication",
+        "site says nutrient values are means, reported per 100 g edible food, and warns natural variation by species/cultivar, soil, climate, practices, processing, storage and transport",
+        "not all values are of South African origin; nutrient-level source references are recorded in the system"
+      ],
+      "observed_metadata": "The current official site lists 1,857 food items in SAFOODS v.2023, with a free web view of energy, carbohydrate, protein, fat and fibre. It states values are means per 100 g edible food and that natural variation depends on cultivar, soil, climate, practice, storage and processing; it also says not all nutrient values are of South African origin. The FAQ states written SAMRC permission is required before any part of the South African Food Database is reproduced. No table or food records have been downloaded or audited here.",
+      "license_status": "free_selected_web_view_and_paid_2024_tables_reuse_terms_need_review",
+      "access_status": "public_selected_nutrient_web_view_full_composition_tables_paid",
+      "ingestion_status": "discovery_only",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation",
+        "partner_and_data_access_discovery"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Contact SAFOODS/MRC for written permission and exact research, machine-learning, redistribution and citation terms before reproducing records or tables. If access is granted, pin exact edition/file digest and nutrient-level source references; capture units, edible portion, fresh/dry basis, analytical/calculated/imputed status, food matching and uncertainty. Keep national means separate from crop-lot assays.",
+      "initial_intended_role": "Local South African food-composition reference and access pathway for CF-024, after terms review. It can support reference values and food matching only within documented limitations; it does not replace directly assayed cultivar, site, post-harvest and preparation-specific observations."
+    },
+    {
+      "id": "DS-016",
+      "title": "USDA FoodData Central (FDC)",
+      "source_uri": "https://fdc.nal.usda.gov/api-guide/",
+      "source_type": "public_domain_food_composition_reference_and_food_metadata",
+      "reported_content": [
+        "USDA FDC API guide states data are public domain and not copyrighted, published under CC0 1.0 Universal",
+        "provides downloadable and API-accessible food and nutrient records across distinct FDC data types",
+        "official API guide documents rate limits and requires an API key for API use",
+        "useful for parser/provenance tests and external reference comparison, not automatic evidence of South African crop composition"
+      ],
+      "observed_metadata": "Official USDA API guide explicitly documents CC0 1.0 for FDC data. FDC contains different data types and food identifiers; each record's source, food type, preparation state, serving and nutrient basis must be preserved. No FDC records or data package have been downloaded, pinned, normalized or scored by this workstream.",
+      "license_status": "verified_cc0_from_official_usda_fdc_api_guide",
+      "access_status": "public_download_or_api_api_key_required_for_api",
+      "ingestion_status": "discovery_only",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation",
+        "schema_audit"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Select a narrowly scoped food/ingredient comparison only after the question is defined. Download a versioned snapshot, retain data type/food IDs and citation, hash source bytes, preserve nutrient and mass basis, edible portion, preparation state, missingness and data type. Keep US food matches separate from South African items and from measured crop lots. Training requires a later independent review even though FDC's general data license is CC0.",
+      "initial_intended_role": "CC0 comparator and schema/provenance reference for CF-024, especially negative controls for units, nutrient tags, food-state matching and missingness. Do not use as a proxy for Gauteng cultivar nutrient assays or local food availability."
+    }
+  ]
+}

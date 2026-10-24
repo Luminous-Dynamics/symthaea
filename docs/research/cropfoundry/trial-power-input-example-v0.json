@@ -1,0 +1,25 @@
+{
+  "schema_version": "cropfoundry-trial-power-input-v0",
+  "study_id": "synthetic-irrigation-policy-field-trial",
+  "protocol_uri": "urn:cropfoundry:example-protocol-v0",
+  "variance_evidence_uri": "urn:cropfoundry:synthetic-variance-assumption-v0",
+  "endpoint": {
+    "name": "marketable_edible_yield",
+    "unit": "kg_per_plot",
+    "minimum_detectable_effect_abs": 0.5,
+    "residual_sd": 1,
+    "familywise_alpha": 0.05,
+    "target_power": 0.8,
+    "co_primary_endpoint_count": 1
+  },
+  "design": {
+    "design_type": "parallel_two_arm_clustered",
+    "allocation_unit": "farm",
+    "plots_per_cluster": 5,
+    "intracluster_correlation": 0.1,
+    "attrition_fraction": 0.1,
+    "planned_site_season_count": 2,
+    "randomization_method": "cluster_randomized",
+    "blocking_unit": "farm"
+  }
+}

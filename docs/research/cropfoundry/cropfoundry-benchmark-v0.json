@@ -1,0 +1,398 @@
+{
+  "suite": "CropFoundry",
+  "suite_version": "0.4.0-proposal",
+  "created": "2026-10-18",
+  "status": "proposed_not_run",
+  "owner_project": "Luminous-Dynamics/symthaea",
+  "partner_projects": [
+    "Luminous-Dynamics/symtropy",
+    "Luminous-Dynamics/mycelix",
+    "Luminous-Dynamics/sol-atlas-leptos"
+  ],
+  "scope": {
+    "initial_region": "South Africa; begin with a defined Gauteng-relevant target population, not an assumption of province-wide representativeness",
+    "pilot_crops": [
+      {
+        "role": "comparatively_well_studied_reference",
+        "candidate": "tomato",
+        "selection_gate": "Choose only after a rights-aware source inventory confirms sufficient harmonized trial observations for at least one predeclared trait."
+      },
+      {
+        "role": "local_underutilized_crop",
+        "candidates": [
+          "amaranth",
+          "Cleome",
+          "Corchorus",
+          "Vigna"
+        ],
+        "selection_gate": "Select exactly one initial species after checking local relevance, partner input, seed/germplasm access, trait definitions, observation coverage, and material-transfer/access conditions."
+      },
+      {
+        "role": "next_stage",
+        "candidates": [
+          "sweet potato",
+          "fruit trees"
+        ],
+        "selection_gate": "Do not use the initial vegetable benchmark to claim perennial crop performance."
+      }
+    ],
+    "excluded_claims": [
+      "No claim of a new or improved cultivar based only on simulation.",
+      "No food-safety conclusion based only on species name or model output.",
+      "No unreviewed laboratory or field intervention."
+    ]
+  },
+  "interoperability": [
+    {
+      "standard": "MIAPPE",
+      "purpose": "Plant phenotyping experiment metadata",
+      "url": "https://www.miappe.org/overview/",
+      "policy": "Map fields and validate applicability; do not replace the standard with a proprietary schema."
+    },
+    {
+      "standard": "BrAPI v2.1",
+      "purpose": "Breeding, germplasm, trial, phenotyping, and genotyping exchange",
+      "url": "https://brapi.org/specification",
+      "policy": "Implement only the modules required by the use case and version-pin mappings."
+    },
+    {
+      "standard": "Crop Ontology",
+      "purpose": "Trait + method + scale definitions",
+      "url": "https://cropontology.org/about",
+      "policy": "Persist ontology identifiers and versions; do not map traits by name alone."
+    },
+    {
+      "standard": "FAO Genebank Standards",
+      "purpose": "Germplasm stewardship and documentation",
+      "url": "https://www.fao.org/agriculture/crops/thematic-sitemap/theme/seeds-pgr/gbs/en/",
+      "policy": "Respect collection-specific access terms and material transfer requirements."
+    }
+  ],
+  "data_provenance_minimum": [
+    "source_uri_or_stable_identifier",
+    "retrieval_date",
+    "source_version_or_content_digest_when_available",
+    "license_or_access_terms",
+    "biological_material_identity_when_applicable",
+    "trait_identifier_and_definition",
+    "method_and_scale",
+    "unit",
+    "environment_and_time_metadata_when_applicable",
+    "transformation_lineage",
+    "missingness_and_exclusion_reason"
+  ],
+  "invariants": [
+    {
+      "id": "INV-01",
+      "rule": "Proposed thresholds are not achieved scores.",
+      "fail_behavior": "Keep status proposed_not_run or not_evaluable until evidence and run receipts exist."
+    },
+    {
+      "id": "INV-02",
+      "rule": "Every reported result must bind to an immutable dataset snapshot, code/model version, split definition, baseline, and evaluation receipt.",
+      "fail_behavior": "Reject result publication."
+    },
+    {
+      "id": "INV-03",
+      "rule": "No forbidden sample/site-year/genotype leakage across split boundaries for the declared generalization question.",
+      "fail_behavior": "Invalidate the run; do not repair the score by post-hoc split changes."
+    },
+    {
+      "id": "INV-04",
+      "rule": "Missing data, inaccessible runners, and unmeasured outcomes are not passes.",
+      "fail_behavior": "Report blocked or not_evaluable."
+    },
+    {
+      "id": "INV-05",
+      "rule": "No cultivar improvement claim without pre-registered physical comparison and uncertainty reporting.",
+      "fail_behavior": "Allow only hypothesis/candidate language."
+    },
+    {
+      "id": "INV-06",
+      "rule": "Data licensing, material access, privacy, consent, and appropriate biosafety/ethics approvals must be checked before ingestion, redistribution, or experiment.",
+      "fail_behavior": "Quarantine the data or block the intervention."
+    }
+  ],
+  "benchmarks": [
+    {
+      "id": "CF-001",
+      "category": "data_integrity",
+      "name": "Evidence lineage completeness",
+      "question": "Can each scored observation be traced to an authorized source and interpretable measurement context?",
+      "primary_metric": "fraction of scored records satisfying the applicable provenance minimum",
+      "proposed_target": "100% of records used to train, validate, test, or support a released claim have required provenance fields or an explicitly justified not_applicable value; 0 fabricated source references",
+      "split_protocol": "Audit every data partition and a reproducible sample of raw-to-derived transformations.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-002",
+      "category": "data_integrity",
+      "name": "Leakage-resistant evaluation",
+      "question": "Are results genuinely out of the intended generalization regime?",
+      "primary_metric": "count of prohibited overlapping group keys across partitions",
+      "proposed_target": "0 prohibited overlap for the declared split policy; publish separate site-year-held-out and genotype-held-out evaluations when data supports both",
+      "split_protocol": "Split by site-year before fitting or selecting models; additionally hold out genotypes for a distinct transfer test where sample size supports it. Keep a final test set untouched.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-003",
+      "category": "prediction",
+      "name": "Held-out agronomic prediction",
+      "question": "Does the model predict a selected trait better than relevant simple and established baselines?",
+      "primary_metric": "pre-registered primary error metric, such as normalized MAE, reported with bootstrap confidence interval",
+      "proposed_target": "Aim for at least 10% relative error reduction versus the strongest eligible baseline on held-out site-years; do not advance if the difference is indistinguishable from noise or material subgroup harm is hidden",
+      "split_protocol": "Define target population, trait, unit, baseline set, missingness policy, and metric before examining final test results. Split by site-year or the strongest valid experimental grouping. If only one site exists, label the result as temporal/within-site evaluation and explicitly prohibit geographic-transfer claims.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-004",
+      "category": "uncertainty",
+      "name": "Predictive interval calibration",
+      "question": "Do stated intervals represent uncertainty usefully across environments?",
+      "primary_metric": "empirical coverage and average width of nominal 90% prediction intervals",
+      "proposed_target": "Initial target: 85%-95% aggregate coverage for nominal 90% intervals, plus per-site-year coverage and interval width; investigate poor subgroup calibration even if aggregate passes",
+      "split_protocol": "Calibration must use training/validation data only; assess once on untouched test data and by environment subgroup.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-005",
+      "category": "robustness",
+      "name": "Out-of-domain detection and abstention",
+      "question": "Does the system recognize conditions outside its validated applicability domain?",
+      "primary_metric": "OOD AUROC plus risk-versus-coverage curve at predeclared abstention thresholds",
+      "proposed_target": "Initial target AUROC >= 0.80 on documented shift scenarios and lower error among retained predictions as coverage decreases; any safety-critical unsupported claim is a failure regardless of AUROC",
+      "split_protocol": "Design shifts involving unseen site-years, cultivar groups, and climate/management ranges; avoid random-row splits as the sole test.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-006",
+      "category": "active_learning",
+      "name": "Trial-selection sample efficiency",
+      "question": "Can model-guided selection reach a decision-quality threshold with fewer observations than random selection?",
+      "primary_metric": "number and cost of trials required to reach a pre-registered error or decision-regret threshold",
+      "proposed_target": "In simulation/replay, aim for >=25% fewer trial observations than random selection at the same threshold across repeated seeds and multiple response surfaces; no real-world efficiency claim until validated prospectively",
+      "split_protocol": "Compare random, uncertainty sampling, and decision-focused expected-value-of-information selection under identical budgets and held-out scenarios.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-007",
+      "category": "multi_objective",
+      "name": "Pareto quality and hard-constraint integrity",
+      "question": "Does optimization expose meaningful trade-offs without violating hard constraints?",
+      "primary_metric": "hypervolume or other predeclared Pareto metric plus count of constraint violations",
+      "proposed_target": "Beat random/naive candidate selection on predeclared synthetic and replay cases; 0 violations of hard safety, rights, and feasibility constraints in every scored recommendation",
+      "split_protocol": "Use fixed objective definitions, reference point, constraint tests, and sensitivity analysis; retain all non-dominated alternatives instead of hiding them behind one score.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-008",
+      "category": "mechanistic_consistency",
+      "name": "Physical and dimensional invariants",
+      "question": "Are units, ranges, and conservation relationships handled consistently?",
+      "primary_metric": "fraction of deterministic invariant/property tests passing",
+      "proposed_target": "100% of unit-conversion, dimensional, non-negative-domain, and enabled water/mass-balance invariants pass; all exceptions documented and bounded",
+      "split_protocol": "Use hand-computed test cases, boundary conditions, unit round trips, and metamorphic tests independent of model fitting.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-009",
+      "category": "physical_validation",
+      "name": "Independent crop improvement gate",
+      "question": "Does a candidate improve a real, farmer-relevant outcome against a local reference?",
+      "primary_metric": "pre-registered effect size and confidence interval for marketable yield, irrigation water productivity, or another farmer-approved primary endpoint",
+      "proposed_target": "Candidate target for suitable annual crops: >=10% more marketable yield at comparable irrigation, or >=15% less irrigation at non-inferior marketable yield; require a powered, replicated, pre-registered physical trial across representative environments/seasons, no unresolved food-safety issue, and no unacceptable predeclared nutrition/sensory/economic regression",
+      "split_protocol": "Use qualified local partners, reference cultivars, randomization and replication appropriate to the design, calibrated measures, and an independent analysis plan. Crop-specific duration and power analysis supersede generic site/season counts.",
+      "status": "not_evaluable_until_physical_trials"
+    },
+    {
+      "id": "CF-010",
+      "category": "nutrition_and_quality",
+      "name": "Independent food-quality evaluation",
+      "question": "Are claimed nutrition and eating-quality changes measured instead of inferred?",
+      "primary_metric": "laboratory nutrient measurements and pre-registered sensory/post-harvest endpoints",
+      "proposed_target": "0 claims based solely on predicted composition; use suitable lab methods and blinded sensory protocols where feasible; report preparation/storage context and uncertainty",
+      "split_protocol": "Compare against references grown and handled under comparable conditions; specify target nutrients, safety endpoints, sensory method, and non-inferiority margins before data collection.",
+      "status": "not_evaluable_until_physical_trials"
+    },
+    {
+      "id": "CF-011",
+      "category": "transfer",
+      "name": "Environment and crop transfer",
+      "question": "Does performance persist across intended environments and locally relevant crops?",
+      "primary_metric": "per-environment error, worst-group error, and coverage of the stated target population",
+      "proposed_target": "Publish per-environment results and the number of independent sites, site-years, cultivars and management regimes. No claim of South Africa-wide or cross-region transfer from a single site, season, or foreign growing environment; measure coverage gaps for the selected local/underutilized crop separately. Missing data is not evidence of low biological potential.",
+      "split_protocol": "Report dataset coverage before modelling. Add sites/seasons/crops only through versioned evaluations; missing data is not evidence of low biological potential.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-012",
+      "category": "decision_value",
+      "name": "Farmer and food-system utility",
+      "question": "Does the recommendation improve a real decision under locally stated constraints?",
+      "primary_metric": "net margin or cost per marketable edible unit plus water/input use, labor, loss, and farmer-defined utility",
+      "proposed_target": "No universal percentage threshold before the local reference economics and priorities are established; require transparent absolute units, sensitivity analysis, distribution of benefits/costs, and grower review",
+      "split_protocol": "Use local prices and season-specific input assumptions with dates; run sensitivity analyses and include non-financial constraints such as seed access and labor.",
+      "status": "not_evaluable_until_local_cost_and_partner_data"
+    },
+    {
+      "id": "CF-013",
+      "category": "breeding_strategy",
+      "name": "Multi-generation breeding-policy value",
+      "question": "When genotype, pedigree, phenotyping, and a defensible breeding simulator or retrospective program are available, does a sequential breeding policy outperform candidate-by-candidate ranking under the same cycle and trial budget?",
+      "primary_metric": "cumulative gain across pre-registered trait objectives, constraint violations, time/cycle cost, and evaluated candidates per breeding cycle",
+      "proposed_target": "On synthetic and retrospective replay only, outperform a predeclared greedy candidate-ranking baseline on at least one primary objective at equal budget without worsening hard constraints; require multi-seed sensitivity analysis and publish all trade-offs. This is a research target, not evidence of real breeding gain.",
+      "split_protocol": "Separate breeding programs/generations or pedigrees where possible; never leak a candidate's future phenotype, progeny outcomes, or post-selection information into policy decisions. Fit policy and hyperparameters on training histories and score once on untouched retrospective histories. Simulation/replay must remain labeled as such.",
+      "status": "not_evaluable_until_genotype_and_pedigree_data"
+    },
+    {
+      "id": "CF-014",
+      "category": "decision_quality",
+      "name": "Decision regret under uncertainty and context shift",
+      "question": "Do recommendations optimized for decision value outperform choices based only on predictive accuracy when water, costs, weather, and constraints vary?",
+      "primary_metric": "decision regret relative to a declared comparator or oracle on replayable scenarios, plus worst-case regret by environment and hard-constraint violations",
+      "proposed_target": "On synthetic and retrospective replay with a predeclared utility and equal information budget, aim for at least 15% lower mean decision regret than a fixed baseline while not worsening predeclared worst-case constraints; report per-environment outcomes and sensitivity to utility assumptions. Simulation/replay is not field-impact evidence.",
+      "split_protocol": "Freeze utility definitions, comparator policy, environmental/price scenarios, and constraints before scoring. Hold out whole site-years or scenario families. Do not choose utility weights after inspecting final outcomes, and publish a Pareto/robustness view rather than only a mean score.",
+      "status": "not_evaluable_until_local_cost_and_partner_data"
+    },
+    {
+      "id": "CF-015",
+      "category": "cross_crop_transfer",
+      "name": "Cold-start transfer to underrepresented crops",
+      "question": "Does a shared mechanistic/phenotypic representation improve prediction for a data-sparse local crop when only a small amount of target-crop evidence is available?",
+      "primary_metric": "target-crop held-out-site-year error at fixed target observation budgets, calibration, and worst-crop / negative-transfer gap",
+      "proposed_target": "Only after at least three crops have comparable, harmonized traits, aim for at least 10% error reduction versus a target-crop-only baseline in predeclared few-shot regimes, without a material worst-crop regression. Report negative transfer explicitly; never imply universal biological transfer.",
+      "split_protocol": "Use whole-species/cultivar and site-year holdouts matched to the intended transfer claim; prevent shared cultivar, parent-family, planting-cycle, or near-duplicate image leakage. Compare within-crop, target-only few-shot, and shared-transfer baselines. Report each target crop and the applicability domain.",
+      "status": "not_evaluable_until_multi_crop_harmonized_data"
+    },
+    {
+      "id": "CF-016",
+      "category": "agroecological_portfolio",
+      "name": "Multi-crop portfolio and rotation resilience",
+      "question": "Can a crop portfolio, intercropping arrangement, or multi-season rotation meet more locally defined nutrition and market-supply needs with lower tail-risk than a monoculture under matched land, water, labor, and cost constraints?",
+      "primary_metric": "nutritional-basket shortfall risk (including a predeclared tail-risk measure), total marketable edible output per area and season, land-equivalent ratio where valid, resource budgets, yield variability across seasons, and net margin; reported as a metric vector",
+      "proposed_target": "On a rights-cleared retrospective dataset or explicitly synthetic scenario set, aim for at least 20% relative reduction in a predeclared severe-shortfall tail-risk measure versus an explicit monoculture/rotation baseline under matched constraints, without violating hard resource or locally defined nutrition constraints. Report per-crop regressions and Pareto trade-offs. Simulation is not field-impact evidence.",
+      "split_protocol": "Freeze target basket, objective definitions, baseline, land/water/labor/cost budgets, price window, weather scenarios, and constraints before scoring. Hold out whole site-years or scenario families. Preserve crop-component yields and interaction terms; do not infer intercropping benefit from comparing unrelated crops or from land-equivalent ratio alone. Field claims require replicated multi-season local evaluation.",
+      "status": "not_evaluable_until_interaction_data"
+    },
+    {
+      "id": "CF-017",
+      "category": "phenotyping_vision",
+      "name": "Tomato ripeness, segmentation and counting benchmark",
+      "question": "Can an evidence-bounded vision pipeline infer ripeness stage, fruit extent and visible fruit counts from images under a fixed, leak-resistant capture-block split?",
+      "primary_metric": "Task-specific metric vector: macro-F1 and per-stage recall/calibration for ripeness classification; AP50:95 for detection; IoU/Dice for masks; MAE for image-level visible-fruit counts. Do not collapse unlike tasks into one score.",
+      "proposed_target": "First reproduce a source-reported baseline where its exact configuration and split are available. For one preregistered primary task, then target either +5 percentage points macro-F1 or at least 10% relative reduction in count MAE versus the pinned eligible baseline, with no more than 2 percentage-point loss in recall for any ripeness class and no split leakage. Thresholds are provisional engineering goals.",
+      "split_protocol": "Use the dataset's published block-grouped split only after inspection confirms its semantics and integrity; otherwise freeze a capture-block split by source video/sequence before tuning. Check exact duplicates and near-duplicates, preserve modality strata (close-range versus drone), pin all resize/mask transforms, and reserve the test partition for one final evaluation. Report source-site and modality limits explicitly.",
+      "status": "not_evaluable_until_imagery_snapshot_and_splits_pinned"
+    },
+    {
+      "id": "CF-018",
+      "category": "causal_intervention",
+      "name": "Treatment-effect evidence and intervention-policy validity",
+      "question": "When the experimental design supports causal identification, can the system estimate treatment effects and select interventions that improve a predeclared outcome on held-out blocks/site-years without confusing association with causation?",
+      "primary_metric": "Absolute error and interval coverage for treatment-effect estimates on held-out experimental units, policy value or regret against a declared comparator, and count of unsupported causal claims",
+      "proposed_target": "Only on datasets with documented randomization or a prespecified defensible causal identification strategy, compare against a simple design-appropriate statistical baseline; target calibrated treatment-effect intervals and lower held-out decision regret without violating safety/resource constraints. If assignment mechanism, blocks, replication, or major confounders cannot be established, causal benchmark status remains blocked and outputs must be labeled associational.",
+      "split_protocol": "Before outcome analysis, pin the allocation mechanism, experimental unit, blocks/replicates, treatments, baseline/comparator, environment, time window, outcomes, exclusions, and causal estimand. Split by independent blocks/site-years and respect treatment assignment. Avoid leakage from repeated observations or post-treatment variables. Compare on held-out units; report uncertainty and sensitivity to assumptions.",
+      "status": "not_evaluable_until_experimental_design_documented"
+    },
+    {
+      "id": "CF-019",
+      "category": "digital_twin_assimilation",
+      "name": "Sequential plant-state assimilation and forecast reliability",
+      "question": "When chronological plant and environment observations arrive, does a versioned digital twin update improve short-horizon predictions and uncertainty calibration versus a frozen model and simple time-series baselines, while correctly detecting stale/drifting sensors?",
+      "primary_metric": "Horizon-specific MAE/RMSE plus probabilistic score or prediction-interval coverage/width, update latency, missing-data robustness, drift-detection precision/recall, and forecast abstention quality",
+      "proposed_target": "On a pinned time-series dataset with interpretable timestamps and units, aim for at least 10% lower predeclared horizon-weighted error than a frozen-model baseline while meeting predeclared interval-calibration and missing-data thresholds. Compare against simple persistence/seasonal baselines, preserve model/data version lineage, and test sensor dropout/drift. This is a retrospective methodology target, not field-impact evidence.",
+      "split_protocol": "Use prequential/chronological evaluation: at prediction time t, only observations available by t may update state or parameters. Hold out complete future windows, audit event-time versus receive-time, prevent same-period harvest/outcome leakage, and replay stale, duplicated, missing and drifted sensor observations. Report each forecast horizon and each environment separately.",
+      "status": "not_evaluable_until_time_series_metadata_pinned"
+    },
+    {
+      "id": "CF-020",
+      "category": "multimodal_stress_detection",
+      "name": "Cross-modal pre-symptomatic plant stress detection",
+      "question": "Do time-aligned thermal, multispectral or hyperspectral, fluorescence, visible imagery, and microclimate signals improve detection of independently confirmed water or heat stress before visible symptoms, relative to RGB-only and simple sensor baselines?",
+      "primary_metric": "Lead time before independently confirmed stress, precision-recall AUC, sensitivity at a preregistered false-alert budget per plant-day, Brier score or calibration error, and performance stratified by crop/site/season",
+      "proposed_target": "On a pinned paired dataset, target at least one valid observation interval of median warning lead over the best unimodal baseline at the same preregistered false-alert budget, while preserving calibrated uncertainty and reporting confidence intervals. This is a provisional research target, not an achieved result; do not promise 24-hour lead time unless collection cadence supports it.",
+      "split_protocol": "Keep all frames and repeated observations from a plant/plot together; hold out complete site-season or greenhouse blocks for transfer claims. Preserve acquisition time, solar conditions, sensor calibration and environmental covariates. Define stress ground truth independently of the candidate sensor channels, preregister event windows and exclusions, and compare against RGB-only, thermal-only, simple threshold, and persistence baselines. Audit near-duplicate frames and temporal leakage.",
+      "status": "not_evaluable_until_paired_stress_sensor_data_pinned"
+    },
+    {
+      "id": "CF-021",
+      "category": "sensor_calibration_transfer",
+      "name": "Low-cost crop-sensor calibration and cross-site transfer",
+      "question": "Can a low-cost sensor stack preserve actionable measurement quality and decision reliability relative to a calibrated reference stack across devices, sites, seasons, and drift conditions while reducing total deployment cost?",
+      "primary_metric": "Reference-relative MAE/RMSE and bias for each physical quantity, prediction-interval coverage, calibration error, drift/missingness robustness, decision regret under the same constraints, and total cost of ownership per monitored plot-season",
+      "proposed_target": "On a preregistered device/site holdout, target 85–95% empirical coverage for nominal 90% uncertainty intervals, decision loss within 5% of the reference-sensor workflow, and at least 30% lower three-year total cost of ownership. Report failure cases, recalibration frequency and labor; treat these as provisional engineering targets, not universal standards.",
+      "split_protocol": "Pair low-cost measurements with calibrated reference instruments over overlapping environmental ranges. Separate device identity and site/season across held-out partitions; include temperature, humidity, illumination, dust/wetness, sensor aging, missing readings, and recalibration events. Never infer a physical unit from numeric magnitude alone. Compare against an uncalibrated low-cost baseline and reference-instrument ceiling; include labor, maintenance, replacement, connectivity and power in total cost.",
+      "status": "not_evaluable_until_calibration_reference_and_site_metadata_pinned"
+    },
+    {
+      "id": "CF-022",
+      "category": "constrained_irrigation_decision_policy",
+      "name": "Water-budgeted irrigation decisions under uncertainty and sensing failure",
+      "question": "Under equal daily water budgets, can a policy using conservative forecast margins and stale-sensor risk adjustments reduce a declared synthetic stress-exposure proxy compared with equal-share and soil-threshold baselines while respecting water caps under heat/drought, biased forecasts, and intermittent sensor loss?",
+      "primary_metric": "Daily total-water-budget violation count (must be zero) and per-plot actuator-limit violation count (must be zero); aggregate and per-scenario v2 synthetic stress proxy with unmet-demand margin preserved; worst/best-zone stress, mean and maximum worst-zone burden, worst-to-best ratio plus count of scenarios where that ratio is defined; per-zone irrigation allocations and disparity; equal-share-relative change; dose-matched counterfactual stress delta; greedy minimax policy comparison; sensor-outage and forecast-bias degradation.",
+      "proposed_target": "Establish deterministic replay, zero daily total-water-budget violations and zero per-plot actuator-limit violations. Use receipt v2's unmet-demand-sensitive stress proxy, which keeps a negative end-of-step water margin in the score while keeping physical storage clamped for the next step. Compare equal-share, soil-threshold, greedy marginal-risk, greedy minimax-stress and dose-matched hindsight allocation. Report all scenarios, zone-level totals, worst-zone stress, worst-to-best disparity and how many scenario ratios are defined; null disparity ratios must never be silently included as zero. The greedy minimax algorithm is not a global optimality guarantee. All scores remain synthetic and uncalibrated.",
+      "split_protocol": "Use deterministic versioned synthetic scenarios with no undocumented randomness. Compare equal-share calendar, soil-threshold and uncertainty-aware risk allocation on the same cap/weather/sensor traces. Add a rotating-uniform allocation counterfactual that takes each risk-aware policy's exact daily total irrigation dose and redistributes it as evenly as the discrete actuator increments allow; assert per-day dose equality. This isolates allocation pattern from total daily water use within the toy simulator and must be labelled a counterfactual, not a deployable policy. Include matched reference, water-cap-only, forecast-bias-only and sensor-dropout-only profiles plus heat/drought and compound failures. Record aggregate and per-zone stress/irrigation, worst/best zone, allocation disparity and all resource quantities. Report all scenarios, retain synthetic/biological evidence boundaries and require calibrated replay plus replicated field trials before claims. Explicitly record and test daily total-water budget and individual per-plot actuator limits; a run is invalid if either constraint is violated. Compare a greedy minimax-stress allocation that lexicographically minimizes maximum predicted per-zone shortfall proxy and then summed proxy at each discrete water increment. This is a bounded greedy heuristic, not a globally optimal or field-safe policy; report predicted scores and realized synthetic per-zone stress separately. Receipt schema v2 must score the unclipped predicted water margin as unmet-demand severity while clamping physical storage for the next step. Include the number of scenarios contributing to each disparity-ratio aggregate; exclude undefined ratios rather than silently turning them into zero, and report the denominator. Preserve v1 results only as historical debugging evidence, not comparable performance numbers.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-023",
+      "category": "postharvest_edible_output",
+      "name": "Marketable edible output and quality retention across post-harvest stages",
+      "question": "Can a harvest/storage/transport decision policy increase safe marketable edible mass delivered at destination, and preserve declared quality/nutrition proxies, versus a documented baseline while respecting storage capacity, energy, time and cost constraints?",
+      "primary_metric": "Destination marketable edible mass ratio to harvested mass, stage-specific loss by cause and measurement method, firmness/color/soluble-solids or crop-appropriate quality trajectories, nutrient retention when directly measured, storage energy and cost per marketable kg, time-to-threshold calibration, and safety-gate violations (must be zero)",
+      "proposed_target": "On a pinned replicated batch dataset, first reproduce a documented baseline and reconcile mass-balance and loss-stage definitions. Then provisionally target at least a 10% relative reduction in measured marketable-mass loss with non-inferior predeclared quality and no increase in safety-gate failures, energy-adjusted cost or total lifecycle burden. The target is not evaluable until batch-level storage/transport interventions, loss definitions, quality data and uncertainty are documented; prediction of appearance alone cannot establish freshness, safety, nutrient retention or edible mass.",
+      "split_protocol": "Keep all observations and images from the same produce lot/batch together. For future-window prediction, split chronologically by harvest lot and never let later observations from a test lot enter training or preprocessing. For intervention comparison, record assignment mechanism, comparator, replication, storage/transport conditions, calibration, measurement time, mass balance, disposal/reason codes, marketability criteria and missingness before outcome analysis. Compare against simple temperature-time/quality thresholds and the documented operational baseline; report each stage, batch, crop, storage condition and subgroup. A single specimen's repeated images are not biological replicates.",
+      "status": "not_evaluable_until_postharvest_batch_storage_and_quality_data_pinned"
+    },
+    {
+      "id": "CF-024",
+      "category": "nutrition_delivery_resource_efficiency",
+      "name": "Nutritionally meaningful edible output delivered per constrained resource",
+      "question": "Can a crop portfolio or cultivation/storage policy increase the amount of specified nutrients actually delivered in safe, edible servings per unit of scarce water, land, energy and cost, without reducing diet adequacy, dietary diversity or access for constrained households?",
+      "primary_metric": "Verified post-preparation nutrient mass delivered per resource unit; proportion of target dietary requirements met by nutrient and population group; edible-serving yield after measured retention/bioavailability factors; cost and embodied energy per nutrition-adequate serving; uncertainty in assay/retention factors; food-safety or hard resource constraint violations (must be zero)",
+      "proposed_target": "On a versioned nutrient-composition and preparation/retention dataset with stated population/serving assumptions, reproduce nutrient mass balance and compare with transparent harvest-mass, nutrient-density and lowest-cost baselines under equal water, land, energy and budget constraints. A provisional research target is at least 10% improvement in the declared nutrient-delivery objective without increasing any predeclared nutrient deficiency/upper-limit violation, worsening diet diversity, exceeding resource caps or increasing fully loaded cost per adequate serving. Do not score unmeasured nutrient composition, infer bioavailability from concentration, or count unsafe/non-edible material as delivered food. Not evaluable until source-backed composition, post-harvest/preparation retention, bioavailability assumptions and population requirements are pinned.",
+      "split_protocol": "Pin source, cultivar/crop, edible portion, assay method, nutrient units and fresh/dry mass basis. Link plant batch -> harvest -> storage/processing -> preparation -> served portion without double counting repeated observations. Keep entire crop lots and household/population-group profiles in one partition; use time-forward and site/crop holdouts for any transfer claim. Separate directly assayed nutrient content from literature-derived retention/bioavailability factors and modelled estimates, with uncertainty ranges and source-specific versions. Compare equal-resource baselines and report every nutrient, requirement group and resource constraint; do not optimize a single weighted scalar unless weights and hard constraints are predeclared and independently reviewed.",
+      "status": "not_evaluable_until_nutrient_assays_retention_factors_and_diet_requirements_pinned"
+    },
+    {
+      "id": "CF-025",
+      "category": "robust_multiobjective_decision_stability",
+      "name": "Crop and food-system policy robustness under hybrid uncertainty",
+      "question": "Do crop, irrigation, storage and nutrition policies remain feasible and non-catastrophic across declared weather, soil, sensor, yield, market-price, composition and decision-preference uncertainty, and how stable are recommendations when risk preferences change?",
+      "primary_metric": "Hard-constraint violation rate (must be zero for water/actuator safety constraints); expected, 90th/95th percentile, worst-case and CVaR95 shortfall for each objective with explicit tail sample count and contributing scenario IDs; complete per-policy × per-scenario score vector; deterministic sensitivity-lattice coverage; Pareto-frontier coverage; policy/ranking stability under declared preference changes; sensitivity to uncertainty source; regret against per-scenario oracle as a diagnostic only. Tail metrics are not calibrated probabilities without an empirically supported joint uncertainty model.",
+      "proposed_target": "First freeze the scenario lattice, constraints, metrics, preference protocol and comparator baselines. On the synthetic sensitivity lattice, require all 30 predeclared cases × 5 policy implementations to satisfy water and per-plot limits and preserve 150 unique policy/scenario diagnostics. For CVaR95, explicitly name the two contributing upper-tail scenarios for each policy, and make the value reproducible from the emitted diagnostics. This is a deterministic stress-test target, not an estimate of field risk. Empirical claims require source-backed joint uncertainty, held-out site-year outcomes, calibration/coverage evidence and sample-size analysis.",
+      "split_protocol": "Build a versioned joint uncertainty schema preserving correlation/dependence among weather, soil water capacity, crop-stage response, sensor error/dropout, costs, prices, yield variability, storage loss, nutrient composition and retention. The CF-025 executable re-simulates five policies on a 30-case fixed deterministic sensitivity lattice: the six unchanged CF-022 base cases plus isolated water-cap, forecast-bias, sensor-dropout, drought and heat sweeps and declared compound cases. Require unique scenario IDs, a full 30×5 grid, exact per-scenario tail membership/upper-tail IDs, daily water/per-plot limit checks, and dose-matched counterfactual trace equality. Keep measured, literature-derived, elicited and invented inputs separate. Use site-year/crop-lot holdouts for empirical sources; equal weights on fixed scenarios are sensitivity conventions unless empirically supported. Require calibrated joint uncertainty and held-out validation before probabilistic risk claims.",
+      "status": "not_evaluable_until_joint_uncertainty_sets_and_preference_protocol_pinned"
+    },
+    {
+      "id": "CF-026",
+      "category": "portfolio_level_nutrient_resource_accounting",
+      "name": "Complete nutrient delivery across crop options under matched resource boundaries",
+      "question": "Can crop or portfolio options be compared on total edible nutrient mass delivered and nutrient output per measured water, land, energy and cost, while preventing resource double-counting across nutrient rows, rejecting missing nutrients rather than treating them as zero, preserving measured-versus-modelled provenance, and requiring comparable resource boundaries?",
+      "primary_metric": "For each predeclared nutrient: total delivered mg, measured-concentration versus estimated-delivery coverage, declared uncertainty interval totals and coverage, bioavailability estimate coverage (unknown when incomplete), mg/L water, mg/m² land, mg/kWh energy, mg/currency unit, resource-ledger completeness, unit/boundary/currency comparability, duplicate batch-nutrient keys, and hard accounting violations",
+      "proposed_target": "Stage 0: reproduce nutrient totals and shared-resource accounting from synthetic fixtures with zero duplicate resource counting and fail-closed missing-nutrient behavior. Stage 1: on a pinned, authorized, batch-complete dataset, compare options only on matched site/season or declared production basis and equal/explicit resource constraints. A later trial may target at least 10% higher delivered mass per predeclared limiting nutrient per scarce resource versus a documented baseline, but only with uncertainty bounds and no violation of predeclared floors for other priority nutrients, food safety, affordability and environmental constraints. The threshold and nutrient floors must be chosen by local agronomists, nutrition scientists, affected communities and a power analysis before viewing outcomes. This benchmark does not by itself estimate dietary adequacy, bioavailability, health effects or an optimal crop recommendation.",
+      "split_protocol": "Use the row-level CF-024 accounting contract for every batch × nutrient record inside each option. Require identical predeclared nutrient sets for every batch, unique option/batch/nutrient keys, and resource measurements to be recorded once per batch in duplicated rows then counted only once. Reject within-batch resource inconsistencies; require comparable resource boundary labels and cost currency across options. Keep unknown concentrations, nutrient absences, unknown bioavailability, missing intervals and unmeasured resources distinct from true zero. All measurements must refer to the same declared comparison basis, site/season, resource allocation rules and edible mass stage. Hold out complete sites/seasons or production cycles for any predictive policy evaluation; do not random-split nutrient rows from one batch. Preserve per-nutrient metrics and uncertainty rather than collapsing them into one scalar without an explicit, externally reviewed set of weights/constraints.",
+      "status": "not_evaluable_until_complete_multi_nutrient_batch_and_matched_resource_ledger"
+    },
+    {
+      "id": "CF-027",
+      "category": "field_trial_design_power",
+      "name": "Pre-registered field-trial power and replication adequacy",
+      "question": "Before a crop, irrigation or nutrition intervention is tested, does its design contain enough independent plots/farms and site-season coverage to detect the smallest practically important effect while accounting for clustering, attrition and multiple co-primary endpoints?",
+      "primary_metric": "Reproducible sample-size calculation from cited baseline variance and minimum effect; target power and family-wise significance; design-effect/ICC sensitivity; planned and retained plots/clusters per arm; site-season coverage; protocol completeness; divergence between simple planning approximation and final design-specific statistical analysis",
+      "proposed_target": "Require a pre-registered endpoint, estimand, minimum practically important effect, variance source, alpha, power, allocation unit, randomization/blocking protocol, attrition assumption and clustering assumptions before any confirmatory field claim. Provisional baseline: power >= 0.80, report 0.90 sensitivity, family-wise alpha <= 0.05 across co-primary endpoints, and at least two site-seasons for any stated transfer claim. Final sample size must be confirmed by a statistician using the actual blocked/clustered analysis model; the included normal-approximation planner is a screening/preflight calculation only.",
+      "split_protocol": "Use historical/pilot variance independent of confirmatory outcomes. Keep the unit of randomization as the inferential unit; model plots nested within farms/sites/seasons and use design-specific power simulation when blocking, repeated measurements, unequal cluster sizes, spatial correlation, non-normal outcomes, noninferiority or interaction effects materially affect power. Freeze analysis plan and exclusions before allocation/outcome inspection. Report planned/actual counts, attrition by arm, protocol deviations, power assumptions and null/inconclusive outcomes; do not use observed post-hoc power to justify the trial.",
+      "status": "not_evaluable_until_trial_protocol_variance_and_cluster_metadata_pinned"
+    }
+  ],
+  "first_milestone_exit_criteria": [
+    "Rights-aware source inventory for one reference crop and one selected local/underutilized crop",
+    "Immutable data snapshot identifiers/digests and documented reuse terms",
+    "One trait selected based on actual coverage, not prior preference",
+    "Group split created and audited before model selection",
+    "Simple baseline reproduced with uncertainty intervals",
+    "Benchmark run receipt contains code/model version, source digest, split digest, metrics, and exclusions",
+    "Any physical trial has an accountable partner, protocol, reference, power rationale, and approval path"
+  ],
+  "scientific_caveat": "All numerical performance thresholds in this file are provisional engineering targets. They are not established universal standards, measured Symthaea results, or evidence of crop improvement. Revise them only prospectively with a recorded rationale; never after inspecting the held-out outcome."
+}
