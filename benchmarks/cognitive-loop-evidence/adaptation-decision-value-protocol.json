@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "benchmark": "symthaea-cognitive-loop-adaptation-decision-value",
+  "status": "proposal-not-measured",
+  "purpose": "Preregister a replay-owned evaluation of whether evidence-gated cognitive-loop adaptation improves held-out task outcomes and safely recovers from harmful interventions.",
+  "depends_on": {
+    "benchmark_manifest": "benchmarks/cognitive-loop-evidence/scenarios.json",
+    "design_document": "docs/research/COGNITIVE_LOOP_ADAPTATION_DECISION_VALUE.md",
+    "counterfactual_summary_command": "score-counterfactual-adaptation-utility"
+  },
+  "claim_guards": [
+    "Detector accuracy is not evidence of adaptation utility.",
+    "An arm-reported stream digest is not proof that a shared replay actually delivered the same exogenous events.",
+    "Oracle-timed adaptation is diagnostic only and is never a deployable comparator.",
+    "Passing coverage gates is not evidence of state-of-the-art superiority.",
+    "Synthetic fixtures validate execution contracts, not scientific hypotheses.",
+    "Never report one weighted aggregate unless its units and cost conversions were preregistered."
+  ],
+  "minimum_coverage": {
+    "dataset_count": 7,
+    "seeds_per_dataset": 50,
+    "drift_cells": [
+      {"drift_type": "class-prior", "transition": "abrupt"},
+      {"drift_type": "class-prior", "transition": "gradual"},
+      {"drift_type": "label-swap", "transition": "abrupt"},
+      {"drift_type": "label-swap", "transition": "gradual"},
+      {"drift_type": "feature-permutation", "transition": "abrupt"},
+      {"drift_type": "feature-permutation", "transition": "gradual"},
+      {"drift_type": "feature-filtering", "transition": "abrupt"},
+      {"drift_type": "feature-filtering", "transition": "gradual"}
+    ],
+    "coverage_interpretation": "For a complete dataset × seed × drift-cell factorial design this is 2800 dataset-seed-cell panels; any incomplete panel must list missing cells and cannot pass the complete-coverage gate.",
+    "tuning": "Leave-one-dataset-out; tune on training datasets only and freeze before held-out evaluation."
+  },
+  "access_tracks": [
+    {
+      "id": "valid-pe-only",
+      "allowed_signal": "Valid prequential prediction error with explicit invalid/missing evidence semantics",
+      "forbidden": ["future labels", "ground-truth drift timestamps", "post-decision outcomes"]
+    },
+    {
+      "id": "feature-only-unsupervised",
+      "allowed_signal": "Current features and registered calibration history available by decision time",
+      "forbidden": ["labels", "future labels", "ground-truth drift timestamps"]
+    },
+    {
+      "id": "auxiliary-loss-unsupervised",
+      "allowed_signal": "Registered auxiliary/self-supervised loss with explicit availability timestamp",
+      "forbidden": ["future labels", "ground-truth drift timestamps", "unavailable outcomes"]
+    },
+    {
+      "id": "delayed-observed-outcome",
+      "allowed_signal": "Observed outcomes only after the registered reveal delay",
+      "forbidden": ["outcomes before reveal time", "ground-truth drift timestamps"]
+    },
+    {
+      "id": "oracle-diagnostic-only",
+      "allowed_signal": "Ground-truth shift timing for offline upper-bound diagnostics",
+      "deployable": false
+    }
+  ],
+  "policy_arms": [
+    {"id": "no-adapt", "role": "required control", "deployable": true},
+    {"id": "always-adapt-registered", "role": "adapt at preregistered boundaries, not oracle timing", "deployable": true},
+    {"id": "detector-triggered", "role": "adapt on detector alarm", "deployable": true},
+    {"id": "detector-benefit-gated", "role": "adapt only when registered expected-benefit and risk conditions pass", "deployable": true},
+    {"id": "staged-verify-rollback", "role": "snapshot, shadow/canary, verify, commit or roll back", "deployable": true},
+    {"id": "scheduled-adaptation", "role": "fixed operational schedule comparator", "deployable": true},
+    {"id": "oracle-timed", "role": "ground-truth-timed diagnostic upper bound", "deployable": false}
+  ],
+  "replay_receipt_requirements": [
+    "dataset_source_and_license",
+    "dataset_artifact_sha256",
+    "transformation_config_sha256",
+    "canonical_ordered_exogenous_event_ledger_sha256",
+    "replay_driver_repository_head_sha",
+    "replay_driver_configuration_digest",
+    "environment_seed",
+    "per_arm_policy_seed",
+    "per_arm_repository_head_sha",
+    "per_arm_configuration_digest",
+    "per_cycle_delivered_event_digest",
+    "per_cycle_available_information_timestamps",
+    "per_cycle_action_record",
+    "pre_and_post_adaptation_state_digests",
+    "per_cycle_task_loss_and_outcome_availability",
+    "adaptation_resource_costs",
+    "verification_and_rollback_events",
+    "raw_trace_sha256",
+    "result_sha256"
+  ],
+  "replay_fail_closed_conditions": [
+    "Missing, duplicated, reordered, early, or altered exogenous event",
+    "Any deployable arm can access oracle-only fields",
+    "Decision consumes evidence with availability_time after decision_time",
+    "Invalid evidence causes a forbidden state update or replay admission",
+    "Arm event ledger differs from the replay driver's canonical event ledger",
+    "Missing code revision, configuration digest, dataset digest, or required raw trace",
+    "Unexplained missing cycle or non-contiguous cycle index",
+    "Cost or outcome record cannot be reconciled with the event/action ledger"
+  ],
+  "primary_metrics": [
+    {"id": "whole_stream_task_loss", "role": "primary task outcome", "direction": "lower"},
+    {"id": "post_shift_task_loss", "role": "primary task outcome", "direction": "lower"},
+    {"id": "post_shift_loss_area", "role": "recovery outcome", "direction": "lower"},
+    {"id": "recovery_time", "role": "recovery outcome", "direction": "lower"},
+    {"id": "harmful_intervention_rate", "role": "decision quality", "direction": "lower"},
+    {"id": "false_adaptation_rate_on_no_impact_shift", "role": "decision quality", "direction": "lower"},
+    {"id": "adaptation_compute_time", "role": "resource cost", "direction": "lower"},
+    {"id": "p95_decision_latency", "role": "systems cost", "direction": "lower"},
+    {"id": "false_alarms_per_1000_valid_observations", "role": "detector quality", "direction": "lower"},
+    {"id": "event_detection_delay", "role": "detector quality", "direction": "lower"}
+  ],
+  "hard_gates": [
+    {
+      "id": "invalid-evidence-is-non-operative",
+      "kind": "integrity",
+      "acceptance": "Zero forbidden updates or replay admissions caused by invalid evidence in the registered hard-gate cases."
+    },
+    {
+      "id": "runner-owned-common-stream",
+      "kind": "replay-integrity",
+      "acceptance": "All arms consume the driver-defined exogenous event sequence in order, with identical event identities and availability times; policy states may diverge."
+    },
+    {
+      "id": "no-future-information",
+      "kind": "causality",
+      "acceptance": "Zero oracle leakage or future-availability features used by deployable arms."
+    },
+    {
+      "id": "recovery-is-verified",
+      "kind": "recovery",
+      "acceptance": "Every registered harmful intervention is rejected before commit or rolled back within a preregistered bound."
+    },
+    {
+      "id": "complete-held-out-panel",
+      "kind": "coverage",
+      "acceptance": "All required dataset × seed × scenario cells are present or explicitly fail the gate; no missing cell is imputed as a success."
+    }
+  ],
+  "statistical_protocol": {
+    "primary_comparison": "Paired policy difference in held-out task loss, detector-benefit-gated and staged-verify-rollback versus detector-triggered.",
+    "generalization": "Publish every dataset-level effect and leave-one-dataset-out sensitivity; do not imply that an interval alone proves broad generalization.",
+    "uncertainty": "Report paired uncertainty with dataset clustering, the registered hierarchical bootstrap, per-dataset signs, and raw per-seed results.",
+    "negative_controls": [
+      "stable stream with no drift",
+      "distribution shift with no task-impact",
+      "shuffled outcomes",
+      "invalid and non-finite evidence",
+      "delayed labels and missingness bursts",
+      "autocorrelated and recurring concepts",
+      "one-arm event mutation and event reordering",
+      "future-label leakage",
+      "harmful adaptation requiring rollback"
+    ],
+    "reporting": "Keep detector metrics, task outcomes, decisions, safety/integrity, and resource costs separate. Preserve all failures and exclusions."
+  },
+  "status_note": "This is a proposed protocol, not an implementation, test result, or performance claim. The replay driver, adapters, and experimental runs remain future work."
+}
