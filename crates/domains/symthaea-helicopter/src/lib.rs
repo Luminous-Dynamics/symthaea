@@ -63,6 +63,7 @@ pub mod data_governance;
 pub mod degraded_human_factors;
 pub mod deployment_manifest;
 pub mod digital_twin_divergence;
+pub mod regenerative_health_adapter;
 pub mod drivetrain_transients;
 pub mod electrical_power_distribution;
 pub mod embodiment;
@@ -251,6 +252,7 @@ pub use deployment_manifest::{
     DeploymentBindingStatus, DeploymentManifest, DeploymentManifestError, DeploymentMismatch,
     DeploymentRuntimeIdentity, ModuleVersionBinding,
 };
+pub use regenerative_health_adapter::{TwinHealthProjectionError, project_twin_report};
 pub use digital_twin_divergence::{
     DigitalTwinDivergenceError, DigitalTwinDivergenceIssue, DigitalTwinDivergenceMonitor,
     DigitalTwinDivergencePolicy, DigitalTwinDivergenceReport, DigitalTwinDivergenceStatus,
