@@ -1057,6 +1057,39 @@ mod tests {
     }
 
     #[test]
+    fn text_cycle_feeds_back_prediction_with_exact_source_cycle() {
+        let mut svc = make_service();
+        let first = svc.cycle("close the HDC LTC prediction loop");
+        assert_eq!(
+            svc.encoder.prediction_cycle(),
+            Some(svc.stats.total_cycles as u64),
+            "output phase must tag the prediction with its producer cycle"
+        );
+        assert!(!first.prediction_error_valid, "cold start has no prior prediction");
+
+        let second = svc.cycle("observe after one valid prediction step");
+        assert_eq!(
+            svc.encoder.last_compared_prediction_cycle(),
+            Some((svc.stats.total_cycles - 1) as u64),
+            "encoder must compare against the immediately preceding cycle only"
+        );
+        assert_eq!(
+            second
+                .metadata
+                .prediction_evidence
+                .as_ref()
+                .expect("typed PE telemetry")
+                .observation_cycle,
+            svc.stats.total_cycles as u64
+        );
+        assert_eq!(
+            svc.encoder.prediction_cycle(),
+            Some(svc.stats.total_cycles as u64),
+            "the new prediction must be tagged for the next cycle"
+        );
+    }
+
+    #[test]
     fn invalid_prediction_sentinels_do_not_enter_cycle_evidence_histories() {
         let mut svc = make_service();
 
