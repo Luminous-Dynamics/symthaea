@@ -186,14 +186,26 @@ impl Scenario {
             return Err("repair aircraft ID does not identify a declared aircraft".into());
         }
 
-        let mut worst_case = self
+        let base_cost = self
             .maintenance_cost
             .checked_add(self.production.cost)
             .ok_or_else(|| "maintenance plus production cost overflows u64".to_string())?;
-        for flight in &self.flights {
-            worst_case = worst_case
-                .checked_add(flight.cancellation_cost)
-                .ok_or_else(|| "maximum scenario cost overflows u64".to_string())?;
+        let _maximum_scenario_cost = self
+            .flights
+            .iter()
+            .try_fold(base_cost, |total, flight| {
+                total.checked_add(flight.cancellation_cost)
+            })
+            .ok_or_else(|| "maximum scenario cost overflows u64".to_string())?;
+
+        if self.production.available
+            && self
+                .production
+                .duration
+                .checked_add(self.maintenance_duration)
+                .is_none()
+        {
+            return Err("production plus maintenance duration overflows u32".into());
         }
         Ok(())
     }
@@ -414,7 +426,7 @@ pub fn verify_plan(scenario: &Scenario, plan: &Plan) -> VerificationReport {
             continue;
         }
         seen_flights.push(&assignment.flight_id);
-        let Some(flight_index) = scenario.flights.iter().position(|f| f.id == assignment.flight_id) else {
+        let Some(flight_index) = scenario.flights.iter().position(|f| f.id.as_str() == assignment.flight_id.as_str()) else {
             violations.push(format!("unknown flight ID in plan: {}", assignment.flight_id));
             continue;
         };
