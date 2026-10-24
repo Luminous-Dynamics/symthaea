@@ -129,7 +129,6 @@ pub fn evaluate(mut input: AdaptationPanelInput) -> anyhow::Result<AdaptationPan
     let mut arm_registry: BTreeMap<String, ArmRegistry> = BTreeMap::new();
     let mut task_loss_metric_id: Option<String> = None;
     let mut task_loss_unit: Option<String> = None;
-    let mut record_streams = BTreeMap::<(String, u64, String), String>::new();
 
     for (index, score) in input.runs.iter().enumerate() {
         ensure!(
@@ -173,8 +172,6 @@ pub fn evaluate(mut input: AdaptationPanelInput) -> anyhow::Result<AdaptationPan
             "duplicate panel record at dataset={}, seed={}, scenario={}",
             key.0, key.1, key.2
         );
-        record_streams.insert(key.clone(), score.shared_stream_sha256.clone());
-
         for (arm, expected_name) in arm_views(score) {
             ensure!(arm.name == expected_name, "runs[{index}] has misnamed policy arm {expected_name}");
             validate_arm_metrics(arm, expected_name)?;
