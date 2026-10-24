@@ -82,9 +82,11 @@ impl CognitiveLoopService {
         let hv16_cached = *state.hv16_cached;
         let unified_psi = state.unified_psi;
         let coherence = state.coherence;
-        let prediction_error = state.prediction_error;
-        let prediction_error_valid =
-            state.prediction_error_valid && prediction_error.is_finite();
+        let prediction_error_sample = state
+            .prediction_evidence
+            .value_for_observation(self.stats.total_cycles as u64);
+        let prediction_error_valid = prediction_error_sample.is_some();
+        let prediction_error = prediction_error_sample.unwrap_or(0.0);
         let phi_attention_weight = state.phi_attention_weight;
         let compressed_state = state.compressed_state;
         let input = state.input;
@@ -1257,8 +1259,6 @@ mod tests {
         super::super::CycleState {
             compressed_state,
             output,
-            prediction_error: 0.2,
-            prediction_error_valid: true,
             prediction_evidence: PredictionErrorEvidence::valid(0.2, None, 1)
                 .expect("finite fixture evidence"),
             coherence: 0.5,
@@ -1340,7 +1340,8 @@ mod tests {
         let mut state = make_cycle_state(&compressed, &output, &hv, "zero psi");
         state.unified_psi = 0.0;
         state.coherence = 0.0;
-        state.prediction_error = 0.0;
+        state.prediction_evidence =
+            PredictionErrorEvidence::valid(0.0, None, 1).expect("finite fixture evidence");
         state.prediction_evidence =
             PredictionErrorEvidence::valid(0.0, None, 1).expect("finite fixture evidence");
         let mut timings = super::super::ModuleTimings::default();
@@ -1357,7 +1358,8 @@ mod tests {
         let output = vec![0.5f32; 64];
         let hv = symthaea_core::hdc::BinaryHV::random(7);
         let mut state = make_cycle_state(&compressed, &output, &hv, "high error");
-        state.prediction_error = 1.0;
+        state.prediction_evidence =
+            PredictionErrorEvidence::valid(1.0, Some(0), 1).expect("finite fixture evidence");
         state.prediction_evidence =
             PredictionErrorEvidence::valid(1.0, Some(0), 1).expect("finite fixture evidence");
         let mut timings = super::super::ModuleTimings::default();
