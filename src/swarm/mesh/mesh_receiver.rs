@@ -235,32 +235,36 @@ impl MeshReceiver {
         let mut nonce_bytes_saved: Option<[u8; 12]> = None;
         #[cfg(feature = "mesh-encryption")]
         let raw = if self.fragment_encryption {
-            if let Some(ref key) = self.encryption_key {
-                // Verify the nonce's source_id matches the transport-layer source
-                // before attempting decryption — prevents cross-stream injection.
-                if raw.len() >= super::AEAD_NONCE_SIZE {
-                    let nonce_source = &raw[..8];
-                    if nonce_source != &source {
-                        self.stats.packets_decrypt_failed += 1;
-                        return None;
-                    }
-                    // Save nonce for post-parse validation
-                    let mut nb = [0u8; 12];
-                    nb.copy_from_slice(&raw[..12]);
-                    nonce_bytes_saved = Some(nb);
+            let Some(ref key) = self.encryption_key else {
+                // Explicitly configured fragment encryption is a security
+                // requirement, not a hint. Never interpret a missing key as
+                // permission to accept plaintext fragments.
+                self.stats.packets_decrypt_failed += 1;
+                return None;
+            };
+
+            // Verify the nonce's source_id matches the transport-layer source
+            // before attempting decryption — prevents cross-stream injection.
+            if raw.len() >= super::AEAD_NONCE_SIZE {
+                let nonce_source = &raw[..8];
+                if nonce_source != &source {
+                    self.stats.packets_decrypt_failed += 1;
+                    return None;
                 }
-                match super::decrypt_fragment(raw, key) {
-                    Some(plain) => {
-                        decrypted_buf = zeroize::Zeroizing::new(plain);
-                        decrypted_buf.as_slice()
-                    }
-                    None => {
-                        self.stats.packets_decrypt_failed += 1;
-                        return None;
-                    }
+                // Save nonce for post-parse validation.
+                let mut nb = [0u8; 12];
+                nb.copy_from_slice(&raw[..12]);
+                nonce_bytes_saved = Some(nb);
+            }
+            match super::decrypt_fragment(raw, key) {
+                Some(plain) => {
+                    decrypted_buf = zeroize::Zeroizing::new(plain);
+                    decrypted_buf.as_slice()
                 }
-            } else {
-                raw
+                None => {
+                    self.stats.packets_decrypt_failed += 1;
+                    return None;
+                }
             }
         } else {
             raw
@@ -660,6 +664,29 @@ mod tests {
         assert_eq!(receiver.stats().packets_complete, 1);
         assert_eq!(receiver.stats().packets_recovered, 0);
         assert_eq!(receiver.pending_count(), 0);
+    }
+
+    // -- Encrypted fragment fail-closed behavior --
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn fragment_encryption_without_key_rejects_plaintext_batch() {
+        let packet = test_packet(41, PEER_A, 0x41);
+        let wire = to_wire(&packet.fragment());
+        let mut receiver = MeshReceiver::new().with_fragment_encryption(true);
+
+        for raw in &wire {
+            assert!(
+                receiver.receive_fragment(PEER_A, raw).is_none(),
+                "plaintext fragments must not complete an encryption-required stream"
+            );
+        }
+
+        assert_eq!(receiver.pending_count(), 0, "rejected plaintext must not allocate assembly state");
+        assert_eq!(receiver.stats().fragments_received, 0);
+        assert_eq!(receiver.stats().packets_complete, 0);
+        assert_eq!(receiver.stats().packets_decrypt_failed, wire.len() as u64);
+        assert_eq!(receiver.peer_count(), 0);
     }
 
     // -- FEC recovery --
