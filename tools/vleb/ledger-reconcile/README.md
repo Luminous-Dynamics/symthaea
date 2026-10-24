@@ -36,6 +36,19 @@ Before the reference tests run, CI executes `bash tools/vleb/check-fixture-integ
 
 This is a consistency gate, not an independent semantic audit: it does not prove that the reference implementation is correct, that a negative control was actually executed, or that any cataloged mutant was compiled and killed. Those remain separate admission requirements.
 
+## Executable semantic mutation probes
+
+The CI workflow runs `tools/vleb/run_mutation_campaign.py` against isolated copies of the reference crate. The first campaign contains four source-level mutants linked to the preregistered catalog:
+
+- `VLEB-LDG-001`: process exact duplicate transactions a second time.
+- `VLEB-LDG-002`: silently ignore conflicting transaction-ID reuse.
+- `VLEB-LDG-004`: replace checked aggregate additions with wrapping arithmetic.
+- `VLEB-LDG-007`: swap CREDIT and DEBIT aggregation paths.
+
+Each variant must compile before the contract suite is run. A compile failure, timeout, or harness error is **unresolved**, never counted as a semantic kill. A mutant is counted as killed only when it compiles and the locked suite reports failed tests. CI retains the machine-readable result and raw per-mutant logs as an artifact, with hashes and the checkout/expected-head identity.
+
+The catalog contains 17 probes; only these four semantic source mutants are executable in the current harness. The remaining semantic and evidence-manipulation probes remain planned and must not be represented as executed. Even a 4/4 kill result would be an initial oracle-smoke test, not a broad mutation score or a production-safety result.
+
 ## Validation status
 
 The reference crate currently contains 17 unit tests and 4 CLI integration tests, including a seeded differential reducer over 64 generated ledgers, permutation invariance, arbitrary duplicate multiplicity, maximum-value arithmetic, strict integer-token syntax and malformed CSV cases. These tests were authored but have not been compiled or executed in this environment because rustc and cargo are unavailable. CI results must be checked at the exact PR head. The fixture is not score-eligible until those tests execute, an independent reviewer approves the oracle, and adversarial task admission is complete.
