@@ -134,7 +134,16 @@ jobs:
             .dataset_id == "synthetic-fixture-not-measured" and
             .no_adapt.cycle_count == 4 and
             .detector_triggered.cycle_count == 4 and
+            .detector_benefit_gated.cycle_count == 4 and
+            .staged_verify_rollback.cycle_count == 4 and
             .oracle_timed.cycle_count == 4 and
+            (.staged_post_shift_task_loss_improvement_vs_detector_triggered > 0.06 and .staged_post_shift_task_loss_improvement_vs_detector_triggered < 0.07) and
+            (.staged_post_shift_task_loss_improvement_vs_no_adapt > 0.43 and .staged_post_shift_task_loss_improvement_vs_no_adapt < 0.44) and
+            (.staged_adaptation_cost_delta_vs_detector_triggered < -0.44 and .staged_adaptation_cost_delta_vs_detector_triggered > -0.46) and
+            .staged_verify_rollback.recovery_cycle == 2 and
+            .staged_dominated_by_detector_triggered == false and
+            .staged_dominated_by_no_adapt == false and
+            .detector_benefit_gated_dominated_by_no_adapt == false and
             (.detector_task_loss_improvement_vs_no_adapt > 0.27 and .detector_task_loss_improvement_vs_no_adapt < 0.28) and
             (.detector_task_loss_regret_vs_oracle_timed > 0.09 and .detector_task_loss_regret_vs_oracle_timed < 0.11) and
             (.detector_post_shift_task_loss_improvement_vs_no_adapt > 0.36 and .detector_post_shift_task_loss_improvement_vs_no_adapt < 0.37) and
@@ -159,6 +168,12 @@ jobs:
             .no_adapt.mean_task_loss == .oracle_timed.mean_task_loss and
             (.detector_task_loss_improvement_vs_no_adapt < -0.12 and .detector_task_loss_improvement_vs_no_adapt > -0.13) and
             (.detector_post_shift_task_loss_improvement_vs_no_adapt < -0.16 and .detector_post_shift_task_loss_improvement_vs_no_adapt > -0.17) and
+            (.staged_post_shift_task_loss_improvement_vs_no_adapt < -0.14 and .staged_post_shift_task_loss_improvement_vs_no_adapt > -0.16) and
+            .detector_benefit_gated.post_shift_mean_task_loss == .no_adapt.post_shift_mean_task_loss and
+            .detector_benefit_gated.total_adaptation_cost_units == 0 and
+            .detector_benefit_gated_dominated_by_no_adapt == false and
+            .staged_dominated_by_no_adapt == true and
+            (.staged_adaptation_cost_delta_vs_no_adapt > 0.44 and .staged_adaptation_cost_delta_vs_no_adapt < 0.46) and
             .no_adapt.recovery_cycle == 1 and
             .detector_triggered.recovery_cycle == 2 and
             .detector_triggered.recovery_delay_cycles == 1 and
