@@ -170,6 +170,46 @@ def _check_metric(run: dict, key: str, expected: Any, errors: list[str]) -> None
         errors.append(f"run {key} mismatch: expected {expected!r}, observed {run.get(key)!r}")
 
 
+def expected_policy_call_counts(
+    policy: str, fidelity_costs: dict[str, int], cost_budget: int, design_count: int
+) -> dict[str, int]:
+    """Re-derive the frozen policy allocation from the benchmark policy contract."""
+    fixed = {
+        "high_only": {"low": 0, "medium": 0, "high": 8},
+        "low_screen": {"low": 75, "medium": 0, "high": 5},
+        "fixed_top_k": {"low": 50, "medium": 10, "high": 4},
+        "discrepancy_aware": {"low": 55, "medium": 4, "high": 5},
+    }
+    if policy in fixed:
+        return dict(fixed[policy])
+    if policy != "adaptive_budget":
+        raise ValueError(f"no frozen call template for policy {policy!r}")
+
+    low_cost = fidelity_costs["low"]
+    medium_cost = fidelity_costs["medium"]
+    high_cost = fidelity_costs["high"]
+    reserved_high_calls = min(2, cost_budget // high_cost)
+    reserved_high_cost = reserved_high_calls * high_cost
+    low_target = min(75, max(5, int((cost_budget * 0.30) // low_cost)))
+    affordable_low = max(
+        0, (cost_budget - reserved_high_cost - 2 * medium_cost) // low_cost
+    )
+    low_target = min(low_target, max(5, affordable_low), design_count)
+    medium_target = min(10, max(2, int((cost_budget * 0.20) // medium_cost)))
+    medium_target = min(medium_target, low_target)
+    affordable_medium = max(
+        0, (cost_budget - low_target * low_cost - reserved_high_cost) // medium_cost
+    )
+    medium_target = min(medium_target, affordable_medium)
+    if medium_target < 1:
+        raise ValueError("budget cannot afford a medium-fidelity probe")
+    remaining = cost_budget - low_target * low_cost - medium_target * medium_cost
+    high_slots = min(low_target, remaining // high_cost)
+    anchor_count = min(2, high_slots, medium_target)
+    promotion_count = min(max(0, high_slots - anchor_count), low_target - anchor_count)
+    return {"low": low_target, "medium": medium_target, "high": anchor_count + promotion_count}
+
+
 def _validate_and_score_run(
     run: Any,
     *,
@@ -179,6 +219,7 @@ def _validate_and_score_run(
     allowed_severities: set[float],
     allowed_seeds: set[int],
     allowed_policies: set[str],
+    expected_design_count: int,
     cost_budget: int,
     fidelity_costs: dict[str, int],
 ) -> tuple[dict | None, list[str]]:
@@ -207,6 +248,8 @@ def _validate_and_score_run(
         errors.append(f"unregistered policy: {policy!r}")
     if isinstance(run["design_count"], bool) or not isinstance(run["design_count"], int) or run["design_count"] < 75:
         errors.append("design_count must be an integer at least 75")
+    elif run["design_count"] != expected_design_count:
+        errors.append("run design_count differs from top-level design_count")
     if run["cost_budget"] != cost_budget:
         errors.append("run cost_budget differs from top-level budget")
     if run["fidelity_costs"] != fidelity_costs:
@@ -284,6 +327,9 @@ def _validate_and_score_run(
         errors.append("not all evaluation rows could be validated")
     if run["fidelity_evaluations"] != counts:
         errors.append(f"fidelity_evaluations mismatch: expected {counts}, observed {run['fidelity_evaluations']!r}")
+    expected_counts = expected_policy_call_counts(policy, fidelity_costs, cost_budget, int(run["design_count"]))
+    if counts != expected_counts:
+        errors.append(f"policy call template mismatch: expected {expected_counts}, observed {counts}")
     if run["fidelity_cost_units_by_level"] != costs:
         errors.append(f"fidelity_cost_units_by_level mismatch: expected {costs}, observed {run['fidelity_cost_units_by_level']!r}")
     cost_spent = sum(costs.values())
@@ -478,6 +524,7 @@ def score_document(
             allowed_severities={float(v) for v in severities},
             allowed_seeds=set(seeds),
             allowed_policies=set(policies),
+            expected_design_count=design_count,
             cost_budget=cost_budget,
             fidelity_costs=fidelity_costs,
         )
