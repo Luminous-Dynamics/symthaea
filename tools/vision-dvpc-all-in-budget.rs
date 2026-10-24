@@ -95,6 +95,7 @@ enum ActionState {
     NotRequested,
     Reserved,
     RejectedBudget,
+    RejectedContaminated,
 }
 
 impl ActionState {
@@ -103,6 +104,7 @@ impl ActionState {
             Self::NotRequested => "NOT_REQUESTED",
             Self::Reserved => "RESERVED",
             Self::RejectedBudget => "REJECTED_BUDGET",
+            Self::RejectedContaminated => "REJECTED_RUN_CONTAMINATED",
         }
     }
 }
@@ -150,6 +152,7 @@ pub struct LedgerSnapshot {
     pub rejected_allocator_budget: usize,
     pub rejected_run_contaminated: usize,
     pub rejected_escalation_budget: usize,
+    pub rejected_escalation_contaminated: usize,
     pub contaminated_decisions: usize,
 }
 
@@ -262,7 +265,7 @@ impl AllInBudgetLedger {
         }
         if self.state == RunState::Contaminated {
             self.decisions.get_mut(decision_id).expect("record exists").action_state =
-                ActionState::RejectedBudget;
+                ActionState::RejectedContaminated;
             return Ok(false);
         }
 
@@ -321,10 +324,10 @@ impl AllInBudgetLedger {
                 self.mark_contaminated(decision_id);
                 return Err("escalation measurement must be positive in both resources; run contaminated".to_owned());
             }
-            (ActionState::NotRequested | ActionState::RejectedBudget, None) => {
+            (ActionState::NotRequested | ActionState::RejectedBudget | ActionState::RejectedContaminated, None) => {
                 (ResourceVector::default(), false)
             }
-            (ActionState::NotRequested | ActionState::RejectedBudget, Some(_)) => {
+            (ActionState::NotRequested | ActionState::RejectedBudget | ActionState::RejectedContaminated, Some(_)) => {
                 self.mark_contaminated(decision_id);
                 return Err("unreserved escalation work observed; run contaminated".to_owned());
             }
@@ -395,6 +398,7 @@ impl AllInBudgetLedger {
         let mut rejected_allocator_budget = 0usize;
         let mut rejected_run_contaminated = 0usize;
         let mut rejected_escalation_budget = 0usize;
+        let mut rejected_escalation_contaminated = 0usize;
         let mut contaminated_decisions = 0usize;
         for record in self.decisions.values() {
             match record.decision_state {
@@ -407,6 +411,9 @@ impl AllInBudgetLedger {
             }
             if record.action_state == ActionState::RejectedBudget {
                 rejected_escalation_budget += 1;
+            }
+            if record.action_state == ActionState::RejectedContaminated {
+                rejected_escalation_contaminated += 1;
             }
         }
         let remaining = ResourceVector {
@@ -428,6 +435,7 @@ impl AllInBudgetLedger {
             rejected_allocator_budget,
             rejected_run_contaminated,
             rejected_escalation_budget,
+            rejected_escalation_contaminated,
             contaminated_decisions,
         }
     }
@@ -452,6 +460,7 @@ impl AllInBudgetLedger {
         let _ = writeln!(out, "LEDGER\trejected_allocator_budget\t{}", snapshot.rejected_allocator_budget);
         let _ = writeln!(out, "LEDGER\trejected_run_contaminated\t{}", snapshot.rejected_run_contaminated);
         let _ = writeln!(out, "LEDGER\trejected_escalation_budget\t{}", snapshot.rejected_escalation_budget);
+        let _ = writeln!(out, "LEDGER\trejected_escalation_contaminated\t{}", snapshot.rejected_escalation_contaminated);
         let _ = writeln!(out, "LEDGER\tcontaminated_decisions\t{}", snapshot.contaminated_decisions);
         let _ = writeln!(out, "LEDGER\tperformance_claim\tNONE");
         for (decision_id, record) in &self.decisions {
@@ -638,6 +647,19 @@ mod tests {
         assert!(ledger.receipt().contains("LEDGER\tspent_latency_us\t22"));
         assert!(ledger.receipt().contains("LEDGER\tspent_energy_uj\t7"));
         assert!(ledger.receipt().contains("LEDGER\tperformance_claim\tNONE"));
+    }
+
+    #[test]
+    fn escalation_after_contamination_has_distinct_rejection() {
+        let mut ledger = AllInBudgetLedger::new(config(100, 100)).unwrap();
+        assert!(ledger.reserve_allocator("d1").unwrap());
+        assert!(ledger.reserve_allocator("d2").unwrap());
+        assert!(ledger.settle("d1", None, None).is_err());
+        assert!(!ledger.reserve_escalation("d2").unwrap());
+        let snapshot = ledger.snapshot();
+        assert_eq!(snapshot.rejected_escalation_budget, 0);
+        assert_eq!(snapshot.rejected_escalation_contaminated, 1);
+        assert_eq!(snapshot.state, RunState::Contaminated);
     }
 
     #[test]
