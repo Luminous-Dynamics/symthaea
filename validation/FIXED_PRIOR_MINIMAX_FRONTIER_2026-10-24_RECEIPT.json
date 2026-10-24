@@ -1,0 +1,61 @@
+{
+  "artifacts": {
+    "full_horizon_1_2": {
+      "bytes": 415371,
+      "filename": "fixed_prior_minimax_frontier_results_exact_2026-10-24.json",
+      "local_only": true,
+      "rows": 1080,
+      "sha256": "2249fc06a87778e07f9d23ab18aa6e0cae39ec5815b8a5fca2b4450e47a856e4",
+      "source_git_blob_bound": "438301f07649d7ffebca6690990a4909ea28e054"
+    },
+    "horizon_3_boundary": {
+      "bytes": 18593,
+      "filename": "fixed_prior_minimax_frontier_results_h3_boundary_2026-10-24.json",
+      "local_only": true,
+      "rows": 60,
+      "sha256": "c72f37975654d80e51489f4caf0852b3ae0c6e0396763da3f14a9c2856eb6111",
+      "source_git_blob_bound": "438301f07649d7ffebca6690990a4909ea28e054"
+    }
+  },
+  "branch": "research/causal-target-subset-kernel-v1",
+  "date": "2026-10-24",
+  "report": {
+    "git_blob": "e5a58dfd94b2f8665dad3387899f6b4543645d1e",
+    "path": "docs/research/FIXED_PRIOR_MINIMAX_FRONTIER_BENCHMARK_2026-10-24.md"
+  },
+  "repository": "Luminous-Dynamics/symthaea",
+  "schema": "symthaea-fixed-prior-minimax-frontier-receipt-v1",
+  "scientific_boundary": [
+    "16-hypothesis chain/fork model only",
+    "finite candidate priors not calibrated",
+    "exact intervention-subset telemetry",
+    "no held-out graph/mechanism families or real-data benchmark",
+    "no SOTA/novelty/production claim"
+  ],
+  "source": {
+    "bytes": 14024,
+    "git_blob": "438301f07649d7ffebca6690990a4909ea28e054",
+    "path": "validation/fixed_prior_minimax_policy_benchmark.py",
+    "sha256": "676b1797209e46ecbb42284370063d99e60c0de207df27c6ea1dc2c984c1290a"
+  },
+  "status": "EXACT_LOCAL_FIXED_PRIOR_MINIMAX_PILOT_NOT_EXTERNAL_QUALIFICATION",
+  "summary": {
+    "git_blob": "2dc4869ed2c0c1c66c756a9da10ce9206c57cb04",
+    "path": "validation/fixed_prior_minimax_frontier_summary_2026-10-24.json"
+  },
+  "test_source": {
+    "bytes": 3580,
+    "git_blob": "e316527b7b041c307a08461dc692a1174918bdde",
+    "path": "validation/test_fixed_prior_minimax_policy_benchmark.py",
+    "result": "10/10_PASS_LOCAL",
+    "sha256": "b81fcd4cdc691718650143d59f25f2a5fba72cd8856309286bed15142ada5a9d",
+    "tests": 10
+  },
+  "validation": {
+    "combined_local_regression_tests": "61/61_PASS",
+    "full_6_prior_horizon_3_all_objectives": "exceeded local execution limit; not claimed complete",
+    "remote_ci": "latest exact PR head inspection pending; skipped is not pass",
+    "risk_vector_components_rechecked_against_tree_evaluation": true,
+    "source_and_test_blob_match_executed_bytes": true
+  }
+}
