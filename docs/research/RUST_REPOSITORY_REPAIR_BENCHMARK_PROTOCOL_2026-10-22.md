@@ -167,6 +167,10 @@ There are two independent axes. **Capability** means resolving genuinely valid u
 - No valid external Rust leaderboard score, private held-out result, GCS treatment effect or cost-per-fix comparison has been measured under this protocol.
 - The new Rust tooling adds testable contracts. Until the fresh runner workflows complete on the current commits and their results are independently reviewed, queued/pending checks remain unverified. A passing CI job validates the tested code path, not the security of the runner itself.
 
+### Independent regrade verifier
+
+The separate [fresh-image regrade audit specification](RUST_REPOSITORY_REPAIR_REGRADING_AUDIT_2026-10-24.md) adds a Rust verifier for comparing primary and independent regrade score reports. It requires external report digests, equal candidate/task/prediction pins and identical per-task patch digests, rechecks the score aggregates, and rejects identical resolved-run logs/evidence. A task counts as double-verified pass only when both grades pass; unresolved tasks suppress strict pass@1. This tooling does not itself launch the second container or attest to its runner, and no primary/regrade comparison has yet been measured.
+
 ## 10. Execution checklist
 
 Before running a scored task, require a locked preregistration validated against `schemas/rust-repair-preregistration.schema.json`. Start with dataset provenance and task quality; then validate the environment; then run paired GCS trials; only after that run confirmatory held-out tasks. Do not wait on a queued CI run to do independent source review, dataset investigation or protocol development—but do not represent unexecuted tests as passing.
