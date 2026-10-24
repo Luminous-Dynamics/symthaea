@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "dataset_id": "synthetic-fixture-not-measured",
   "stream_id": "synthetic-counterfactual-fixture-not-measured",
   "scenario_id": "fixture-only-adaptation-recovery",
