@@ -1,0 +1,130 @@
+{
+  "schema_version": "vleb-task-v1",
+  "task_id": "vleb-ledger-reconcile-0001",
+  "task_family": "data_transaction_integrity",
+  "title": "Reconcile ledger records with idempotent duplicate handling",
+  "classification": {
+    "exposure": "public_development",
+    "sensitivity": "synthetic",
+    "difficulty": "intermediate",
+    "reviewer_count": 0
+  },
+  "source_identity": {
+    "source_kind": "synthetic_fixture",
+    "repository": null,
+    "revision": "synthetic-ledger-v1",
+    "source_sha256": "2f976927b50b516fa6d00a55ee5a7237ee5fa0de39fc76965307e9c960125715",
+    "fixture_sha256": {
+      "input_csv": "2f976927b50b516fa6d00a55ee5a7237ee5fa0de39fc76965307e9c960125715",
+      "expected_output_json": "6b0b77b40e1a152da26f82ba98c7ce7b367f1756948aa8ef950097cf75672f10",
+      "negative_control_csv": "ac3f29ecb70c7d242d2d719f323662daddb7bfc26a26f442ffe4a531522a86e7"
+    }
+  },
+  "environment": {
+    "platform": "linux",
+    "network_mode": "none",
+    "toolchains": [
+      {
+        "name": "rustc",
+        "version": "1.96.0",
+        "role": "compiler"
+      }
+    ],
+    "resource_budget": {
+      "timeout_seconds": 60,
+      "memory_mb": 512,
+      "cpu_count": 1
+    }
+  },
+  "behavior_contract": {
+    "task_statement": "Implement a deterministic ledger reconciler that validates CSV rows, applies exact duplicate transactions once, rejects conflicting duplicate transaction IDs without partial effects, and reports exact per-account and global totals.",
+    "invariants": [
+      "Amounts are positive integers in minor units; binary floating-point is prohibited.",
+      "Exact duplicate rows are idempotent and count once.",
+      "A transaction ID reused with different data causes rejection before any side effects are committed.",
+      "Output account rows are ordered lexicographically by account ID.",
+      "Global credits, debits and net equal the sums over account rows.",
+      "Net equals credits minus debits with checked integer arithmetic."
+    ],
+    "allowed_behavior_changes": [],
+    "observable_effects": [
+      "stdout_bytes",
+      "exit_code",
+      "control_totals",
+      "numeric_semantics",
+      "idempotency"
+    ]
+  },
+  "oracle_contract": {
+    "required_test_ids": [
+      "ledger.normal_exact_output",
+      "ledger.exact_duplicate_idempotency",
+      "ledger.account_totals",
+      "ledger.global_totals",
+      "ledger.conflicting_duplicate_rejected",
+      "ledger.conflict_has_no_partial_effect",
+      "ledger.invalid_amount_fails_closed",
+      "ledger.unknown_side_fails_closed",
+      "ledger.overflow_fails_closed",
+      "ledger.amount_token_canonical",
+      "ledger.maximum_credit_debit_valid",
+      "ledger.transaction_order_invariant",
+      "ledger.final_line_ending_invariant",
+      "ledger.duplicate_multiplicity_idempotent",
+      "ledger.generated_differential_reducer",
+      "ledger.malformed_csv_rejected"
+    ],
+    "baseline_empty_patch_must_fail": true,
+    "reference_patch_must_pass": true,
+    "regression_guards": [
+      "ledger.global_totals",
+      "ledger.account_totals"
+    ],
+    "negative_controls": [
+      {
+        "control_id": "nc-empty",
+        "mutation_class": "empty_patch",
+        "expected_verdict": "fail",
+        "notes": "The baseline implementation cannot satisfy the contract."
+      },
+      {
+        "control_id": "nc-duplicate",
+        "mutation_class": "duplicate_processing",
+        "expected_verdict": "fail",
+        "notes": "Apply TX-002 twice and verify totals diverge."
+      },
+      {
+        "control_id": "nc-rounding",
+        "mutation_class": "rounding_or_truncation",
+        "expected_verdict": "fail",
+        "notes": "Replace integer-minor-unit arithmetic with lossy numeric conversion."
+      },
+      {
+        "control_id": "nc-conflict",
+        "mutation_class": "other_semantic",
+        "expected_verdict": "fail",
+        "notes": "Accept a transaction ID collision with different content."
+      },
+      {
+        "control_id": "nc-partial",
+        "mutation_class": "missing_side_effect",
+        "expected_verdict": "fail",
+        "notes": "Apply rows before detecting a later conflicting duplicate."
+      }
+    ],
+    "oracle_review": {
+      "independent_reviewer_count": 0,
+      "mutation_equivalence_reviewed": false,
+      "notes": "Blueprint only; review and actual control runs are prerequisites for task admission."
+    }
+  },
+  "evaluation_policy": {
+    "primary_attempt_limit": 1,
+    "unresolved_policy": "retain_in_denominator_and_suppress_headline_score",
+    "agent_network_policy": "offline",
+    "abstention_allowed": true,
+    "attempts_per_task_secondary": 5,
+    "notes": "Not score-eligible until implementation, reference controls, test execution, and all evidence receipts are materialized."
+  },
+  "evidence_schema_version": "vleb-evidence-v1"
+}
