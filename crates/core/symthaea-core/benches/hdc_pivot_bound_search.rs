@@ -265,18 +265,23 @@ fn verify_correctness() {
     let query = BinaryHV::random(QUERY_SEED);
     let corpus = random_corpus(257);
     for pivot_count in PIVOT_COUNTS {
-        let ids = evenly_spaced_pivot_ids(256, pivot_count);
-        // Use a non-power-of-two query corpus and choose valid pivot IDs for it.
-        let ids: Vec<usize> = ids.into_iter().filter(|&id| id < corpus.len()).collect();
-        let index = PivotIndex::build(&corpus, &ids);
-        assert_eq!(
-            exact_argmin(&query, &corpus),
-            {
-                let result = pivot_exact_argmin::<true>(&query, &corpus, &index);
-                (result.0, result.1)
-            },
-            "pivot search differs from exhaustive search"
-        );
+        let selections = [
+            evenly_spaced_pivot_ids(256, pivot_count),
+            farthest_first_pivot_ids(&corpus, pivot_count),
+        ];
+        for ids in selections {
+            // Use a non-power-of-two query corpus and choose valid pivot IDs.
+            let ids: Vec<usize> = ids.into_iter().filter(|&id| id < corpus.len()).collect();
+            let index = PivotIndex::build(&corpus, &ids);
+            assert_eq!(
+                exact_argmin(&query, &corpus),
+                {
+                    let result = pivot_exact_argmin::<true>(&query, &corpus, &index);
+                    (result.0, result.1)
+                },
+                "pivot search differs from exhaustive search"
+            );
+        }
     }
 
     // Duplicate exact matches at non-adjacent IDs; lower-ID tie wins regardless
