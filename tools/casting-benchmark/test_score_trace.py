@@ -8,15 +8,37 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from score_trace import HypervolumeArchive2D, TraceScoreError, hypervolume_2d_minimize, score_trace
+from score_trace import HypervolumeArchive2D, TraceScoreError, hypervolume_2d_minimize, score_trace as _score_trace
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "success_receipt.fixture.json"
 TRACE_SCHEMA_PATH = ROOT / "docs" / "research" / "CASTING_BENCHMARK_TRACE.schema.json"
+PROTOCOL_PATH = ROOT / "docs" / "research" / "CASTING_BENCHMARK_PROTOCOL_V1.json"
+ANALYSIS_LOCK_PATH = ROOT / "docs" / "research" / "CASTING_BENCHMARK_ANALYSIS_LOCK_V1.json"
 SCORER_PATH = Path(__file__).parent / "score_trace.py"
 SCHEMA_BYTES = TRACE_SCHEMA_PATH.read_bytes()
+PROTOCOL_BYTES = PROTOCOL_PATH.read_bytes()
+ANALYSIS_LOCK_BYTES = ANALYSIS_LOCK_PATH.read_bytes()
 SCORER_BYTES = SCORER_PATH.read_bytes()
 BASE_RECEIPT = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+
+
+def score_trace(
+    receipt: dict[str, Any],
+    trace_bytes: bytes,
+    trace_schema_bytes: bytes = SCHEMA_BYTES,
+    scorer_bytes: bytes = SCORER_BYTES,
+    for_publication: bool = False,
+):
+    return _score_trace(
+        receipt,
+        trace_bytes,
+        trace_schema_bytes,
+        scorer_bytes,
+        PROTOCOL_BYTES,
+        ANALYSIS_LOCK_BYTES,
+        for_publication=for_publication,
+    )
 
 
 def make_row(index: int, status: str, objectives: list[float] | None, candidate: str | None = None) -> dict[str, Any]:
@@ -45,7 +67,10 @@ def make_receipt(
     receipt["synthetic_fixture_only"] = True
     receipt["evaluation_mode"] = "single_fidelity"
     receipt["suite"].update({
-        "dimension": 30,
+        "id": "test_only_hv_2d",
+        "version": "fixture-v1",
+        "instance_id": "known-answer",
+        "dimension": 2,
         "objective_count": 2,
         "objective_direction": "minimize_all",
         "ideal_point": [0.0, 0.0],
@@ -75,6 +100,8 @@ def make_receipt(
         "mean_interval_width_proxy": None,
         "abstention_fraction": 0.0,
     }
+    receipt["protocol_sha256"] = hashlib.sha256(PROTOCOL_BYTES).hexdigest()
+    receipt["analysis_lock_sha256"] = hashlib.sha256(ANALYSIS_LOCK_BYTES).hexdigest()
     receipt["artifacts"]["raw_trace_sha256"] = hashlib.sha256(trace_bytes).hexdigest()
     receipt["artifacts"]["trace_schema_sha256"] = hashlib.sha256(SCHEMA_BYTES).hexdigest()
     receipt["artifacts"]["scorer_sha256"] = hashlib.sha256(SCORER_BYTES).hexdigest()
@@ -123,6 +150,64 @@ class IndependentTraceScorerTests(unittest.TestCase):
             batch = hypervolume_2d_minimize(observed, [10.0, 10.0])
             self.assertAlmostEqual(incremental, batch, places=9)
         self.assertAlmostEqual(archive.area, 64.0, places=9)
+
+    def test_locked_zdt_reference_point_and_dimension_are_accepted(self) -> None:
+        rows = [
+            make_row(1, "feasible", [0.2, 0.8]),
+            make_row(2, "feasible", [0.6, 0.4]),
+        ]
+        trace = encode_rows(rows)
+        expected = {
+            "final_hypervolume": 0.47,
+            "normalized_hypervolume_auc": 0.74 / (2.0 * 1.21),
+            "feasible_fraction": 1.0,
+            "invalid_or_failed_fraction": 0.0,
+        }
+        receipt = make_receipt(trace, ["feasible", "feasible"], 2, expected)
+        receipt["suite"].update({
+            "id": "zdt_standard",
+            "instance_id": "ZDT1",
+            "dimension": 30,
+            "ideal_point": [0.0, 0.0],
+            "reference_point": [1.1, 1.1],
+        })
+        result = score_trace(receipt, trace)
+        self.assertAlmostEqual(result["metrics_recomputed"]["final_hypervolume"], 0.47, places=12)
+
+    def test_per_run_reference_point_change_is_rejected_by_analysis_lock(self) -> None:
+        rows = [
+            make_row(1, "feasible", [0.2, 0.8]),
+            make_row(2, "feasible", [0.6, 0.4]),
+        ]
+        trace = encode_rows(rows)
+        expected = {
+            "final_hypervolume": 0.47,
+            "normalized_hypervolume_auc": 0.74 / (2.0 * 1.21),
+            "feasible_fraction": 1.0,
+            "invalid_or_failed_fraction": 0.0,
+        }
+        receipt = make_receipt(trace, ["feasible", "feasible"], 2, expected)
+        receipt["suite"].update({
+            "id": "zdt_standard",
+            "instance_id": "ZDT1",
+            "dimension": 30,
+            "ideal_point": [0.0, 0.0],
+            "reference_point": [1.2, 1.1],
+        })
+        with self.assertRaisesRegex(TraceScoreError, "reference point differs from immutable suite contract"):
+            score_trace(receipt, trace)
+
+    def test_protocol_and_analysis_lock_hashes_must_match_exact_files(self) -> None:
+        receipt = make_receipt(self.known_trace, ["feasible"] * 4, 6, self.known_metrics)
+        receipt["protocol_sha256"] = "0" * 64
+        with self.assertRaisesRegex(TraceScoreError, "protocol digest mismatch"):
+            _score_trace(receipt, self.known_trace, SCHEMA_BYTES, SCORER_BYTES,
+                         PROTOCOL_BYTES, ANALYSIS_LOCK_BYTES)
+        receipt["protocol_sha256"] = hashlib.sha256(PROTOCOL_BYTES).hexdigest()
+        receipt["analysis_lock_sha256"] = "0" * 64
+        with self.assertRaisesRegex(TraceScoreError, "analysis-lock digest mismatch"):
+            _score_trace(receipt, self.known_trace, SCHEMA_BYTES, SCORER_BYTES,
+                         PROTOCOL_BYTES, ANALYSIS_LOCK_BYTES)
 
     def test_known_answer_hypervolume_and_early_stop_auc(self) -> None:
         result = score_known_answer(self.known_rows, 6, self.known_metrics)
