@@ -465,7 +465,7 @@ mod tests {
     }
 
     #[test]
-    fn missing_evidence_does_not_advance_idempotency_cursor() {
+    fn missing_evidence_does_not_advance_admitted_cursor() {
         use super::PredictionEvidenceCursor;
 
         let mut cursor = PredictionEvidenceCursor::default();
