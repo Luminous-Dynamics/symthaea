@@ -831,6 +831,21 @@ mod tests {
     }
 
     #[test]
+    fn smoke_fixture_parses_contract_and_routes_all_three_tiers() {
+        let input = include_str!("../tests/fixtures/vision-dvpc-017-smoke.tsv");
+        let table = parse_table(input).expect("smoke fixture parses");
+        let meta = parse_meta(&table).expect("smoke metadata parses");
+        let digest = sha256_hex(input.as_bytes());
+        validate_bundle(&table, &meta, &digest).expect("frozen fixture contract validates");
+        let tiers: Vec<Tier> = table.traces.iter().map(|trace| route(trace, &meta).tier).collect();
+        assert_eq!(tiers, vec![Tier::Full, Tier::Medium, Tier::Cheap, Tier::Full, Tier::Cheap]);
+        let rendered = receipt(&table, &meta, &digest);
+        assert!(rendered.contains("SCOPE\\tEVALUATION_ONLY_NOT_A_CERTIFICATE"));
+        assert!(rendered.contains("DECISION\\tt02\\tmedium\\tfull_gain_below_floor"));
+        assert!(rendered.contains("DECISION\\tt05\\tcheap\\tmedium_reservation_exceeds_budget"));
+    }
+
+    #[test]
     fn all_policy_aggregates_preserve_paired_trace_count() {
         let mut traces = Vec::new();
         for i in 0..5 {
