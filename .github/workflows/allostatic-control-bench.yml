@@ -1,0 +1,51 @@
+name: Allostatic Control Benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/allostatic-control-bench/**"
+      - "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
+      - ".github/workflows/allostatic-control-bench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: allostatic-control-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head Rust qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact tested revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust with required components
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Qualify benchmark, report, and provenance receipt
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash tools/allostatic-control-bench/qualify.sh "$EXPECTED_HEAD"
+
+      - name: Preserve generated evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allostatic-control-evidence
+          if-no-files-found: warn
+          path: |
+            allostatic-control-v1.csv
+            allostatic-control-v1.csv.receipt.txt
+            allostatic-control-v1-summary.csv
+            allostatic-control-v1-paired-deltas.csv
