@@ -461,12 +461,17 @@ impl NixOSExecutor {
 
     /// Capture the current NixOS generation for rollback
     pub async fn capture_generation(&mut self) -> anyhow::Result<u32> {
-        let output = Command::new("nixos-rebuild")
-            .args(["list-generations"])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .await?;
+        // Route even observational subprocesses through the injectable runner
+        // so tests can qualify the complete executor process boundary.
+        let args = vec!["list-generations".to_owned()];
+        let output = self.runner.run("nixos-rebuild", &args).await?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!(
+                "nixos-rebuild list-generations exited unsuccessfully: {}",
+                stderr.trim()
+            ));
+        }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -801,6 +806,87 @@ mod tests {
         }
     }
 
+
+    #[cfg(unix)]
+    struct StaticOutputRunner {
+        invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        success: bool,
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+    }
+
+    #[cfg(unix)]
+    impl NixOSCommandRunner for StaticOutputRunner {
+        fn run<'a>(
+            &'a self,
+            executable: &'a str,
+            args: &'a [String],
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = std::io::Result<std::process::Output>,
+                    > + Send
+                    + 'a,
+            >,
+        > {
+            assert_eq!(executable, "nixos-rebuild");
+            assert_eq!(args, &["list-generations".to_owned()]);
+            self.invocations
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let success = self.success;
+            let stdout = self.stdout.clone();
+            let stderr = self.stderr.clone();
+            Box::pin(async move {
+                use std::os::unix::process::ExitStatusExt;
+                let status = if success {
+                    std::process::ExitStatus::from_raw(0)
+                } else {
+                    std::process::ExitStatus::from_raw(1 << 8)
+                };
+                Ok(std::process::Output {
+                    status,
+                    stdout,
+                    stderr,
+                })
+            })
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn capture_generation_uses_runner_and_rejects_failed_command_output() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+
+        let valid_invocations = Arc::new(AtomicUsize::new(0));
+        let valid_runner = Arc::new(StaticOutputRunner {
+            invocations: Arc::clone(&valid_invocations),
+            success: true,
+            stdout: b"42 2026-10-24 12:00:00 (current) NixOS\n".to_vec(),
+            stderr: Vec::new(),
+        });
+        let mut valid_executor = NixOSExecutor::new().with_runner(valid_runner);
+        assert_eq!(valid_executor.capture_generation().await.unwrap(), 42);
+        assert_eq!(valid_executor.current_generation, Some(42));
+        assert_eq!(valid_invocations.load(Ordering::SeqCst), 1);
+
+        // A failed subprocess must not be accepted as fresh pre-state even
+        // if stdout happens to contain a parseable '(current)' row.
+        let failed_invocations = Arc::new(AtomicUsize::new(0));
+        let failed_runner = Arc::new(StaticOutputRunner {
+            invocations: Arc::clone(&failed_invocations),
+            success: false,
+            stdout: b"99 2026-10-24 12:00:00 (current) NixOS\n".to_vec(),
+            stderr: b"failed to inspect generations".to_vec(),
+        });
+        let mut failed_executor = NixOSExecutor::new().with_runner(failed_runner);
+        let error = failed_executor.capture_generation().await.unwrap_err();
+        assert!(error.to_string().contains("exited unsuccessfully"));
+        assert_eq!(failed_executor.current_generation, None);
+        assert_eq!(failed_invocations.load(Ordering::SeqCst), 1);
+    }
 
     #[test]
     fn test_command_safety_levels() {
