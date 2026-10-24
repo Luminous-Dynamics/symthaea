@@ -178,6 +178,7 @@ impl CognitiveLoopService {
         let prediction_evidence = Self::compute_prediction_error_evidence(
             &compressed_state,
             self.last_prediction.as_deref(),
+            self.last_prediction_cycle,
             observation_cycle,
         );
         let prediction_error_sample =
@@ -589,6 +590,7 @@ impl CognitiveLoopService {
     fn compute_prediction_error_evidence(
         current: &[f32],
         previous: Option<&[f32]>,
+        prediction_cycle: Option<u64>,
         observation_cycle: u64,
     ) -> super::types::PredictionErrorEvidence {
         use super::types::PredictionEvidenceStatus as Status;
@@ -597,6 +599,9 @@ impl CognitiveLoopService {
             None => (Status::NoPriorPrediction, None),
             Some(previous) if current.is_empty() || previous.is_empty() => {
                 (Status::EmptyObservation, None)
+            }
+            Some(_) if prediction_cycle != observation_cycle.checked_sub(1) => {
+                (Status::StaleOrOutOfOrder, None)
             }
             Some(previous) if current.len() != previous.len() => {
                 (Status::DimensionMismatch, None)
@@ -627,7 +632,7 @@ impl CognitiveLoopService {
         super::types::PredictionErrorEvidence::from_comparison(
             status,
             value,
-            None,
+            prediction_cycle,
             observation_cycle,
         )
     }
@@ -1122,27 +1127,38 @@ mod prediction_evidence_replay_tests {
         use crate::cognitive_loop::types::PredictionEvidenceStatus as Status;
 
         let cold_start =
-            CognitiveLoopService::compute_prediction_error_evidence(&[0.1], None, 7);
+            CognitiveLoopService::compute_prediction_error_evidence(&[0.1], None, None, 7);
         assert_eq!(cold_start.status(), Status::NoPriorPrediction);
         assert_eq!(cold_start.value_for_observation(7), None);
 
-        let empty = CognitiveLoopService::compute_prediction_error_evidence(&[], Some(&[]), 7);
+        let stale =
+            CognitiveLoopService::compute_prediction_error_evidence(
+                &[0.1],
+                Some(&[0.1]),
+                Some(5),
+                7,
+            );
+        assert_eq!(stale.status(), Status::StaleOrOutOfOrder);
+        assert_eq!(stale.value_for_observation(7), None);
+
+        let empty = CognitiveLoopService::compute_prediction_error_evidence(&[], Some(&[]), Some(6), 7);
         assert_eq!(empty.status(), Status::EmptyObservation);
         assert_eq!(empty.value_for_observation(7), None);
 
         let mismatch =
-            CognitiveLoopService::compute_prediction_error_evidence(&[0.1, 0.2], Some(&[0.1]), 7);
+            CognitiveLoopService::compute_prediction_error_evidence(&[0.1, 0.2], Some(&[0.1]), Some(6), 7);
         assert_eq!(mismatch.status(), Status::DimensionMismatch);
         assert_eq!(mismatch.value_for_observation(7), None);
 
         let non_finite =
-            CognitiveLoopService::compute_prediction_error_evidence(&[f32::NAN], Some(&[0.0]), 7);
+            CognitiveLoopService::compute_prediction_error_evidence(&[f32::NAN], Some(&[0.0]), Some(6), 7);
         assert_eq!(non_finite.status(), Status::NonFiniteInput);
         assert_eq!(non_finite.value_for_observation(7), None);
 
         let identical = CognitiveLoopService::compute_prediction_error_evidence(
             &[0.1, 0.2],
             Some(&[0.1, 0.2]),
+            Some(6),
             7,
         );
         assert_eq!(identical.status(), Status::Valid);
@@ -1151,6 +1167,7 @@ mod prediction_evidence_replay_tests {
         let mismatch_error = CognitiveLoopService::compute_prediction_error_evidence(
             &[0.1, 0.2],
             Some(&[0.2, 0.3]),
+            Some(6),
             7,
         );
         let error = mismatch_error
