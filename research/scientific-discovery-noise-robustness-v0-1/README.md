@@ -19,6 +19,7 @@ cargo clippy --manifest-path research/scientific-discovery-noise-robustness-v0-1
 - AR(1)-correlated residuals.
 - Explicit missing and left/right-censored outcomes.
 - A predeclared noise-scale change point.
+- A bounded interleaved-anchor schedule helper to reduce confounding between time/order drift and covariate shifts in fixed-design controls.
 
 The combined-shift regime in the protocol manifest remains reserved for a later stress phase and is not implemented here.
 
@@ -26,4 +27,4 @@ The combined-shift regime in the protocol manifest remains reserved for a later 
 
 The generator is evaluator-side synthetic infrastructure. Keep the model configuration and latent response out of the discovery policy; only admitted observations and permitted pre-outcome design variables belong on the policy side. The built-in pseudorandom generator is deterministic and suitable only for reproducible fixtures, not cryptography, secret labels, or secure blinding.
 
-Passing unit tests would establish generator mechanics and deterministic replay only. It would not establish calibration, valid sequential guarantees, detection power, real-data robustness, law-recovery performance, or superiority over published methods. Those require separate statistical qualification and matched benchmark executions.
+Passing unit tests would establish generator mechanics, diagnostic schedule invariants and deterministic replay only. It would not establish calibration, valid sequential guarantees, detection power, real-data robustness, law-recovery performance, or superiority over published methods. Those require separate statistical qualification and matched benchmark executions.
