@@ -33,6 +33,7 @@ impl Outcome {
 struct ScoreTask {
     instance_id: String,
     outcome: Outcome,
+    reasons: Vec<String>,
     prediction_patch_sha256: Option<String>,
     scored_log_sha256: Option<String>,
     evaluation_evidence_sha256: Option<String>,
@@ -269,12 +270,7 @@ fn read_pinned_report(
                 canonical_path.display()
             ));
         }
-        if task.required_tests_passing > task.required_test_count {
-            return Err(format!(
-                "task {:?} required_tests_passing exceeds required_test_count",
-                task.instance_id
-            ));
-        }
+        validate_outcome_consistency(task)?;
         valid_digest_field(&task.prediction_patch_sha256, "prediction patch", &task.instance_id)?;
         valid_digest_field(&task.scored_log_sha256, "scored log", &task.instance_id)?;
         valid_digest_field(
@@ -377,6 +373,60 @@ fn read_pinned_report(
         report,
         tasks,
     })
+}
+
+fn validate_outcome_consistency(task: &ScoreTask) -> Result<(), String> {
+    if task.required_tests_passing > task.required_test_count {
+        return Err(format!(
+            "task {:?} required_tests_passing exceeds required_test_count",
+            task.instance_id
+        ));
+    }
+    let patch_not_applied = task.reasons.iter().any(|reason| reason == "prediction patch was not applied");
+    match task.outcome {
+        Outcome::Pass => {
+            if task.reasons.is_empty()
+                && task.required_test_count > 0
+                && task.required_tests_passing == task.required_test_count
+                && task.scored_test_exit_code == Some(0)
+            {
+                Ok(())
+            } else {
+                Err(format!(
+                    "task {:?} is marked pass without empty reasons, all required tests passing, and exit code zero",
+                    task.instance_id
+                ))
+            }
+        }
+        Outcome::Fail => {
+            if patch_not_applied {
+                return Ok(());
+            }
+            let required_failed = task.required_test_count.saturating_sub(task.required_tests_passing);
+            let expected_reason = format!("{required_failed} required regression/fail-to-pass test(s) failed");
+            if required_failed > 0
+                && task.scored_test_exit_code != Some(0)
+                && task.reasons.as_slice() == [expected_reason.as_str()]
+            {
+                Ok(())
+            } else {
+                Err(format!(
+                    "task {:?} is marked fail without a required-test failure or patch-application failure reason",
+                    task.instance_id
+                ))
+            }
+        }
+        Outcome::Unresolved => {
+            if !task.reasons.is_empty() {
+                Ok(())
+            } else {
+                Err(format!(
+                    "task {:?} is unresolved without an audit reason",
+                    task.instance_id
+                ))
+            }
+        }
+    }
 }
 
 fn same_optional_float(left: Option<f64>, right: Option<f64>) -> bool {
@@ -877,6 +927,11 @@ mod tests {
         ScoreTask {
             instance_id: instance_id.to_string(),
             outcome,
+            reasons: match outcome {
+                Outcome::Pass => Vec::new(),
+                Outcome::Fail => vec!["1 required regression/fail-to-pass test(s) failed".to_string()],
+                Outcome::Unresolved => vec!["test status unresolved".to_string()],
+            },
             prediction_patch_sha256: Some(patch.repeat(64 / patch.len())),
             scored_log_sha256: Some(log.repeat(64 / log.len())),
             evaluation_evidence_sha256: Some(evidence.repeat(64 / evidence.len())),
@@ -1110,6 +1165,33 @@ mod tests {
         assert!(parse_cli(&args).unwrap_err().contains("--report-out"));
     }
 
+
+    #[test]
+    fn impossible_outcome_labels_are_rejected() {
+        let mut forged_fail = task("task-fail", Outcome::Fail, "1", "2", "3");
+        forged_fail.required_tests_passing = forged_fail.required_test_count;
+        forged_fail.scored_test_exit_code = Some(0);
+        forged_fail.reasons.clear();
+        assert!(
+            validate_outcome_consistency(&forged_fail)
+                .unwrap_err()
+                .contains("marked fail")
+        );
+
+        let mut forged_pass = task("task-pass", Outcome::Pass, "1", "2", "3");
+        forged_pass.required_tests_passing -= 1;
+        assert!(
+            validate_outcome_consistency(&forged_pass)
+                .unwrap_err()
+                .contains("marked pass")
+        );
+
+        let mut reasoned_fail = task("task-fail-applied", Outcome::Fail, "1", "2", "3");
+        reasoned_fail.reasons = vec!["prediction patch was not applied".to_string()];
+        reasoned_fail.required_tests_passing = reasoned_fail.required_test_count;
+        reasoned_fail.scored_test_exit_code = Some(0);
+        assert!(validate_outcome_consistency(&reasoned_fail).is_ok());
+    }
 
     #[test]
     fn completed_run_success_rate_is_recomputed_from_resolved_rows() {
