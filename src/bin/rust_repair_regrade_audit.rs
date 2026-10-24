@@ -689,7 +689,7 @@ fn read_pinned_manifest(
             || task.runtime_platform != "linux"
             || task.network_mode != "none"
             || !task.workspace_clean
-            || task.repo != task.repo.trim()
+            || task.repo.trim().is_empty()
             || task.container_ids.is_empty()
             || task.container_ids.iter().any(|id| id.trim().is_empty())
             || task.fail_to_pass_count == 0
@@ -958,6 +958,7 @@ mod tests {
             "--expected-primary-report-sha256".to_string(), "a".repeat(64),
             "--regrade-report".to_string(), "regrade.json".to_string(),
             "--expected-regrade-report-sha256".to_string(), "b".repeat(64),
+            "--task-manifest".to_string(), "manifest.json".to_string(),
             "--expected-task-manifest-sha256".to_string(), "c".repeat(64),
         ];
         assert!(parse_cli(&args).unwrap_err().contains("--report-out"));
