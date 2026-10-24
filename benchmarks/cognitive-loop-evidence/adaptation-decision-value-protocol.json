@@ -162,7 +162,9 @@
   ],
   "score_receipt_binding": {
     "receipt_schema_version": 2,
+    "utility_input_schema_version": 3,
     "executed_replay_outcomes": "Every arm decision must carry finite non-negative task_loss and adaptation_cost_units plus task_loss_available_at_tick >= decision_tick.",
+    "utility_schema_note": "Counterfactual utility schema v3 adds task_loss_available_at_tick to each scored observation; receipt-bound scoring requires an exact match to the raw receipt decision record.",
     "cli_flag": "--receipt",
     "required_identity_matches": [
       "score.dataset_id equals receipt.dataset_id",
@@ -199,25 +201,25 @@
       "id": "mean_task_loss",
       "role": "secondary descriptive outcome",
       "direction": "lower",
-      "metric_source": "counterfactual-utility-v2"
+      "metric_source": "counterfactual-utility-v3"
     },
     {
       "id": "post_shift_mean_task_loss",
       "role": "single confirmatory task endpoint",
       "direction": "lower",
-      "metric_source": "counterfactual-utility-v2"
+      "metric_source": "counterfactual-utility-v3"
     },
     {
       "id": "post_shift_loss_area_above_threshold",
       "role": "recovery outcome",
       "direction": "lower",
-      "metric_source": "counterfactual-utility-v2"
+      "metric_source": "counterfactual-utility-v3"
     },
     {
       "id": "recovery_delay_cycles",
       "role": "recovery outcome",
       "direction": "lower",
-      "metric_source": "counterfactual-utility-v2"
+      "metric_source": "counterfactual-utility-v3"
     },
     {
       "id": "harmful_intervention_rate",
