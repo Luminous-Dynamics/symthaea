@@ -1479,7 +1479,13 @@ mod tests {
         let hv = symthaea_core::hdc::BinaryHV::random(42);
         for cycle in 1..=5 {
             s.stats.total_cycles = cycle;
-            let state = make_cycle_state(&compressed, &output, &hv, "stable input");
+            let mut state = make_cycle_state(&compressed, &output, &hv, "stable input");
+            state.prediction_evidence = PredictionErrorEvidence::valid(
+                0.2,
+                cycle.checked_sub(1).map(|previous| previous as u64),
+                cycle as u64,
+            )
+            .expect("finite cycle evidence");
             let mut timings = super::super::ModuleTimings::default();
             let m = s.compute_consciousness_metrics(&state, &mut timings);
             assert!(
