@@ -1,0 +1,151 @@
+{
+  "artifact": {
+    "bytes": 37662,
+    "filename": "objective_matched_oracle_results_exact_2026-10-23.json",
+    "local_only": true,
+    "rows": 99,
+    "sha256": "00e02e219779d4ef1cf779d32760746e0e564c3ff382966aa4d3beb47c9cedc5",
+    "source_git_blob_bound": "f101346c2f37cfad4e029ae280e9a002548f309c"
+  },
+  "base_source": {
+    "git_blob": "ce19dccec3a81f4c6a18563de88152019b966f5d",
+    "path": "validation/action_subset_kernel_benchmark.py"
+  },
+  "branch": "research/causal-target-subset-kernel-v1",
+  "date": "2026-10-23",
+  "horizon_3": {
+    "graph": {
+      "best_policies": [
+        {
+          "gain_bits": 0.412716,
+          "policy": "greedy_graph",
+          "regret_bits": 0.0
+        },
+        {
+          "gain_bits": 0.412716,
+          "policy": "oracle_graph",
+          "regret_bits": 0.0
+        },
+        {
+          "gain_bits": 0.373086,
+          "policy": "oracle_joint",
+          "regret_bits": 0.03963
+        },
+        {
+          "gain_bits": 0.345538,
+          "policy": "greedy_joint",
+          "regret_bits": 0.067178
+        }
+      ],
+      "oracle_gain_bits": 0.412716
+    },
+    "joint": {
+      "best_policies": [
+        {
+          "gain_bits": 0.941652,
+          "policy": "oracle_joint",
+          "regret_bits": 0.0
+        },
+        {
+          "gain_bits": 0.940572,
+          "policy": "greedy_joint",
+          "regret_bits": 0.00108
+        },
+        {
+          "gain_bits": 0.909471,
+          "policy": "greedy_graph",
+          "regret_bits": 0.032181
+        },
+        {
+          "gain_bits": 0.909471,
+          "policy": "oracle_graph",
+          "regret_bits": 0.032181
+        }
+      ],
+      "oracle_gain_bits": 0.941652
+    },
+    "kernel": {
+      "best_policies": [
+        {
+          "gain_bits": 0.642285,
+          "policy": "round_robin",
+          "regret_bits": 0.0
+        },
+        {
+          "gain_bits": 0.642285,
+          "policy": "greedy_kernel",
+          "regret_bits": 0.0
+        },
+        {
+          "gain_bits": 0.642285,
+          "policy": "coverage_graph",
+          "regret_bits": 0.0
+        },
+        {
+          "gain_bits": 0.642285,
+          "policy": "coverage_kernel",
+          "regret_bits": 0.0
+        }
+      ],
+      "oracle_gain_bits": 0.642285
+    }
+  },
+  "limitations": [
+    "Reduced 16-hypothesis game; chain and fork only",
+    "Exact target-subset telemetry assumed",
+    "No published or external baseline run",
+    "No SOTA claim"
+  ],
+  "protocol": {
+    "graphs": [
+      "chain",
+      "fork"
+    ],
+    "horizons": [
+      1,
+      2,
+      3
+    ],
+    "joint_hypotheses": 16,
+    "policies": 11,
+    "result_rows": 99,
+    "scored_objectives": [
+      "graph",
+      "kernel",
+      "joint"
+    ],
+    "spill_probabilities": [
+      0.1,
+      0.6
+    ]
+  },
+  "report": {
+    "content_retrieved_from_github": true,
+    "git_blob": "f505b2909998aef341c290dc0f084b0ba26cfe3a",
+    "path": "docs/research/OBJECTIVE_MATCHED_ORACLE_BENCHMARK_2026-10-23.md"
+  },
+  "repository": "Luminous-Dynamics/symthaea",
+  "schema": "symthaea-objective-matched-oracle-summary-v1",
+  "source": {
+    "bytes": 11298,
+    "git_blob": "f101346c2f37cfad4e029ae280e9a002548f309c",
+    "path": "validation/objective_matched_oracle_benchmark.py",
+    "sha256": "518d94210dbfd870cb6a3302ca7b0ac0798be5d50011330f6cc757b2f335aec4"
+  },
+  "status": "EXACT_LOCAL_OBJECTIVE_MATCHED_ORACLE_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "tests": {
+    "bytes": 2542,
+    "count": 8,
+    "git_blob": "e8369315d0640785517017aec9a738c2e20929c7",
+    "path": "validation/test_objective_matched_oracle_benchmark.py",
+    "result": "8/8_PASS_LOCAL",
+    "sha256": "122f6ca8eb88f7935a526851714f94819a31ad2bb1dbb1f412be41fe1cec205f"
+  },
+  "validation": {
+    "all_matched_oracles_have_zero_regret": true,
+    "combined_local_suites": "30/30_PASS_LOCAL",
+    "no_policy_beats_matched_oracle": true,
+    "remote_ci": "not claimed",
+    "source_and_test_blobs_match_executed_bytes": true
+  }
+}

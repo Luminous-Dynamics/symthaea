@@ -1,0 +1,89 @@
+{
+  "schema": "symthaea-robust-ambiguity-policy-summary-v1",
+  "date": "2026-10-24",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/causal-target-subset-kernel-v1",
+  "status": "EXACT_LOCAL_ROBUST_POLICY_PILOT_NOT_EXTERNAL_QUALIFICATION",
+  "source": {
+    "path": "validation/robust_ambiguity_policy_benchmark.py",
+    "git_blob": "c511c9651de071458734e014137484d982c717dc",
+    "sha256": "890f2cd8598595bc37793d742d8af970b4e2cb4caa2d8daf8ac3f167cc0ba1c5",
+    "bytes": 12315
+  },
+  "test_source": {
+    "path": "validation/test_robust_ambiguity_policy_benchmark.py",
+    "git_blob": "a45fd468130890974e694b0f52c70686434ac04f",
+    "sha256": "b7b798dd1d22b52e789b6bd586426a2acaf56df157b257f812ee195cc006061e",
+    "bytes": 3159,
+    "tests": 8,
+    "result": "8/8_PASS_LOCAL"
+  },
+  "artifacts": {
+    "full_horizons_1_2": {
+      "filename": "robust_ambiguity_policy_results_full_h2.json",
+      "bytes": 675036,
+      "rows": 1080,
+      "sha256": "6997bb7f001bd7505e182293f73c8f6e993a548896d0173c07b70759cc9755e9",
+      "source_git_blob_bound": "c511c9651de071458734e014137484d982c717dc",
+      "local_only": true
+    },
+    "horizon_3_boundary": {
+      "filename": "robust_ambiguity_policy_results_h3_boundary.json",
+      "bytes": 111925,
+      "rows": 180,
+      "sha256": "b26d170e8f157cdec13702fcd63b6062a1d0c3254bc644ca481cf39c4cd79490",
+      "source_git_blob_bound": "c511c9651de071458734e014137484d982c717dc",
+      "local_only": true
+    }
+  },
+  "protocol": {
+    "hypothesis_count": 16,
+    "prior_candidates": 6,
+    "full_grid": "6 true priors x 6 learner priors x 3 objectives x 5 policies x horizons 1-2 = 1080 rows",
+    "horizon_3_boundary": "true/learner priors uniform and high-spill-biased; 4 prior pairings x 3 objectives x 5 policies x horizons 1-3 = 180 rows",
+    "robust_policy": "one-step minimax expected terminal cross-entropy over the six candidate-world posterior scenarios",
+    "score": "exact expected terminal categorical cross-entropy and Brier risk",
+    "telemetry": "exact realized target subset and three-bit outcome"
+  },
+  "horizon_2_misspecified_prior_metrics": {
+    "graph": {
+      "robust_minimax_one_step": {"mean_ce_bits": 0.858556, "worst_ce_bits": 1.609473, "mean_ce_reduction_bits": 0.361741, "min_ce_reduction_bits": 0.112542},
+      "greedy_joint": {"mean_ce_bits": 0.897715, "worst_ce_bits": 1.708013, "mean_ce_reduction_bits": 0.322582, "min_ce_reduction_bits": 0.000899},
+      "round_robin": {"mean_ce_bits": 0.994745, "worst_ce_bits": 1.866977, "mean_ce_reduction_bits": 0.225552, "min_ce_reduction_bits": -0.037094},
+      "random_uniform": {"mean_ce_bits": 1.079059, "worst_ce_bits": 2.035729, "mean_ce_reduction_bits": 0.141238, "min_ce_reduction_bits": -0.073213}
+    },
+    "kernel": {
+      "robust_minimax_one_step": {"mean_ce_bits": 3.168323, "worst_ce_bits": 6.075885, "mean_ce_reduction_bits": 0.487364, "min_ce_reduction_bits": 0.317434},
+      "greedy_joint": {"mean_ce_bits": 3.194939, "worst_ce_bits": 6.177194, "mean_ce_reduction_bits": 0.460749, "min_ce_reduction_bits": 0.063832},
+      "round_robin": {"mean_ce_bits": 3.147793, "worst_ce_bits": 6.075885, "mean_ce_reduction_bits": 0.507895, "min_ce_reduction_bits": 0.240136},
+      "random_uniform": {"mean_ce_bits": 3.163253, "worst_ce_bits": 6.109654, "mean_ce_reduction_bits": 0.492434, "min_ce_reduction_bits": 0.289955}
+    },
+    "joint": {
+      "robust_minimax_one_step": {"mean_ce_bits": 4.188293, "worst_ce_bits": 6.785929, "mean_ce_reduction_bits": 0.853859, "min_ce_reduction_bits": 0.588478},
+      "greedy_joint": {"mean_ce_bits": 4.205072, "worst_ce_bits": 6.917406, "mean_ce_reduction_bits": 0.837079, "min_ce_reduction_bits": 0.606409},
+      "round_robin": {"mean_ce_bits": 4.263053, "worst_ce_bits": 6.824400, "mean_ce_reduction_bits": 0.779099, "min_ce_reduction_bits": 0.537128},
+      "random_uniform": {"mean_ce_bits": 4.370710, "worst_ce_bits": 6.943428, "mean_ce_reduction_bits": 0.671442, "min_ce_reduction_bits": 0.476258}
+    }
+  },
+  "horizon_3_misspecified_boundary_metrics": {
+    "graph": {"robust_mean_worst_ce": [0.633019, 0.678754], "greedy_joint_mean_worst_ce": [0.678327, 0.748367], "round_robin_mean_worst_ce": [0.825970, 0.852273], "random_mean_worst_ce": [0.834069, 0.857941]},
+    "kernel": {"robust_mean_worst_ce": [3.003574, 3.546673], "greedy_joint_mean_worst_ce": [3.016040, 3.648102], "round_robin_mean_worst_ce": [2.981286, 3.546673], "random_mean_worst_ce": [3.026258, 3.603452]},
+    "joint": {"robust_mean_worst_ce": [3.732584, 4.300840], "greedy_joint_mean_worst_ce": [3.694367, 4.256389], "round_robin_mean_worst_ce": [3.807256, 4.346340], "random_mean_worst_ce": [3.860326, 4.413648]},
+    "pairing_limit": "Only two mismatched prior pairings; boundary diagnostic only"
+  },
+  "validation": {
+    "combined_local_regression_tests": "51/51_PASS",
+    "source_git_blob_matches_executed_file": true,
+    "test_git_blob_matches_executed_file": true,
+    "exact_result_hashes_verified": true,
+    "remote_ci": "inspect exact final PR head separately; no pass inferred from skipped jobs"
+  },
+  "scientific_boundary": [
+    "16 hypotheses; chain/fork only; three binary action-specific spill parameters.",
+    "Finite six-prior ambiguity set is not a calibrated confidence set.",
+    "Policy is one-step minimax cross-entropy, not a multi-step minimax Bellman optimum.",
+    "Exact target-subset telemetry; no action costs, noisy/missing telemetry or disturbance.",
+    "True priors are within the tested candidate set; no evidence about missing graph/mechanism support.",
+    "No external benchmark executed; no SOTA or novelty claim."
+  ]
+}

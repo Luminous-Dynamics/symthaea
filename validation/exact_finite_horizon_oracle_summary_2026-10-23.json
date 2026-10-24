@@ -1,0 +1,42 @@
+{
+  "schema": "symthaea-exact-finite-horizon-oracle-summary-v1",
+  "date": "2026-10-23",
+  "status": "EXACT_LOCAL_FINITE_HORIZON_ORACLE_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "source_git_blob": "20981e1e1b4db0886849f64ee4f689e68ecddf53",
+  "test_git_blob": "6d6aa7db02d733678f742168515e2926cf3d66bd",
+  "artifact": {
+    "filename": "exact_finite_horizon_oracle_results_2026-10-23.json",
+    "bytes": 8988,
+    "sha256": "7fb11a9b1b8e263e106e91ca0149b050d9024125fc4e740ad8fbb7b67b4b28d2",
+    "local_only": true
+  },
+  "protocol": {
+    "joint_hypotheses": 16,
+    "graphs": ["chain", "fork"],
+    "off_target_probabilities": [0.1, 0.6],
+    "horizons": [1, 2, 3],
+    "policies": 7,
+    "result_rows": 21,
+    "objective": "minimize expected terminal entropy of joint graph and action-kernel hypothesis"
+  },
+  "horizon_3": {
+    "exact_oracle_information_gain_bits": 0.941652,
+    "greedy_joint_information_gain_bits": 0.940572,
+    "greedy_joint_regret_bits": 0.001080,
+    "greedy_graph_regret_bits": 0.032181,
+    "round_robin_regret_bits": 0.099034,
+    "random_regret_bits": 0.161491
+  },
+  "validation": {
+    "oracle_tests": "7/7_PASS_LOCAL",
+    "all_three_suites": "22/22_PASS_LOCAL",
+    "source_and_test_blobs_match_executed_bytes": true,
+    "remote_ci": "not claimed"
+  },
+  "limitations": [
+    "Only chain and fork graphs and a 16-hypothesis finite prior",
+    "Exact realized-target telemetry assumed",
+    "No published baseline or external benchmark was run",
+    "No SOTA claim"
+  ]
+}

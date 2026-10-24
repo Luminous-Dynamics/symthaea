@@ -1,0 +1,44 @@
+{
+  "artifact": {
+    "bytes": 8988,
+    "filename": "exact_finite_horizon_oracle_results_2026-10-23.json",
+    "local_only": true,
+    "sha256": "7fb11a9b1b8e263e106e91ca0149b050d9024125fc4e740ad8fbb7b67b4b28d2",
+    "source_git_blob_bound": "20981e1e1b4db0886849f64ee4f689e68ecddf53"
+  },
+  "branch": "research/causal-target-subset-kernel-v1",
+  "date": "2026-10-23",
+  "repository": "Luminous-Dynamics/symthaea",
+  "report": {
+    "git_blob": "a6e66cb3c1dcf51a61fdf73accf76b1a8af757c2",
+    "path": "docs/research/EXACT_FINITE_HORIZON_ORACLE_2026-10-23.md"
+  },
+  "schema": "symthaea-exact-finite-horizon-oracle-receipt-v1",
+  "scientific_boundary": "Exact Bellman results apply only to a reduced 16-hypothesis chain/fork game with exact target-subset telemetry. No external benchmark or published baseline was run; no SOTA claim.",
+  "source": {
+    "bytes": 10763,
+    "git_blob": "20981e1e1b4db0886849f64ee4f689e68ecddf53",
+    "path": "validation/exact_finite_horizon_oracle.py",
+    "sha256": "ca7bc5bc2317c5f3a06772f8a565be6e479e4f4fdaf9cb73c356622c3cef1100"
+  },
+  "status": "EXACT_LOCAL_FINITE_HORIZON_ORACLE_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "summary": {
+    "git_blob": "cd320801ed4a8b30491b2c7400947ac61460fb2f",
+    "path": "validation/exact_finite_horizon_oracle_summary_2026-10-23.json",
+    "sha256": "1a99e7cdf34aa8c0a48cabbe36d4e62ca2897151105bde17b82408a2fd216419"
+  },
+  "tests": {
+    "bytes": 1767,
+    "count": 7,
+    "git_blob": "6d6aa7db02d733678f742168515e2926cf3d66bd",
+    "path": "validation/test_exact_finite_horizon_oracle.py",
+    "result": "7/7_PASS_LOCAL",
+    "sha256": "d3a7861f8b96f2db17a26324343f4543b5cbf85de5ff0806d3165e9eee7e8aff"
+  },
+  "validation": {
+    "combined_test_suites": "22/22_PASS_LOCAL",
+    "oracle_regret_zero_all_horizons": true,
+    "remote_ci": "not claimed; latest-head checks must be read separately",
+    "source_and_test_git_blobs_match_executed_bytes": true
+  }
+}

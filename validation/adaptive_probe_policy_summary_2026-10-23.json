@@ -1,0 +1,85 @@
+{
+  "schema": "symthaea-adaptive-probe-policy-summary-v1",
+  "date": "2026-10-23",
+  "status": "EXACT_LOCAL_ADAPTIVE_POLICY_PILOT_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/causal-target-subset-kernel-v1",
+  "source": {
+    "path": "validation/adaptive_probe_policy_benchmark.py",
+    "git_blob": "b8a40e8bdba0687a4792c9b57ed222889c50a92d",
+    "sha256": "0efb2d5b6f96be95a680391363aaa8be1b25d0223326bc6198948b5cc43372f2",
+    "bytes": 16672
+  },
+  "base_kernel_source": {
+    "path": "validation/action_subset_kernel_benchmark.py",
+    "git_blob": "ce19dccec3a81f4c6a18563de88152019b966f5d",
+    "sha256": "9d000f97b9cd7f16e4e86e9089c1ff230c2fc4ee4624dc7a5836a7c1ebbf6526",
+    "bytes": 25398
+  },
+  "tests": {
+    "path": "validation/test_adaptive_probe_policy_benchmark.py",
+    "git_blob": "63592e5a64ecbea391bd24e9ab0d004b67ac6222",
+    "sha256": "55eb970c63affba4f15cc7390b60efc7123277f2",
+    "bytes": 2298,
+    "count": 7,
+    "result": "7/7_PASS_LOCAL"
+  },
+  "artifact": {
+    "filename": "adaptive_probe_policy_results_exact_2026-10-23.json",
+    "bytes": 184055,
+    "sha256": "9d3221eda838d534a24215a55e738fadc9552115d3ceb299365b5414e40eafd5",
+    "source_git_blob_bound": "b8a40e8bdba0687a4792c9b57ed222889c50a92d",
+    "local_only": true
+  },
+  "report": {
+    "path": "docs/research/ADAPTIVE_PROBE_POLICY_BENCHMARK_2026-10-23.md",
+    "git_blob": "f4d79291d9d137eb5a4cf309a6574159e39ec5af"
+  },
+  "parameters": {
+    "graph_families": 4,
+    "kernel_truth_regimes": 2,
+    "policies": 7,
+    "replicates_per_graph_regime": 5,
+    "probes_per_trial": 8,
+    "observation_modes": ["exact_target_subset"],
+    "rows": 280,
+    "trials_per_policy_per_regime": 20
+  },
+  "headline_findings": {
+    "in_grid_greedy_graph_information": {
+      "mean_action_counts": [6.4, 1.0, 0.6],
+      "graph_map_accuracy": 0.75,
+      "graph_log_loss_bits": 0.527,
+      "mean_target_kernel_l1": 0.930
+    },
+    "in_grid_coverage_then_graph_information": {
+      "mean_action_counts": [3.05, 3.55, 1.4],
+      "graph_map_accuracy": 0.80,
+      "graph_log_loss_bits": 0.359,
+      "mean_target_kernel_l1": 0.712
+    },
+    "in_grid_greedy_joint_information": {
+      "graph_map_accuracy": 0.75,
+      "graph_log_loss_bits": 0.561,
+      "mean_target_kernel_l1": 0.594
+    },
+    "out_of_grid_round_robin": {
+      "graph_map_accuracy": 0.95,
+      "graph_log_loss_bits": 0.615,
+      "mean_target_kernel_l1": 0.660
+    },
+    "out_of_grid_greedy_joint_information": {
+      "graph_map_accuracy": 0.75,
+      "graph_log_loss_bits": 0.819,
+      "mean_target_kernel_l1": 0.592
+    }
+  },
+  "limitations": [
+    "Four small synthetic SCMs only; 20 trials per policy/truth regime.",
+    "Exact realized-target telemetry only in this adaptive-policy lane.",
+    "Equal probe count, not equal real-world intervention cost or damage.",
+    "The quarter-step kernel prior is deliberately misspecified in the out-of-grid regime.",
+    "No direct execution of ACDB, CausalArena, TCD-Arena, or the published Choo et al. baseline.",
+    "No SOTA claim; findings are exploratory and do not establish statistical significance."
+  ]
+}

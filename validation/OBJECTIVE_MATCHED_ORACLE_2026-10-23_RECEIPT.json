@@ -1,0 +1,55 @@
+{
+  "schema": "symthaea-objective-matched-oracle-receipt-v1",
+  "date": "2026-10-23",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/causal-target-subset-kernel-v1",
+  "status": "EXACT_LOCAL_OBJECTIVE_MATCHED_ORACLE_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "source": {
+    "path": "validation/objective_matched_oracle_benchmark.py",
+    "git_blob": "f101346c2f37cfad4e029ae280e9a002548f309c",
+    "sha256": "518d94210dbfd870cb6a3302ca7b0ac0798be5d50011330f6cc757b2f335aec4",
+    "bytes": 11298
+  },
+  "test_source": {
+    "path": "validation/test_objective_matched_oracle_benchmark.py",
+    "git_blob": "e8369315d0640785517017aec9a738c2e20929c7",
+    "sha256": "122f6ca8eb88f7935a526851714f94819a31ad2bb1dbb1f412be41fe1cec205f",
+    "bytes": 2542,
+    "tests": 8,
+    "result": "8/8_PASS_LOCAL"
+  },
+  "artifact": {
+    "filename": "objective_matched_oracle_results_exact_2026-10-23.json",
+    "bytes": 37662,
+    "sha256": "00e02e219779d4ef1cf779d32760746e0e564c3ff382966aa4d3beb47c9cedc5",
+    "source_git_blob_bound": "f101346c2f37cfad4e029ae280e9a002548f309c",
+    "rows": 99,
+    "local_only": true
+  },
+  "report": {
+    "path": "docs/research/OBJECTIVE_MATCHED_ORACLE_BENCHMARK_2026-10-23.md",
+    "git_blob": "f505b2909998aef341c290dc0f084b0ba26cfe3a"
+  },
+  "summary": {
+    "path": "validation/objective_matched_oracle_summary_2026-10-23.json",
+    "git_blob": "3195b151100a41357f324ebc06e91ca58b30c045"
+  },
+  "validation": {
+    "exact_finite_horizon_bellman_oracles": "PASS_LOCAL",
+    "all_matched_oracles_have_zero_regret": true,
+    "no_policy_beats_objective_matched_oracle": true,
+    "all_four_research_suites": "30/30_PASS_LOCAL",
+    "source_and_test_git_blobs_match_executed_bytes": true,
+    "remote_ci": "no passing CI claim; check exact head separately"
+  },
+  "protocol": {
+    "hypotheses": 16,
+    "graphs": ["chain", "fork"],
+    "kernel_spill_probabilities": [0.1, 0.6],
+    "horizons": [1, 2, 3],
+    "policies": 11,
+    "scored_objectives": ["graph", "kernel", "joint"],
+    "result_rows": 99
+  },
+  "scientific_boundary": "This is a reduced exact game with perfect realized-subset telemetry. The results do not establish superiority outside this prior/model class. No published Choo-style baseline, ACDB, CausalArena, or TCD-Arena run is claimed; no SOTA claim."
+}

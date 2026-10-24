@@ -1,0 +1,83 @@
+{
+  "schema": "symthaea-policy-frontier-column-generation-receipt-v1",
+  "created_on": "2026-10-24",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/causal-target-subset-kernel-v1",
+  "artifacts": {
+    "source": {
+      "path": "validation/policy_frontier_column_generation_benchmark.py",
+      "git_blob": "98cb554d3a474cb3c6c398049845519f211508bd",
+      "commit": "8b3734b586f1d99af114ce913202abe425b18adf"
+    },
+    "tests": {
+      "path": "validation/test_policy_frontier_column_generation_benchmark.py",
+      "git_blob": "e99ce5c1c5a994c4646e190470a8fdb156371e49",
+      "commit": "92abd84cac27719ae89495760e26660b4db17d11",
+      "local_source_sha256": "a304df823802f6fa6b2a120eb6c3f67a4f69999a13766447394b885f4fef28d6"
+    },
+    "report": {
+      "path": "docs/research/POLICY_FRONTIER_COLUMN_GENERATION_BENCHMARK_2026-10-24.md",
+      "git_blob": "b06b20a118059ffb568f8a4e861ac7f544c9214a",
+      "commit": "7fa910e595f7edb643361ed7abc18f3f9800c9b9"
+    },
+    "summary": {
+      "path": "validation/policy_frontier_column_generation_summary_2026-10-24.json",
+      "git_blob": "94bb0391bd527653b803f851cded54852e2b2919",
+      "commit": "8fff7e9e38ec9a45e8df9dfbf541f0fcb1692ec8"
+    },
+    "exact_result_json": {
+      "path": "local-only: policy_frontier_column_generation_results_exact_2026-10-24.json",
+      "bytes": 74511,
+      "sha256": "e48554121720fc480aeeed5f63cf7144e51d2fe8fdbee57731105bd21d9476f7"
+    },
+    "horizon_three_pricing_only_result": {
+      "path": "local-only: validation/policy_frontier_column_generation_horizon3_2026-10-24.json",
+      "bytes": 3084,
+      "sha256": "fd809bf5bdaaadfee6f15ae03c682099227259313dd48843c3cdd2868dd8a1a1",
+      "local_source_git_blob": "1f2656c5f49a375043ffe42155df11952a27217a",
+      "exhaustive_frontier_oracle_used": false
+    }
+  },
+  "validation": {
+    "local_regression": "78/78 PASS",
+    "rows": 36,
+    "all_local_rows_certified": true,
+    "maximum_primal_to_pricing_gap_bits": 8.881784197001252e-16,
+    "maximum_difference_from_exhaustive_oracle_bits": 8.881784197001252e-16,
+    "external_benchmark_run": false,
+    "exact_head_integration": false,
+    "remote_ci_pass_claimed": false,
+    "local_test_sha256": "a304df823802f6fa6b2a120eb6c3f67a4f69999a13766447394b885f4fef28d6",
+    "horizon_three_pricing_slice": {
+      "rows": 6,
+      "certified_rows": 6,
+      "maximum_primal_to_pricing_gap_bits": 2.0294876890147862e-13,
+      "horizon": 3,
+      "exact_frontier_oracle_used": false
+    }
+  },
+  "source_binding": {
+    "executed_local_source_sha256": "08371649907d5a3252036789a7f774f3f01b9ff57143467c0001d15c3d116409",
+    "executed_local_source_git_blob": "1f2656c5f49a375043ffe42155df11952a27217a",
+    "committed_source_git_blob": "98cb554d3a474cb3c6c398049845519f211508bd",
+    "match": false,
+    "disclosure": "The executed local source blob is 1f2656c5f49a375043ffe42155df11952a27217a, while the current committed source blob is 98cb554d3a474cb3c6c398049845519f211508bd; they are not byte-identical. The local runtime had no repository checkout and the fixed-prior helper used for local execution was reconstructed from displayed source, not the exact repository blob. Regenerate from an exact checkout before treating these results as exact-head evidence.",
+    "test_source_git_blob": "e99ce5c1c5a994c4646e190470a8fdb156371e49"
+  },
+  "scientific_boundary": [
+    "Finite 16-hypothesis chain/fork toy problem; horizons 1-2",
+    "Six candidate prior scenarios are not a calibrated ambiguity set",
+    "Exact subset telemetry; no costs, noisy/missing/delayed telemetry, or task disturbance",
+    "No external causal discovery benchmark; no SOTA or novelty claim",
+    "Average runtime was slower than exhaustive frontier plus LP; no overall speedup claimed"
+  ],
+  "branch_artifacts": {
+    "source_git_blob": "98cb554d3a474cb3c6c398049845519f211508bd",
+    "test_git_blob": "e99ce5c1c5a994c4646e190470a8fdb156371e49",
+    "report_git_blob": "b06b20a118059ffb568f8a4e861ac7f544c9214a",
+    "summary_git_blob": "94bb0391bd527653b803f851cded54852e2b2919",
+    "source_matches_local_executed_version": false,
+    "exact_head_integration_tested": false,
+    "ci_pass_claimed": false
+  }
+}
