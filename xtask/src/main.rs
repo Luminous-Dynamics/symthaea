@@ -6,6 +6,7 @@ mod cognitive_loop_evidence;
 mod cognitive_drift_score;
 mod cognitive_drift_compare;
 mod cognitive_adaptation_utility;
+mod cognitive_adaptation_panel;
 mod cognitive_drift_baselines;
 mod cognitive_replay_receipt;
 mod duplicate_scan;
@@ -108,6 +109,14 @@ enum Commands {
 
     /// Validate causal timing, event parity, oracle isolation, and adaptation transactions in a replay receipt.
     ValidateCognitiveReplayReceipt {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+
+    /// Aggregate five-arm utility records across the complete preregistered dataset × seed × scenario grid.
+    CompareCognitiveAdaptationPanel {
         #[arg(long)]
         input: PathBuf,
         #[arg(long)]
@@ -258,6 +267,17 @@ fn main() -> anyhow::Result<()> {
             if let Some(path) = out {
                 std::fs::write(&path, rendered.as_bytes())?;
                 println!("Wrote cognitive replay receipt validation to {}", path.display());
+            } else {
+                println!("{rendered}");
+            }
+        }
+
+        Commands::CompareCognitiveAdaptationPanel { input, out } => {
+            let result = cognitive_adaptation_panel::evaluate_file(&input)?;
+            let rendered = serde_json::to_string_pretty(&result)?;
+            if let Some(path) = out {
+                std::fs::write(&path, rendered.as_bytes())?;
+                println!("Wrote cognitive adaptation panel result to {}", path.display());
             } else {
                 println!("{rendered}");
             }
