@@ -2055,10 +2055,7 @@ impl CognitiveLoopService {
         self.create_experience_with_evidence(
             &perception.encoding.compressed_state,
             &prediction,
-            perception
-                .urgency
-                .prediction_error_valid
-                .then_some(prediction_error),
+            prediction_error_valid.then_some(prediction_error),
         );
 
         // 10. Update coherence bridge (zero-clone on CfC hot path)
