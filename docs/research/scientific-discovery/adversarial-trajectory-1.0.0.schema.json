@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://symthaea.luminousdynamics.io/schemas/adversarial-discovery-trajectory-1.0.0.json",
+  "title":"Adversarial Scientific Discovery Trajectory",
+  "type":"object",
+  "required":["schema","schema_version","attack_classes","authority"],
+  "properties":{
+    "schema":{"const":"symthaea.scientific_discovery.adversarial_trajectory"},
+    "schema_version":{"const":"1.0.0"},
+    "authority":{"const":"integrity_testing_only"},
+    "attack_classes":{"type":"array","items":{"enum":["post_commitment_mutation","prospective_exposure_leak","same_actor_replication","criterion_without_evidence","missing_parent","duplicate_identity"]},"minItems":6,"uniqueItems":true}
+  }
+}

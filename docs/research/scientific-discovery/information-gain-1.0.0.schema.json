@@ -1,0 +1,22 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://symthaea.luminousdynamics.io/schemas/scientific-information-gain-1.0.0.json",
+  "title":"Scientific Information-Gain Planner",
+  "type":"object",
+  "required":["schema","schema_version","authority","non_equivalences"],
+  "properties":{
+    "schema":{"const":"symthaea.scientific_discovery.information_gain"},
+    "schema_version":{"const":"1.0.0"},
+    "authority":{"const":"decision_support_only"},
+    "non_equivalences":{
+      "type":"array",
+      "const":[
+        "information_gain_is_not_truth",
+        "test_ranking_is_not_scientific_evidence",
+        "model_agreement_is_not_independent_corroboration",
+        "simulated_outcomes_are_not_observations",
+        "cost_efficiency_is_not_scientific_validity"
+      ]
+    }
+  }
+}
