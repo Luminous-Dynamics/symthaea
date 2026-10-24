@@ -144,6 +144,26 @@ class MultiFidelityStressTests(unittest.TestCase):
                 summary["q75_normalized_hypervolume_fraction"],
             )
 
+    def test_custom_fidelity_cost_ratios_are_reported_and_reconciled(self) -> None:
+        costs = {"low": 1, "medium": 10, "high": 50}
+        result = run_suite(seed=31, grid_size=9, severity=1.0, fidelity_costs=costs)
+        self.assertEqual(result["cost_budget"], 400)
+        for row in result["policy_results"]:
+            with self.subTest(policy=row["policy"]):
+                self.assertEqual(row["fidelity_costs"], costs)
+                self.assertEqual(sum(row["fidelity_cost_units_by_level"].values()), row["cost_spent"])
+                self.assertLessEqual(row["cost_spent"], result["cost_budget"])
+                self.assertEqual(row["fidelity_cost_units_by_level"], {
+                    fidelity: row["fidelity_evaluations"][fidelity] * costs[fidelity]
+                    for fidelity in costs
+                })
+
+    def test_invalid_fidelity_cost_maps_are_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "exactly low, medium, and high"):
+            run_suite(seed=1, grid_size=9, fidelity_costs={"low": 1, "high": 25})
+        with self.assertRaisesRegex(ValueError, "positive integer"):
+            run_suite(seed=1, grid_size=9, fidelity_costs={"low": 1, "medium": 0, "high": 25})
+
     def test_policy_templates_reject_incompatible_budget_or_grid(self) -> None:
         with self.assertRaisesRegex(ValueError, "at least 200"):
             run_suite(seed=1, cost_budget=199, grid_size=21)
