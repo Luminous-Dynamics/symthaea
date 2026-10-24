@@ -46,6 +46,8 @@ def run_policy_on_scenario(
     """Run one policy, then audit its selected high-fidelity archive against hidden truth."""
     if policy_name not in POLICIES:
         raise ValueError(f"unknown policy: {policy_name}")
+    if design_count < 75:
+        raise ValueError("design_count must be at least 75 for all frozen proposal policies")
     costs = normalize_fidelity_costs(fidelity_costs)
     if cost_budget < required_policy_costs(costs)[policy_name]:
         raise ValueError(
