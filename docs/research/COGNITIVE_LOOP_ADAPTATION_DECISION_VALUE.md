@@ -6,7 +6,7 @@
 
 ## Why this increment
 
-The existing benchmark separates detector quality from downstream task loss and cost, which is the right foundation. However, its current counterfactual utility command consumes three arm summaries. It checks their declared exogenous-stream digests, cycle panels, implementation revisions, configuration digests, and outcomes, but it cannot establish that those summaries came from an independently controlled, common replay. The next experiment should make the replay driver—not each arm—the authority for the exogenous stream and action/event ledger.
+The existing benchmark separates detector quality from downstream task loss and cost, which is the right foundation. However, an arm summary and its self-reported stream digest are not enough to establish a common replay. The scorer now supports binding each five-arm score to a raw replay receipt that it revalidates, while keeping the boundary explicit: a valid receipt is an internally consistent artifact, not proof that a runner executed honestly. The next experiment should make the replay driver—not each arm—the authority for the exogenous stream and action/event ledger.
 
 This distinction matters because the research question is not just “did a detector find the change?” It is:
 
@@ -80,6 +80,14 @@ Report these separately:
 - Adaptation benefit persistence after the verification window.
 
 The implemented counterfactual utility scorer is schema v2 and requires all five policy arms. It computes whole-stream and pre/post-window loss, post-shift loss area above the preregistered threshold, recovery cycle/delay, intervention cost, and the primary paired-record effect of staged-verify-rollback versus detector-triggered adaptation on post-shift mean task loss. It also reports benefit-gated and staged effects relative to no-adapt. These are metrics over supplied arm summaries, not yet outputs from a driver-owned real replay.
+
+For receipt-bound scoring, pass the raw receipt to the same command:
+
+`cargo run --locked -p xtask -- score-counterfactual-adaptation-utility --input path/to/counterfactual-adaptation.json --receipt path/to/replay-receipt.json --out reports/counterfactual-adaptation.json`
+
+The scorer reruns receipt validation and fails closed unless dataset, stream ID, environment seed, and the canonical event-ledger digest match the score, and each of the five policy arms matches the receipt's repository head and configuration digest. It then includes both the canonical receipt hash and receipt-validation-report hash in the score's own result digest. A score created without `--receipt` remains an unlinked exploratory summary.
+
+The panel distinguishes grid coverage from receipt linkage. It emits the preregistered comparison only when all 2,800 cells are present and each score carries valid receipt-link fields marked `run_kind: "replay"`; synthetic/not-measured receipts never satisfy this gate. The panel checks digests and declared linkage rather than re-executing 2,800 receipts. Preserve the raw receipt artifacts and have an independent verifier revalidate them; neither hashes nor receipt structure prove that the runner was honest, oracle access was technically isolated, or task outcomes were genuine.
 
 **Decision quality**
 - Fraction of interventions that improve task loss.
