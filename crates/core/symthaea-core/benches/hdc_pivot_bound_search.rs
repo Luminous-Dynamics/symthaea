@@ -340,7 +340,7 @@ fn bench_pivot_exact_search(c: &mut Criterion) {
             };
             let query = match profile {
                 "random" => BinaryHV::random(QUERY_SEED),
-                "clustered" => perturb(&corpus[5], 32, 491)
+                "clustered" => perturb(&corpus[5], 32, 491),
                 _ => unreachable!(),
             };
             let expected = exact_argmin(&query, &corpus);
@@ -371,12 +371,8 @@ fn bench_pivot_exact_search(c: &mut Criterion) {
                         pivot_exact_argmin::<true>(&query, &corpus, &index);
                     let metadata_bytes = index.signatures.len() * std::mem::size_of::<u16>();
                     eprintln!(
-                        "pivot-diagnostic profile={profile} selector={selector} n={corpus_size} pivots={pivot_count} \\
-                         exact_vectors={full_evaluations}/{} signature_bytes={} result_id={} distance={}",
-                        corpus_size,
-                        metadata_bytes,
-                        actual.0,
-                        actual.1,
+                        "pivot-diagnostic profile={profile} selector={selector} n={corpus_size} pivots={pivot_count} exact_vectors={full_evaluations}/{} signature_bytes={} result_id={} distance={}",
+                        corpus_size, metadata_bytes, actual.0, actual.1,
                     );
 
                     group.throughput(Throughput::Elements(corpus_size as u64));
