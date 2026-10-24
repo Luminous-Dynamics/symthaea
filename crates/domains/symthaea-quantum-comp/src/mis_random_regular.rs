@@ -67,7 +67,16 @@ pub enum MisRandomRegularError {
     /// No attempts were allowed.
     ZeroRetryBudget,
     /// No simple pairing was found within the configured budget.
-    RetryBudgetExhausted { max_attempts: usize },
+    RetryBudgetExhausted {
+        /// Number of vertices in the requested graph.
+        vertex_count: usize,
+        /// Requested regular degree.
+        degree: usize,
+        /// Seed defining the deterministic random stream.
+        seed: u64,
+        /// Number of complete pairings attempted.
+        max_attempts: usize,
+    },
     /// The independently validating graph constructor rejected the generated edges.
     GraphConstruction(MisGraphError),
 }
@@ -85,8 +94,10 @@ impl fmt::Display for MisRandomRegularError {
             Self::StubCountOverflow { vertex_count, degree } =>
                 write!(f, "vertex_count * degree overflows usize: {vertex_count} * {degree}"),
             Self::ZeroRetryBudget => write!(f, "max_attempts must be positive"),
-            Self::RetryBudgetExhausted { max_attempts } =>
-                write!(f, "no simple pairing found in {max_attempts} attempts"),
+            Self::RetryBudgetExhausted { vertex_count, degree, seed, max_attempts } => write!(
+                f,
+                "no simple pairing found in {max_attempts} attempts (n={vertex_count}, degree={degree}, seed={seed})"
+            ),
             Self::GraphConstruction(error) => write!(f, "graph construction failed: {error}"),
         }
     }
@@ -171,6 +182,9 @@ pub fn generate_mis_random_regular(
         }));
     }
     Err(MisRandomRegularError::RetryBudgetExhausted {
+        vertex_count: config.vertex_count,
+        degree: config.degree,
+        seed: config.seed,
         max_attempts: config.max_attempts,
     })
 }
@@ -294,6 +308,24 @@ mod tests {
         assert!(
             (observed - expected).abs() < 0.04,
             "K3,3 sample fraction {observed:.4} too far from reference {expected:.4}"
+        );
+    }
+
+    #[test]
+    fn retry_exhaustion_preserves_workload_identity() {
+        // The one-attempt seed is selected to produce a non-simple first pairing.
+        let config = MisRandomRegularConfig {
+            max_attempts: 1,
+            ..MisRandomRegularConfig::new(6, 3, 1)
+        };
+        assert_eq!(
+            generate_mis_random_regular(config),
+            Err(MisRandomRegularError::RetryBudgetExhausted {
+                vertex_count: 6,
+                degree: 3,
+                seed: 1,
+                max_attempts: 1,
+            })
         );
     }
 
