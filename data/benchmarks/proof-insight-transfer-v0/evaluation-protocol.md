@@ -370,3 +370,8 @@ The Rust analyzer now checks that the declared operation matches the interventio
 Executed outcome rows must carry a semantic-gate record bound to the exact target statement. The record separately captures (i) statement correspondence with at least two independent reviewers for a pass, (ii) axiom-policy compliance and receipt, (iii) dependent-successor testing or a reasoned not-applicable decision, and (iv) mutation-control status and suite receipt. The analyzer derives `passed` / `failed` / `unknown` from the component evidence and rejects contradictions. The primary exact-target solve rate now requires both checker success and semantic-gate pass; raw checker success is reported separately.
 
 The semantic-gate digests remain references, not self-authenticating proof of reviewer identity or receipt truth. Independent review and verification of receipt contents remain required. This changes the evidence contract, not the result of an experiment.
+
+
+### 2026-10-24 amendment — preserve individual statement-review evidence
+
+A semantic-gate pass now depends on at least two separately identified reviewer records, each with an individual decision and evidence digest. The analyzer rejects blank or duplicate reviewer identities, invalid evidence digests, and aggregate correspondence statuses that disagree with the individual decisions. A split decision remains `unknown`; it is not converted to a majority-vote label. The aggregate review-receipt digest remains as an additional envelope binding, not a substitute for the individual records.
