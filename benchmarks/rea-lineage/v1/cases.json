@@ -1,0 +1,927 @@
+{
+  "schema_version": "symthaea.rea-lineage-manifest.v1",
+  "benchmark_id": "ENG-REA-004",
+  "corpus_status": "public-development-known-answer",
+  "claims_ceiling": "Synthetic task-lineage and byte-mapping contract only; no REA/Unblob provider, firmware execution, or physical-device qualification.",
+  "cases": [
+    {
+      "id": "LNG-001",
+      "description": "Valid compressed child: parent source chunk maps to root; child-local chunks have no root mapping.",
+      "selection_offset": 256,
+      "selection_length": 128,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 128,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/fw",
+          "size": 512,
+          "blob_id": "blob-fw"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/fw",
+          "provider_blob_id": "blob-fw",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 32,
+            "length": 40
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "blob-fw",
+          "range": {
+            "offset": 32,
+            "length": 40
+          },
+          "root_file_range": {
+            "offset": 288,
+            "length": 40
+          }
+        },
+        {
+          "input_path": "$output/fw",
+          "provider_id": "inner-blob",
+          "range": {
+            "offset": 4,
+            "length": 16
+          },
+          "root_file_range": null
+        }
+      ]
+    },
+    {
+      "id": "LNG-002",
+      "description": "Compressed child chunk claims invented linear root offset.",
+      "selection_offset": 256,
+      "selection_length": 128,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 128,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/fw",
+          "size": 512,
+          "blob_id": "blob-fw"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/fw",
+          "provider_blob_id": "blob-fw",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 32,
+            "length": 40
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "blob-fw",
+          "range": {
+            "offset": 32,
+            "length": 40
+          },
+          "root_file_range": {
+            "offset": 288,
+            "length": 40
+          }
+        },
+        {
+          "input_path": "$output/fw",
+          "provider_id": "inner-blob",
+          "range": {
+            "offset": 4,
+            "length": 16
+          },
+          "root_file_range": {
+            "offset": 292,
+            "length": 16
+          }
+        }
+      ]
+    },
+    {
+      "id": "LNG-003",
+      "description": "Valid two-level nested extraction preserves task-local offsets at both descendant levels.",
+      "selection_offset": 100,
+      "selection_length": 128,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 128,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/archive",
+          "size": 80,
+          "blob_id": "blob-a"
+        },
+        {
+          "path": "$output/archive/inner",
+          "size": 256,
+          "blob_id": "blob-b"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/archive",
+          "provider_blob_id": "blob-a",
+          "stage_kind": "archive",
+          "parent_file_range": {
+            "offset": 10,
+            "length": 50
+          }
+        },
+        {
+          "parent_path": "$output/archive",
+          "child_path": "$output/archive/inner",
+          "provider_blob_id": "blob-b",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 4,
+            "length": 20
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "blob-a",
+          "range": {
+            "offset": 10,
+            "length": 50
+          },
+          "root_file_range": {
+            "offset": 110,
+            "length": 50
+          }
+        },
+        {
+          "input_path": "$output/archive",
+          "provider_id": "blob-b",
+          "range": {
+            "offset": 4,
+            "length": 20
+          },
+          "root_file_range": null
+        },
+        {
+          "input_path": "$output/archive/inner",
+          "provider_id": "inner-part",
+          "range": {
+            "offset": 10,
+            "length": 12
+          },
+          "root_file_range": null
+        }
+      ]
+    },
+    {
+      "id": "LNG-004",
+      "description": "Edge names a child task not present in the task inventory.",
+      "selection_offset": 0,
+      "selection_length": 64,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 64,
+          "blob_id": "blob-root"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/missing",
+          "provider_blob_id": "blob-missing",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 8,
+            "length": 8
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "blob-missing",
+          "range": {
+            "offset": 8,
+            "length": 8
+          },
+          "root_file_range": {
+            "offset": 8,
+            "length": 8
+          }
+        }
+      ]
+    },
+    {
+      "id": "LNG-005",
+      "description": "Derivation provider blob ID disagrees with the child task identity.",
+      "selection_offset": 0,
+      "selection_length": 64,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 64,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/fw",
+          "size": 128,
+          "blob_id": "blob-real"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/fw",
+          "provider_blob_id": "blob-fake",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 8,
+            "length": 16
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "blob-real",
+          "range": {
+            "offset": 8,
+            "length": 16
+          },
+          "root_file_range": {
+            "offset": 8,
+            "length": 16
+          }
+        }
+      ]
+    },
+    {
+      "id": "LNG-006",
+      "description": "Parent extraction range runs past the selected input size.",
+      "selection_offset": 0,
+      "selection_length": 128,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 128,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/fw",
+          "size": 256,
+          "blob_id": "blob-fw"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/fw",
+          "provider_blob_id": "blob-fw",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 100,
+            "length": 40
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "blob-fw",
+          "range": {
+            "offset": 100,
+            "length": 40
+          },
+          "root_file_range": {
+            "offset": 100,
+            "length": 40
+          }
+        }
+      ]
+    },
+    {
+      "id": "LNG-007",
+      "description": "Valid multi-file stage has no single parent byte range; unknown remains null.",
+      "selection_offset": 64,
+      "selection_length": 128,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 128,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/one.bin",
+          "size": 32,
+          "blob_id": "blob-one"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/one.bin",
+          "provider_blob_id": "blob-one",
+          "stage_kind": "multi-file",
+          "parent_file_range": null
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$output/one.bin",
+          "provider_id": "inner",
+          "range": {
+            "offset": 0,
+            "length": 8
+          },
+          "root_file_range": null
+        }
+      ]
+    },
+    {
+      "id": "LNG-008",
+      "description": "Multi-file stage is assigned a fabricated contiguous parent range.",
+      "selection_offset": 64,
+      "selection_length": 128,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 128,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/one.bin",
+          "size": 32,
+          "blob_id": "blob-one"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/one.bin",
+          "provider_blob_id": "blob-one",
+          "stage_kind": "multi-file",
+          "parent_file_range": {
+            "offset": 0,
+            "length": 32
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$output/one.bin",
+          "provider_id": "inner",
+          "range": {
+            "offset": 0,
+            "length": 8
+          },
+          "root_file_range": null
+        }
+      ]
+    },
+    {
+      "id": "LNG-009",
+      "description": "Orphan task is disconnected from the selected input.",
+      "selection_offset": 0,
+      "selection_length": 128,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 128,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/a",
+          "size": 64,
+          "blob_id": "blob-a"
+        },
+        {
+          "path": "$output/orphan",
+          "size": 20,
+          "blob_id": "blob-o"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/a",
+          "provider_blob_id": "blob-a",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 8,
+            "length": 24
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "blob-a",
+          "range": {
+            "offset": 8,
+            "length": 24
+          },
+          "root_file_range": {
+            "offset": 8,
+            "length": 24
+          }
+        }
+      ]
+    },
+    {
+      "id": "LNG-010",
+      "description": "A descendant edge feeds back into the selected-input root.",
+      "selection_offset": 0,
+      "selection_length": 128,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 128,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/a",
+          "size": 64,
+          "blob_id": "blob-a"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/a",
+          "provider_blob_id": "blob-a",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 8,
+            "length": 24
+          }
+        },
+        {
+          "parent_path": "$output/a",
+          "child_path": "$input",
+          "provider_blob_id": "blob-root",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 0,
+            "length": 16
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "blob-a",
+          "range": {
+            "offset": 8,
+            "length": 24
+          },
+          "root_file_range": {
+            "offset": 8,
+            "length": 24
+          }
+        },
+        {
+          "input_path": "$output/a",
+          "provider_id": "blob-root",
+          "range": {
+            "offset": 0,
+            "length": 16
+          },
+          "root_file_range": null
+        }
+      ]
+    },
+    {
+      "id": "LNG-011",
+      "description": "Task inventory contains duplicate logical paths.",
+      "selection_offset": 0,
+      "selection_length": 128,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 128,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/a",
+          "size": 64,
+          "blob_id": "blob-a"
+        },
+        {
+          "path": "$output/a",
+          "size": 20,
+          "blob_id": "blob-other"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/a",
+          "provider_blob_id": "blob-a",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 8,
+            "length": 24
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "blob-a",
+          "range": {
+            "offset": 8,
+            "length": 24
+          },
+          "root_file_range": {
+            "offset": 8,
+            "length": 24
+          }
+        }
+      ]
+    },
+    {
+      "id": "LNG-012",
+      "description": "Parent range has fractional offset and length, invalid for byte coordinates.",
+      "selection_offset": 0,
+      "selection_length": 128,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 128,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/a",
+          "size": 64,
+          "blob_id": "blob-a"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/a",
+          "provider_blob_id": "blob-a",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 8.5,
+            "length": 24.5
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "blob-a",
+          "range": {
+            "offset": 8.5,
+            "length": 24.5
+          },
+          "root_file_range": {
+            "offset": 8.5,
+            "length": 24.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "LNG-013",
+      "description": "Zero-length parent range is not valid derivation evidence.",
+      "selection_offset": 0,
+      "selection_length": 128,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 128,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/a",
+          "size": 64,
+          "blob_id": "blob-a"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/a",
+          "provider_blob_id": "blob-a",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 8,
+            "length": 0
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "blob-a",
+          "range": {
+            "offset": 8,
+            "length": 0
+          },
+          "root_file_range": {
+            "offset": 8,
+            "length": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "LNG-014",
+      "description": "Direct selected-input chunk maps to original-file coordinates with the selection offset.",
+      "selection_offset": 4096,
+      "selection_length": 32,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 32,
+          "blob_id": "blob-root"
+        }
+      ],
+      "derivations": [],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "direct",
+          "range": {
+            "offset": 0,
+            "length": 16
+          },
+          "root_file_range": {
+            "offset": 4096,
+            "length": 16
+          }
+        }
+      ]
+    },
+    {
+      "id": "LNG-015",
+      "description": "Direct input chunk root offset forgets the caller's selected-range offset.",
+      "selection_offset": 4096,
+      "selection_length": 32,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 32,
+          "blob_id": "blob-root"
+        }
+      ],
+      "derivations": [],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "direct",
+          "range": {
+            "offset": 0,
+            "length": 16
+          },
+          "root_file_range": {
+            "offset": 0,
+            "length": 16
+          }
+        }
+      ]
+    },
+    {
+      "id": "LNG-016",
+      "description": "Descendant uses an empty fake root range rather than null/unknown.",
+      "selection_offset": 256,
+      "selection_length": 128,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 128,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/fw",
+          "size": 512,
+          "blob_id": "blob-fw"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/fw",
+          "provider_blob_id": "blob-fw",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 32,
+            "length": 40
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "blob-fw",
+          "range": {
+            "offset": 32,
+            "length": 40
+          },
+          "root_file_range": {
+            "offset": 288,
+            "length": 40
+          }
+        },
+        {
+          "input_path": "$output/fw",
+          "provider_id": "inner",
+          "range": {
+            "offset": 4,
+            "length": 16
+          },
+          "root_file_range": {
+            "offset": 0,
+            "length": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "LNG-017",
+      "description": "Lineage is known while exact parent byte span is unknown; null is retained instead of defaulting to zero.",
+      "selection_offset": 0,
+      "selection_length": 64,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 64,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/fw",
+          "size": 512,
+          "blob_id": "blob-fw"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/fw",
+          "provider_blob_id": "blob-fw",
+          "stage_kind": "unknown",
+          "parent_file_range": null
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$output/fw",
+          "provider_id": "inner",
+          "range": {
+            "offset": 4,
+            "length": 16
+          },
+          "root_file_range": null
+        }
+      ]
+    },
+    {
+      "id": "LNG-018",
+      "description": "Self-referential edge is malformed lineage.",
+      "selection_offset": 0,
+      "selection_length": 64,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 64,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/a",
+          "size": 32,
+          "blob_id": "blob-a"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/a",
+          "provider_blob_id": "blob-a",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 8,
+            "length": 16
+          }
+        },
+        {
+          "parent_path": "$output/a",
+          "child_path": "$output/a",
+          "provider_blob_id": "blob-a",
+          "stage_kind": "gzip",
+          "parent_file_range": {
+            "offset": 0,
+            "length": 8
+          }
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "blob-a",
+          "range": {
+            "offset": 8,
+            "length": 16
+          },
+          "root_file_range": {
+            "offset": 8,
+            "length": 16
+          }
+        },
+        {
+          "input_path": "$output/a",
+          "provider_id": "blob-a",
+          "range": {
+            "offset": 0,
+            "length": 8
+          },
+          "root_file_range": null
+        }
+      ]
+    },
+    {
+      "id": "LNG-019",
+      "description": "An edge with unknown range omits the stage identity instead of explicitly reporting an unknown stage.",
+      "selection_offset": 0,
+      "selection_length": 64,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 64,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/fw",
+          "size": 512,
+          "blob_id": "blob-fw"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/fw",
+          "provider_blob_id": "blob-fw",
+          "parent_file_range": null
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$output/fw",
+          "provider_id": "inner",
+          "range": {
+            "offset": 4,
+            "length": 16
+          },
+          "root_file_range": null
+        }
+      ]
+    },
+    {
+      "id": "LNG-020",
+      "description": "A direct input chunk has an empty provider identity and must not be accepted as provenance evidence.",
+      "selection_offset": 0,
+      "selection_length": 64,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 64,
+          "blob_id": "blob-root"
+        }
+      ],
+      "derivations": [],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "",
+          "range": {
+            "offset": 0,
+            "length": 8
+          },
+          "root_file_range": {
+            "offset": 0,
+            "length": 8
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": "symthaea.rea-lineage-oracle.v1",
+  "benchmark_id": "ENG-REA-004",
+  "expected_dispositions": {
+    "LNG-001": "accept",
+    "LNG-002": "reject",
+    "LNG-003": "accept",
+    "LNG-004": "reject",
+    "LNG-005": "reject",
+    "LNG-006": "reject",
+    "LNG-007": "accept",
+    "LNG-008": "reject",
+    "LNG-009": "reject",
+    "LNG-010": "reject",
+    "LNG-011": "reject",
+    "LNG-012": "reject",
+    "LNG-013": "reject",
+    "LNG-014": "accept",
+    "LNG-015": "reject",
+    "LNG-016": "reject",
+    "LNG-017": "accept",
+    "LNG-018": "reject",
+    "LNG-019": "reject",
+    "LNG-020": "reject"
+  },
+  "claim_limits": [
+    "A valid derivation edge establishes lineage, not bytewise equivalence or runtime behavior.",
+    "Parent-file ranges identify bytes in the immediate parent task, not automatically in the original input.",
+    "Child task chunk offsets are task-local; root_file_range must remain null unless the evidence contract explicitly supports such a direct mapping.",
+    "Public oracle is known-answer regression data, not a blind generalization benchmark.",
+    "No case requires or authorizes executing extracted vendor firmware or touching physical hardware."
+  ]
+}

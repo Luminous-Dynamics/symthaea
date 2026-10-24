@@ -1,0 +1,48 @@
+name: REA Lineage Contract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "benchmarks/rea-lineage/v1/**"
+      - ".github/workflows/rea-lineage-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "benchmarks/rea-lineage/v1/**"
+      - ".github/workflows/rea-lineage-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-lineage-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Lineage graph, mapping and permutation checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Verify tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v jq
+          jq --version
+          git --version
+
+      - name: Verify lineage corpus and record-order invariance
+        shell: bash
+        run: sh benchmarks/rea-lineage/v1/verify.sh
+
+      - name: Verify lineage regressions fail closed
+        shell: bash
+        run: sh benchmarks/rea-lineage/v1/mutation-controls.sh
