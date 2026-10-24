@@ -760,6 +760,7 @@ impl CognitiveLoopService {
             last_state: None,
             training_state_buf: None,
             last_prediction: None,
+            last_prediction_cycle: None,
             start_time: Instant::now(),
             is_consolidating: false,
             language_comm: super::language_comm_manager::LanguageAndCommunicationManager {
