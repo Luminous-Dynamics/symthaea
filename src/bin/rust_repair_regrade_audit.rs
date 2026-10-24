@@ -870,6 +870,8 @@ mod tests {
             unresolved_count,
             lockable,
             pass_at_1: lockable.then(|| success_count as f64 / tasks.len() as f64),
+            completed_run_success_rate: (success_count + failure_count > 0)
+                .then(|| success_count as f64 / (success_count + failure_count) as f64),
             tasks,
         }
     }
