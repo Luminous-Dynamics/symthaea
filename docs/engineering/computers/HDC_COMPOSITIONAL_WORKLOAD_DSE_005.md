@@ -34,17 +34,19 @@ The sweep covers:
 - corpus size N = 256, 1,024, 4,096, 16,384;
 - 16,384-bit BinaryHV records (2,048 bytes/record);
 - deterministic query samples spread across each corpus;
+- a fixed corruption sweep of 0%, 1%, 2%, 5% and 10% exact query-bit flips, reported as task-level retrieval robustness;
 - exact optimized top-1 search against the resident record corpus;
 - record-build benchmarks for the smaller 256 / 1,024 / 4,096 corpus sizes;
 - an independent byte-wise XOR/popcount top-1 oracle on smaller non-power-of-two and ordinary corpora;
-- a duplicated exact-match fixture that enforces lowest-candidate-ID tie behavior.
+- a duplicated exact-match fixture that enforces lowest-candidate-ID tie behavior;
+- optimized-versus-scalar top-1 oracle checks at every query-noise rate on 17- and 257-record fixtures, plus an assertion that each noise fixture flips exactly the requested number of bits.
 
 Run on an exact revision:
 
     cargo test -p symthaea-core test_binary_hv_direct_pack_matches_reference_encoders
     cargo bench -p symthaea-core --bench hdc_compositional_workload
 
-Criterion output measures host execution time only. The diagnostic line prints semantic_hit_at_1, sampled median target rank, and the minimum observed target-versus-impostor similarity margin for the fixed eight-query sample. Eight queries are a pilot sample, not a statistical claim about population-level recall; increase and hold out query seeds before reporting a stable quality estimate.
+Criterion output measures host execution time for the clean representative query only. Separate diagnostic lines print semantic_hit_at_1, sampled median target rank, and the minimum observed target-versus-impostor similarity margin for the fixed eight-query sample at every corruption level. The noise schedule flips exactly floor(DIM × rate) bits using a deterministic coprime-stride pattern. Eight queries are a pilot sample, not a statistical claim about population-level recall; increase and hold out query seeds before reporting a stable quality estimate.
 
 The corpus and query cues are fully resident during query timing. The build group measures deterministic role/value encoding and record bundling, not cold storage, file I/O, OS page faults, or an accelerator transfer. Query latency and build cost must remain separate; do not call setup free.
 
@@ -62,8 +64,7 @@ The earlier early-abandon and pivot-bound probes ask how to scan a given corpus 
 
 ### 2. Test robustness, not just one lucky sample
 
-Next extensions should use multiple declared seeds and held-out query sets, then stress:
-- query cue corruption at 0%, 1%, 2%, 5%, and 10% bit flips;
+The benchmark now includes a deterministic query-cue corruption sweep at 0%, 1%, 2%, 5%, and 10% bit flips. Next extensions should use multiple declared seeds and held-out query sets, then stress:
 - partial or missing role/value facts;
 - role reuse and record overlap;
 - correlated records with shared components;
