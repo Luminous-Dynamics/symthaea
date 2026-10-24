@@ -5,9 +5,8 @@
 //! exact-target success comparison.
 //!
 //! This is a *planning aid*, not a proof checker or an empirical benchmark
-//! result. It models shared family difficulty with a beta-distributed cluster
-//! success probability, applies the treatment gain on the probability scale,
-//! simulates paired control/treatment outcomes, and uses a cluster-level
+//! result. It models shared family difficulty, heterogeneous family-level
+//! treatment effects, and paired target potential outcomes. It uses a cluster-level
 //! t-interval as the preregistered gate approximation. The report records the
 //! model and its limitations so it cannot be mistaken for measured utility.
 
@@ -609,6 +608,8 @@ mod tests {
             expected_gain: 0.5,
             minimum_observed_gain: 0.1,
             icc: 0.0,
+            cluster_effect_sd: 0.0,
+            pair_association: 0.0,
             cluster_sizes: vec![1; MIN_CLUSTERS],
             simulations: MIN_SIMULATIONS,
             seed: 1,
