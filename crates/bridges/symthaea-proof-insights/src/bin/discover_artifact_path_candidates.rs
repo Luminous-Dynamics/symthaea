@@ -108,8 +108,8 @@ fn stopwords() -> BTreeSet<&'static str> {
         "result results family families conjecture conjectures theorem theorems ",
         "lemma lemmas proof proofs bound bounds formula formulas problem problems ",
         "new related general using its their this that preprints preprint lean docs paper pdf main ",
-        "final manuscript version draft supplement supplemental appendix appendices october september ",
-        "august july june may april march january february december november"
+        "final manuscript version draft supplement supplemental appendix appendices ",
+        "october september august july june may april march january february december november"
     )
     .split_whitespace()
     .collect()
