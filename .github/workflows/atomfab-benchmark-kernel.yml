@@ -1,0 +1,64 @@
+name: AtomFab Benchmark Kernel
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/atomfab-benchmark-kernel.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/domains/symthaea-atomfab/**"
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/atomfab-benchmark-kernel.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/domains/symthaea-atomfab/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atomfab-benchmark-kernel-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  kernel-tests:
+    name: AtomFab Kernel (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: clippy, rustfmt
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check AtomFab formatting
+        run: cargo fmt --package symthaea-atomfab -- --check
+
+      - name: Test AtomFab metrics, contracts, campaigns, and registry
+        run: cargo test --locked -p symthaea-atomfab
+
+      - name: Verify Cargo.lock remains unchanged
+        if: always()
+        run: |
+          git diff --exit-code -- Cargo.lock
+          test -z "$(git status --short -- Cargo.lock)"
+
+      - name: Validate embedded benchmark registry
+        run: cargo run --locked -p symthaea-atomfab --bin atomfab-validate-registry
+
+      - name: Lint AtomFab crate and tests
+        run: cargo clippy --locked -p symthaea-atomfab --all-targets -- -D warnings

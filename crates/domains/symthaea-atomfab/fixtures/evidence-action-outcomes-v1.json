@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "fixture_kind": "illustrative_not_result",
+  "note": "Outcomes are synthetic examples for testing retrospective score logic, not measured benchmark results.",
+  "outcomes": [
+    {
+      "action_id": "static-screen",
+      "source": "reference",
+      "status": "completed",
+      "realized_cost_units": 2,
+      "outcome_evidence_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "realized_decision_loss_change_units": 4
+    },
+    {
+      "action_id": "universal-mlip",
+      "source": "reference",
+      "status": "completed",
+      "realized_cost_units": 4,
+      "outcome_evidence_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+      "realized_decision_loss_change_units": 20
+    },
+    {
+      "action_id": "domain-specific-mlip",
+      "source": "reference",
+      "status": "completed",
+      "realized_cost_units": 8,
+      "outcome_evidence_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+      "realized_decision_loss_change_units": 24
+    },
+    {
+      "action_id": "dft-reference",
+      "source": "reference",
+      "status": "failed",
+      "realized_cost_units": 40,
+      "outcome_evidence_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "realized_decision_loss_change_units": -1
+    },
+    {
+      "action_id": "out-of-domain-mlip",
+      "source": "reference",
+      "status": "not_run",
+      "realized_cost_units": 0,
+      "outcome_evidence_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+      "realized_decision_loss_change_units": 0
+    }
+  ]
+}

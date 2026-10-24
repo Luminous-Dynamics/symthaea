@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/published-ranking-metrics-v1.schema.json",
+  "title": "AtomFab Published Ranking Metrics v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "candidate_count",
+    "rbo_persistence",
+    "extrapolated_rbo",
+    "kendall_tau_b",
+    "energy_tie_tolerance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "candidate_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "rbo_persistence": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "extrapolated_rbo": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "kendall_tau_b": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "energy_tie_tolerance": {
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "$comment": "RBO uses a canonical-ID tie break for exact energy ties and the finite-list extrapolated RBO formula. Kendall tau-b uses the declared energy tie tolerance. All inputs must have exactly the same unique canonical structure IDs; discovery-set overlap is a separate metric."
+}

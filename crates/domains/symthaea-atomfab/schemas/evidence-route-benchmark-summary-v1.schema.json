@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/evidence-route-benchmark-summary-v1.schema.json",
+  "title": "AtomFab Retrospective Evidence Route Benchmark Summary v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "domain",
+    "comparison_contract_digest",
+    "benefit_unit",
+    "cost_unit",
+    "max_cost_units",
+    "outcome_source",
+    "selected_action_id",
+    "selected_efficiency",
+    "oracle_action_id",
+    "oracle_efficiency",
+    "eligible_action_count",
+    "failed_action_count",
+    "outcomes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain": {
+      "enum": [
+        "atomistic",
+        "process_twin",
+        "metrology"
+      ]
+    },
+    "comparison_contract_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "benefit_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cost_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "max_cost_units": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "outcome_source": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "reference",
+        "simulation",
+        "measurement",
+        "independent_reproduction",
+        null
+      ]
+    },
+    "selected_action_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "selected_efficiency": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ratio"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "oracle_action_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "oracle_efficiency": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ratio"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "eligible_action_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "failed_action_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "outcomes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/outcome"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ratio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "benefit_units",
+        "cost_units"
+      ],
+      "properties": {
+        "benefit_units": {
+          "type": "integer"
+        },
+        "cost_units": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "source",
+        "status",
+        "realized_decision_loss_change_units",
+        "realized_cost_units",
+        "outcome_evidence_digest"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "enum": [
+            "reference",
+            "simulation",
+            "measurement",
+            "independent_reproduction"
+          ]
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "failed",
+            "abstained",
+            "not_run"
+          ]
+        },
+        "realized_cost_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outcome_evidence_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "realized_decision_loss_change_units": {
+          "type": "integer"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not_run"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "realized_cost_units": {
+                "const": 0
+              },
+              "realized_decision_loss_change_units": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "failed",
+                  "abstained"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "realized_cost_units": {
+                "minimum": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "completed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "realized_cost_units": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$comment": "The report stores realized net decision-loss reduction as a signed numerator and cost as a positive denominator. Negative ratios indicate harmful actions; the no-action baseline (zero benefit, zero cost) is the oracle when no eligible action has positive realized benefit. Rust EvidenceRouteBenchmarkSummary::validate recomputes selection and oracle from outcome records."
+}

@@ -1,0 +1,438 @@
+{
+  "schema_version": 1,
+  "registry_id": "atomfab-benchmark-matrix-v1",
+  "reviewed_on": "2026-10-20",
+  "status": "planned_not_executed",
+  "purpose": "Compare AtomFab's decision and evidence layer with current specialist models, public scientific benchmarks, conventional acquisition policies, and process-twin baselines.",
+  "claim_policy": {
+    "no_sota_claim_until": [
+      "the official task and split are reproduced",
+      "the exact baseline model/tool version and configuration are pinned",
+      "test/train overlap is audited where feasible",
+      "equal budgets and target definitions are used for policy comparisons",
+      "all failed runs and exclusions are reported",
+      "metrics are independently recomputed from raw predictions or traceable outputs"
+    ],
+    "distinguish_result_classes": [
+      "reference",
+      "prediction",
+      "simulation",
+      "measurement",
+      "independently_reproduced"
+    ],
+    "rule": "Novel architecture, high source-code volume, or internal test success is not evidence of state-of-the-art performance."
+  },
+  "benchmark_lanes": [
+    {
+      "id": "scientific-ms25",
+      "status": "first_reference_lane",
+      "goal": "Reproduce task-level atomistic metrics and derived-observable behavior on a tractable, license-compatible MS25 subset.",
+      "reference": {
+        "name": "MS25",
+        "doi": "10.1021/acs.jcim.5c01262",
+        "url": "https://doi.org/10.1021/acs.jcim.5c01262",
+        "systems": [
+          "MgO surfaces",
+          "liquid water",
+          "zeolites",
+          "Pt surface reaction",
+          "high-entropy alloys",
+          "disordered Zr oxides"
+        ]
+      },
+      "baselines": [
+        "Published MS25 reference results using the exact declared reference method, settings and subset.",
+        "Choose the strongest compatible pinned pretrained potential from the public Matbench Discovery model catalog; candidate pool includes MatRIS-10M-OAM, eSEN-30M-OAM, Orb-v3, MatterSim-v1.5M, and MACE-MP-0/OMAT variants, subject to species, dataset, license, precision and hardware compatibility.",
+        "One simpler domain-appropriate baseline where scientifically meaningful.",
+        "Policy ablation: same potential/evaluator with the selection/evidence layer disabled."
+      ],
+      "metrics": [
+        "energy MAE/RMSE/max error",
+        "force MAE/RMSE/max error",
+        "derived observable error",
+        "per-family error",
+        "OOD calibration",
+        "typed failure-mode counts by model/material family/split/severity, with abstentions reported separately",
+        "per-family transferability and declared applicability-domain violations, not only pooled error",
+        "derived-observable error and violation rates (lattice/volume/barrier or task-relevant outputs) by failure category",
+        "failure-mode rates scoped by evaluation stratum (e.g., particle size × support surface × temperature regime), with the scope digest retained"
+      ],
+      "gates": [
+        "reproduce a published baseline within its reported tolerance",
+        "preserve exact reference method and units",
+        "group correlated configurations by parent material",
+        "report failures and exclusions",
+        "retain every tested sample disposition (pass, failed, abstained) and never omit failed/non-converged samples from aggregate denominators",
+        "publish critical failure counts and grouped family-holdout results beside MAE/RMSE; a good average cannot compensate for catastrophic failures",
+        "use a frozen failure taxonomy and evaluator digest; summary counts must recompute from record-level evidence with no mixed model/split/family pooling",
+        "report each evaluation stratum separately before any cross-stratum aggregate; no result may pool particle sizes, support surfaces or thermodynamic regimes into one hidden rate"
+      ]
+    },
+    {
+      "id": "crystal-stability",
+      "status": "leaderboard_comparison_after_lane_1",
+      "goal": "Measure competitiveness on the official high-throughput crystal stability task.",
+      "reference": {
+        "name": "Matbench Discovery",
+        "doi": "10.1038/s42256-025-01055-1",
+        "url": "https://docs.materialsproject.org/services/ml-and-ai-applications/matbench-discovery"
+      },
+      "baselines": [
+        "Current official Matbench Discovery leaderboard models, pinning the exact checkpoint, metadata and evaluator version.",
+        "Candidate current catalog models include MatRIS-10M-OAM, eSEN-30M-OAM, Orb-v3, MatterSim-v1.5M and MACE variants when their task coverage and use terms permit.",
+        "A published or simpler baseline from the official benchmark protocol."
+      ],
+      "metrics": [
+        "official F1",
+        "precision",
+        "recall",
+        "discovery acceleration factor",
+        "compute per evaluated structure"
+      ],
+      "gates": [
+        "use the official evaluator and fixed split",
+        "only compare scores with matching compliance labels",
+        "do not infer overall manufacturing performance from a stability score"
+      ]
+    },
+    {
+      "id": "experimental-reality-gap",
+      "status": "validation_lane_no_hardware_claim",
+      "goal": "Test whether model selection, uncertainty and abstention improve agreement with experimental properties.",
+      "reference": {
+        "name": "UniFFBench / MinX",
+        "doi": "10.1038/s43588-026-01019-4",
+        "url": "https://doi.org/10.1038/s43588-026-01019-4",
+        "scope": "1500+ mineral systems, 85 elements, experimental reference measurements"
+      },
+      "baselines": [
+        "pinned universal MLIP baselines from the benchmark",
+        "simple chemistry/structure baseline where applicable"
+      ],
+      "metrics": [
+        "property error against experiment",
+        "reference uncertainty-aware normalized error",
+        "interval coverage",
+        "abstention risk-coverage curve",
+        "error by material/environment family",
+        "risk-coverage curve and stepwise AURC for uncertainty-based abstention",
+        "AURC against random-uncertainty and shuffled-uncertainty negative controls at identical retained coverages",
+        "risk-at-nearest-attainable 50%, 75%, 90%, and 100% coverage points without splitting equal-uncertainty groups",
+        "measurement-vs-prediction discrepancy and failure/abstention category by material/environment family"
+      ],
+      "gates": [
+        "respect experimental reference uncertainty",
+        "separate in-domain from OOD cases",
+        "do not label simulation outputs as measurement",
+        "freeze uncertainty construction and any abstention threshold on validation data; report the complete risk-coverage curve and AURC on a disjoint test set",
+        "publish risk and realized coverage at nominal 50%, 75%, 90%, and 100% coverage points; preserve equal-uncertainty groups even when realized coverage differs from nominal",
+        "separate prediction, simulation, measurement and independent reproduction result classes; never reinterpret simulated sensor values as measurement evidence"
+      ]
+    },
+    {
+      "id": "off-equilibrium-search",
+      "status": "planned",
+      "goal": "Test whether potential-guided search recovers correct structures and energetic hierarchy under perturbed geometries.",
+      "reference": {
+        "name": "2026 universal interatomic potential EOS and minima-hopping benchmark",
+        "doi": "10.1038/s41524-026-02251-2",
+        "url": "https://doi.org/10.1038/s41524-026-02251-2"
+      },
+      "baselines": [
+        "pinned universal MLIPs",
+        "reference DFT results",
+        "simple local/random search baseline where applicable"
+      ],
+      "metrics": [
+        "equation-of-state curve error",
+        "equilibrium volume",
+        "bulk modulus",
+        "reference structure recovery",
+        "pairwise energetic-ordering accuracy",
+        "search cost"
+      ],
+      "gates": [
+        "separate equilibrium and far-from-equilibrium reports",
+        "count failed and duplicated searches",
+        "validate energetic rankings against the declared reference method"
+      ]
+    },
+    {
+      "id": "supported-nanoparticle-search",
+      "status": "planned_after_reference-lane",
+      "goal": "Separate energy-prediction accuracy from structural exploration quality for supported nanoparticle searches, measuring whether a potential-guided search finds diverse, physically valid low-energy structures rather than merely assigning accurate energies to a limited set of structures.",
+      "reference": {
+        "name": "2026 supported-nanoparticle uMLIP structural-exploration benchmark / UniAlCu",
+        "doi": "10.1038/s41524-026-02043-8",
+        "url": "https://doi.org/10.1038/s41524-026-02043-8",
+        "scope": "Supported nanoparticle systems; exact compositions, support surfaces, configurations, data license and reference method must be pinned before execution."
+      },
+      "baselines": [
+        "Published reference protocol and DFT-relaxed structures for the chosen systems.",
+        "A strong pinned universal interatomic potential compatible with the selected elements and interfaces.",
+        "A simple randomized or local-search baseline with the same starting candidates, DFT budget and stopping rule.",
+        "The same potential and search algorithm with Symthaea candidate selection disabled.",
+        "Ablation where ranking uses predicted energy only, without structural-diversity or uncertainty criteria."
+      ],
+      "metrics": [
+        "energy error on matched structures",
+        "reference energetic-ordering accuracy on matched structures",
+        "top-weighted finite-prefix ranking overlap (normalized RBO-style, p=0.94) restricted to shared canonical candidate IDs; report candidate-set Jaccard separately",
+        "candidate-set Jaccard overlap between predicted and reference candidate sets",
+        "reference low-energy structure recovery rate",
+        "unique low-energy minima found at equal reference-calculation budget",
+        "structural diversity and duplicate-minimum rate under a pinned deduplication tolerance",
+        "fraction of candidates satisfying geometry and interface validity constraints",
+        "energy error conditional on structure recovery",
+        "search cost per unique validated low-energy structure",
+        "best validated objective and learning curve at equal cost",
+        "Pareto frontier over unique reference-validated low-energy structures, best validated objective, and total cost; do not collapse these dimensions into one weighted score",
+        "typed structural-search failure modes: non-convergence, geometry collapse, interatomic overlap, support/interface breakdown, non-finite force, out-of-domain recommendation, and abstention",
+        "failure-mode rates scoped by evaluation stratum (e.g., particle size × support surface × temperature regime), with the scope digest retained",
+        "published reference-search reproduction on 12 explicit strata: Cu27/Cu38/Cu47/Cu55 × γ-Al2O3(100)/γ-Al2O3(110)/α-Al2O3(0001)",
+        "reference-method/checkpoint/data-manifest completeness and checksum coverage before claim-bearing execution",
+        "paper-compatible budget: 50 lowest-energy candidates per MLIP locally DFT-optimized per stratum; record the original candidate pool, failed refinements, duplicates and resulting unique validated discoveries",
+        "distinct budget for the policy-extension phase: matched per-policy reference budget over at least 20 paired seeds, with router/preprocessing/retry costs included",
+        "paper-reported search-winner fingerprint by model across 12 size×surface systems, reported as reference context rather than a deterministic requirement under different stochastic seeds",
+        "paper-compatible extrapolated RBO with persistence p=0.94 and Kendall tau-b on identical canonical candidate IDs, reported separately from discovery-set Jaccard and the finite-prefix RBO-style internal metric"
+      ],
+      "gates": [
+        "report energy accuracy and structural exploration as separate score families",
+        "canonicalize and deduplicate structure identities with a frozen tolerance before ranking comparison; candidate IDs must be stable across policies, and unmatched candidates count as discovery differences rather than being silently remapped",
+        "pin particle composition, support surface, slab construction, relaxation settings and structural deduplication method before testing",
+        "group related configurations by parent nanoparticle/support system when defining held-out splits",
+        "count failed relaxations, duplicate minima, and invalid interfaces rather than silently excluding them",
+        "compare search policies at equal reference-calculation budgets and include a strong pretrained potential",
+        "do not generalize from the chosen supported-nanoparticle family to universal catalyst performance",
+        "report the nondominated policy set per matched seed; hard-constraint violations make an outcome ineligible rather than tradeable against discovery quality or cost",
+        "report failure and abstention distributions by particle size and support surface; do not report a search as efficient by excluding failed relaxations or invalid interfaces",
+        "report each evaluation stratum separately before any cross-stratum aggregate; no result may pool particle sizes, support surfaces or thermodynamic regimes into one hidden rate",
+        "reproduce the published GA/reference protocol, including population 50, 20 generations, random initial population, cut-and-splice and mutation, after pinning every remaining method setting",
+        "preserve the 12 per-size/per-surface strata; keep the 2025 related Zenodo training/validation/global-minima archive distinct from the exact 2026 benchmark evaluation manifest",
+        "no claim-bearing run until exact DFT settings, candidate/reference structure manifest, model checkpoints, licenses, evaluator version and SHA-256 artifact digests are pinned",
+        "report the published reproduction phase separately from the policy-extension phase; do not infer exact candidate counts from population × generations when code-level duplicate/offspring accounting has not been pinned",
+        "for the extension stretch claim, use paired seeds and identical frozen targets; if either policy fails to reach the target, target-reaching acceleration is undefined for that pair and the failure remains in the report",
+        "never label a finite GA best-known structure as the true global minimum unless exhaustive/certifying evidence supports that claim; record random seeds and deviations from paper-reported winner counts without tuning the evaluator",
+        "pin both mutation operators and their probabilities, including rattle/mirror weighting, before exact reproduction",
+        "match the published ranking comparison by applying RBO p=0.94 and tie-aware Kendall tau-b to the same reference-DFT-refined candidate universe; keep discovery-set overlap as a separate metric",
+        "pin the canonical-ID tie-break for exact RBO ties and the predeclared energy tie tolerance for Kendall tau-b before evaluating held-out results"
+      ]
+    },
+    {
+      "id": "catalyst-later",
+      "status": "later_domain_lane",
+      "goal": "Measure adsorption and relaxation quality when a catalytic-material use case is selected.",
+      "reference": {
+        "name": "Open Catalyst Project OC20/OC22",
+        "url": "https://opencatalystproject.org/"
+      },
+      "baselines": [
+        "official task baselines",
+        "current available pretrained potential under matched settings"
+      ],
+      "metrics": [
+        "official energy-within-threshold metric",
+        "energy MAE",
+        "relaxation success",
+        "compute and memory cost"
+      ],
+      "gates": [
+        "do not compare metrics across non-equivalent leaderboards",
+        "freeze data/model version and relaxation protocol"
+      ]
+    },
+    {
+      "id": "active-learning-policy",
+      "status": "first_algorithmic_ablation",
+      "goal": "Isolate whether Symthaea's decision layer improves candidate selection when physics outputs are held constant.",
+      "reference": {
+        "name": "Frozen labelled subset with retrospective masked queries",
+        "url": null
+      },
+      "baselines": [
+        "random",
+        "diversity-only",
+        "uncertainty-only",
+        "cost-aware acquisition",
+        "Symthaea policy",
+        "Symthaea with history/retrieval ablated",
+        "calibrated ensemble disagreement",
+        "counterexample-guided falsification"
+      ],
+      "metrics": [
+        "best validated objective at equal cost",
+        "area under learning curve",
+        "AF",
+        "EF",
+        "decision regret",
+        "queries and time to target",
+        "risk-coverage curve",
+        "risk-coverage AURC at matched coverage and budget",
+        "coverage and false-feasible count alongside selective risk; abstention is not free success",
+        "matched-seed Pareto frontier over validated objective quality, unique reference-validated discoveries, and declared total cost",
+        "paired median acceleration factor and percentile bootstrap interval across all predeclared matched seeds",
+        "number of predeclared seed pairs reaching the same target under both policies; non-reaching pairs block target-reaching confidence intervals",
+        "paired target-reach rate and candidate-minus-baseline reach-rate difference with percentile-bootstrap interval over every predeclared seed, including failed and incomplete campaigns"
+      ],
+      "gates": [
+        "freeze target and budget before campaigns",
+        "at least 20 fixed seeds for a strong comparative claim when feasible",
+        "matched target costs",
+        "report full curves and confidence intervals",
+        "no win unless quality is at least as good at equal budget",
+        "compare uncertainty-ranked selection against random-score and shuffled-score negative controls; report retained coverage and risk together",
+        "report realized coverage at nominal 50%, 75%, 90%, and 100% operating points; never split equal-uncertainty ties to hit a nominal coverage exactly",
+        "publish nondominated policies and per-dimension trade-offs; never use a single weighted score to hide discovery, quality, or cost regressions",
+        "bootstrap acceleration intervals require at least 20 predeclared paired seeds and every pair must reach the same frozen target; never drop non-reaching seeds to create a success-only interval",
+        "pin confidence level, resample count and bootstrap seed; a speedup claim requires the 95% percentile-bootstrap lower bound above 1 and no worse validated objective quality at equal total cost",
+        "pin ensemble checkpoints and calibrate disagreement on validation-only data; include inference cost and compare against shuffled-disagreement controls",
+        "counterexample-guided policy must predeclare falsifiable hypotheses and score every proposed counterexample against the reference evaluator; no post-hoc target changes",
+        "publish target-reachability counts and paired discordant outcomes over the full predeclared seed roster; failed/incomplete runs count as not reaching target and are never omitted from this endpoint"
+      ]
+    },
+    {
+      "id": "symtropy-workcell",
+      "status": "first_process_twin_lane",
+      "goal": "Validate process feasibility and fault response on a simulation-only surrogate workcell.",
+      "reference": {
+        "name": "Symtropy AtomFab digital-twin contract",
+        "url": "https://github.com/Luminous-Dynamics/symtropy/pull/2140"
+      },
+      "baselines": [
+        "static constraint checker",
+        "simple conventional path planner",
+        "Symthaea decision policy with process feedback ablated"
+      ],
+      "metrics": [
+        "false-feasible count/rate",
+        "missed-feasible count",
+        "collision/limit violations",
+        "fault detection precision/recall",
+        "safe-stop latency",
+        "recovery",
+        "replay fidelity",
+        "decision/reason-code parity over the frozen 15-case atomfab-workcell-fault-corpus-v1; report runtime-integrated versus specification-only cases separately"
+      ],
+      "gates": [
+        "zero false-feasible accepts on the frozen adversarial hard-constraint suite",
+        "undefined false-feasible rate when no cases are accepted",
+        "every rejection has a reason",
+        "synthetic validity must not be presented as hardware validation",
+        "execute all 15 corpus cases against the exact pinned workcell/adapter build; require zero false-feasible accepts, explicit rejection reasons, expected parity for typed adapter cases, and accepted in-domain controls"
+      ]
+    },
+    {
+      "id": "metrology-prospective",
+      "status": "blocked_until_laboratory_gate",
+      "goal": "Test prediction-to-measurement gap on a supervised physical material process.",
+      "reference": {
+        "name": "Prospectively selected and independently measured samples",
+        "url": null
+      },
+      "baselines": [
+        "frozen prediction before experiment",
+        "declared conventional planning or expert baseline"
+      ],
+      "metrics": [
+        "property error against experiment",
+        "yield",
+        "defect density",
+        "process repeatability",
+        "time/cost to target",
+        "failed runs/rework",
+        "uncertainty calibration"
+      ],
+      "gates": [
+        "pre-register protocol and exclusions",
+        "independent instrumentation/interlocks",
+        "operator approval",
+        "calibration and sample provenance",
+        "independent characterization"
+      ]
+    },
+    {
+      "id": "multi-fidelity-evidence-routing",
+      "status": "first_algorithmic_ablation",
+      "goal": "Select the next evidence action for a declared decision, balancing calibrated expected decision-loss reduction against cost without allowing one evidence domain to substitute for another.",
+      "reference": {
+        "name": "Supported-nanoparticle structural-exploration benchmark and materials active-learning strategy benchmark",
+        "doi": "10.1038/s41524-026-02043-8",
+        "url": "https://doi.org/10.1038/s41524-026-02043-8"
+      },
+      "baselines": [
+        "Fixed cheapest-first escalation",
+        "Random selection among eligible actions",
+        "Uncertainty-only escalation",
+        "Cost-aware expected information gain or calibrated value of information",
+        "Symthaea evidence router",
+        "Symthaea router with history/retrieval ablated"
+      ],
+      "metrics": [
+        "best reference-validated objective at equal total cost",
+        "unique reference-validated discoveries per total cost",
+        "target-reaching acceleration only when both paired routes reach the same frozen target",
+        "decision-loss reduction estimate calibration and residual error",
+        "selected-action regret against a retrospective oracle on fully labelled runs",
+        "action/fidelity mix, abstention rate and OOD rejection rate",
+        "failed-action and rework costs included in total cost",
+        "Pareto frontier across validated discoveries, best validated objective, and total cost",
+        "domain/action-kind mismatch, stale-calibration, prerequisite-block and over-budget rejection counts"
+      ],
+      "gates": [
+        "compare routes only within the same request, evidence domain, decision contract, units, and budget",
+        "calibrate expected decision-loss reduction estimates on disjoint validation campaigns before routing a prospective campaign",
+        "atomistic, process-twin, and metrology actions must be benchmarked as separate decision domains; none may be scored as a substitute for another",
+        "run fixed-fidelity, random, uncertainty-only, cost-aware, and Symthaea policies under matched seeds and total-cost accounting",
+        "include a negative control with shuffled value estimates and an OOD action with inflated uncalibrated value; neither may win",
+        "report all failed/incomplete actions, valid abstentions, and target failures; no action selected is not a success unless abstention is the preregistered correct decision",
+        "freeze target, total cost unit/resolution, calibration split, and stopping rule before test campaigns"
+      ]
+    }
+  ],
+  "policy_baselines": [
+    {
+      "id": "random",
+      "definition": "Uniform selection from the eligible candidate pool with fixed seeds."
+    },
+    {
+      "id": "diversity",
+      "definition": "Select candidates to maximize a predeclared geometric/feature-space diversity objective."
+    },
+    {
+      "id": "uncertainty",
+      "definition": "Select candidates with highest calibrated predictive uncertainty."
+    },
+    {
+      "id": "cost_aware",
+      "definition": "Select by expected target improvement or information value divided by measured evaluation cost."
+    },
+    {
+      "id": "symthaea_full",
+      "definition": "Preregistered AtomFab policy using evidence, constraints, uncertainty and history."
+    },
+    {
+      "id": "symthaea_ablation",
+      "definition": "Same policy with the specific claimed advantage disabled; matched model, budget and seeds."
+    },
+    {
+      "id": "ensemble_disagreement",
+      "definition": "Select among eligible candidates by calibrated disagreement across pinned compatible potential checkpoints; normalize disagreement using held-out validation and charge all model-inference cost."
+    },
+    {
+      "id": "counterexample_guided",
+      "definition": "Select candidates to falsify the current best-ranked structure, model-domain assumptions, or process-feasibility hypothesis; freeze the falsification objective before evaluation and report all counterexamples and failed searches."
+    }
+  ],
+  "performance_claims": {
+    "accelerations": {
+      "stretch_target_median_af": 2,
+      "minimum_campaigns": 20,
+      "confidence_interval": "95% bootstrap lower bound > 1.0",
+      "precondition": "same preregistered target, matched query cost model, equal final-quality requirement"
+    },
+    "process_feasibility": {
+      "maximum_false_feasible_accepts_on_frozen_adversarial_suite": 0,
+      "if_no_candidates_accepted": "false_feasible_rate=null; never report as 0"
+    }
+  }
+}

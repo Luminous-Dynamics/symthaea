@@ -1,0 +1,734 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/supported-cu-alumina-reference-campaign-v1.schema.json",
+  "title": "AtomFab Supported Cu/Alumina Reference Campaign Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "status",
+    "objective",
+    "claim_ceiling",
+    "sources",
+    "reference_method",
+    "search_protocol",
+    "primary_model_baselines",
+    "secondary_baselines_to_evaluate_after_exact_reproduction",
+    "strata",
+    "required_pins_before_execution",
+    "metrics",
+    "gates",
+    "published_candidate_refinement",
+    "policy_comparison",
+    "published_result_fingerprint",
+    "published_ranking_settings"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "campaign_id": {
+      "const": "atomfab-supported-cu-alumina-reference-v1"
+    },
+    "status": {
+      "const": "proposed_not_executed"
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sources": {
+      "type": "object",
+      "required": [
+        "benchmark_paper",
+        "related_dataset_record",
+        "related_dataset_artifacts",
+        "published_evaluation_manifest"
+      ],
+      "properties": {
+        "benchmark_paper": {
+          "type": "object",
+          "required": [
+            "doi",
+            "url",
+            "role"
+          ],
+          "properties": {
+            "doi": {
+              "const": "10.1038/s41524-026-02043-8"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "role": {
+              "type": "string"
+            }
+          }
+        },
+        "related_dataset_record": {
+          "type": "object",
+          "required": [
+            "doi",
+            "url",
+            "role",
+            "status"
+          ],
+          "properties": {
+            "doi": {
+              "const": "10.5281/zenodo.15865800"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "role": {
+              "type": "string"
+            },
+            "status": {
+              "const": "not_materialized"
+            }
+          },
+          "additionalProperties": false
+        },
+        "related_dataset_artifacts": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "object",
+            "required": [
+              "filename",
+              "source_record_md5",
+              "sha256",
+              "bytes",
+              "status",
+              "evaluation_role",
+              "independent_test_disposition"
+            ],
+            "properties": {
+              "filename": {
+                "type": "string"
+              },
+              "source_record_md5": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{32}$"
+              },
+              "sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "bytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "status": {
+                "enum": [
+                  "not_downloaded",
+                  "materialized"
+                ]
+              },
+              "evaluation_role": {
+                "enum": [
+                  "training_validation_source",
+                  "published_reference_structure_source",
+                  "training_configuration_source",
+                  "reference_calculation_input_source"
+                ]
+              },
+              "independent_test_disposition": {
+                "enum": [
+                  "not_independent_for_models_trained_on_archive",
+                  "audit_overlap_before_test_use",
+                  "not_evaluation_data"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "uniqueItems": false
+        },
+        "published_evaluation_manifest": {
+          "type": "object",
+          "required": [
+            "status",
+            "note"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "unresolved",
+                "pinned"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "reference_method": {
+      "type": "object",
+      "required": [
+        "family",
+        "exchange_correlation",
+        "electronic_structure_code",
+        "pseudopotential_or_basis_digest",
+        "plane_wave_cutoff",
+        "k_point_mesh",
+        "electronic_convergence_tolerance",
+        "ionic_relaxation_tolerance",
+        "dispersion_correction",
+        "units",
+        "status",
+        "gate"
+      ],
+      "properties": {
+        "family": {
+          "const": "DFT"
+        },
+        "exchange_correlation": {
+          "type": "string"
+        },
+        "electronic_structure_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pseudopotential_or_basis_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plane_wave_cutoff": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "k_point_mesh": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "electronic_convergence_tolerance": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ionic_relaxation_tolerance": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "dispersion_correction": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "unresolved_before_execution",
+            "pinned"
+          ]
+        },
+        "gate": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "search_protocol": {
+      "type": "object",
+      "required": [
+        "algorithm",
+        "source",
+        "population_size",
+        "generations",
+        "initial_population",
+        "offspring_operators",
+        "additional_published_details",
+        "status"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "genetic_algorithm"
+        },
+        "source": {
+          "type": "string"
+        },
+        "population_size": {
+          "const": 50
+        },
+        "generations": {
+          "const": 20
+        },
+        "initial_population": {
+          "const": "randomly_generated_structures"
+        },
+        "offspring_operators": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "enum": [
+              "cut_and_splice",
+              "mutation"
+            ]
+          }
+        },
+        "additional_published_details": {
+          "type": "string"
+        },
+        "status": {
+          "const": "partial_parameters_transcribed_not_reproduced"
+        }
+      },
+      "additionalProperties": false
+    },
+    "primary_model_baselines": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "checkpoint_digest",
+          "license_terms_status",
+          "execution_status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "checkpoint_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "license_terms_status": {
+            "type": "string"
+          },
+          "execution_status": {
+            "const": "not_run"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "secondary_baselines_to_evaluate_after_exact_reproduction": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "strata": {
+      "type": "array",
+      "minItems": 12,
+      "items": {
+        "type": "object",
+        "required": [
+          "stratum_id",
+          "nanoparticle",
+          "copper_atom_count",
+          "support_surface",
+          "support_surface_id",
+          "expected_model_domain_note",
+          "split_group_key",
+          "status"
+        ],
+        "properties": {
+          "stratum_id": {
+            "type": "string"
+          },
+          "nanoparticle": {
+            "const": "Cu"
+          },
+          "copper_atom_count": {
+            "enum": [
+              27,
+              38,
+              47,
+              55
+            ]
+          },
+          "support_surface": {
+            "enum": [
+              "γ-Al2O3(100)",
+              "γ-Al2O3(110)",
+              "α-Al2O3(0001)"
+            ]
+          },
+          "support_surface_id": {
+            "type": "string"
+          },
+          "expected_model_domain_note": {
+            "type": "string"
+          },
+          "split_group_key": {
+            "type": "string"
+          },
+          "status": {
+            "const": "planned"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "required_pins_before_execution": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "string"
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "string"
+      }
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "type": "string"
+      }
+    },
+    "published_candidate_refinement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "candidate_pool_per_model_per_stratum",
+        "pool_note",
+        "selected_candidates_per_model_per_stratum",
+        "model_count",
+        "dft_refined_candidates_per_stratum",
+        "stratum_count",
+        "implied_total_dft_refinements_across_all_strata",
+        "selection_rule",
+        "exact_dft_settings_status",
+        "duplicates_and_failures",
+        "status",
+        "mutation_operators",
+        "mutation_operator_probability",
+        "global_minimum_claim_ceiling"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_pool_per_model_per_stratum": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pool_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selected_candidates_per_model_per_stratum": {
+          "const": 50
+        },
+        "model_count": {
+          "const": 3
+        },
+        "dft_refined_candidates_per_stratum": {
+          "const": 150
+        },
+        "stratum_count": {
+          "const": 12
+        },
+        "implied_total_dft_refinements_across_all_strata": {
+          "const": 1800
+        },
+        "selection_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exact_dft_settings_status": {
+          "const": "unresolved_before_execution"
+        },
+        "duplicates_and_failures": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "const": "published_refinement_count_transcribed_other_run_details_unresolved"
+        },
+        "mutation_operators": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "rattle",
+              "mirror"
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "mutation_operator_probability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rattle",
+            "mirror"
+          ],
+          "properties": {
+            "rattle": {
+              "const": 0.5
+            },
+            "mirror": {
+              "const": 0.5
+            }
+          }
+        },
+        "global_minimum_claim_ceiling": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "policy_comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "paired_campaign_count",
+        "same_seed_across_policies",
+        "fixed_per_policy_reference_refinement_budget",
+        "budget_note",
+        "include_all_costs",
+        "costs_to_include",
+        "policies",
+        "outcomes",
+        "stretch_gate",
+        "seed_manifest"
+      ],
+      "properties": {
+        "status": {
+          "const": "proposed_extension_not_part_of_exact_paper_reproduction"
+        },
+        "paired_campaign_count": {
+          "const": 20
+        },
+        "same_seed_across_policies": {
+          "const": true
+        },
+        "fixed_per_policy_reference_refinement_budget": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "budget_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "include_all_costs": {
+          "const": true
+        },
+        "costs_to_include": {
+          "type": "array",
+          "minItems": 6,
+          "items": {
+            "type": "string"
+          }
+        },
+        "policies": {
+          "type": "array",
+          "minItems": 8,
+          "items": {
+            "type": "string"
+          }
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 7,
+          "items": {
+            "type": "string"
+          }
+        },
+        "stretch_gate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "median_acceleration_factor_at_least",
+            "campaigns_at_least",
+            "confidence_level",
+            "bootstrap_lower_bound_factor_strictly_greater_than",
+            "requires_same_frozen_target_for_both_policies",
+            "requires_validated_objective_quality_no_worse_at_equal_total_cost",
+            "status"
+          ],
+          "properties": {
+            "median_acceleration_factor_at_least": {
+              "const": 2
+            },
+            "campaigns_at_least": {
+              "const": 20
+            },
+            "confidence_level": {
+              "const": 0.95
+            },
+            "bootstrap_lower_bound_factor_strictly_greater_than": {
+              "const": 1
+            },
+            "requires_same_frozen_target_for_both_policies": {
+              "const": true
+            },
+            "requires_validated_objective_quality_no_worse_at_equal_total_cost": {
+              "const": true
+            },
+            "status": {
+              "const": "proposed_not_achieved"
+            }
+          }
+        },
+        "seed_manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "seeds",
+            "sha256"
+          ],
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "seeds": {
+              "type": "array",
+              "minItems": 20,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "published_result_fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "system_count",
+        "model_minimum_binding_energy_winner_counts",
+        "interpretation",
+        "citation_doi"
+      ],
+      "properties": {
+        "status": {
+          "const": "paper_reported_not_reproduced"
+        },
+        "system_count": {
+          "const": 12
+        },
+        "model_minimum_binding_energy_winner_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dp-unialcu",
+            "mattersim-v1.0.0-1m",
+            "mace-omat-medium"
+          ],
+          "properties": {
+            "dp-unialcu": {
+              "const": 8
+            },
+            "mattersim-v1.0.0-1m": {
+              "const": 3
+            },
+            "mace-omat-medium": {
+              "const": 1
+            }
+          }
+        },
+        "interpretation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation_doi": {
+          "const": "10.1038/s41524-026-02043-8"
+        }
+      }
+    },
+    "published_ranking_settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rbo_persistence",
+        "rbo_variant",
+        "exact_energy_tie_order",
+        "kendall_tau_variant",
+        "kendall_tau_energy_tie_tolerance_eV",
+        "common_candidate_set",
+        "status"
+      ],
+      "properties": {
+        "rbo_persistence": {
+          "const": 0.94
+        },
+        "rbo_variant": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exact_energy_tie_order": {
+          "const": "canonical_structure_id_ascending"
+        },
+        "kendall_tau_variant": {
+          "const": "tau_b"
+        },
+        "kendall_tau_energy_tie_tolerance_eV": {
+          "const": 0
+        },
+        "common_candidate_set": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "const": "preregistered_for_reproduction"
+        }
+      }
+    }
+  },
+  "$comment": "This is an unexecuted campaign plan. The schema intentionally permits missing SHA-256 file/checkpoint digests only because status is proposed_not_executed. An executable manifest must use a distinct status/schema and require all pins."
+}

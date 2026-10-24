@@ -1,0 +1,334 @@
+{
+  "schema_version": 1,
+  "corpus_id": "atomfab-workcell-fault-corpus-v1",
+  "reviewed_on": "2026-10-20",
+  "status": "frozen_software_regression_suite",
+  "claim_ceiling": "Synthetic software-contract evidence only. This corpus does not qualify a physical safety function, validate atomistic physics, authorize hardware actuation, or prove a material can be fabricated.",
+  "interpretation_rules": [
+    "A rejected, abstained, or reevaluation case must not authorize a simulation action.",
+    "A case with an explicit hard-constraint violation must never be accepted as feasible.",
+    "Unknown, stale, malformed, or out-of-domain evidence is not evidence of feasibility.",
+    "At least one valid in-domain control must be accepted; reject-all is not a passing policy.",
+    "All timestamps, drift values, clearances, commands, and actuator counts are synthetic test inputs, not measured apparatus behavior."
+  ],
+  "cases": [
+    {
+      "case_id": "stale-observation",
+      "category": "sensor_validity",
+      "control": false,
+      "description": "Observation age exceeds the declared maximum age.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "observation_age_ms": 501,
+        "maximum_age_ms": 100
+      },
+      "expected": {
+        "decision": "reject",
+        "reason_codes": [
+          "observation_stale"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "not_evaluated",
+        "hard_constraint_violation": false
+      },
+      "adapter_fault": "invalid_observation"
+    },
+    {
+      "case_id": "non-finite-observation",
+      "category": "sensor_validity",
+      "control": false,
+      "description": "Observation contains a non-finite value represented without illegal JSON numeric tokens.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "value_state": "nan",
+        "field": "tool_pose_x"
+      },
+      "expected": {
+        "decision": "reject",
+        "reason_codes": [
+          "non_finite_observation"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "not_evaluated",
+        "hard_constraint_violation": false
+      },
+      "adapter_fault": "invalid_observation"
+    },
+    {
+      "case_id": "sensor-drift-outside-calibration",
+      "category": "calibration",
+      "control": false,
+      "description": "Sensor drift exceeds its declared calibrated domain.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "absolute_drift": 0.08,
+        "calibrated_absolute_drift_limit": 0.05,
+        "unit": "normalized_range"
+      },
+      "expected": {
+        "decision": "abstain",
+        "reason_codes": [
+          "sensor_drift_outside_calibration_domain"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "unknown",
+        "hard_constraint_violation": false
+      }
+    },
+    {
+      "case_id": "actuator-saturation",
+      "category": "hard_constraint",
+      "control": false,
+      "description": "Requested normalized actuator command exceeds its declared limit.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "requested_command": 1.2,
+        "maximum_command_magnitude": 1,
+        "unit": "normalized_command"
+      },
+      "expected": {
+        "decision": "reject",
+        "reason_codes": [
+          "actuator_limit_exceeded"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "infeasible",
+        "hard_constraint_violation": true
+      }
+    },
+    {
+      "case_id": "invalid-planner-gain",
+      "category": "interface_contract",
+      "control": false,
+      "description": "Planner gain lies outside its declared [0, 1] domain.",
+      "source_kind": "synthetic",
+      "adapter_fault": "invalid_gain",
+      "inputs": {
+        "requested_gain": 1.2,
+        "minimum_valid_gain": 0,
+        "maximum_valid_gain": 1
+      },
+      "expected": {
+        "decision": "reject",
+        "reason_codes": [
+          "invalid_gain"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "not_evaluated",
+        "hard_constraint_violation": false
+      }
+    },
+    {
+      "case_id": "tool-obstruction",
+      "category": "hard_constraint",
+      "control": false,
+      "description": "Predicted tool clearance violates the minimum collision margin.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "predicted_clearance_m": -0.002,
+        "minimum_clearance_m": 0.001
+      },
+      "expected": {
+        "decision": "reject",
+        "reason_codes": [
+          "collision_margin_breached"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "infeasible",
+        "hard_constraint_violation": true
+      }
+    },
+    {
+      "case_id": "actuator-count-mismatch",
+      "category": "interface_contract",
+      "control": false,
+      "description": "Requested actuator count differs from the target interface contract.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "requested_actuator_count": 4,
+        "declared_actuator_count": 3
+      },
+      "expected": {
+        "decision": "reject",
+        "reason_codes": [
+          "actuator_interface_mismatch"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "not_evaluated",
+        "hard_constraint_violation": false
+      },
+      "adapter_fault": "actuator_interface_mismatch"
+    },
+    {
+      "case_id": "bridge-timeout",
+      "category": "integration_failure",
+      "control": false,
+      "description": "The planner bridge returns a timeout instead of a valid typed result.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "bridge_response": "timeout",
+        "timeout_ms": 100
+      },
+      "expected": {
+        "decision": "reject",
+        "reason_codes": [
+          "bridge_failure"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "not_evaluated",
+        "hard_constraint_violation": false
+      },
+      "adapter_fault": "bridge_failure"
+    },
+    {
+      "case_id": "malformed-planner-output",
+      "category": "interface_contract",
+      "control": false,
+      "description": "Planner output is shorter than the declared actuator count.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "expected_output_count": 3,
+        "actual_output_count": 2,
+        "all_values_finite": true
+      },
+      "expected": {
+        "decision": "reject",
+        "reason_codes": [
+          "invalid_planner_output"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "not_evaluated",
+        "hard_constraint_violation": false
+      },
+      "adapter_fault": "invalid_output"
+    },
+    {
+      "case_id": "model-out-of-domain",
+      "category": "model_applicability",
+      "control": false,
+      "description": "The requested process scenario falls outside the model's declared validity domain.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "scenario_domain": "high_vacuum_tip_deposition",
+        "model_domain": "room_pressure_fixture_motion"
+      },
+      "expected": {
+        "decision": "abstain",
+        "reason_codes": [
+          "model_out_of_domain"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "unknown",
+        "hard_constraint_violation": false
+      }
+    },
+    {
+      "case_id": "replay-divergence",
+      "category": "reproducibility",
+      "control": false,
+      "description": "A replay's terminal-state digest differs from the frozen expected digest.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "expected_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observed_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "expected": {
+        "decision": "abstain",
+        "reason_codes": [
+          "replay_digest_mismatch"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "unknown",
+        "hard_constraint_violation": false
+      }
+    },
+    {
+      "case_id": "synthetic-as-measurement",
+      "category": "evidence_provenance",
+      "control": false,
+      "description": "A simulator-generated result is offered with a measured source label.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "actual_source_kind": "simulated",
+        "claimed_source_kind": "measured"
+      },
+      "expected": {
+        "decision": "reject",
+        "reason_codes": [
+          "source_kind_mismatch"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "not_evaluated",
+        "hard_constraint_violation": false
+      }
+    },
+    {
+      "case_id": "physical-actuation-without-interlock",
+      "category": "authority_boundary",
+      "control": false,
+      "description": "A software-only run requests physical actuation without a separately qualified interlock and operator approval.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "requested_effect": "physical_actuation",
+        "interlock_qualified": false,
+        "operator_approval_present": false
+      },
+      "expected": {
+        "decision": "reject",
+        "reason_codes": [
+          "physical_actuation_out_of_scope"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "not_evaluated",
+        "hard_constraint_violation": false
+      }
+    },
+    {
+      "case_id": "bounded-sensor-drift-control",
+      "category": "control",
+      "control": true,
+      "description": "Sensor drift remains inside the declared calibration envelope and all other preconditions are valid.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "absolute_drift": 0.04,
+        "calibrated_absolute_drift_limit": 0.05,
+        "unit": "normalized_range",
+        "observation_age_ms": 20,
+        "maximum_age_ms": 100
+      },
+      "expected": {
+        "decision": "accept",
+        "reason_codes": [],
+        "simulation_action_authorized": true,
+        "feasibility_status": "feasible",
+        "hard_constraint_violation": false
+      }
+    },
+    {
+      "case_id": "valid-simulation-control",
+      "category": "control",
+      "control": true,
+      "description": "A fully specified in-domain synthetic control passes declared software gates.",
+      "source_kind": "synthetic",
+      "inputs": {
+        "observation_age_ms": 20,
+        "maximum_age_ms": 100,
+        "requested_actuator_count": 3,
+        "declared_actuator_count": 3,
+        "command_magnitude": 0.5,
+        "maximum_command_magnitude": 1,
+        "predicted_clearance_m": 0.02,
+        "minimum_clearance_m": 0.001,
+        "model_domain_match": true,
+        "replay_digest_match": true
+      },
+      "expected": {
+        "decision": "accept",
+        "reason_codes": [],
+        "simulation_action_authorized": true,
+        "feasibility_status": "feasible",
+        "hard_constraint_violation": false
+      }
+    }
+  ]
+}

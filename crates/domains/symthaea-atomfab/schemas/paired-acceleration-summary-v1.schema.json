@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/paired-acceleration-summary-v1.schema.json",
+  "title": "AtomFab Paired Acceleration Summary v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baseline_policy_id",
+    "predeclared_seeds",
+    "seed_manifest_sha256",
+    "candidate_policy_id",
+    "campaign_pair_count",
+    "bootstrap_resamples",
+    "bootstrap_seed",
+    "confidence_level",
+    "median_acceleration_factor",
+    "lower_confidence_bound",
+    "upper_confidence_bound",
+    "candidate_faster_count",
+    "tied_cost_count",
+    "candidate_slower_count"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "baseline_policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate_policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "campaign_pair_count": {
+      "type": "integer",
+      "minimum": 20
+    },
+    "bootstrap_resamples": {
+      "type": "integer",
+      "minimum": 1000
+    },
+    "bootstrap_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "confidence_level": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "median_acceleration_factor": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "lower_confidence_bound": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "upper_confidence_bound": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "candidate_faster_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tied_cost_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "candidate_slower_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "predeclared_seeds": {
+      "type": "array",
+      "minItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "seed_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1,0 +1,767 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/contract-v1.schema.json",
+  "title": "AtomFab Contract Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "scenario_id",
+    "sequence",
+    "created_at",
+    "clock_domain",
+    "source_kind",
+    "producer",
+    "evidence_refs",
+    "limitations",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "clock_domain": {
+      "enum": [
+        "simulation",
+        "monotonic_process",
+        "wall_clock"
+      ]
+    },
+    "source_kind": {
+      "enum": [
+        "proposed",
+        "predicted",
+        "simulated",
+        "measured",
+        "independently_reproduced"
+      ]
+    },
+    "producer": {
+      "$ref": "#/$defs/producer"
+    },
+    "parent_digest": {
+      "$ref": "#/$defs/nullable_digest"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence_reference"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/manufacturing_intent"
+        },
+        {
+          "$ref": "#/$defs/atomistic_evaluation"
+        },
+        {
+          "$ref": "#/$defs/process_proposal"
+        },
+        {
+          "$ref": "#/$defs/twin_evaluation"
+        },
+        {
+          "$ref": "#/$defs/measurement_record"
+        },
+        {
+          "$ref": "#/$defs/decision_record"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "record_type": {
+                "const": "manufacturing_intent"
+              }
+            }
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_kind": {
+            "const": "proposed"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "record_type": {
+                "const": "process_proposal"
+              }
+            }
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_kind": {
+            "const": "proposed"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "record_type": {
+                "const": "atomistic_evaluation"
+              }
+            }
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_kind": {
+            "enum": [
+              "predicted",
+              "simulated"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "record_type": {
+                "const": "twin_evaluation"
+              }
+            }
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_kind": {
+            "const": "simulated"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "record_type": {
+                "const": "measurement_record"
+              }
+            }
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_kind": {
+            "const": "measured"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "record_type": {
+                "const": "decision_record"
+              },
+              "outcome": {
+                "const": "accept"
+              }
+            }
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "then": {
+        "required": [
+          "parent_digest"
+        ],
+        "properties": {
+          "evidence_refs": {
+            "minItems": 1
+          },
+          "parent_digest": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullable_digest": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "version",
+        "source_revision",
+        "config_digest"
+      ],
+      "properties": {
+        "component": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "config_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "evidence_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "sha256",
+        "role"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "standard_uncertainty",
+        "unit",
+        "method",
+        "calibrated",
+        "valid_domain"
+      ],
+      "properties": {
+        "standard_uncertainty": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibrated": {
+          "type": "boolean"
+        },
+        "valid_domain": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "quantity_estimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "unit"
+      ],
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/uncertainty"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "named_estimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "estimate"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "estimate": {
+          "$ref": "#/$defs/quantity_estimate"
+        }
+      }
+    },
+    "property_constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "operator",
+        "target"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operator": {
+          "enum": [
+            "at_least",
+            "at_most",
+            "equal_within"
+          ]
+        },
+        "target": {
+          "$ref": "#/$defs/quantity_estimate"
+        },
+        "tolerance": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operator": {
+                "const": "equal_within"
+              }
+            },
+            "required": [
+              "operator"
+            ]
+          },
+          "then": {
+            "required": [
+              "tolerance"
+            ]
+          }
+        }
+      ]
+    },
+    "process_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_type",
+        "parameters"
+      ],
+      "properties": {
+        "action_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/quantity_estimate"
+          }
+        }
+      }
+    },
+    "manufacturing_intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "objective",
+        "material_family",
+        "target_properties",
+        "hard_constraints"
+      ],
+      "properties": {
+        "record_type": {
+          "const": "manufacturing_intent"
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 1
+        },
+        "material_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_properties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/property_constraint"
+          }
+        },
+        "hard_constraints": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "target_properties"
+          ],
+          "properties": {
+            "target_properties": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": [
+            "hard_constraints"
+          ],
+          "properties": {
+            "hard_constraints": {
+              "minItems": 1
+            }
+          }
+        }
+      ]
+    },
+    "atomistic_evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "structure_fingerprint",
+        "composition",
+        "solver_id",
+        "convergence",
+        "observables"
+      ],
+      "properties": {
+        "record_type": {
+          "const": "atomistic_evaluation"
+        },
+        "structure_fingerprint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "composition": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "solver_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "convergence": {
+          "enum": [
+            "converged",
+            "not_converged",
+            "not_applicable"
+          ]
+        },
+        "energy_per_atom": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/quantity_estimate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observables": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/named_estimate"
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "energy_per_atom"
+          ],
+          "properties": {
+            "energy_per_atom": {
+              "$ref": "#/$defs/quantity_estimate"
+            }
+          }
+        },
+        {
+          "required": [
+            "observables"
+          ],
+          "properties": {
+            "observables": {
+              "minItems": 1
+            }
+          }
+        }
+      ]
+    },
+    "process_proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "equipment_class",
+        "actions",
+        "preconditions",
+        "abort_guards"
+      ],
+      "properties": {
+        "record_type": {
+          "const": "process_proposal"
+        },
+        "equipment_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/process_action"
+          }
+        },
+        "preconditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "abort_guards": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "twin_evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "status",
+        "hard_constraints_satisfied",
+        "violations",
+        "metrics",
+        "replay_digest"
+      ],
+      "properties": {
+        "record_type": {
+          "const": "twin_evaluation"
+        },
+        "status": {
+          "enum": [
+            "feasible",
+            "infeasible",
+            "unknown",
+            "out_of_domain"
+          ]
+        },
+        "hard_constraints_satisfied": {
+          "type": "boolean"
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/named_estimate"
+          }
+        },
+        "replay_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "measurement_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "instrument_id",
+        "calibration_digest",
+        "sample_id",
+        "raw_data_digest",
+        "readings"
+      ],
+      "properties": {
+        "record_type": {
+          "const": "measurement_record"
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "readings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/named_estimate"
+          }
+        },
+        "operator_approval_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "decision_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "outcome",
+        "reasons"
+      ],
+      "properties": {
+        "record_type": {
+          "const": "decision_record"
+        },
+        "outcome": {
+          "enum": [
+            "accept",
+            "reject",
+            "abstain",
+            "reevaluate"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "next_action": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

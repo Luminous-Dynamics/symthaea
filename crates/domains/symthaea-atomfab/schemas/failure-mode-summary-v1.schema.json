@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/failure-mode-summary-v1.schema.json",
+  "title": "AtomFab Failure Mode Summary v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "model_id",
+    "model_digest",
+    "evaluator_digest",
+    "evaluation_scope_digest",
+    "material_family",
+    "evaluation_stratum",
+    "split",
+    "assessment_basis",
+    "total_assessed",
+    "passed_count",
+    "failed_count",
+    "abstained_count",
+    "critical_failure_count",
+    "failure_mode_counts",
+    "abstention_reason_counts",
+    "severity_counts",
+    "record_ids",
+    "evidence_digests"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evaluator_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evaluation_scope_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "material_family": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "enum": [
+        "validation",
+        "test",
+        "family_holdout",
+        "prospective"
+      ]
+    },
+    "assessment_basis": {
+      "enum": [
+        "reference",
+        "simulation",
+        "measurement",
+        "independent_reproduction"
+      ]
+    },
+    "total_assessed": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "passed_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "failed_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "abstained_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "critical_failure_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "failure_mode_counts": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "non_finite_energy",
+          "non_finite_force",
+          "solver_non_convergence",
+          "geometry_collapse",
+          "interatomic_overlap",
+          "unsupported_species",
+          "out_of_domain",
+          "force_spike",
+          "energy_ordering_violation",
+          "observable_violation",
+          "uncertainty_undercoverage",
+          "interface_breakdown",
+          "infeasible_process"
+        ]
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "abstention_reason_counts": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "non_finite_energy",
+          "non_finite_force",
+          "solver_non_convergence",
+          "geometry_collapse",
+          "interatomic_overlap",
+          "unsupported_species",
+          "out_of_domain",
+          "force_spike",
+          "energy_ordering_violation",
+          "observable_violation",
+          "uncertainty_undercoverage",
+          "interface_breakdown",
+          "infeasible_process"
+        ]
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "severity_counts": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "informational",
+          "degraded",
+          "critical"
+        ]
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "record_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evidence_digests": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "evaluation_stratum": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "$comment": "Aggregate counts are scoped to one model/family/evaluation stratum (e.g., particle size × support surface × temperature)/split/campaign and assessment basis. JSON schema checks structure; FailureModeSummary::validate recomputes counts from source records."
+}

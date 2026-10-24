@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/campaign-record-v1.schema.json",
+  "title": "AtomFab Campaign Record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "lane_id",
+    "policy_id",
+    "seed",
+    "dataset_digest",
+    "model_digest",
+    "evaluator_digest",
+    "environment_digest",
+    "config_digest",
+    "target_definition_digest",
+    "budget_definition_digest",
+    "objective_name",
+    "objective_unit",
+    "objective_direction",
+    "used_evaluations",
+    "max_evaluations",
+    "elapsed_seconds",
+    "total_cost_value",
+    "total_cost_unit",
+    "terminal_status",
+    "target_reached",
+    "best_validated_objective",
+    "evidence",
+    "failure_reasons"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lane_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "dataset_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "model_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evaluator_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "config_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "target_definition_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "budget_definition_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "objective_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "objective_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "objective_direction": {
+      "enum": [
+        "maximize",
+        "minimize"
+      ]
+    },
+    "used_evaluations": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_evaluations": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "elapsed_seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "terminal_status": {
+      "enum": [
+        "completed",
+        "failed",
+        "incomplete"
+      ]
+    },
+    "target_reached": {
+      "type": "boolean"
+    },
+    "best_validated_objective": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence_reference"
+      }
+    },
+    "failure_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "total_cost_value": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Total campaign cost in the versioned unit specified by total_cost_unit."
+    },
+    "total_cost_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment_digest": {
+      "$ref": "#/$defs/sha256",
+      "description": "Digest of shared execution environment excluding policy-specific configuration."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "terminal_status": {
+            "const": "completed"
+          }
+        },
+        "required": [
+          "terminal_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "best_validated_objective": {
+            "type": "number"
+          },
+          "evidence": {
+            "minItems": 1
+          },
+          "failure_reasons": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "terminal_status": {
+            "enum": [
+              "failed",
+              "incomplete"
+            ]
+          }
+        },
+        "required": [
+          "terminal_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "failure_reasons": {
+            "minItems": 1
+          },
+          "target_reached": {
+            "const": false
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evidence_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "sha256",
+        "role"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$comment": "The relationship used_evaluations <= max_evaluations is enforced by the Rust semantic validator because standard JSON Schema does not compare sibling values."
+}

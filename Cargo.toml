@@ -31,6 +31,11 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # README-only REA verifier specification; exclude until its Cargo manifest
+    # and executable source are committed together. Reassert this exclusion
+    # explicitly because the root workspace's crates/domains/* glob otherwise
+    # enrolls the documentation-only directory during fresh CI checkouts.
+    "crates/domains/symthaea-rea-evidence-verifier",
 ]
 default-members = [
     "xtask",

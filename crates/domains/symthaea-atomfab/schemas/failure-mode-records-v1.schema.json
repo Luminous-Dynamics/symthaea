@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/failure-mode-records-v1.schema.json",
+  "title": "AtomFab Failure Mode Records v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_kind",
+    "note",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "fixture_kind": {
+      "const": "illustrative_not_result"
+    },
+    "note": {
+      "type": "string",
+      "minLength": 1
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/record"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "campaign_id",
+        "model_id",
+        "model_digest",
+        "evaluator_digest",
+        "evaluation_scope_digest",
+        "material_family",
+        "evaluation_stratum",
+        "split",
+        "parent_system_id",
+        "sample_id",
+        "assessment_basis",
+        "disposition",
+        "failure_mode",
+        "severity",
+        "evidence_digest"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "campaign_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluator_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluation_scope_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "material_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "enum": [
+            "validation",
+            "test",
+            "family_holdout",
+            "prospective"
+          ]
+        },
+        "parent_system_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assessment_basis": {
+          "enum": [
+            "reference",
+            "simulation",
+            "measurement",
+            "independent_reproduction"
+          ]
+        },
+        "disposition": {
+          "enum": [
+            "pass",
+            "failed",
+            "abstained"
+          ]
+        },
+        "failure_mode": {
+          "oneOf": [
+            {
+              "enum": [
+                "non_finite_energy",
+                "non_finite_force",
+                "solver_non_convergence",
+                "geometry_collapse",
+                "interatomic_overlap",
+                "unsupported_species",
+                "out_of_domain",
+                "force_spike",
+                "energy_ordering_violation",
+                "observable_violation",
+                "uncertainty_undercoverage",
+                "interface_breakdown",
+                "infeasible_process"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "severity": {
+          "oneOf": [
+            {
+              "enum": [
+                "informational",
+                "degraded",
+                "critical"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluation_stratum": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "pass"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "failure_mode": {
+                "type": "null"
+              },
+              "severity": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "failed",
+                  "abstained"
+                ]
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "failure_mode": {
+                "enum": [
+                  "non_finite_energy",
+                  "non_finite_force",
+                  "solver_non_convergence",
+                  "geometry_collapse",
+                  "interatomic_overlap",
+                  "unsupported_species",
+                  "out_of_domain",
+                  "force_spike",
+                  "energy_ordering_violation",
+                  "observable_violation",
+                  "uncertainty_undercoverage",
+                  "interface_breakdown",
+                  "infeasible_process"
+                ]
+              },
+              "severity": {
+                "enum": [
+                  "informational",
+                  "degraded",
+                  "critical"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$comment": "The Rust semantic validator requires a single exact campaign/model/evaluator/scope/family/split/assessment-basis group, unique record IDs, and a disposition-compatible mode/severity."
+}

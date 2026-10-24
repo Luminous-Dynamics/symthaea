@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symtropy/blob/main/docs/research/ATOMFAB_WORKCELL_FAULT_CORPUS_V1.schema.json",
+  "title": "AtomFab Workcell Fault Corpus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "reviewed_on",
+    "status",
+    "claim_ceiling",
+    "interpretation_rules",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "corpus_id": {
+      "const": "atomfab-workcell-fault-corpus-v1"
+    },
+    "reviewed_on": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "const": "frozen_software_regression_suite"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "interpretation_rules": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 15,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "category",
+          "control",
+          "description",
+          "source_kind",
+          "inputs",
+          "expected"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "category": {
+            "enum": [
+              "sensor_validity",
+              "calibration",
+              "hard_constraint",
+              "interface_contract",
+              "integration_failure",
+              "model_applicability",
+              "reproducibility",
+              "evidence_provenance",
+              "authority_boundary",
+              "control"
+            ]
+          },
+          "control": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_kind": {
+            "const": "synthetic"
+          },
+          "inputs": {
+            "type": "object"
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "decision",
+              "reason_codes",
+              "simulation_action_authorized",
+              "feasibility_status",
+              "hard_constraint_violation"
+            ],
+            "properties": {
+              "decision": {
+                "enum": [
+                  "accept",
+                  "reject",
+                  "abstain",
+                  "reevaluate"
+                ]
+              },
+              "reason_codes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "simulation_action_authorized": {
+                "type": "boolean"
+              },
+              "feasibility_status": {
+                "enum": [
+                  "feasible",
+                  "infeasible",
+                  "unknown",
+                  "not_evaluated"
+                ]
+              },
+              "hard_constraint_violation": {
+                "type": "boolean"
+              }
+            }
+          },
+          "adapter_fault": {
+            "enum": [
+              "invalid_configuration",
+              "invalid_gain",
+              "invalid_observation",
+              "invalid_danger_level",
+              "agent_not_authorized",
+              "encoding_failure",
+              "actuator_interface_mismatch",
+              "bridge_failure",
+              "invalid_output"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

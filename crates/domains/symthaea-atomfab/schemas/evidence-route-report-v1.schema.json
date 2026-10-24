@@ -1,0 +1,275 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/evidence-route-report-v1.schema.json",
+  "title": "AtomFab Evidence Route Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "domain",
+    "comparison_contract_digest",
+    "benefit_unit",
+    "cost_unit",
+    "max_cost_units",
+    "selected_action_id",
+    "entries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain": {
+      "enum": [
+        "atomistic",
+        "process_twin",
+        "metrology"
+      ]
+    },
+    "comparison_contract_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "benefit_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cost_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "max_cost_units": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "selected_action_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "request_id",
+        "domain",
+        "action_kind",
+        "comparison_contract_digest",
+        "benefit_unit",
+        "expected_decision_loss_reduction_units",
+        "max_cost_units",
+        "cost_units",
+        "cost_unit",
+        "value_estimate_evidence_digest",
+        "prerequisites_met",
+        "model_in_domain",
+        "value_estimate_calibrated"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain": {
+          "enum": [
+            "atomistic",
+            "process_twin",
+            "metrology"
+          ]
+        },
+        "action_kind": {
+          "enum": [
+            "static_screen",
+            "universal_ml_potential",
+            "domain_specific_ml_potential",
+            "dft_reference",
+            "workcell_simulation",
+            "calibrated_measurement",
+            "independent_reproduction"
+          ]
+        },
+        "comparison_contract_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "benefit_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_decision_loss_reduction_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_cost_units": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cost_units": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cost_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value_estimate_evidence_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "prerequisites_met": {
+          "type": "boolean"
+        },
+        "model_in_domain": {
+          "type": "boolean"
+        },
+        "value_estimate_calibrated": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "domain": {
+                "const": "atomistic"
+              }
+            },
+            "required": [
+              "domain"
+            ]
+          },
+          "then": {
+            "properties": {
+              "action_kind": {
+                "enum": [
+                  "static_screen",
+                  "universal_ml_potential",
+                  "domain_specific_ml_potential",
+                  "dft_reference"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "domain": {
+                "const": "process_twin"
+              }
+            },
+            "required": [
+              "domain"
+            ]
+          },
+          "then": {
+            "properties": {
+              "action_kind": {
+                "const": "workcell_simulation"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "domain": {
+                "const": "metrology"
+              }
+            },
+            "required": [
+              "domain"
+            ]
+          },
+          "then": {
+            "properties": {
+              "action_kind": {
+                "enum": [
+                  "calibrated_measurement",
+                  "independent_reproduction"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal",
+        "disposition"
+      ],
+      "properties": {
+        "proposal": {
+          "$ref": "#/$defs/proposal"
+        },
+        "disposition": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "rank"
+              ],
+              "properties": {
+                "status": {
+                  "const": "ranked"
+                },
+                "rank": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "reasons"
+              ],
+              "properties": {
+                "status": {
+                  "const": "ineligible"
+                },
+                "reasons": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$comment": "The Rust EvidenceRouteReport::validate method recomputes the canonical ranking and selected action from the retained proposals. JSON Schema alone cannot enforce cross-entry request/domain/contract parity or the exact rational value-per-cost order."
+}

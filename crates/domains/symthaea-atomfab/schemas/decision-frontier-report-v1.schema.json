@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/decision-frontier-report-v1.schema.json",
+  "title": "AtomFab Decision Frontier Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "comparison_contract_digest",
+    "seed",
+    "objective_name",
+    "objective_unit",
+    "objective_direction",
+    "objective_tolerance",
+    "total_cost_unit",
+    "entries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "comparison_contract_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "objective_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "objective_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "objective_direction": {
+      "enum": [
+        "maximize",
+        "minimize"
+      ]
+    },
+    "objective_tolerance": {
+      "type": "number",
+      "minimum": 0
+    },
+    "total_cost_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "validated_discovery_count",
+        "best_validated_objective",
+        "total_cost_units",
+        "elapsed_seconds",
+        "reference_calculation_count",
+        "false_feasible_accepts",
+        "hard_constraints_assessed",
+        "evidence_digest",
+        "disposition"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status"
+              ],
+              "properties": {
+                "status": {
+                  "const": "pareto_frontier"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "dominated_by"
+              ],
+              "properties": {
+                "status": {
+                  "const": "dominated"
+                },
+                "dominated_by": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "reasons"
+              ],
+              "properties": {
+                "status": {
+                  "const": "ineligible"
+                },
+                "reasons": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "validated_discovery_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "best_validated_objective": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total_cost_units": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "elapsed_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reference_calculation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_feasible_accepts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hard_constraints_assessed": {
+          "type": "boolean"
+        },
+        "evidence_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "validated_discovery_count": {
+                "const": 0
+              }
+            },
+            "required": [
+              "validated_discovery_count"
+            ]
+          },
+          "then": {
+            "properties": {
+              "best_validated_objective": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "validated_discovery_count": {
+                "minimum": 1
+              }
+            },
+            "required": [
+              "validated_discovery_count"
+            ]
+          },
+          "then": {
+            "properties": {
+              "best_validated_objective": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "false_feasible_accepts": {
+                "minimum": 1
+              }
+            },
+            "required": [
+              "false_feasible_accepts"
+            ]
+          },
+          "then": {
+            "properties": {
+              "disposition": {
+                "properties": {
+                  "status": {
+                    "const": "ineligible"
+                  },
+                  "reasons": {
+                    "contains": {
+                      "const": "false_feasible_accepts_nonzero"
+                    }
+                  }
+                },
+                "required": [
+                  "status",
+                  "reasons"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hard_constraints_assessed": {
+                "const": false
+              }
+            },
+            "required": [
+              "hard_constraints_assessed"
+            ]
+          },
+          "then": {
+            "properties": {
+              "disposition": {
+                "properties": {
+                  "status": {
+                    "const": "ineligible"
+                  },
+                  "reasons": {
+                    "contains": {
+                      "const": "hard_constraints_not_assessed"
+                    }
+                  }
+                },
+                "required": [
+                  "status",
+                  "reasons"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "pareto_frontier",
+                      "dominated"
+                    ]
+                  }
+                }
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "false_feasible_accepts": {
+                "const": 0
+              },
+              "hard_constraints_assessed": {
+                "const": true
+              }
+            },
+            "required": [
+              "false_feasible_accepts",
+              "hard_constraints_assessed"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "$comment": "Structural validation is complemented by DecisionFrontier::validate, which rebuilds the Pareto classifications from the retained metrics and rejects forged dispositions. Cross-field constraints below prevent common safety/evidence inconsistencies in independent JSON Schema consumers."
+}

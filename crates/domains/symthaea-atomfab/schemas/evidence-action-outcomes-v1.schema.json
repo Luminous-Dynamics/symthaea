@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/evidence-action-outcomes-v1.schema.json",
+  "title": "AtomFab Retrospective Evidence Action Outcomes v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_kind",
+    "note",
+    "outcomes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "fixture_kind": {
+      "const": "illustrative_not_result"
+    },
+    "note": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outcomes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/outcome"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "source",
+        "status",
+        "realized_decision_loss_change_units",
+        "realized_cost_units",
+        "outcome_evidence_digest"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "enum": [
+            "reference",
+            "simulation",
+            "measurement",
+            "independent_reproduction"
+          ]
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "failed",
+            "abstained",
+            "not_run"
+          ]
+        },
+        "realized_cost_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outcome_evidence_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "realized_decision_loss_change_units": {
+          "type": "integer"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not_run"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "realized_cost_units": {
+                "const": 0
+              },
+              "realized_decision_loss_change_units": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "failed",
+                  "abstained"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "realized_cost_units": {
+                "minimum": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "completed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "realized_cost_units": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$comment": "Rust scoring enforces outcome IDs exist in the route, complete outcomes for every ranked action, same evidence source class, and zero-cost not-run semantics."
+}
