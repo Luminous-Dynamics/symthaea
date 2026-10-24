@@ -29,6 +29,7 @@ const META_KEYS: &[&str] = &[
     "split",
     "utility_spec_sha256",
     "bundle_lock_sha256",
+    "paired_unit_set_sha256",
     "policy_count",
     "budget_point_count",
     "expected_evaluated_traces",
@@ -56,6 +57,7 @@ const SWEEP_HEADER: &[&str] = &[
     "pooled_harm_upper_bound",
     "worst_group_harm_upper_bound",
     "risk_certificate_state",
+    "paired_unit_set_sha256",
     "evaluated_traces",
     "independent_clusters",
 ];
@@ -98,6 +100,7 @@ struct Constraints {
     harm_rate_limit: f64,
     cvar95_loss_limit: f64,
     safety_violations_max: u64,
+    paired_unit_set_sha256: String,
 }
 
 #[derive(Debug, Clone)]
@@ -301,6 +304,8 @@ fn parse_constraints(meta: &BTreeMap<String, String>) -> Result<Constraints, Str
     }
     let safety_violations_max = meta["safety_violations_max"].parse::<u64>()
         .map_err(|_| invalid("safety_violations_max must be an integer"))?;
+    let paired_unit_set_sha256 =
+        validate_sha256(&meta["paired_unit_set_sha256"], "paired_unit_set_sha256")?;
     Ok(Constraints {
         policy_count,
         budget_point_count,
@@ -309,6 +314,7 @@ fn parse_constraints(meta: &BTreeMap<String, String>) -> Result<Constraints, Str
         harm_rate_limit,
         cvar95_loss_limit,
         safety_violations_max,
+        paired_unit_set_sha256,
     })
 }
 
@@ -338,8 +344,12 @@ fn parse_run(row: &[String], row_number: usize, c: &Constraints) -> Result<RunPo
     if !matches!(risk_certificate_state.as_str(), "CERTIFIED" | "NOT_CERTIFIED_RISK_BOUND" | "INSUFFICIENT_EVIDENCE" | "REVOKED_SHIFT" | "UNKNOWN") {
         return Err(invalid(format!("row {row_number}: unknown risk certificate state")));
     }
-    let evaluated_traces = parse_u64(&row[18], "evaluated_traces", row_number)?;
-    let independent_clusters = parse_u64(&row[19], "independent_clusters", row_number)?;
+    let paired_unit_set_sha256 = validate_sha256(&row[18], "paired_unit_set_sha256")?;
+    if paired_unit_set_sha256 != c.paired_unit_set_sha256 {
+        return Err(invalid(format!("row {row_number}: paired trace/cluster set digest differs from the frozen evaluation contract")));
+    }
+    let evaluated_traces = parse_u64(&row[19], "evaluated_traces", row_number)?;
+    let independent_clusters = parse_u64(&row[20], "independent_clusters", row_number)?;
     if actual_latency_us == 0 || actual_energy_uj == 0 || allocator_latency_us == 0 || allocator_energy_uj == 0 {
         return Err(invalid(format!("row {row_number}: all-in and allocator costs must be positive")));
     }
@@ -535,7 +545,7 @@ fn analyze(input: &str, expected_trace_lock: &str, expected_sweep_digest: &str) 
     let mut output = String::new();
     let _ = writeln!(output, "PARETO\tformat\t{RECEIPT_VERSION}");
     let _ = writeln!(output, "PARETO\tstatus\tSAFETY_GATED_FRONTIER_ANALYSIS_ONLY");
-    for key in ["experiment_id", "dataset_id", "dataset_revision", "split", "utility_spec_sha256", "bundle_lock_sha256"] {
+    for key in ["experiment_id", "dataset_id", "dataset_revision", "split", "utility_spec_sha256", "bundle_lock_sha256", "paired_unit_set_sha256"] {
         let _ = writeln!(output, "PARETO\t{key}\t{}", table.meta[key]);
     }
     let _ = writeln!(output, "PARETO\tsweep_input_sha256\t{actual_sweep_digest}");
