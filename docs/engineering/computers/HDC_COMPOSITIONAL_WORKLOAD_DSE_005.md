@@ -52,7 +52,15 @@ The corpus and query cues are fully resident during query timing. The build grou
 
 ## Independent model and evidence boundary
 
-A separate NumPy-based Python pilot (not Rust execution) tested N = 256, eight sampled query/target pairs, and the same role-bind / majority-bundle workload semantics. The sampled semantic hit@1 was 8/8 for each arity. The minimum target-versus-strongest-impostor similarity margin across those eight queries was 0.23383 for K = 3, 0.13812 for K = 7, and 0.08746 for K = 15. The margin declines as more facts are bundled, consistent with stronger superposition interference. This is a small synthetic pilot only: it does not estimate population-level recall, does not cover the 1,024–16,384 corpus sizes, and uses NumPy-generated data rather than the Rust branch's BLAKE3-based seed generator. It is not a Rust source test or a performance measurement.
+A separate NumPy-based Python pilot (not Rust execution) tested N = 256, eight sampled query/target pairs, the same role-bind / majority-bundle semantics, and the same deterministic bit-flip schedule. In every arity/noise cell, sampled semantic hit@1 was 8/8. The minimum target-versus-strongest-impostor similarity margins were:
+
+| Bundle arity K | 0% noise | 1% noise | 2% noise | 5% noise | 10% noise |
+|---:|---:|---:|---:|---:|---:|
+| 3 | 0.23383 | 0.2287 | 0.2237 | 0.2094 | 0.1825 |
+| 7 | 0.13812 | 0.1334 | 0.1286 | 0.1193 | 0.1060 |
+| 15 | 0.08746 | 0.0851 | 0.0822 | 0.0773 | 0.0684 |
+
+The margin declines both as more facts are bundled and as cues become noisier, even though all eight sampled targets remain top-1 in this small fixture. This illustrates why a single hit@1 number can conceal shrinking robustness margins. It does not estimate population-level recall, cover the 1,024–16,384 corpus sizes, or reproduce the Rust branch's BLAKE3-based seed generator. It is not a Rust source test or a performance measurement.
 
 No performance result is claimed by authoring this benchmark. The benchmark source has not been compiled or executed here because the authoring environment lacks Cargo/Rust. A successful source fetch and manifest registration establish only that the files exist at the named revision. Exact nearest-neighbor oracle checks are encoded in the target but remain unexecuted until the Rust target is run.
 
