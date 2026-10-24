@@ -53,7 +53,27 @@ pub struct MotifReturnEvidence {
 
 impl MotifReturnEvidence {
     pub fn meets_threshold(&self, threshold: f32) -> bool {
-        self.aligned_note_count >= 2 && self.overall_similarity >= threshold.clamp(0.0, 1.0)
+        let length_compatible = match self.expected_transformation {
+            ReturnTransformation::Literal
+            | ReturnTransformation::Transposed
+            | ReturnTransformation::Inverted
+            | ReturnTransformation::Augmented
+            | ReturnTransformation::Diminished => {
+                self.source_note_count == self.target_note_count
+            }
+            // Fragmentation is directional: the target must be a meaningful
+            // proper fragment of the earlier/source material, not an arbitrary
+            // prefix of a longer target melody.
+            ReturnTransformation::Fragmented => {
+                self.target_note_count >= 3 && self.target_note_count < self.source_note_count
+            }
+            // Restoration has a separate historical-evidence requirement at
+            // the obligation verifier; similarity alone does not prove it.
+            ReturnTransformation::Restored => true,
+        };
+        self.aligned_note_count >= 2
+            && length_compatible
+            && self.overall_similarity >= threshold.clamp(0.0, 1.0)
     }
 }
 
@@ -320,25 +340,21 @@ fn mean_duration_scale(source: &[ScoreNote], target: &[ScoreNote]) -> f32 {
 }
 
 fn best_fragment_similarity(source: &[i32], target: &[i32]) -> f32 {
-    if source.is_empty() || target.is_empty() {
+    // The declared transformation means the target is a fragment of the
+    // source. Require at least two intervals (three notes), so a single
+    // interval cannot make an arbitrary two-note snippet look like a
+    // convincing long-range thematic return.
+    if source.len() < 3 || target.len() < 2 || target.len() >= source.len() {
         return 0.0;
     }
-    let (longer, shorter) = if source.len() >= target.len() {
-        (source, target)
-    } else {
-        (target, source)
-    };
-    if shorter.is_empty() {
-        return 0.0;
-    }
-    (0..=longer.len() - shorter.len())
+    (0..=source.len() - target.len())
         .map(|offset| {
-            shorter
+            target
                 .iter()
-                .zip(&longer[offset..offset + shorter.len()])
+                .zip(&source[offset..offset + target.len()])
                 .filter(|(left, right)| left == right)
                 .count() as f32
-                / shorter.len() as f32
+                / target.len() as f32
         })
         .fold(0.0_f32, f32::max)
 }
@@ -416,6 +432,84 @@ mod tests {
             compare_melodic_sequences(&source, &augmented, ReturnTransformation::Augmented);
         assert!((augmentation.duration_scale - 2.0).abs() < 1e-6);
         assert!(augmentation.overall_similarity > 0.9);
+    }
+
+    #[test]
+    fn fragment_return_is_directional_and_requires_a_meaningful_fragment() {
+        let source = vec![
+            note(60, 0, Duration::quarter()),
+            note(62, 1, Duration::quarter()),
+            note(65, 2, Duration::quarter()),
+            note(64, 3, Duration::quarter()),
+        ];
+        let real_fragment = vec![
+            note(62, 0, Duration::quarter()),
+            note(65, 1, Duration::quarter()),
+            note(64, 2, Duration::quarter()),
+        ];
+        let evidence = compare_melodic_sequences(
+            &source,
+            &real_fragment,
+            ReturnTransformation::Fragmented,
+        );
+        assert_eq!(evidence.fragment_similarity, 1.0);
+        assert!(evidence.meets_threshold(0.75));
+
+        let longer_target = vec![
+            note(55, 0, Duration::quarter()),
+            note(60, 1, Duration::quarter()),
+            note(62, 2, Duration::quarter()),
+            note(65, 3, Duration::quarter()),
+            note(64, 4, Duration::quarter()),
+        ];
+        let false_fragment = compare_melodic_sequences(
+            &source,
+            &longer_target,
+            ReturnTransformation::Fragmented,
+        );
+        assert_eq!(
+            false_fragment.fragment_similarity, 0.0,
+            "the source must contain the target fragment, not vice versa"
+        );
+        assert!(!false_fragment.meets_threshold(0.75));
+
+        let two_note_snippet = vec![
+            note(62, 0, Duration::quarter()),
+            note(65, 1, Duration::quarter()),
+        ];
+        let too_short = compare_melodic_sequences(
+            &source,
+            &two_note_snippet,
+            ReturnTransformation::Fragmented,
+        );
+        assert_eq!(too_short.fragment_similarity, 0.0);
+        assert!(!too_short.meets_threshold(0.75));
+    }
+
+    #[test]
+    fn full_motif_transformations_require_equal_event_counts() {
+        let source = vec![
+            note(60, 0, Duration::quarter()),
+            note(62, 1, Duration::quarter()),
+            note(65, 2, Duration::quarter()),
+            note(64, 3, Duration::quarter()),
+        ];
+        let longer_target: Vec<_> = source
+            .iter()
+            .copied()
+            .map(|mut note| {
+                note.pitch = note.pitch.transpose(7);
+                note
+            })
+            .chain(std::iter::once(note(72, 4, Duration::quarter())))
+            .collect();
+        let evidence =
+            compare_melodic_sequences(&source, &longer_target, ReturnTransformation::Transposed);
+        assert!(evidence.overall_similarity > 0.75);
+        assert!(
+            !evidence.meets_threshold(0.75),
+            "a convincing prefix must not fulfil a full-transformation claim"
+        );
     }
 
     #[test]
