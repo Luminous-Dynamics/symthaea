@@ -42,6 +42,217 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  nixward-root-executor-authority-focused:
+    name: Nixward Root Executor Authority Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check root executor formatting
+        run: cargo fmt --check -- src/action/nixos_patterns.rs
+
+      - name: Run root executor authority regressions
+        run: cargo test -p symthaea --lib test_legacy_executor_
+
+  nixward-actionir-authority-chain-focused:
+    name: Nixward ActionIR Authority Chain Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Run ActionIR authority regressions
+        run: cargo test -p symthaea executor_authority_tests --lib
+
+  nixward-legacy-sandbox-authority-focused:
+    name: Nixward Legacy Sandbox Authority Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Run legacy sandbox authority regressions
+        run: cargo test -p symthaea test_real_execution_rejects_authority_sensitive_commands_before_spawn --lib
+
+  nixward-custom-risk-focused:
+    name: Nixward Custom Risk Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check Custom risk formatting
+        run: cargo fmt --check -- crates/core/nixward/src/action/executor.rs
+
+      - name: Run Custom risk regressions
+        run: |
+          cargo test -p nixward test_custom_safety_label_cannot_lower_risk --lib
+          cargo test -p nixward test_custom_command_safety --lib
+
+  nixward-rebuild-args-focused:
+    name: Nixward Rebuild Args Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check rebuild authority formatting
+        run: cargo fmt --check -- crates/core/nixward/src/action/executor.rs
+
+      - name: Run rebuild argument authority regressions
+        run: cargo test -p nixward test_rebuild_extra_args_cannot_expand_real_authority --lib
+
+  nixward-typed-effect-migration-focused:
+    name: Nixward Typed Effect Migration Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check typed-effect formatting
+        run: cargo fmt --check -- crates/core/nixward/src/action/executor.rs crates/core/nixward/src/action/service_manager.rs crates/core/nixward/src/action/generation_manager.rs crates/core/nixward/src/action/flake_ops.rs crates/core/nixward/src/bin/nixward_daemon.rs
+
+      - name: Compile Nixward features and run typed-effect regressions
+        run: |
+          cargo check -p nixward --features cli
+          cargo check -p nixward --features daemon
+          cargo test -p nixward test_command_safety_levels --lib
+          cargo test -p nixward test_rollback_all_rebuild_variants --lib
+          cargo test -p nixward test_init_command --lib
+
+      - name: Confirm core producers no longer manufacture Custom effects
+        shell: bash
+        run: |
+          if rg -n 'NixOSCommand::Custom' \
+            crates/core/nixward/src/action/service_manager.rs \
+            crates/core/nixward/src/action/generation_manager.rs \
+            crates/core/nixward/src/action/flake_ops.rs \
+            crates/core/nixward/src/bin/nixward_daemon.rs \
+            crates/core/nixward/src/mind/active_inference.rs; then
+            echo 'A migrated core producer still manufactures an ungoverned Custom effect.' >&2
+            exit 1
+          fi
+  nixward-typed-effects-focused:
+    name: Nixward Typed Effects Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check typed-effect formatting
+        run: cargo fmt --check -- crates/core/nixward/src/action/executor.rs crates/core/nixward/src/action/service_manager.rs crates/core/nixward/src/action/generation_manager.rs crates/core/nixward/src/action/flake_ops.rs crates/core/nixward/src/bin/nixward_daemon.rs
+
+      - name: Compile daemon feature and run typed-effect regressions
+        run: |
+          cargo check -p nixward --features daemon
+          cargo test -p nixward test_command_safety_levels --lib
+          cargo test -p nixward test_init_command --lib
+
+      - name: Confirm migrated producers contain no Custom constructors
+        shell: bash
+        run: |
+          if rg -n 'NixOSCommand::Custom' \
+            crates/core/nixward/src/action/service_manager.rs \
+            crates/core/nixward/src/action/generation_manager.rs \
+            crates/core/nixward/src/action/flake_ops.rs \
+            crates/core/nixward/src/bin/nixward_daemon.rs; then
+            echo 'A migrated core producer still manufactures an ungoverned Custom effect.' >&2
+            exit 1
+          fi
+
+  nixward-direct-spawn-boundary-focused:
+    name: Nixward Direct Spawn Boundary Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check direct NixOSCommand spawns are absent
+        shell: bash
+        run: |
+          if rg -n 'Command::new\(&bin\)|Command::new\(&cmd\)' \
+            crates/core/nixward/src/bin/nixward.rs \
+            crates/core/nixward/src/support/watchdog.rs; then
+            echo 'Direct NixOSCommand tuple spawning remains outside the governed executor.' >&2
+            exit 1
+          fi
+
+      - name: Check caller formatting
+        run: cargo fmt --check -- crates/core/nixward/src/bin/nixward.rs crates/core/nixward/src/support/watchdog.rs
+
+      - name: Compile CLI and run authority regression
+        run: |
+          cargo check -p nixward --features cli
+          cargo test -p nixward custom_command_cannot_mint_authority --lib
+
+  nixward-custom-authority-focused:
+    name: Nixward Custom Authority Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check Nixward Custom authority formatting
+        run: cargo fmt --check -- crates/core/nixward/src/action/executor.rs
+
+      - name: Run Custom authority regressions
+        run: cargo test -p nixward custom_command_cannot_mint_authority --lib
+
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
