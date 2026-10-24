@@ -965,13 +965,31 @@ mod tests {
     }
 
     #[test]
-    fn bootstrap_speedup_interval_is_reproducible_and_collapses_for_constant_data() {
-        let values = vec![2.0; 24];
-        let first = bootstrap_median_ci(&values, 12345);
-        let second = bootstrap_median_ci(&values, 12345);
+    fn grouped_bootstrap_is_reproducible_and_collapses_for_constant_data() {
+        let values: Vec<(u64, f64)> = (0..8).map(|group| (group, 2.0)).collect();
+        let first = bootstrap_grouped_median_ci(&values, 12345);
+        let second = bootstrap_grouped_median_ci(&values, 12345);
         assert_eq!(first, second);
         assert_eq!(first, (2.0, 2.0));
-        assert_eq!(median_f64(&values), 2.0);
+        assert_eq!(median_f64(&values.iter().map(|(_, value)| *value).collect::<Vec<_>>()), 2.0);
+    }
+
+    #[test]
+    fn grouped_bootstrap_keeps_queries_from_the_same_cluster_together() {
+        let values = vec![
+            (10, 1.0),
+            (10, 1.2),
+            (10, 1.1),
+            (20, 4.0),
+            (20, 4.2),
+            (30, 8.0),
+        ];
+        let first = bootstrap_grouped_median_ci(&values, 77);
+        let second = bootstrap_grouped_median_ci(&values, 77);
+        assert_eq!(first, second);
+        assert!(first.0.is_finite());
+        assert!(first.1.is_finite());
+        assert!(first.0 <= first.1);
     }
 
     #[test]
@@ -1026,6 +1044,7 @@ mod tests {
         for (left, right) in left_queries.iter().zip(right_queries.iter()) {
             assert_eq!(left.kind, right.kind);
             assert_eq!(left.vector, right.vector);
+            assert_eq!(left.group_id, right.group_id);
         }
         assert_eq!(
             left_queries.iter().filter(|query| query.kind == "novel").count(),
@@ -1038,5 +1057,13 @@ mod tests {
                 .count(),
             16
         );
+        assert!(left_queries
+            .iter()
+            .filter(|query| query.kind == "near_neighbor")
+            .all(|query| query.group_id < config.clusters as u64));
+        assert!(left_queries
+            .iter()
+            .filter(|query| query.kind == "novel")
+            .all(|query| query.group_id >= config.clusters as u64));
     }
 }
