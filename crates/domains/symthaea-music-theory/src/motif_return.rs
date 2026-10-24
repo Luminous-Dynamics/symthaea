@@ -669,6 +669,191 @@ mod tests {
     }
 
     #[test]
+    fn deterministic_metamorphic_motif_return_suite() {
+        // 2,048 frozen seeds × 9 comparisons = 18,432 deterministic
+        // transformation and adversarial cases. This qualifies symbolic
+        // evidence only; it is not a human-musicality benchmark.
+        let mut cases_checked = 0usize;
+
+        for seed in 0u64..2_048 {
+            let length = 5 + (seed as usize % 6);
+            let mut state = seed.wrapping_add(1);
+            let mut midi = 60 + (seed % 9) as i32;
+            let mut source = Vec::with_capacity(length);
+
+            for index in 0..length {
+                state = state
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1_442_695_040_888_963_407);
+                let step = ((state >> 32) % 9) as i32 - 4;
+                midi = (midi + step).clamp(48, 84);
+                let duration = match (state >> 16) % 5 {
+                    0 => Duration::quarter(),
+                    1 => Duration::eighth(),
+                    2 => Duration::half(),
+                    3 => Duration::new(3, 2),
+                    _ => Duration::triplet_eighth(),
+                };
+                source.push(note(midi as u8, index as i64, duration));
+            }
+
+            // Positive 1: exact literal return.
+            let literal = compare_melodic_sequences(
+                &source,
+                &source,
+                ReturnTransformation::Literal,
+            );
+            assert!(
+                literal.meets_threshold(0.99),
+                "literal positive failed for seed {seed}: {literal:?}"
+            );
+            cases_checked += 1;
+
+            // Positive 2: exact constant-semitone transposition.
+            let transposed: Vec<_> = source
+                .iter()
+                .copied()
+                .map(|mut event| {
+                    event.pitch = event.pitch.transpose(5);
+                    event
+                })
+                .collect();
+            let transposed_evidence = compare_melodic_sequences(
+                &source,
+                &transposed,
+                ReturnTransformation::Transposed,
+            );
+            assert!(
+                transposed_evidence.meets_threshold(0.99),
+                "transposition positive failed for seed {seed}: {transposed_evidence:?}"
+            );
+            cases_checked += 1;
+
+            // Positive 3: exact pitch inversion around a fixed MIDI pivot.
+            let inverted: Vec<_> = source
+                .iter()
+                .copied()
+                .map(|mut event| {
+                    event.pitch = Pitch::from_midi((132 - event.pitch.midi() as i32) as u8);
+                    event
+                })
+                .collect();
+            let inverted_evidence = compare_melodic_sequences(
+                &source,
+                &inverted,
+                ReturnTransformation::Inverted,
+            );
+            assert!(
+                inverted_evidence.meets_threshold(0.85),
+                "inversion positive failed for seed {seed}: {inverted_evidence:?}"
+            );
+            cases_checked += 1;
+
+            // Positive 4/5: exact uniform augmentation and diminution.
+            let augmented: Vec<_> = source
+                .iter()
+                .copied()
+                .map(|mut event| {
+                    event.duration = event.duration.scale(2, 1);
+                    event
+                })
+                .collect();
+            let augmented_evidence = compare_melodic_sequences(
+                &source,
+                &augmented,
+                ReturnTransformation::Augmented,
+            );
+            assert!(
+                augmented_evidence.meets_threshold(0.99),
+                "augmentation positive failed for seed {seed}: {augmented_evidence:?}"
+            );
+            cases_checked += 1;
+
+            let diminished: Vec<_> = source
+                .iter()
+                .copied()
+                .map(|mut event| {
+                    event.duration = event.duration.scale(1, 2);
+                    event
+                })
+                .collect();
+            let diminished_evidence = compare_melodic_sequences(
+                &source,
+                &diminished,
+                ReturnTransformation::Diminished,
+            );
+            assert!(
+                diminished_evidence.meets_threshold(0.99),
+                "diminution positive failed for seed {seed}: {diminished_evidence:?}"
+            );
+            cases_checked += 1;
+
+            // Positive 6: exact interior fragment with matching rhythm.
+            let fragment = source[1..length - 1].to_vec();
+            let fragment_evidence = compare_melodic_sequences(
+                &source,
+                &fragment,
+                ReturnTransformation::Fragmented,
+            );
+            assert!(
+                fragment_evidence.meets_threshold(0.75),
+                "fragment positive failed for seed {seed}: {fragment_evidence:?}"
+            );
+            cases_checked += 1;
+
+            // Negative 7: one corrupted note must not pass a full transposition.
+            let mut corrupted = transposed.clone();
+            let corrupted_index = length / 2;
+            corrupted[corrupted_index].pitch =
+                corrupted[corrupted_index].pitch.transpose(1);
+            let corrupted_evidence = compare_melodic_sequences(
+                &source,
+                &corrupted,
+                ReturnTransformation::Transposed,
+            );
+            assert!(
+                !corrupted_evidence.meets_threshold(0.95),
+                "corrupted transposition was accepted for seed {seed}: {corrupted_evidence:?}"
+            );
+            cases_checked += 1;
+
+            // Negative 8: one duration receives an eightfold rather than
+            // twofold scale; other notes remain doubled.
+            let mut irregular_scale = augmented.clone();
+            irregular_scale[corrupted_index].duration =
+                source[corrupted_index].duration.scale(8, 1);
+            let irregular_evidence = compare_melodic_sequences(
+                &source,
+                &irregular_scale,
+                ReturnTransformation::Augmented,
+            );
+            assert!(
+                !irregular_evidence.meets_threshold(0.85),
+                "non-uniform augmentation was accepted for seed {seed}: {irregular_evidence:?}"
+            );
+            cases_checked += 1;
+
+            // Negative 9: a longer target that embeds the source is not a
+            // fragment of the shorter source (wrong direction).
+            let mut longer_target = Vec::with_capacity(length + 1);
+            longer_target.push(note(50, -1, Duration::quarter()));
+            longer_target.extend(source.iter().copied());
+            let wrong_direction = compare_melodic_sequences(
+                &source,
+                &longer_target,
+                ReturnTransformation::Fragmented,
+            );
+            assert!(
+                !wrong_direction.meets_threshold(0.75),
+                "wrong-direction fragment was accepted for seed {seed}: {wrong_direction:?}"
+            );
+            cases_checked += 1;
+        }
+
+        assert_eq!(cases_checked, 18_432);
+    }
+
+    #[test]
     fn region_extraction_ignores_non_melodic_voices() {
         let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
         score.push(note(60, 0, Duration::quarter()));
