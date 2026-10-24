@@ -281,7 +281,7 @@ def main() -> int:
 
             output_text = test_output.decode("utf-8", errors="replace")
             failure_pattern = re.compile(
-                r"^\\s*test\\s+(?:[A-Za-z0-9_]+::)*([A-Za-z0-9_]+)\\s+\\.\\.\\.\\s+FAILED\\s*$"
+                r"^\s*test\s+(?:[A-Za-z0-9_]+::)*([A-Za-z0-9_]+)\s+\.\.\.\s+FAILED\s*$"
             )
             failed_names = sorted(
                 {
