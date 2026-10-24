@@ -714,6 +714,7 @@ struct TrialOutcome {
     ground_truth_equivalent: bool,
     ground_truth_extrapolation_equivalent: bool,
     initial_pool_contains_reference: bool,
+    in_domain_holdout_points: usize,
     extrapolation_holdout_points: usize,
     recovery_triggered_on_empty_pool: bool,
     typed_recovery_restarts: usize,
@@ -742,6 +743,7 @@ fn unresolved_trial_outcome(
         ground_truth_equivalent: false,
         ground_truth_extrapolation_equivalent: false,
         initial_pool_contains_reference: false,
+        in_domain_holdout_points: 0,
         extrapolation_holdout_points: 0,
         recovery_triggered_on_empty_pool: false,
         typed_recovery_restarts: 0,
@@ -946,12 +948,20 @@ fn run_trial_with_mode(
     let initial_hypotheses = hypotheses.clone();
 
     // Independent evaluator-only points: never passed to the experiment selector or recovery
-    // generator. Ground-truth equivalence is scored only after the adaptive policy terminates.
+    // generator. Use a bounded attempt budget and require a minimum valid design; otherwise the
+    // evaluator endpoint fails closed instead of hanging or silently shrinking its split.
+    const IN_DOMAIN_HOLDOUT_TARGET: usize = 64;
+    const IN_DOMAIN_HOLDOUT_MINIMUM: usize = 32;
+    const IN_DOMAIN_HOLDOUT_ATTEMPT_CAP: usize = 4096;
     let mut evaluator_rng = seed ^ 0xE7A1_0A7A_2026_0001;
-    let mut holdout: Vec<Experiment> = Vec::with_capacity(64);
-    while holdout.len() < 64 {
+    let mut holdout: Vec<Experiment> = Vec::with_capacity(IN_DOMAIN_HOLDOUT_TARGET);
+    let mut in_domain_attempts = 0usize;
+    while holdout.len() < IN_DOMAIN_HOLDOUT_TARGET
+        && in_domain_attempts < IN_DOMAIN_HOLDOUT_ATTEMPT_CAP
+    {
+        in_domain_attempts += 1;
         let point = random_experiment(&mut evaluator_rng);
-        if eval_at(&ground_truth, &point).is_some() {
+        if eval_at(&ground_truth, &point).is_some_and(|value| value.abs() < 1.0e12) {
             holdout.push(point);
         }
     }
@@ -1339,6 +1349,7 @@ fn run_trial_with_mode(
     }
 
     let ground_truth_equivalent = live.len() == 1
+        && holdout.len() >= IN_DOMAIN_HOLDOUT_MINIMUM
         && evaluator_matches_reference(&hypotheses[live[0]], &ground_truth, &holdout);
     let ground_truth_extrapolation_equivalent = live.len() == 1
         && extrapolation_holdout.len() >= OOD_HOLDOUT_MINIMUM
@@ -1357,6 +1368,7 @@ fn run_trial_with_mode(
     TrialOutcome {
         rounds_used: round,
         success: systematic_discrepancy == 0.0
+            && holdout.len() >= IN_DOMAIN_HOLDOUT_MINIMUM
             && ground_truth_equivalent
             && ground_truth_extrapolation_equivalent
             && (!truth_absent || !initial_pool_contains_reference)
@@ -1378,6 +1390,7 @@ fn run_trial_with_mode(
         ground_truth_equivalent,
         ground_truth_extrapolation_equivalent,
         initial_pool_contains_reference,
+        in_domain_holdout_points: holdout.len(),
         extrapolation_holdout_points: extrapolation_holdout.len(),
         recovery_triggered_on_empty_pool,
         typed_recovery_restarts,
