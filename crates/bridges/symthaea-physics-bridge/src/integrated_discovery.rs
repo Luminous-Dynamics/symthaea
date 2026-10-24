@@ -647,7 +647,7 @@ fn generate_truth_absent_candidates(
     seed: u64,
     config: PipelineConfig,
     design: &[Experiment],
-) -> Vec<Expr> {
+) -> Option<Vec<Expr>> {
     let mut hypotheses: Vec<Expr> = Vec::with_capacity(POOL_SIZE);
     let mut candidate_rng = seed
         ^ if config.typed_candidates {
@@ -689,12 +689,7 @@ fn generate_truth_absent_candidates(
         candidate_values.push(values);
         hypotheses.push(candidate);
     }
-    assert_eq!(
-        hypotheses.len(),
-        POOL_SIZE,
-        "truth-absent candidate generator exhausted its predeclared attempt budget"
-    );
-    hypotheses
+    (hypotheses.len() == POOL_SIZE).then_some(hypotheses)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -726,6 +721,35 @@ struct TrialOutcome {
     accepted_recovery_candidates: usize,
     post_recovery_validation_measurements: usize,
     terminal_pit_alarm: bool,
+}
+
+fn unresolved_trial_outcome(
+    final_live: usize,
+    selection_failed: bool,
+    monitoring_protocol_invalid: bool,
+    terminal_pit_alarm: bool,
+) -> TrialOutcome {
+    TrialOutcome {
+        rounds_used: 0,
+        success: false,
+        final_live,
+        selection_failed,
+        audit_queries: 0,
+        model_discrepancy_detected: false,
+        overconfident_under_misspecification: false,
+        prequential_pit_alarm: false,
+        monitoring_protocol_invalid,
+        ground_truth_equivalent: false,
+        ground_truth_extrapolation_equivalent: false,
+        initial_pool_contains_reference: false,
+        extrapolation_holdout_points: 0,
+        recovery_triggered_on_empty_pool: false,
+        typed_recovery_restarts: 0,
+        structured_recovery_candidates: 0,
+        accepted_recovery_candidates: 0,
+        post_recovery_validation_measurements: 0,
+        terminal_pit_alarm,
+    }
 }
 
 const POOL_SIZE: usize = 6;
@@ -866,27 +890,7 @@ fn run_trial_with_mode(
 ) -> TrialOutcome {
     let pit_mode = active_selector == ActiveSelector::InformationGainWithPrequentialPitAudits;
     if pit_mode && (!config.active_selection || config.smoothing) {
-        return TrialOutcome {
-            rounds_used: 0,
-            success: false,
-            final_live: POOL_SIZE,
-            selection_failed: true,
-            audit_queries: 0,
-            model_discrepancy_detected: false,
-            overconfident_under_misspecification: false,
-            prequential_pit_alarm: false,
-            monitoring_protocol_invalid: true,
-            ground_truth_equivalent: false,
-            ground_truth_extrapolation_equivalent: false,
-            initial_pool_contains_reference: false,
-            extrapolation_holdout_points: 0,
-            recovery_triggered_on_empty_pool: false,
-            typed_recovery_restarts: 0,
-            structured_recovery_candidates: 0,
-            accepted_recovery_candidates: 0,
-            post_recovery_validation_measurements: 0,
-            terminal_pit_alarm: false,
-        };
+        return unresolved_trial_outcome(POOL_SIZE, true, true, false);
     }
     let mut setup_rng = seed ^ 0x5EED_0000_0000_0001;
     let probes: Vec<Experiment> = (0..GT_SANITY_PROBES)
@@ -909,7 +913,10 @@ fn run_trial_with_mode(
         .collect();
 
     let mut hypotheses: Vec<Expr> = if truth_absent {
-        generate_truth_absent_candidates(seed, config, &candidate_pool)
+        let Some(candidates) = generate_truth_absent_candidates(seed, config, &candidate_pool) else {
+            return unresolved_trial_outcome(0, true, false, true);
+        };
+        candidates
     } else {
         // Oracle-present discrimination track: the reference is deliberately included, and
         // near-miss candidates are derived from it. These results are reported separately.
