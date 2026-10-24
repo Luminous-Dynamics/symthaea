@@ -1,0 +1,38 @@
+name: VIS-DVPC-015 all-in online budget ledger
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-all-in-budget.rs"
+      - "docs/research/VIS_DVPC_015_ALL_IN_BUDGET_LEDGER_V1.md"
+      - ".github/workflows/vis-dvpc-015-all-in-budget.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-all-in-budget.rs"
+      - "docs/research/VIS_DVPC_015_ALL_IN_BUDGET_LEDGER_V1.md"
+      - ".github/workflows/vis-dvpc-015-all-in-budget.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Compile and run all-in budget tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-all-in-budget.rs -o /tmp/vis-dvpc-015-tests
+          /tmp/vis-dvpc-015-tests
+
+      - name: Check formatting after executable checks
+        if: always()
+        run: rustfmt --edition 2024 --check tools/vision-dvpc-all-in-budget.rs
