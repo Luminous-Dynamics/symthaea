@@ -221,7 +221,12 @@ fn read_dataset(path: &str, min_cases: usize, min_groups: usize) -> Result<Datas
             (17, "unauthorized_memory_exposure"),
             (18, "deleted_memory_resurrection"),
         ] {
-            let _ = parse_binary(fields[index], name, line_number)?;
+            let value = parse_binary(fields[index], name, line_number)?;
+            if index >= 16 && value != 0 {
+                return Err(format!(
+                    "line {line_number}: observed governance event {name}; inference is blocked"
+                ));
+            }
         }
         if fields[12] == "0" && fields[13] != "0" {
             return Err(format!("line {line_number}: inapplicable action cannot be marked correct"));
