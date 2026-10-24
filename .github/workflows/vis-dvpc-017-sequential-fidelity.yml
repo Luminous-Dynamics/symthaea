@@ -1,0 +1,45 @@
+name: VIS-DVPC-017 sequential multi-fidelity replay
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-sequential-fidelity.rs"
+      - "tests/fixtures/vision-dvpc-017-smoke.tsv"
+      - "docs/research/VIS_DVPC_017_SEQUENTIAL_MULTIFIDELITY_V1.md"
+      - ".github/workflows/vis-dvpc-017-sequential-fidelity.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-sequential-fidelity.rs"
+      - "tests/fixtures/vision-dvpc-017-smoke.tsv"
+      - "docs/research/VIS_DVPC_017_SEQUENTIAL_MULTIFIDELITY_V1.md"
+      - ".github/workflows/vis-dvpc-017-sequential-fidelity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run exact-source unit tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-sequential-fidelity.rs -o /tmp/vis-dvpc-017-tests
+          /tmp/vis-dvpc-017-tests
+
+      - name: Build standalone replay
+        run: rustc --edition=2024 -O tools/vision-dvpc-sequential-fidelity.rs -o /tmp/vis-dvpc-017
+
+      - name: Exercise frozen smoke bundle end to end
+        run: |
+          input_sha="$(sha256sum tests/fixtures/vision-dvpc-017-smoke.tsv | cut -d ' ' -f1)"
+          /tmp/vis-dvpc-017 tests/fixtures/vision-dvpc-017-smoke.tsv "$input_sha" > /tmp/vis-dvpc-017-receipt.tsv
+          grep -q '^SCOPE.*EVALUATION_ONLY_NOT_A_CERTIFICATE' /tmp/vis-dvpc-017-receipt.tsv
+          grep -q '^POLICY[[:space:]]sequential[[:space:]]5[[:space:]]' /tmp/vis-dvpc-017-receipt.tsv
+          grep -q '^DECISION[[:space:]]t01[[:space:]]full' /tmp/vis-dvpc-017-receipt.tsv
