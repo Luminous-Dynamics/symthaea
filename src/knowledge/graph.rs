@@ -12,8 +12,11 @@
 //! Science: Temporal knowledge graphs (Trivedi et al. 2017),
 //!          Belief revision (AGM theory, Alchourrón et al. 1985)
 
+use super::claim_provenance::{
+    ClaimContext, EvidenceLink, EvidenceLinkStatus, EvidenceRelation,
+};
 use super::encoding::FactEncoding;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use symthaea_core::hdc::unified_hv::BinaryHV;
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -91,8 +94,14 @@ pub struct EnhancedKnowledgeGraph {
     contradiction_threshold: f32,
     /// Domain index: domain_tag → Vec<FactId>
     domain_index: HashMap<String, Vec<FactId>>,
-    /// Pending contradiction alerts (drained by the knowledge manager each cycle)
+    /// Pending contradiction candidates (drained by the knowledge manager each cycle)
     pending_contradictions: Vec<ContradictionAlert>,
+    /// Source-grounded claim context indexed separately to preserve TemporalFact's public shape.
+    claim_contexts: HashMap<FactId, ClaimContext>,
+    /// Explicit and candidate typed links between facts.
+    evidence_links: Vec<EvidenceLink>,
+    /// Contradiction alert identities already resolved, for idempotent resolution.
+    resolved_contradictions: HashSet<(FactId, FactId, Vec<String>)>,
     /// Statistics
     total_insertions: u64,
     total_evictions: u64,
@@ -116,6 +125,9 @@ impl EnhancedKnowledgeGraph {
             contradiction_threshold: 0.7,
             domain_index: HashMap::new(),
             pending_contradictions: Vec::new(),
+            claim_contexts: HashMap::new(),
+            evidence_links: Vec::new(),
+            resolved_contradictions: HashSet::new(),
             total_insertions: 0,
             total_evictions: 0,
             total_contradictions: 0,
@@ -125,6 +137,10 @@ impl EnhancedKnowledgeGraph {
     /// Insert a new fact into the knowledge graph.
     ///
     /// Returns the fact ID and any contradiction alerts generated.
+    /// Insert a generic fact without inferring identity from HDC similarity.
+    ///
+    /// Similarity remains a retrieval/candidate-link signal; it cannot merge facts
+    /// or increment confidence without explicit, typed evidence.
     pub fn insert(
         &mut self,
         encoding: FactEncoding,
@@ -132,29 +148,55 @@ impl EnhancedKnowledgeGraph {
         domain: Option<String>,
         has_causal: bool,
     ) -> (FactId, Vec<ContradictionAlert>) {
-        // Check for contradictions before inserting
+        self.insert_with_context(encoding, current_cycle, domain, has_causal, None)
+    }
+
+    /// Insert a source-grounded fact with explicit claim identity.
+    pub fn insert_grounded(
+        &mut self,
+        encoding: FactEncoding,
+        current_cycle: u64,
+        domain: Option<String>,
+        has_causal: bool,
+        claim_context: ClaimContext,
+    ) -> Result<(FactId, Vec<ContradictionAlert>), String> {
+        claim_context.validate()?;
+        Ok(self.insert_with_context(
+            encoding,
+            current_cycle,
+            domain,
+            has_causal,
+            Some(claim_context),
+        ))
+    }
+
+    fn insert_with_context(
+        &mut self,
+        encoding: FactEncoding,
+        current_cycle: u64,
+        domain: Option<String>,
+        has_causal: bool,
+        claim_context: Option<ClaimContext>,
+    ) -> (FactId, Vec<ContradictionAlert>) {
+        // Similarity/text checks create candidates, never an adjudicated contradiction.
         let contradictions = self.detect_contradictions(&encoding, current_cycle);
+        let similar_existing: Vec<(FactId, f32)> = self
+            .facts
+            .values()
+            .filter_map(|fact| {
+                let similarity = encoding.vector.similarity(&fact.encoding.vector);
+                (similarity > 0.85).then_some((fact.id, similarity))
+            })
+            .collect();
 
-        // Check for corroboration (highly similar existing fact)
-        if let Some(existing_id) = self.find_corroboration(&encoding) {
-            if let Some(fact) = self.facts.get_mut(&existing_id) {
-                fact.corroboration_count += 1;
-                // Boost confidence on corroboration (capped at initial)
-                fact.confidence = (fact.confidence + 0.1).min(1.0);
-                fact.last_accessed_cycle = current_cycle;
-                return (existing_id, contradictions);
-            }
-        }
-
-        // Evict if at capacity
         if self.facts.len() >= self.capacity {
             self.evict_lowest_confidence();
         }
 
         let id = self.next_id;
         self.next_id += 1;
-
         let confidence = encoding.confidence;
+        let context_for_index = claim_context.clone();
         let fact = TemporalFact {
             id,
             encoding,
@@ -163,24 +205,480 @@ impl EnhancedKnowledgeGraph {
             confidence,
             initial_confidence: confidence,
             corroboration_count: 0,
-            contradiction_count: contradictions.len() as u32,
+            contradiction_count: 0,
             domain: domain.clone(),
             has_causal_relations: has_causal,
         };
-
         self.facts.insert(id, fact);
+        if let Some(context) = context_for_index {
+            self.claim_contexts.insert(id, context);
+        }
         self.total_insertions += 1;
 
-        // Update domain index
         if let Some(ref d) = domain {
             self.domain_index.entry(d.clone()).or_default().push(id);
         }
 
-        // Store contradiction alerts
-        self.pending_contradictions.extend(contradictions.clone());
-        self.total_contradictions += contradictions.len() as u64;
+        // Keep semantically close facts distinct. Record only a candidate link.
+        for (existing_id, similarity) in similar_existing {
+            if !self.facts.contains_key(&existing_id) {
+                continue;
+            }
+            let (relation, evidence_ids) = {
+                candidate_relation(
+                    self.claim_contexts.get(&id),
+                    self.claim_contexts.get(&existing_id),
+                )
+            };
+            self.evidence_links.push(EvidenceLink {
+                from_fact_id: existing_id,
+                to_fact_id: id,
+                relation,
+                status: EvidenceLinkStatus::Candidate,
+                evidence_ids,
+                rationale: Some(format!(
+                    "HDC similarity {similarity:.4} generated a candidate only; no inference or confidence update"
+                )),
+                causal_argument: None,
+                transmission_chain: None,
+                detected_at_cycle: current_cycle,
+            });
+        }
 
+        self.pending_contradictions.extend(contradictions.clone());
         (id, contradictions)
+    }
+
+    /// Typed semantic/evidence links. Candidate links never change confidence.
+    pub fn evidence_links(&self) -> &[EvidenceLink] {
+        &self.evidence_links
+    }
+
+    fn validate_imported_evidence_link(&self, link: &EvidenceLink) -> Result<(), String> {
+        if link.from_fact_id == link.to_fact_id {
+            return Err("evidence links must connect two distinct facts".into());
+        }
+        let from = self
+            .facts
+            .get(&link.from_fact_id)
+            .ok_or_else(|| format!("evidence link source {} is missing", link.from_fact_id))?;
+        let to = self
+            .facts
+            .get(&link.to_fact_id)
+            .ok_or_else(|| format!("evidence link target {} is missing", link.to_fact_id))?;
+
+        if link.status == EvidenceLinkStatus::Rejected
+            && link.rationale.as_deref().is_none_or(str::is_empty)
+        {
+            return Err("rejected evidence links require a rationale".into());
+        }
+        if link.status != EvidenceLinkStatus::Adjudicated {
+            return Ok(());
+        }
+
+        let supplied: HashSet<&str> = link.evidence_ids.iter().map(String::as_str).collect();
+        if supplied.is_empty()
+            || supplied.len() != link.evidence_ids.len()
+            || link.evidence_ids.iter().any(|id| id.trim().is_empty())
+            || link.rationale.as_deref().is_none_or(str::is_empty)
+        {
+            return Err("adjudicated evidence links require a rationale and unique evidence IDs".into());
+        }
+        let from_context = from
+            .claim_context
+            .as_ref()
+            .ok_or_else(|| format!("adjudicated link source {} has no claim context", link.from_fact_id))?;
+        let to_context = to
+            .claim_context
+            .as_ref()
+            .ok_or_else(|| format!("adjudicated link target {} has no claim context", link.to_fact_id))?;
+        if !from_context.evidence_ids.iter().any(|id| supplied.contains(id.as_str()))
+            || !to_context.evidence_ids.iter().any(|id| supplied.contains(id.as_str()))
+        {
+            return Err("adjudicated link evidence must reference both claim contexts".into());
+        }
+        let context_evidence: HashSet<&str> = from_context
+            .evidence_ids
+            .iter()
+            .chain(to_context.evidence_ids.iter())
+            .map(String::as_str)
+            .collect();
+        if !supplied.is_subset(&context_evidence) {
+            return Err(
+                "adjudicated link evidence contains IDs not declared by either claim context"
+                    .into(),
+            );
+        }
+        match link.relation {
+            EvidenceRelation::SemanticNeighbor | EvidenceRelation::SameWitnessVariant => {
+                return Err("candidate-only relations cannot be adjudicated".into());
+            }
+            EvidenceRelation::Corroborates => {
+                if !from_context.same_claim(to_context)
+                    || !from_context.admissibly_independent_from(to_context)
+                {
+                    return Err("adjudicated corroboration violates claim identity or source independence".into());
+                }
+            }
+            EvidenceRelation::Contradicts => {
+                if !from_context.same_conflict_scope(to_context)
+                    || from_context.same_claim(to_context)
+                {
+                    return Err("adjudicated contradiction violates scoped-claim invariants".into());
+                }
+            }
+            EvidenceRelation::Precedes => {
+                if !strictly_precedes(from_context, to_context) {
+                    return Err("adjudicated precedes relation requires explicit increasing event times".into());
+                }
+            }
+            EvidenceRelation::Causes => {
+                if !strictly_precedes(from_context, to_context)
+                    || link.causal_argument.as_deref().is_none_or(str::is_empty)
+                {
+                    return Err("adjudicated causes relation requires temporal precedence and a causal argument".into());
+                }
+            }
+            EvidenceRelation::HistoricallyInfluences => {
+                if !strictly_precedes(from_context, to_context)
+                    || link.transmission_chain.as_deref().is_none_or(str::is_empty)
+                {
+                    return Err("adjudicated historical influence requires temporal precedence and a transmission chain".into());
+                }
+            }
+            EvidenceRelation::Resembles => {}
+        }
+        Ok(())
+    }
+
+    /// Import persisted links only after validating all endpoint, evidence and
+    /// relation invariants. No partial imports occur on validation failure.
+    pub fn import_evidence_links(&mut self, links: &[EvidenceLink]) -> Result<usize, String> {
+        let mut unique_incoming: Vec<EvidenceLink> = Vec::new();
+        for link in links {
+            self.validate_imported_evidence_link(link)?;
+            if unique_incoming.contains(link) || self.evidence_links.contains(link) {
+                continue;
+            }
+            let symmetric = matches!(
+                link.relation,
+                EvidenceRelation::Corroborates
+                    | EvidenceRelation::Contradicts
+                    | EvidenceRelation::Resembles
+                    | EvidenceRelation::SemanticNeighbor
+                    | EvidenceRelation::SameWitnessVariant
+            );
+            let mut already_adjudicated = false;
+            for existing in self.evidence_links.iter().chain(unique_incoming.iter()) {
+                let same_direction = existing.from_fact_id == link.from_fact_id
+                    && existing.to_fact_id == link.to_fact_id;
+                let reverse_direction = symmetric
+                    && existing.from_fact_id == link.to_fact_id
+                    && existing.to_fact_id == link.from_fact_id;
+                if (same_direction || reverse_direction)
+                    && existing.relation == link.relation
+                    && existing.status == EvidenceLinkStatus::Adjudicated
+                    && link.status == EvidenceLinkStatus::Adjudicated
+                {
+                    if existing.evidence_ids == link.evidence_ids {
+                        // Idempotent re-import of the same adjudication, even if
+                        // the persisted row differs only by symmetric orientation.
+                        already_adjudicated = true;
+                        break;
+                    }
+                    return Err(
+                        "fact pair/relation already has an adjudication with different evidence"
+                            .into(),
+                    );
+                }
+            }
+            if !already_adjudicated {
+                unique_incoming.push(link.clone());
+            }
+        }
+
+        // Adjudication finalizes a prior candidate for the same pair/relation.
+        let finalized: Vec<(FactId, FactId, EvidenceRelation)> = unique_incoming
+            .iter()
+            .filter(|link| link.status == EvidenceLinkStatus::Adjudicated)
+            .map(|link| (link.from_fact_id, link.to_fact_id, link.relation))
+            .collect();
+        let is_symmetric = |relation: EvidenceRelation| {
+            matches!(
+                relation,
+                EvidenceRelation::Corroborates
+                    | EvidenceRelation::Contradicts
+                    | EvidenceRelation::Resembles
+                    | EvidenceRelation::SemanticNeighbor
+                    | EvidenceRelation::SameWitnessVariant
+            )
+        };
+        unique_incoming.retain(|link| {
+            if link.status != EvidenceLinkStatus::Candidate {
+                return true;
+            }
+            !finalized.iter().any(|(from, to, relation)| {
+                *relation == link.relation
+                    && ((*from == link.from_fact_id && *to == link.to_fact_id)
+                        || (is_symmetric(*relation)
+                            && *from == link.to_fact_id
+                            && *to == link.from_fact_id))
+            })
+        });
+        self.evidence_links.retain(|existing| {
+            if existing.status != EvidenceLinkStatus::Candidate {
+                return true;
+            }
+            !finalized.iter().any(|(from, to, relation)| {
+                *relation == existing.relation
+                    && ((*from == existing.from_fact_id && *to == existing.to_fact_id)
+                        || (is_symmetric(*relation)
+                            && *from == existing.to_fact_id
+                            && *to == existing.from_fact_id))
+            })
+        });
+
+        for link in &unique_incoming {
+            if link.status == EvidenceLinkStatus::Adjudicated {
+                match link.relation {
+                    EvidenceRelation::Corroborates => {
+                        for fact_id in [link.from_fact_id, link.to_fact_id] {
+                            if let Some(fact) = self.facts.get_mut(&fact_id) {
+                                fact.corroboration_count = fact.corroboration_count.saturating_add(1);
+                            }
+                        }
+                    }
+                    EvidenceRelation::Contradicts => {
+                        for fact_id in [link.from_fact_id, link.to_fact_id] {
+                            if let Some(fact) = self.facts.get_mut(&fact_id) {
+                                fact.contradiction_count = fact.contradiction_count.saturating_add(1);
+                            }
+                        }
+                        self.total_contradictions = self.total_contradictions.saturating_add(1);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let count = unique_incoming.len();
+        self.evidence_links.extend(unique_incoming);
+        Ok(count)
+    }
+
+    /// Reject a generated candidate without changing either fact's confidence.
+    pub fn reject_evidence_candidate(
+        &mut self,
+        from_fact_id: FactId,
+        to_fact_id: FactId,
+        relation: EvidenceRelation,
+        rationale: String,
+        current_cycle: u64,
+    ) -> Result<EvidenceLink, String> {
+        if rationale.trim().is_empty() {
+            return Err("rejecting a candidate requires a rationale".into());
+        }
+        let index = self
+            .evidence_links
+            .iter()
+            .position(|link| {
+                link.from_fact_id == from_fact_id
+                    && link.to_fact_id == to_fact_id
+                    && link.relation == relation
+                    && link.status == EvidenceLinkStatus::Candidate
+            })
+            .ok_or_else(|| "matching candidate evidence link not found".to_string())?;
+        let mut link = self.evidence_links[index].clone();
+        link.status = EvidenceLinkStatus::Rejected;
+        link.rationale = Some(rationale);
+        link.detected_at_cycle = current_cycle;
+        self.evidence_links[index] = link.clone();
+        Ok(link)
+    }
+
+    /// Adjudicate a typed relation using source evidence referenced by both claims.
+    #[allow(clippy::too_many_arguments)]
+    pub fn adjudicate_evidence_relation(
+        &mut self,
+        from_fact_id: FactId,
+        to_fact_id: FactId,
+        relation: EvidenceRelation,
+        evidence_ids: Vec<String>,
+        rationale: String,
+        causal_argument: Option<String>,
+        transmission_chain: Option<String>,
+        current_cycle: u64,
+    ) -> Result<EvidenceLink, String> {
+        if from_fact_id == to_fact_id {
+            return Err("an evidence relation requires two distinct facts".into());
+        }
+        if rationale.trim().is_empty() {
+            return Err("adjudicated evidence relations require a rationale".into());
+        }
+        let mut evidence_ids = evidence_ids;
+        evidence_ids.sort();
+        let supplied: HashSet<&str> = evidence_ids.iter().map(String::as_str).collect();
+        if evidence_ids.is_empty()
+            || evidence_ids.iter().any(|id| id.trim().is_empty())
+            || supplied.len() != evidence_ids.len()
+        {
+            return Err("adjudication requires unique, non-empty evidence IDs".into());
+        }
+
+        let from_context = self
+            .claim_contexts
+            .get(&from_fact_id)
+            .ok_or_else(|| format!("fact {from_fact_id} has no claim provenance"))?;
+        let to_context = self
+            .claim_contexts
+            .get(&to_fact_id)
+            .ok_or_else(|| format!("fact {to_fact_id} has no claim provenance"))?;
+        let from_has_evidence = from_context
+            .evidence_ids
+            .iter()
+            .any(|id| supplied.contains(id.as_str()));
+        let to_has_evidence = to_context
+            .evidence_ids
+            .iter()
+            .any(|id| supplied.contains(id.as_str()));
+        if !from_has_evidence || !to_has_evidence {
+            return Err("adjudication evidence must reference both claim contexts".into());
+        }
+        let context_evidence: HashSet<&str> = from_context
+            .evidence_ids
+            .iter()
+            .chain(to_context.evidence_ids.iter())
+            .map(String::as_str)
+            .collect();
+        if !supplied.is_subset(&context_evidence) {
+            return Err(
+                "adjudication evidence contains IDs not declared by either claim context".into(),
+            );
+        }
+
+        match relation {
+            EvidenceRelation::SemanticNeighbor | EvidenceRelation::SameWitnessVariant => {
+                return Err("semantic proximity and witness variants are candidate-only relations".into());
+            }
+            EvidenceRelation::Corroborates => {
+                if !from_context.same_claim(to_context)
+                    || !from_context.admissibly_independent_from(to_context)
+                {
+                    return Err("corroboration requires the same scoped claim and independent source evidence".into());
+                }
+            }
+            EvidenceRelation::Contradicts => {
+                if !from_context.same_conflict_scope(to_context)
+                    || from_context.same_claim(to_context)
+                {
+                    return Err("contradiction requires incompatible claims in the same subject/relation/context/time scope".into());
+                }
+            }
+            EvidenceRelation::Resembles => {}
+            EvidenceRelation::Precedes => {
+                if !strictly_precedes(from_context, to_context) {
+                    return Err("precedes requires explicit event times with from earlier than to".into());
+                }
+            }
+            EvidenceRelation::Causes => {
+                if !strictly_precedes(from_context, to_context)
+                    || causal_argument.as_deref().is_none_or(str::is_empty)
+                {
+                    return Err("causes requires temporal precedence and a causal_argument".into());
+                }
+            }
+            EvidenceRelation::HistoricallyInfluences => {
+                if !strictly_precedes(from_context, to_context)
+                    || transmission_chain.as_deref().is_none_or(str::is_empty)
+                {
+                    return Err("historical influence requires temporal precedence and a transmission_chain".into());
+                }
+            }
+        }
+
+        let symmetric_relation = matches!(
+            relation,
+            EvidenceRelation::Corroborates | EvidenceRelation::Contradicts | EvidenceRelation::Resembles
+        );
+        if let Some(existing) = self.evidence_links.iter().find(|link| {
+            let same_direction =
+                link.from_fact_id == from_fact_id && link.to_fact_id == to_fact_id;
+            let reverse_direction = symmetric_relation
+                && link.from_fact_id == to_fact_id
+                && link.to_fact_id == from_fact_id;
+            (same_direction || reverse_direction)
+                && link.relation == relation
+                && link.status == EvidenceLinkStatus::Adjudicated
+        }) {
+            if existing.evidence_ids == evidence_ids {
+                return Ok(existing.clone());
+            }
+            return Err(
+                "this fact pair/relation is already adjudicated with a different evidence set; update the claim context before adjudicating again"
+                    .into(),
+            );
+        }
+        let link = EvidenceLink {
+            from_fact_id,
+            to_fact_id,
+            relation,
+            status: EvidenceLinkStatus::Adjudicated,
+            evidence_ids: evidence_ids.clone(),
+            rationale: Some(rationale),
+            causal_argument,
+            transmission_chain,
+            detected_at_cycle: current_cycle,
+        };
+        if relation == EvidenceRelation::Corroborates {
+            for fact_id in [from_fact_id, to_fact_id] {
+                if let Some(fact) = self.facts.get_mut(&fact_id) {
+                    fact.corroboration_count = fact.corroboration_count.saturating_add(1);
+                    fact.confidence = (fact.confidence + 0.05).clamp(0.0, 1.0);
+                    fact.last_accessed_cycle = current_cycle;
+                }
+            }
+        } else if relation == EvidenceRelation::Contradicts {
+            for fact_id in [from_fact_id, to_fact_id] {
+                if let Some(fact) = self.facts.get_mut(&fact_id) {
+                    fact.contradiction_count = fact.contradiction_count.saturating_add(1);
+                }
+            }
+            self.total_contradictions += 1;
+        }
+        if let Some(candidate_index) = self.evidence_links.iter().position(|candidate| {
+            let same_direction =
+                candidate.from_fact_id == from_fact_id && candidate.to_fact_id == to_fact_id;
+            let reverse_direction = symmetric_relation
+                && candidate.from_fact_id == to_fact_id
+                && candidate.to_fact_id == from_fact_id;
+            (same_direction || reverse_direction)
+                && candidate.relation == relation
+                && candidate.status == EvidenceLinkStatus::Candidate
+        }) {
+            self.evidence_links[candidate_index] = link.clone();
+        } else {
+            self.evidence_links.push(link.clone());
+        }
+        Ok(link)
+    }
+
+    /// Turn a string/HDC contradiction candidate into an evidence-backed decision.
+    pub fn adjudicate_contradiction(
+        &mut self,
+        alert: &ContradictionAlert,
+        evidence_ids: Vec<String>,
+        rationale: String,
+    ) -> Result<(), String> {
+        self.adjudicate_evidence_relation(
+            alert.existing_fact_id,
+            alert.new_fact_id,
+            EvidenceRelation::Contradicts,
+            evidence_ids,
+            rationale,
+            None,
+            None,
+            alert.detected_at_cycle,
+        )?;
+        Ok(())
     }
 
     /// Search for facts similar to a query vector, returning top-k results
@@ -492,19 +990,52 @@ impl EnhancedKnowledgeGraph {
     pub fn resolve_contradictions(&mut self, alerts: &[ContradictionAlert]) -> usize {
         let mut resolved = 0;
         for alert in alerts {
+            let Some(evidence_ids) = self
+                .evidence_links
+                .iter()
+                .find(|link| {
+                    let same_direction = link.from_fact_id == alert.existing_fact_id
+                        && link.to_fact_id == alert.new_fact_id;
+                    // Contradicts is symmetric: adjudication may be recorded from
+                    // either witness toward the other, but resolution must still apply
+                    // to the confidence ordering carried by this alert.
+                    let reverse_direction = link.from_fact_id == alert.new_fact_id
+                        && link.to_fact_id == alert.existing_fact_id;
+                    (same_direction || reverse_direction)
+                        && link.relation == EvidenceRelation::Contradicts
+                        && link.status == EvidenceLinkStatus::Adjudicated
+                        && !link.evidence_ids.is_empty()
+                        && link.rationale.as_deref().is_some_and(|text| !text.trim().is_empty())
+                })
+                .map(|link| link.evidence_ids.clone())
+            else {
+                continue;
+            };
+            let resolution_key = (
+                alert.new_fact_id,
+                alert.existing_fact_id,
+                evidence_ids,
+            );
+            if self.resolved_contradictions.contains(&resolution_key) {
+                continue;
+            }
             let weaker_id = if alert.higher_confidence_id == alert.new_fact_id {
                 alert.existing_fact_id
             } else {
                 alert.new_fact_id
             };
+            let mut resolution_applied = false;
             let should_remove = if let Some(fact) = self.facts.get_mut(&weaker_id) {
                 fact.confidence *= 0.5;
-                fact.contradiction_count += 1;
                 resolved += 1;
+                resolution_applied = true;
                 fact.confidence < 0.05
             } else {
                 false
             };
+            if resolution_applied {
+                self.resolved_contradictions.insert(resolution_key);
+            }
             if should_remove {
                 self.remove_fact(weaker_id);
             }
@@ -514,8 +1045,26 @@ impl EnhancedKnowledgeGraph {
 
     // ── Persistence Support ─────────────────────────────────────────────
 
-    /// Import a fact from a persistence record.
+    /// Import a legacy fact record, assigning an in-memory identity.
     pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) {
+        self.import_fact_record_with_provenance(record, None, None);
+    }
+
+    /// Import a graph snapshot record with stable identity and optional provenance.
+    pub fn import_graph_fact_record(&mut self, record: &super::persistence::GraphFactRecord) {
+        self.import_fact_record_with_provenance(
+            &record.fact,
+            record.fact_id,
+            record.claim_context.clone(),
+        );
+    }
+
+    fn import_fact_record_with_provenance(
+        &mut self,
+        record: &super::persistence::FactRecord,
+        fact_id: Option<FactId>,
+        claim_context: Option<ClaimContext>,
+    ) {
         if record.vector_bytes.len() != 2048 {
             return;
         }
@@ -527,8 +1076,10 @@ impl EnhancedKnowledgeGraph {
             source_text: record.source_text.clone(),
             confidence: record.confidence,
         };
-        let id: FactId = self.next_id;
-        self.next_id += 1;
+        let id = fact_id
+            .filter(|candidate| !self.facts.contains_key(candidate))
+            .unwrap_or(self.next_id);
+        self.next_id = self.next_id.max(id.saturating_add(1));
         let fact = TemporalFact {
             id,
             encoding,
@@ -541,6 +1092,9 @@ impl EnhancedKnowledgeGraph {
             domain: record.domain.clone(),
             has_causal_relations: record.is_causal,
         };
+        if let Some(context) = claim_context {
+            self.claim_contexts.insert(id, context);
+        }
         if let Some(ref domain) = fact.domain {
             self.domain_index
                 .entry(domain.clone())
@@ -561,6 +1115,25 @@ impl EnhancedKnowledgeGraph {
                 domain: f.domain.clone(),
                 cycle: f.inserted_at_cycle,
                 is_causal: f.has_causal_relations,
+            })
+            .collect()
+    }
+
+    /// Export stable graph identities alongside the legacy persistence record shape.
+    pub fn export_graph_fact_records(&self) -> Vec<super::persistence::GraphFactRecord> {
+        self.facts
+            .values()
+            .map(|fact| super::persistence::GraphFactRecord {
+                fact_id: Some(fact.id),
+                fact: super::persistence::FactRecord {
+                    vector_bytes: fact.encoding.vector.0.to_vec(),
+                    source_text: fact.encoding.source_text.clone(),
+                    confidence: fact.confidence,
+                    domain: fact.domain.clone(),
+                    cycle: fact.inserted_at_cycle,
+                    is_causal: fact.has_causal_relations,
+                },
+                claim_context: self.claim_contexts.get(&fact.id).cloned(),
             })
             .collect()
     }
@@ -654,13 +1227,13 @@ impl EnhancedKnowledgeGraph {
                 if new_negated != existing_negated {
                     // One is negated and the other isn't = contradiction
                     let higher_confidence_id = if new_encoding.confidence > existing.confidence {
-                        0 // Placeholder — will be set after insertion
+                        self.next_id
                     } else {
                         existing.id
                     };
 
                     alerts.push(ContradictionAlert {
-                        new_fact_id: self.next_id, // Will be assigned
+                        new_fact_id: self.next_id,
                         existing_fact_id: existing.id,
                         similarity: sim,
                         higher_confidence_id,
@@ -671,17 +1244,6 @@ impl EnhancedKnowledgeGraph {
         }
 
         alerts
-    }
-
-    fn find_corroboration(&self, encoding: &FactEncoding) -> Option<FactId> {
-        // A fact with >0.85 similarity is likely the same information
-        for existing in self.facts.values() {
-            let sim = encoding.vector.similarity(&existing.encoding.vector);
-            if sim > 0.85 {
-                return Some(existing.id);
-            }
-        }
-        None
     }
 
     fn evict_lowest_confidence(&mut self) {
@@ -697,6 +1259,11 @@ impl EnhancedKnowledgeGraph {
 
     fn remove_fact(&mut self, id: FactId) {
         if let Some(fact) = self.facts.remove(&id) {
+            self.claim_contexts.remove(&id);
+            self.evidence_links
+                .retain(|link| link.from_fact_id != id && link.to_fact_id != id);
+            self.resolved_contradictions
+                .retain(|(new_id, existing_id, _)| *new_id != id && *existing_id != id);
             // Clean domain index
             if let Some(ref domain) = fact.domain {
                 if let Some(ids) = self.domain_index.get_mut(domain) {
@@ -708,6 +1275,42 @@ impl EnhancedKnowledgeGraph {
             }
         }
     }
+}
+
+fn candidate_relation(
+    new_context: Option<&ClaimContext>,
+    old_context: Option<&ClaimContext>,
+) -> (EvidenceRelation, Vec<String>) {
+    let mut evidence_ids = Vec::new();
+    if let Some(context) = old_context {
+        evidence_ids.extend(context.evidence_ids.iter().cloned());
+    }
+    if let Some(context) = new_context {
+        evidence_ids.extend(context.evidence_ids.iter().cloned());
+    }
+    evidence_ids.sort();
+    evidence_ids.dedup();
+
+    let relation = match (new_context, old_context) {
+        (Some(new_context), Some(old_context)) if old_context.same_claim(new_context) => {
+            if old_context.admissibly_independent_from(new_context) {
+                EvidenceRelation::Corroborates
+            } else {
+                EvidenceRelation::SameWitnessVariant
+            }
+        }
+        (Some(new_context), Some(old_context))
+            if old_context.same_conflict_scope(new_context) =>
+        {
+            EvidenceRelation::Contradicts
+        }
+        _ => EvidenceRelation::SemanticNeighbor,
+    };
+    (relation, evidence_ids)
+}
+
+fn strictly_precedes(from: &ClaimContext, to: &ClaimContext) -> bool {
+    matches!((from.event_time, to.event_time), (Some(from_time), Some(to_time)) if from_time < to_time)
 }
 
 fn contains_negation(text: &str) -> bool {
@@ -734,6 +1337,7 @@ fn contains_negation(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::claim_provenance::{ClaimKind, ClaimPolarity};
 
     fn make_encoding(text: &str, confidence: f32) -> FactEncoding {
         FactEncoding {
@@ -741,6 +1345,29 @@ mod tests {
             role_vectors: HashMap::new(),
             source_text: text.to_string(),
             confidence,
+        }
+    }
+
+    fn make_claim_context(
+        witness_id: &str,
+        source_family_id: &str,
+        evidence_id: &str,
+        object: &str,
+        polarity: ClaimPolarity,
+        event_time: Option<i64>,
+    ) -> ClaimContext {
+        ClaimContext {
+            subject: "Oil prices".into(),
+            predicate: "rose".into(),
+            object: object.into(),
+            witness_id: witness_id.into(),
+            source_family_id: source_family_id.into(),
+            context_id: "market-report:day-1".into(),
+            temporal_scope: Some("day-1".into()),
+            event_time,
+            claim_kind: ClaimKind::SourceAttested,
+            polarity,
+            evidence_ids: vec![evidence_id.into()],
         }
     }
 
@@ -779,20 +1406,502 @@ mod tests {
     }
 
     #[test]
-    fn test_corroboration() {
+    fn semantic_similarity_does_not_merge_or_boost_generic_facts() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
 
-        let enc1 = make_encoding("oil prices rose", 0.7);
-        let (id1, _) = graph.insert(enc1, 1, None, false);
+        let (id1, _) = graph.insert(make_encoding("oil prices rose", 0.7), 1, None, false);
+        let before = graph.get_fact(id1).unwrap().confidence;
+        let (id2, _) = graph.insert(make_encoding("oil prices rose", 0.8), 2, None, false);
 
-        // Insert same fact again — should corroborate, not duplicate
-        let enc2 = make_encoding("oil prices rose", 0.8);
-        let (id2, _) = graph.insert(enc2, 2, None, false);
+        assert_ne!(id1, id2);
+        assert_eq!(graph.len(), 2);
+        assert_eq!(graph.get_fact(id1).unwrap().corroboration_count, 0);
+        assert_eq!(graph.get_fact(id1).unwrap().confidence, before);
+        assert!(graph.evidence_links().iter().any(|link| {
+            link.from_fact_id == id1
+                && link.to_fact_id == id2
+                && link.relation == EvidenceRelation::SemanticNeighbor
+                && link.status == EvidenceLinkStatus::Candidate
+        }));
+    }
 
-        assert_eq!(id1, id2); // Same ID = corroborated
-        assert_eq!(graph.len(), 1); // Still one fact
-        let fact = graph.get_fact(id1).unwrap();
-        assert_eq!(fact.corroboration_count, 1);
+    #[test]
+    fn grounded_similarity_creates_candidate_not_corroboration() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let context_a = make_claim_context(
+            "witness-a", "family-a", "evidence-a", "renewal", ClaimPolarity::Positive, Some(1),
+        );
+        let context_b = make_claim_context(
+            "witness-b", "family-b", "evidence-b", "renewal", ClaimPolarity::Positive, Some(1),
+        );
+        let (id_a, _) = graph
+            .insert_grounded(make_encoding("oil prices rose", 0.7), 1, None, false, context_a)
+            .unwrap();
+        let (id_b, _) = graph
+            .insert_grounded(make_encoding("oil prices rose", 0.7), 2, None, false, context_b)
+            .unwrap();
+
+        let link = graph.evidence_links().iter().find(|link| {
+            link.from_fact_id == id_a && link.to_fact_id == id_b
+        }).unwrap();
+        assert_eq!(link.relation, EvidenceRelation::Corroborates);
+        assert_eq!(link.status, EvidenceLinkStatus::Candidate);
+        assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 0);
+        assert_eq!(graph.get_fact(id_a).unwrap().confidence, 0.7);
+        assert_eq!(graph.get_fact(id_b).unwrap().confidence, 0.7);
+    }
+
+    #[test]
+    fn rejecting_similarity_candidate_does_not_change_confidence() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (first, _) = graph.insert(make_encoding("symbol means renewal", 0.7), 1, None, false);
+        let before = graph.get_fact(first).unwrap().confidence;
+        let (second, _) = graph.insert(make_encoding("symbol means renewal", 0.8), 2, None, false);
+        let rejected = graph
+            .reject_evidence_candidate(
+                first,
+                second,
+                EvidenceRelation::SemanticNeighbor,
+                "Same vector pattern but no admissible identity evidence".into(),
+                3,
+            )
+            .unwrap();
+        assert_eq!(rejected.status, EvidenceLinkStatus::Rejected);
+        assert_eq!(graph.get_fact(first).unwrap().confidence, before);
+        assert_eq!(graph.get_fact(first).unwrap().corroboration_count, 0);
+    }
+
+    #[test]
+    fn explicit_independent_corroboration_boosts_once() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let context_a = make_claim_context(
+            "witness-a", "family-a", "evidence-a", "renewal", ClaimPolarity::Positive, Some(1),
+        );
+        let context_b = make_claim_context(
+            "witness-b", "family-b", "evidence-b", "renewal", ClaimPolarity::Positive, Some(1),
+        );
+        let (id_a, _) = graph
+            .insert_grounded(make_encoding("oil prices rose", 0.7), 1, None, false, context_a)
+            .unwrap();
+        let (id_b, _) = graph
+            .insert_grounded(make_encoding("oil prices rose", 0.7), 2, None, false, context_b)
+            .unwrap();
+        let evidence = vec!["evidence-a".to_string(), "evidence-b".to_string()];
+
+        let link = graph.adjudicate_evidence_relation(
+            id_a,
+            id_b,
+            EvidenceRelation::Corroborates,
+            evidence.clone(),
+            "Independent witnesses support the same scoped proposition".into(),
+            None,
+            None,
+            3,
+        ).unwrap();
+        assert_eq!(link.status, EvidenceLinkStatus::Adjudicated);
+        assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 1);
+        assert_eq!(graph.get_fact(id_a).unwrap().confidence, 0.75);
+
+        graph.adjudicate_evidence_relation(
+            id_a,
+            id_b,
+            EvidenceRelation::Corroborates,
+            evidence,
+            "Same evidence adjudication repeated".into(),
+            None,
+            None,
+            4,
+        ).unwrap();
+        assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 1);
+        assert_eq!(graph.get_fact(id_a).unwrap().confidence, 0.75);
+    }
+
+    #[test]
+    fn imported_evidence_links_reject_unbound_adjudication_ids_atomically() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let context = |witness: &str, family: &str, evidence: &str| ClaimContext {
+            subject: "subject".into(),
+            predicate: "predicate".into(),
+            object: "object".into(),
+            witness_id: witness.into(),
+            source_family_id: family.into(),
+            context_id: "shared-context".into(),
+            temporal_scope: Some("period-a".into()),
+            event_time: Some(1),
+            claim_kind: ClaimKind::SourceAttested,
+            polarity: ClaimPolarity::Positive,
+            evidence_ids: vec![evidence.into()],
+        };
+        let (a, _) = graph
+            .insert_grounded(
+                make_encoding("claim a", 0.5),
+                1,
+                None,
+                false,
+                context("witness-a", "family-a", "evidence-a"),
+            )
+            .unwrap();
+        let (b, _) = graph
+            .insert_grounded(
+                make_encoding("claim b", 0.5),
+                2,
+                None,
+                false,
+                context("witness-b", "family-b", "evidence-b"),
+            )
+            .unwrap();
+        let invalid = EvidenceLink {
+            from_fact_id: a,
+            to_fact_id: b,
+            relation: EvidenceRelation::Corroborates,
+            status: EvidenceLinkStatus::Adjudicated,
+            evidence_ids: vec![
+                "evidence-a".into(),
+                "evidence-b".into(),
+                "unbound-id".into(),
+            ],
+            rationale: Some("malformed persisted-link control".into()),
+            causal_argument: None,
+            transmission_chain: None,
+            detected_at_cycle: 3,
+        };
+        let before = graph.evidence_links().len();
+        let error = graph.import_evidence_links(&[invalid]).unwrap_err();
+        assert!(error.contains("not declared by either claim context"));
+        assert_eq!(graph.evidence_links().len(), before);
+        assert_eq!(graph.get_fact(a).unwrap().corroboration_count, 0);
+        assert_eq!(graph.get_fact(b).unwrap().corroboration_count, 0);
+    }
+
+    #[test]
+    fn adjudication_rejects_unbound_extra_evidence_ids() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let context_a = make_claim_context(
+            "witness-a",
+            "family-a",
+            "evidence-a",
+            "renewal",
+            ClaimPolarity::Positive,
+            Some(1),
+        );
+        let context_b = make_claim_context(
+            "witness-b",
+            "family-b",
+            "evidence-b",
+            "renewal",
+            ClaimPolarity::Positive,
+            Some(1),
+        );
+        let (id_a, _) = graph
+            .insert_grounded(
+                make_encoding("same proposition", 0.7),
+                1,
+                None,
+                false,
+                context_a,
+            )
+            .unwrap();
+        let (id_b, _) = graph
+            .insert_grounded(
+                make_encoding("same proposition", 0.7),
+                2,
+                None,
+                false,
+                context_b,
+            )
+            .unwrap();
+
+        let error = graph
+            .adjudicate_evidence_relation(
+                id_a,
+                id_b,
+                EvidenceRelation::Corroborates,
+                vec![
+                    "evidence-a".into(),
+                    "evidence-b".into(),
+                    "unbound-evidence".into(),
+                ],
+                "Attempt to attach an evidence ID absent from either claim context".into(),
+                None,
+                None,
+                3,
+            )
+            .unwrap_err();
+        assert!(error.contains("not declared by either claim context"));
+        assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 0);
+        assert_eq!(graph.get_fact(id_b).unwrap().corroboration_count, 0);
+        assert!(graph.evidence_links().is_empty());
+    }
+
+    #[test]
+    fn corroboration_rejects_two_witnesses_from_one_source_family() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let context_a = make_claim_context(
+            "witness-a",
+            "same-work-family",
+            "evidence-a",
+            "renewal",
+            ClaimPolarity::Positive,
+            Some(1),
+        );
+        let context_b = make_claim_context(
+            "witness-b",
+            "same-work-family",
+            "evidence-b",
+            "renewal",
+            ClaimPolarity::Positive,
+            Some(1),
+        );
+        let (id_a, _) = graph
+            .insert_grounded(
+                make_encoding("same proposition", 0.7),
+                1,
+                None,
+                false,
+                context_a,
+            )
+            .unwrap();
+        let (id_b, _) = graph
+            .insert_grounded(
+                make_encoding("same proposition", 0.7),
+                2,
+                None,
+                false,
+                context_b,
+            )
+            .unwrap();
+        let error = graph
+            .adjudicate_evidence_relation(
+                id_a,
+                id_b,
+                EvidenceRelation::Corroborates,
+                vec!["evidence-a".into(), "evidence-b".into()],
+                "Two witnesses from one shared source family".into(),
+                None,
+                None,
+                3,
+            )
+            .unwrap_err();
+        assert!(error.contains("independent source evidence"));
+        assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 0);
+        assert_eq!(graph.get_fact(id_a).unwrap().confidence, 0.7);
+    }
+
+    #[test]
+    fn corroboration_cannot_boost_twice_for_reverse_orientation_or_new_evidence_subset() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let mut context_a = make_claim_context(
+            "witness-a", "family-a", "evidence-a", "renewal", ClaimPolarity::Positive, Some(1),
+        );
+        context_a.evidence_ids.push("evidence-a2".into());
+        let mut context_b = make_claim_context(
+            "witness-b", "family-b", "evidence-b", "renewal", ClaimPolarity::Positive, Some(1),
+        );
+        context_b.evidence_ids.push("evidence-b2".into());
+        let (id_a, _) = graph
+            .insert_grounded(make_encoding("same proposition", 0.7), 1, None, false, context_a)
+            .unwrap();
+        let (id_b, _) = graph
+            .insert_grounded(make_encoding("same proposition", 0.7), 2, None, false, context_b)
+            .unwrap();
+
+        graph.adjudicate_evidence_relation(
+            id_a, id_b, EvidenceRelation::Corroborates,
+            vec!["evidence-a".into(), "evidence-b".into()],
+            "Two independent source families".into(), None, None, 3,
+        ).unwrap();
+        assert!(
+            graph.adjudicate_evidence_relation(
+                id_b, id_a, EvidenceRelation::Corroborates,
+                vec!["evidence-a".into(), "evidence-b".into()],
+                "Same adjudication requested in reverse".into(), None, None, 4,
+            ).is_ok()
+        );
+        let error = graph.adjudicate_evidence_relation(
+            id_a, id_b, EvidenceRelation::Corroborates,
+            vec!["evidence-a2".into(), "evidence-b2".into()],
+            "Alternative subset from same two sources".into(), None, None, 5,
+        ).unwrap_err();
+        assert!(error.contains("already adjudicated with a different evidence set"));
+        assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 1);
+        assert_eq!(graph.get_fact(id_a).unwrap().confidence, 0.75);
+        assert_eq!(graph.evidence_links().iter().filter(|link| {
+            link.relation == EvidenceRelation::Corroborates
+                && link.status == EvidenceLinkStatus::Adjudicated
+        }).count(), 1);
+    }
+
+    #[test]
+    fn historical_influence_requires_explicit_transmission_chain() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let earlier = make_claim_context(
+            "witness-a", "family-a", "evidence-a", "renewal", ClaimPolarity::Positive, Some(-300),
+        );
+        let later = make_claim_context(
+            "witness-b", "family-b", "evidence-b", "renewal", ClaimPolarity::Positive, Some(-200),
+        );
+        let (from, _) = graph.insert_grounded(
+            make_encoding("earlier myth", 0.7), 1, None, false, earlier,
+        ).unwrap();
+        let (to, _) = graph.insert_grounded(
+            make_encoding("later myth", 0.7), 2, None, false, later,
+        ).unwrap();
+        let error = graph.adjudicate_evidence_relation(
+            from, to, EvidenceRelation::HistoricallyInfluences,
+            vec!["evidence-a".into(), "evidence-b".into()],
+            "Motif similarity only".into(), None, None, 3,
+        ).unwrap_err();
+        assert!(error.contains("transmission_chain"));
+
+        assert!(graph.adjudicate_evidence_relation(
+            from, to, EvidenceRelation::HistoricallyInfluences,
+            vec!["evidence-a".into(), "evidence-b".into()],
+            "Documented transmission argument".into(), None,
+            Some("source A -> intermediary -> source B".into()), 3,
+        ).is_ok());
+    }
+
+    #[test]
+    fn graph_snapshot_round_trip_preserves_claim_context_and_candidate_links() {
+        let mut original = EnhancedKnowledgeGraph::new(100);
+        let context_a = make_claim_context(
+            "witness-a",
+            "family-a",
+            "evidence-a",
+            "renewal",
+            ClaimPolarity::Positive,
+            Some(-300),
+        );
+        let context_b = make_claim_context(
+            "witness-b",
+            "family-b",
+            "evidence-b",
+            "renewal",
+            ClaimPolarity::Positive,
+            Some(-300),
+        );
+        let (id_a, _) = original
+            .insert_grounded(
+                make_encoding("same grounded claim", 0.7),
+                1,
+                None,
+                false,
+                context_a,
+            )
+            .unwrap();
+        let (id_b, _) = original
+            .insert_grounded(
+                make_encoding("same grounded claim", 0.7),
+                2,
+                None,
+                false,
+                context_b,
+            )
+            .unwrap();
+        let records = original.export_graph_fact_records();
+        let links = original.evidence_links().to_vec();
+        assert_eq!(records.len(), 2);
+        assert_eq!(links.len(), 1);
+
+        let mut restored = EnhancedKnowledgeGraph::new(100);
+        for record in &records {
+            restored.import_graph_fact_record(record);
+        }
+        restored.import_evidence_links(&links).unwrap();
+        assert_eq!(restored.get_fact(id_a).unwrap().confidence, 0.7);
+        assert_eq!(restored.get_fact(id_b).unwrap().confidence, 0.7);
+        let adjudicated = restored
+            .adjudicate_evidence_relation(
+                id_a,
+                id_b,
+                EvidenceRelation::Corroborates,
+                vec!["evidence-a".into(), "evidence-b".into()],
+                "Two independent witnesses support the same scoped proposition".into(),
+                None,
+                None,
+                3,
+            )
+            .unwrap();
+        assert_eq!(adjudicated.status, EvidenceLinkStatus::Adjudicated);
+        assert_eq!(restored.get_fact(id_a).unwrap().corroboration_count, 1);
+        assert_eq!(restored.get_fact(id_a).unwrap().confidence, 0.75);
+    }
+
+    #[test]
+    fn contradiction_candidates_do_not_demote_facts_before_adjudication() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (id_a, _) = graph.insert(make_encoding("oil prices rose", 0.8), 1, None, false);
+        let before = graph.get_fact(id_a).unwrap().confidence;
+        let mut negative = make_encoding("oil prices did not rise", 0.8);
+        negative.vector = graph.get_fact(id_a).unwrap().encoding.vector.clone();
+        let (id_b, alerts) = graph.insert(negative, 2, None, false);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(graph.resolve_contradictions(&alerts), 0);
+        assert_eq!(graph.get_fact(id_a).unwrap().confidence, before);
+        assert_eq!(graph.get_fact(id_a).unwrap().contradiction_count, 0);
+        assert!(graph.get_fact(id_b).is_some());
+    }
+
+    #[test]
+    fn contradiction_resolution_requires_adjudication_and_runs_once() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let positive_context = make_claim_context(
+            "witness-a",
+            "family-a",
+            "evidence-a",
+            "rise",
+            ClaimPolarity::Positive,
+            Some(1),
+        );
+        let negative_context = make_claim_context(
+            "witness-b",
+            "family-b",
+            "evidence-b",
+            "rise",
+            ClaimPolarity::Negative,
+            Some(1),
+        );
+        let (positive_id, _) = graph
+            .insert_grounded(
+                make_encoding("oil prices rose", 0.8),
+                1,
+                None,
+                false,
+                positive_context,
+            )
+            .unwrap();
+        let mut negative_encoding = make_encoding("oil prices did not rise", 0.6);
+        negative_encoding.vector = graph
+            .get_fact(positive_id)
+            .unwrap()
+            .encoding
+            .vector
+            .clone();
+        let (negative_id, candidates) = graph
+            .insert_grounded(negative_encoding, 2, None, false, negative_context)
+            .unwrap();
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(graph.resolve_contradictions(&candidates), 0);
+        assert_eq!(graph.get_fact(negative_id).unwrap().confidence, 0.6);
+
+        // Contradiction is symmetric, so deliberately adjudicate from the
+        // newly inserted negative claim back toward the existing positive claim.
+        graph
+            .adjudicate_evidence_relation(
+                negative_id,
+                positive_id,
+                EvidenceRelation::Contradicts,
+                vec!["evidence-a".into(), "evidence-b".into()],
+                "Both source claims address the same scoped proposition with opposite polarity".into(),
+                None,
+                None,
+                3,
+            )
+            .unwrap();
+        assert_eq!(graph.resolve_contradictions(&candidates), 1);
+        assert!((graph.get_fact(negative_id).unwrap().confidence - 0.3).abs() < f32::EPSILON);
+        assert_eq!(graph.resolve_contradictions(&candidates), 0);
+        assert!((graph.get_fact(negative_id).unwrap().confidence - 0.3).abs() < f32::EPSILON);
     }
 
     #[test]
