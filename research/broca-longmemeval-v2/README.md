@@ -22,8 +22,8 @@ The adapter must use the official upstream evaluation harness and leaderboard ag
 
 ## Run the local protocol controls
 
-    scripts/test_broca_lme_v2_receipt.sh
-    scripts/check_broca_lme_v2_receipt.sh path/to/receipt.json
+    bash scripts/test_broca_lme_v2_receipt.sh
+    bash scripts/check_broca_lme_v2_receipt.sh path/to/receipt.json
 
 The tests create temporary protocol-shaped fixtures only. Fixture pass output is not benchmark evidence. A real receipt's artifact paths must resolve to files under the directory containing that receipt.
 
