@@ -51,6 +51,7 @@ fn gallery_alert() {
     let snap = CognitiveSnapshot {
         consciousness_level: 0.7,
         prediction_error: 0.15,
+        prediction_error_valid: true,
         living_mind_vitality: 0.6,
         living_mind_coherence: 0.55,
         dopamine: 0.6,
@@ -81,6 +82,7 @@ fn gallery_turbulent() {
     let snap = CognitiveSnapshot {
         consciousness_level: 0.5,
         prediction_error: 0.8,
+        prediction_error_valid: true,
         living_mind_vitality: 0.4,
         living_mind_coherence: 0.3,
         dopamine: 0.8,
@@ -111,6 +113,7 @@ fn gallery_harmonious() {
     let snap = CognitiveSnapshot {
         consciousness_level: 0.9,
         prediction_error: 0.05,
+        prediction_error_valid: true,
         living_mind_vitality: 0.85,
         living_mind_coherence: 0.8,
         dopamine: 0.5,
@@ -141,6 +144,7 @@ fn gallery_dreaming() {
     let snap = CognitiveSnapshot {
         consciousness_level: 0.3,
         prediction_error: 0.4,
+        prediction_error_valid: true,
         living_mind_vitality: 0.3,
         living_mind_coherence: 0.2,
         dopamine: 0.2,
@@ -171,6 +175,7 @@ fn gallery_deterministic() {
     let snap = CognitiveSnapshot {
         consciousness_level: 0.6,
         prediction_error: 0.2,
+        prediction_error_valid: true,
         living_mind_vitality: 0.5,
         living_mind_coherence: 0.5,
         dopamine: 0.5,
