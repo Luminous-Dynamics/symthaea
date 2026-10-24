@@ -243,23 +243,12 @@ impl CognitiveSubsystem for VisionManager {
     }
 
     fn checkpoint(&self) -> Vec<u8> {
-        // Preserve the legacy 12-byte state prefix and append PEVC v2 watermarks.
-        let mut data = Vec::with_capacity(35);
+        // Preserve the legacy 12-byte state prefix and use the shared PEVC codec.
+        let mut data = Vec::with_capacity(12 + 23);
         data.extend_from_slice(&self.surprise_threshold.to_le_bytes());
         data.extend_from_slice(&self.visual_pe_ema.to_le_bytes());
         data.extend_from_slice(&self.low_surprise_streak.to_le_bytes());
-        data.extend_from_slice(b"PEVC");
-        data.push(2); // extension version
-        let observed_cycle = self
-            .prediction_error_cursor
-            .last_observed_observation_cycle();
-        data.push(u8::from(observed_cycle.is_some()));
-        data.extend_from_slice(&observed_cycle.unwrap_or_default().to_le_bytes());
-        let admitted_cycle = self
-            .prediction_error_cursor
-            .last_admitted_observation_cycle();
-        data.push(u8::from(admitted_cycle.is_some()));
-        data.extend_from_slice(&admitted_cycle.unwrap_or_default().to_le_bytes());
+        data.extend_from_slice(&self.prediction_error_cursor.encode_checkpoint_extension_v2());
         data
     }
 
@@ -271,57 +260,12 @@ impl CognitiveSubsystem for VisionManager {
             ));
         }
 
-        // Decode and validate before mutating manager state. Legacy 12-byte
-        // checkpoints do not carry cycle provenance and restore a fresh cursor.
-        let (restored_observed_cycle, restored_admitted_cycle) = if data.len() == 12 {
-            (None, None)
+        // Decode/validate before mutating state. Legacy checkpoints have no PE
+        // provenance and therefore restore with a fresh cursor.
+        let restored_cursor = if data.len() == 12 {
+            PredictionEvidenceCursor::default()
         } else {
-            if &data[12..16] != b"PEVC" {
-                return Err("VisionManager: invalid PE cursor checkpoint magic".to_string());
-            }
-            if data[16] != 2 {
-                return Err(format!(
-                    "VisionManager: unsupported PE cursor checkpoint version {}",
-                    data[16]
-                ));
-            }
-            let has_observed = data[17];
-            let observed_value = u64::from_le_bytes(
-                data[18..26]
-                    .try_into()
-                    .map_err(|_| "VisionManager: corrupt observed-cycle bytes".to_string())?,
-            );
-            let has_admitted = data[26];
-            let admitted_value = u64::from_le_bytes(
-                data[27..35]
-                    .try_into()
-                    .map_err(|_| "VisionManager: corrupt admitted-cycle bytes".to_string())?,
-            );
-            if has_observed > 1 || has_admitted > 1 {
-                return Err("VisionManager: invalid PE cursor presence flag".to_string());
-            }
-            let observed = match has_observed {
-                1 => Some(observed_value),
-                0 if observed_value == 0 => None,
-                0 => {
-                    return Err("VisionManager: absent observed cycle must encode zero".to_string());
-                }
-                _ => unreachable!("presence flag was checked above"),
-            };
-            let admitted = match has_admitted {
-                1 => Some(admitted_value),
-                0 if admitted_value == 0 => None,
-                0 => {
-                    return Err("VisionManager: absent admitted cycle must encode zero".to_string());
-                }
-                _ => unreachable!("presence flag was checked above"),
-            };
-            if admitted.is_some_and(|cycle| observed.is_none_or(|observed_cycle| cycle > observed_cycle)) {
-                return Err(
-                    "VisionManager: admitted PE cycle exceeds observed high-water mark".to_string(),
-                );
-            }
-            (observed, admitted)
+            PredictionEvidenceCursor::decode_checkpoint_extension_v2(&data[12..35])?
         };
 
         self.surprise_threshold = f32::from_le_bytes(
@@ -339,8 +283,7 @@ impl CognitiveSubsystem for VisionManager {
                 .try_into()
                 .map_err(|_| "VisionManager: corrupt bytes [8..12]".to_string())?,
         );
-        self.prediction_error_cursor
-            .restore_cycles(restored_observed_cycle, restored_admitted_cycle);
+        self.prediction_error_cursor = restored_cursor;
         Ok(())
     }
 }
