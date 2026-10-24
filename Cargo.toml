@@ -1248,6 +1248,10 @@ name = "agw_ethics_holdout"
 path = "examples/agw_ethics_holdout.rs"
 
 [[example]]
+name = "consent_event_resolution_bench"
+path = "examples/consent_event_resolution_bench.rs"
+
+[[example]]
 name = "engineering_school_benchmarks"
 path = "examples/engineering_school_benchmarks.rs"
 
