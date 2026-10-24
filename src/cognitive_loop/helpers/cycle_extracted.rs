@@ -154,12 +154,25 @@ impl CognitiveLoopService {
         if decision.allowed {
             return None;
         }
-        let metadata = super::super::CycleMetadata {
+        let observation_cycle = self.stats.total_cycles as u64;
+        let not_evaluated = super::super::types::PredictionErrorEvidence::invalid(
+            super::super::types::PredictionEvidenceStatus::NotEvaluated,
+            None,
+            observation_cycle,
+        )
+        .expect("NotEvaluated is an invalid evidence status");
+        let mut metadata = super::super::CycleMetadata {
             safety_blocked: true,
             safety_category: decision.category.map(|c| format!("{c:?}")),
             urgency: self.carryover.urgency.urgency,
             ..Default::default()
         };
+        metadata.prediction_evidence = Some(
+            super::super::types::PredictionEvidenceTelemetry::from_evidence(
+                &not_evaluated,
+                observation_cycle,
+            ),
+        );
         tracing::warn!(
             target: "cognitive_loop::safety",
             category = ?decision.category,
