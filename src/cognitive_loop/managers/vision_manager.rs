@@ -21,6 +21,7 @@
 use super::super::subsystem_trait::{
     CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
+use crate::cognitive_loop::types::PredictionEvidenceCursor;
 
 /// Vision Manager — consolidates visual surprise, habituation, and saccade urgency.
 ///
@@ -43,6 +44,9 @@ pub struct VisionManager {
     /// Imagination-reality surprise from the vision manifold (P6-A).
     /// Set externally each cycle by the cognitive loop from VisionBridge::imagination_surprise().
     imagination_surprise: f32,
+
+    /// Prevents duplicate or stale PE samples from being mixed into visual surprise.
+    prediction_error_cursor: PredictionEvidenceCursor,
 }
 
 impl Default for VisionManager {
@@ -55,6 +59,7 @@ impl Default for VisionManager {
             surprise_threshold: 0.2,
             visual_pe_ema: 0.0,
             imagination_surprise: 0.0,
+            prediction_error_cursor: PredictionEvidenceCursor::default(),
         }
     }
 }
@@ -151,7 +156,10 @@ impl CognitiveSubsystem for VisionManager {
         // Combine compressed state variance with prediction error for visual surprise.
         // P6-A: Imagination surprise amplifies the signal — when reality violates
         // the mental model, surprise is boosted by up to 30%.
-        let base_surprise = if let Some(prediction_error) = snapshot.prediction_error_sample() {
+        let prediction_error_sample = self
+            .prediction_error_cursor
+            .admit_evidence(&snapshot.prediction_error_evidence(), snapshot.cycle_number);
+        let base_surprise = if let Some(prediction_error) = prediction_error_sample {
             state_variance * 0.4 + prediction_error * 0.6
         } else {
             // Still process observable state variance, but don't substitute the
@@ -235,20 +243,87 @@ impl CognitiveSubsystem for VisionManager {
     }
 
     fn checkpoint(&self) -> Vec<u8> {
-        let mut data = Vec::with_capacity(32);
+        // Preserve the legacy 12-byte state prefix and append PEVC v2 watermarks.
+        let mut data = Vec::with_capacity(35);
         data.extend_from_slice(&self.surprise_threshold.to_le_bytes());
         data.extend_from_slice(&self.visual_pe_ema.to_le_bytes());
         data.extend_from_slice(&self.low_surprise_streak.to_le_bytes());
+        data.extend_from_slice(b"PEVC");
+        data.push(2); // extension version
+        let observed_cycle = self
+            .prediction_error_cursor
+            .last_observed_observation_cycle();
+        data.push(u8::from(observed_cycle.is_some()));
+        data.extend_from_slice(&observed_cycle.unwrap_or_default().to_le_bytes());
+        let admitted_cycle = self
+            .prediction_error_cursor
+            .last_admitted_observation_cycle();
+        data.push(u8::from(admitted_cycle.is_some()));
+        data.extend_from_slice(&admitted_cycle.unwrap_or_default().to_le_bytes());
         data
     }
 
     fn restore(&mut self, data: &[u8]) -> Result<(), String> {
-        if data.len() < 12 {
+        if data.len() != 12 && data.len() != 35 {
             return Err(format!(
-                "VisionManager checkpoint too short: {} < 12",
+                "VisionManager checkpoint has unsupported length: {}",
                 data.len()
             ));
         }
+
+        // Decode and validate before mutating manager state. Legacy 12-byte
+        // checkpoints do not carry cycle provenance and restore a fresh cursor.
+        let (restored_observed_cycle, restored_admitted_cycle) = if data.len() == 12 {
+            (None, None)
+        } else {
+            if &data[12..16] != b"PEVC" {
+                return Err("VisionManager: invalid PE cursor checkpoint magic".to_string());
+            }
+            if data[16] != 2 {
+                return Err(format!(
+                    "VisionManager: unsupported PE cursor checkpoint version {}",
+                    data[16]
+                ));
+            }
+            let has_observed = data[17];
+            let observed_value = u64::from_le_bytes(
+                data[18..26]
+                    .try_into()
+                    .map_err(|_| "VisionManager: corrupt observed-cycle bytes".to_string())?,
+            );
+            let has_admitted = data[26];
+            let admitted_value = u64::from_le_bytes(
+                data[27..35]
+                    .try_into()
+                    .map_err(|_| "VisionManager: corrupt admitted-cycle bytes".to_string())?,
+            );
+            if has_observed > 1 || has_admitted > 1 {
+                return Err("VisionManager: invalid PE cursor presence flag".to_string());
+            }
+            let observed = match has_observed {
+                1 => Some(observed_value),
+                0 if observed_value == 0 => None,
+                0 => {
+                    return Err("VisionManager: absent observed cycle must encode zero".to_string());
+                }
+                _ => unreachable!("presence flag was checked above"),
+            };
+            let admitted = match has_admitted {
+                1 => Some(admitted_value),
+                0 if admitted_value == 0 => None,
+                0 => {
+                    return Err("VisionManager: absent admitted cycle must encode zero".to_string());
+                }
+                _ => unreachable!("presence flag was checked above"),
+            };
+            if admitted.is_some_and(|cycle| observed.is_none_or(|observed_cycle| cycle > observed_cycle)) {
+                return Err(
+                    "VisionManager: admitted PE cycle exceeds observed high-water mark".to_string(),
+                );
+            }
+            (observed, admitted)
+        };
+
         self.surprise_threshold = f32::from_le_bytes(
             data[0..4]
                 .try_into()
@@ -264,6 +339,8 @@ impl CognitiveSubsystem for VisionManager {
                 .try_into()
                 .map_err(|_| "VisionManager: corrupt bytes [8..12]".to_string())?,
         );
+        self.prediction_error_cursor
+            .restore_cycles(restored_observed_cycle, restored_admitted_cycle);
         Ok(())
     }
 }
@@ -336,8 +413,10 @@ mod tests {
         let mut vm = VisionManager::default();
         let initial = vm.surprise_threshold;
         let snap = snapshot_with_state_and_pe(0.0, 0.8);
-        for _ in 0..20 {
-            vm.process(&snap);
+        for cycle in 0..20 {
+            let mut current = snap;
+            current.cycle_number = cycle;
+            vm.process(&current);
         }
         assert!(
             vm.surprise_threshold > initial,
@@ -391,6 +470,138 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_pe_cycle_is_not_reused_for_visual_surprise() {
+        let mut manager = VisionManager::default();
+        let mut first = snapshot_with_state_and_pe(0.0, 0.8);
+        first.cycle_number = 10;
+        manager.process(&first);
+        let ema_after_first = manager.visual_pe_ema;
+        assert!(ema_after_first > 0.0);
+
+        // Same observation cycle with a different numeric payload must not
+        // create another PE-backed visual-surprise contribution.
+        first.prediction_error = 1.0;
+        manager.process(&first);
+        assert!(manager.visual_pe_ema < ema_after_first);
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(10)
+        );
+    }
+
+    #[test]
+    fn invalid_newer_pe_blocks_delayed_older_but_allows_recovery() {
+        let mut manager = VisionManager::default();
+        let mut invalid = snapshot_with_state_and_pe(0.0, 1.0);
+        invalid.cycle_number = 12;
+        invalid.prediction_error_valid = 0;
+        manager.process(&invalid);
+        assert_eq!(manager.visual_pe_ema, 0.0);
+        assert_eq!(
+            manager.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(12)
+        );
+
+        let mut delayed = snapshot_with_state_and_pe(0.0, 0.8);
+        delayed.cycle_number = 11;
+        manager.process(&delayed);
+        assert_eq!(manager.visual_pe_ema, 0.0);
+
+        let mut retry = delayed;
+        retry.cycle_number = 12;
+        manager.process(&retry);
+        assert!(manager.visual_pe_ema > 0.0);
+        let ema_after_retry = manager.visual_pe_ema;
+        manager.process(&retry);
+        assert!(manager.visual_pe_ema < ema_after_retry);
+    }
+
+    #[test]
+    fn checkpoint_roundtrip_preserves_vision_pe_watermarks() {
+        let mut manager = VisionManager::default();
+        let mut valid = snapshot_with_state_and_pe(0.0, 0.7);
+        valid.cycle_number = 10;
+        manager.process(&valid);
+        let mut invalid = valid;
+        invalid.cycle_number = 12;
+        invalid.prediction_error_valid = 0;
+        manager.process(&invalid);
+
+        let checkpoint = manager.checkpoint();
+        assert_eq!(checkpoint.len(), 35);
+        let mut restored = VisionManager::default();
+        restored.restore(&checkpoint).unwrap();
+        assert_eq!(
+            restored.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(12)
+        );
+        assert_eq!(
+            restored.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(10)
+        );
+
+        let mut delayed = valid;
+        delayed.cycle_number = 11;
+        restored.process(&delayed);
+        assert_eq!(
+            restored.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(10)
+        );
+
+        let mut retry = valid;
+        retry.cycle_number = 12;
+        restored.process(&retry);
+        assert_eq!(
+            restored.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(12)
+        );
+    }
+
+    #[test]
+    fn legacy_vision_checkpoint_restore_clears_cursor() {
+        let mut manager = VisionManager::default();
+        let mut sample = snapshot_with_state_and_pe(0.0, 0.7);
+        sample.cycle_number = 50;
+        manager.process(&sample);
+        let legacy = manager.checkpoint()[..12].to_vec();
+
+        manager.restore(&legacy).unwrap();
+        assert_eq!(
+            manager.prediction_error_cursor.last_observed_observation_cycle(),
+            None
+        );
+        let mut reset_sample = sample;
+        reset_sample.cycle_number = 1;
+        manager.process(&reset_sample);
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn malformed_vision_pe_checkpoint_is_rejected_atomically() {
+        let mut manager = VisionManager::default();
+        let mut sample = snapshot_with_state_and_pe(0.0, 0.5);
+        sample.cycle_number = 12;
+        manager.process(&sample);
+        let before_threshold = manager.surprise_threshold;
+        let mut checkpoint = manager.checkpoint();
+        checkpoint[0..4].copy_from_slice(&0.1_f32.to_le_bytes());
+        checkpoint[27..35].copy_from_slice(&13_u64.to_le_bytes());
+        assert!(manager.restore(&checkpoint).is_err());
+        assert_eq!(manager.surprise_threshold, before_threshold);
+        assert_eq!(
+            manager.prediction_error_cursor.last_observed_observation_cycle(),
+            Some(12)
+        );
+        assert_eq!(
+            manager.prediction_error_cursor.last_admitted_observation_cycle(),
+            Some(12)
+        );
+    }
+
+    #[test]
     fn test_restore_rejects_short_data() {
         let mut vm = VisionManager::default();
         assert!(vm.restore(&[0u8; 5]).is_err());
@@ -423,8 +634,10 @@ mod tests {
         ) {
             let mut vm = VisionManager::default();
             let snap = CycleSnapshot { prediction_error: pe, prediction_error_valid: 1, ..Default::default() };
-            for _ in 0..100 {
-                vm.process(&snap);
+            for cycle in 0..100 {
+                let mut current = snap;
+                current.cycle_number = cycle;
+                vm.process(&current);
             }
             prop_assert!(vm.surprise_threshold() >= 0.05,
                 "threshold below min: {}", vm.surprise_threshold());
@@ -438,8 +651,10 @@ mod tests {
         ) {
             let mut vm = VisionManager::default();
             let snap = CycleSnapshot { prediction_error: pe, prediction_error_valid: 1, ..Default::default() };
-            for _ in 0..50 {
-                vm.process(&snap);
+            for cycle in 0..50 {
+                let mut current = snap;
+                current.cycle_number = cycle;
+                vm.process(&current);
             }
             prop_assert!(vm.visual_pe_ema() >= 0.0,
                 "pe_ema below 0: {}", vm.visual_pe_ema());
