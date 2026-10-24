@@ -18,6 +18,7 @@ const BUNDLE_ARITIES: [usize; 3] = [3, 7, 15];
 const CORPUS_SIZES: [usize; 4] = [256, 1024, 4096, 16384];
 const BUILD_BENCH_SIZES: [usize; 3] = [256, 1024, 4096];
 const METRIC_QUERY_COUNT: usize = 8;
+const QUERY_NOISE_BPS: [usize; 5] = [0, 100, 200, 500, 1000];
 const ROLE_SEED: u64 = 0xA11C_E000_0000;
 const VALUE_SEED: u64 = 0xC0DE_0000_0000;
 
@@ -90,6 +91,19 @@ fn scalar_top1_id(query: &BinaryHV, corpus: &[BinaryHV]) -> usize {
     best_id
 }
 
+/// Flip an exact, deterministic number of query bits. The odd stride 8191 is
+/// coprime with DIM, so the selected bit positions do not repeat for this sweep.
+fn corrupt_query(query: &BinaryHV, noise_bps: usize, salt: usize) -> BinaryHV {
+    assert!(noise_bps <= 10_000);
+    let mut corrupted = *query;
+    let flip_count = BinaryHV::DIM * noise_bps / 10_000;
+    for i in 0..flip_count {
+        let bit = (i * 8191 + salt * 127) % BinaryHV::DIM;
+        corrupted.0[bit / 8] ^= 1u8 << (bit % 8);
+    }
+    corrupted
+}
+
 struct RetrievalSummary {
     hit_at_one: usize,
     sampled: usize,
@@ -99,7 +113,7 @@ struct RetrievalSummary {
 
 /// Evaluate a fixed, spread-out sample of query/target pairs. Rank is based on
 /// the optimized exact similarity score and the same lowest-ID tie policy.
-fn summarize_retrieval(workload: &CompositionalWorkload) -> RetrievalSummary {
+fn summarize_retrieval(workload: &CompositionalWorkload, noise_bps: usize) -> RetrievalSummary {
     let n = workload.corpus.len();
     let sampled = METRIC_QUERY_COUNT.min(n);
     let mut ranks = Vec::with_capacity(sampled);
@@ -110,8 +124,9 @@ fn summarize_retrieval(workload: &CompositionalWorkload) -> RetrievalSummary {
         // 9973 is coprime with the configured power-of-two corpus sizes; this
         // rotates the sample across the corpus instead of testing only its head.
         let target_id = (sample_id * 9973 + 17) % n;
-        let query = &workload.query_atoms[target_id];
-        let (winner_id, _) = exact_top1(query, &workload.corpus);
+        let clean_query = &workload.query_atoms[target_id];
+        let query = corrupt_query(clean_query, noise_bps, target_id);
+        let (winner_id, _) = exact_top1(&query, &workload.corpus);
         if winner_id == target_id {
             hit_at_one += 1;
         }
@@ -151,11 +166,20 @@ fn correctness_contract() {
         let workload = build_workload(corpus_size, 3);
         for target_id in [0usize, corpus_size / 2, corpus_size - 1] {
             let query = &workload.query_atoms[target_id];
-            assert_eq!(
-                exact_top1(query, &workload.corpus).0,
-                scalar_top1_id(query, &workload.corpus),
-                "optimized and scalar exact top-1 differ for n={corpus_size}, target={target_id}"
-            );
+            for noise_bps in QUERY_NOISE_BPS {
+                let noisy = corrupt_query(query, noise_bps, target_id);
+                let expected_flips = (BinaryHV::DIM * noise_bps / 10_000) as u32;
+                assert_eq!(
+                    scalar_hamming(query, &noisy),
+                    expected_flips,
+                    "query-noise fixture flipped an unexpected number of bits"
+                );
+                assert_eq!(
+                    exact_top1(&noisy, &workload.corpus).0,
+                    scalar_top1_id(&noisy, &workload.corpus),
+                    "optimized and scalar exact top-1 differ for n={corpus_size}, target={target_id}, noise_bps={noise_bps}"
+                );
+            }
         }
     }
 
@@ -183,15 +207,17 @@ fn bench_compositional_retrieval(c: &mut Criterion) {
     for arity in BUNDLE_ARITIES {
         for corpus_size in CORPUS_SIZES {
             let workload = build_workload(corpus_size, arity);
-            let summary = summarize_retrieval(&workload);
-            eprintln!(
-                "compositional-retrieval arity={arity} n={corpus_size} \
-                 semantic_hit_at_1={}/{} median_target_rank={} min_target_margin={:.6}",
-                summary.hit_at_one,
-                summary.sampled,
-                summary.median_target_rank,
-                summary.minimum_target_margin,
-            );
+            for noise_bps in QUERY_NOISE_BPS {
+                let summary = summarize_retrieval(&workload, noise_bps);
+                eprintln!(
+                    "compositional-retrieval arity={arity} n={corpus_size} noise_bps={noise_bps} \
+                     semantic_hit_at_1={}/{} median_target_rank={} min_target_margin={:.6}",
+                    summary.hit_at_one,
+                    summary.sampled,
+                    summary.median_target_rank,
+                    summary.minimum_target_margin,
+                );
+            }
 
             let query = workload.query_atoms[corpus_size / 2];
             group.throughput(Throughput::Elements(corpus_size as u64));
