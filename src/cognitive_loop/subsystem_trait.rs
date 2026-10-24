@@ -256,6 +256,22 @@ impl CycleSnapshot {
     pub fn budget_exceeded(&self) -> bool {
         self.attention_budget_exceeded != 0
     }
+
+    /// Read prediction error only when the ABI validity byte is canonical
+    /// and the measurement is finite. This is the sole safe accessor for
+    /// consumers of the legacy repr(C) snapshot fields.
+    ///
+    /// The snapshot layout intentionally remains unchanged for WASM/FFI
+    /// compatibility; consumers should use this method instead of reading
+    /// `prediction_error` and `prediction_error_valid` independently.
+    #[inline]
+    pub fn prediction_error_sample(&self) -> Option<f32> {
+        if self.prediction_error_valid == 1 && self.prediction_error.is_finite() {
+            Some(self.prediction_error)
+        } else {
+            None
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -927,6 +943,31 @@ mod tests {
         let size = std::mem::size_of::<SubsystemOutput>();
         assert!(size > 0);
         eprintln!("SubsystemOutput size: {} bytes", size);
+    }
+
+    #[test]
+    fn prediction_error_sample_fails_closed_on_invalid_flag_or_value() {
+        for payload in [0.0, 1.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let mut snapshot = CycleSnapshot::default();
+            snapshot.prediction_error = payload;
+            snapshot.prediction_error_valid = 0;
+            assert_eq!(snapshot.prediction_error_sample(), None);
+        }
+
+        for flag in [2, u8::MAX] {
+            let mut snapshot = CycleSnapshot::default();
+            snapshot.prediction_error = 0.25;
+            snapshot.prediction_error_valid = flag;
+            assert_eq!(snapshot.prediction_error_sample(), None);
+        }
+
+        let mut valid = CycleSnapshot::default();
+        valid.prediction_error = 0.25;
+        valid.prediction_error_valid = 1;
+        assert_eq!(valid.prediction_error_sample(), Some(0.25));
+
+        valid.prediction_error = f32::NAN;
+        assert_eq!(valid.prediction_error_sample(), None);
     }
 
     /// Verify CycleSnapshot alignment is suitable for WASM.
