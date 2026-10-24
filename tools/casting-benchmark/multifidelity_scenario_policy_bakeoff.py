@@ -10,10 +10,10 @@ import argparse
 import json
 import math
 import statistics
+from dataclasses import asdict
 from typing import Iterable
 
 from multifidelity_stress import (
-    FIDELITY_COSTS,
     FIDELITIES,
     POLICIES,
     PolicyEvaluator,
@@ -123,13 +123,7 @@ def run_policy_on_scenario(
             false_promotions / predicted_feasible_promotions
             if predicted_feasible_promotions else None
         ),
-        "evaluations": [record.__dict__ if hasattr(record, "__dict__") else {
-            "candidate_id": record.candidate_id,
-            "fidelity": record.fidelity,
-            "objectives": record.objectives,
-            "constraint_margin": record.constraint_margin,
-            "cost_units": record.cost_units,
-        } for record in evaluator.records],
+        "evaluations": [asdict(record) for record in evaluator.records],
     }
 
 
