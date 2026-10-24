@@ -214,18 +214,6 @@ fn pivot_ids(corpus_len: usize, pivot_count: usize) -> Vec<usize> {
         .collect()
 }
 
-fn query_for_profile(profile: &str, corpus_size: usize) -> BinaryHV {
-    match profile {
-        "random" => BinaryHV::random(QUERY_SEED),
-        "clustered" => {
-            let corpus = clustered_corpus(corpus_size);
-            let per_cluster = corpus_size / CLUSTER_COUNT;
-            perturb(&corpus[5 * per_cluster], 32, 491)
-        }
-        _ => unreachable!("known profile"),
-    }
-}
-
 fn verify_correctness() {
     let query = BinaryHV::random(QUERY_SEED);
     let corpus = random_corpus(257);
