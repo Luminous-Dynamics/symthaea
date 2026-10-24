@@ -321,23 +321,30 @@ impl ExecutionAuthorizationLedger {
     /// The permit is marked consumed before checking the request fields. Thus
     /// any failed dispatch attempt burns it (fail-closed) and cannot be used to
     /// probe for a matching command, principal, scope or authority.
-    pub fn consume(
-        &mut self,
-        permit: &ExecutionPermit,
-        attempt: &AuthorizationAttempt,
-    ) -> Result<AuthorizationReceipt, AuthorizationError> {
+    /// Consume a permit without authorizing dispatch. Use this for malformed
+    /// or unsupported attempts that fail before a valid AuthorizationAttempt
+    /// can be constructed, so a failed attempt cannot leave the permit reusable.
+    pub fn burn(&mut self, permit: &ExecutionPermit) -> Result<(), AuthorizationError> {
         if permit.ledger_id != self.ledger_id {
             return Err(AuthorizationError::WrongLedger);
         }
         if !self.records.contains_key(&permit.permit_id) {
             return Err(AuthorizationError::UnknownPermit);
         }
-        if self.consumed.contains(&permit.permit_id) {
+        if !self.consumed.insert(permit.permit_id) {
             return Err(AuthorizationError::Replay);
         }
-        // Burn on the first attempt, including expired, revoked, or mismatched
-        // attempts, so the same capability can never be retried.
-        self.consumed.insert(permit.permit_id);
+        Ok(())
+    }
+
+    pub fn consume(
+        &mut self,
+        permit: &ExecutionPermit,
+        attempt: &AuthorizationAttempt,
+    ) -> Result<AuthorizationReceipt, AuthorizationError> {
+        // Burn before validity checks: every first attempt is one-shot,
+        // including expired, revoked, and mismatched attempts.
+        self.burn(permit)?;
 
         let record = self
             .records
