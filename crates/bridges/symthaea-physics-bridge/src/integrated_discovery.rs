@@ -2466,6 +2466,14 @@ mod tests {
         assert_eq!(evaluable_worlds + incomplete_evaluator_worlds, SEEDS as usize);
         assert_eq!(initial_reference_hits, 0);
         assert_eq!(baseline_reference_hits, 0);
+        assert!(
+            pool_collapse_recoveries > 0,
+            "operator-heldout pilot never exercised the post-falsification recovery path"
+        );
+        assert!(
+            accepted_unary_corrections > 0,
+            "operator-heldout pilot never accepted any bounded unary-function correction"
+        );
         assert!(same_domain_matches <= evaluable_worlds);
         assert!(ood_matches <= same_domain_matches);
         assert!(full_successes <= ood_matches);
