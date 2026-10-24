@@ -498,17 +498,23 @@ impl FragmentAssembler {
             };
 
             let len = if Some(i) == missing_idx {
-                // Recovered fragment: compute its length from the expected total
+                // Recovered fragment: infer its length from the expected total.
+                // Compressed/variable-size streams may not carry enough legacy
+                // metadata to infer a missing terminal chunk. Reject impossible
+                // lengths rather than underflowing or slicing beyond the buffer.
                 if i < data_count - 1 {
                     PAYLOAD_SIZE
                 } else {
-                    // Last data fragment — infer from expected payload size
-                    self.expected_payload_size - (data_count - 1) * PAYLOAD_SIZE
+                    let prefix_len = (data_count - 1).checked_mul(PAYLOAD_SIZE)?;
+                    self.expected_payload_size.checked_sub(prefix_len)?
                 }
             } else {
                 self.payload_lens[i] as usize
             };
 
+            if len > PAYLOAD_SIZE || len > frag_data.len() {
+                return None;
+            }
             payload.extend_from_slice(&frag_data[..len]);
         }
 
@@ -797,6 +803,39 @@ mod tests {
         let mut assembler = FragmentAssembler::new(9, frags.len() as u8, payload.len());
         assert!(!assembler.feed(&frags[last_index]));
         assert_eq!(assembler.received_data_count(), 0);
+        assert!(assembler.assemble().is_none());
+    }
+
+    #[test]
+    fn recovery_rejects_unknown_compressed_terminal_length_without_panicking() {
+        // The receiver is configured for a full WisdomPacket, but a compressed
+        // message may occupy a single data fragment. If that data fragment is
+        // lost, the legacy header does not encode its original byte length.
+        let short_payload = vec![0x7B; 17];
+        let frags = fragment(11, &short_payload);
+        assert_eq!(frags.len(), 2);
+
+        let mut assembler = FragmentAssembler::new(11, 2, WISDOM_PACKET_SIZE);
+        assert!(!assembler.feed(&frags[1])); // FEC only: the data fragment is lost.
+        assert!(assembler.is_complete());
+        assert!(
+            assembler.assemble().is_none(),
+            "unknown terminal length must be rejected instead of slicing beyond the FEC buffer"
+        );
+    }
+
+    #[test]
+    fn recovery_rejects_payload_count_inconsistent_with_expected_size() {
+        let short_payload = vec![0x6C; PAYLOAD_SIZE * 2];
+        let frags = fragment(12, &short_payload);
+        let mut assembler = FragmentAssembler::new(12, frags.len() as u8, PAYLOAD_SIZE * 10);
+
+        // Lose the terminal data fragment while retaining its FEC. In this
+        // legacy format the configured expected size implies a recovered
+        // length larger than one fragment; the assembler must fail closed.
+        assert!(!assembler.feed(&frags[0]));
+        assert!(assembler.feed(&frags[2]));
+        assert!(assembler.is_complete());
         assert!(assembler.assemble().is_none());
     }
 
