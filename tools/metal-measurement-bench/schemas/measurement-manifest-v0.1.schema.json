@@ -1,0 +1,335 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Source-bound measurement manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset",
+    "related_sources",
+    "challenge_context",
+    "reuse_policy",
+    "artifacts",
+    "source_objects"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "doi",
+        "title",
+        "publisher",
+        "source_url",
+        "repository_url",
+        "descriptive_readme_url",
+        "citation_policy",
+        "source_revision",
+        "metadata_accessed_on"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "doi": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "repository_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "descriptive_readme_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "citation_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metadata_accessed_on": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+      }
+    },
+    "related_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "doi",
+          "role",
+          "url"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "doi": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "challenge_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "material",
+        "process",
+        "condition",
+        "test_method",
+        "strain_rate_per_second",
+        "gauge_length_mm",
+        "target_specimen_count",
+        "target_parent_specimen_id",
+        "target_definition",
+        "split_policy"
+      ],
+      "properties": {
+        "material": {
+          "type": "string",
+          "minLength": 1
+        },
+        "process": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "strain_rate_per_second": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "gauge_length_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "target_specimen_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "target_parent_specimen_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "reuse_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_terms_reviewed",
+        "local_use_authorized",
+        "repository_bundling_authorized",
+        "status_note"
+      ],
+      "properties": {
+        "artifact_terms_reviewed": {
+          "type": "boolean"
+        },
+        "local_use_authorized": {
+          "type": "boolean"
+        },
+        "repository_bundling_authorized": {
+          "type": "boolean"
+        },
+        "status_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "relative_path",
+          "sha256",
+          "size_bytes",
+          "media_type",
+          "source_url",
+          "source_object_id",
+          "artifact_revision",
+          "accessed_on",
+          "terms_url",
+          "terms_reviewed",
+          "local_use_authorized",
+          "repository_bundling_authorized",
+          "source_doi"
+        ],
+        "properties": {
+          "relative_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "media_type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "source_object_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "artifact_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "accessed_on": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "terms_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "terms_reviewed": {
+            "type": "boolean"
+          },
+          "local_use_authorized": {
+            "type": "boolean"
+          },
+          "repository_bundling_authorized": {
+            "type": "boolean"
+          },
+          "source_doi": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "source_objects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "source_doi",
+          "source_url",
+          "source_revision",
+          "accessed_on",
+          "terms_url",
+          "terms_reviewed",
+          "local_use_authorized"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_doi": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "source_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "accessed_on": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "terms_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "terms_reviewed": {
+            "type": "boolean"
+          },
+          "local_use_authorized": {
+            "type": "boolean"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "local_use_authorized": {
+                  "const": true
+                }
+              },
+              "required": [
+                "local_use_authorized"
+              ]
+            },
+            "then": {
+              "properties": {
+                "terms_reviewed": {
+                  "const": true
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
