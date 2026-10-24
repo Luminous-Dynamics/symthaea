@@ -579,6 +579,7 @@ mod tests {
             valence: 0.3,
             arousal: 0.5,
             prediction_error: 0.1,
+            prediction_error_valid: true,
             ..CognitiveSnapshot::dormant()
         };
 
