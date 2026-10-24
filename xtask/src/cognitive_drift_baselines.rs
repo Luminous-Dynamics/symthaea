@@ -759,6 +759,59 @@ mod tests {
     }
 
     #[test]
+    fn predictive_rank_betting_factors_have_unit_conditional_null_mean() {
+        let n = 6usize;
+        let order: Vec<f64> = (0..=n).map(|j| j as f64 / n as f64 - 0.5).collect();
+        let dispersion: Vec<f64> = (0..=n)
+            .map(|j| (2.0 * j as f64 / n as f64 - 1.0).abs() - 0.5)
+            .collect();
+        let base_order_sum: f64 = order.iter().sum();
+        let base_dispersion_sum: f64 = dispersion.iter().sum();
+        let prior_rank_sequences = [
+            vec![],
+            vec![0, 6],
+            vec![3, 3, 3],
+            vec![0, 1, 6, 2, 5],
+        ];
+        let lambdas = [0.5_f64, -0.5, 0.5, -0.5];
+
+        for prior_ranks in prior_rank_sequences {
+            let mut counts = vec![0usize; n + 1];
+            let mut history_order_sum = 0.0;
+            let mut history_dispersion_sum = 0.0;
+            for &rank in &prior_ranks {
+                counts[rank] += 1;
+                history_order_sum += order[rank];
+                history_dispersion_sum += dispersion[rank];
+            }
+            let denominator = (n + prior_ranks.len() + 1) as f64;
+            let expected_order =
+                (base_order_sum + history_order_sum) / denominator;
+            let expected_dispersion =
+                (base_dispersion_sum + history_dispersion_sum) / denominator;
+
+            for component in 0..4 {
+                let mut conditional_expectation = 0.0;
+                for rank in 0..=n {
+                    let pi = (1.0 + counts[rank] as f64) / denominator;
+                    let centered = if component < 2 {
+                        order[rank] - expected_order
+                    } else {
+                        dispersion[rank] - expected_dispersion
+                    };
+                    let factor = 1.0 + lambdas[component] * centered;
+                    assert!(factor > 0.0 && factor.is_finite());
+                    conditional_expectation += pi * factor;
+                }
+                assert!(
+                    (conditional_expectation - 1.0).abs() < 1e-12,
+                    "predictive-rank component {component} did not have null mean one"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn predictive_rank_martingale_input_digest_is_invariant_to_calibration_order() {
         let mut first = fixture(ScalarDetectorMethod::PredictiveRankMartingalePortfolio);
         first.calibration_values = (0..20).map(|i| 0.1 + i as f64 * 0.001).collect();
