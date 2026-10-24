@@ -375,3 +375,14 @@ The semantic-gate digests remain references, not self-authenticating proof of re
 ### 2026-10-24 amendment — preserve individual statement-review evidence
 
 A semantic-gate pass now depends on at least two separately identified reviewer records, each with an individual decision and evidence digest. The analyzer rejects blank or duplicate reviewer identities, invalid evidence digests, and aggregate correspondence statuses that disagree with the individual decisions. A split decision remains `unknown`; it is not converted to a majority-vote label. The aggregate review-receipt digest remains as an additional envelope binding, not a substitute for the individual records.
+
+
+### 2026-10-24 amendment — cross-family leakage is a confirmatory gate
+
+The frozen family split is an assignment rule, not evidence that the holdout is independent. Before confirmatory scoring, prepare a versioned relationship inventory tied to the exact partition digest. Classify candidate cross-family links as exact duplicate, shared source artifact, formal dependency, reused lemma, equivalent statement, conceptual similarity, or citation-only; attach evidence locators/digests and preserve unresolved assessments.
+
+For quarantine, an exact duplicate, shared source artifact, formal dependency, reused lemma, or equivalent statement is a hard relationship. A confirmed or unresolved hard edge joins its endpoints into a connected component; if that component spans train/validation/test, quarantine the whole component under a frozen, pre-outcome rule. Dismissed edges require two distinct reviewers. Conceptual similarity and citation-only links are inventoried but do not automatically count as leakage, because the benchmark's purpose is to measure safe transfer across related mathematical ideas.
+
+The new `analyze_family_leakage` tool re-derives the registered split assignment, checks the upstream pin, 372-family count, 70/15/15 counts and exact partition digest, rejects unknown/duplicate family links, derives cross-split connected components, and reports original plus known-quarantined family counts without changing the frozen split. Evidence and coverage-receipt hashes are references, not byte-level authentication.
+
+**Current status: not qualified.** The checked-in relationship fixture is synthetic control data only; the real independently reviewed relationship inventory is not yet present. An incomplete inventory must never certify a clean holdout. Before running model outcomes, reviewers must inspect the real evidence, complete and sign off the relationship-coverage audit, independently verify cited artifact bytes, preserve all exclusions in the run manifest, and freeze the adjusted denominator. If that leaves too few independent components, report an underpowered/exploratory result; do not reshuffle the split or relax this gate after viewing outcomes.
