@@ -816,7 +816,7 @@ mod tests {
         assert_eq!(frags.len(), 2);
 
         let mut assembler = FragmentAssembler::new(11, 2, WISDOM_PACKET_SIZE);
-        assert!(!assembler.feed(&frags[1])); // FEC only: the data fragment is lost.
+        assert!(assembler.feed(&frags[1])); // FEC only: reconstructable, but inferred size is unsafe.
         assert!(assembler.is_complete());
         assert!(
             assembler.assemble().is_none(),
