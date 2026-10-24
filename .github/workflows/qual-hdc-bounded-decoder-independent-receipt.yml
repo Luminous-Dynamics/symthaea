@@ -1,0 +1,2004 @@
+name: QUAL HDC bounded decoder independent run receipt
+
+on:
+  workflow_run:
+    workflows:
+      - QUAL HDC bounded decoder trusted runner
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+  statuses: write
+
+jobs:
+  receipt:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Independently verify bounded decoder qualification
+        id: verify
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # pinned
+        env:
+          EXPECTED_PR: "6803"
+          EXPECTED_SUBJECT: "433ca9c92b16bfac824225950e32692e8e151238"
+          EXPECTED_PARENT: "164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
+          EXPECTED_BRANCH: "research/hdc-linear-code-bounded-decoder-v2"
+          EXPECTED_BASE_BRANCH: "research/hdc-linear-code-recovery-design-v1"
+          EXPECTED_REPOSITORY: "Luminous-Dynamics/symthaea"
+          EXPECTED_REPOSITORY_ID: "1136141775"
+          EXPECTED_WORKFLOW_PATH: ".github/workflows/qual-hdc-bounded-decoder-trusted-runner.yml"
+          EXPECTED_WORKFLOW_NAME: "QUAL HDC bounded decoder trusted runner"
+          EXPECTED_WORKFLOW_BLOB_SHA: "0c98627095d87304c4a28d05ec3746e12ec27f77"
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const crypto = require('crypto');
+
+            const expected = {
+              pr: Number(process.env.EXPECTED_PR),
+              subject: process.env.EXPECTED_SUBJECT,
+              parent: process.env.EXPECTED_PARENT,
+              branch: process.env.EXPECTED_BRANCH,
+              baseBranch: process.env.EXPECTED_BASE_BRANCH,
+              repository: process.env.EXPECTED_REPOSITORY,
+              repositoryId: Number(process.env.EXPECTED_REPOSITORY_ID),
+              workflowPath: process.env.EXPECTED_WORKFLOW_PATH,
+              workflowName: process.env.EXPECTED_WORKFLOW_NAME,
+              workflowBlobSha: process.env.EXPECTED_WORKFLOW_BLOB_SHA,
+            };
+
+            const TRUSTED_VERIFIER_WORKFLOW_PATH = '.github/workflows/qual-hdc-bounded-decoder-independent-receipt.yml';
+            const STATUS_CONTEXT = 'HDC / Independent Qualification';
+
+            function canonicalize(value) {
+              if (Array.isArray(value)) return value.map(canonicalize);
+              if (value && typeof value === 'object') {
+                return Object.fromEntries(
+                  Object.keys(value).sort().map((key) => [key, canonicalize(value[key])])
+                );
+              }
+              return value;
+            }
+
+            function sha256Canonical(value, domain = 'promotion-eligibility-lease-v1\\u0000') {
+              return crypto
+                .createHash('sha256')
+                .update(domain + JSON.stringify(canonicalize(value)))
+                .digest('hex');
+            }
+
+            function admissionPolicyIdentity(expectedValue, files, steps) {
+              return sha256Canonical({
+                schema_version: 'hdc-bounded-decoder-admission-policy-v1',
+                expected: expectedValue,
+                expected_files: files,
+                required_steps: steps,
+              });
+            }
+
+            function qualificationRunMatchesExpected(candidate) {
+              return (
+                candidate !== null &&
+                candidate.path === expected.workflowPath &&
+                candidate.name === expected.workflowName &&
+                candidate.event === 'pull_request' &&
+                candidate.head_branch === expected.branch &&
+                candidate.head_sha === expected.subject &&
+                Number(candidate.repository?.id) === expected.repositoryId &&
+                Number(candidate.head_repository?.id) === expected.repositoryId &&
+                candidate.head_repository?.full_name === expected.repository
+              );
+            }
+
+            function newestQualificationRun(runs) {
+              return [...runs]
+                .filter(qualificationRunMatchesExpected)
+                .sort((a, b) => {
+                  const aCreated = Date.parse(a.created_at ?? '');
+                  const bCreated = Date.parse(b.created_at ?? '');
+                  if (Number.isFinite(aCreated) && Number.isFinite(bCreated) && aCreated !== bCreated) {
+                    return bCreated - aCreated;
+                  }
+                  return Number(b.id) - Number(a.id);
+                })[0] ?? null;
+            }
+
+            function buildPromotionEligibilityLease({
+              evaluation,
+              evidence,
+              governanceObservation,
+              verifierWorkflowBlobSha,
+              policyIdentity,
+              observedAt,
+            }) {
+              const reasons = [];
+              if (evaluation.qualificationResult !== 'PASS') reasons.push('qualification_not_pass');
+              if (evidence.contextSha !== evidence.currentMainSha ||
+                  evidence.contextSha !== evidence.finalMainSha) reasons.push('verifier_root_drift');
+              if (!evaluation.checks.run_attempt_matches_trigger) reasons.push('run_attempt_drift');
+              if (!evaluation.checks.pr_snapshot_stable) reasons.push('pr_snapshot_drift');
+              if (!evaluation.checks.base_branch_tip_stable) reasons.push('base_branch_tip_drift');
+              if (!evaluation.checks.artifact_snapshot_stable) reasons.push('artifact_snapshot_drift');
+              if (!governanceObservation.verified) reasons.push('governance_authority_unverified');
+              if (evidence.finalPr?.state !== 'open') reasons.push('pr_not_open');
+              if (evidence.finalPr?.draft !== false) reasons.push('pr_not_ready_for_review');
+              if (evidence.latestExactHeadRunMatchesTrigger !== true ||
+                  evidence.finalLatestExactHeadRunMatchesTrigger !== true) {
+                reasons.push('qualification_run_superseded');
+              }
+
+              const lease = {
+                schema_version: 'PromotionEligibilityLeaseV1',
+                lease_state: reasons.length === 0 ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
+                invalidation_reasons: reasons,
+                observed_at: observedAt,
+                repository: {
+                  id: expected.repositoryId,
+                  full_name: expected.repository,
+                },
+                subject: {
+                  pr_number: expected.pr,
+                  head_sha: evidence.pr.head.sha,
+                  base_branch: evidence.pr.base.ref,
+                  base_sha: evidence.pr.base.sha,
+                  merge_commit_sha: evidence.pr.merge_commit_sha ?? null,
+                },
+                currentness: {
+                  verifier_main_tip_initial: evidence.currentMainSha,
+                  verifier_main_tip_final: evidence.finalMainSha,
+                  stacked_base_tip_initial: evidence.initialBaseBranchTipSha,
+                  stacked_base_tip_final: evidence.finalBaseBranchTipSha,
+                },
+                qualification: {
+                  run_id: evidence.run.id,
+                  run_attempt: evidence.run.run_attempt,
+                  triggering_run_attempt: evidence.triggerRunAttempt,
+                  head_sha: evidence.run.head_sha,
+                  workflow_path: evidence.run.path,
+                  latest_exact_head_run_id: evidence.latestExactHeadRun?.id ?? null,
+                  latest_exact_head_run_attempt: evidence.latestExactHeadRun?.run_attempt ?? null,
+                  latest_exact_head_run_matches_trigger: evidence.latestExactHeadRunMatchesTrigger,
+                  final_latest_exact_head_run_id: evidence.finalLatestExactHeadRun?.id ?? null,
+                  final_latest_exact_head_run_attempt: evidence.finalLatestExactHeadRun?.run_attempt ?? null,
+                  final_latest_exact_head_run_matches_trigger: evidence.finalLatestExactHeadRunMatchesTrigger,
+                },
+                evidence_lifecycle: {
+                  artifact_id: evidence.finalArtifacts?.[0]?.id ?? null,
+                  digest: evidence.finalArtifacts?.[0]?.digest ?? null,
+                  created_at: evidence.finalArtifacts?.[0]?.created_at ?? null,
+                  expires_at: evidence.finalArtifacts?.[0]?.expires_at ?? null,
+                },
+                trusted_verifier_root: {
+                  workflow_path: TRUSTED_VERIFIER_WORKFLOW_PATH,
+                  workflow_blob_sha: verifierWorkflowBlobSha,
+                  commit_sha: evidence.contextSha,
+                },
+                independent_admission_policy: {
+                  identity_sha256: policyIdentity,
+                  schema_version: 'hdc-bounded-decoder-admission-policy-v1',
+                },
+                governance_authority: governanceObservation,
+                reconciliation: {
+                  observed_at: observedAt,
+                  status_context: STATUS_CONTEXT,
+                },
+              };
+              lease.lease_id_sha256 = sha256Canonical(lease);
+              return lease;
+            }
+            const expectedFiles = [
+              '.github/workflows/hdc-linear-code-syndrome-qualify.yml',
+              'crates/core/symthaea-core/src/hdc/mod.rs',
+              'crates/core/symthaea-core/src/hdc/syndrome_decoder.rs',
+              'crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs',
+              'docs/research/HDC_LINEAR_CODE_BOUNDED_DECODER.md',
+            ].sort();
+
+            const expectedSourceBlobShas = {
+              '.github/workflows/hdc-linear-code-syndrome-qualify.yml':
+                '748fd4220be7cbdc215761b97c408bf960684fe7',
+              'crates/core/symthaea-core/src/hdc/mod.rs':
+                '17b297a167b57f22070a50115f4967b820f911c1',
+              'crates/core/symthaea-core/src/hdc/syndrome_decoder.rs':
+                'cdb2010231e64632e04e5fe2e81a89fddd69d1cd',
+              'crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs':
+                'ca19e6d79b90501e9ce0d94d88924595264e77d6',
+              'docs/research/HDC_LINEAR_CODE_BOUNDED_DECODER.md':
+                '6ef9f1b7aa7447a7e883cbaa87e240061d6ec8b1',
+            };
+
+            const requiredSteps = [
+              'Checkout exact research head',
+              'Record exact research head and parent',
+              'Enforce stacked research surface',
+              'Install pinned Rust toolchain',
+              'Verify pinned Rust toolchain',
+              'Capture runner provenance',
+              'Capture source provenance',
+              'Focused formatting',
+              'Build isolated stacked harness',
+              'Existing linear-code unit suite',
+              'Existing ambiguity qualification',
+              'Independent syndrome decoder qualification',
+              'Capture brute-force dual-space oracle',
+              'Capture fixed syndrome specification oracle',
+              'Capture syndrome quotient metric ledger',
+              'Capture full syndrome quotient distance spectrum',
+              'Capture executable spectrum-label blind-spot adversary',
+              'Capture exact syndrome fiber difference closure',
+              'Capture Walsh dual-fiber structure',
+              'Capture syndrome/coset invariant ledger',
+              'Capture exhaustive syndrome oracle and linearity ledger',
+              'Capture exact minimum-syndrome multiplicity ledger',
+              'Verify explicit minimum-syndrome list truncation',
+              'Prove factorization ambiguity is separate',
+              'Capture coordinate permutation equivariance',
+              'Capture syndrome decoder ledger',
+              'Capture generator-basis equivariance',
+              'Capture composed metamorphic invariance',
+              'Capture random-code list and independent-oracle sweep',
+              'Capture deterministic random-code sweep',
+              'Capture beyond-radius semantics',
+              'Strict Clippy',
+              'Emit qualification receipt',
+              'Upload qualification receipt',
+              'Revalidate uploaded artifact provenance',
+              'Publish artifact provenance summary',
+            ];
+
+            function artifactLifecycleVerified(artifact, nowMs = Date.now()) {
+              if (!artifact || !Number.isSafeInteger(artifact.id) || artifact.id <= 0) {
+                return false;
+              }
+              if (
+                typeof artifact.created_at !== 'string' ||
+                typeof artifact.expires_at !== 'string' ||
+                !Number.isSafeInteger(artifact.size_in_bytes) ||
+                artifact.size_in_bytes <= 0
+              ) {
+                return false;
+              }
+
+              const createdAt = Date.parse(artifact.created_at);
+              const expiresAt = Date.parse(artifact.expires_at);
+              return (
+                Number.isFinite(createdAt) &&
+                Number.isFinite(expiresAt) &&
+                createdAt <= nowMs &&
+                nowMs < expiresAt
+              );
+            }
+
+            function evaluate(evidence) {
+              const jobs = evidence.jobs ?? [];
+              const firstJobSteps =
+                jobs.length === 1 && Array.isArray(jobs[0].steps)
+                  ? jobs[0].steps
+                  : [];
+
+              const stepConclusions = {};
+              for (const name of requiredSteps) {
+                const matches = firstJobSteps.filter((step) => step.name === name);
+                stepConclusions[name] = matches.map((step) => step.conclusion);
+              }
+
+              const exactStepSurface =
+                jobs.length === 1 &&
+                jobs[0].name === 'Trusted exact-head bounded syndrome qualification' &&
+                firstJobSteps.length === requiredSteps.length &&
+                JSON.stringify(firstJobSteps.map((step) => step.name)) ===
+                  JSON.stringify(requiredSteps);
+
+              const requiredStepsSucceeded = requiredSteps.every(
+                (name) =>
+                  stepConclusions[name].length === 1 &&
+                  stepConclusions[name][0] === 'success'
+              );
+
+              const artifacts = evidence.artifacts ?? [];
+              const expectedArtifactName =
+                'hdc-linear-code-bounded-decoder-' +
+                expected.subject +
+                '-run-' +
+                evidence.run.id +
+                '-attempt-' +
+                evidence.run.run_attempt;
+
+              const artifactMatches = artifacts.filter(
+                (artifact) => artifact.name === expectedArtifactName
+              );
+
+              const artifact = artifactMatches[0] ?? null;
+              const finalArtifacts = evidence.finalArtifacts ?? evidence.artifacts ?? [];
+              const finalArtifactMatches = finalArtifacts.filter(
+                (candidate) => candidate.name === expectedArtifactName
+              );
+              const finalArtifact = finalArtifactMatches[0] ?? null;
+              const finalArtifactVerified =
+                finalArtifacts.length === 1 &&
+                finalArtifactMatches.length === 1 &&
+                artifactLifecycleVerified(finalArtifact) &&
+                finalArtifact.expired === false &&
+                finalArtifact.size_in_bytes > 0 &&
+                finalArtifact.workflow_run?.id === evidence.run.id &&
+                finalArtifact.workflow_run?.repository_id === expected.repositoryId &&
+                finalArtifact.workflow_run?.head_repository_id === expected.repositoryId &&
+                finalArtifact.workflow_run?.head_sha === expected.subject &&
+                typeof finalArtifact.digest === 'string' &&
+                /^sha256:[0-9a-f]{64}$/.test(finalArtifact.digest);
+              const artifactSnapshotStable =
+                artifact !== null &&
+                finalArtifact !== null &&
+                artifact.id === finalArtifact.id &&
+                artifact.name === finalArtifact.name &&
+                artifact.digest === finalArtifact.digest &&
+                artifact.created_at === finalArtifact.created_at &&
+                artifact.expires_at === finalArtifact.expires_at;
+              const artifactVerified =
+                artifacts.length === 1 &&
+                artifactMatches.length === 1 &&
+                artifactLifecycleVerified(artifact) &&
+                artifact.expired === false &&
+                artifact.size_in_bytes > 0 &&
+                artifact.workflow_run?.id === evidence.run.id &&
+                artifact.workflow_run?.repository_id === expected.repositoryId &&
+                artifact.workflow_run?.head_repository_id === expected.repositoryId &&
+                artifact.workflow_run?.head_sha === expected.subject &&
+                typeof artifact.digest === 'string' &&
+                /^sha256:[0-9a-f]{64}$/.test(artifact.digest);
+
+              const sourceIdentityVerified =
+                JSON.stringify(evidence.sourceBlobShas) ===
+                  JSON.stringify(expectedSourceBlobShas) &&
+                evidence.workflowFileSha === expected.workflowBlobSha;
+
+              const mergeParentSet =
+                evidence.mergeCommit?.parents?.map((parent) => parent.sha).sort() ?? [];
+              const expectedMergeParentSet = [expected.parent, expected.subject].sort();
+
+              const mergeIdentityVerified =
+                typeof evidence.pr.merge_commit_sha === 'string' &&
+                evidence.pr.merge_commit_sha !== expected.subject &&
+                evidence.pr.merge_commit_sha !== expected.parent &&
+                /^[0-9a-f]{40}$/.test(evidence.pr.merge_commit_sha) &&
+                evidence.mergeCommit?.sha === evidence.pr.merge_commit_sha &&
+                evidence.mergeCommit?.parents?.length === 2 &&
+                JSON.stringify(mergeParentSet) === JSON.stringify(expectedMergeParentSet);
+
+              const mergeSourceIdentityVerified =
+                JSON.stringify(evidence.mergeSourceBlobShas) ===
+                  JSON.stringify(expectedSourceBlobShas) &&
+                true;
+
+              const changedFiles = [...(evidence.compare.files ?? [])]
+                .map((file) => file.filename)
+                .sort();
+
+              const runIdentityShapeVerified =
+                Number.isSafeInteger(evidence.run.id) &&
+                evidence.run.id > 0 &&
+                Number.isSafeInteger(evidence.run.run_attempt) &&
+                evidence.run.run_attempt > 0;
+
+              const checks = {
+                verifier_on_main: evidence.contextRef === 'refs/heads/main',
+                run_identity_shape: runIdentityShapeVerified,
+                run_attempt_matches_trigger:
+                  evidence.run.run_attempt === evidence.triggerRunAttempt,
+                verifier_root_current: evidence.contextSha === evidence.currentMainSha,
+                verifier_root_stable:
+                  evidence.contextSha === evidence.currentMainSha &&
+                  evidence.contextSha === evidence.finalMainSha,
+                repository_identity:
+                  evidence.contextRepository === expected.repository &&
+                  Number(evidence.run.repository?.id) === expected.repositoryId &&
+                  Number(evidence.run.head_repository?.id) === expected.repositoryId &&
+                  evidence.run.head_repository?.full_name === expected.repository,
+                run_identity:
+                  evidence.run.path === expected.workflowPath &&
+                  evidence.run.name === expected.workflowName &&
+                  evidence.run.event === 'pull_request' &&
+                  evidence.run.conclusion === 'success' &&
+                  evidence.run.head_branch === expected.branch &&
+                  evidence.run.head_sha === expected.subject,
+                pr_snapshot_stable:
+                  evidence.finalPr?.number === evidence.pr.number &&
+                  evidence.finalPr?.head?.sha === evidence.pr.head?.sha &&
+                  evidence.finalPr?.head?.ref === evidence.pr.head?.ref &&
+                  Number(evidence.finalPr?.head?.repo?.id) === Number(evidence.pr.head?.repo?.id) &&
+                  evidence.finalPr?.base?.sha === evidence.pr.base?.sha &&
+                  evidence.finalPr?.base?.ref === evidence.pr.base?.ref &&
+                  Number(evidence.finalPr?.base?.repo?.id) === Number(evidence.pr.base?.repo?.id) &&
+                  evidence.finalPr?.merge_commit_sha === evidence.pr.merge_commit_sha,
+                base_branch_tip_stable:
+                  evidence.initialBaseBranchTipSha === expected.parent &&
+                  evidence.finalBaseBranchTipSha === expected.parent &&
+                  evidence.initialBaseBranchTipSha === evidence.finalBaseBranchTipSha &&
+                  evidence.pr.base.sha === evidence.initialBaseBranchTipSha &&
+                  evidence.finalPr?.base?.sha === evidence.finalBaseBranchTipSha,
+                pr_identity:
+                  evidence.pr.number === expected.pr &&
+                  evidence.pr.head.ref === expected.branch &&
+                  evidence.pr.head.sha === expected.subject &&
+                  Number(evidence.pr.head.repo?.id) === expected.repositoryId &&
+                  evidence.pr.head.repo?.full_name === expected.repository &&
+                  evidence.pr.base.ref === expected.baseBranch &&
+                  evidence.pr.base.sha === expected.parent &&
+                  Number(evidence.pr.base.repo?.id) === expected.repositoryId &&
+                  evidence.pr.base.repo?.full_name === expected.repository,
+                run_pr_association_view_shape:
+                  Array.isArray(evidence.run.pull_requests) &&
+                  evidence.run.pull_requests.length === 1 &&
+                  evidence.run.pull_requests[0].number === expected.pr,
+                ancestry:
+                  evidence.parentCommit.sha === expected.subject &&
+                  evidence.parentCommit.parents?.[0]?.sha === expected.parent,
+                comparison:
+                  evidence.compare.status === 'ahead' &&
+                  evidence.compare.ahead_by > 0 &&
+                  evidence.compare.behind_by === 0 &&
+                  evidence.compare.merge_base_commit?.sha === expected.parent &&
+                  JSON.stringify(changedFiles) === JSON.stringify(expectedFiles),
+                workflow_definition: evidence.workflowFileSha === expected.workflowBlobSha,
+                merge_snapshot_identity: mergeIdentityVerified,
+                merge_snapshot_source_identity: mergeSourceIdentityVerified,
+                exact_step_surface: exactStepSurface,
+                required_steps_succeeded: requiredStepsSucceeded,
+                artifact_verified: artifactVerified,
+                artifact_snapshot_stable: artifactSnapshotStable && finalArtifactVerified,
+                source_identity_verified: sourceIdentityVerified,
+              };
+
+              return {
+                qualificationResult:
+                  Object.values(checks).every(Boolean) ? 'PASS' : 'NOT_PASS',
+                checks,
+                artifact,
+                finalArtifact,
+                stepConclusions,
+                changedFiles,
+              };
+            }
+
+            function syntheticEvidence() {
+              const runId = 1;
+              return {
+                contextRef: 'refs/heads/main',
+                contextSha: 'synthetic-main',
+                currentMainSha: 'synthetic-main',
+                finalMainSha: 'synthetic-main',
+                contextRepository: expected.repository,
+                triggerRunAttempt: 1,
+                run: {
+                  id: runId,
+                  run_attempt: 1,
+                  repository: { id: expected.repositoryId },
+                  head_repository: {
+                    id: expected.repositoryId,
+                    full_name: expected.repository,
+                  },
+                  path: expected.workflowPath,
+                  name: expected.workflowName,
+                  event: 'pull_request',
+                  conclusion: 'success',
+                  head_branch: expected.branch,
+                   head_sha: expected.subject,
+                  pull_requests: [
+                    {
+                      number: expected.pr,
+                      head: {
+                        sha: expected.subject,
+                        ref: expected.branch,
+                        repo: {
+                          id: expected.repositoryId,
+                          full_name: expected.repository,
+                        },
+                      },
+                      base: {
+                        sha: expected.parent,
+                        ref: expected.baseBranch,
+                        repo: {
+                          id: expected.repositoryId,
+                          full_name: expected.repository,
+                        },
+                      },
+                    },
+                  ],
+                },
+                pr: {
+                  number: expected.pr,
+                  state: 'open',
+                  draft: false,
+                  head: {
+                    sha: expected.subject,
+                    ref: expected.branch,
+                    repo: {
+                      id: expected.repositoryId,
+                      full_name: expected.repository,
+                    },
+                  },
+                  base: {
+                    sha: expected.parent,
+                    ref: expected.baseBranch,
+                    repo: {
+                      id: expected.repositoryId,
+                      full_name: expected.repository,
+                    },
+                  },
+                   merge_commit_sha: 'c'.repeat(40),
+                },
+                initialBaseBranchTipSha: expected.parent,
+                finalBaseBranchTipSha: expected.parent,
+                latestExactHeadRun: {
+                  id: runId,
+                  run_attempt: 1,
+                },
+                finalLatestExactHeadRun: {
+                  id: runId,
+                  run_attempt: 1,
+                },
+                latestExactHeadRunMatchesTrigger: true,
+                finalLatestExactHeadRunMatchesTrigger: true,
+                finalPr: {
+                  number: expected.pr,
+                  state: 'open',
+                  draft: false,
+                  head: {
+                    sha: expected.subject,
+                    ref: expected.branch,
+                    repo: {
+                      id: expected.repositoryId,
+                      full_name: expected.repository,
+                    },
+                  },
+                  base: {
+                    sha: expected.parent,
+                    ref: expected.baseBranch,
+                    repo: {
+                      id: expected.repositoryId,
+                      full_name: expected.repository,
+                    },
+                  },
+                  merge_commit_sha: 'c'.repeat(40),
+                },
+                parentCommit: {
+                  sha: expected.subject,
+                  parents: [{ sha: expected.parent }],
+                },
+                compare: {
+                  status: 'ahead',
+                  ahead_by: 1,
+                  behind_by: 0,
+                  merge_base_commit: { sha: expected.parent },
+                  files: expectedFiles.map((filename) => ({ filename })),
+                },
+                mergeCommit: {
+                   sha: 'c'.repeat(40),
+                  parents: [
+                    { sha: expected.parent },
+                    { sha: expected.subject },
+                  ],
+                },
+                mergeSourceBlobShas: { ...expectedSourceBlobShas },
+                workflowFileSha: expected.workflowBlobSha,
+                sourceBlobShas: { ...expectedSourceBlobShas },
+                jobs: [
+                  {
+                    name: 'Trusted exact-head bounded syndrome qualification',
+                    steps: requiredSteps.map((name) => ({ name, conclusion: 'success' })),
+                  },
+                ],
+                artifacts: [
+                  {
+                    id: 1,
+                    name:
+                      'hdc-linear-code-bounded-decoder-' +
+                      expected.subject +
+                      '-run-' +
+                      runId +
+                      '-attempt-1',
+                    expired: false,
+                    created_at: '2026-01-01T00:00:00Z',
+                    expires_at: '2027-01-01T00:00:00Z',
+                    size_in_bytes: 1,
+                    digest: 'sha256:' + 'a'.repeat(64),
+                    workflow_run: {
+                      id: runId,
+                      repository_id: expected.repositoryId,
+                      head_repository_id: expected.repositoryId,
+                      head_sha: expected.subject,
+                    },
+                  },
+                ],
+                finalArtifacts: [
+                  {
+                    id: 1,
+                    name:
+                      'hdc-linear-code-bounded-decoder-' +
+                      expected.subject +
+                      '-run-' +
+                      runId +
+                      '-attempt-1',
+                    expired: false,
+                    created_at: '2026-01-01T00:00:00Z',
+                    expires_at: '2027-01-01T00:00:00Z',
+                    size_in_bytes: 1,
+                    digest: 'sha256:' + 'a'.repeat(64),
+                    workflow_run: {
+                      id: runId,
+                      repository_id: expected.repositoryId,
+                      head_repository_id: expected.repositoryId,
+                      head_sha: expected.subject,
+                    },
+                  },
+                ],
+              };
+            }
+
+            const attackCases = [
+              ['verifier_ref', (e) => { e.contextRef = 'refs/heads/research/evil'; }],
+              ['verifier_root_stale', (e) => { e.currentMainSha = '0'.repeat(40); }],
+              ['verifier_root_drift_between_reads', (e) => { e.finalMainSha = '0'.repeat(40); }],
+              ['repository_id', (e) => { e.run.repository.id += 1; }],
+              ['run_workflow_path', (e) => { e.run.path = 'untrusted/workflow.yml'; }],
+              ['run_workflow_name', (e) => { e.run.name = 'untrusted workflow'; }],
+              ['run_head_branch', (e) => { e.run.head_branch = 'untrusted-branch'; }],
+              ['run_head_repository', (e) => { e.run.head_repository.full_name = 'attacker/clone'; }],
+              ['run_event', (e) => { e.run.event = 'push'; }],
+              ['run_conclusion', (e) => { e.run.conclusion = 'failure'; }],
+              ['run_head_sha', (e) => { e.run.head_sha = '0'.repeat(40); }],
+              ['run_id_zero', (e) => { e.run.id = 0; }],
+              ['run_id_string', (e) => { e.run.id = '1'; }],
+              ['run_attempt_zero', (e) => { e.run.run_attempt = 0; }],
+              ['run_attempt_string', (e) => { e.run.run_attempt = '1'; }],
+              ['run_attempt_mismatch', (e) => { e.run.run_attempt = 2; }],
+              ['run_pr_number', (e) => { e.run.pull_requests[0].number += 1; }],
+              ['run_pr_association_missing', (e) => { e.run.pull_requests = []; }],
+              ['run_pr_head_repo', (e) => { e.run.pull_requests[0].head.repo.full_name = 'attacker/clone'; }],
+              ['run_pr_base_sha', (e) => { e.run.pull_requests[0].base.sha = '0'.repeat(40); }],
+              ['run_pr_base_ref', (e) => { e.run.pull_requests[0].base.ref = 'untrusted-base'; }],
+              ['run_pr_base_repo_id', (e) => { e.run.pull_requests[0].base.repo.id += 1; }],
+              ['run_pr_base_repo_name', (e) => { e.run.pull_requests[0].base.repo.full_name = 'attacker/clone'; }],
+              ['pr_head_ref', (e) => { e.pr.head.ref = 'untrusted-branch'; }],
+              ['pr_head_sha', (e) => { e.pr.head.sha = '0'.repeat(40); }],
+              ['pr_head_repo_id', (e) => { e.pr.head.repo.id += 1; }],
+              ['pr_snapshot_drift_head', (e) => { e.finalPr.head.sha = '0'.repeat(40); }],
+              ['pr_snapshot_drift_base', (e) => { e.finalPr.base.sha = '0'.repeat(40); }],
+              ['pr_snapshot_drift_merge', (e) => { e.finalPr.merge_commit_sha = '0'.repeat(40); }],
+              ['base_branch_tip_initial_drift', (e) => { e.initialBaseBranchTipSha = '0'.repeat(40); }],
+              ['base_branch_tip_final_drift', (e) => { e.finalBaseBranchTipSha = '0'.repeat(40); }],
+              ['pr_base_ref', (e) => { e.pr.base.ref = 'untrusted-base'; }],
+              ['pr_base_sha', (e) => { e.pr.base.sha = '0'.repeat(40); }],
+              ['pr_base_repo_id', (e) => { e.pr.base.repo.id += 1; }],
+              ['pr_base_repo_name', (e) => { e.pr.base.repo.full_name = 'attacker/clone'; }],
+              ['parent_sha', (e) => { e.parentCommit.parents[0].sha = '0'.repeat(40); }],
+              ['merge_base_sha', (e) => { e.compare.merge_base_commit.sha = '0'.repeat(40); }],
+              ['changed_file_surface', (e) => { e.compare.files.push({ filename: 'untrusted.txt' }); }],
+              ['workflow_blob_sha', (e) => { e.workflowFileSha = '0'.repeat(40); }],
+              ['source_blob_sha', (e) => {
+                e.sourceBlobShas['crates/core/symthaea-core/src/hdc/syndrome_decoder.rs'] = '0'.repeat(40);
+              }],
+              ['merge_commit_sha', (e) => { e.pr.merge_commit_sha = '0'.repeat(40); }],
+              ['merge_commit_equals_subject', (e) => { e.pr.merge_commit_sha = e.pr.head.sha; e.mergeCommit.sha = e.pr.head.sha; }],
+              ['merge_parent_sha', (e) => { e.mergeCommit.parents[0].sha = '0'.repeat(40); }],
+              ['merge_observed_commit_sha', (e) => { e.mergeCommit.sha = '0'.repeat(40); }],
+              ['merge_source_blob_sha', (e) => {
+                e.mergeSourceBlobShas['crates/core/symthaea-core/src/hdc/syndrome_decoder.rs'] = '0'.repeat(40);
+              }],
+              ['job_step_name', (e) => { e.jobs[0].steps[0].name = 'forged step'; }],
+              ['job_step_conclusion', (e) => { e.jobs[0].steps[20].conclusion = 'failure'; }],
+              ['extra_job_step', (e) => { e.jobs[0].steps.push({ name: 'unreviewed step', conclusion: 'success' }); }],
+              ['artifact_name', (e) => { e.artifacts[0].name = 'decoy'; }],
+              ['artifact_id_missing', (e) => { delete e.artifacts[0].id; }],
+              ['artifact_lifetime_equal', (e) => { e.artifacts[0].expires_at = e.artifacts[0].created_at; }],
+              ['artifact_lifetime_inverted', (e) => { e.artifacts[0].created_at = '2027-01-01T00:00:00Z'; }],
+              ['artifact_created_in_future', (e) => { e.artifacts[0].created_at = '2027-01-01T00:00:00Z'; e.artifacts[0].expires_at = '2028-01-01T00:00:00Z'; }],
+              ['artifact_expired_by_timestamp', (e) => { e.artifacts[0].expires_at = '2026-01-01T00:00:00Z'; }],
+              ['artifact_created_at_malformed', (e) => { e.artifacts[0].created_at = 'not-a-timestamp'; }],
+              ['artifact_expires_at_malformed', (e) => { e.artifacts[0].expires_at = 'not-a-timestamp'; }],
+              ['artifact_digest_nonhex', (e) => { e.artifacts[0].digest = 'sha256:' + 'g'.repeat(64); }],
+              ['artifact_expired', (e) => { e.artifacts[0].expired = true; }],
+              ['artifact_head_sha', (e) => { e.artifacts[0].workflow_run.head_sha = '0'.repeat(40); }],
+              ['artifact_digest', (e) => { e.artifacts[0].digest = ''; }],
+              ['artifact_repository_id', (e) => { e.artifacts[0].workflow_run.repository_id += 1; }],
+              ['final_artifact_deleted', (e) => { e.finalArtifacts = []; }],
+              ['final_artifact_expired', (e) => { e.finalArtifacts[0].expired = true; }],
+              ['final_artifact_digest', (e) => { e.finalArtifacts[0].digest = ''; }],
+              ['artifact_extra_decoy', (e) => {
+                e.artifacts.push({
+                  id: 2,
+                  name: 'decoy',
+                  expired: false,
+                  created_at: '2026-01-01T00:00:00Z',
+                  expires_at: '2027-01-01T00:00:00Z',
+                  size_in_bytes: 1,
+                  digest: 'sha256:' + 'b'.repeat(64),
+                  workflow_run: {
+                    id: e.run.id,
+                    repository_id: expected.repositoryId,
+                    head_repository_id: expected.repositoryId,
+                    head_sha: expected.subject,
+                  },
+                });
+              }],
+            ];
+
+            const requiredStepSurfaceValid =
+              requiredSteps.length === 36 &&
+              new Set(requiredSteps).size === requiredSteps.length &&
+              requiredSteps.every((name) => typeof name === 'string' && name.length > 0);
+            const adversarialCorpusShapeValid =
+              attackCases.length === 63 &&
+              new Set(attackCases.map(([name]) => name)).size === attackCases.length &&
+              attackCases.every(
+                ([name, mutate]) =>
+                  typeof name === 'string' &&
+                  name.length > 0 &&
+                  typeof mutate === 'function'
+              );
+
+            const syntheticBaseline = evaluate(syntheticEvidence());
+            const syntheticBaselinePassed =
+              syntheticBaseline.qualificationResult === 'PASS';
+
+            const staleAssociationEvidence = syntheticEvidence();
+            staleAssociationEvidence.run.pull_requests[0].head.sha = '0'.repeat(40);
+            staleAssociationEvidence.run.pull_requests[0].head.repo.id = expected.repositoryId + 1;
+            staleAssociationEvidence.run.pull_requests[0].head.repo.full_name = 'attacker/clone';
+            staleAssociationEvidence.run.pull_requests[0].base.sha = '1'.repeat(40);
+            staleAssociationEvidence.run.pull_requests[0].base.ref = 'stale-base';
+            staleAssociationEvidence.run.pull_requests[0].base.repo.id = expected.repositoryId + 1;
+            staleAssociationEvidence.run.pull_requests[0].base.repo.full_name = 'attacker/clone';
+            const staleAssociationEvaluation = evaluate(staleAssociationEvidence);
+            const staleAssociationViewPassed =
+              staleAssociationEvaluation.qualificationResult === 'PASS';
+
+            const syntheticGovernanceVerified = {
+              observation_identity_sha256: 'g'.repeat(64),
+              default_branch: 'main',
+              verified: true,
+              verification_basis: 'synthetic_test',
+              ruleset_count: 1,
+              branch_protection_accessible: true,
+              required_status_context: STATUS_CONTEXT,
+            };
+            const syntheticLease = buildPromotionEligibilityLease({
+              evaluation: syntheticBaseline,
+              evidence: syntheticEvidence(),
+              governanceObservation: syntheticGovernanceVerified,
+              verifierWorkflowBlobSha: 'd'.repeat(40),
+              policyIdentity: 'p'.repeat(64),
+              observedAt: '2026-01-01T00:00:00Z',
+            });
+            const syntheticLeasePassed =
+              syntheticLease.lease_state === 'ELIGIBLE' &&
+              syntheticLease.invalidation_reasons.length === 0 &&
+              /^[0-9a-f]{64}$/.test(syntheticLease.lease_id_sha256);
+
+            const governanceUnverifiedLease = buildPromotionEligibilityLease({
+              evaluation: syntheticBaseline,
+              evidence: syntheticEvidence(),
+              governanceObservation: {
+                ...syntheticGovernanceVerified,
+                verified: false,
+              },
+              verifierWorkflowBlobSha: 'd'.repeat(40),
+              policyIdentity: 'p'.repeat(64),
+              observedAt: '2026-01-01T00:00:00Z',
+            });
+            const governanceLeaseInvalidationPassed =
+              governanceUnverifiedLease.lease_state === 'NOT_ELIGIBLE' &&
+              governanceUnverifiedLease.invalidation_reasons.includes(
+                'governance_authority_unverified'
+              );
+            const closedPrSynthetic = syntheticEvidence();
+            closedPrSynthetic.finalPr.state = 'closed';
+            const closedPrLease = buildPromotionEligibilityLease({
+              evaluation: syntheticBaseline,
+              evidence: closedPrSynthetic,
+              governanceObservation: syntheticGovernanceVerified,
+              verifierWorkflowBlobSha: 'd'.repeat(40),
+              policyIdentity: 'p'.repeat(64),
+              observedAt: '2026-01-01T00:00:00Z',
+            });
+            const draftPrSynthetic = syntheticEvidence();
+            draftPrSynthetic.finalPr.draft = true;
+            const draftPrLease = buildPromotionEligibilityLease({
+              evaluation: syntheticBaseline,
+              evidence: draftPrSynthetic,
+              governanceObservation: syntheticGovernanceVerified,
+              verifierWorkflowBlobSha: 'd'.repeat(40),
+              policyIdentity: 'p'.repeat(64),
+              observedAt: '2026-01-01T00:00:00Z',
+            });
+            const prStateLeaseInvalidationPassed =
+              closedPrLease.lease_state === 'NOT_ELIGIBLE' &&
+              closedPrLease.invalidation_reasons.includes('pr_not_open') &&
+              draftPrLease.lease_state === 'NOT_ELIGIBLE' &&
+              draftPrLease.invalidation_reasons.includes('pr_not_ready_for_review');
+
+            const supersededRunSynthetic = syntheticEvidence();
+            supersededRunSynthetic.latestExactHeadRun = { id: 2, run_attempt: 1 };
+            const supersededRunLease = buildPromotionEligibilityLease({
+              evaluation: syntheticBaseline,
+              evidence: supersededRunSynthetic,
+              governanceObservation: syntheticGovernanceVerified,
+              verifierWorkflowBlobSha: 'd'.repeat(40),
+              policyIdentity: 'p'.repeat(64),
+              observedAt: '2026-01-01T00:00:00Z',
+            });
+            const finalSupersededRunSynthetic = syntheticEvidence();
+            finalSupersededRunSynthetic.finalLatestExactHeadRun = { id: 2, run_attempt: 1 };
+            const finalSupersededRunLease = buildPromotionEligibilityLease({
+              evaluation: syntheticBaseline,
+              evidence: finalSupersededRunSynthetic,
+              governanceObservation: syntheticGovernanceVerified,
+              verifierWorkflowBlobSha: 'd'.repeat(40),
+              policyIdentity: 'p'.repeat(64),
+              observedAt: '2026-01-01T00:00:00Z',
+            });
+            const qualificationRunSupersessionLeasePassed =
+              supersededRunLease.lease_state === 'NOT_ELIGIBLE' &&
+              supersededRunLease.invalidation_reasons.includes('qualification_run_superseded') &&
+              finalSupersededRunLease.lease_state === 'NOT_ELIGIBLE' &&
+              finalSupersededRunLease.invalidation_reasons.includes('qualification_run_superseded');
+
+            const adversarialResults = [];
+            for (const [name, mutate] of attackCases) {
+              const mutated = JSON.parse(JSON.stringify(syntheticEvidence()));
+              mutate(mutated);
+              const observed = evaluate(mutated).qualificationResult;
+              adversarialResults.push({
+                mutation: name,
+                expected: 'NOT_PASS',
+                observed,
+                passed: observed === 'NOT_PASS',
+              });
+            }
+
+            const adversarialCorpusPassed =
+              requiredStepSurfaceValid &&
+              adversarialCorpusShapeValid &&
+              syntheticBaselinePassed &&
+              adversarialResults.length === attackCases.length &&
+              adversarialResults.every((result) => result.passed) &&
+              syntheticLeasePassed &&
+              governanceLeaseInvalidationPassed &&
+              prStateLeaseInvalidationPassed;
+              qualificationRunSupersessionLeasePassed;
+
+            const runId = context.payload.workflow_run?.id;
+            if (!Number.isInteger(runId) || runId <= 0) {
+              throw new Error('workflow_run.id is missing or invalid');
+            }
+            const triggerRunAttempt = context.payload.workflow_run?.run_attempt;
+            if (!Number.isInteger(triggerRunAttempt) || triggerRunAttempt <= 0) {
+              throw new Error('workflow_run.run_attempt is missing or invalid');
+            }
+
+            const run = (await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+            })).data;
+
+            if (!Number.isSafeInteger(run.workflow_id) || run.workflow_id <= 0) {
+              throw new Error('trusted runner workflow_id is missing or invalid');
+            }
+
+            const initialQualificationRuns = await github.paginate(
+              github.rest.actions.listWorkflowRunsForWorkflow,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: run.workflow_id,
+                event: 'pull_request',
+                head_sha: expected.subject,
+                per_page: 100,
+              }
+            );
+            const latestExactHeadRun = newestQualificationRun(initialQualificationRuns);
+            if (latestExactHeadRun === null) {
+              throw new Error('no exact-head trusted qualification run was observed');
+            }
+            const latestExactHeadRunMatchesTrigger =
+              latestExactHeadRun.id === run.id &&
+              latestExactHeadRun.run_attempt === run.run_attempt;
+
+            const verifierWorkflowFile = await github.rest.repos.getContent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: TRUSTED_VERIFIER_WORKFLOW_PATH,
+              ref: context.sha,
+            });
+            if (Array.isArray(verifierWorkflowFile.data)) {
+              throw new Error('trusted verifier workflow path resolved to a directory');
+            }
+            const verifierWorkflowBlobSha = String(verifierWorkflowFile.data.sha ?? '');
+            if (!/^[0-9a-f]{40}$/.test(verifierWorkflowBlobSha)) {
+              throw new Error('trusted verifier workflow blob SHA is not canonical');
+            }
+
+            const jobs = await github.paginate(
+              github.rest.actions.listJobsForWorkflowRun,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 100,
+              }
+            );
+
+            const pr = (await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: expected.pr,
+            })).data;
+
+            const mergeCommit = pr.merge_commit_sha
+              ? (await github.rest.repos.getCommit({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: pr.merge_commit_sha,
+                })).data
+              : null;
+
+            const parentCommit = (await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: expected.subject,
+            })).data;
+
+            const compare = (await github.rest.repos.compareCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              basehead: expected.parent + '...' + expected.subject,
+            })).data;
+
+            const changedFiles = (compare.files ?? [])
+              .map((file) => file.filename)
+              .sort();
+
+            const workflowFile = await github.rest.repos.getContent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: expected.workflowPath,
+              ref: context.sha,
+            });
+            if (Array.isArray(workflowFile.data)) {
+              throw new Error('qualification workflow path resolved to a directory');
+            }
+
+            const sourceBlobShas = {};
+            for (const file of expectedFiles) {
+              const content = await github.rest.repos.getContent({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                path: file,
+                ref: expected.subject,
+              });
+              if (Array.isArray(content.data)) {
+                throw new Error('expected source path resolved to a directory: ' + file);
+              }
+              sourceBlobShas[file] = content.data.sha;
+            }
+
+            const mergeSourceBlobShas = {};
+            if (mergeCommit) {
+              for (const file of expectedFiles) {
+                const content = await github.rest.repos.getContent({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  path: file,
+                  ref: mergeCommit.sha,
+                });
+                if (Array.isArray(content.data)) {
+                  throw new Error('expected merged source path resolved to a directory: ' + file);
+                }
+                mergeSourceBlobShas[file] = content.data.sha;
+              }
+            }
+
+            const policyIdentity = admissionPolicyIdentity(expected, expectedFiles, requiredSteps);
+
+            const repositoryMetadata = (await github.rest.repos.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            })).data;
+            if (repositoryMetadata.default_branch !== 'main') {
+              throw new Error(
+                'independent verifier requires the repository default branch to remain main'
+              );
+            }
+
+            const liveMainRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/main',
+            })).data;
+            const initialMainSha = String(liveMainRef.object?.sha ?? '');
+            if (!/^[0-9a-f]{40}$/.test(initialMainSha)) {
+              throw new Error(
+                'initial live default-branch ref did not resolve to a canonical commit SHA'
+              );
+            }
+
+            const artifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 100,
+              }
+            );
+
+            const finalMainRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/main',
+            })).data;
+            const finalMainSha = String(finalMainRef.object?.sha ?? '');
+            if (!/^[0-9a-f]{40}$/.test(finalMainSha)) {
+              throw new Error(
+                'final live default-branch ref did not resolve to a canonical commit SHA'
+              );
+            }
+
+            const baseBranchRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/' + expected.baseBranch,
+            })).data;
+            const initialBaseBranchTipSha = String(baseBranchRef.object?.sha ?? '');
+            if (!/^[0-9a-f]{40}$/.test(initialBaseBranchTipSha)) {
+              throw new Error('initial base-branch ref did not resolve to a canonical commit SHA');
+            }
+
+            const finalPr = (await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: expected.pr,
+            })).data;
+
+            const finalBaseBranchRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/' + expected.baseBranch,
+            })).data;
+            const finalBaseBranchTipSha = String(finalBaseBranchRef.object?.sha ?? '');
+            if (!/^[0-9a-f]{40}$/.test(finalBaseBranchTipSha)) {
+              throw new Error('final base-branch ref did not resolve to a canonical commit SHA');
+            }
+
+            const finalQualificationRuns = await github.paginate(
+              github.rest.actions.listWorkflowRunsForWorkflow,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: run.workflow_id,
+                event: 'pull_request',
+                head_sha: expected.subject,
+                per_page: 100,
+              }
+            );
+            const finalLatestExactHeadRun = newestQualificationRun(finalQualificationRuns);
+            const finalLatestExactHeadRunMatchesTrigger =
+              finalLatestExactHeadRun !== null &&
+              finalLatestExactHeadRun.id === run.id &&
+              finalLatestExactHeadRun.run_attempt === run.run_attempt;
+
+            const finalArtifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 100,
+              }
+            );
+
+            const rulesetsResponse = await github.request('GET /repos/{owner}/{repo}/rulesets', {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const rulesets = Array.isArray(rulesetsResponse.data) ? rulesetsResponse.data : [];
+
+            let effectiveRulesObservation;
+            try {
+              const response = await github.request(
+                'GET /repos/{owner}/{repo}/rules/branches/{branch}',
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  branch: repositoryMetadata.default_branch,
+                }
+              );
+              effectiveRulesObservation = {
+                accessible: true,
+                http_status: response.status,
+                rules: Array.isArray(response.data)
+                  ? response.data.map((rule) => ({
+                      type: rule.type ?? null,
+                      parameters: rule.parameters ?? null,
+                    }))
+                  : [],
+              };
+            } catch (error) {
+              effectiveRulesObservation = {
+                accessible: false,
+                http_status: Number(error.status ?? 0) || null,
+                rules: [],
+              };
+            }
+
+            const branchSummaryResponse = await github.request(
+              'GET /repos/{owner}/{repo}/branches/{branch}',
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: repositoryMetadata.default_branch,
+              }
+            );
+            const branchSummary = {
+              protected: branchSummaryResponse.data?.protected === true,
+              protection: branchSummaryResponse.data?.protection ?? null,
+            };
+
+            let branchProtection;
+            try {
+              const response = await github.request(
+                'GET /repos/{owner}/{repo}/branches/{branch}/protection',
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  branch: repositoryMetadata.default_branch,
+                }
+              );
+              branchProtection = {
+                accessible: true,
+                http_status: response.status,
+                required_status_checks: response.data?.required_status_checks ?? null,
+              };
+            } catch (error) {
+              branchProtection = {
+                accessible: false,
+                http_status: Number(error.status ?? 0) || null,
+                required_status_checks: null,
+              };
+            }
+
+            const governanceObserved = {
+              schema_version: 'governance-authority-observation-v1',
+              default_branch: repositoryMetadata.default_branch,
+              branch_summary: branchSummary,
+              effective_rules: effectiveRulesObservation,
+              rulesets: rulesets.map((rule) => ({
+                id: rule.id ?? null,
+                name: rule.name ?? null,
+                target: rule.target ?? null,
+                enforcement: rule.enforcement ?? null,
+              })),
+              branch_protection: branchProtection,
+            };
+            const governanceIdentitySha256 = sha256Canonical(governanceObserved);
+            const requiredStatusCheckObserved =
+              Array.isArray(branchSummary.protection?.required_status_checks?.contexts) &&
+              branchSummary.protection.required_status_checks.contexts.includes(STATUS_CONTEXT);
+            const effectiveRequiredStatusRule =
+              effectiveRulesObservation.accessible
+                ? effectiveRulesObservation.rules.find((rule) => rule.type === 'required_status_checks')
+                : null;
+            const effectiveRequiredStatusCheck =
+              effectiveRequiredStatusRule?.parameters?.required_status_checks?.find(
+                (check) => check?.context === STATUS_CONTEXT
+              ) ?? null;
+            const effectiveStatusAuthorityObserved =
+              effectiveRequiredStatusCheck !== null &&
+              effectiveRequiredStatusCheck.integration_id !== undefined &&
+              effectiveRequiredStatusCheck.integration_id !== -1;
+            const effectiveStrictPolicy =
+              effectiveRequiredStatusRule?.parameters?.strict_required_status_checks_policy === true;
+            const governanceObservation = {
+              observation_identity_sha256: governanceIdentitySha256,
+              default_branch: repositoryMetadata.default_branch,
+              verified:
+                branchSummary.protected &&
+                effectiveRulesObservation.accessible &&
+                effectiveRequiredStatusCheck !== null &&
+                effectiveStatusAuthorityObserved &&
+                effectiveStrictPolicy,
+              verification_basis:
+                !branchSummary.protected
+                  ? 'default_branch_unprotected'
+                  : !effectiveRulesObservation.accessible
+                    ? 'effective_branch_rules_unavailable'
+                    : !effectiveRequiredStatusCheck
+                      ? 'required_status_context_not_observed'
+                      : !effectiveStatusAuthorityObserved
+                        ? 'status_source_not_pinned'
+                        : !effectiveStrictPolicy
+                          ? 'strict_status_policy_not_observed'
+                          : 'effective_required_status_authority_verified',
+              protected: branchSummary.protected,
+              ruleset_count: rulesets.length,
+              effective_rules_accessible: effectiveRulesObservation.accessible,
+              effective_required_status_context: effectiveRequiredStatusCheck?.context ?? null,
+              effective_status_integration_id:
+                effectiveRequiredStatusCheck?.integration_id ?? null,
+              effective_strict_policy: effectiveStrictPolicy,
+              branch_protection_accessible: branchProtection.accessible,
+              required_status_context: STATUS_CONTEXT,
+            };
+
+            const liveEvidence = {
+              contextRef: context.ref,
+              contextSha: context.sha,
+              currentMainSha: initialMainSha,
+              finalMainSha,
+              contextRepository: context.repo.owner + '/' + context.repo.repo,
+              triggerRunAttempt,
+              initialBaseBranchTipSha,
+              finalBaseBranchTipSha,
+              run,
+              jobs,
+              pr,
+              latestExactHeadRun,
+              latestExactHeadRunMatchesTrigger,
+              finalLatestExactHeadRun,
+              finalLatestExactHeadRunMatchesTrigger,
+              finalPr,
+              parentCommit,
+              mergeCommit,
+              mergeSourceBlobShas,
+              compare: {
+                status: compare.status,
+                ahead_by: compare.ahead_by,
+                behind_by: compare.behind_by,
+                merge_base_commit: compare.merge_base_commit,
+                files: compare.files ?? [],
+              },
+              workflowFileSha: workflowFile.data.sha,
+              sourceBlobShas,
+              artifacts,
+              finalArtifacts,
+              verifierWorkflowBlobSha,
+              policyIdentity,
+              governanceObservation,
+            };
+
+            const liveEvaluation = evaluate(liveEvidence);
+            const leaseObservedAt = new Date().toISOString();
+            const promotionLease = buildPromotionEligibilityLease({
+              evaluation: liveEvaluation,
+              evidence: liveEvidence,
+              governanceObservation,
+              verifierWorkflowBlobSha,
+              policyIdentity,
+              observedAt: leaseObservedAt,
+            });
+
+            const receipt = {
+              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v14',
+              qualification_result:
+                adversarialCorpusPassed && liveEvaluation.qualificationResult === 'PASS'
+                  ? 'PASS'
+                  : 'NOT_PASS',
+              trusted_verifier: {
+                repository: expected.repository,
+                default_branch: repositoryMetadata.default_branch,
+                verifier_ref: context.ref,
+                verifier_sha: context.sha,
+                live_default_branch_initial_tip_sha: liveEvidence.currentMainSha,
+                live_default_branch_final_tip_sha: liveEvidence.finalMainSha,
+                verifier_root_current: liveEvaluation.checks.verifier_root_current,
+                verifier_root_stable: liveEvaluation.checks.verifier_root_stable,
+                workflow_run_id: run.id,
+              },
+              run_pr_association_view: {
+                expected_immutable_identity: false,
+                stale_association_view_accepted: staleAssociationViewPassed,
+              },
+              triggering_run_attempt: {
+                observed_attempt: liveEvidence.run.run_attempt,
+                triggering_event_attempt: liveEvidence.triggerRunAttempt,
+                exact_match: liveEvaluation.checks.run_attempt_matches_trigger,
+              },
+              pr_reconciliation: {
+                initial_head_sha: liveEvidence.pr.head?.sha ?? null,
+                final_head_sha: liveEvidence.finalPr.head?.sha ?? null,
+                initial_base_sha: liveEvidence.pr.base?.sha ?? null,
+                final_base_sha: liveEvidence.finalPr.base?.sha ?? null,
+                initial_merge_commit_sha: liveEvidence.pr.merge_commit_sha ?? null,
+                final_merge_commit_sha: liveEvidence.finalPr.merge_commit_sha ?? null,
+                stable: liveEvaluation.checks.pr_snapshot_stable,
+                initial_base_branch_tip_sha: liveEvidence.initialBaseBranchTipSha,
+                final_base_branch_tip_sha: liveEvidence.finalBaseBranchTipSha,
+                base_branch_tip_stable: liveEvaluation.checks.base_branch_tip_stable,
+              },
+              adversarial_verifier_corpus: {
+                test_count: adversarialResults.length,
+                baseline_result: syntheticBaseline.qualificationResult,
+                baseline_passed: syntheticBaselinePassed,
+                passed: adversarialCorpusPassed,
+                lease_baseline_passed: syntheticLeasePassed,
+                governance_invalidation_lease_passed: governanceLeaseInvalidationPassed,
+                pr_state_invalidation_lease_passed: prStateLeaseInvalidationPassed,
+                qualification_run_supersession_lease_passed: qualificationRunSupersessionLeasePassed,
+                cases: adversarialResults,
+              },
+              subject: {
+                pr_number: expected.pr,
+                head_sha: expected.subject,
+                merge_sha: pr.merge_commit_sha ?? null,
+                head_branch: run.head_branch,
+                base_branch: pr.base.ref,
+                base_sha: pr.base.sha,
+              },
+              triggering_run: {
+                id: run.id,
+                attempt: run.run_attempt,
+                conclusion: run.conclusion,
+                event: run.event,
+                workflow_id: run.workflow_id,
+                workflow_name: run.name,
+                workflow_path: run.path,
+                head_sha: run.head_sha,
+                head_branch: run.head_branch,
+              },
+              comparison: {
+                status: liveEvidence.compare.status,
+                ahead_by: liveEvidence.compare.ahead_by,
+                behind_by: liveEvidence.compare.behind_by,
+                merge_base_sha: liveEvidence.compare.merge_base_commit?.sha ?? null,
+                changed_files: liveEvaluation.changedFiles,
+                expected_files: expectedFiles,
+              },
+              workflow_definition: {
+                observed_blob_sha: liveEvidence.workflowFileSha,
+                expected_blob_sha: expected.workflowBlobSha,
+              },
+              source_identity: {
+                observed_blob_shas: liveEvidence.sourceBlobShas,
+                expected_blob_shas: expectedSourceBlobShas,
+              },
+              merge_snapshot: {
+                pr_merge_commit_sha: pr.merge_commit_sha ?? null,
+                observed_merge_commit_sha: liveEvidence.mergeCommit?.sha ?? null,
+                merge_commit_sha_is_current: true,
+                observed_source_blob_shas: liveEvidence.mergeSourceBlobShas,
+                expected_source_blob_shas: expectedSourceBlobShas,
+              },
+              jobs: {
+                count: liveEvidence.jobs.length,
+                name: liveEvidence.jobs[0]?.name ?? null,
+                exact_step_surface: liveEvaluation.checks.exact_step_surface,
+                required_steps_succeeded: liveEvaluation.checks.required_steps_succeeded,
+                step_conclusions: liveEvaluation.stepConclusions,
+              },
+              artifact: liveEvaluation.artifact,
+              artifact_reconciliation: {
+                initial_artifact_id: liveEvaluation.artifact?.id ?? null,
+                final_artifact_id: liveEvaluation.finalArtifact?.id ?? null,
+                initial_digest: liveEvaluation.artifact?.digest ?? null,
+                final_digest: liveEvaluation.finalArtifact?.digest ?? null,
+                stable: liveEvaluation.checks.artifact_snapshot_stable,
+              },
+              artifact_lifecycle: {
+                artifact_id: liveEvaluation.artifact?.id ?? null,
+                created_at: liveEvaluation.artifact?.created_at ?? null,
+                expires_at: liveEvaluation.artifact?.expires_at ?? null,
+                lifetime_ordered:
+                  liveEvaluation.artifact == null
+                    ? false
+                    : artifactLifecycleVerified(liveEvaluation.artifact),
+                provider_expired:
+                  liveEvaluation.artifact?.expired ?? null,
+              },
+              live_checks: liveEvaluation.checks,
+              governance_observation: governanceObservation,
+              independent_admission_policy: {
+                schema_version: 'hdc-bounded-decoder-admission-policy-v1',
+                identity_sha256: policyIdentity,
+              },
+              trusted_verifier_root: {
+                workflow_path: TRUSTED_VERIFIER_WORKFLOW_PATH,
+                workflow_blob_sha: verifierWorkflowBlobSha,
+                commit_sha: context.sha,
+              },
+              promotion_eligibility_lease: promotionLease,
+            };
+
+            const outputPath = path.join(
+              process.env.RUNNER_TEMP,
+              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V14.json'
+            );
+
+            const publicationMainRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/' + repositoryMetadata.default_branch,
+            })).data;
+            const publicationMainSha = String(publicationMainRef.object?.sha ?? '');
+            const publicationPr = (await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: expected.pr,
+            })).data;
+            const publicationBaseRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/' + expected.baseBranch,
+            })).data;
+            const publicationBaseSha = String(publicationBaseRef.object?.sha ?? '');
+            const publicationGovernanceResponse = await github.request('GET /repos/{owner}/{repo}/rulesets', {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const publicationRulesets = Array.isArray(publicationGovernanceResponse.data)
+              ? publicationGovernanceResponse.data
+              : [];
+            let publicationEffectiveRules;
+            try {
+              const response = await github.request(
+                'GET /repos/{owner}/{repo}/rules/branches/{branch}',
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  branch: repositoryMetadata.default_branch,
+                }
+              );
+              publicationEffectiveRules = {
+                accessible: true,
+                http_status: response.status,
+                rules: Array.isArray(response.data)
+                  ? response.data.map((rule) => ({
+                      type: rule.type ?? null,
+                      parameters: rule.parameters ?? null,
+                    }))
+                  : [],
+              };
+            } catch (error) {
+              publicationEffectiveRules = {
+                accessible: false,
+                http_status: Number(error.status ?? 0) || null,
+                rules: [],
+              };
+            }
+            const publicationBranchSummaryResponse = await github.request(
+              'GET /repos/{owner}/{repo}/branches/{branch}',
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: repositoryMetadata.default_branch,
+              }
+            );
+            const publicationBranchSummary = {
+              protected: publicationBranchSummaryResponse.data?.protected === true,
+              protection: publicationBranchSummaryResponse.data?.protection ?? null,
+            };
+            let publicationBranchProtection;
+            try {
+              const response = await github.request(
+                'GET /repos/{owner}/{repo}/branches/{branch}/protection',
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  branch: repositoryMetadata.default_branch,
+                }
+              );
+              publicationBranchProtection = {
+                accessible: true,
+                http_status: response.status,
+                required_status_checks: response.data?.required_status_checks ?? null,
+              };
+            } catch (error) {
+              publicationBranchProtection = {
+                accessible: false,
+                http_status: Number(error.status ?? 0) || null,
+                required_status_checks: null,
+              };
+            }
+            const publicationGovernanceObserved = {
+              schema_version: 'governance-authority-observation-v1',
+              default_branch: repositoryMetadata.default_branch,
+              branch_summary: publicationBranchSummary,
+              effective_rules: publicationEffectiveRules,
+              rulesets: publicationRulesets.map((rule) => ({
+                id: rule.id ?? null,
+                name: rule.name ?? null,
+                target: rule.target ?? null,
+                enforcement: rule.enforcement ?? null,
+              })),
+              branch_protection: publicationBranchProtection,
+            };
+            const publicationGovernanceIdentitySha256 = sha256Canonical(publicationGovernanceObserved);
+            const publicationRun = (await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.id,
+            })).data;
+            const publicationArtifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 100,
+              }
+            );
+            const publicationExpectedArtifactName =
+              'hdc-linear-code-bounded-decoder-' +
+              expected.subject +
+              '-run-' +
+              run.id +
+              '-attempt-' +
+              run.run_attempt;
+            const publicationArtifactMatches = publicationArtifacts.filter(
+              (candidate) => candidate.name === publicationExpectedArtifactName
+            );
+            const publicationArtifact = publicationArtifactMatches[0] ?? null;
+            const publicationArtifactStable =
+              publicationArtifacts.length === 1 &&
+              publicationArtifactMatches.length === 1 &&
+              artifactLifecycleVerified(publicationArtifact) &&
+              publicationArtifact.expired === false &&
+              publicationArtifact.size_in_bytes > 0 &&
+              publicationArtifact.workflow_run?.id === run.id &&
+              publicationArtifact.workflow_run?.repository_id === expected.repositoryId &&
+              publicationArtifact.workflow_run?.head_repository_id === expected.repositoryId &&
+              publicationArtifact.workflow_run?.head_sha === expected.subject &&
+              typeof publicationArtifact.digest === 'string' &&
+              /^sha256:[0-9a-f]{64}$/.test(publicationArtifact.digest) &&
+              publicationArtifact.id === liveEvaluation.finalArtifact?.id &&
+              publicationArtifact.digest === liveEvaluation.finalArtifact?.digest &&
+              publicationArtifact.created_at === liveEvaluation.finalArtifact?.created_at &&
+              publicationArtifact.expires_at === liveEvaluation.finalArtifact?.expires_at;
+
+            const publicationRunStable =
+              publicationRun.id === run.id &&
+              publicationRun.run_attempt === run.run_attempt &&
+              publicationRun.conclusion === run.conclusion &&
+              publicationRun.head_sha === run.head_sha &&
+              publicationRun.head_branch === run.head_branch;
+
+            const publicationPrIdentityStable =
+              publicationPr?.number === expected.pr &&
+              publicationPr?.state === 'open' &&
+              publicationPr?.draft === false &&
+              publicationPr?.head?.ref === expected.branch &&
+              Number(publicationPr?.head?.repo?.id) === expected.repositoryId &&
+              publicationPr?.head?.repo?.full_name === expected.repository &&
+              publicationPr?.base?.ref === expected.baseBranch &&
+              Number(publicationPr?.base?.repo?.id) === expected.repositoryId &&
+              publicationPr?.base?.repo?.full_name === expected.repository;
+
+            const publicationFencePassed =
+              publicationMainSha === liveEvidence.finalMainSha &&
+              publicationPr.head?.sha === liveEvidence.finalPr.head?.sha &&
+              publicationPr.base?.sha === liveEvidence.finalPr.base?.sha &&
+              publicationPr.merge_commit_sha === liveEvidence.finalPr.merge_commit_sha &&
+              publicationPrIdentityStable &&
+              finalLatestExactHeadRunMatchesTrigger &&
+              publicationBaseSha === liveEvidence.finalBaseBranchTipSha &&
+              publicationGovernanceIdentitySha256 === governanceIdentitySha256 &&
+              publicationRunStable &&
+              publicationArtifactStable;
+
+            const finalLeaseObservedAt = new Date().toISOString();
+            promotionLease.observed_at = finalLeaseObservedAt;
+            promotionLease.reconciliation.observed_at = finalLeaseObservedAt;
+            promotionLease.reconciliation.publication_fence = {
+              passed: publicationFencePassed,
+              main_tip_sha: publicationMainSha,
+              base_tip_sha: publicationBaseSha,
+              governance_identity_sha256: publicationGovernanceIdentitySha256,
+              run_id: publicationRun.id,
+              run_attempt: publicationRun.run_attempt,
+              run_stable: publicationRunStable,
+              artifact_id: publicationArtifact?.id ?? null,
+              artifact_digest: publicationArtifact?.digest ?? null,
+              artifact_lifecycle_stable: publicationArtifactStable,
+              pr_identity_stable: publicationPrIdentityStable,
+              latest_exact_head_run_is_triggering: finalLatestExactHeadRunMatchesTrigger,
+            };
+            if (!publicationFencePassed) {
+              if (!promotionLease.invalidation_reasons.includes('publication_fence_failed')) {
+                promotionLease.invalidation_reasons.push('publication_fence_failed');
+              }
+              promotionLease.lease_state = 'NOT_ELIGIBLE';
+            }
+            promotionLease.lease_id_sha256 = sha256Canonical({
+              ...promotionLease,
+              lease_id_sha256: undefined,
+            });
+            delete promotionLease.lease_id_sha256;
+
+            const leaseBodyForHash = JSON.parse(JSON.stringify(promotionLease));
+            promotionLease.lease_id_sha256 = sha256Canonical(leaseBodyForHash);
+
+            receipt.promotion_eligibility_lease = promotionLease;
+
+            fs.writeFileSync(outputPath, JSON.stringify(receipt, null, 2) + '\n');
+            core.info('Promotion lease: ' + promotionLease.lease_state + ' [' + promotionLease.lease_id_sha256 + ']');
+            core.info('Independent verifier adversarial corpus: ' + (adversarialCorpusPassed ? 'PASS' : 'NOT_PASS'));
+            core.info('Independent qualification result: ' + receipt.qualification_result);
+
+            const promotable =
+              receipt.qualification_result === 'PASS' &&
+              promotionLease.lease_state === 'ELIGIBLE' &&
+              publicationFencePassed;
+
+            core.setOutput('qualification_result', receipt.qualification_result);
+            core.setOutput('lease_state', promotionLease.lease_state);
+            core.setOutput('lease_id', promotionLease.lease_id_sha256);
+            core.setOutput('publication_fence_passed', String(publicationFencePassed));
+            core.setOutput('promotable', String(promotable));
+            core.setOutput('final_main_sha', publicationMainSha);
+            core.setOutput('final_base_sha', publicationBaseSha);
+            core.setOutput('final_pr_head_sha', publicationPr.head?.sha ?? '');
+            core.setOutput('final_pr_base_sha', publicationPr.base?.sha ?? '');
+            core.setOutput('final_pr_merge_sha', publicationPr.merge_commit_sha ?? '');
+            core.setOutput('run_id', String(publicationRun.id));
+            core.setOutput('run_attempt', String(publicationRun.run_attempt));
+            core.setOutput('latest_exact_head_run_id', String(finalLatestExactHeadRun?.id ?? ''));
+            core.setOutput('latest_exact_head_run_attempt', String(finalLatestExactHeadRun?.run_attempt ?? ''));
+            core.setOutput('artifact_id', String(publicationArtifact?.id ?? ''));
+            core.setOutput('artifact_digest', publicationArtifact?.digest ?? '');
+            core.setOutput('artifact_created_at', publicationArtifact?.created_at ?? '');
+            core.setOutput('artifact_expires_at', publicationArtifact?.expires_at ?? '');
+            core.setOutput('governance_identity_sha256', publicationGovernanceIdentitySha256);
+
+            if (receipt.qualification_result !== 'PASS') {
+              core.setFailed('Independent verifier refused to qualify the triggering run');
+            }
+      - name: Upload independent qualification receipt
+        id: upload_receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hdc-linear-code-bounded-decoder-independent-run-receipt
+          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V14.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish decision-time qualification status
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # pinned
+        env:
+          EXPECTED_SUBJECT: "433ca9c92b16bfac824225950e32692e8e151238"
+          EXPECTED_PR: "6803"
+          EXPECTED_BRANCH: "research/hdc-linear-code-bounded-decoder-v2"
+          EXPECTED_REPOSITORY_ID: "1136141775"
+          EXPECTED_BASE_BRANCH: "research/hdc-linear-code-recovery-design-v1"
+          STATUS_CONTEXT: "HDC / Independent Qualification"
+          VERIFIER_OUTCOME: ${{ steps.verify.outcome }}
+          UPLOAD_OUTCOME: ${{ steps.upload_receipt.outcome }}
+          PROMOTABLE: ${{ steps.verify.outputs.promotable }}
+          LEASE_ID: ${{ steps.verify.outputs.lease_id }}
+          EXPECTED_MAIN_SHA: ${{ steps.verify.outputs.final_main_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.verify.outputs.final_base_sha }}
+          EXPECTED_PR_HEAD_SHA: ${{ steps.verify.outputs.final_pr_head_sha }}
+          EXPECTED_PR_BASE_SHA: ${{ steps.verify.outputs.final_pr_base_sha }}
+          EXPECTED_PR_MERGE_SHA: ${{ steps.verify.outputs.final_pr_merge_sha }}
+          EXPECTED_RUN_ID: ${{ steps.verify.outputs.run_id }}
+          EXPECTED_RUN_ATTEMPT: ${{ steps.verify.outputs.run_attempt }}
+          EXPECTED_ARTIFACT_ID: ${{ steps.verify.outputs.artifact_id }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ steps.verify.outputs.artifact_digest }}
+          EXPECTED_ARTIFACT_CREATED_AT: ${{ steps.verify.outputs.artifact_created_at }}
+          EXPECTED_ARTIFACT_EXPIRES_AT: ${{ steps.verify.outputs.artifact_expires_at }}
+          EXPECTED_GOVERNANCE_IDENTITY_SHA256: ${{ steps.verify.outputs.governance_identity_sha256 }}
+        with:
+          script: |
+            const crypto = require('crypto');
+            const uploadSucceeded = process.env.UPLOAD_OUTCOME === 'success';
+            const verifierSucceeded = process.env.VERIFIER_OUTCOME === 'success';
+            const targetUrl =
+              context.serverUrl +
+              '/' +
+              context.repo.owner +
+              '/' +
+              context.repo.repo +
+              '/actions/runs/' +
+              context.runId;
+
+            function artifactLifecycleVerified(artifact, nowMs = Date.now()) {
+              if (!artifact || !Number.isSafeInteger(artifact.id) || artifact.id <= 0) return false;
+              if (
+                typeof artifact.created_at !== 'string' ||
+                typeof artifact.expires_at !== 'string' ||
+                !Number.isSafeInteger(artifact.size_in_bytes) ||
+                artifact.size_in_bytes <= 0
+              ) return false;
+              const createdAt = Date.parse(artifact.created_at);
+              const expiresAt = Date.parse(artifact.expires_at);
+              return Number.isFinite(createdAt) &&
+                Number.isFinite(expiresAt) &&
+                createdAt <= nowMs &&
+                nowMs < expiresAt;
+            }
+            function canonicalize(value) {
+              if (Array.isArray(value)) return value.map(canonicalize);
+              if (value && typeof value === 'object') {
+                return Object.fromEntries(
+                  Object.keys(value).sort().map((key) => [key, canonicalize(value[key])])
+                );
+              }
+              return value;
+            }
+
+            function governanceIdentity(value) {
+              return crypto
+                .createHash('sha256')
+                .update('promotion-eligibility-lease-v1\\u0000' + JSON.stringify(canonicalize(value)))
+                .digest('hex');
+            }
+
+            let receiptArtifactAvailable = false;
+            let receiptArtifact = null;
+
+
+            if (!verifierSucceeded || !uploadSucceeded || !process.env.EXPECTED_RUN_ID) {
+              await github.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: process.env.EXPECTED_SUBJECT,
+                state: 'pending',
+                target_url: targetUrl,
+                description: 'Qualification verifier did not produce a complete publishable evidence snapshot.',
+                context: process.env.STATUS_CONTEXT,
+              });
+              core.info('Published decision-time status: pending (incomplete verifier publication path)');
+              return;
+            }
+
+            if (uploadSucceeded) {
+              const artifacts = await github.paginate(
+                github.rest.actions.listWorkflowRunArtifacts,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: context.runId,
+                  per_page: 100,
+                }
+              );
+              const matches = artifacts.filter(
+                (artifact) =>
+                  artifact.name === 'hdc-linear-code-bounded-decoder-independent-run-receipt'
+              );
+              receiptArtifact = matches[0] ?? null;
+              receiptArtifactAvailable =
+                matches.length === 1 &&
+                receiptArtifact !== null &&
+                receiptArtifact.expired === false &&
+                artifactLifecycleVerified(receiptArtifact) &&
+                Number.isSafeInteger(receiptArtifact.id) &&
+                receiptArtifact.id > 0 &&
+                Number.isSafeInteger(receiptArtifact.size_in_bytes) &&
+                receiptArtifact.size_in_bytes > 0;
+            }
+
+            const mainRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/main',
+            })).data;
+            const currentMainSha = String(mainRef.object?.sha ?? '');
+
+            const currentPr = (await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: Number(process.env.EXPECTED_PR),
+            })).data;
+
+            const currentBaseRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/' + process.env.EXPECTED_BASE_BRANCH,
+            })).data;
+            const currentBaseSha = String(currentBaseRef.object?.sha ?? '');
+
+            const currentRun = (await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number(process.env.EXPECTED_RUN_ID),
+            })).data;
+
+            if (!Number.isSafeInteger(currentRun.workflow_id) || currentRun.workflow_id <= 0) {
+              throw new Error('current trusted runner workflow_id is missing or invalid');
+            }
+            const currentQualificationRuns = await github.paginate(
+              github.rest.actions.listWorkflowRunsForWorkflow,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: currentRun.workflow_id,
+                event: 'pull_request',
+                head_sha: process.env.EXPECTED_PR_HEAD_SHA,
+                per_page: 100,
+              }
+            );
+            const currentLatestQualificationRun = [...currentQualificationRuns]
+              .filter((candidate) =>
+                candidate.path === '.github/workflows/qual-hdc-bounded-decoder-trusted-runner.yml' &&
+                candidate.name === 'QUAL HDC bounded decoder trusted runner' &&
+                candidate.event === 'pull_request' &&
+                candidate.head_branch === 'research/hdc-linear-code-bounded-decoder-v2' &&
+                candidate.head_sha === process.env.EXPECTED_PR_HEAD_SHA &&
+                Number(candidate.repository?.id) === Number(process.env.EXPECTED_REPOSITORY_ID) &&
+                Number(candidate.head_repository?.id) === Number(process.env.EXPECTED_REPOSITORY_ID) &&
+                candidate.head_repository?.full_name === context.repo.owner + '/' + context.repo.repo
+              )
+              .sort((a, b) => {
+                const aCreated = Date.parse(a.created_at ?? '');
+                const bCreated = Date.parse(b.created_at ?? '');
+                if (Number.isFinite(aCreated) && Number.isFinite(bCreated) && aCreated !== bCreated) {
+                  return bCreated - aCreated;
+                }
+                return Number(b.id) - Number(a.id);
+              })[0] ?? null;
+            const currentLatestQualificationRunStable =
+              currentLatestQualificationRun !== null &&
+              currentLatestQualificationRun.id === currentRun.id &&
+              currentLatestQualificationRun.run_attempt === currentRun.run_attempt;
+
+            const currentArtifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: Number(process.env.EXPECTED_RUN_ID),
+                per_page: 100,
+              }
+            );
+            const currentProducerArtifactMatches = currentArtifacts.filter(
+              (artifact) => Number(artifact.id) === Number(process.env.EXPECTED_ARTIFACT_ID)
+            );
+            const currentProducerArtifact = currentProducerArtifactMatches[0] ?? null;
+
+            const currentRulesetsResponse = await github.request('GET /repos/{owner}/{repo}/rulesets', {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            let currentEffectiveRules;
+            try {
+              const response = await github.request(
+                'GET /repos/{owner}/{repo}/rules/branches/{branch}',
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  branch: 'main',
+                }
+              );
+              currentEffectiveRules = {
+                accessible: true,
+                http_status: response.status,
+                rules: Array.isArray(response.data)
+                  ? response.data.map((rule) => ({
+                      type: rule.type ?? null,
+                      parameters: rule.parameters ?? null,
+                    }))
+                  : [],
+              };
+            } catch (error) {
+              currentEffectiveRules = {
+                accessible: false,
+                http_status: Number(error.status ?? 0) || null,
+                rules: [],
+              };
+            }
+            const currentBranchSummaryResponse = await github.request(
+              'GET /repos/{owner}/{repo}/branches/{branch}',
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: 'main',
+              }
+            );
+            let currentBranchProtection;
+            try {
+              const response = await github.request(
+                'GET /repos/{owner}/{repo}/branches/{branch}/protection',
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  branch: 'main',
+                }
+              );
+              currentBranchProtection = {
+                accessible: true,
+                http_status: response.status,
+                required_status_checks: response.data?.required_status_checks ?? null,
+              };
+            } catch (error) {
+              currentBranchProtection = {
+                accessible: false,
+                http_status: Number(error.status ?? 0) || null,
+                required_status_checks: null,
+              };
+            }
+            const currentGovernanceObserved = {
+              schema_version: 'governance-authority-observation-v1',
+              default_branch: 'main',
+              branch_summary: {
+                protected: currentBranchSummaryResponse.data?.protected === true,
+                protection: currentBranchSummaryResponse.data?.protection ?? null,
+              },
+              effective_rules: currentEffectiveRules,
+              rulesets: (Array.isArray(currentRulesetsResponse.data) ? currentRulesetsResponse.data : [])
+                .map((rule) => ({
+                  id: rule.id ?? null,
+                  name: rule.name ?? null,
+                  target: rule.target ?? null,
+                  enforcement: rule.enforcement ?? null,
+                })),
+              branch_protection: currentBranchProtection,
+            };
+            const currentGovernanceIdentitySha256 = governanceIdentity(currentGovernanceObserved);
+
+            const finalPrIdentityStable =
+              currentPr?.number === Number(process.env.EXPECTED_PR) &&
+              currentPr?.state === 'open' &&
+              currentPr?.draft === false &&
+              currentPr?.head?.ref === process.env.EXPECTED_BRANCH &&
+              Number(currentPr?.head?.repo?.id) === Number(process.env.EXPECTED_REPOSITORY_ID) &&
+              currentPr?.head?.repo?.full_name === context.repo.owner + '/' + context.repo.repo &&
+              currentPr?.base?.ref === process.env.EXPECTED_BASE_BRANCH &&
+              Number(currentPr?.base?.repo?.id) === Number(process.env.EXPECTED_REPOSITORY_ID) &&
+              currentPr?.base?.repo?.full_name === context.repo.owner + '/' + context.repo.repo;
+
+            const finalLeaseFenceStable =
+              currentMainSha === process.env.EXPECTED_MAIN_SHA &&
+              currentBaseSha === process.env.EXPECTED_BASE_SHA &&
+              currentPr.head?.sha === process.env.EXPECTED_PR_HEAD_SHA &&
+              currentPr.base?.sha === process.env.EXPECTED_PR_BASE_SHA &&
+              currentPr.merge_commit_sha === process.env.EXPECTED_PR_MERGE_SHA &&
+              finalPrIdentityStable &&
+              currentRun.id === Number(process.env.EXPECTED_RUN_ID) &&
+              currentRun.run_attempt === Number(process.env.EXPECTED_RUN_ATTEMPT) &&
+              currentRun.conclusion === 'success' &&
+              currentRun.head_sha === process.env.EXPECTED_PR_HEAD_SHA &&
+              currentLatestQualificationRunStable &&
+              currentProducerArtifact?.id === Number(process.env.EXPECTED_ARTIFACT_ID) &&
+              currentProducerArtifact?.digest === process.env.EXPECTED_ARTIFACT_DIGEST &&
+              currentProducerArtifact?.created_at === process.env.EXPECTED_ARTIFACT_CREATED_AT &&
+              currentProducerArtifact?.expires_at === process.env.EXPECTED_ARTIFACT_EXPIRES_AT &&
+              artifactLifecycleVerified(currentProducerArtifact) &&
+              currentProducerArtifact.expired === false &&
+              currentGovernanceIdentitySha256 === process.env.EXPECTED_GOVERNANCE_IDENTITY_SHA256;
+
+            const success =
+              verifierSucceeded &&
+              uploadSucceeded &&
+              receiptArtifactAvailable &&
+              process.env.PROMOTABLE === 'true' &&
+              finalLeaseFenceStable;
+            const state = success ? 'success' : 'pending';
+            const description = success
+              ? 'Qualification and decision-time promotion lease verified.'
+              : 'Qualification evidence is not currently promotion-eligible; evidence publication or currentness fence is not satisfied.';
+
+            await github.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: process.env.EXPECTED_SUBJECT,
+              state,
+              target_url: targetUrl,
+              description,
+              context: process.env.STATUS_CONTEXT,
+            });
+
+            core.info(
+              'Published decision-time status: ' +
+                state +
+                ' lease=' +
+                (process.env.LEASE_ID || 'unavailable') +
+                ' receipt_artifact=' +
+                (receiptArtifact?.id ?? 'unavailable')
+            );

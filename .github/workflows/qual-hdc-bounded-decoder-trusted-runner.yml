@@ -1,0 +1,711 @@
+name: QUAL HDC bounded decoder trusted runner
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    branches:
+      - "research/hdc-linear-code-recovery-design-v1"
+
+concurrency:
+  group: hdc-linear-code-bounded-decoder-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  qualify:
+    if: github.event.pull_request.number == 6803 && github.event.pull_request.head.repo.id == 1136141775
+    name: Trusted exact-head bounded syndrome qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout exact research head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Record exact research head and parent
+        id: head
+        env:
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          EVENT_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          EVENT_HEAD_REPO_ID: ${{ github.event.pull_request.head.repo.id }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+          EVENT_BASE_REPO_ID: ${{ github.event.pull_request.base.repo.id }}
+          SYNTHETIC_MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          PARENT_SHA="164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
+          git fetch --no-tags --depth=1 origin "$PARENT_SHA"
+          TRUSTED_WORKFLOW_PATH=".github/workflows/qual-hdc-bounded-decoder-trusted-runner.yml"
+          TRUSTED_WORKFLOW_REF="Luminous-Dynamics/symthaea/.github/workflows/qual-hdc-bounded-decoder-trusted-runner.yml@refs/heads/main"
+          test "$GITHUB_EVENT_NAME" = "pull_request"
+          test "$EVENT_HEAD_REF" = "research/hdc-linear-code-bounded-decoder-v2"
+          test "$EVENT_HEAD_REPO" = "Luminous-Dynamics/symthaea"
+          test "$EVENT_HEAD_REPO_ID" = "1136141775"
+          test "$EVENT_BASE_REPO" = "Luminous-Dynamics/symthaea"
+          test "$EVENT_BASE_REPO_ID" = "1136141775"
+          test "$GITHUB_REPOSITORY" = "Luminous-Dynamics/symthaea"
+          test "$GITHUB_REPOSITORY_ID" = "1136141775"
+          test "$EVENT_BASE_SHA" = "$PARENT_SHA"
+          test -n "$SYNTHETIC_MERGE_SHA"
+          LIVE_RUN_JSON="$(gh api --method GET -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")"
+          LIVE_RUN_REPO_ID="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.repository.id')"
+          LIVE_RUN_HEAD_SHA="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.head_sha')"
+          LIVE_RUN_HEAD_REF="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.head_branch')"
+          LIVE_RUN_WORKFLOW_PATH="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.path')"
+          LIVE_RUN_WORKFLOW_NAME="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.name')"
+          LIVE_RUN_EVENT="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.event')"
+          LIVE_RUN_PR_COUNT="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.pull_requests | length')"
+          LIVE_RUN_PR_NUMBER="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].number else 0 end')"
+          LIVE_RUN_PR_ASSOCIATION_HEAD_SHA="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].head.sha else "" end')"
+          LIVE_RUN_PR_ASSOCIATION_BASE_SHA="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.sha else "" end')"
+          LIVE_RUN_PR_ASSOCIATION_HEAD_REPO_ID="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].head.repo.id else 0 end')"
+          LIVE_RUN_PR_ASSOCIATION_BASE_REPO_ID="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.repo.id else 0 end')"
+          LIVE_RUN_PR_ASSOCIATION_HEAD_REPO_NAME="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].head.repo.full_name else "" end')"
+          LIVE_RUN_PR_ASSOCIATION_BASE_REPO_NAME="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.repo.full_name else "" end')"
+          test "$LIVE_RUN_REPO_ID" = "1136141775"
+          test "$LIVE_RUN_HEAD_SHA" = "$EVENT_HEAD_SHA"
+          test "$LIVE_RUN_HEAD_REF" = "$EVENT_HEAD_REF"
+          test "$LIVE_RUN_WORKFLOW_PATH" = "$TRUSTED_WORKFLOW_PATH"
+          test "$LIVE_RUN_WORKFLOW_NAME" = "QUAL HDC bounded decoder trusted runner"
+          test "$LIVE_RUN_EVENT" = "pull_request"
+          test "$LIVE_RUN_PR_COUNT" -eq 1
+          test "$LIVE_RUN_PR_NUMBER" = "$GITHUB_EVENT_NUMBER"
+          # workflow_run.pull_requests is a mutable association view. Historical
+          # run identity comes from the run head fields plus the pull_request event
+          # payload; association head/base metadata is retained for observation only.
+          MERGE_JSON="$(gh api --method GET -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/commits/${SYNTHETIC_MERGE_SHA}")"
+          MERGE_PARENT_1="$(printf '%s' "$MERGE_JSON" | jq -r '.parents[0].sha')"
+          MERGE_PARENT_2="$(printf '%s' "$MERGE_JSON" | jq -r '.parents[1].sha')"
+          test "$MERGE_PARENT_1" = "$PARENT_SHA" -o "$MERGE_PARENT_2" = "$PARENT_SHA"
+          test "$MERGE_PARENT_1" = "$EVENT_HEAD_SHA" -o "$MERGE_PARENT_2" = "$EVENT_HEAD_SHA"
+          test "$ACTUAL_SHA" = "$EVENT_HEAD_SHA"
+          git cat-file -e "${PARENT_SHA}^{commit}"
+          COMPARE_JSON="$(gh api --method GET -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/compare/${PARENT_SHA}...${ACTUAL_SHA}")"
+          COMPARE_STATUS="$(printf '%s' "$COMPARE_JSON" | jq -r '.status')"
+          COMPARE_AHEAD_BY="$(printf '%s' "$COMPARE_JSON" | jq -r '.ahead_by')"
+          COMPARE_BEHIND_BY="$(printf '%s' "$COMPARE_JSON" | jq -r '.behind_by')"
+          COMPARE_MERGE_BASE_SHA="$(printf '%s' "$COMPARE_JSON" | jq -r '.merge_base_commit.sha')"
+          test "$COMPARE_STATUS" = "ahead"
+          test "$COMPARE_AHEAD_BY" -gt 0
+          test "$COMPARE_BEHIND_BY" -eq 0
+          test "$COMPARE_MERGE_BASE_SHA" = "$PARENT_SHA"
+          echo "sha=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
+          echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"
+          echo "source_ref=$EVENT_HEAD_REF" >> "$GITHUB_OUTPUT"
+          echo "source_repo=$EVENT_HEAD_REPO" >> "$GITHUB_OUTPUT"
+          echo "source_repo_id=$EVENT_HEAD_REPO_ID" >> "$GITHUB_OUTPUT"
+          echo "event_repo_id=$GITHUB_REPOSITORY_ID" >> "$GITHUB_OUTPUT"
+          echo "event_base_sha=$EVENT_BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "live_run_repo_id=$LIVE_RUN_REPO_ID" >> "$GITHUB_OUTPUT"
+          echo "live_run_head_sha=$LIVE_RUN_HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "live_run_head_is_pr_head=true" >> "$GITHUB_OUTPUT"
+          echo "live_run_head_ref=$LIVE_RUN_HEAD_REF" >> "$GITHUB_OUTPUT"
+          echo "live_run_workflow_path=$LIVE_RUN_WORKFLOW_PATH" >> "$GITHUB_OUTPUT"
+          echo "live_run_workflow_name=$LIVE_RUN_WORKFLOW_NAME" >> "$GITHUB_OUTPUT"
+          echo "live_run_event=$LIVE_RUN_EVENT" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_count=$LIVE_RUN_PR_COUNT" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_number=$LIVE_RUN_PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_is_non_authoritative=true" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_head_sha=$LIVE_RUN_PR_ASSOCIATION_HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_base_sha=$LIVE_RUN_PR_ASSOCIATION_BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_head_repo_id=$LIVE_RUN_PR_ASSOCIATION_HEAD_REPO_ID" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_base_repo_id=$LIVE_RUN_PR_ASSOCIATION_BASE_REPO_ID" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_head_sha=$LIVE_RUN_PR_ASSOCIATION_HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_head_repo_id=$LIVE_RUN_PR_ASSOCIATION_HEAD_REPO_ID" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_base_sha=$LIVE_RUN_PR_ASSOCIATION_BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_base_repo_id=$LIVE_RUN_PR_ASSOCIATION_BASE_REPO_ID" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_head_repo_name=$LIVE_RUN_PR_ASSOCIATION_HEAD_REPO_NAME" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_base_repo_name=$LIVE_RUN_PR_ASSOCIATION_BASE_REPO_NAME" >> "$GITHUB_OUTPUT"
+          echo "current_repo_id=$GITHUB_REPOSITORY_ID" >> "$GITHUB_OUTPUT"
+          echo "ancestry_status=$COMPARE_STATUS" >> "$GITHUB_OUTPUT"
+          echo "stack_distance=$COMPARE_AHEAD_BY" >> "$GITHUB_OUTPUT"
+          echo "stack_behind=$COMPARE_BEHIND_BY" >> "$GITHUB_OUTPUT"
+          echo "compare_merge_base_sha=$COMPARE_MERGE_BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "synthetic_merge_sha=$SYNTHETIC_MERGE_SHA" >> "$GITHUB_OUTPUT"
+          echo "merge_parent_1=$MERGE_PARENT_1" >> "$GITHUB_OUTPUT"
+          echo "merge_parent_2=$MERGE_PARENT_2" >> "$GITHUB_OUTPUT"
+          echo "merge_parent_check=true" >> "$GITHUB_OUTPUT"
+          echo "workflow_sha=$GITHUB_WORKFLOW_SHA" >> "$GITHUB_OUTPUT"
+          echo "workflow_ref=$GITHUB_WORKFLOW_REF" >> "$GITHUB_OUTPUT"
+          echo "trusted_workflow_path=$TRUSTED_WORKFLOW_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce stacked research surface
+        id: scope
+        env:
+          HEAD_SHA: ${{ steps.head.outputs.sha }}
+          PARENT_SHA: ${{ steps.head.outputs.parent_sha }}
+        run: |
+          EXPECTED_PATHS="$RUNNER_TEMP/hdc-linear-code-bounded-decoder-expected-paths"
+          CHANGED_PATHS="$RUNNER_TEMP/hdc-linear-code-bounded-decoder-changed-paths"
+          cat > "$EXPECTED_PATHS" <<'EOF'
+          .github/workflows/hdc-linear-code-syndrome-qualify.yml
+          crates/core/symthaea-core/src/hdc/mod.rs
+          crates/core/symthaea-core/src/hdc/syndrome_decoder.rs
+          crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs
+          docs/research/HDC_LINEAR_CODE_BOUNDED_DECODER.md
+          EOF
+          sort -u "$EXPECTED_PATHS" -o "$EXPECTED_PATHS"
+          git diff --name-only "$PARENT_SHA" "$HEAD_SHA" | sort -u > "$CHANGED_PATHS"
+          diff -u "$EXPECTED_PATHS" "$CHANGED_PATHS"
+          test "$(wc -l < "$CHANGED_PATHS" | tr -d ' ')" -eq 5
+          printf "parent_head_sha=%s\n" "$PARENT_SHA" >> "$GITHUB_OUTPUT"
+          printf "stacked_head_sha=%s\n" "$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          printf "changed_paths=" >> "$GITHUB_OUTPUT"
+          paste -sd "|" "$CHANGED_PATHS" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned Rust toolchain
+        id: toolchain_install
+        run: |
+          rustup toolchain install 1.96.1 --component rustfmt --component clippy --profile minimal --no-self-update
+
+      - name: Verify pinned Rust toolchain
+        id: toolchain
+        run: |
+          test "$(rustc +1.96.1 --version | awk '{print $2}')" = "1.96.1"
+          test "$(cargo +1.96.1 --version | awk '{print $2}')" = "1.96.1"
+
+      - name: Capture runner provenance
+        id: runner
+        run: |
+          echo "runner_os=$RUNNER_OS" >> "$GITHUB_OUTPUT"
+          echo "runner_arch=$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
+          echo "runner_image=$ImageOS" >> "$GITHUB_OUTPUT"
+          echo "runner_image_version=$ImageVersion" >> "$GITHUB_OUTPUT"
+
+      - name: Capture source provenance
+        id: provenance
+        run: |
+          sha256sum \
+            crates/core/symthaea-core/src/hdc/linear_code.rs \
+            crates/core/symthaea-core/src/hdc/syndrome_decoder.rs \
+            crates/core/symthaea-core/src/hdc/mod.rs \
+            crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs \
+            crates/core/symthaea-core/tests/linear_code_ambiguity.rs \
+            .github/workflows/hdc-linear-code-syndrome-qualify.yml \
+            docs/research/HDC_LINEAR_CODE_BOUNDED_DECODER.md \
+            > "$RUNNER_TEMP/source-sha256.txt"
+          mkdir -p hdc-linear-code-evidence
+          cp "$RUNNER_TEMP/source-sha256.txt" hdc-linear-code-evidence/source-sha256.txt
+
+      - name: Focused formatting
+        id: format
+        run: |
+          rustfmt +1.96.1 --check --edition 2024 \
+            crates/core/symthaea-core/src/hdc/syndrome_decoder.rs \
+            crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs
+          grep -Eq "^[[:space:]]*pub mod syndrome_decoder;" \
+            crates/core/symthaea-core/src/hdc/mod.rs
+
+      - name: Build isolated stacked harness
+        id: harness
+        run: |
+          HARNESS="$RUNNER_TEMP/hdc-linear-code-bounded-decoder"
+          rm -rf "$HARNESS"
+          mkdir -p "$HARNESS/src" "$HARNESS/tests"
+
+          cat > "$HARNESS/Cargo.toml" <<'EOF'
+          [package]
+          name = "symthaea-core"
+          version = "0.0.0"
+          edition = "2024"
+          publish = false
+
+          [lib]
+          path = "src/lib.rs"
+
+          [dependencies]
+          rand = "=0.8.6"
+          rand_chacha = "=0.3.1"
+          blake3 = "=1.8.2"
+          EOF
+
+          cat > "$HARNESS/src/lib.rs" <<EOF
+          pub mod hdc {
+              #[path = "${GITHUB_WORKSPACE}/crates/core/symthaea-core/src/hdc/linear_code.rs"]
+              pub mod linear_code;
+              #[path = "${GITHUB_WORKSPACE}/crates/core/symthaea-core/src/hdc/syndrome_decoder.rs"]
+              pub mod syndrome_decoder;
+          }
+          EOF
+
+          cp "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs" \
+            "$HARNESS/tests/linear_code_ambiguity.rs"
+          cp "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs" \
+            "$HARNESS/tests/linear_code_syndrome_decoder.rs"
+
+          cargo +1.96.1 generate-lockfile --manifest-path "$HARNESS/Cargo.toml"
+          LOCK_SHA256="$(sha256sum "$HARNESS/Cargo.lock" | cut -d" " -f1)"
+          echo "path=$HARNESS" >> "$GITHUB_OUTPUT"
+          echo "lock_sha256=$LOCK_SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Existing linear-code unit suite
+        id: unit_tests
+        run: |
+          cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --lib linear_code
+
+      - name: Existing ambiguity qualification
+        id: inherited_tests
+        run: |
+          cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_ambiguity
+
+      - name: Independent syndrome decoder qualification
+        id: decoder_tests
+        run: |
+          cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder
+
+      - name: Capture brute-force dual-space oracle
+        id: brute_force_dual_space
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            random_code_production_parity_check_rows_match_bruteforce_dual_space -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^BRUTE_FORCE_DUAL_SPACE_ORACLE=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^BRUTE_FORCE_DUAL_SPACE_ORACLE=//p')"
+          test -n "$LEDGER"
+          printf "brute_force_dual_space=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture fixed syndrome specification oracle
+        id: fixed_syndrome_spec
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            small_fixture_fixed_parity_check_spec_agrees_with_all_syndrome_oracles -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^FIXED_SYNDROME_SPEC=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^FIXED_SYNDROME_SPEC=//p')"
+          test -n "$LEDGER"
+          printf "fixed_syndrome_spec=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+      - name: Capture syndrome quotient metric ledger
+        id: quotient_metric
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            small_fixture_quotient_metric_matches_ambient_coset_geometry -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SYNDROME_QUOTIENT_METRIC=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SYNDROME_QUOTIENT_METRIC=//p')"
+          test -n "$LEDGER"
+          printf "syndrome_quotient_metric=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture full syndrome quotient distance spectrum
+        id: quotient_spectrum
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            small_fixture_full_coset_distance_spectrum_is_syndrome_difference_invariant -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SYNDROME_QUOTIENT_SPECTRUM=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SYNDROME_QUOTIENT_SPECTRUM=//p')"
+          test -n "$LEDGER"
+          printf "syndrome_quotient_spectrum=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture executable spectrum-label blind-spot adversary
+        id: spectrum_adversary
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            small_fixture_spectrum_adversary_demonstrates_nonadditive_label_blind_spot -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SYNDROME_SPECTRUM_ADVERSARY=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SYNDROME_SPECTRUM_ADVERSARY=//p')"
+          test -n "$LEDGER"
+          printf "syndrome_spectrum_adversary=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture exact syndrome fiber difference closure
+        id: fiber_difference
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            small_fixture_exact_fiber_difference_identity_holds_for_every_anchor -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SYNDROME_FIBER_DIFFERENCE=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SYNDROME_FIBER_DIFFERENCE=//p')"
+          test -n "$LEDGER"
+          printf "syndrome_fiber_difference=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture Walsh dual-fiber structure
+        id: walsh_dual_fiber
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            small_fixture_walsh_fibers_have_exact_dual_support_and_parseval -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^WALSH_DUAL_FIBER=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^WALSH_DUAL_FIBER=//p')"
+          test -n "$LEDGER"
+          printf "walsh_dual_fiber=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture syndrome/coset invariant ledger
+        id: coset_invariants
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            small_fixture_kernel_equals_code_and_syndrome_cosets_are_exact -- --nocapture 2>&1)"
+          LEDGER_COUNT="$(printf '%s\\n' "$OUTPUT" | grep -c '^SYNDROME_COSET_LEDGER=')"
+          test "$LEDGER_COUNT" -eq 1
+          LEDGER="$(printf '%s\\n' "$OUTPUT" | sed -n 's/^SYNDROME_COSET_LEDGER=//p')"
+          test -n "$LEDGER"
+          printf "syndrome_coset_ledger=%s\\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture exhaustive syndrome oracle and linearity ledger
+        id: syndrome_oracle
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            small_fixture_production_syndrome_matches_independent_oracle_and_is_linear -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SYNDROME_ORACLE_LINEAREXHAUSTIVE=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SYNDROME_ORACLE_LINEAREXHAUSTIVE=//p')"
+          test -n "$LEDGER"
+          printf "syndrome_oracle_linearity=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+      - name: Capture exact minimum-syndrome multiplicity ledger
+        id: multiplicity_invariant
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            minimum_weight_syndrome_multiplicity_matches_nearest_codeword_multiplicity_exhaustively -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^MIN_SYNDROME_MULTIPLICITY_LEDGER=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^MIN_SYNDROME_MULTIPLICITY_LEDGER=//p')"
+          test -n "$LEDGER"
+          printf "minimum_syndrome_multiplicity_ledger=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Verify explicit minimum-syndrome list truncation
+        id: minimum_list_capture
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            minimum_syndrome_list_truncation_is_explicit_and_fail_closed -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^MIN_SYNDROME_LIST_CAPTURE=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^MIN_SYNDROME_LIST_CAPTURE=//p')"
+          test -n "$LEDGER"
+          printf "minimum_syndrome_list_capture=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Prove factorization ambiguity is separate
+        id: factor_separation
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            factorization_ambiguity_is_distinct_from_syndrome_ambiguity -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\\n' "$OUTPUT" | grep -c '^FACTOR_SYNDROME_SEPARATION=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\\n' "$OUTPUT" | sed -n 's/^FACTOR_SYNDROME_SEPARATION=//p')"
+          test -n "$LEDGER"
+          printf "factor_syndrome_separation=%s\\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture coordinate permutation equivariance
+        id: coordinate_permutation
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            coordinate_permutation_equivariance_preserves_bounded_decoder_semantics -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^COORDINATE_PERMUTATION_EQUIVARIANCE=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^COORDINATE_PERMUTATION_EQUIVARIANCE=//p')"
+          test -n "$LEDGER"
+          printf "coordinate_permutation_equivariance=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture syndrome decoder ledger
+        id: decoder_ledger
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            decoder_work_ledger_matches_exact_weight_search_space -- --nocapture 2>&1)"
+          LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SYNDROME_DECODER_LEDGER=')"
+          test "$LEDGER_COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SYNDROME_DECODER_LEDGER=//p')"
+          test -n "$LEDGER"
+          printf "syndrome_decoder_ledger=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture generator-basis equivariance
+        id: generator_basis_equivariance
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            generator_basis_change_preserves_parity_check_and_decoder_semantics -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^GENERATOR_BASIS_EQUIVARIANCE=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^GENERATOR_BASIS_EQUIVARIANCE=//p')"
+          test -n "$LEDGER"
+          printf "generator_basis_equivariance=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+      - name: Capture composed metamorphic invariance
+        id: composed_metamorphic
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            composed_basis_and_coordinate_metamorphisms_preserve_decoder_semantics -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^COMPOSED_METAMORPHIC_EQUIVARIANCE=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^COMPOSED_METAMORPHIC_EQUIVARIANCE=//p')"
+          test -n "$LEDGER"
+          printf "composed_metamorphic_equivariance=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+      - name: Capture random-code list and independent-oracle sweep
+        id: random_list_oracle
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            random_code_list_surface_matches_independent_oracles_and_is_deterministic -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^RANDOM_LIST_ORACLE=')"
+          test "$COUNT" -eq 2
+          LEDGER="$(printf '%s\n' "$OUTPUT" | grep '^RANDOM_LIST_ORACLE=' | tr '\n' '|' | sed 's/|$//')"
+          test -n "$LEDGER"
+          printf "random_list_oracle=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture deterministic random-code sweep
+        id: random_sweep
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            random_small_and_low_rate_code_sweep_matches_exhaustive_oracle_within_guaranteed_radius -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^RANDOM_SYNDROME_SWEEP=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^RANDOM_SYNDROME_SWEEP=//p')"
+          test -n "$LEDGER"
+          printf "random_syndrome_sweep=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture beyond-radius semantics
+        id: beyond_radius
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            beyond_unique_radius_decoder_matches_nearest_or_no_match_without_claiming_target_recovery -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^BEYOND_RADIUS_LEDGER=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^BEYOND_RADIUS_LEDGER=//p')"
+          test -n "$LEDGER"
+          printf "beyond_radius_ledger=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+      - name: Strict Clippy
+        id: clippy
+        run: |
+          cargo +1.96.1 clippy --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --all-targets \
+            -- -D warnings
+
+      - name: Emit qualification receipt
+        if: always()
+        run: |
+          mkdir -p hdc-linear-code-evidence
+          cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
+          HDC Linear-Code Bounded Decoder Qualification
+          =============================================
+          receipt_schema=hdc-linear-code-bounded-decoder-trusted-runner-v1
+          github_run_id=${{ github.run_id }}
+          github_run_attempt=${{ github.run_attempt }}
+          github_workflow_sha=${{ github.workflow_sha }}
+          workflow_ref=${{ github.workflow_ref }}
+          trusted_execution_root=independent_main_verifier_blob_pin
+          event_name=${{ github.event_name }}
+          exact_head=${{ steps.head.outputs.sha }}
+          event_head_ref=${{ steps.head.outputs.source_ref }}
+          synthetic_merge_sha=${{ steps.head.outputs.synthetic_merge_sha }}
+          parent_head=${{ steps.head.outputs.parent_sha }}
+          parent_head_required=164d6b94d12bb72a902bdc2164d25cd540d3ba7f
+          source_repo=${{ steps.head.outputs.source_repo }}
+          source_repo_id=${{ steps.head.outputs.source_repo_id }}
+          canonical_repo=Luminous-Dynamics/symthaea
+          checkout_persist_credentials=false
+          live_run_pr_association_head_repo_name=${{ steps.head.outputs.live_run_pr_association_head_repo_name }}
+          live_run_pr_association_base_repo_name=${{ steps.head.outputs.live_run_pr_association_base_repo_name }}
+          event_repo_id=${{ steps.head.outputs.event_repo_id }}
+          current_repo_id=${{ steps.head.outputs.current_repo_id }}
+          live_run_repo_id=${{ steps.head.outputs.live_run_repo_id }}
+          live_run_head_sha=${{ steps.head.outputs.live_run_head_sha }}
+          live_run_head_ref=${{ steps.head.outputs.live_run_head_ref }}
+          live_run_workflow_path=${{ steps.head.outputs.live_run_workflow_path }}
+          live_run_workflow_name=${{ steps.head.outputs.live_run_workflow_name }}
+          live_run_event=${{ steps.head.outputs.live_run_event }}
+          workflow_sha=${{ steps.head.outputs.workflow_sha }}
+          workflow_ref=${{ steps.head.outputs.workflow_ref }}
+          live_run_pr_count=${{ steps.head.outputs.live_run_pr_count }}
+          live_run_pr_number=${{ steps.head.outputs.live_run_pr_number }}
+          live_run_pr_association_head_sha=${{ steps.head.outputs.live_run_pr_association_head_sha }}
+          live_run_pr_association_head_repo_id=${{ steps.head.outputs.live_run_pr_association_head_repo_id }}
+          live_run_pr_association_base_sha=${{ steps.head.outputs.live_run_pr_association_base_sha }}
+          live_run_pr_association_base_repo_id=${{ steps.head.outputs.live_run_pr_association_base_repo_id }}
+          event_base_sha=${{ steps.head.outputs.event_base_sha }}
+          ancestry_status=${{ steps.head.outputs.ancestry_status }}
+          stack_distance=${{ steps.head.outputs.stack_distance }}
+          stack_behind=${{ steps.head.outputs.stack_behind }}
+          compare_merge_base_sha=${{ steps.head.outputs.compare_merge_base_sha }}
+          research_surface_status=${{ steps.scope.outcome }}
+          research_surface_paths=${{ steps.scope.outputs.changed_paths }}
+          rust_toolchain=1.96.1
+          rust_toolchain_installation_status=${{ steps.toolchain_install.outcome }}
+          rust_toolchain_verification_status=${{ steps.toolchain.outcome }}
+          format_status=${{ steps.format.outcome }}
+          harness_status=${{ steps.harness.outcome }}
+          unit_tests_status=${{ steps.unit_tests.outcome }}
+          inherited_ambiguity_status=${{ steps.inherited_tests.outcome }}
+          syndrome_decoder_status=${{ steps.decoder_tests.outcome }}
+          strict_clippy_status=${{ steps.clippy.outcome }}
+          dependency_lock_sha256=${{ steps.harness.outputs.lock_sha256 }}
+          syndrome_oracle_linearity_status=${{ steps.syndrome_oracle.outcome }}
+          syndrome_oracle_linearity=${{ steps.syndrome_oracle.outputs.syndrome_oracle_linearity }}
+          syndrome_coset_ledger_status=${{ steps.coset_invariants.outcome }}
+          brute_force_dual_space_status=${{ steps.brute_force_dual_space.outcome }}
+          brute_force_dual_space=${{ steps.brute_force_dual_space.outputs.brute_force_dual_space }}
+          fixed_syndrome_spec_status=${{ steps.fixed_syndrome_spec.outcome }}
+          quotient_metric_status=${{ steps.quotient_metric.outcome }}
+          syndrome_quotient_metric=${{ steps.quotient_metric.outputs.syndrome_quotient_metric }}
+          quotient_spectrum_status=${{ steps.quotient_spectrum.outcome }}
+          syndrome_quotient_spectrum=${{ steps.quotient_spectrum.outputs.syndrome_quotient_spectrum }}
+          syndrome_spectrum_adversary_status=${{ steps.spectrum_adversary.outcome }}
+          syndrome_spectrum_adversary=${{ steps.spectrum_adversary.outputs.syndrome_spectrum_adversary }}
+          coordinate_permutation_equivariance_status=${{ steps.coordinate_permutation.outcome }}
+          coordinate_permutation_equivariance=${{ steps.coordinate_permutation.outputs.coordinate_permutation_equivariance }}
+          generator_basis_equivariance_status=${{ steps.generator_basis_equivariance.outcome }}
+          generator_basis_equivariance=${{ steps.generator_basis_equivariance.outputs.generator_basis_equivariance }}
+          composed_metamorphic_status=${{ steps.composed_metamorphic.outcome }}
+          composed_metamorphic_equivariance=${{ steps.composed_metamorphic.outputs.composed_metamorphic_equivariance }}
+          syndrome_fiber_difference_status=${{ steps.fiber_difference.outcome }}
+          syndrome_fiber_difference=${{ steps.fiber_difference.outputs.syndrome_fiber_difference }}
+          walsh_dual_fiber_status=${{ steps.walsh_dual_fiber.outcome }}
+          walsh_dual_fiber=${{ steps.walsh_dual_fiber.outputs.walsh_dual_fiber }}
+          fixed_syndrome_spec=${{ steps.fixed_syndrome_spec.outputs.fixed_syndrome_spec }}
+          syndrome_coset_ledger=${{ steps.coset_invariants.outputs.syndrome_coset_ledger }}
+          minimum_syndrome_multiplicity_status=${{ steps.multiplicity_invariant.outcome }}
+          minimum_syndrome_multiplicity_ledger=${{ steps.multiplicity_invariant.outputs.minimum_syndrome_multiplicity_ledger }}
+          factor_syndrome_separation_status=${{ steps.factor_separation.outcome }}
+          factor_syndrome_separation=${{ steps.factor_separation.outputs.factor_syndrome_separation }}
+          minimum_syndrome_list_capture_status=${{ steps.minimum_list_capture.outcome }}
+          minimum_syndrome_list_capture=${{ steps.minimum_list_capture.outputs.minimum_syndrome_list_capture }}
+          random_list_oracle_status=${{ steps.random_list_oracle.outcome }}
+          random_list_oracle=${{ steps.random_list_oracle.outputs.random_list_oracle }}
+          syndrome_decoder_ledger_status=${{ steps.decoder_ledger.outcome }}
+          runner_os=${{ steps.runner.outputs.runner_os }}
+          runner_arch=${{ steps.runner.outputs.runner_arch }}
+          runner_image=${{ steps.runner.outputs.runner_image }}
+          runner_image_version=${{ steps.runner.outputs.runner_image_version }}
+          workflow_identity_status=live_run_path_and_name_matched
+          trusted_execution_root=independent_main_verifier_blob_pin
+          trusted_workflow_path=${{ steps.head.outputs.trusted_workflow_path }}
+          trusted_workflow_sha=${{ steps.head.outputs.workflow_sha }}
+          artifact_revalidation_deferred=true
+          qualification_status_pre_artifact=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.generator_basis_equivariance.outcome == 'success' && steps.composed_metamorphic.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.brute_force_dual_space.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.spectrum_adversary.outcome == 'success' && steps.coordinate_permutation.outcome == 'success' && steps.fiber_difference.outcome == 'success' && steps.walsh_dual_fiber.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
+          random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
+          random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}
+          beyond_radius_status=${{ steps.beyond_radius.outcome }}
+          beyond_radius_ledger=${{ steps.beyond_radius.outputs.beyond_radius_ledger }}
+          EOF
+
+      - name: Upload qualification receipt
+        id: upload_receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hdc-linear-code-bounded-decoder-${{ github.event.pull_request.head.sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: hdc-linear-code-evidence
+          if-no-files-found: error
+
+      - name: Revalidate uploaded artifact provenance
+        id: artifact_revalidate
+        if: always() && steps.upload_receipt.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXACT_HEAD: ${{ steps.head.outputs.sha }}
+          SYNTHETIC_MERGE_SHA: ${{ steps.head.outputs.synthetic_merge_sha }}
+          RUN_ID: ${{ github.run_id }}
+          ARTIFACT_ID: ${{ steps.upload_receipt.outputs.artifact-id }}
+          EXPECTED_NAME: hdc-linear-code-bounded-decoder-${{ steps.head.outputs.sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          EXPECTED_REPO_ID: 1136141775
+        run: |
+          test -n "$ARTIFACT_ID"
+          ARTIFACT_JSON="$(gh api --method GET -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}")"
+          REFETCH_ID="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".id")"
+          REFETCH_NAME="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".name")"
+          REFETCH_REPO_ID="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".workflow_run.repository_id")"
+          REFETCH_RUN_ID="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".workflow_run.id")"
+          REFETCH_HEAD_SHA="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".workflow_run.head_sha")"
+          REFETCH_HEAD_REPO_ID="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".workflow_run.head_repository_id")"
+          REFETCH_DIGEST="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".digest")"
+          test "$REFETCH_ID" = "$ARTIFACT_ID"
+          test "$REFETCH_NAME" = "$EXPECTED_NAME"
+          test "$REFETCH_REPO_ID" = "$EXPECTED_REPO_ID"
+          test "$REFETCH_RUN_ID" = "$RUN_ID"
+          test "$REFETCH_HEAD_SHA" = "$EXACT_HEAD"
+          test "$REFETCH_HEAD_REPO_ID" = "$EXPECTED_REPO_ID"
+          test "$EXACT_HEAD" != "$EXPECTED_MERGE_SHA"
+          test -n "$REFETCH_DIGEST"
+          echo "artifact_refetch_id=$REFETCH_ID" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_name=$REFETCH_NAME" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_repo_id=$REFETCH_REPO_ID" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_run_id=$REFETCH_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_head_sha=$REFETCH_HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_synthetic_merge_sha=$SYNTHETIC_MERGE_SHA" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_pr_head_sha=$EXACT_HEAD" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_head_repo_id=$REFETCH_HEAD_REPO_ID" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_digest=$REFETCH_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_match=true" >> "$GITHUB_OUTPUT"
+      - name: Publish artifact provenance summary
+        if: always() && steps.upload_receipt.outcome == 'success'
+        env:
+          EXACT_HEAD: ${{ steps.head.outputs.sha }}
+          PARENT_HEAD: ${{ steps.head.outputs.parent_sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          ARTIFACT_ID: ${{ steps.upload_receipt.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.upload_receipt.outputs.artifact-url }}
+          ARTIFACT_DIGEST: ${{ steps.upload_receipt.outputs.artifact-digest }}
+        run: |
+          test -n "$ARTIFACT_ID"
+          test -n "$ARTIFACT_URL"
+          test -n "$ARTIFACT_DIGEST"
+          {
+            echo "## HDC qualification artifact provenance"
+            echo "- exact_head: \`$EXACT_HEAD\`"
+            echo "- parent_head: \`$PARENT_HEAD\`"
+            echo "- github.run_id: \`$RUN_ID\`"
+            echo "- github.run_attempt: \`$RUN_ATTEMPT\`"
+            echo "- github.workflow_sha: \`$WORKFLOW_SHA\`"
+            echo "- github.workflow_ref: \`$WORKFLOW_REF\`"
+            echo "- artifact_id: \`$ARTIFACT_ID\`"
+            echo "- artifact_digest: \`$ARTIFACT_DIGEST\`"
+            echo "- artifact_url: $ARTIFACT_URL"
+          } >> "$GITHUB_STEP_SUMMARY"
