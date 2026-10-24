@@ -24,7 +24,7 @@ This implementation adds a process-local typed ledger in `crates/core/nixward/sr
 This is deliberately a **same-process, in-memory primitive**, not a complete security boundary.
 
 1. The caller of `issue` remains trusted to call it only after a real approval or policy decision. The type does not authenticate its own issuer.
-2. An executor can still bypass the ledger until dispatch integration is complete. No current Nixward execution path is claimed to be protected by this change alone.
+2. The new `execute_with_permit` method checks a capability before calling the shared injectable process runner, but ordinary `execute`, public `execute_confirmed`, generation capture, daemon execution, rollback and the legacy executor remain separate paths. This is not a repository-wide fail-closed guarantee.
 3. The handle and receipt are not signed and must not cross a process boundary as trusted evidence. A future daemon/worker split needs authenticated, replay-resistant receipts and a well-defined key/identity lifecycle.
 4. The ledger's IDs and replay state are process-local, not durable across restart. Persistence and crash consistency belong in the later enforcement design.
 5. Command equality does not by itself prove that a command is safe, that the principal is correctly authenticated, or that policy was appropriate. It only binds the permit to the attempt that consumes it.
@@ -47,7 +47,7 @@ The unit-test contract is:
 | Whitespace-bearing arguments versus multiple argv entries | remain distinguishable |
 | Empty executable, embedded NUL, zero lifetime | reject |
 
-The library tests prove the in-memory model only. They do not prove that the real process runner has been gated.
+The authored unit tests cover the in-memory model and exercise `execute_with_permit` against a counting mock runner, asserting one invocation for a valid permit and zero invocations for replay, command substitution, unsupported custom commands, and malformed identity. They do not prove that every existing production path is gated, and they have not been executed in this environment.
 
 ## Integration acceptance gates
 
@@ -78,7 +78,7 @@ Proposed initial deterministic suite: 10,000 generated attempts, stratified acro
 Proposed targets—not current results:
 
 - **100%** rejection of all deterministic invalid/replayed capabilities in the frozen suite.
-- **0** protected side effects on denied paths in the mock-runner harness.
+- **0** mock-runner invocations (and, in a later OS-level sandbox harness, zero protected side effects) on denied paths.
 - **100%** valid positive-control dispatches for policies defined as allowed.
 - **0** duplicate process invocations from concurrent consumption of one permit.
 - Report false permits, false blocks, request rate, dispatch rate, side effects, and p50/p95/p99 overhead separately.
