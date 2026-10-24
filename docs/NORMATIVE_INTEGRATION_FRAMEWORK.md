@@ -141,8 +141,8 @@ From `examples/substrate_moral_topology_study.rs`:
 
 From moral algebra classification:
 
-- **91.1% accuracy** on ethical scenario classification (not hardcoded)
-- **Per-category classifiers** contribute 33.6 percentage points (ablation)
+- Historical 91.1% accuracy claim is unqualified pending task semantics, split/manifest reconciliation and independent reproduction
+- Historical per-category ablation gain (33.6 percentage points) is unqualified: existing ablation harness trains and evaluates those classifiers on the same ethics.json, creating in-sample leakage
 - Sentiment analysis contributes 2.4pp, dimension tuning 0.7pp
 
 ## Benchmark: NormativeIntegration

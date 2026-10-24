@@ -91,7 +91,7 @@ If classified as High-Risk, Symthaea must satisfy Articles 8-15. Current complia
 | Monitoring/functioning description | **Implemented** | CycleMetadata (75+ fields), SafetyAgent, SelfAssessmentMonitor |
 | Risk management system | **Implemented** | `AI_RISK_REGISTER.md` |
 | Changes made during lifecycle | **Partial** | Git history; ADR system started but sparse |
-| Performance metrics | **Implemented** | Phi validation (r=0.99), moral classification (91.1%), CfC cycle time (4.3ms), psych-bench baselines |
+| Performance metrics | **Partial** | Phi validation and cycle telemetry have separate evidence; historical moral classification score is unqualified pending task-matched validation |
 | Post-market monitoring plan | **Not yet** | System not yet deployed |
 
 ### Article 12: Record-Keeping (Logging)
@@ -128,7 +128,7 @@ If classified as High-Risk, Symthaea must satisfy Articles 8-15. Current complia
 
 | Requirement | Status | Implementation |
 |-------------|--------|----------------|
-| Appropriate accuracy levels | **Implemented** | Phi r=0.99, moral classification 91.1%, CfC 234Hz release mode |
+| Appropriate accuracy levels | **Partial** | No qualified task-matched moral accuracy baseline; previous 91.1% claim is unqualified |
 | Resilience to errors/inconsistencies | **Implemented** | NaN-safe clamping in SafetyMetrics, proptest stability validation, homeostasis regulation |
 | Resilience to adversarial attempts | **Partial** | SafetyGateway blocks dangerous inputs; no adversarial ML robustness testing |
 | Cybersecurity measures | **Implemented** | PQC readiness documented; Holochain cryptographic integrity; Ed25519 signatures |
@@ -236,7 +236,7 @@ This assessment was conducted in good faith based on the current state of the Sy
 The developer acknowledges:
 1. Consciousness metrics are proxy-based and should not be interpreted as measuring phenomenal consciousness (TECHNICAL_STATUS.md, Key Observation #2)
 2. Substrate feasibility for silicon has honest_confidence of 0.10 (theoretical evidence only)
-3. Moral classification accuracy is 91.1%, leaving a ~9% error rate that requires human oversight
+3. Moral classification accuracy is not currently qualified; no error rate should be inferred until a task-matched held-out evaluation is reproduced
 4. The system's novel characteristics (consciousness gating, moral algebra, autonomous cognitive loop) may not be fully addressed by existing regulatory categories
 
 ---

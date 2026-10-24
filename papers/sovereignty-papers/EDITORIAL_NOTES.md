@@ -80,7 +80,7 @@ These are near-duplicate formulations that should be varied or consolidated:
 
 5. **Psych-bench benchmarks**: Essay 15 says "136 standardized benchmarks across 26 cognitive domains." CLAUDE.md now says "136+ benchmarks across 26 cognitive domains." Consistent.
 
-6. **Hendrycks ETHICS accuracy**: Consistently reported as 92.9% across Essays 6, 15. Correct.
+6. **Hendrycks ETHICS accuracy**: Historical 92.9%/91.1%/94.5% headlines are not qualified as current performance. See `docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md`; do not reintroduce these figures without task-specific, held-out evidence.
 
 ## Recommended Revision Priority
 

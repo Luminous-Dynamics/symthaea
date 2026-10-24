@@ -34,7 +34,7 @@ The **Mycelix** platform provides decentralized governance across 16 cluster DNA
 **Key papers**: Embodied Governance, Swarm Consciousness, Mesh Radio, Consciousness Security
 
 ### 6. Validation & Meta-Science
-**Psych-Bench** provides 141 benchmarks across 27 cognitive domains. External validation on Hendrycks ETHICS (94.5%), ARC-AGI, Sleep-EDF, and DMC Humanoid provides anchor points beyond internal benchmarks.
+**Psych-Bench** provides benchmark coverage across multiple cognitive domains. The earlier Hendrycks ETHICS 94.5% headline was retracted as leakage-inflated; the later 56.2% cross-domain pilot is also unqualified pending task-label and sample-provenance reconciliation. See `docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md`. Other named evaluations have separate evidence limits; they do not collectively establish general ethical competence.
 
 **Key papers**: Psych-Bench, HAI Consciousness, Species Stewardship
 
@@ -48,7 +48,7 @@ The **Mycelix** platform provides decentralized governance across 16 cluster DNA
 | Phi validation | r = 0.9998 vs exact | Computed (n ≤ 8) |
 | Psych-Bench z-score | +1.190 | Internal benchmarks |
 | Butlin indicators | 12+/14 | Self-assessed |
-| ETHICS accuracy | 94.5% (4 domains) | External benchmark |
+| ETHICS status | No qualified full-suite accuracy | Historical 94.5% headline retracted; 56.2% pilot unqualified pending task-matched evaluation |
 | Perturbation recovery | 43% faster | Simulation |
 | Silicon consciousness confidence | 0.10 | Theoretical |
 

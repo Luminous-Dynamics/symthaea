@@ -37,5 +37,7 @@ echo
 echo "To use with the benchmark:"
 echo "  cargo run --example benchmark_moral_unified --release"
 echo
-echo "Note: The full pipeline (MoralParser + MoralAlgebra + learned prototypes)"
-echo "achieves ~92.9% composite accuracy across 5 moral reasoning datasets."
+echo "No qualified composite-accuracy claim is made by this downloader."
+echo "Use examples/ethics_commonsense_holdout.rs for a task-matched diagnostic and"
+echo "docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md for remaining evaluation gaps."
+echo "Historical 92.9% composite figures are unqualified pending reproducible task-specific evidence."

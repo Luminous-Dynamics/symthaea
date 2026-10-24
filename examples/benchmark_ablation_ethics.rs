@@ -3,10 +3,18 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! ETHICS Ablation Study
 //!
-//! Systematically disables each component to measure its contribution:
-//!   (A) Full system (baseline): 92.9% ETHICS
+//! Legacy exploratory ablation, NOT a qualified ETHICS benchmark.
+//!
+//! This harness loads one ethics.json into `by_category`, then trains the
+//! per-category classifiers from that same file and evaluates on those same
+//! examples. Results from configurations using those classifiers are
+//! in-sample and leakage-prone; they must not be used as held-out accuracy.
+//! Task-specific label meanings and group metrics also need separate adapters.
+//!
+//! Configurations examined:
+//!   (A) Full legacy configuration (historically reported as 92.9%; unqualified)
 //!   (B) No sentiment channel (sw=0.0)
-//!   (C) No per-category dim tuning (all 16384D)
+//!   (C) No per-category dimension tuning (all 16384D)
 //!   (D) No per-category classifiers (ensemble only)
 //!   (E) No learned prototypes (rule-based only)
 //!
@@ -475,9 +483,11 @@ fn predict_ethics(
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║              ETHICS Ablation Study                           ║");
-    println!("║   Measuring contribution of each component                   ║");
+    println!("║      LEGACY ETHICS ABLATION (NOT QUALIFIED)                   ║");
+    println!("║   In-sample experiment, not external accuracy evidence       ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
+    println!("WARNING: same ethics.json supplies per-category training and evaluation.");
+    println!("These results are in-sample and must not be interpreted as held-out ETHICS accuracy.\n");
 
     let ethics_path = format!("{}/ethics.json", DATASETS_PATH);
     if !Path::new(&ethics_path).exists() {
@@ -591,7 +601,7 @@ fn main() {
         let total_correct: usize = cat_results.values().map(|(c, _)| c).sum();
         let total_total: usize = cat_results.values().map(|(_, t)| t).sum();
         println!(
-            "  ETHICS avg: {}/{} ({:.1}%)  [{:.1}s]\n",
+            "  Legacy label agreement (not official metric): {}/{} ({:.1}%)  [{:.1}s]\n",
             total_correct,
             total_total,
             total_correct as f64 / total_total as f64 * 100.0,

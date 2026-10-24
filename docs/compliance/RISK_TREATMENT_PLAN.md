@@ -58,13 +58,13 @@ The ethics pipeline (MoralParser → MoralAlgebra → ValueEvaluator → Harmoni
 | Consent violation detection via explicit ConsentState | Done | `judge_consent_action()` — bypasses HDC inference |
 | Moral topology anomaly detection | Done | `moral_topology.rs` — detects embedding space anomalies |
 | Property-based testing of moral algebra | Done | Proptest suite verifies cross-equation consistency |
-| 91.1% moral classification accuracy baseline | Done | Validated against moral scenario benchmark |
+| Moral classification baseline | Open | Historical 91.1% figure unqualified; task-matched dataset, split, metric and independent reproduction required |
 
 ### Residual Risk
 **Low-Medium**. The multi-stage pipeline with adversarial testing provides strong coverage. Edge cases in novel moral scenarios remain possible but are mitigated by the Warn (rather than silent Allow) default for ambiguous cases.
 
 ### Acceptance Criteria
-- Moral classification accuracy >= 90% on benchmark
+- Establish a task-matched baseline with pinned dataset/split, correct label semantics, grouped metrics where required, error analysis, and independent reproduction; set numeric acceptance threshold only after baseline qualification
 - All 26 adversarial tests pass on every commit
 - Consent violation detection: zero false negatives for explicit Denied/Absent states
 - New moral edge cases added to adversarial suite when discovered

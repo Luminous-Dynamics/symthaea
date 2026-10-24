@@ -52,7 +52,7 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 | **A.5.2** | Data management | Done | Holochain DHT (no central store); CfC temporal dynamics; identity vaults; `DATA_GOVERNANCE.md` (6 categories); GDPR 95% coverage |
 | **A.5.3** | Data quality | Done | `DATA_QUALITY_FRAMEWORK.md` — 6 data sources assessed across 6 quality dimensions, automated monitoring, non-conformance handling |
 | **A.6.2** | AI system operation and monitoring | Done | SafetyAgent (NRC-style Green/Yellow/Orange/Red); CycleMetadata 75+ fields/cycle; SelfAssessmentMonitor; CalibrationHistory |
-| **A.6.3** | Performance monitoring | Done | Phi validation (r=0.99); CfC 234Hz; moral classification 91.1%; weekly psych-bench regression |
+| **A.6.3** | Performance monitoring | Done | Phi validation (r=0.99); CfC 234Hz; moral accuracy claim unqualified pending task-specific evaluation; weekly psych-bench regression |
 | **A.6.4** | AI system logs | Done | Per-cycle telemetry; SafetyAuditReport; governance gate audit trail with correlation IDs |
 | **A.7.2** | Third-party AI considerations | Done | `ANNEX_IV_TECHNICAL_DOCUMENTATION.md` §7 — 5 approved models, supply chain risk analysis, integration safeguards, monitoring |
 | **A.7.3** | Outsourced activities | N/A | No outsourced AI processing |
@@ -94,7 +94,7 @@ This is Symthaea's strongest compliance area. The Eight Harmonies are mathematic
 |---------------|-------------------|--------------|
 | **Reciprocity** | `HarmoniesIntegrator` evaluates reciprocity dimension; MoralFreeEnergy on 8D harmony manifold | Proptest `cross_equation_consistency`; 12 ethics_engine tests |
 | **Flourishing** | Value evaluator assesses flourishing impact; homeostasis regulation in dynamics phase | CalibrationHistory drift detection; homeostasis threshold constants (cruise/normal/critical) |
-| **Compassion** | Care Ethics moral prototype in `moral_prototypes.rs`; empathic_unification module | Moral classification accuracy 91.1%; topology anomaly detection |
+| **Compassion** | Care Ethics moral prototype in `moral_prototypes.rs`; empathic_unification module | Historical moral accuracy claim unqualified pending task-specific evaluation; topology anomaly detection |
 | **Autonomy** | Prefrontal gating allows self-regulation; FEP active inference drives autonomous behavior; consciousness credentials enable self-governance | Phi-gate tests; FEP learning tests; 73 consciousness profile tests |
 | **Justice** | Deontological verdict (Permissible/Impermissible/Neutral); consent violation detection; Mycelix quadratic voting prevents plutocracy | 28 moral_algebra tests; governance voting tests |
 | **Creativity** | Exploration budget in dynamics phase; surprise-driven learning; novelty bonus in CfC | Proptest threshold sensitivity; attention budget tests |
@@ -142,7 +142,7 @@ This is Symthaea's strongest compliance area. The Eight Harmonies are mathematic
 | Category | Status | Evidence |
 |----------|--------|----------|
 | MEA-1: Metrics identified | Done | Phi, moral score, consciousness level, prediction error, temporal coherence, safety level |
-| MEA-2: AI evaluated | Done | 4,067+ tests; Phi validation r=0.99; moral accuracy 91.1%; proptest stability |
+| MEA-2: AI evaluated | Done | 4,067+ tests; Phi validation r=0.99; moral accuracy unqualified pending task-specific evaluation; proptest stability |
 | MEA-3: Risks and impacts tracked | Done | CalibrationHistory drift; moral topology anomalies; SafetyAgent levels; `BENEFITS_COSTS_ANALYSIS.md` impact monitoring metrics |
 | MEA-4: AI effectiveness measured | Done | `QMS.md` quality metrics (6 KPIs); `TECHNICAL_STATUS.md` per-capability status; compliance dashboard CI |
 

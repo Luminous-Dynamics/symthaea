@@ -24,9 +24,11 @@
 //!
 //! ## Note on Hendrycks ETHICS
 //!
-//! The full-pipeline moral reasoning benchmark (92.9% on 5 datasets) lives in
-//! `examples/benchmark_moral_unified.rs`, which uses MoralParser + MoralAlgebra +
-//! learned HDC prototypes — NOT the keyword-matching adapter that was previously here.
+//! Historical ETHICS experiments exist in `examples/benchmark_moral_unified.rs`,
+//! but prior aggregate claims are not currently qualified. The current cross-domain
+//! pilot fails to preserve the tasks' distinct target semantics; see
+//! `docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md`. Do not use these legacy
+//! figures as external validation or as evidence of general moral competence.
 
 pub mod fact_verification;
 pub mod simple_qa;

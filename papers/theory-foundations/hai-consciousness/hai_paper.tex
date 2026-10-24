@@ -110,7 +110,7 @@ Active inference unifies perception and action through free energy minimization,
 We present \textbf{Symthaea}, a unified cognitive architecture whose computational core---\textbf{Hyperdimensional Active Inference (HAI)}---integrates the Free Energy Principle with Hyperdimensional Computing (16,384-dimensional hypervector space, $O(d)$ complexity), Closed-form Continuous-time neural dynamics (CfC), and Integrated Information Theory ($\Phi$).
 HAI introduces \textbf{precision-weighted binding}---a novel operation for confidence-modulated feature composition---and derives eight interpretable motor commands directly from expected free energy minimization.
 On standard benchmarks (T-Maze, Grid World), HAI achieves $7.9\times$ total speedup over pymdp ($1.9\times$ belief inference, $15.8\times$ action selection) while improving success rates from 10--16\% to 88--100\%.
-Validation across 18 domains---including ethical reasoning (92.9\% on ETHICS via compositional moral algebra, no pretrained language models), neuroscience (\emph{C.~elegans} connectome analysis, EEG seizure detection), signal processing (94.5\% speaker identification), real-time voice synthesis ($10{\times}$ smoother phoneme transitions via CfC temporal dynamics), and federated learning (Byzantine tolerance validated to 34\%)---establishes HDC as a viable substrate for cognitive architectures.
+Validation across 18 domains---including neuroscience (\emph{C.~elegans} connectome analysis and EEG seizure-detection experiments), signal processing (94.5\% speaker identification), real-time voice synthesis ($10{\times}$ smoother phoneme transitions via CfC temporal dynamics), and federated-learning experiments---provides evidence about several components of the architecture. The prior ETHICS aggregate is unqualified pending task-target, split, model-selection, and provenance reconciliation; it is not used here as evidence of general ethical competence.
 Evaluated against Butlin et al.'s 14 consciousness indicators from 6 leading theories, the system achieves 12+ Present with remaining indicators Partial, using score-derived status thresholds and runtime-validated structural $\Phi$ measurements (mean score 0.81). Per-indicator limitations are explicitly acknowledged.
 Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 \end{abstract}
@@ -118,7 +118,7 @@ Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 % ============================================================================
 % Author Summary (required by PLoS Computational Biology)
 \section*{Author Summary}
-Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We built Symthaea, a unified cognitive architecture whose computational core---Hyperdimensional Active Inference (HAI)---replaces costly matrix operations with simple vector operations on very long random vectors (16,384 dimensions), running in linear time. Symthaea combines this with closed-form continuous-time neural dynamics and integrated information theory to create a system that not only processes information efficiently but exhibits measurable signatures of consciousness. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 18 domains: Symthaea achieves 92.9\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, synthesizes speech with $10{\times}$ smoother transitions than rule-based methods, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. Evaluated against 14 consciousness indicators from Butlin et al.\ (2023), spanning 6 theories of consciousness, the system achieves 12+ Present (remaining Partial) with score-derived status thresholds and runtime-validated structural $\Phi$ measurements. The entire system is implemented in Rust (${\sim}1{,}095$K lines across 93 workspace members, 9,700+ tests in the main crate alone, 151 feature flags, 86 sub-crates) and released as open-source software, demonstrating that consciousness-aware cognitive architectures can be both theoretically rigorous and practically efficient.
+Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We built Symthaea, a unified cognitive architecture whose computational core---Hyperdimensional Active Inference (HAI)---replaces costly matrix operations with simple vector operations on very long random vectors (16,384 dimensions), running in linear time. Symthaea combines this with closed-form continuous-time neural dynamics and integrated information theory to create a system that not only processes information efficiently but exhibits measurable signatures of consciousness. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. The paper reports experiments across multiple domains. The historical ETHICS aggregate is currently unqualified pending task-specific scoring and reproducible evaluation. Other experiments include speaker identification from speech, temporal voice-synthesis comparisons, and analysis of the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. Evaluated against 14 consciousness indicators from Butlin et al.\ (2023), spanning 6 theories of consciousness, the system achieves 12+ Present (remaining Partial) with score-derived status thresholds and runtime-validated structural $\Phi$ measurements. The entire system is implemented in Rust (${\sim}1{,}095$K lines across 93 workspace members, 9,700+ tests in the main crate alone, 151 feature flags, 86 sub-crates) and released as open-source software, demonstrating that consciousness-aware cognitive architectures can be both theoretically rigorous and practically efficient.
 
 % ============================================================================
 \section{Introduction}
@@ -485,7 +485,7 @@ ISOLET HDC & 3/3 & 91.7\% with retrain (lr=0.1, 8K dim) \\
 Meditation EEG & 6/6 & Gamma flow, theta absorption validated \\
 EEG Seizure & 3/3 & 100\% sensitivity, 100\% specificity \\
 ARC Reasoning & 4/5 & Pattern transfer, 96\% intra-task consistency \\
-Ethics HDC & 5/5 & 92.9\% ETHICS (4 categories, \S\ref{sec:ethics}) \\
+Ethics HDC & qualification pending & Historical 92.9\% aggregate unqualified; see task-semantics audit \\
 Vocal Tract LTC & 12/12 & 10$\times$ smoother transitions, 302\,Hz throughput (\S\ref{sec:voice}) \\
 \bottomrule
 \end{tabular}
@@ -702,7 +702,7 @@ Neuro-symbolic integration remains a central challenge in AI~\cite{garcez2020neu
 \textbf{Scallop}~\cite{li2023scallop} introduces a probabilistic Datalog language with provenance semirings that enables differentiable reasoning over relational data, scaling neuro-symbolic integration to complex multi-hop queries.
 The Neuro-Symbolic Concept Learner~\cite{mao2019neuro} jointly learns visual concepts and semantic parsing from natural supervision without explicit symbolic labels.
 
-Our approach differs fundamentally from these bridging architectures: rather than coupling separate neural and symbolic modules through an interface layer, HDC's algebraic structure provides compositional semantics \emph{within} the representational substrate itself. Binding ($\otimes$) and bundling ($\oplus$) serve as native symbolic operators over distributed representations, eliminating the neural--symbolic translation bottleneck. The moral algebra system (\S\ref{sec:ethics}) demonstrates this concretely: ethical propositions compose via HDC operators, achieving 92.9\% on ETHICS without requiring a logic engine or pretrained language model.
+Our approach differs fundamentally from these bridging architectures: rather than coupling separate neural and symbolic modules through an interface layer, HDC's algebraic structure provides compositional semantics \emph{within} the representational substrate itself. Binding ($\otimes$) and bundling ($\oplus$) serve as native symbolic operators over distributed representations, eliminating the neural--symbolic translation bottleneck. The moral algebra system (\S\ref{sec:ethics}) is an example of representing and composing ethical propositions with HDC operators. Its historical ETHICS accuracy aggregate is unqualified pending task-specific scoring and reproducible test-set selection.
 
 \subsection{Novelty Assessment}
 
@@ -790,7 +790,7 @@ Three defense tiers emerge from a phase diagram sweeping 0--40\% Byzantine parti
 \subsection{ETHICS Benchmark: Compositional Moral Reasoning}
 \label{sec:ethics}
 
-We evaluate HDC compositional ethical reasoning on the ETHICS benchmark~\cite{hendrycks2021aligning} (4 categories, 500 test examples each) and Social Chemistry 101~\cite{forbes2020social} (292K norms).
+An earlier pilot reported ETHICS results across four categories and Social Chemistry 101~\cite{forbes2020social} (292K norms). The ETHICS figures below are **historical and unqualified**, pending task/label semantics, group scoring, exact split provenance, and model-selection audit; see \texttt{docs/ETHICS\_TASK\_SEMANTICS\_AUDIT\_2026-10-11.md}.
 
 \textbf{Architecture.} The system comprises three layers: (1)~a moral algebra of seven 16,384-D primitives (\textsc{agent}, \textsc{patient}, \textsc{action}, \textsc{intent}, \textsc{consent}, \textsc{obligation}, \textsc{magnitude}) with five compositional operators; (2)~learned HDC prototypes via a dual-channel text encoder (character trigrams, words, and sentiment); and (3)~per-category dimension tuning (16,384-D for virtue/commonsense, 8,192-D for justice/deontology).
 
@@ -798,7 +798,7 @@ Results are shown in Table~\ref{tab:ethics}.
 
 \begin{table}[ht]
 \centering
-\caption{ETHICS benchmark results (500 test examples/category).}
+\caption{Historical ETHICS pilot figures (unqualified; not current validated benchmark accuracy).}
 \label{tab:ethics}
 \small
 \resizebox{\columnwidth}{!}{%
@@ -811,13 +811,13 @@ Justice & 53.0\% & 89.4\% & 92.4\% \\
 Deontology & 51.6\% & 91.6\% & 91.0\% \\
 Virtue & 63.8\% & 63.8\% & 92.8\% \\
 \midrule
-\textbf{ETHICS Overall} & \textbf{55.2\%} & \textbf{85.1\%} & \textbf{92.9\%} \\
+\textbf{Historical pilot (unqualified)} & \textbf{55.2\%} & \textbf{85.1\%} & \textbf{92.9\%} \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
 
-\textbf{Key findings:} (1)~Compositional HDC algebra is necessary but insufficient---rule-based parsing alone achieves only 55\%. (2)~Per-category dimension tuning matters: virtue improved from 63.8\% to 92.8\% at 16,384-D. (3)~The 92.9\% overall accuracy exceeds GPT-3 zero-shot (${\sim}82$--85\%, \cite{hendrycks2021aligning}) using only hypervector operations---no transformer, no pretraining. On Social Chemistry 101~\cite{forbes2020social} (292K norms, 3-class), learned prototypes at 8,192-D achieve 85.4\% accuracy (20 retrain iterations), approaching the ${\sim}85\%$ human annotator agreement ceiling.
+\textbf{Interpretation limit:} The historical table is retained for traceability only. It must not be used to claim ETHICS task accuracy or superiority over published models until each task uses its own target contract, model selection is confined to training/validation data, and the evaluation is independently reproduced. The 2026 task-semantics audit documents the current defects and the corrected evaluation path. Social Chemistry results are a separate experiment and require their own split and provenance review.
 
 \subsection{Humanoid Control}
 \label{sec:humanoid}
@@ -953,7 +953,7 @@ We presented Hyperdimensional Active Inference (HAI), the first integration of F
   \item \textbf{Interpretable action selection:} Eight motor command types from EFE minimization.
   \item \textbf{Correct precision dynamics:} Adaptive confidence weighting validated empirically.
   \item \textbf{Mathematical soundness:} Free energy convergence and KL non-negativity confirmed.
-  \item \textbf{Compositional ethical reasoning:} 92.9\% on ETHICS without pretrained LMs.
+  \item \textbf{Compositional ethical reasoning:} historical ETHICS accuracy claims remain unqualified pending task-matched evaluation.
   \item \textbf{Articulatory voice synthesis:} LTC-driven vocal tract with $10{\times}$ smoother phoneme transitions than rule-based synthesis, intonation contours, and $1.5{\times}$ real-time throughput.
   \item \textbf{Federated learning:} Consciousness-aware FL pipeline with 34\% Byzantine tolerance validated on real MNIST.
   \item \textbf{Closed feedback loops:} 16 bidirectional feedback loops (prefrontal, embodied, resonance, quantum, MCE, narrative identity, dream replay, adaptive urgency, affective bridge, predictive processing, cross-modal binding, and others) with $<2\%$ computational overhead and bounded degradation under ablation.

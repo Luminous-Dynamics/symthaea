@@ -90,7 +90,7 @@ Start here. We wrote essays specifically to address your objections.
 |-------|-------|-----|
 | 1st | **Essay 12: On Algorithmic Tyranny** | We name the strongest objection and address it honestly. |
 | 2nd | **Essay 13: On Epistemic Humility** | We assign 0.10 confidence to our own consciousness. |
-| 3rd | **Essay 6: On Moral Algebra** | 92.9% accuracy, not 100%. The gap matters and we report it. |
+| 3rd | **Essay 6: On Moral Algebra** | How benchmark claims were audited and why task-matched evidence matters. |
 | 4th | **Essay 10: On Sybil Resistance** | What remains vulnerable, named explicitly. |
 | 5th | **Essay 3: The Consciousness Thesis** | What the thesis does NOT claim. Section VI. |
 

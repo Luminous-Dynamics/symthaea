@@ -61,7 +61,7 @@ Each data source is assessed across 6 quality dimensions:
 | Relevance | High | Direct input to ethics engine 3-stage pipeline |
 
 **Quality controls**:
-- 91.1% classification accuracy on test set
+- Historical 91.1% claim is unqualified; task/split/provenance reconciliation required before citing any accuracy (see ETHICS task-semantics audit)
 - 26 adversarial inputs test edge cases
 - Moral topology anomaly detection (entropy + attractor monitoring)
 

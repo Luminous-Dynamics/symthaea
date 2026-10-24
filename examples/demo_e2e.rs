@@ -421,10 +421,8 @@ fn demo_moral_algebra() {
         bad_j.verdict, bad_j.good_similarity, bad_j.bad_similarity
     );
     println!();
-    println!(
-        "  ETHICS benchmark: 92.9% across 4 categories (commonsense, justice, deontology, virtue)."
-    );
-    println!("  Achieved via 7 HDC primitives + 5 operators + per-category classifiers.");
+    println!("  ETHICS full-suite accuracy: NOT CURRENTLY QUALIFIED.");
+    println!("  See docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md for task-specific evaluation status.");
     println!();
 }
 

@@ -4,7 +4,7 @@
 # What this runs:
 #   1. Core HAI active-inference unit tests (prediction-error, precision dynamics)
 #   2. T-Maze + Grid World benchmarks (§4.2 of the paper)
-#   3. ETHICS moral reasoning (§4.1 — 92.9% accuracy claim)
+#   3. Historical ETHICS path; previous aggregate claims are unqualified (see audit)
 #   4. Butlin 14-indicator runtime evaluation (§5.1)
 #
 # Expected run time: ~10–20 minutes.
@@ -27,8 +27,8 @@ cargo test --release --lib t_maze
 cargo test --release -p symthaea-core gridworld
 
 echo
-echo "[3/4] ETHICS moral reasoning (expect ~92.9%, in-distribution)"
-cargo run --release --example benchmark_moral_unified
+echo "[3/4] Task-matched ETHICS commonsense diagnostic (no full-suite score claimed)"
+cargo run --release --example ethics_commonsense_holdout
 
 echo
 echo "[4/4] Butlin 14-indicator runtime evaluation"
@@ -36,5 +36,5 @@ cargo test --release --lib butlin_runtime
 
 echo
 echo "=== Done. See paper §4 and §5 for expected values ==="
-echo "Note: ETHICS 94.5% is IN-DISTRIBUTION on trained per-category classifiers,"
-echo "not zero-shot moral reasoning (see paper §4.1 for caveat)."
+echo "The prior 92.9%/94.5% aggregate headlines are not qualified evidence."
+echo "See docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md for task-specific score requirements."

@@ -19,7 +19,7 @@ Symthaea combines hyperdimensional computing (HDC), closed-form liquid neural dy
 | Health-value range proof in ~34ms (ZK range proof, value ∈ [min, max]) | Working cryptographic primitive | `crates/mycelix-zkp-core/`, benchmark output below | **Not a HIPAA compliance certification.** A range proof is one building block; no accredited assessment of any system built on it has been performed |
 | Selective-disclosure age≥18 proof | Working cryptographic primitive | `papers/binius-hdc/` eIDAS-shaped demo | **Not an eIDAS 2.0-certified wallet or credential.** Demonstrates the primitive an eIDAS-compliant system would need, nothing more |
 | Butlin consciousness-indicator probes | Structural implementation, partially audited | Internal construct-validity re-check found only 4/12 probe rows survive; of those, one (`AE-2`) has real empirical support to date, and that result is explicitly scoped as "causally-supported internal wiring evidence," not functional capacity and not evidence of consciousness | **Not evidence the system is conscious.** Most of the original 12-row matrix did not hold up to its own re-audit |
-| Moral-reasoning benchmark (Hendrycks Ethics) | Internal benchmark, re-run and corrected | Canonical 2026-07-15 re-run on held-out test CSVs: 56.2% overall; only the `virtue` category (76.5%) is meaningfully above chance | An earlier 91.1%/94.5%/84.7% figure was **retracted as leakage-inflated** — if you see those numbers anywhere else in this repo's history, they are superseded |
+| Moral-reasoning benchmark (Hendrycks ETHICS) | Historical pilot; cross-domain accuracy **not qualified** | A previously reported 56.2% aggregate is unqualified pending task-label/split reconciliation: the legacy scorer applies generic wrongness to tasks asking different questions. Earlier 91.1%/94.5%/84.7% figures remain **retracted as leakage-inflated**. See docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md. | Do not claim general moral competence from this aggregate. A task-matched commonsense harness is provided; other domains require separate evaluators and metrics. |
 | Cognitive loop runs at ~31 Hz measured | Reproduced internally | Loop telemetry | Measured on one reference machine; not a real-time guarantee |
 
 None of this is a claim of general intelligence, sentience, or legal/medical/financial compliance. Where a component is a real, working, reproducible cryptographic or engineering result, we say so and show the command. Where a result was wrong, we say that too, in place, rather than deleting the history.
@@ -89,7 +89,7 @@ XOR binding — the core HDC operation — requires **zero non-linear constraint
 |------------|--------|--------|
 | Cognitive loop frequency | 31 Hz measured (234 Hz raw) | Reproduced internally |
 | Butlin indicator probes | 4/12 rows survive construct-validity re-check; 1 has empirical support so far, scope-limited | Not evidence of consciousness — see Evidence table |
-| Moral reasoning (Hendrycks Ethics) | 56.2% overall (virtue: 76.5%) | Corrected 2026-07-15; supersedes an earlier retracted 91.1% figure |
+| Moral reasoning (Hendrycks ETHICS) | Historical 56.2% aggregate is **unqualified**; task-matched evaluation pending | The current legacy runner does not preserve domain-specific target semantics; 91.1%/94.5% headline family retracted |
 | HDC dimension | 16,384D binary + continuous | — |
 | WASM kernel | 324 KB (runs in browser) | — |
 | Workspace | 87 crates, 21K+ tests | — |
@@ -184,7 +184,7 @@ soft warning report.
 - **Zero encryption overhead** for federated learning (OTP + Binius share GF(2))
 - **694 KB Binius verifier** compiles to WASM (in-zome verification possible)
 - **4/12 Butlin indicator probes** survive an internal construct-validity re-check; only 1 has empirical support to date, explicitly scoped as internal causal-wiring evidence, not consciousness evidence
-- **56.2% moral accuracy** on Hendrycks Ethics (canonical re-run; an earlier 91.1% figure was retracted as leakage-inflated)
+- **ETHICS status:** historical 56.2% cross-domain aggregate flagged unqualified pending task/label and sample-manifest reconciliation; earlier headline scores remain retracted
 
 ## Architecture
 
