@@ -628,6 +628,7 @@ impl NixOSExecutor {
         let safety_level = command.safety_level();
 
         if matches!(&command, NixOSCommand::Custom { .. }) {
+            let _ = ledger.burn(permit);
             return ExecutionResult::Blocked {
                 reason: "custom command requires a separately audited authorization policy"
                     .to_string(),
@@ -651,6 +652,9 @@ impl NixOSExecutor {
             .and_then(|attempt| ledger.consume(permit, &attempt));
 
         if let Err(error) = authorization {
+            // consume() already burns a permit on ledger-level denials; this
+            // also burns it when binding/attempt construction failed earlier.
+            let _ = ledger.burn(permit);
             return ExecutionResult::Blocked {
                 reason: format!("one-shot authorization denied before dispatch: {error}"),
                 safety_level,
@@ -1063,6 +1067,69 @@ mod tests {
         assert!(matches!(
             result,
             ExecutionResult::Blocked { ref reason, .. } if reason.contains("separately audited")
+        ));
+        assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_malformed_identity_attempt_burns_the_permit() {
+        use super::super::authorization::{
+            ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
+            ExecutionAuthorizationLedger,
+        };
+        use std::time::Duration;
+
+        let command = NixOSCommand::RebuildSwitch {
+            flake: Some(".#host".to_string()),
+            extra_args: vec![],
+        };
+        let (executable, args) = command.to_command();
+        let request = AuthorizationRequest::new(
+            CommandBinding::new(executable, args).unwrap(),
+            "operator:alice",
+            ActionScope::SystemCritical,
+            AuthorizationAuthority::HumanOperator,
+            "exec-test-004",
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        let mut ledger = ExecutionAuthorizationLedger::default();
+        let permit = ledger.issue(request).unwrap();
+        let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let runner = std::sync::Arc::new(CountingRunner {
+            invocations: std::sync::Arc::clone(&invocations),
+        });
+        let mut executor = NixOSExecutor::new().with_runner(runner);
+
+        let malformed = executor
+            .execute_with_permit(
+                command.clone(),
+                1.0,
+                &mut ledger,
+                &permit,
+                "",
+                AuthorizationAuthority::HumanOperator,
+            )
+            .await;
+        assert!(matches!(
+            malformed,
+            ExecutionResult::Blocked { ref reason, .. } if reason.contains("principal")
+        ));
+
+        let replay = executor
+            .execute_with_permit(
+                command,
+                1.0,
+                &mut ledger,
+                &permit,
+                "operator:alice",
+                AuthorizationAuthority::HumanOperator,
+            )
+            .await;
+        assert!(matches!(
+            replay,
+            ExecutionResult::Blocked { ref reason, .. } if reason.contains("already consumed")
         ));
         assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
