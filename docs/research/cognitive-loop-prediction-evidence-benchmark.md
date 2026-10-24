@@ -1,6 +1,6 @@
 # Cognitive-loop prediction-evidence benchmark (PEV-1)
 
-**Status:** proposed benchmark contract; typed-boundary tests are authored but have not been run end-to-end. The full 14-case consumer-level protocol remains outstanding.
+**Status:** proposed benchmark contract; typed-boundary tests are authored but have not been run end-to-end. The full 15-case consumer-level protocol remains outstanding.
 
 ## 1. Research claim
 
@@ -71,6 +71,7 @@ Each scenario should be replayed against the same initial state and deterministi
 | PEV-12 | Long stream with task shifts and distractors | No false PE-driven reinforcement, forgetting, confidence inflation, or reactivation caused by an invalid sentinel |
 | PEV-13 | Cycle preempted before a prediction comparison (e.g., safety gate) | Report `NotEvaluated`; do not fabricate zero/high PE; preserve the independent preemption/safety decision |
 | PEV-14 | Prediction reused after a skipped/out-of-order cycle | Classify as `StaleOrOutOfOrder`; do not update encoder attention/PE history; preserve source and observation cycle IDs; recover on the next valid fresh prediction |
+| PEV-15 | Explicit reset or expectation reset | Clear both encoder-HDC and embedding/HV prediction windows and provenance; first post-reset observation is `NoPriorPrediction`; no pre-reset sample may update PE-dependent state |
 
 Where a subsystem is independent of PE, the expected result is not “no change to the entire system.” The invariant applies only to the PE-derived component; coherence, energy, explicit reward, sensory variance, and other valid signals remain eligible to change state.
 
@@ -101,7 +102,7 @@ For stream-learning experiments also report per-step task performance, forward/b
 
 ### Typed-contract regression checks
 
-The typed layer includes unit tests for invalid numeric payloads (`0`, `1`, NaN, and positive/negative infinity), non-finite values incorrectly flagged valid, cycle mismatch, stale-status classification, constructor invariants, valid serialization round-trip, malformed serialized records, and a deterministic 10,000-payload boundary sweep. Consumer-focused tests cover stale and missing evidence in urgency and surprise paths, plus the encoder's consecutive-cycle acceptance, skipped-cycle rejection, and non-finite prediction rejection before PE/attention statistics. The main text-loop test verifies source-cycle handoff, and an output test checks that public telemetry agrees with the compatibility validity bit and records the observation cycle. Keep these separate from the 14 core PEV scenarios so passing type-contract tests cannot be mistaken for coverage of all downstream consumers. These are authored checks, not a pass claim until run at the exact head.
+The typed layer includes unit tests for invalid numeric payloads (`0`, `1`, NaN, and positive/negative infinity), non-finite values incorrectly flagged valid, cycle mismatch, stale-status classification, constructor invariants, valid serialization round-trip, malformed serialized records, and a deterministic 10,000-payload boundary sweep. Consumer-focused tests cover stale and missing evidence in urgency and surprise paths, plus the encoder's consecutive-cycle acceptance, skipped-cycle rejection, non-finite prediction rejection before PE/attention statistics, and explicit service reset of prediction provenance. The main text-loop test verifies source-cycle handoff, and an output test checks that public telemetry agrees with the compatibility validity bit and records the observation cycle. Keep these separate from the 15 core PEV scenarios so passing type-contract tests cannot be mistaken for coverage of all downstream consumers. These are authored checks, not a pass claim until run at the exact head.
 
 ## 5. Experimental protocol
 
