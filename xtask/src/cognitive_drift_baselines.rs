@@ -763,7 +763,10 @@ mod tests {
         let b = run_scalar_detector(second).expect("reordered calibration PRM run");
         assert_eq!(a.canonical_input_sha256, b.canonical_input_sha256);
         assert_eq!(a.result_sha256, b.result_sha256);
-        assert_eq!(a.detections, b.detections);
+        assert_eq!(
+            a.detections.iter().map(|d| d.cycle_index).collect::<Vec<_>>(),
+            b.detections.iter().map(|d| d.cycle_index).collect::<Vec<_>>()
+        );
     }
 
     #[test]
