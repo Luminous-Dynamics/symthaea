@@ -211,3 +211,30 @@ Research motivation: the 2026 MFO survey highlights that many current benchmark 
 - Li & Li, *Multi-Fidelity Methods for Optimization: A Survey* (ACM Computing Surveys, 2026): https://doi.org/10.1145/3801959
 - Mainini et al., *Analytical benchmark problems and methodological framework for the assessment and comparison of multifidelity optimization methods* (published 2025; volume 2026): https://doi.org/10.1007/s11831-025-10392-8
 - Essam et al., *A review of computational modeling, artificial intelligence, and digital twins in metal casting and foundry operations* (2026): https://link.springer.com/article/10.1007/s43939-026-00685-5
+
+
+## Paired internal-policy bake-off across scenario families
+
+The diagnostic suite identifies how fidelity levels disagree; the next layer runs the existing repository proposal policies against the same scenario-seed candidate pools. The contract is frozen in `docs/research/CASTING_MULTIFIDELITY_POLICY_SCENARIOS_V1.json`.
+
+At default settings, the runner compares five internal policies—high-only, low-screen, fixed top-k, discrepancy-aware and adaptive-budget—across six scenarios, dimensions 2/5/10, severities 0.5/1/2 and three paired seeds. That yields 810 policy runs, 270 policy-cell summaries, and 216 paired comparisons against `high_only`.
+
+```sh
+python3 tools/casting-benchmark/multifidelity_scenario_policy_bakeoff.py \
+  --scenarios smooth_stationary,local_bias_island,warped_coordinates,constraint_boundary,discontinuous_step,heteroscedastic_noise \
+  --dimensions 2,5,10 \
+  --severities 0.5,1,2 \
+  --seeds 17,23,29 \
+  --cost-budget 200 \
+  --design-count 128
+```
+
+Targeted tests:
+
+```sh
+python3 -m unittest discover -s tools/casting-benchmark -p 'test_multifidelity_scenario_policy_bakeoff.py' -v
+```
+
+All five policies use the same candidate set within each scenario/seed and a 200-unit cap with default costs 1/5/25. The score is the high-fidelity feasible archive hypervolume divided by the high-fidelity finite-pool truth hypervolume. Actual per-fidelity calls, cost and unused budget are retained. Paired bootstrap intervals and win/tie/loss counts are exploratory because the default has only three seeds and no multiple-comparison adjustment.
+
+This closes the gap between fidelity diagnostics and internal-policy evaluation, but it is **not yet an external benchmark bake-off**: MF-HVKG/MOMF, qLogNEHVI/qLogEHVI/qLogNParEGO, Sobol, random search and NSGA-II are not run here. The standard execution lock (#8620) and budget-matched external protocol (#8551) remain authoritative. Before inferential or SOTA claims, use at least 20 paired seeds (target 30), account for optimizer compute and wall-clock separately from objective calls, independently recompute the raw traces, and apply predeclared multiplicity handling. None of these synthetic results establishes physical casting quality or foundry economics.
