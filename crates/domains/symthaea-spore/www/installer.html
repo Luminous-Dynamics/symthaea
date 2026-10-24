@@ -1263,6 +1263,39 @@ input:focus, select:focus {
 	      ];
 	      var ws = null;
 
+function newRequestId() {
+  var bytes = new Uint8Array(16);
+  if (!window.crypto || !window.crypto.getRandomValues) {
+    throw new Error('Web Crypto getRandomValues is unavailable');
+  }
+  window.crypto.getRandomValues(bytes);
+  return Array.prototype.map.call(bytes, function (byte) {
+    return byte.toString(16).padStart(2, '0');
+  }).join('');
+}
+
+function getInstallRequestId() {
+  var key = 'nfh_install_request_id';
+  try {
+    var existing = sessionStorage.getItem(key);
+    if (existing) return existing;
+  } catch (e) {}
+  var requestId = newRequestId();
+  try { sessionStorage.setItem(key, requestId); } catch (e) {}
+  return requestId;
+}
+
+function clearInstallRequestId() {
+  try { sessionStorage.removeItem('nfh_install_request_id'); } catch (e) {}
+}
+
+function durableTransactionOutcome(msg) {
+  var outcome = msg && msg.transaction && msg.transaction.outcome;
+  return (outcome === 'observed_success' || outcome === 'failed' || outcome === 'indeterminate')
+    ? outcome
+    : null;
+}
+
       for (var i = 0; i < relayUrls.length; i++) {
         try {
           sshStatus.textContent = 'Connecting to relay at ' + relayUrls[i] + '...';
@@ -1489,7 +1522,7 @@ input:focus, select:focus {
                 if (preserveFirst) {
                   appendTerminal('Preserving data...', 'var(--teal)');
                   sshStatus.textContent = 'Backing up data before install...';
-                  ws.send(JSON.stringify({ action: 'preserve_data' }));
+                  ws.send(JSON.stringify({ action: 'preserve_data', request_id: newRequestId() }));
                   // Wait for data_preserved response before continuing
                 }
                 if (!confirm('SERVER WARNING\n\n' + safety.message + '\n\nRisk factors:\n' +
@@ -1741,7 +1774,10 @@ input:focus, select:focus {
             break;
 
           case 'exit':
-            if (msg.code === 0) {
+            var transactionOutcome = durableTransactionOutcome(msg);
+            if (transactionOutcome === 'observed_success') {
+              // Only a durably recorded terminal transaction consumes the request key.
+              clearInstallRequestId();
               appendTerminal('Installation complete!', 'var(--leaf-green)');
               updateProgress('Complete', 100, 'FirstBreath');
 
@@ -1780,7 +1816,7 @@ input:focus, select:focus {
                     window.addNarration('The machine draws its first breath. It is sovereign.', true);
 
                     if (window.speechSynthesis && window.narrateTTS) {
-                      var utt = new SpeechSynthesisUtterance('The machine draws its first breath. It is sovereign.');
+                      var utt = new SpeechSynthesisUtterance('The machine draws its first breath. Not just alive — but aware of its being alive.');
                       utt.rate = 0.78; utt.pitch = 0.85; utt.volume = 0.9;
                       window.speechSynthesis.speak(utt);
                     }
@@ -1825,13 +1861,23 @@ input:focus, select:focus {
                   }, 2000);
                 }, 2000);
               }
-            } else {
-              appendTerminal('Installation failed with code ' + msg.code, 'var(--clay)');
-              sshStatus.textContent = 'Installation encountered an error. Check Diagnostics for details.';
+            } else if (transactionOutcome === 'failed') {
+              // A durably recorded failure is terminal and may consume the request key.
+              clearInstallRequestId();
+              var failedCode = (msg.code === null || typeof msg.code === 'undefined') ? 'unknown' : msg.code;
+              appendTerminal('Installation failed (durably recorded; exit code ' + failedCode + ')', 'var(--clay)');
+              sshStatus.textContent = 'Installation failed; the terminal transaction receipt was durably recorded.';
               sshStatus.style.color = 'var(--clay)';
-              // Open diagnostics automatically on error
               var diag = document.getElementById('ssh-diagnostics');
               if (diag) diag.open = true;
+            } else {
+              // Missing/unknown/indeterminate receipts are deliberately not terminal.
+              // Keep the request ID so reconnect/status recovery cannot create a new effect.
+              appendTerminal('Installation outcome is uncertain; request identity retained for recovery.', 'var(--solar-gold)');
+              sshStatus.textContent = 'Installation completion is uncertain. The relay did not authorize a fresh execution.';
+              sshStatus.style.color = 'var(--solar-gold)';
+              var uncertainDiag = document.getElementById('ssh-diagnostics');
+              if (uncertainDiag) uncertainDiag.open = true;
             }
             btn.disabled = false;
             btn.textContent = 'Connect & Deploy';
@@ -1903,7 +1949,7 @@ input:focus, select:focus {
 
               if (msg.type === 'connected') {
                 // SSH reconnected — now check install status
-                ws.send(JSON.stringify({ action: 'check_install_status' }));
+                ws.send(JSON.stringify({ action: 'check_install_status', request_id: getInstallRequestId() }));
               } else if (msg.type === 'install_status') {
                 var status = {};
                 try { status = JSON.parse(msg.data); } catch(e) {}
@@ -1915,11 +1961,12 @@ input:focus, select:focus {
                   // Keep polling
                   setTimeout(function() {
                     if (ws.readyState === WebSocket.OPEN) {
-                      ws.send(JSON.stringify({ action: 'check_install_status' }));
+                      ws.send(JSON.stringify({ action: 'check_install_status', request_id: getInstallRequestId() }));
                     }
                   }, 10000);
                 } else if (status.status === 'complete') {
                   appendTerminal('Install completed while disconnected!', 'var(--leaf-green)');
+                  clearInstallRequestId();
                   sshStatus.textContent = 'Installation complete! Reboot the target machine.';
                   sshStatus.style.color = 'var(--solar-gold)';
                   installInProgress = false;
@@ -1927,7 +1974,13 @@ input:focus, select:focus {
                   window.addNarration('The machine draws its first breath. It is sovereign.');
                 } else if (status.status === 'failed') {
                   appendTerminal('Install failed: ' + (status.last_line || 'unknown error'), 'var(--clay)');
+                  clearInstallRequestId();
                   sshStatus.textContent = 'Installation failed. Check the terminal output.';
+                  sshStatus.style.color = 'var(--clay)';
+                  installInProgress = false;
+                } else if (status.status === 'uncertain') {
+                  appendTerminal('Install outcome is uncertain; no duplicate install was attempted.', 'var(--clay)');
+                  sshStatus.textContent = 'Install outcome uncertain. Inspect the target before retrying.';
                   sshStatus.style.color = 'var(--clay)';
                   installInProgress = false;
                 } else {
@@ -2489,6 +2542,7 @@ input:focus, select:focus {
       installInProgress = true;
       ws.send(JSON.stringify({
         action: 'install',
+        request_id: getInstallRequestId(),
         disk: diskName,
         layout: layout,
         fast_disk: fastDisk,

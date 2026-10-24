@@ -20,6 +20,10 @@ exclude = [
     # `nixward` path dependency. Keep it out of the workspace and build it
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
+    "crates/core/symthaea-observation-attestation",
+    # Excluded until symthaea-core exposes the observation_fabric contract it imports.
+    # Keeping the unfinished adapter out of workspace resolution preserves --locked
+    # reproducibility instead of weakening the lockfile gate.
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
