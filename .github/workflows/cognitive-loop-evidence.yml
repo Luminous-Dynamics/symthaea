@@ -11,6 +11,7 @@ on:
       - "xtask/src/cognitive_drift_score.rs"
       - "xtask/src/cognitive_drift_compare.rs"
       - "xtask/src/cognitive_drift_baselines.rs"
+      - "xtask/src/cognitive_replay_receipt.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/main.rs"
       - "docs/research/COGNITIVE_LOOP_EVIDENCE_BENCHMARK.md"
@@ -151,6 +152,46 @@ jobs:
             (.canonical_input_sha256 | length) == 64 and
             (.result_sha256 | length) == 64
           ' "$RUNNER_TEMP/no-impact-adaptation-utility.json"
+
+      - name: Validate the synthetic cognitive replay receipt
+        run: |
+          cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json --out "$RUNNER_TEMP/replay-receipt-validation.json"
+          jq -e '
+            .metric_version == "cognitive-replay-receipt-v1" and
+            .run_kind == "synthetic-not-measured" and
+            .event_count == 5 and
+            .arm_count == 5 and
+            .total_decision_count == 25 and
+            ([.arm_summaries[] | select(.arm_id == "staged-verify-rollback")][0].commits == 1) and
+            ([.arm_summaries[] | select(.arm_id == "staged-verify-rollback")][0].rollbacks == 1) and
+            ([.arm_summaries[] | select(.arm_id == "no-adapt")][0].commits == 0) and
+            (.canonical_receipt_sha256 | length) == 64 and
+            (.result_sha256 | length) == 64
+          ' "$RUNNER_TEMP/replay-receipt-validation.json"
+
+      - name: Reject future-information leakage in replay receipts
+        run: |
+          jq '.arms[0].decisions[0].observed_event_ids += ["e1"]' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-future-leak.json"
+          if cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input "$RUNNER_TEMP/replay-future-leak.json" --out "$RUNNER_TEMP/replay-future-leak-output.json"; then
+            echo "::error::Replay receipt accepted a future/unavailable event."
+            exit 1
+          fi
+
+      - name: Reject oracle-channel access in a deployable replay arm
+        run: |
+          jq '.arms[0].oracle_channel_access = true' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-oracle-leak.json"
+          if cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input "$RUNNER_TEMP/replay-oracle-leak.json" --out "$RUNNER_TEMP/replay-oracle-leak-output.json"; then
+            echo "::error::Replay receipt accepted oracle access by a deployable arm."
+            exit 1
+          fi
+
+      - name: Reject commit without verified staged candidate
+        run: |
+          jq '.arms[3].decisions[2].action = "commit"' benchmarks/cognitive-loop-evidence/synthetic-replay-receipt.json > "$RUNNER_TEMP/replay-unverified-commit.json"
+          if cargo run --locked -p xtask -- validate-cognitive-replay-receipt --input "$RUNNER_TEMP/replay-unverified-commit.json" --out "$RUNNER_TEMP/replay-unverified-commit-output.json"; then
+            echo "::error::Replay receipt accepted a commit without verification."
+            exit 1
+          fi
 
       - name: Run the fixed-threshold drift baseline against the synthetic fixture
         run: |
