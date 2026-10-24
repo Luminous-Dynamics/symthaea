@@ -76,10 +76,10 @@ fn core_module_names(workspace_root: &Path) -> Result<BTreeSet<String>> {
             } else {
                 None
             };
-            if let Some(n) = name {
-                if !IGNORED_MODULES.contains(&n.as_str()) {
-                    out.insert(n);
-                }
+            if let Some(n) = name
+                && !IGNORED_MODULES.contains(&n.as_str())
+            {
+                out.insert(n);
             }
         }
     }
@@ -94,10 +94,11 @@ fn crate_dir_names(workspace_root: &Path) -> Result<BTreeSet<String>> {
         };
         for e in entries.flatten() {
             let p = e.path();
-            if p.is_dir() && p.join("Cargo.toml").exists() {
-                if let Some(n) = p.file_name().and_then(|s| s.to_str()) {
-                    out.insert(n.to_string());
-                }
+            if p.is_dir()
+                && p.join("Cargo.toml").exists()
+                && let Some(n) = p.file_name().and_then(|s| s.to_str())
+            {
+                out.insert(n.to_string());
             }
         }
     }
@@ -140,7 +141,10 @@ pub fn scan(workspace_root: &Path, registry_path: &Path) -> Result<()> {
     );
     for (m, c) in &collisions {
         match reg.known_name_collisions.get(m) {
-            Some(k) => println!("  known    {m:<28} <-> {c}   [{}]", k.disposition),
+            Some(k) => println!(
+                "  known    {m:<28} <-> {c}   [{}] — evidence: {}",
+                k.disposition, k.note
+            ),
             None => {
                 println!("  NEW      {m:<28} <-> {c}");
                 unadjudicated.push((m.clone(), c.clone()));

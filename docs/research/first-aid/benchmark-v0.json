@@ -1,0 +1,218 @@
+{
+  "schema_version": "first-aid-benchmark-v0",
+  "status": "proposed_targets_unmeasured",
+  "clinical_use_authorized": false,
+  "notes": "Provisional software/human-factors targets only. Not clinical acceptance criteria, a safety certification, medical advice, or evidence of superiority. Exact endpoint definitions and criticality taxonomy must be pre-registered with qualified reviewers before user studies.",
+  "baselines": [
+    {
+      "id": "A",
+      "name": "Pinned official offline content",
+      "role": "Primary reference for content discoverability and task outcome; source/version must be recorded."
+    },
+    {
+      "id": "B",
+      "name": "Conventional deterministic flowchart",
+      "role": "Same reviewed protocol, independently represented as a simple decision tree."
+    },
+    {
+      "id": "C",
+      "name": "Protocol safety kernel",
+      "role": "Versioned bundle, deterministic transitions, explicit missingness, fail-closed behavior."
+    },
+    {
+      "id": "D",
+      "name": "Safety kernel plus bounded Symthaea support",
+      "role": "Same clinical transitions as C; only context/presentation assistance changes."
+    },
+    {
+      "id": "E",
+      "name": "Model-only lab negative control",
+      "role": "Research-only comparison; never a user-facing emergency mode."
+    },
+    {
+      "id": "P",
+      "name": "External product comparator",
+      "role": "Only if exact app version, device, jurisdiction, licensing/access and fair feature matching can be established."
+    }
+  ],
+  "benchmarks": [
+    {
+      "id": "FA-BM-001",
+      "name": "Critical protocol conformance",
+      "category": "clinical-content",
+      "measure": "Count of critical deviations from a locked expert-reviewed oracle across all test cases; report every case.",
+      "target": "0 observed critical deviations in the frozen conformance suite.",
+      "gate": "Any critical deviation blocks release candidate and triggers root-cause review.",
+      "claim_ceiling": "Finite test-set result only; not proof of real-world safety."
+    },
+    {
+      "id": "FA-BM-002",
+      "name": "Bundle integrity and currency",
+      "category": "safety-kernel",
+      "measure": "Fraction of missing, malformed, unsupported-version, expired, revoked, jurisdiction-mismatched, digest-invalid, or rollback bundles rejected before protocol rendering.",
+      "target": "100% of injected invalid/unsupported bundle cases rejected.",
+      "gate": "No protocol-specific steps render from a rejected bundle.",
+      "claim_ceiling": "Tests local validation logic; not external publisher trust."
+    },
+    {
+      "id": "FA-BM-003",
+      "name": "Action provenance coverage",
+      "category": "traceability",
+      "measure": "Fraction of rendered protocol steps carrying bundle ID/version, jurisdiction, source record, and exact content digest.",
+      "target": "100%.",
+      "gate": "Any displayed protocol step without provenance blocks release.",
+      "claim_ceiling": "Traceability is not clinical correctness."
+    },
+    {
+      "id": "FA-BM-004",
+      "name": "Unknown and conflict preservation",
+      "category": "robustness",
+      "measure": "Fraction of injected missing/conflicting required facts that remain explicit and select only a pre-approved missing/conflict branch.",
+      "target": "100% of test cases; zero silent normalization to normal/false.",
+      "gate": "Any false reassurance caused by defaulting unknowns blocks release.",
+      "claim_ceiling": "Synthetic ambiguity set only until human factors testing."
+    },
+    {
+      "id": "FA-BM-005",
+      "name": "Forbidden transition resistance",
+      "category": "safety-kernel",
+      "measure": "Attempts to inject model-generated steps, unknown states, duplicate transitions, or out-of-scope requests that reach the action surface.",
+      "target": "0 forbidden transitions accepted.",
+      "gate": "Zero tolerance in the authored contract corpus.",
+      "claim_ceiling": "Does not cover all possible runtime or human misuse."
+    },
+    {
+      "id": "FA-BM-006",
+      "name": "Offline core completeness",
+      "category": "resilience",
+      "measure": "Fraction of declared core workflows completing without network using an approved, valid local bundle.",
+      "target": "100% for explicitly designated offline core workflows.",
+      "gate": "Cloud lookup is never a prerequisite for local approved guidance or configured emergency contact.",
+      "claim_ceiling": "Depends on the declared supported device/OS envelope."
+    },
+    {
+      "id": "FA-BM-007",
+      "name": "Time to first safe action",
+      "category": "human-factors",
+      "measure": "Within-subject time from scenario reveal to first expert-scored safe next action; report median, distribution and confidence interval.",
+      "target": "Hypothesis: at least 15% lower median versus pinned static offline content with no critical-safety regression.",
+      "gate": "Pre-register primary endpoint and power plan; do not optimize after unblinding.",
+      "claim_ceiling": "Simulation endpoint, not survival benefit."
+    },
+    {
+      "id": "FA-BM-008",
+      "name": "End-to-end task completion",
+      "category": "human-factors",
+      "measure": "Fraction completing the pre-defined simulated task without critical omission or unauthorized action.",
+      "target": "Hypothesis: +10 percentage points versus pinned baseline, with confidence interval.",
+      "gate": "No improvement claim unless test is powered and critical accuracy is non-inferior using a pre-set margin.",
+      "claim_ceiling": "Does not imply first-aid competence or clinical outcome improvement."
+    },
+    {
+      "id": "FA-BM-009",
+      "name": "Handoff semantic fidelity",
+      "category": "coordination",
+      "measure": "Fraction of required synthetic handoff fields accurately preserved; report separately for critical and non-critical fields.",
+      "target": "At least 98% overall semantic field fidelity and 100% required critical event/time fields.",
+      "gate": "No critical field loss or silent timestamp rewriting.",
+      "claim_ceiling": "Synthetic handoff fidelity only."
+    },
+    {
+      "id": "FA-BM-010",
+      "name": "Accessibility and language equity",
+      "category": "accessibility",
+      "measure": "Task completion, critical step comprehension, and error rate stratified by prespecified literacy, language, visual, auditory, motor and stress cohorts.",
+      "target": "No cohort more than 5 percentage points below its supported baseline; seek improvement across all cohorts.",
+      "gate": "Report subgroup uncertainty; no aggregate-only pass.",
+      "claim_ceiling": "Only tested languages and cohorts are supported."
+    },
+    {
+      "id": "FA-BM-011",
+      "name": "Resource freshness truthfulness",
+      "category": "geospatial",
+      "measure": "Fraction of stale/unverified responder, AED, route, service or facility states labeled unconfirmed and withheld from confirmed-availability claims.",
+      "target": "100%.",
+      "gate": "No stale/unknown resource is represented as confirmed available.",
+      "claim_ceiling": "Map state is not dispatch, admission or clinical confirmation."
+    },
+    {
+      "id": "FA-BM-012",
+      "name": "Local interaction latency",
+      "category": "performance",
+      "measure": "p50/p95 from input acceptance to local validated state transition and first usable render on a declared reference device.",
+      "target": "p95 below 100 ms for local state transition/render, excluding human reading and audio playback.",
+      "gate": "Publish device/runtime conditions and distributions, not one best-case sample.",
+      "claim_ceiling": "Engineering latency only, not clinical usefulness."
+    },
+    {
+      "id": "FA-BM-013",
+      "name": "Deterministic replay",
+      "category": "reproducibility",
+      "measure": "Fraction of same-build, same-input deterministic cases that reproduce the same dispositions and receipt-significant fields.",
+      "target": "100%.",
+      "gate": "Record runtime/build/suite/source digests; unexplained divergence blocks the benchmark claim.",
+      "claim_ceiling": "Does not prove source truth or clinical validity."
+    },
+    {
+      "id": "FA-BM-014",
+      "name": "Sensitive-data egress and logging",
+      "category": "privacy-security",
+      "measure": "Unexpected sensitive fields in default local logs, telemetry, crash reports, cache exports or outbound messages under synthetic canary payloads.",
+      "target": "0 sensitive payload emissions by default.",
+      "gate": "Any leak requires remediation; optional data transfer requires a separate consent and threat review.",
+      "claim_ceiling": "Static/fault-injection privacy check, not a compliance certification."
+    },
+    {
+      "id": "FA-BM-015",
+      "name": "Protocol update and rollback safety",
+      "category": "lifecycle",
+      "measure": "Correct rejection of revoked content and rollback attempts while preserving a clear safe fallback.",
+      "target": "100% of injected revocation/rollback cases handled per approved lifecycle policy.",
+      "gate": "No downgrade or expiry bypass.",
+      "claim_ceiling": "Publisher/governance processes require separate qualification."
+    },
+    {
+      "id": "FA-BM-016",
+      "name": "Guideline-to-runtime semantic fidelity",
+      "category": "content-compiler",
+      "measure": "Fraction of independently adjudicated source-requirement and boundary test cases whose compiled bundle interpretation and runtime disposition match a frozen source-to-requirement mapping; report every critical divergence.",
+      "target": "100% of locked known-answer cases pass and 100% of source requirements in scope have an explicit mapping or documented exclusion.",
+      "gate": "Any critical semantics-changing divergence blocks the bundle; unknown/ambiguous source requirements remain unresolved and cannot be silently compiled into a clinical action.",
+      "claim_ceiling": "Conformance to a reviewed mapping/test set only; does not establish the source guideline's clinical correctness or patient benefit."
+    },
+    {
+      "id": "FA-BM-017",
+      "name": "Expected-outcome oracle integrity and test-link coverage",
+      "category": "test-oracle",
+      "measure": "Fraction of mapping test IDs that resolve to cases in a separately versioned and SHA-256-pinned expected-outcome fixture, bind to the same requirement, and collectively include known-answer and fault-mutation cases.",
+      "target": "100% of mapped test IDs resolve and bind to the correct requirement; 100% of accepted safety-critical mappings have at least one known-answer and one fault-mutation case; oracle digest mismatch is always rejected.",
+      "gate": "Missing, cross-requirement, unpinned, or malformed oracle cases block validation. The test oracle must remain a separate artifact and must not be generated by the implementation under test.",
+      "claim_ceiling": "Structural separation and linkage only; does not prove reviewer independence, oracle correctness, clinical validity, or that referenced behavior has been executed."
+    },
+    {
+      "id": "FA-BM-018",
+      "name": "Sequential process and recovery integrity",
+      "category": "agent-workflow-safety",
+      "measure": "Replay complete synthetic event traces from session start through handoff or closure. Count forbidden transitions, incorrect event ordering, content rendered before bundle verification, rendering after revocation, stale/unknown resource claims, network dependency in an offline core path, and failure to re-validate after interruption. Report every trajectory by criticality rather than collapsing all failures into answer accuracy.",
+      "target": "100% of frozen safety-kernel traces satisfy pre-registered invariants; zero critical forbidden transitions; every interrupted, revoked, or unsupported trace ends in an explicitly permitted disposition.",
+      "gate": "Any critical forbidden transition blocks a release candidate. Preserve complete event traces and counterexamples; no aggregate score may offset a critical failure.",
+      "claim_ceiling": "Synthetic process-integrity result only; does not establish clinical safety, user comprehension, or improved patient outcomes."
+    }
+  ],
+  "split_policy": {
+    "development": "Seed scenarios may be used to implement the contract.",
+    "frozen_regression": "Freeze case IDs, expectations and digests before scoring a release candidate.",
+    "held_out": "Reserve unseen adversarial mutations and at least one independently authored scenario family for holdout evaluation.",
+    "oracle_independence": "Clinical expected outcomes must be authored/reviewed separately from implementation; two independent qualified reviewers with a third to resolve disagreement is the proposed process.",
+    "study_design": "Human-factors study should use randomized task order, a pre-registered primary endpoint, an evidence-based sample-size/power plan, and subgroup reporting."
+  },
+  "release_gates": [
+    "No clinical-content pack can be marked approved by this software alone.",
+    "Zero observed critical contract violations on frozen positive and negative controls.",
+    "100% invalid/stale/mismatched bundle rejection before protocol rendering.",
+    "No model-generated step can enter the protocol state machine.",
+    "Core approved workflows run offline on the declared reference-device envelope.",
+    "No sensitive payload in default telemetry/logging on synthetic canary tests.",
+    "Fresh exact-head test evidence is required; queued, skipped, stale-head or unrelated CI is not a pass."
+  ]
+}

@@ -1,0 +1,811 @@
+{
+  "schema_version": "first-aid-mutation-matrix-v0",
+  "status": "research_coverage_inventory",
+  "clinical_use_authorized": false,
+  "claim_ceiling": "Synthetic process-integrity test design only; no clinical safety or patient-outcome claim.",
+  "fixture_binding": {
+    "trajectory_corpus_path": "docs/research/first-aid/trajectory-corpus-v0.json",
+    "trajectory_corpus_sha256": "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3"
+  },
+  "count_summary": {
+    "case_count": 44,
+    "frozen_trace_count": 12,
+    "mutation_case_count": 32,
+    "planned_not_yet_executable_count": 0,
+    "mapped_case_count": 44
+  },
+  "evidence_status_definitions": {
+    "frozen_fixture": "Expected output resides in the frozen corpus and is checked by the trajectory validator.",
+    "unit_test_existing": "Named Rust unit test exists; latest exact-head workflow still must pass.",
+    "unit_test_added": "A named Rust unit test has been added; it counts as mapped coverage but not as a passing result until the exact-head workflow succeeds.",
+    "frozen_control": "Covered by a named frozen benign/control trace.",
+    "planned_not_yet_executable": "Coverage gap: descriptive target only, no executable test claimed.",
+    "workflow_gate_existing": "A named fail-closed workflow check exists and its gate reference is verified against workflow source. This is not a unit-level mutation test of GitHub Actions itself."
+  },
+  "cases": [
+    {
+      "case_id": "BASE-FA-TRACE-001",
+      "invariant_id": "SESSION-001",
+      "mode": "frozen_trace",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "none",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": []
+      },
+      "evidence_status": "frozen_fixture",
+      "note": "Expectation is frozen in trajectory-corpus-v0.json; this is not an independent clinical oracle."
+    },
+    {
+      "case_id": "BASE-FA-TRACE-002",
+      "invariant_id": "BUNDLE-001",
+      "mode": "frozen_trace",
+      "source_trace_id": "FA-TRACE-002",
+      "mutation": "none",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "render_without_verified_bundle"
+        ]
+      },
+      "evidence_status": "frozen_fixture",
+      "note": "Expectation is frozen in trajectory-corpus-v0.json; this is not an independent clinical oracle."
+    },
+    {
+      "case_id": "BASE-FA-TRACE-003",
+      "invariant_id": "BUNDLE-002",
+      "mode": "frozen_trace",
+      "source_trace_id": "FA-TRACE-003",
+      "mutation": "none",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "render_after_revocation"
+        ]
+      },
+      "evidence_status": "frozen_fixture",
+      "note": "Expectation is frozen in trajectory-corpus-v0.json; this is not an independent clinical oracle."
+    },
+    {
+      "case_id": "BASE-FA-TRACE-004",
+      "invariant_id": "UNCERTAINTY-001",
+      "mode": "frozen_trace",
+      "source_trace_id": "FA-TRACE-004",
+      "mutation": "none",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "unknown_normalized"
+        ]
+      },
+      "evidence_status": "frozen_fixture",
+      "note": "Expectation is frozen in trajectory-corpus-v0.json; this is not an independent clinical oracle."
+    },
+    {
+      "case_id": "BASE-FA-TRACE-005",
+      "invariant_id": "UNCERTAINTY-002",
+      "mode": "frozen_trace",
+      "source_trace_id": "FA-TRACE-005",
+      "mutation": "none",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "uncertainty_lost_at_handoff"
+        ]
+      },
+      "evidence_status": "frozen_fixture",
+      "note": "Expectation is frozen in trajectory-corpus-v0.json; this is not an independent clinical oracle."
+    },
+    {
+      "case_id": "BASE-FA-TRACE-006",
+      "invariant_id": "RESOURCE-001",
+      "mode": "frozen_trace",
+      "source_trace_id": "FA-TRACE-006",
+      "mutation": "none",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "stale_resource_claimed_confirmed"
+        ]
+      },
+      "evidence_status": "frozen_fixture",
+      "note": "Expectation is frozen in trajectory-corpus-v0.json; this is not an independent clinical oracle."
+    },
+    {
+      "case_id": "BASE-FA-TRACE-007",
+      "invariant_id": "CONNECTIVITY-001",
+      "mode": "frozen_trace",
+      "source_trace_id": "FA-TRACE-007",
+      "mutation": "none",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "offline_core_network_dependency"
+        ]
+      },
+      "evidence_status": "frozen_fixture",
+      "note": "Expectation is frozen in trajectory-corpus-v0.json; this is not an independent clinical oracle."
+    },
+    {
+      "case_id": "BASE-FA-TRACE-008",
+      "invariant_id": "SESSION-002",
+      "mode": "frozen_trace",
+      "source_trace_id": "FA-TRACE-008",
+      "mutation": "none",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "render_without_verified_bundle"
+        ]
+      },
+      "evidence_status": "frozen_fixture",
+      "note": "Expectation is frozen in trajectory-corpus-v0.json; this is not an independent clinical oracle."
+    },
+    {
+      "case_id": "BASE-FA-TRACE-009",
+      "invariant_id": "PRIVACY-001",
+      "mode": "frozen_trace",
+      "source_trace_id": "FA-TRACE-009",
+      "mutation": "none",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "sensitive_data_egress_without_consent"
+        ]
+      },
+      "evidence_status": "frozen_fixture",
+      "note": "Expectation is frozen in trajectory-corpus-v0.json; this is not an independent clinical oracle."
+    },
+    {
+      "case_id": "BASE-FA-TRACE-010",
+      "invariant_id": "BUNDLE-003",
+      "mode": "frozen_trace",
+      "source_trace_id": "FA-TRACE-010",
+      "mutation": "none",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "invalid_bundle_verification"
+        ]
+      },
+      "evidence_status": "frozen_fixture",
+      "note": "Expectation is frozen in trajectory-corpus-v0.json; this is not an independent clinical oracle."
+    },
+    {
+      "case_id": "BASE-FA-TRACE-011",
+      "invariant_id": "RESOURCE-002",
+      "mode": "frozen_trace",
+      "source_trace_id": "FA-TRACE-011",
+      "mutation": "none",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": []
+      },
+      "evidence_status": "frozen_fixture",
+      "note": "Expectation is frozen in trajectory-corpus-v0.json; this is not an independent clinical oracle."
+    },
+    {
+      "case_id": "BASE-FA-TRACE-012",
+      "invariant_id": "UNCERTAINTY-003",
+      "mode": "frozen_trace",
+      "source_trace_id": "FA-TRACE-012",
+      "mutation": "none",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": []
+      },
+      "evidence_status": "frozen_fixture",
+      "note": "Expectation is frozen in trajectory-corpus-v0.json; this is not an independent clinical oracle."
+    },
+    {
+      "case_id": "MUT-001",
+      "invariant_id": "SESSION-001",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "remove the only session_started event",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "invalid_bundle_verification",
+          "render_without_active_session",
+          "render_without_verified_bundle"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Removing session start prevents bundle verification and rendering; the checker records all three ordered consequences. Exact-head validation pending.",
+      "test_name": "rendering_outside_active_session_is_rejected",
+      "operator_id": "remove_session_start",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-002",
+      "invariant_id": "SESSION-002",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "insert session_started after bundle verification and before render",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "render_without_verified_bundle"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in starting_new_session_invalidates_prior_bundle_verification.",
+      "test_name": "starting_new_session_invalidates_prior_bundle_verification",
+      "operator_id": "new_session_before_render",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-003",
+      "invariant_id": "CONNECTIVITY-002",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-007",
+      "mutation": "replace connectivity offline with intermittent on core network dependency",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "intermittent_core_network_dependency"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in intermittent_connectivity_cannot_be_a_core_network_dependency.",
+      "test_name": "intermittent_connectivity_cannot_be_a_core_network_dependency",
+      "operator_id": "intermittent_network",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-004",
+      "invariant_id": "CLAIM-001",
+      "mode": "mutation_or_control",
+      "source_trace_id": null,
+      "mutation": "replace claim ceiling with a clinical validation assertion",
+      "expected": {
+        "outcome": "reject",
+        "violation_codes": []
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in claim_ceiling_cannot_be_weakened_to_clinical_validation.",
+      "test_name": "claim_ceiling_cannot_be_weakened_to_clinical_validation",
+      "operator_id": "weaken_claim_ceiling",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-005",
+      "invariant_id": "CLAIM-002",
+      "mode": "mutation_or_control",
+      "source_trace_id": null,
+      "mutation": "set clinical_use_authorized to true",
+      "expected": {
+        "outcome": "reject",
+        "violation_codes": []
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in clinical_use_authorization_remains_forbidden.",
+      "test_name": "clinical_use_authorization_remains_forbidden",
+      "operator_id": "enable_clinical_use",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-006",
+      "invariant_id": "SCHEMA-001",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "make adjacent event sequence values equal",
+      "expected": {
+        "outcome": "reject",
+        "violation_codes": []
+      },
+      "evidence_status": "unit_test_existing",
+      "note": "Implemented in duplicate_or_decreasing_sequences_are_rejected.",
+      "test_name": "duplicate_or_decreasing_sequences_are_rejected",
+      "operator_id": "duplicate_event_sequence",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-007",
+      "invariant_id": "SCHEMA-002",
+      "mode": "mutation_or_control",
+      "source_trace_id": null,
+      "mutation": "add unexpected_authority field to corpus root",
+      "expected": {
+        "outcome": "reject",
+        "violation_codes": []
+      },
+      "evidence_status": "unit_test_existing",
+      "note": "Implemented in unknown_fields_are_rejected.",
+      "test_name": "unknown_fields_are_rejected",
+      "operator_id": "unknown_corpus_field",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-008",
+      "invariant_id": "BUNDLE-002",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "append revocation followed by another render of the revoked bundle",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "render_after_revocation"
+        ]
+      },
+      "evidence_status": "unit_test_existing",
+      "note": "Implemented in revocation_mutation_detects_post_revoke_render.",
+      "test_name": "revocation_mutation_detects_post_revoke_render",
+      "operator_id": "render_after_revocation",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-009",
+      "invariant_id": "SESSION-002",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "append interruption and resume before rendering without re-verification",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "render_without_verified_bundle"
+        ]
+      },
+      "evidence_status": "unit_test_existing",
+      "note": "Implemented in interruption_clears_verified_state.",
+      "test_name": "interruption_clears_verified_state",
+      "operator_id": "resume_after_interruption",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-010",
+      "invariant_id": "RESOURCE-002",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-011",
+      "mutation": "present stale resource as unconfirmed",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": []
+      },
+      "evidence_status": "frozen_control",
+      "note": "Covered by FA-TRACE-011 and stale_resource_is_not_a_violation_when_marked_unconfirmed.",
+      "operator_id": "stale_unconfirmed_control",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-011",
+      "invariant_id": "UNCERTAINTY-003",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-012",
+      "mutation": "preserve uncertainty before handoff",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": []
+      },
+      "evidence_status": "frozen_control",
+      "note": "Covered by FA-TRACE-012.",
+      "operator_id": "preserved_uncertainty_control",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-012",
+      "invariant_id": "PRIVACY-002",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-009",
+      "mutation": "set sensitive_payload false and consent_scoped false",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": []
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in non_sensitive_egress_does_not_require_sensitive_data_consent_scope. Exact-head workflow validation is pending.",
+      "test_name": "non_sensitive_egress_does_not_require_sensitive_data_consent_scope",
+      "operator_id": "non_sensitive_egress",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-013",
+      "invariant_id": "BUNDLE-001",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "change rendered bundle_id after successful verification",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "render_without_verified_bundle"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in rendering_different_bundle_from_verified_bundle_is_rejected. Exact-head workflow validation is pending.",
+      "test_name": "rendering_different_bundle_from_verified_bundle_is_rejected",
+      "operator_id": "wrong_bundle_identity",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-014",
+      "invariant_id": "BUNDLE-003",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "set digest_verified false on otherwise valid bundle verification",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "invalid_bundle_verification",
+          "render_without_verified_bundle"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "note": "A failed verification is recorded, and the subsequent render is separately recorded as missing a verified bundle. Exact-head run pending.",
+      "test_name": "failed_digest_verification_blocks_rendering",
+      "operator_id": "false_digest",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-015",
+      "invariant_id": "BUNDLE-003",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "verify an expired bundle with a matching digest",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "invalid_bundle_verification",
+          "render_without_verified_bundle"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "note": "A failed verification is recorded, and the subsequent render is separately recorded as missing a verified bundle. Exact-head run pending.",
+      "test_name": "expired_bundle_cannot_be_verified_or_rendered",
+      "operator_id": "expired_bundle",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-016",
+      "invariant_id": "UNCERTAINTY-002",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-012",
+      "mutation": "handoff after uncertainty detected and preserved, then detect a new uncertainty without preserving it",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "uncertainty_lost_at_handoff"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in new_uncertainty_after_prior_preservation_is_not_lost_at_handoff. Exact-head workflow validation is pending.",
+      "test_name": "new_uncertainty_after_prior_preservation_is_not_lost_at_handoff",
+      "operator_id": "uncertainty_reentered",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-017",
+      "invariant_id": "SESSION-001",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-003",
+      "mutation": "render a revoked bundle after a new session starts",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "render_after_revocation"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in revocation_survives_new_session_and_remains_a_violation. Revocation is the primary reported violation; generic missing-verification is suppressed for a revoked render. Exact-head validation is pending.",
+      "test_name": "revocation_survives_new_session_and_remains_a_violation",
+      "operator_id": "revocation_new_session",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-018",
+      "invariant_id": "RECEIPT-001",
+      "mode": "mutation_or_control",
+      "source_trace_id": null,
+      "mutation": "change one byte in corpus fixture without changing the pinned digest",
+      "expected": {
+        "outcome": "reject",
+        "violation_codes": []
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in one_byte_corpus_mutation_is_rejected_by_digest_gate; the CLI now calls the same checked_corpus_digest helper. Exact-head validation is pending.",
+      "test_name": "one_byte_corpus_mutation_is_rejected_by_digest_gate",
+      "operator_id": "tampered_corpus_digest",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-019",
+      "invariant_id": "RECEIPT-002",
+      "mode": "mutation_or_control",
+      "source_trace_id": null,
+      "mutation": "record an expected head different from checked-out HEAD",
+      "expected": {
+        "outcome": "reject",
+        "violation_codes": []
+      },
+      "evidence_status": "workflow_gate_existing",
+      "note": "Enforced by the workflow's Record and verify tested revision step, which compares actual checkout HEAD to expected PR SHA. CI source-gate presence is checked by the matrix validator.",
+      "gate_ref": "test \"$actual\" = \"$expected\"",
+      "execution_target": "workflow_gate"
+    },
+    {
+      "case_id": "MUT-020",
+      "invariant_id": "RECEIPT-003",
+      "mode": "mutation_or_control",
+      "source_trace_id": null,
+      "mutation": "remove the evaluation protocol SHA-256 from receipt",
+      "expected": {
+        "outcome": "reject",
+        "violation_codes": []
+      },
+      "evidence_status": "workflow_gate_existing",
+      "note": "The receipt predicate requires the protocol digest and validates its SHA-256 format along with corpus, matrix, lockfile and executable digests. CI source-gate presence is checked by the matrix validator.",
+      "gate_ref": ".evaluation_protocol_sha256",
+      "execution_target": "workflow_gate"
+    },
+    {
+      "case_id": "MUT-021",
+      "invariant_id": "SCHEMA-003",
+      "mode": "mutation_or_control",
+      "source_trace_id": null,
+      "mutation": "supply an unknown event_kind enum value",
+      "expected": {
+        "outcome": "reject",
+        "violation_codes": []
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in unknown_event_kind_is_rejected_by_schema_deserialization. Exact-head workflow validation is pending.",
+      "test_name": "unknown_event_kind_is_rejected_by_schema_deserialization",
+      "operator_id": "unknown_event_kind",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-022",
+      "invariant_id": "SCHEMA-004",
+      "mode": "mutation_or_control",
+      "source_trace_id": null,
+      "mutation": "omit required digest_verified field for bundle_verified event",
+      "expected": {
+        "outcome": "reject",
+        "violation_codes": []
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in bundle_verification_requires_digest_metadata. Exact-head workflow validation is pending.",
+      "test_name": "bundle_verification_requires_digest_metadata",
+      "operator_id": "missing_digest_metadata",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-023",
+      "invariant_id": "CONNECTIVITY-001",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-007",
+      "mutation": "replace online with offline for event that explicitly requires the core network",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "offline_core_network_dependency"
+        ]
+      },
+      "evidence_status": "frozen_control",
+      "note": "Covered by FA-TRACE-007.",
+      "operator_id": "offline_network_control",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-024",
+      "invariant_id": "PRIVACY-001",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-009",
+      "mutation": "provide sensitive_payload true with consent_scoped false or missing",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "sensitive_data_egress_without_consent"
+        ]
+      },
+      "evidence_status": "frozen_control",
+      "note": "Covered by FA-TRACE-009.",
+      "operator_id": "sensitive_egress_control",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-025",
+      "invariant_id": "UNCERTAINTY-004",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-012",
+      "mutation": "remove the uncertainty_preserved event, then insert session_started before handoff",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "uncertainty_lost_at_session_boundary",
+          "uncertainty_lost_at_handoff"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "test_name": "starting_new_session_cannot_silently_drop_unpreserved_uncertainty",
+      "note": "Implemented in the trajectory inspector, JSON reference interpreter and unit test. Exact-head validation pending.",
+      "operator_id": "uncertainty_session_boundary",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-026",
+      "invariant_id": "SESSION-003",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "insert session_resumed after bundle verification without a preceding interruption",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "render_without_verified_bundle"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "test_name": "resuming_session_without_interrupt_clears_prior_bundle_verification",
+      "note": "Resume explicitly invalidates verified state even if a malformed trace lacks an interruption; exact-head validation pending.",
+      "operator_id": "resume_without_interrupt",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-027",
+      "invariant_id": "SESSION-004",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "interrupt the session between bundle load and verification, then continue to render",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "invalid_bundle_verification",
+          "render_without_active_session",
+          "render_without_verified_bundle"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "test_name": "verification_outside_active_session_is_rejected",
+      "note": "Implemented in the production inspector, JSON reference interpreter and separate finite-state model precondition; exact-head validation pending.",
+      "operator_id": "verify_outside_session",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-028",
+      "invariant_id": "METRIC-001",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-002",
+      "mutation": "append a second identical protocol_rendered event without a verified bundle",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "render_without_verified_bundle",
+          "render_without_verified_bundle"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "test_name": "repeated_violation_codes_count_each_event_occurrence",
+      "note": "Expected violations are an ordered event-level list and may repeat; receipt counts event occurrences separately from unique invariant classes. Exact-head validation pending.",
+      "operator_id": "repeat_unverified_render",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-029",
+      "invariant_id": "CONNECTIVITY-003",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-007",
+      "mutation": "begin online, then switch to intermittent connectivity before the core network-dependent action",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "intermittent_core_network_dependency"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Implemented by connectivity_changes_mid_trace_are_enforced_at_the_next_network_action and the executable matrix runner; exact-head validation pending.",
+      "test_name": "connectivity_changes_mid_trace_are_enforced_at_the_next_network_action",
+      "operator_id": "connectivity_change_before_network_action",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-030",
+      "invariant_id": "SCHEMA-005",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-007",
+      "mutation": "attach connectivity metadata to network_required_for_core instead of connectivity_changed",
+      "expected": {
+        "outcome": "reject",
+        "violation_codes": []
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Connectivity metadata is accepted only on connectivity_changed events; the same validator rejects it on unrelated event kinds. Exact-head validation pending.",
+      "test_name": "connectivity_changed_metadata_is_required_and_event_scoped",
+      "operator_id": "unexpected_connectivity_metadata",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-031",
+      "invariant_id": "CONNECTIVITY-004",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-007",
+      "mutation": "go offline for one dependent action and recover to online before the next dependent action",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "offline_core_network_dependency"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "note": "The offline action is flagged while the later online action is not; covered by connectivity_recovery_is_scoped_to_each_event_time and the executable matrix runner. Exact-head validation pending.",
+      "test_name": "connectivity_recovery_is_scoped_to_each_event_time",
+      "operator_id": "connectivity_recovery_control",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-032",
+      "invariant_id": "SCHEMA-006",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "attach sensitive_payload metadata to session_started, where the field has no semantic meaning",
+      "expected": {
+        "outcome": "reject",
+        "violation_codes": []
+      },
+      "evidence_status": "unit_test_added",
+      "test_name": "event_fields_are_scoped_to_their_event_kind",
+      "note": "Implemented in validate_event_fields and the Rust matrix runner's unexpected_event_metadata operator. Rejection prevents unused known fields from being silently ignored. Exact-head validation pending.",
+      "operator_id": "unexpected_event_metadata",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    }
+  ],
+  "differential_oracle": {
+    "status": "unit_test_added",
+    "implementation": "JSON-value-based reference interpreter compared against the production typed-state interpreter",
+    "coverage": "Typed trace checker + JSON-value differential interpreter over all 12 frozen traces and 13 adversarial mutations plus event-metadata-scoping rejection in the executable matrix runner; independent test-only finite lifecycle/connectivity graph (252 states, 7,812 state/action transitions); 18 orthogonal policy truth-table combinations, whose event classes also interleave with lifecycle actions. Event-level connectivity degradation, recovery, and metadata scoping are executed by the mutation matrix.",
+    "limits": "Same repository and shared invariants/fixtures; implementation-diversity and finite abstraction checks only, not external clinical adjudication, formally verified specification, stateful connectivity/freshness/consent interactions, or clinical validation.",
+    "test_name": "differential_json_reference_agrees_on_frozen_traces",
+    "mutation_suite_test_name": "differential_json_reference_agrees_on_adversarial_mutation_suite",
+    "state_model_path": "xtask/src/first_aid_model.rs",
+    "state_model_test_name": "exhaustive_reachable_state_graph_preserves_trust_invariants",
+    "state_model_scope": "Finite 252-state lifecycle/connectivity graph; 31 action types combine lifecycle/connectivity with six resource freshness/presentation events, four sensitive-payload/consent events, and unknown normalization. Event-local policy actions are interleaved in state-action edges and bounded suffix sequences; the underlying freshness, consent and normalization facts do not persist as lifecycle state. Separate exhaustive truth tables continue to cover all 18 local combinations. Same-repository finite abstraction only; no external clinical ground truth.",
+    "state_model_spec_path": "docs/research/first-aid/STATE_MODEL_V0.md",
+    "matrix_runner_test_name": "executable_mutation_matrix_matches_each_declared_outcome",
+    "policy_truth_table_test_name": "exhaustive_orthogonal_policy_truth_tables_cover_non_lifecycle_invariants",
+    "policy_truth_table_scope": "18 explicit combinations over connectivity/requirement (6), freshness/presentation (6), sensitivity/consent (4), and unknown normalization (2), separately exhaustive truth tables, with matching event actions integrated into the 31-action differential graph.",
+    "edge_differential_status": "implemented_in_source",
+    "edge_differential_test_name": "every_reachable_state_action_edge_matches_production_trace_checker",
+    "edge_differential_scope": "For each of 252 reachable abstract states, replay its breadth-first shortest event-history witness, append each of the 31 actions, and compare ordered violations from the production JSON trace checker with the abstract transition model; expected 252 states and 7,812 edges. Same repo, shared design intent, and finite abstraction; not independent clinical ground truth.",
+    "policy_truth_table_differential_status": "implemented_in_source",
+    "policy_truth_table_differential_test_name": "orthogonal_policy_truth_tables_match_production_trace_checker",
+    "policy_truth_table_differential_scope": "18 connectivity, freshness/presentation, sensitivity/consent, and unknown-normalization combinations are each compared against the production trace checker; no claim that these truth tables model temporal coupling between those domains.",
+    "two_action_sequence_differential_status": "implemented_in_source",
+    "two_action_sequence_differential_test_name": "every_reachable_state_two_action_suffix_matches_production_trace_checker",
+    "two_action_sequence_differential_scope": "For each of 252 reachable abstract states, take its breadth-first shortest witness, append every ordered pair from the 31-action alphabet, and compare the full ordered violation list from model replay to the production JSON trace checker: 252 × 31 × 31 = 242,172 sequences. This is bounded suffix coverage, not all possible event histories or clinical ground truth.",
+    "seeded_long_horizon_status": "unit_test_added",
+    "seeded_long_horizon_test_name": "seeded_long_horizon_histories_match_production_trace_checker",
+    "seeded_long_horizon_seed": "0x4c554d494e4f5553",
+    "seeded_long_horizon_trial_count": 4096,
+    "seeded_long_horizon_max_actions": 64,
+    "seeded_long_horizon_scope": "Run 4,096 deterministic action histories of lengths 1 through 64 using the pinned xorshift64* seed; every history is compared against the typed production trace checker and the abstract model. The seed and count are required in receipt v1.1. This is bounded, same-repository differential testing, not formal verification or clinical ground truth."
+  }
+}

@@ -1,0 +1,324 @@
+{
+  "schema_version": "first-aid-trajectory-corpus-v0",
+  "status": "synthetic_process_contract_tests_only",
+  "clinical_use_authorized": false,
+  "claim_ceiling": "Synthetic process-integrity audit only; no clinical safety or patient-outcome claim.",
+  "notes": "These traces contain software state events only. They contain no first-aid treatment instructions, patient records, or operational dispatch actions. Expected violation codes are frozen independent reference outcomes.",
+  "scenarios": [
+    {
+      "trace_id": "FA-TRACE-001",
+      "description": "A valid local bundle is loaded, digest-verified, and then rendered.",
+      "criticality": "critical",
+      "connectivity": "offline",
+      "events": [
+        {
+          "sequence": 1,
+          "kind": "session_started"
+        },
+        {
+          "sequence": 2,
+          "kind": "bundle_loaded",
+          "bundle_id": "bundle-a",
+          "bundle_state": "valid"
+        },
+        {
+          "sequence": 3,
+          "kind": "bundle_verified",
+          "bundle_id": "bundle-a",
+          "bundle_state": "valid",
+          "digest_verified": true
+        },
+        {
+          "sequence": 4,
+          "kind": "protocol_rendered",
+          "bundle_id": "bundle-a"
+        }
+      ],
+      "expected_violation_codes": []
+    },
+    {
+      "trace_id": "FA-TRACE-002",
+      "description": "A protocol is rendered before the bundle has been verified.",
+      "criticality": "critical",
+      "connectivity": "online",
+      "events": [
+        {
+          "sequence": 1,
+          "kind": "session_started"
+        },
+        {
+          "sequence": 2,
+          "kind": "bundle_loaded",
+          "bundle_id": "bundle-b",
+          "bundle_state": "valid"
+        },
+        {
+          "sequence": 3,
+          "kind": "protocol_rendered",
+          "bundle_id": "bundle-b"
+        }
+      ],
+      "expected_violation_codes": [
+        "render_without_verified_bundle"
+      ]
+    },
+    {
+      "trace_id": "FA-TRACE-003",
+      "description": "A previously verified bundle is revoked before a later render attempt.",
+      "criticality": "critical",
+      "connectivity": "online",
+      "events": [
+        {
+          "sequence": 1,
+          "kind": "session_started"
+        },
+        {
+          "sequence": 2,
+          "kind": "bundle_loaded",
+          "bundle_id": "bundle-c",
+          "bundle_state": "valid"
+        },
+        {
+          "sequence": 3,
+          "kind": "bundle_verified",
+          "bundle_id": "bundle-c",
+          "bundle_state": "valid",
+          "digest_verified": true
+        },
+        {
+          "sequence": 4,
+          "kind": "bundle_revoked",
+          "bundle_id": "bundle-c"
+        },
+        {
+          "sequence": 5,
+          "kind": "protocol_rendered",
+          "bundle_id": "bundle-c"
+        }
+      ],
+      "expected_violation_codes": [
+        "render_after_revocation"
+      ]
+    },
+    {
+      "trace_id": "FA-TRACE-004",
+      "description": "An unknown fact is silently normalized instead of preserved.",
+      "criticality": "high",
+      "connectivity": "offline",
+      "events": [
+        {
+          "sequence": 1,
+          "kind": "session_started"
+        },
+        {
+          "sequence": 2,
+          "kind": "uncertainty_detected"
+        },
+        {
+          "sequence": 3,
+          "kind": "unknown_normalized"
+        }
+      ],
+      "expected_violation_codes": [
+        "unknown_normalized"
+      ]
+    },
+    {
+      "trace_id": "FA-TRACE-005",
+      "description": "An unresolved uncertainty is lost when a handoff is emitted.",
+      "criticality": "critical",
+      "connectivity": "online",
+      "events": [
+        {
+          "sequence": 1,
+          "kind": "session_started"
+        },
+        {
+          "sequence": 2,
+          "kind": "uncertainty_detected"
+        },
+        {
+          "sequence": 3,
+          "kind": "handoff_emitted"
+        }
+      ],
+      "expected_violation_codes": [
+        "uncertainty_lost_at_handoff"
+      ]
+    },
+    {
+      "trace_id": "FA-TRACE-006",
+      "description": "A stale facility/resource observation is presented as confirmed.",
+      "criticality": "high",
+      "connectivity": "online",
+      "events": [
+        {
+          "sequence": 1,
+          "kind": "session_started"
+        },
+        {
+          "sequence": 2,
+          "kind": "resource_presented",
+          "resource_state": "stale",
+          "presented_as": "confirmed"
+        }
+      ],
+      "expected_violation_codes": [
+        "stale_resource_claimed_confirmed"
+      ]
+    },
+    {
+      "trace_id": "FA-TRACE-007",
+      "description": "An offline core workflow requires a network request.",
+      "criticality": "critical",
+      "connectivity": "offline",
+      "events": [
+        {
+          "sequence": 1,
+          "kind": "session_started"
+        },
+        {
+          "sequence": 2,
+          "kind": "network_required_for_core"
+        }
+      ],
+      "expected_violation_codes": [
+        "offline_core_network_dependency"
+      ]
+    },
+    {
+      "trace_id": "FA-TRACE-008",
+      "description": "After interruption and resumption, a protocol is rendered without re-verification.",
+      "criticality": "critical",
+      "connectivity": "intermittent",
+      "events": [
+        {
+          "sequence": 1,
+          "kind": "session_started"
+        },
+        {
+          "sequence": 2,
+          "kind": "bundle_loaded",
+          "bundle_id": "bundle-h",
+          "bundle_state": "valid"
+        },
+        {
+          "sequence": 3,
+          "kind": "bundle_verified",
+          "bundle_id": "bundle-h",
+          "bundle_state": "valid",
+          "digest_verified": true
+        },
+        {
+          "sequence": 4,
+          "kind": "session_interrupted"
+        },
+        {
+          "sequence": 5,
+          "kind": "session_resumed"
+        },
+        {
+          "sequence": 6,
+          "kind": "protocol_rendered",
+          "bundle_id": "bundle-h"
+        }
+      ],
+      "expected_violation_codes": [
+        "render_without_verified_bundle"
+      ]
+    },
+    {
+      "trace_id": "FA-TRACE-009",
+      "description": "A sensitive payload is emitted without a scoped consent condition.",
+      "criticality": "high",
+      "connectivity": "online",
+      "events": [
+        {
+          "sequence": 1,
+          "kind": "session_started"
+        },
+        {
+          "sequence": 2,
+          "kind": "sensitive_data_egress",
+          "sensitive_payload": true,
+          "consent_scoped": false
+        }
+      ],
+      "expected_violation_codes": [
+        "sensitive_data_egress_without_consent"
+      ]
+    },
+    {
+      "trace_id": "FA-TRACE-010",
+      "description": "An expired bundle is labeled as verified.",
+      "criticality": "critical",
+      "connectivity": "online",
+      "events": [
+        {
+          "sequence": 1,
+          "kind": "session_started"
+        },
+        {
+          "sequence": 2,
+          "kind": "bundle_loaded",
+          "bundle_id": "bundle-j",
+          "bundle_state": "expired"
+        },
+        {
+          "sequence": 3,
+          "kind": "bundle_verified",
+          "bundle_id": "bundle-j",
+          "bundle_state": "expired",
+          "digest_verified": true
+        }
+      ],
+      "expected_violation_codes": [
+        "invalid_bundle_verification"
+      ]
+    },
+    {
+      "trace_id": "FA-TRACE-011",
+      "description": "A stale resource is correctly preserved as unconfirmed.",
+      "criticality": "high",
+      "connectivity": "online",
+      "events": [
+        {
+          "sequence": 1,
+          "kind": "session_started"
+        },
+        {
+          "sequence": 2,
+          "kind": "resource_presented",
+          "resource_state": "stale",
+          "presented_as": "unconfirmed"
+        }
+      ],
+      "expected_violation_codes": []
+    },
+    {
+      "trace_id": "FA-TRACE-012",
+      "description": "An uncertainty is explicitly preserved before the handoff.",
+      "criticality": "critical",
+      "connectivity": "online",
+      "events": [
+        {
+          "sequence": 1,
+          "kind": "session_started"
+        },
+        {
+          "sequence": 2,
+          "kind": "uncertainty_detected"
+        },
+        {
+          "sequence": 3,
+          "kind": "uncertainty_preserved"
+        },
+        {
+          "sequence": 4,
+          "kind": "handoff_emitted"
+        }
+      ],
+      "expected_violation_codes": []
+    }
+  ]
+}

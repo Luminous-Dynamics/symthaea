@@ -1,0 +1,99 @@
+{
+  "schema_version": "first-aid-change-impact-v0",
+  "status": "synthetic_contract_tests_only",
+  "clinical_use_authorized": false,
+  "release_candidate": true,
+  "from_revision_id": "SYN-GUIDE-A",
+  "to_revision_id": "SYN-GUIDE-B",
+  "source_revisions": [
+    {
+      "revision_id": "SYN-GUIDE-A",
+      "source_path": "docs/research/first-aid/fixtures/synthetic-guideline-baseline-vA.txt",
+      "source_sha256": "a502fb3f5cb6008f7aa788bf3ab6dad0e2322e9fa0196d1166707b5e3db7a2c4",
+      "jurisdiction": "SYNTHETIC",
+      "intended_use": "validator-contract-test-only"
+    },
+    {
+      "revision_id": "SYN-GUIDE-B",
+      "source_path": "docs/research/first-aid/fixtures/synthetic-guideline-candidate-vB.txt",
+      "source_sha256": "24b7ef228456c056990de01bcc9d734f7a513972db9c14918401e3ca63ee65d8",
+      "jurisdiction": "SYNTHETIC",
+      "intended_use": "validator-contract-test-only"
+    }
+  ],
+  "requirements": [
+    {
+      "requirement_id": "REQ-001",
+      "source_revision_id": "SYN-GUIDE-B",
+      "source_locator": "synthetic://SYN-GUIDE-B/REQ-001",
+      "criticality": "safety_critical",
+      "disposition": "accepted",
+      "bundle_target": "rendered_item.source_revision",
+      "test_ids": [
+        "KAT-001",
+        "MUT-001"
+      ],
+      "reviewer_record_id": "SYNTHETIC-REVIEW-001",
+      "exclusion_rationale": null,
+      "source_requirement_sha256": "f70e94f69d511171573a59d433308b79c640b043e40bc12368135a5af01d72ca"
+    },
+    {
+      "requirement_id": "REQ-002",
+      "source_revision_id": "SYN-GUIDE-B",
+      "source_locator": "synthetic://SYN-GUIDE-B/REQ-002",
+      "criticality": "safety_critical",
+      "disposition": "accepted",
+      "bundle_target": "content.currentness_gate",
+      "test_ids": [
+        "KAT-002",
+        "MUT-002"
+      ],
+      "reviewer_record_id": "SYNTHETIC-REVIEW-002",
+      "exclusion_rationale": null,
+      "source_requirement_sha256": "850320c96545736ed236d0a345fe9b5c1f7ca85680f03031bf1b4f376b48a116"
+    },
+    {
+      "requirement_id": "REQ-003",
+      "source_revision_id": "SYN-GUIDE-B",
+      "source_locator": "synthetic://SYN-GUIDE-B/REQ-003",
+      "criticality": "safety_critical",
+      "disposition": "accepted",
+      "bundle_target": "resource.availability_label",
+      "test_ids": [
+        "KAT-003",
+        "MUT-003"
+      ],
+      "reviewer_record_id": "SYNTHETIC-REVIEW-003",
+      "exclusion_rationale": null,
+      "source_requirement_sha256": "0a88ec953807b3de32753e183c561cc2f90a32ad096939a20e29c7e169fd9e94"
+    }
+  ],
+  "change_records": [
+    {
+      "requirement_id": "REQ-002",
+      "change_kind": "changed",
+      "disposition": "retested",
+      "case_ids": [
+        "KAT-002",
+        "MUT-002"
+      ],
+      "reviewer_record_id": "SYNTHETIC-IMPACT-REVIEW-002",
+      "rationale": null
+    },
+    {
+      "requirement_id": "REQ-003",
+      "change_kind": "added",
+      "disposition": "retested",
+      "case_ids": [
+        "KAT-003",
+        "MUT-003"
+      ],
+      "reviewer_record_id": "SYNTHETIC-IMPACT-REVIEW-003",
+      "rationale": null
+    }
+  ],
+  "notes": "Synthetic source-to-mapping integrity fixture. Source files contain no clinical treatment content. This is not a clinical guideline, not a real protocol compiler, and not evidence of clinical correctness.",
+  "oracle_fixture_path": "docs/research/first-aid/fixtures/change-impact-independent-oracle-v0.json",
+  "oracle_fixture_sha256": "28ebb0721856de30088c40dc0aab385078c5b5e7401646ecae8285f29dbe5bef",
+  "oracle_class": "separate_synthetic_expected_outcomes"
+}

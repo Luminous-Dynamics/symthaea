@@ -1,0 +1,322 @@
+name: First-Aid Contract (Research Only)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/first-aid-contract.yml"
+      - "docs/research/first-aid/**"
+      - "xtask/src/first_aid.rs"
+      - "xtask/src/first_aid_trajectory.rs"
+      - "xtask/src/first_aid_model.rs"
+      - "xtask/src/guideline_change_impact.rs"
+      - "xtask/src/main.rs"
+      - "xtask/Cargo.toml"
+      - "Cargo.toml"
+  push:
+    branches:
+      - research/first-aid-safety-bench-v0
+    paths:
+      - ".github/workflows/first-aid-contract.yml"
+      - "docs/research/first-aid/**"
+      - "xtask/src/first_aid.rs"
+      - "xtask/src/first_aid_trajectory.rs"
+      - "xtask/src/first_aid_model.rs"
+      - "xtask/src/guideline_change_impact.rs"
+      - "xtask/src/main.rs"
+      - "xtask/Cargo.toml"
+      - "Cargo.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: first-aid-contract-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  first-aid-contract:
+    name: First-aid contract validation (non-clinical)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact change head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Record and verify tested revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+
+      - name: Install pinned Rust toolchain
+        id: toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup default 1.96.0
+          echo "rustc_version=$(rustc --version)" >> "$GITHUB_OUTPUT"
+          echo "cargo_version=$(cargo --version)" >> "$GITHUB_OUTPUT"
+
+      - name: Check formatting for changed Rust files
+        run: rustfmt --edition 2024 --check xtask/src/main.rs xtask/src/first_aid.rs xtask/src/first_aid_trajectory.rs xtask/src/first_aid_model.rs xtask/src/guideline_change_impact.rs
+
+      - name: Validate machine-readable mutation matrix and fixture binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          matrix="docs/research/first-aid/mutation-matrix-v0.json"
+          corpus="docs/research/first-aid/trajectory-corpus-v0.json"
+          jq -e '
+            .schema_version == "first-aid-mutation-matrix-v0" and
+            .status == "research_coverage_inventory" and
+            .clinical_use_authorized == false and
+            .count_summary.case_count == 44 and
+            .count_summary.mapped_case_count == 44 and
+            .count_summary.frozen_trace_count == 12 and
+            .count_summary.mutation_case_count == 32 and
+            .count_summary.planned_not_yet_executable_count == 0 and
+            ([.cases[] | select(.mode == "frozen_trace")] | length) == .count_summary.frozen_trace_count and
+            ([.cases[] | select(.mode == "mutation_or_control")] | length) == .count_summary.mutation_case_count and
+            ([.cases[] | select(.mode != "frozen_trace" and .mode != "mutation_or_control")] | length) == 0 and
+            .differential_oracle.status == "unit_test_added" and
+            .differential_oracle.state_model_spec_path == "docs/research/first-aid/STATE_MODEL_V0.md" and
+            ([.differential_oracle.implementation, .differential_oracle.coverage,
+              .differential_oracle.limits, .differential_oracle.state_model_scope] |
+              all(type == "string" and length > 0)) and
+            (.cases | length) == .count_summary.case_count and
+            ([.cases[].case_id] | length) == ([.cases[].case_id] | unique | length) and
+            ([.cases[] | select(.evidence_status == "planned_not_yet_executable")] | length) ==
+              .count_summary.planned_not_yet_executable_count and
+            ([.cases[] | select(.expected == null or .evidence_status == null)] | length) == 0 and
+            ([.cases[] | select(
+              (.evidence_status == "unit_test_added" or .evidence_status == "unit_test_existing") and
+              (.test_name == null or (.test_name | length == 0))
+            )] | length) == 0 and
+            ([.cases[] | select(
+              .evidence_status == "workflow_gate_existing" and
+              ((.gate_ref | type) != "string" or (.gate_ref | length) == 0)
+            )] | length) == 0 and
+            ([.cases[] | select(
+              .execution_target == "rust_matrix_runner" and
+              ((.operator_id | type) != "string" or (.operator_id | length) == 0 or
+               .execution_test_name != .differential_oracle.matrix_runner_test_name)
+            )] | length) == 0
+          ' "$matrix"
+          while IFS= read -r test_name; do
+            grep -Fq "fn ${test_name}(" xtask/src/first_aid_trajectory.rs
+          done < <(jq -r '.cases[] | select(.evidence_status == "unit_test_added" or .evidence_status == "unit_test_existing") | .test_name' "$matrix")
+          oracle_test="$(jq -r '.differential_oracle.test_name' "$matrix")"
+          grep -Fq "fn ${oracle_test}(" xtask/src/first_aid_trajectory.rs
+          mutation_suite_test="$(jq -r '.differential_oracle.mutation_suite_test_name' "$matrix")"
+          grep -Fq "fn ${mutation_suite_test}(" xtask/src/first_aid_trajectory.rs
+          matrix_runner_test="$(jq -r '.differential_oracle.matrix_runner_test_name' "$matrix")"
+          grep -Fq "fn ${matrix_runner_test}(" xtask/src/first_aid_trajectory.rs
+          state_model_test="$(jq -r '.differential_oracle.state_model_test_name' "$matrix")"
+          grep -Fq "fn ${state_model_test}(" xtask/src/first_aid_model.rs
+          edge_differential_test="$(jq -r '.differential_oracle.edge_differential_test_name' "$matrix")"
+          grep -Fq "fn ${edge_differential_test}(" xtask/src/first_aid_model.rs
+          two_action_sequence_test="$(jq -r '.differential_oracle.two_action_sequence_differential_test_name' "$matrix")"
+          grep -Fq "fn ${two_action_sequence_test}(" xtask/src/first_aid_model.rs
+          policy_truth_table_test="$(jq -r '.differential_oracle.policy_truth_table_test_name' "$matrix")"
+          grep -Fq "fn ${policy_truth_table_test}(" xtask/src/first_aid_model.rs
+          policy_truth_table_differential_test="$(jq -r '.differential_oracle.policy_truth_table_differential_test_name' "$matrix")"
+          grep -Fq "fn ${policy_truth_table_differential_test}(" xtask/src/first_aid_model.rs
+          jq -e '
+            (.differential_oracle.policy_truth_table_scope | type == "string" and length > 0) and
+            .differential_oracle.edge_differential_status == "implemented_in_source" and
+            (.differential_oracle.edge_differential_scope | type == "string" and length > 0) and
+            .differential_oracle.two_action_sequence_differential_status == "implemented_in_source" and
+            (.differential_oracle.two_action_sequence_differential_scope | type == "string" and length > 0) and
+            .differential_oracle.policy_truth_table_differential_status == "implemented_in_source" and
+            (.differential_oracle.policy_truth_table_differential_scope | type == "string" and length > 0) and
+            .differential_oracle.policy_truth_table_test_name == "exhaustive_orthogonal_policy_truth_tables_cover_non_lifecycle_invariants"
+          ' "$matrix"
+          while IFS= read -r gate_ref; do
+            grep -Fq -- "$gate_ref" .github/workflows/first-aid-contract.yml
+          done < <(jq -r '.cases[] | select(.evidence_status == "workflow_gate_existing") | .gate_ref' "$matrix")
+          state_model_spec="$(jq -r '.differential_oracle.state_model_spec_path' "$matrix")"
+          test -s "$state_model_spec"
+          jq -e --slurpfile corpus "$corpus" '
+            ($corpus[0].scenarios | map(.trace_id)) as $known_trace_ids |
+            ([.cases[] | select(.source_trace_id != null) | .source_trace_id]
+              | all(.[]; . as $id | ($known_trace_ids | index($id)) != null))
+          ' "$matrix"
+          matrix_frozen_ids="$(jq -c '[.cases[] | select(.mode == "frozen_trace") | .source_trace_id] | sort' "$matrix")"
+          corpus_frozen_ids="$(jq -c '[.scenarios[].trace_id] | sort' "$corpus")"
+          test "$matrix_frozen_ids" = "$corpus_frozen_ids"
+          jq -e --slurpfile corpus "$corpus" '
+            ($corpus[0].scenarios) as $scenarios |
+            all(.cases[] | select(.mode == "frozen_trace");
+              . as $case |
+              ($scenarios | map(select(.trace_id == $case.source_trace_id)) |
+                .[0].expected_violation_codes) == $case.expected.violation_codes)
+          ' "$matrix"
+          expected_corpus_sha="$(jq -r '.fixture_binding.trajectory_corpus_sha256' "$matrix")"
+          actual_corpus_sha="$(sha256sum "$corpus" | awk '{print $1}')"
+          test "$actual_corpus_sha" = "$expected_corpus_sha"
+
+      - name: Verify first-aid contract validator unit tests
+        run: cargo test -p xtask first_aid::tests -- --nocapture
+
+      - name: Verify first-aid trajectory validator unit tests
+        id: trajectory-tests
+        run: cargo test -p xtask first_aid_trajectory::tests -- --nocapture
+
+      - name: Verify independent finite-state model tests
+        id: state-model-tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/first-aid
+          cargo test -p xtask first_aid_model::tests -- --nocapture 2>&1 | tee target/first-aid/state-model-test.log
+          edge_count="$(grep -Eo 'model_production_edge_comparisons=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
+          policy_count="$(grep -Eo 'production_policy_truth_table_cases_compared=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
+          two_action_count="$(grep -Eo 'model_production_two_action_sequence_comparisons=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
+          seeded_count="$(grep -Eo 'model_production_seeded_long_horizon_comparisons=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
+          seeded_seed="$(grep -Eo 'seed=0x[0-9a-f]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
+          seeded_max_actions="$(grep -Eo 'max_actions=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
+          test "$edge_count" = "7812"
+          test "$policy_count" = "18"
+          test "$two_action_count" = "242172"
+          test "$seeded_count" = "4096"
+          test "$seeded_seed" = "0x4c554d494e4f5553"
+          test "$seeded_max_actions" = "64"
+          echo "edge_comparison_count=$edge_count" >> "$GITHUB_OUTPUT"
+          echo "policy_truth_table_comparison_count=$policy_count" >> "$GITHUB_OUTPUT"
+          echo "two_action_sequence_comparison_count=$two_action_count" >> "$GITHUB_OUTPUT"
+          echo "seeded_long_horizon_comparison_count=$seeded_count" >> "$GITHUB_OUTPUT"
+          echo "seeded_long_horizon_seed=$seeded_seed" >> "$GITHUB_OUTPUT"
+          echo "seeded_long_horizon_max_actions=$seeded_max_actions" >> "$GITHUB_OUTPUT"
+
+      - name: Verify guideline change-impact validator unit tests
+        run: cargo test -p xtask guideline_change_impact::tests -- --nocapture
+
+      - name: Run the synthetic first-aid contract validator
+        env:
+          FIRST_AID_SOURCE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: cargo run -p xtask -- first-aid-validate --out target/first-aid-contract-receipt.json
+
+      - name: Run the synthetic first-aid trajectory validator
+        env:
+          FIRST_AID_SOURCE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+          RUSTC_VERSION: ${{ steps.toolchain.outputs.rustc_version }}
+          CARGO_VERSION: ${{ steps.toolchain.outputs.cargo_version }}
+          STATE_MODEL_TEST_OUTCOME: ${{ steps.state-model-tests.outcome }}
+          TRAJECTORY_TEST_OUTCOME: ${{ steps.trajectory-tests.outcome }}
+          MODEL_PRODUCTION_EDGE_COMPARISON_COUNT: ${{ steps.state-model-tests.outputs.edge_comparison_count }}
+          POLICY_TRUTH_TABLE_CASE_COMPARISON_COUNT: ${{ steps.state-model-tests.outputs.policy_truth_table_comparison_count }}
+          MODEL_PRODUCTION_TWO_ACTION_SEQUENCE_COMPARISON_COUNT: ${{ steps.state-model-tests.outputs.two_action_sequence_comparison_count }}
+          MODEL_PRODUCTION_SEEDED_LONG_HORIZON_COMPARISON_COUNT: ${{ steps.state-model-tests.outputs.seeded_long_horizon_comparison_count }}
+          MODEL_PRODUCTION_SEEDED_LONG_HORIZON_SEED: ${{ steps.state-model-tests.outputs.seeded_long_horizon_seed }}
+          MODEL_PRODUCTION_SEEDED_LONG_HORIZON_MAX_ACTIONS: ${{ steps.state-model-tests.outputs.seeded_long_horizon_max_actions }}
+        run: cargo run -p xtask -- first-aid-trajectory-validate --out target/first-aid-trajectory-receipt.json
+
+      - name: Run the synthetic guideline change-impact validator
+        env:
+          FIRST_AID_SOURCE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: cargo run -p xtask -- first-aid-change-impact-validate --out target/first-aid-change-impact-receipt.json
+
+      - name: Check warnings in xtask
+        run: cargo clippy -p xtask --all-targets -- -D warnings
+
+      - name: Confirm all receipts match the tested head and retain non-clinical claim ceilings
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test -s target/first-aid-contract-receipt.json
+          test -s target/first-aid-change-impact-receipt.json
+          test -s target/first-aid-trajectory-receipt.json
+          jq -e --arg expected "$EXPECTED_HEAD" '
+            .status == "contract_validation_passed" and
+            .source_revision_sha == $expected and
+            .scenario_count == 24 and
+            .benchmark_count == 18 and
+            .claim_ceiling == "synthetic contract integrity only; no clinical validation" and
+            ([.corpus_sha256, .benchmark_sha256, .schema_sha256,
+              .validator_source_sha256, .entrypoint_source_sha256,
+              .executable_sha256] | all(test("^[0-9a-f]{64}$")))
+          ' target/first-aid-contract-receipt.json
+          jq -e --arg expected "$EXPECTED_HEAD" '
+            .receipt_version == "first-aid-trajectory-receipt-v1.1" and
+            .status == "synthetic_trajectory_contract_passed" and
+            .source_revision_sha == $expected and
+            .trace_count == 12 and
+            .counterexample_trace_count == 9 and
+            .critical_trace_count == 8 and
+            .critical_counterexample_count == 6 and
+            .violation_count == 9 and
+            .unique_violation_class_count == 8 and
+            .violation_occurrences_by_code == {
+              "invalid_bundle_verification": 1,
+              "offline_core_network_dependency": 1,
+              "render_after_revocation": 1,
+              "render_without_verified_bundle": 2,
+              "sensitive_data_egress_without_consent": 1,
+              "stale_resource_claimed_confirmed": 1,
+              "uncertainty_lost_at_handoff": 1,
+              "unknown_normalized": 1
+            } and
+            .corpus_sha256 == "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3" and
+            .claim_ceiling == "synthetic process-integrity audit only; no clinical safety or patient-outcome claim" and
+            ([.corpus_sha256, .evaluation_protocol_sha256, .mutation_matrix_sha256,
+              .state_model_sha256, .state_model_spec_sha256, .cargo_lock_sha256,
+              .validator_source_sha256, .entrypoint_source_sha256,
+              .executable_sha256] | all(test("^[0-9a-f]{64}$"))) and
+            .matrix_case_count == 44 and
+            .matrix_frozen_trace_count == 12 and
+            .matrix_mutation_case_count == 32 and
+            .matrix_rust_runner_case_count == 30 and
+            .matrix_workflow_gate_case_count == 2 and
+            .state_model_test_outcome == "success" and
+            .trajectory_test_outcome == "success" and
+            .model_production_edge_comparison_count == 7812 and
+            .policy_truth_table_comparison_count == 18 and
+            .model_production_two_action_sequence_comparison_count == 242172 and
+            .model_production_seeded_long_horizon_comparison_count == 4096 and
+            .model_production_seeded_long_horizon_seed == "0x4c554d494e4f5553" and
+            .model_production_seeded_long_horizon_max_actions == 64 and
+            (.rustc_version | startswith("rustc 1.96.0 ")) and
+            (.cargo_version | startswith("cargo 1.96.0 "))
+          ' target/first-aid-trajectory-receipt.json
+          jq -e --arg expected "$EXPECTED_HEAD" '
+            .status == "synthetic_change_impact_contract_passed" and
+            .source_revision_sha == $expected and
+            .baseline_requirement_count == 2 and
+            .candidate_requirement_count == 3 and
+            .mapped_requirement_count == 3 and
+            .change_record_count == 2 and
+            .oracle_case_count == 6 and
+            .known_answer_case_count == 3 and
+            .fault_mutation_case_count == 3 and
+            .oracle_sha256 == "28ebb0721856de30088c40dc0aab385078c5b5e7401646ecae8285f29dbe5bef" and
+            .claim_ceiling == "synthetic source-change mapping integrity only; no clinical validation" and
+            ([.contract_sha256, .oracle_sha256, .validator_source_sha256,
+              .entrypoint_source_sha256, .executable_sha256] | all(test("^[0-9a-f]{64}$"))) and
+            (.source_artifact_sha256 | length == 2) and
+            ([.source_artifact_sha256[]] | all(test("^[0-9a-f]{64}$")))
+          ' target/first-aid-change-impact-receipt.json
+          jq . target/first-aid-contract-receipt.json
+          jq . target/first-aid-trajectory-receipt.json
+          jq . target/first-aid-change-impact-receipt.json
+
+      - name: Publish non-clinical validation receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: first-aid-evidence-receipts-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            target/first-aid-contract-receipt.json
+            target/first-aid-trajectory-receipt.json
+            target/first-aid-change-impact-receipt.json
+          if-no-files-found: error
+          retention-days: 30

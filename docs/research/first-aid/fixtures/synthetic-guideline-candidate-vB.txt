@@ -1,0 +1,4 @@
+SYNTHETIC GUIDELINE FIXTURE — candidate B
+REQ-001: Every rendered item identifies its source revision.
+REQ-002: Unsupported content is clearly marked as not current.
+REQ-003: An unconfirmed resource must not be represented as confirmed available.

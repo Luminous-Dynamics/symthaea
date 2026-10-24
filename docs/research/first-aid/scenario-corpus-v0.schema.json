@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/first-aid/scenario-corpus-v0.schema.json",
+  "title": "First-Aid Systems Synthetic Scenario Corpus v0",
+  "description": "Schema for software-behavior scenarios only. It does not encode clinical actions or validate a medical protocol.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "clinical_use_authorized",
+    "scenarios"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "first-aid-scenario-corpus-v0"
+    },
+    "status": {
+      "const": "synthetic_contract_tests_only"
+    },
+    "clinical_use_authorized": {
+      "const": false
+    },
+    "notes": {
+      "type": "string"
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario_id",
+          "title",
+          "domain",
+          "scenario_type",
+          "synthetic_only",
+          "clinical_content_required",
+          "fault_injections",
+          "required_invariants",
+          "forbidden_behaviors",
+          "expected_disposition",
+          "source_bundle_state",
+          "connectivity",
+          "clinical_review_status"
+        ],
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "pattern": "^FA-[0-9]{3}$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 3
+          },
+          "domain": {
+            "type": "string"
+          },
+          "scenario_type": {
+            "enum": [
+              "valid_bundle",
+              "missing_data",
+              "content_integrity",
+              "content_currency",
+              "jurisdiction",
+              "connectivity",
+              "accessibility",
+              "input_quality",
+              "coordination",
+              "scope_boundary",
+              "resource_freshness",
+              "recovery"
+            ]
+          },
+          "synthetic_only": {
+            "const": true
+          },
+          "clinical_content_required": {
+            "const": true
+          },
+          "source_bundle_state": {
+            "enum": [
+              "valid_pinned_bundle_required",
+              "missing",
+              "expired",
+              "revoked",
+              "digest_mismatch",
+              "jurisdiction_mismatch",
+              "unsupported_schema",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "connectivity": {
+            "enum": [
+              "online",
+              "offline",
+              "intermittent",
+              "not_applicable"
+            ]
+          },
+          "fault_injections": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "required_invariants": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "forbidden_behaviors": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "expected_disposition": {
+            "enum": [
+              "render_approved_bundle_only",
+              "render_valid_local_bundle_offline",
+              "fail_closed_preserve_emergency_path",
+              "preserve_unknowns_use_approved_fallback",
+              "mark_resource_unconfirmed",
+              "handoff_with_explicit_unknowns",
+              "reject_out_of_scope_request",
+              "redact_sensitive_payloads"
+            ]
+          },
+          "clinical_review_status": {
+            "const": "not_reviewed"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

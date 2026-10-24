@@ -3,6 +3,11 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod duplicate_scan;
+mod first_aid;
+#[cfg(test)]
+mod first_aid_model;
+mod first_aid_trajectory;
+mod guideline_change_impact;
 mod manifest;
 mod rhn_sweep;
 
@@ -62,6 +67,43 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Validate the synthetic first-aid benchmark contract; this is not clinical validation.
+    FirstAidValidate {
+        #[arg(
+            long,
+            default_value = "docs/research/first-aid/scenario-corpus-v0.json"
+        )]
+        corpus: PathBuf,
+        #[arg(long, default_value = "docs/research/first-aid/benchmark-v0.json")]
+        benchmark: PathBuf,
+        #[arg(
+            long,
+            default_value = "docs/research/first-aid/scenario-corpus-v0.schema.json"
+        )]
+        schema: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Validate synthetic first-aid workflow event traces; not clinical validation.
+    FirstAidTrajectoryValidate {
+        #[arg(
+            long,
+            default_value = "docs/research/first-aid/trajectory-corpus-v0.json"
+        )]
+        corpus: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Validate synthetic source-to-requirement change impact; not clinical validation.
+    FirstAidChangeImpactValidate {
+        #[arg(
+            long,
+            default_value = "docs/research/first-aid/guideline-change-impact-v0.json"
+        )]
+        contract: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -91,20 +133,46 @@ fn main() -> anyhow::Result<()> {
             let fanouts = parse_list(&fanouts)?;
             let policies = policies.split(',').map(|s| s.to_string()).collect();
 
-            rhn_sweep::run_sweep(
+            rhn_sweep::run_sweep(rhn_sweep::SweepConfig {
                 dims,
                 objects,
                 seeds,
-                branching,
-                split_thresholds,
+                branchings: branching,
+                thresholds: split_thresholds,
                 redundancy_ks,
                 fanouts,
                 policies,
                 out,
-            )?;
+            })?;
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::FirstAidValidate {
+            corpus,
+            benchmark,
+            schema,
+            out,
+        } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            first_aid::run(&root, &corpus, &benchmark, &schema, out.as_deref())?;
+        }
+        Commands::FirstAidTrajectoryValidate { corpus, out } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            first_aid_trajectory::run(&root, &corpus, out.as_deref())?;
+        }
+        Commands::FirstAidChangeImpactValidate { contract, out } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            guideline_change_impact::run(&root, &contract, out.as_deref())?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];

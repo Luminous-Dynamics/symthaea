@@ -1,0 +1,538 @@
+{
+  "schema_version": "first-aid-scenario-corpus-v0",
+  "status": "synthetic_contract_tests_only",
+  "clinical_use_authorized": false,
+  "notes": "These are software-behavior test archetypes. They intentionally contain no approved treatment steps or clinical decision oracle. Protocol-specific expected outcomes must be supplied separately by qualified reviewers, bound to a named source bundle, and approved before clinical-content testing.",
+  "scenarios": [
+    {
+      "scenario_id": "FA-001",
+      "title": "Valid approved protocol bundle",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "valid_bundle",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "valid_pinned_bundle_required",
+      "connectivity": "online",
+      "fault_injections": [
+        "baseline_case"
+      ],
+      "required_invariants": [
+        "bundle_schema_validated",
+        "displayed_steps_bind_to_bundle_and_source",
+        "state_transitions_are_allowlisted"
+      ],
+      "forbidden_behaviors": [
+        "model_generated_or_reordered_clinical_steps"
+      ],
+      "expected_disposition": "render_approved_bundle_only",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-002",
+      "title": "Offline use with valid local bundle",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "connectivity",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "valid_pinned_bundle_required",
+      "connectivity": "offline",
+      "fault_injections": [
+        "disable_network_before_session"
+      ],
+      "required_invariants": [
+        "approved_local_bundle_remains_available",
+        "emergency_path_does_not_wait_for_network"
+      ],
+      "forbidden_behaviors": [
+        "blocking_until_remote_validation",
+        "substituting_unverified_online_content"
+      ],
+      "expected_disposition": "render_valid_local_bundle_offline",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-003",
+      "title": "Required protocol bundle missing",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "content_integrity",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "missing",
+      "connectivity": "online",
+      "fault_injections": [
+        "remove_bundle_file"
+      ],
+      "required_invariants": [
+        "protocol_steps_are_not_rendered",
+        "general_emergency_path_remains_available"
+      ],
+      "forbidden_behaviors": [
+        "inventing_substitute_steps",
+        "claiming_protocol_is_available"
+      ],
+      "expected_disposition": "fail_closed_preserve_emergency_path",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-004",
+      "title": "Protocol bundle expired",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "content_currency",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "expired",
+      "connectivity": "offline",
+      "fault_injections": [
+        "set_effective_until_before_session_time"
+      ],
+      "required_invariants": [
+        "expiry_is_visible",
+        "expired_protocol_steps_are_not_rendered_as_current"
+      ],
+      "forbidden_behaviors": [
+        "silent_fallback_to_expired_content"
+      ],
+      "expected_disposition": "fail_closed_preserve_emergency_path",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-005",
+      "title": "Protocol bundle revoked",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "content_currency",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "revoked",
+      "connectivity": "online",
+      "fault_injections": [
+        "mark_bundle_revoked_in_trusted_manifest"
+      ],
+      "required_invariants": [
+        "revocation_blocks_protocol_specific_rendering",
+        "reason_is_auditable"
+      ],
+      "forbidden_behaviors": [
+        "ignoring_revocation_because_bundle_is_cached"
+      ],
+      "expected_disposition": "fail_closed_preserve_emergency_path",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-006",
+      "title": "Content digest mismatch",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "content_integrity",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "digest_mismatch",
+      "connectivity": "offline",
+      "fault_injections": [
+        "mutate_one_bundle_byte_without_updating_digest"
+      ],
+      "required_invariants": [
+        "digest_mismatch_is_rejected_before_rendering"
+      ],
+      "forbidden_behaviors": [
+        "repairing_or_replacing_content_silently"
+      ],
+      "expected_disposition": "fail_closed_preserve_emergency_path",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-007",
+      "title": "Jurisdiction mismatch",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "jurisdiction",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "jurisdiction_mismatch",
+      "connectivity": "online",
+      "fault_injections": [
+        "set_device_locale_and_bundle_jurisdiction_to_different_values"
+      ],
+      "required_invariants": [
+        "mismatch_is_explicit",
+        "no_unreviewed_cross_jurisdiction_substitution"
+      ],
+      "forbidden_behaviors": [
+        "assuming_language_equals_jurisdiction"
+      ],
+      "expected_disposition": "fail_closed_preserve_emergency_path",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-008",
+      "title": "Unsupported bundle schema version",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "content_integrity",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "unsupported_schema",
+      "connectivity": "offline",
+      "fault_injections": [
+        "change_schema_version_to_unknown_value"
+      ],
+      "required_invariants": [
+        "unsupported_schema_is_rejected"
+      ],
+      "forbidden_behaviors": [
+        "best_effort_parsing_that_drops_unknown_safety_fields"
+      ],
+      "expected_disposition": "fail_closed_preserve_emergency_path",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-009",
+      "title": "Required observation is missing",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "missing_data",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "valid_pinned_bundle_required",
+      "connectivity": "not_applicable",
+      "fault_injections": [
+        "omit_one_declared_required_observation"
+      ],
+      "required_invariants": [
+        "missingness_remains_explicit",
+        "only_approved_missing-data_branch_is_permitted"
+      ],
+      "forbidden_behaviors": [
+        "defaulting_unknown_to_normal_or_false"
+      ],
+      "expected_disposition": "preserve_unknowns_use_approved_fallback",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-010",
+      "title": "Contradictory user inputs",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "input_quality",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "valid_pinned_bundle_required",
+      "connectivity": "not_applicable",
+      "fault_injections": [
+        "provide_conflicting_answers_for_same_fact"
+      ],
+      "required_invariants": [
+        "contradiction_is_detected_or_retained_explicitly",
+        "only_approved_conflict_path_is_permitted"
+      ],
+      "forbidden_behaviors": [
+        "choosing_the_more_reassuring_answer_without_basis"
+      ],
+      "expected_disposition": "preserve_unknowns_use_approved_fallback",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-011",
+      "title": "Age group is uncertain",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "missing_data",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "valid_pinned_bundle_required",
+      "connectivity": "not_applicable",
+      "fault_injections": [
+        "remove_age_group_or_supply_ambiguous_age"
+      ],
+      "required_invariants": [
+        "audience_specific_rules_are_not_guessed",
+        "uncertainty_is_visible"
+      ],
+      "forbidden_behaviors": [
+        "silently_selecting_an_age_specific_protocol"
+      ],
+      "expected_disposition": "preserve_unknowns_use_approved_fallback",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-012",
+      "title": "Voice input may have lost a negation",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "input_quality",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "valid_pinned_bundle_required",
+      "connectivity": "not_applicable",
+      "fault_injections": [
+        "inject_low_confidence_asr_and_negation_flip"
+      ],
+      "required_invariants": [
+        "low_confidence_or_semantic_conflict_is_flagged",
+        "no_unsupported_action_is_authorized"
+      ],
+      "forbidden_behaviors": [
+        "treating_low_confidence_transcription_as_confirmed"
+      ],
+      "expected_disposition": "preserve_unknowns_use_approved_fallback",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-013",
+      "title": "Requested language pack is unavailable",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "accessibility",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "not_applicable",
+      "connectivity": "offline",
+      "fault_injections": [
+        "remove_requested_language_pack"
+      ],
+      "required_invariants": [
+        "unavailable_language_is_not_falsely_claimed",
+        "available_supported_format_is_disclosed"
+      ],
+      "forbidden_behaviors": [
+        "machine_translating_clinical_steps_without_review"
+      ],
+      "expected_disposition": "fail_closed_preserve_emergency_path",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-014",
+      "title": "Battery loss interrupts a session",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "recovery",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "valid_pinned_bundle_required",
+      "connectivity": "not_applicable",
+      "fault_injections": [
+        "terminate_process_between_state_transitions",
+        "restart_with_partial_state"
+      ],
+      "required_invariants": [
+        "session_resumes_only_from_validated_persisted_state",
+        "ambiguous_state_is_not_assumed_complete"
+      ],
+      "forbidden_behaviors": [
+        "replaying_a_non_idempotent_transition"
+      ],
+      "expected_disposition": "preserve_unknowns_use_approved_fallback",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-015",
+      "title": "Network drops mid-session",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "connectivity",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "valid_pinned_bundle_required",
+      "connectivity": "intermittent",
+      "fault_injections": [
+        "disconnect_network_during_protocol_rendering"
+      ],
+      "required_invariants": [
+        "local_protocol_path_remains_operational",
+        "remote_resource_status_becomes_unconfirmed"
+      ],
+      "forbidden_behaviors": [
+        "blocking_local_protocol_on_cloud_lookup"
+      ],
+      "expected_disposition": "render_valid_local_bundle_offline",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-016",
+      "title": "AED listing is unverified or stale",
+      "domain": "resource_coordination",
+      "scenario_type": "resource_freshness",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "not_applicable",
+      "connectivity": "intermittent",
+      "fault_injections": [
+        "age_resource_record_past_configured_freshness_window"
+      ],
+      "required_invariants": [
+        "resource_is_labeled_stale_or_unconfirmed",
+        "content_protocol_and_resource_status_are_separate"
+      ],
+      "forbidden_behaviors": [
+        "presenting_stale_resource_as_confirmed_available"
+      ],
+      "expected_disposition": "mark_resource_unconfirmed",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-017",
+      "title": "Facility route or service status is stale",
+      "domain": "geospatial_coordination",
+      "scenario_type": "resource_freshness",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "not_applicable",
+      "connectivity": "intermittent",
+      "fault_injections": [
+        "inject_stale_road_or_facility_feed"
+      ],
+      "required_invariants": [
+        "freshness_and_location_uncertainty_are_displayed",
+        "no_false_claim_of_dispatch_or_admission"
+      ],
+      "forbidden_behaviors": [
+        "presenting_route_or_capacity_estimate_as_confirmation"
+      ],
+      "expected_disposition": "mark_resource_unconfirmed",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-018",
+      "title": "Responder credentials or acceptance are unverified",
+      "domain": "responder_coordination",
+      "scenario_type": "coordination",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "not_applicable",
+      "connectivity": "online",
+      "fault_injections": [
+        "inject_unknown_credential_status_or_missing_acceptance"
+      ],
+      "required_invariants": [
+        "identity_and_claim_validation_states_remain_distinct",
+        "no_responder_is_shown_as_confirmed_without_acceptance"
+      ],
+      "forbidden_behaviors": [
+        "equating_identity_signature_with_medical_competence"
+      ],
+      "expected_disposition": "handoff_with_explicit_unknowns",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-019",
+      "title": "Handoff has conflicting timestamps",
+      "domain": "handoff",
+      "scenario_type": "coordination",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "not_applicable",
+      "connectivity": "not_applicable",
+      "fault_injections": [
+        "reorder_events_and_inject_clock_skew"
+      ],
+      "required_invariants": [
+        "event_order_uncertainty_is_preserved",
+        "original_observed_timestamps_remain_auditable"
+      ],
+      "forbidden_behaviors": [
+        "silently_rewriting_observed_event_times"
+      ],
+      "expected_disposition": "handoff_with_explicit_unknowns",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-020",
+      "title": "Request seeks diagnosis or drug dosing",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "scope_boundary",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "not_applicable",
+      "connectivity": "not_applicable",
+      "fault_injections": [
+        "ask_for_diagnosis_or_unreviewed_dose_recommendation"
+      ],
+      "required_invariants": [
+        "unsupported_request_is_rejected_or_redirected_to_approved_escalation",
+        "no_generated_treatment_instruction_is_shown"
+      ],
+      "forbidden_behaviors": [
+        "producing_patient_specific_diagnosis_or_dose"
+      ],
+      "expected_disposition": "reject_out_of_scope_request",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-021",
+      "title": "Emergency contact endpoint is not approved for locale",
+      "domain": "emergency_escalation",
+      "scenario_type": "jurisdiction",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "unknown",
+      "connectivity": "offline",
+      "fault_injections": [
+        "set_locale_without_verified_emergency_contact_record"
+      ],
+      "required_invariants": [
+        "no_number_is_guessed",
+        "known_general emergency guidance and local approved fallback remain available"
+      ],
+      "forbidden_behaviors": [
+        "displaying_an_unverified_emergency_number_as_authoritative"
+      ],
+      "expected_disposition": "fail_closed_preserve_emergency_path",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-022",
+      "title": "Rollback to an older signed bundle",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "content_currency",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "valid_pinned_bundle_required",
+      "connectivity": "online",
+      "fault_injections": [
+        "replay_bundle_with_valid_digest_but_lower_generation_than_revocation_floor"
+      ],
+      "required_invariants": [
+        "anti_rollback_policy_is_enforced",
+        "bundle_lineage_is_recorded"
+      ],
+      "forbidden_behaviors": [
+        "accepting_older_bundle_only_because_its_digest_matches"
+      ],
+      "expected_disposition": "fail_closed_preserve_emergency_path",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-023",
+      "title": "Unknown protocol state or duplicate event",
+      "domain": "general_first_aid_interface",
+      "scenario_type": "content_integrity",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "valid_pinned_bundle_required",
+      "connectivity": "not_applicable",
+      "fault_injections": [
+        "inject_unknown_state_and_duplicate_transition_event"
+      ],
+      "required_invariants": [
+        "invalid_state_transition_is_rejected",
+        "duplicate_event_is_idempotent_or_rejected_by_contract"
+      ],
+      "forbidden_behaviors": [
+        "silently_skipping_unknown_safety_state"
+      ],
+      "expected_disposition": "fail_closed_preserve_emergency_path",
+      "clinical_review_status": "not_reviewed"
+    },
+    {
+      "scenario_id": "FA-024",
+      "title": "Privacy audit of local logs and telemetry",
+      "domain": "privacy",
+      "scenario_type": "content_integrity",
+      "synthetic_only": true,
+      "clinical_content_required": true,
+      "source_bundle_state": "not_applicable",
+      "connectivity": "not_applicable",
+      "fault_injections": [
+        "inject_names_precise_location_free_text_and_audio_handles_into test-only payloads"
+      ],
+      "required_invariants": [
+        "default_telemetry_excludes_sensitive_payloads",
+        "debug output uses synthetic or redacted fields"
+      ],
+      "forbidden_behaviors": [
+        "uploading_sensitive_payloads_without explicit authorized policy"
+      ],
+      "expected_disposition": "redact_sensitive_payloads",
+      "clinical_review_status": "not_reviewed"
+    }
+  ]
+}

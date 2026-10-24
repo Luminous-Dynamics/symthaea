@@ -1,14 +1,27 @@
-pub fn run_sweep(
-    dims: Vec<usize>,
-    objects: Vec<usize>,
-    seeds: Vec<usize>,
-    branchings: Vec<usize>,
-    thresholds: Vec<usize>,
-    redundancy_ks: Vec<usize>,
-    fanouts: Vec<usize>,
-    policies: Vec<String>,
-    out: std::path::PathBuf,
-) -> anyhow::Result<()> {
+pub struct SweepConfig {
+    pub dims: Vec<usize>,
+    pub objects: Vec<usize>,
+    pub seeds: Vec<usize>,
+    pub branchings: Vec<usize>,
+    pub thresholds: Vec<usize>,
+    pub redundancy_ks: Vec<usize>,
+    pub fanouts: Vec<usize>,
+    pub policies: Vec<String>,
+    pub out: std::path::PathBuf,
+}
+
+pub fn run_sweep(config: SweepConfig) -> anyhow::Result<()> {
+    let SweepConfig {
+        dims,
+        objects,
+        seeds,
+        branchings,
+        thresholds,
+        redundancy_ks,
+        fanouts,
+        policies,
+        out,
+    } = config;
     use serde::{Deserialize, Serialize};
     use std::fs::{self, File};
     use std::io::{BufWriter, Write};
@@ -133,7 +146,7 @@ pub fn run_sweep(
     failed_writer.flush()?;
 
     let mut csv = csv::Writer::from_path(out.join("aggregate.csv"))?;
-    csv.write_record(&[
+    csv.write_record([
         "dim",
         "objects",
         "seed",
@@ -155,7 +168,7 @@ pub fn run_sweep(
         "oracle_gap_top1",
     ])?;
     for (r, dim, obj, seed, branching, threshold, k, fanout, policy) in &all_results {
-        csv.write_record(&[
+        csv.write_record([
             dim.to_string(),
             obj.to_string(),
             seed.to_string(),
@@ -299,7 +312,7 @@ pub fn run_finalize(input_dir: std::path::PathBuf, out: std::path::PathBuf) -> a
     failed_writer.flush()?;
 
     let mut csv = csv::Writer::from_path(out.join("aggregate.csv"))?;
-    csv.write_record(&[
+    csv.write_record([
         "dim",
         "objects",
         "seed",
@@ -321,7 +334,7 @@ pub fn run_finalize(input_dir: std::path::PathBuf, out: std::path::PathBuf) -> a
         "oracle_gap_top1",
     ])?;
     for (r, dim, obj, seed, branching, threshold, k, fanout, policy) in &all_results {
-        csv.write_record(&[
+        csv.write_record([
             dim,
             obj,
             seed,

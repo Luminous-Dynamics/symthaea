@@ -1,0 +1,3 @@
+SYNTHETIC GUIDELINE FIXTURE — baseline A
+REQ-001: Every rendered item identifies its source revision.
+REQ-002: Unsupported content is never represented as current.
