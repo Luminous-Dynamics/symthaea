@@ -253,6 +253,7 @@ fn make_serene_state() -> CognitiveSnapshot {
     CognitiveSnapshot {
         consciousness_level: 0.85,
         prediction_error: 0.05,
+        prediction_error_valid: true,
         dopamine: 0.5,
         serotonin: 0.8,
         noradrenaline: 0.2,
@@ -281,6 +282,7 @@ fn make_turbulent_state() -> CognitiveSnapshot {
     CognitiveSnapshot {
         consciousness_level: 0.6,
         prediction_error: 0.7,
+        prediction_error_valid: true,
         dopamine: 0.3,
         serotonin: 0.2,
         noradrenaline: 0.9,
@@ -309,6 +311,7 @@ fn make_playful_state() -> CognitiveSnapshot {
     CognitiveSnapshot {
         consciousness_level: 0.75,
         prediction_error: 0.3,
+        prediction_error_valid: true,
         dopamine: 0.8,
         serotonin: 0.5,
         noradrenaline: 0.5,
@@ -337,6 +340,7 @@ fn make_contemplative_state() -> CognitiveSnapshot {
     CognitiveSnapshot {
         consciousness_level: 0.9,
         prediction_error: 0.02,
+        prediction_error_valid: true,
         dopamine: 0.4,
         serotonin: 0.7,
         noradrenaline: 0.1,
