@@ -1,0 +1,136 @@
+{
+  "schema_version": "1.0.0",
+  "lock_id": "CASTING-MF-POLICY-SCENARIOS-PRERUN-001",
+  "title": "Pre-run source freeze for the internal adversarial multi-fidelity policy diagnostic",
+  "status": "PRE_RUN_SOURCE_FREEZE_NOT_EXECUTION_EVIDENCE",
+  "source_commit": "01164855e587ef0543cd17d18eacebb262f9b0db",
+  "hash_convention": "Git blob SHA-1 over canonical Git object bytes; used only to check exact repository file identity, not as a security signature",
+  "locked_files": [
+    {
+      "path": "tools/casting-benchmark/multifidelity_stress.py",
+      "git_blob_sha1": "99620f6f7e3ef47f51742fbd55ba1faa872cd103"
+    },
+    {
+      "path": "tools/casting-benchmark/multifidelity_scenario_suite.py",
+      "git_blob_sha1": "2e2b3cb35e3ac72eb0c1de64a3ec5dd3649c6b1a"
+    },
+    {
+      "path": "tools/casting-benchmark/multifidelity_scenario_policy_bakeoff.py",
+      "git_blob_sha1": "28a23653bc41be9caed59a3af6c52d74f120eb95"
+    },
+    {
+      "path": "tools/casting-benchmark/score_scenario_policy_bakeoff.py",
+      "git_blob_sha1": "aca17a3771ca21342690baabb92da8860415b65f"
+    },
+    {
+      "path": "docs/research/CASTING_MULTIFIDELITY_SCENARIO_SUITE_V1.json",
+      "git_blob_sha1": "4332a8c60342b52940e269ec1c0cc71b3d8be527"
+    },
+    {
+      "path": "docs/research/CASTING_MULTIFIDELITY_POLICY_SCENARIOS_V1.json",
+      "git_blob_sha1": "778f5d98b6c72672f3a678f71e36d1684268655f"
+    },
+    {
+      "path": "tools/casting-benchmark/test_score_scenario_policy_bakeoff.py",
+      "git_blob_sha1": "9c10723c799e3b22c60133d2632b7e10e1509d18"
+    },
+    {
+      "path": "tools/casting-benchmark/test_multifidelity_scenario_policy_bakeoff.py",
+      "git_blob_sha1": "c8937cdb01459a0965053e1700c8373c9183b666"
+    }
+  ],
+  "preregistration": {
+    "benchmark_id": "CASTING-MF-POLICY-SCENARIOS-001",
+    "claim_ceiling": "SYNTHETIC_TRACE_REPLAYED_NOT_SOTA_EVIDENCE",
+    "design": {
+      "scenario_ids": [
+        "smooth_stationary",
+        "local_bias_island",
+        "warped_coordinates",
+        "constraint_boundary",
+        "discontinuous_step",
+        "heteroscedastic_noise"
+      ],
+      "dimensions": [
+        2,
+        5,
+        10
+      ],
+      "severities": [
+        0.5,
+        1,
+        2
+      ],
+      "paired_seeds": [
+        17,
+        23,
+        29
+      ],
+      "design_count": 128,
+      "fidelity_costs": {
+        "low": 1,
+        "medium": 5,
+        "high": 25
+      },
+      "cost_budget": 200,
+      "policy_ids": [
+        "high_only",
+        "low_screen",
+        "fixed_top_k",
+        "discrepancy_aware",
+        "adaptive_budget"
+      ],
+      "expected_run_count": 810,
+      "expected_cell_summary_count": 270,
+      "expected_paired_comparison_count": 216
+    },
+    "primary_metric": "observed high-fidelity feasible finite-pool hypervolume divided by that cell's high-fidelity truth-pool hypervolume",
+    "secondary_metrics": [
+      "false_feasible_promotion_count",
+      "false_feasible_promotion_rate",
+      "actual_cost_units",
+      "unused_cost_units",
+      "calls_by_fidelity",
+      "paired_seed_hypervolume_delta_vs_high_only"
+    ],
+    "run_requirements": [
+      "Keep the complete raw run ledger; do not drop failed, invalid, or incomplete runs.",
+      "Pair methods on the same scenario, dimension, severity, seed, design pool, reference point and cost budget.",
+      "Reject missing or duplicate run cells and unknown JSON keys.",
+      "Replay every fidelity observation and recompute costs, promotion labels, feasible archive and hypervolume from raw traces.",
+      "Require the separate trace scorer to issue a valid receipt before reporting any metric.",
+      "Report all per-cell outcomes; three seeds are exploratory only and cannot support a superiority claim."
+    ],
+    "non_claims": [
+      "This internal policy comparison does not run BoTorch MF-HVKG, MOMF, COCO, NSGA-II or other external baselines.",
+      "Synthetic equations are not a calibrated casting simulator or held-out foundry data.",
+      "Passing source verification or trace replay is not evidence of SOTA or industrial benefit."
+    ],
+    "planned_command_argv": [
+      "python3",
+      "tools/casting-benchmark/multifidelity_scenario_policy_bakeoff.py",
+      "--scenarios",
+      "smooth_stationary,local_bias_island,warped_coordinates,constraint_boundary,discontinuous_step,heteroscedastic_noise",
+      "--dimensions",
+      "2,5,10",
+      "--severities",
+      "0.5,1,2",
+      "--seeds",
+      "17,23,29",
+      "--cost-budget",
+      "200",
+      "--design-count",
+      "128",
+      "--bootstrap-samples",
+      "1000"
+    ],
+    "environment_recording": [
+      "Python executable path",
+      "Python runtime version",
+      "execution HEAD commit",
+      "pre-run and post-run source-lock verifier output",
+      "raw result SHA-256",
+      "replay receipt SHA-256"
+    ]
+  }
+}
