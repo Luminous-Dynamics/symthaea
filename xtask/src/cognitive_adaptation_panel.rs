@@ -1,6 +1,6 @@
 //! Batch-level gate for preregistered five-arm cognitive-adaptation panels.
 //!
-//! This consumes individually scored v2 records, validates their provenance and metric digests,
+//! This consumes individually scored v3 records, validates their provenance and metric digests,
 //! checks the full dataset × seed × scenario grid, and only then computes the confirmatory
 //! dataset-clustered paired comparison. An incomplete panel returns diagnostics with no effect
 //! estimate; coverage never becomes a performance claim.
