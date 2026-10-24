@@ -17,6 +17,7 @@ fixed.workspace = true
 statig.workspace = true
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-humanoid = { path = "../symthaea-humanoid" }
+symthaea-maritime-core = { path = "../symthaea-maritime-core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
