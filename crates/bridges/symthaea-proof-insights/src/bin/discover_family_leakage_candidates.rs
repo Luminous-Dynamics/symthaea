@@ -135,7 +135,7 @@ fn deterministic_splits(ids: &[String]) -> Result<BTreeMap<String, String>> {
         .iter()
         .map(|id| {
             (
-                sha256(format!("{SPLIT_SEED}\\0{id}").as_bytes()),
+                sha256(format!("{SPLIT_SEED}\0{id}").as_bytes()),
                 id.clone(),
             )
         })
@@ -248,7 +248,7 @@ fn validate_catalogue(doc: &Value) -> Result<(String, Vec<Family>, SplitCounts)>
 
     let tag_re = Regex::new(r"<[^>]*>").context("compile HTML-tag tokenizer")?;
     let entity_re = Regex::new(r"&[A-Za-z]+;").context("compile entity tokenizer")?;
-    let token_re = Regex::new(r"(?u)[\\p{L}\\p{N}]{3,}")
+    let token_re = Regex::new(r"(?u)[\p{L}\p{N}]{3,}")
         .context("compile Unicode tokenizer")?;
     let stop = stopwords();
     let mut families = Vec::with_capacity(rows.len());
@@ -356,7 +356,7 @@ fn discover(families: &[Family]) -> Vec<Candidate> {
             .then_with(|| a.source_family_id.cmp(&b.source_family_id))
             .then_with(|| a.target_family_id.cmp(&b.target_family_id))
     });
-        candidates
+    candidates
 }
 
 fn counts(candidates: &[Candidate]) -> CandidateCounts {
