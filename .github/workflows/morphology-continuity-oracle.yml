@@ -60,6 +60,9 @@ jobs:
       - name: Verify frozen calibration-interval request digest
         run: echo "4f68fc455cebdff3c6e11d1a0e6292f6f119a89715345b983bc26704e8924312  tools/morphology-continuity-oracle/calibration_interval_request_v0_9.txt" | sha256sum --check -
 
+      - name: Verify frozen class-conditional robustness request digest
+        run: echo "ac71a51d4dcc86c4d53e33ab79b8bfdc252faecc0842945f3f6b8470b3218cb8  tools/morphology-continuity-oracle/class_conditional_robustness_request_v1_0.txt" | sha256sum --check -
+
       - name: Formatting
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
 
