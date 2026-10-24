@@ -803,13 +803,18 @@ mod tests {
     // -- V1 parser rejects non-canonical structural metadata --
 
     #[test]
-    fn parser_rejects_reserved_flag_bits_with_valid_crc() {
+    fn parser_rejects_every_reserved_flag_bit_with_valid_crc() {
         let mut malformed = fragment(42, &[0xA5; 17])[0].clone();
-        malformed.flags |= 0x02; // Bit 1 is reserved in V1.
-        malformed.checksum = malformed.compute_checksum();
         let mut buf = [0u8; LORA_MTU];
-        let len = malformed.to_bytes(&mut buf);
-        assert!(LoRaFragment::from_bytes(&buf[..len]).is_none());
+        for bit in 1..=7 {
+            malformed.flags = 1u8 << bit; // Only bit 0 (FLAG_FEC) is defined in V1.
+            malformed.checksum = malformed.compute_checksum();
+            let len = malformed.to_bytes(&mut buf);
+            assert!(
+                LoRaFragment::from_bytes(&buf[..len]).is_none(),
+                "reserved flag bit {bit} must be rejected even with a valid CRC"
+            );
+        }
     }
 
     #[test]
@@ -834,7 +839,7 @@ mod tests {
     }
 
     #[test]
-    fn parser_rejects_empty_data_and_short_fec_payloads() {
+    fn parser_rejects_empty_data_and_every_short_fec_payload() {
         let mut empty_data = fragment(45, &[0x01])[0].clone();
         empty_data.payload_len = 0;
         empty_data.checksum = empty_data.compute_checksum();
@@ -843,10 +848,32 @@ mod tests {
         assert!(LoRaFragment::from_bytes(&buf[..len]).is_none());
 
         let mut short_fec = fragment(46, &[0x02])[1].clone();
-        short_fec.payload_len = (PAYLOAD_SIZE - 1) as u8;
-        short_fec.checksum = short_fec.compute_checksum();
-        let len = short_fec.to_bytes(&mut buf);
-        assert!(LoRaFragment::from_bytes(&buf[..len]).is_none());
+        // Exercise every nonzero FEC length below the only valid size.
+        for payload_len in 1..PAYLOAD_SIZE {
+            short_fec.payload_len = payload_len as u8;
+            short_fec.checksum = short_fec.compute_checksum();
+            let len = short_fec.to_bytes(&mut buf);
+            assert!(
+                LoRaFragment::from_bytes(&buf[..len]).is_none(),
+                "FEC payload length {payload_len} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn parser_accepts_legacy_padding_within_mtu() {
+        let fragment = fragment(49, &[0x71; 17])[0].clone();
+        let mut serialized = [0u8; LORA_MTU];
+        let len = fragment.to_bytes(&mut serialized);
+        assert!(len < LORA_MTU);
+
+        // Preserve existing adapter behavior: bytes after the declared payload
+        // may be transport padding, provided the complete frame stays <= MTU.
+        let parsed = LoRaFragment::from_bytes(&serialized);
+        assert!(parsed.is_some());
+        let parsed = parsed.expect("valid padded frame should parse");
+        assert_eq!(parsed.payload_len as usize, 17);
+        assert_eq!(&parsed.payload[..17], &[0x71; 17]);
     }
 
     #[test]
