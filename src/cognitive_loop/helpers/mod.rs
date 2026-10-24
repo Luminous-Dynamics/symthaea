@@ -1018,6 +1018,7 @@ impl CognitiveLoopService {
     /// Reset all learning state
     pub fn reset(&mut self) {
         self.encoder.reset_attention();
+        self.encoder.clear_prediction();
         // Reset CfC state by injecting zeros
         let zeros = Array1::from_vec(vec![0.0f32; self.config.cfc_config.input_dim]);
         let _ = self.temporal_network.inject(&zeros);
