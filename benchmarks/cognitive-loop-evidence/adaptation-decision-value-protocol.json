@@ -387,7 +387,8 @@
       "Require the same source revision and version for each policy arm across the panel.",
       "Permit per-dataset tuned configuration digests but require configuration stability across seeds/scenarios within each dataset.",
       "Recompute the staged-versus-detector post-shift effect from the arm outcomes.",
-      "Reject duplicate or out-of-grid records."
+      "Reject duplicate or out-of-grid records.",
+      "Require stream_id uniqueness across distinct dataset × seed × scenario cells."
     ],
     "incomplete_panel_behavior": "List missing dataset × seed × scenario cells, set complete_coverage_gate_pass=false, and emit primary_comparison=null. Do not calculate or display a confirmatory effect/interval for incomplete coverage.",
     "complete_panel_behavior": "Call the existing hierarchical paired bootstrap with dataset resampling first, then seed resampling while preserving each seed's scenario block. Orient lower post-shift task loss as positive effect for the staged candidate.",
