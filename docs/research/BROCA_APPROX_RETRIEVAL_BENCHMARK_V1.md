@@ -24,7 +24,7 @@ Run at multiple store sizes, using the same machine and compiler build:
 for size in 1000 10000 50000; do
   cargo run -p symthaea-hdc-store --example ann_benchmark --release -- \
     --source-sha="$(git rev-parse HEAD)" \
-    --size="$size" --clusters=64 --cluster-noise-bits=1024 --lsh-configs=32x8,16x16,64x4 --queries=200 --rounds=5 --top-k=10 --seed=42 \
+    --size="$size" --clusters=64 --cluster-noise-bits=1024 --noise-bits=128 --hard-noise-bits=4096 --lsh-configs=32x8,16x16,64x4 --queries=200 --rounds=5 --top-k=10 --seed=42 \
     > "broca-ann-$size.csv"
 done
 ```
