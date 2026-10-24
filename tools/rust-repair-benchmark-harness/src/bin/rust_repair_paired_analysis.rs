@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const REPORT_VERSION: u32 = 1;
 const DEFAULT_SEED: u64 = 20_261_024;
@@ -171,7 +171,7 @@ fn is_hex_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-fn read_json<T: for<'de> Deserialize<'de>>(path: &PathBuf) -> Result<(T, Vec<u8>), String> {
+fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<(T, Vec<u8>), String> {
     let bytes = fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
     let parsed = serde_json::from_slice(&bytes)
         .map_err(|error| format!("cannot parse {}: {error}", path.display()))?;
@@ -667,7 +667,7 @@ mod tests {
             &ids,
         )
         .unwrap();
-        assert_eq!(indexed.get("one"), Some(&Outcome::Unresolved));
+        assert_eq!(indexed.get("one").copied(), Some(Outcome::Unresolved));
         assert!(!report.lockable);
         assert_eq!(report.pass_at_1, None);
     }
