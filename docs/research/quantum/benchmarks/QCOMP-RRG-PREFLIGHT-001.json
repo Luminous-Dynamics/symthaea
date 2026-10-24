@@ -1895,7 +1895,7 @@
     "max_stubs_per_call": 1000000,
     "seed_stream_alignment": "The canonical Rust API was updated to use the same XorShift64* stream, rejection-sampled Fisher-Yates bounded draw and in-place re-shuffle semantics as this independent JS translation. Exact Rust-to-JS graph-byte parity remains unverified until Rust is executable. A static test review also fixed a stub-ceiling fixture that previously would have triggered the vertex ceiling first; the fixture now uses n=100000,d=12 to isolate the stub-limit error.",
     "execution_status": "not compiled or executed",
-    "failure_provenance": "Generator exhaustion error now preserves vertex_count, degree, seed and max_attempts; CLI emits a structured failure receipt to stderr and keeps graph stdout empty on failure. Rust execution remains unverified."
+    "failure_provenance": "Retry exhaustion now preserves vertex_count, degree, seed and max_attempts in the typed error. CLI parse/input/generation failures produce a structured JSON receipt on stderr and leave graph stdout empty. Rust execution remains unverified."
   },
   "preflight_origin": {
     "created_with": "independent JavaScript translation, not Rust",
