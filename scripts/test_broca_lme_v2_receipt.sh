@@ -43,11 +43,11 @@ make_fixture() {
 }
 expect_pass() {
   local receipt=$1
-  if ! "$checker" "$receipt"; then echo "FAIL: expected receipt to pass" >&2; exit 1; fi
+  if ! bash "$checker" "$receipt"; then echo "FAIL: expected receipt to pass" >&2; exit 1; fi
 }
 expect_fail() {
   local receipt=$1 label=$2
-  if "$checker" "$receipt" >/dev/null 2>&1; then echo "FAIL: negative control was accepted: $label" >&2; exit 1; fi
+  if bash "$checker" "$receipt" >/dev/null 2>&1; then echo "FAIL: negative control was accepted: $label" >&2; exit 1; fi
 }
 
 make_fixture "$work/valid"
