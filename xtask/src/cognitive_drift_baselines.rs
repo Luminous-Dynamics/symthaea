@@ -91,7 +91,7 @@ pub fn evaluate_file(path: &Path) -> anyhow::Result<ScalarDriftRunResult> {
     run_scalar_detector(input)
 }
 
-pub fn run_scalar_detector(input: ScalarDriftRunInput) -> anyhow::Result<ScalarDriftRunResult> {
+pub fn run_scalar_detector(mut input: ScalarDriftRunInput) -> anyhow::Result<ScalarDriftRunResult> {
     ensure!(input.schema_version == 1, "scalar drift input schema_version must be 1");
     ensure!(!input.stream_id.trim().is_empty(), "stream_id must not be empty");
     ensure!(
@@ -138,6 +138,12 @@ pub fn run_scalar_detector(input: ScalarDriftRunInput) -> anyhow::Result<ScalarD
         }
     }
 
+    // Ground-truth events are a set of intervals, not an ordered stream. Normalize
+    // their serialization before hashing while preserving calibration/sample order.
+    input.drift_events.sort_by(|left, right| {
+        (left.start_cycle, left.end_cycle, &left.id)
+            .cmp(&(right.start_cycle, right.end_cycle, &right.id))
+    });
     let input_digest = sha256(&serde_json::to_vec(&input)?);
     let configuration_digest = sha256(&serde_json::to_vec(&input.detector)?);
     let (detector_id, detections) = detect(&input)?;
@@ -439,6 +445,21 @@ mod tests {
         let mut bad_calibration = fixture(ScalarDetectorMethod::EwmaControlChart);
         bad_calibration.calibration_values[1] = f64::NAN;
         assert!(run_scalar_detector(bad_calibration).is_err());
+    }
+
+    #[test]
+    fn canonical_input_digest_is_invariant_to_ground_truth_event_order() {
+        let mut first = fixture(ScalarDetectorMethod::FixedThreshold);
+        let mut second = first.clone();
+        second.drift_events.reverse();
+        let a = run_scalar_detector(first.clone()).expect("first run");
+        let b = run_scalar_detector(second).expect("reordered ground truth run");
+        assert_eq!(a.canonical_input_sha256, b.canonical_input_sha256);
+        assert_eq!(a.score.event_f1, b.score.event_f1);
+        assert_eq!(a.result_sha256, b.result_sha256);
+        // Observation order is semantic and must not be normalized away.
+        first.observations.swap(0, 1);
+        assert!(run_scalar_detector(first).is_err());
     }
 
     #[test]
