@@ -278,7 +278,9 @@ impl DualLayerMesh {
                 let frags = fragment(packet.thought_id(), &envelope);
                 let mut buf = [0u8; LORA_MTU];
                 for frag in &frags {
-                    let len = frag.to_bytes(&mut buf);
+                    let len = frag
+                        .try_to_bytes(&mut buf)
+                        .map_err(MeshError::FragmentEncoding)?;
                     // Optionally encrypt each fragment individually
                     #[cfg(feature = "mesh-encryption")]
                     if self.fragment_encryption {
