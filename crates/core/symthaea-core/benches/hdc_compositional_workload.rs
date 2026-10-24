@@ -18,6 +18,8 @@ const BUNDLE_ARITIES: [usize; 3] = [3, 7, 15];
 const CORPUS_SIZES: [usize; 4] = [256, 1024, 4096, 16384];
 const BUILD_BENCH_SIZES: [usize; 3] = [256, 1024, 4096];
 const METRIC_QUERY_COUNT: usize = 8;
+const OPEN_SET_CALIBRATION_COUNT: usize = 8;
+const OPEN_SET_TEST_COUNT: usize = 8;
 const QUERY_NOISE_BPS: [usize; 5] = [0, 100, 200, 500, 1000];
 const ROLE_SEED: u64 = 0xA11C_E000_0000;
 const VALUE_SEED: u64 = 0xC0DE_0000_0000;
@@ -25,6 +27,7 @@ const VALUE_SEED: u64 = 0xC0DE_0000_0000;
 struct CompositionalWorkload {
     corpus: Vec<BinaryHV>,
     query_atoms: Vec<BinaryHV>,
+    role_zero: BinaryHV,
 }
 
 /// Construct each record from distinct role/value bindings, then bundle those
@@ -51,7 +54,11 @@ fn build_workload(corpus_size: usize, arity: usize) -> CompositionalWorkload {
         corpus.push(BinaryHV::bundle(&facts));
     }
 
-    CompositionalWorkload { corpus, query_atoms }
+    CompositionalWorkload {
+        corpus,
+        query_atoms,
+        role_zero: roles[0],
+    }
 }
 
 /// Canonical optimized exact top-1; strict score improvement preserves the
@@ -102,6 +109,140 @@ fn corrupt_query(query: &BinaryHV, noise_bps: usize, salt: usize) -> BinaryHV {
         corrupted.0[bit / 8] ^= 1u8 << (bit % 8);
     }
     corrupted
+}
+
+/// An open-set query has the same role-bound cue form as a stored record but
+/// its value seed is outside the corpus seed range.
+fn unknown_query(workload: &CompositionalWorkload, unknown_index: usize) -> BinaryHV {
+    let seed_index = workload
+        .corpus
+        .len()
+        .wrapping_add(100_000)
+        .wrapping_add(unknown_index) as u64;
+    let value = BinaryHV::random(
+        VALUE_SEED.wrapping_add(seed_index.wrapping_mul(64)),
+    );
+    workload.role_zero.bind(&value)
+}
+
+#[derive(Clone, Copy)]
+struct AcceptanceThreshold {
+    score: f32,
+    calibration_false_reject_rate: f32,
+    calibration_false_accept_rate: f32,
+}
+
+/// Choose a similarity threshold on calibration-only examples. Accept iff the
+/// nearest score is >= threshold. Minimize false-reject + false-accept rate,
+/// then prefer the more balanced error rate, then the higher threshold.
+fn calibrate_acceptance_threshold(
+    known_scores: &[f32],
+    unknown_scores: &[f32],
+) -> AcceptanceThreshold {
+    assert!(!known_scores.is_empty());
+    assert!(!unknown_scores.is_empty());
+
+    let mut candidates = vec![0.0f32, 1.0f32];
+    candidates.extend(known_scores.iter().copied());
+    candidates.extend(unknown_scores.iter().copied());
+    candidates.sort_by(f32::total_cmp);
+    candidates.dedup_by(|a, b| a.total_cmp(b).is_eq());
+    let adjacent: Vec<f32> = candidates
+        .windows(2)
+        .map(|pair| (pair[0] + pair[1]) * 0.5)
+        .collect();
+    candidates.extend(adjacent);
+
+    let mut best = AcceptanceThreshold {
+        score: 0.0,
+        calibration_false_reject_rate: 1.0,
+        calibration_false_accept_rate: 1.0,
+    };
+    let mut best_error = f32::INFINITY;
+    let mut best_imbalance = f32::INFINITY;
+
+    for threshold in candidates {
+        let false_rejects = known_scores.iter().filter(|&&s| s < threshold).count();
+        let false_accepts = unknown_scores.iter().filter(|&&s| s >= threshold).count();
+        let fnr = false_rejects as f32 / known_scores.len() as f32;
+        let fpr = false_accepts as f32 / unknown_scores.len() as f32;
+        let error = fnr + fpr;
+        let imbalance = (fnr - fpr).abs();
+
+        if error < best_error
+            || (error == best_error && imbalance < best_imbalance)
+            || (error == best_error
+                && imbalance == best_imbalance
+                && threshold > best.score)
+        {
+            best_error = error;
+            best_imbalance = imbalance;
+            best = AcceptanceThreshold {
+                score: threshold,
+                calibration_false_reject_rate: fnr,
+                calibration_false_accept_rate: fpr,
+            };
+        }
+    }
+
+    best
+}
+
+/// Calibrate on clean cues and unknown values, then evaluate only on distinct
+/// held-out record IDs and unknown-value seeds. Noise is applied after the
+/// clean threshold is frozen so the robustness curve cannot retune itself.
+fn open_set_diagnostics(workload: &CompositionalWorkload) {
+    let n = workload.corpus.len();
+    let known_calibration: Vec<f32> = (0..OPEN_SET_CALIBRATION_COUNT)
+        .map(|i| {
+            let target_id = (i * 9973 + 17) % n;
+            exact_top1(&workload.query_atoms[target_id], &workload.corpus).1
+        })
+        .collect();
+    let unknown_calibration: Vec<f32> = (0..OPEN_SET_CALIBRATION_COUNT)
+        .map(|i| exact_top1(&unknown_query(workload, i), &workload.corpus).1)
+        .collect();
+    let threshold = calibrate_acceptance_threshold(&known_calibration, &unknown_calibration);
+
+    let known_test_ids: Vec<usize> = (0..OPEN_SET_TEST_COUNT)
+        .map(|i| ((i + 64) * 9973 + 17) % n)
+        .collect();
+    let unknown_test_scores: Vec<f32> = (OPEN_SET_CALIBRATION_COUNT
+        ..OPEN_SET_CALIBRATION_COUNT + OPEN_SET_TEST_COUNT)
+        .map(|i| exact_top1(&unknown_query(workload, i), &workload.corpus).1)
+        .collect();
+    let false_accepts = unknown_test_scores
+        .iter()
+        .filter(|&&score| score >= threshold.score)
+        .count();
+
+    for noise_bps in QUERY_NOISE_BPS {
+        let false_rejects = known_test_ids
+            .iter()
+            .map(|&target_id| corrupt_query(&workload.query_atoms[target_id], noise_bps, target_id))
+            .map(|query| exact_top1(&query, &workload.corpus).1)
+            .filter(|&score| score < threshold.score)
+            .count();
+
+        eprintln!(
+            "open-set-acceptance arity={} n={} noise_bps={} threshold_similarity={:.6} \
+             cal_fnr={:.3} cal_fpr={:.3} test_fnr={:.3} test_fpr={:.3} \
+             test_known={}/{} test_unknown_false_accepts={}/{}",
+            // The arity is inferred by the caller's current workload label.
+            0,
+            n,
+            noise_bps,
+            threshold.score,
+            threshold.calibration_false_reject_rate,
+            threshold.calibration_false_accept_rate,
+            false_rejects as f32 / OPEN_SET_TEST_COUNT as f32,
+            false_accepts as f32 / OPEN_SET_TEST_COUNT as f32,
+            OPEN_SET_TEST_COUNT - false_rejects,
+            OPEN_SET_TEST_COUNT,
+            false_accepts,
+            OPEN_SET_TEST_COUNT,
+        );
+    }
 }
 
 struct RetrievalSummary {
