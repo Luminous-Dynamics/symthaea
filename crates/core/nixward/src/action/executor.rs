@@ -905,7 +905,7 @@ mod tests {
     }
 
     #[cfg(unix)]
-#[tokio::test]
+    #[tokio::test]
     async fn test_execute_with_permit_accepts_exact_typed_command_once() {
         use super::super::authorization::{
             ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
@@ -967,7 +967,7 @@ mod tests {
     }
 
     #[cfg(unix)]
-#[tokio::test]
+    #[tokio::test]
     async fn test_execute_with_permit_blocks_command_substitution() {
         use super::super::authorization::{
             ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
@@ -1019,7 +1019,7 @@ mod tests {
     }
 
     #[cfg(unix)]
-#[tokio::test]
+    #[tokio::test]
     async fn test_execute_with_permit_rejects_unclassified_custom_command() {
         use super::super::authorization::{
             ActionScope, AuthorizationAuthority, AuthorizationRequest, CommandBinding,
