@@ -141,6 +141,11 @@ def main() -> int:
         required=True,
         help="Directory for machine-readable results and raw compile/test logs",
     )
+    parser.add_argument(
+        "--expected-head-sha",
+        default=None,
+        help="Expected PR head SHA (not necessarily the workflow checkout/merge SHA)",
+    )
     args = parser.parse_args()
     output_dir = Path(args.output_dir).resolve()
     if output_dir == ROOT or ROOT in output_dir.parents:
@@ -180,7 +185,8 @@ def main() -> int:
     report: dict[str, object] = {
         "schema_version": "vleb-mutation-campaign-v1",
         "task_id": TASK_ID,
-        "base_revision": base_revision,
+        "checkout_revision": base_revision,
+        "expected_head_sha": args.expected_head_sha,
         "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "toolchains": versions,
         "reference_source_sha256": sha256(reference_source.encode("utf-8")),
