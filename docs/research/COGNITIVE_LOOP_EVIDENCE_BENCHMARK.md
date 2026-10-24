@@ -304,3 +304,29 @@ cargo test --locked -p xtask cognitive_drift_baselines
 ```
 
 This is deliberately described as a reference variant, not as a bit-for-bit reproduction of every Page-Hinkley library implementation. It is upward-shift-only for the PE use case, and the latch/rearm rule is part of the detector contract. Report its parameters and false alarms, delay, and task-level impact. The published KDD 2026 comparison still requires its independently pinned detector implementations, datasets, fold/tuning protocol, and shared classifier-error stream; this PE-only variant cannot substitute for that track.
+
+
+## Fourth executable reference control: predictive rank martingale portfolio
+
+A more substantive direction than adding another scalar threshold is to make the alarm boundary correspond to a false-alarm budget. Kuang and Xia's September 2026 preprint, *Anytime-Valid Distribution Shift Detection via Predictive Rank Martingales*, derives the exact sequential null predictive law for ranks computed against a fixed calibration set. It forms nonnegative martingales by betting on centered rank features; crossing wealth (1/\alpha) is an anytime-valid stopping rule under the paper's null and randomization assumptions. Its order feature targets directional shifts, while its dispersion feature targets center-versus-tail changes. See the [paper](https://arxiv.org/abs/2609.00536), especially its predictive-rank law and portfolio construction.
+
+The Rust baseline runner now includes `predictive-rank-martingale-portfolio`. It uses a fixed calibration reference and four fixed-bet components: positive/negative order features and positive/negative dispersion features, combined with equal weights. Its configured `prm_alpha` defines the first-crossing boundary (1/\alpha); e.g. `0.05` means a wealth boundary of 20. The algorithm updates its predictive rank probabilities from the observed rank history, rather than treating repeated calibration-based p-values as independent.
+
+The implementation is deliberately scoped:
+
+- It uses fixed betting coefficients, not the paper's adaptive Online Newton Step (ONS) bet updates.
+- It produces only the **first alarm per calibration epoch**. Repeated alarms require a fresh, justified calibration epoch or a separately validated alpha-spending construction; resetting wealth informally would destroy the stated guarantee.
+- Tie-breaking uses a deterministic PRNG stream derived from the recorded experiment seed, for reproducibility. The exact mathematical guarantee assumes independent randomized tie-breaking; do not claim the guarantee conditional on one fixed pseudorandom seed. Benchmark runs should treat the seed as independent experimental randomization and include multiple independent seeds.
+- The guarantee assumes a stable IID null for the calibrated scalar scores. It does not automatically establish validity for autocorrelated PE streams, informative missingness, changing calibration distributions, or the complete cognitive loop.
+- This implementation is a reference portfolio, not a reproduction of the paper's ONS algorithm or a measured superiority result.
+
+A synthetic CLI fixture, `benchmarks/cognitive-loop-evidence/synthetic-predictive-rank-martingale-run.json`, tests the first-crossing behavior on one sustained upward shift. It is not benchmark evidence.
+
+```bash
+cargo run --locked -p xtask -- run-cognitive-drift-baseline \
+  --input benchmarks/cognitive-loop-evidence/synthetic-predictive-rank-martingale-run.json \
+  --out reports/predictive-rank-martingale-smoke.json
+cargo test --locked -p xtask cognitive_drift_baselines
+```
+
+For a meaningful state-of-the-art comparison, compare this fixed-bet portfolio against the published ONS PRM, CCTM, ADWIN/Page-Hinkley and KDD 2026 baselines using identical held-out streams. Report empirical anytime false-alarm rate over the entire stream (not per-cycle alarms treated as independent), detection delay, missed shifts, task-loss improvement, and intervention cost. Until an audited PRNG/independent-seed model and null-calibration study are complete, label this as an implementation prototype with a martingale-inspired contract, not a formally certified detector.
