@@ -550,6 +550,23 @@ mod tests {
     }
 
     #[test]
+    fn invalid_prediction_error_does_not_change_pixel_canvas_encoding() {
+        let genesis = GenesisSeed::from_phrase("pixel-canvas-invalid-pe-boundary");
+        let mut low = CognitiveSnapshot::dormant();
+        low.prediction_error = 0.0;
+        low.prediction_error_valid = false;
+        let mut sentinel = low.clone();
+        sentinel.prediction_error = 1.0;
+
+        let low_hv = NeuralPainter::encode_snapshot(&low, &genesis);
+        let sentinel_hv = NeuralPainter::encode_snapshot(&sentinel, &genesis);
+        assert_eq!(
+            low_hv.values, sentinel_hv.values,
+            "invalid PE payload must be omitted from pixel canvas HDC encoding"
+        );
+    }
+
+    #[test]
     fn neural_painter_creates_art() {
         let genesis = GenesisSeed::from_phrase("test-painter");
         let mut painter = NeuralPainter::new(&genesis);
