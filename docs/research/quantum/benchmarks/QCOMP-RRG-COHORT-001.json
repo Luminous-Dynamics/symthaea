@@ -29,7 +29,7 @@
       "generator_blob_sha1": "247414ded11cb7cb12637a56e7c2699564a6efe1",
       "cli_path": "crates/domains/symthaea-quantum-comp/src/bin/qcomp_rrg_generate.rs",
       "cli_blob_sha1": "0d0488d8605a2256d813e0c09740b9e4ebd5b9bf",
-      "note": "Source pin includes generator exhaustion errors that retain n, degree, seed and max_attempts, plus a structured JSON failure receipt emitted to stderr by the CLI while preserving DIMACS-only stdout. Rust remains uncompiled in this environment."
+      "note": "Source pin includes the retry-exhaustion error preserving n, degree, seed and max_attempts, plus a structured JSON failure receipt on CLI stderr while preserving DIMACS-only stdout. Rust remains uncompiled in this environment."
     }
   },
   "motivation": {
