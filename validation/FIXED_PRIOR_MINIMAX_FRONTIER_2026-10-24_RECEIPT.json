@@ -54,7 +54,7 @@
   "validation": {
     "combined_local_regression_tests": "61/61_PASS",
     "full_6_prior_horizon_3_all_objectives": "exceeded local execution limit; not claimed complete",
-    "remote_ci": "latest exact PR head inspection pending; skipped is not pass",
+    "remote_ci": "at exact PR head ff1d65dcb3a0a2d28749ec9e1656953edce77a55, combined status list empty; PR Governance, Symthaea Benchmark Suite, Showroom Integrity, and CI all completed skipped; no remote pass claimed",
     "risk_vector_components_rechecked_against_tree_evaluation": true,
     "source_and_test_blob_match_executed_bytes": true
   }
