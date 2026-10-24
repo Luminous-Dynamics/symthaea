@@ -83,7 +83,8 @@ def _check_string(value: Any, label: str, errors: list[str]) -> None:
 
 def _check_hash(value: Any, pattern: re.Pattern[str], label: str, errors: list[str]) -> None:
     if not isinstance(value, str) or pattern.fullmatch(value) is None:
-        errors.append(f"{label} must be a lowercase hexadecimal digest of length {pattern.pattern.count('[') and (40 if pattern is SHA1_RE else 64)}")
+        expected_length = 40 if pattern.pattern == SHA1_RE.pattern else 64
+        errors.append(f"{label} must be a lowercase hexadecimal digest of length {expected_length}")
 
 
 def validate_lock(document: Any, for_execution: bool = False) -> list[str]:
@@ -97,11 +98,11 @@ def validate_lock(document: Any, for_execution: bool = False) -> list[str]:
     if document["protocol_id"] != "CASTING-MO-BO-001":
         errors.append("protocol_id must be CASTING-MO-BO-001")
     _check_string(document["lock_id"], "lock_id", errors)
-    if not DATE_RE.fullmatch(document["inspected_on"]) if isinstance(document["inspected_on"], str) else True:
+    if not isinstance(document["inspected_on"], str) or DATE_RE.fullmatch(document["inspected_on"]) is None:
         errors.append("inspected_on must use YYYY-MM-DD")
     if not isinstance(document["execution_eligible"], bool):
         errors.append("execution_eligible must be a boolean")
-    if document["status"] not in {
+    if not isinstance(document["status"], str) or document["status"] not in {
         "source_pins_recorded_environment_unlocked", "locked_for_execution"
     }:
         errors.append("status must be source_pins_recorded_environment_unlocked or locked_for_execution")
@@ -153,7 +154,9 @@ def validate_lock(document: Any, for_execution: bool = False) -> list[str]:
             _check_string(pin[key], f"{label}.{key}", errors)
         _check_hash(pin["source_commit"], SHA1_RE, f"{label}.source_commit", errors)
         _check_hash(pin["source_blob_sha1"], SHA1_RE, f"{label}.source_blob_sha1", errors)
-        if pin["pin_status"] not in {"source_pinned_environment_unlocked", "locked_for_execution"}:
+        if not isinstance(pin["pin_status"], str) or pin["pin_status"] not in {
+            "source_pinned_environment_unlocked", "locked_for_execution"
+        }:
             errors.append(f"{label}.pin_status is not a supported status")
         if not isinstance(pin["execution_eligible"], bool):
             errors.append(f"{label}.execution_eligible must be a boolean")
@@ -188,7 +191,7 @@ def validate_lock(document: Any, for_execution: bool = False) -> list[str]:
 
     env = document["environment_lock"]
     if _exact_keys(env, ENVIRONMENT_KEYS, "environment_lock", errors):
-        if env["status"] not in {"not_locked", "locked"}:
+        if not isinstance(env["status"], str) or env["status"] not in {"not_locked", "locked"}:
             errors.append("environment_lock.status must be not_locked or locked")
         if env["status"] == "not_locked":
             if env["lockfile_path"] is not None or env["lockfile_sha256"] is not None:
@@ -205,10 +208,11 @@ def validate_lock(document: Any, for_execution: bool = False) -> list[str]:
                 errors.append("framework_versions must contain exact non-empty versions")
             if not isinstance(env["dependency_artifact_hashes"], dict) or not env["dependency_artifact_hashes"]:
                 errors.append("locked environment requires dependency_artifact_hashes")
-            elif any(not _is_nonempty_string(k) or SHA256_RE.fullmatch(v) is None for k, v in env["dependency_artifact_hashes"].items() if not isinstance(v, str) or not _is_nonempty_string(k)):
-                errors.append("dependency_artifact_hashes must map package names to SHA-256 digests")
-            elif any(not isinstance(v, str) or SHA256_RE.fullmatch(v) is None for v in env["dependency_artifact_hashes"].values()):
-                errors.append("dependency_artifact_hashes must map package names to SHA-256 digests")
+            else:
+                for package_name, digest in env["dependency_artifact_hashes"].items():
+                    if not _is_nonempty_string(package_name) or not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
+                        errors.append("dependency_artifact_hashes must map package names to SHA-256 digests")
+                        break
             if env["execution_smoke_test"] != "passed":
                 errors.append("locked environment requires execution_smoke_test=passed")
         _check_string(env["note"], "environment_lock.note", errors)
