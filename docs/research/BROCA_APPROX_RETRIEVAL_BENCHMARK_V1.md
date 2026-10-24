@@ -31,6 +31,14 @@ SIZES="10000 50000" SEEDS="11 12 13 14 15" QUERIES=500 ROUNDS=7 OUT_DIR=/tmp/bro
   bash scripts/run_broca_ann_sweep.sh
 ```
 
+After the runs finish, evaluate every CSV with the fail-closed proposed-gate checker:
+
+```sh
+bash scripts/check_broca_ann_gates.sh artifacts/broca-ann/*.csv
+```
+
+It verifies source/receipt metadata, CSV completeness, three-stratum coverage, at least ten near-neighbor source groups, and every proposed low-noise Recall@K/candidate/fallback/p95-speedup gate. It fails on missing metrics or incomplete raw rows. It **never certifies hard-neighbor routing**: that needs a preregistered unsafe event and an independent risk qualification step. The gate thresholds are research decision rules, not published industry standards.
+
 For a single controlled arm or an explicit candidate-multiplier sweep, use the direct `cargo run` command above. Keep the same seed, query plan, vector dimension, top-K and cache protocol across matched arms.
 
 The LSH parameters are explicit and recorded in the output. By default, each run sweeps three arms: `32x8`, `16x16`, and `64x4` (bands × rows). Override them with `--lsh-configs=32x8,16x16,64x4`; no arm may be duplicated and a run is limited to 16 arms. The same deterministic corpus and query vectors are reused across all arms, while each arm gets a separately built index. Do not compare arms whose source, vector corpus, query corpus or cache protocol differs.
