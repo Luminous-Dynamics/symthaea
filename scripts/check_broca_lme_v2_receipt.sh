@@ -29,9 +29,9 @@ jq -e '
   .benchmark.name == "LongMemEval-V2" and
   .benchmark.repository == "https://github.com/xiaowu0162/LongMemEval-V2" and
   (.benchmark.upstream_commit | hex40) and
-  (.benchmark.dataset_sha256 | hex64) and
+  (.benchmark.dataset_manifest_sha256 | hex64) and
   (.benchmark.dataset_manifest_file | type == "string" and length > 0) and
-  (.benchmark.official_harness_sha256 | hex64) and
+  (.benchmark.official_harness_manifest_sha256 | hex64) and
   (.benchmark.official_harness_manifest_file | type == "string" and length > 0) and
   (.benchmark.tier == "small" or .benchmark.tier == "medium") and
   .benchmark.question_count == 451 and
@@ -42,7 +42,9 @@ jq -e '
   (.experiment.judge_model | type == "string" and length > 0) and
   (.experiment.judge_revision | type == "string" and length > 0) and
   (.experiment.reader_prompt_sha256 | hex64) and
+  (.experiment.reader_prompt_file | type == "string" and length > 0) and
   (.experiment.judge_prompt_sha256 | hex64) and
+  (.experiment.judge_prompt_file | type == "string" and length > 0) and
   (.experiment.memory_context_max_tokens | type == "number" and . > 0) and
   (.benchmark.arms | type == "array" and length >= 3 and (unique | length) == length) and
   (.benchmark.arms | map(select(. == "broca" or . == "no_retrieval" or . == "rag_query_to_slice")) | unique | sort) == ["broca", "no_retrieval", "rag_query_to_slice"] and
@@ -128,6 +130,6 @@ done < <(jq -r '.experiment.aggregates[] | [.output_file,.sha256,.arm] | @tsv' "
 
 while IFS=$'\t' read -r path digest label; do
   verify_artifact "$path" "$digest" "$label"
-done < <(jq -r '[ [.benchmark.dataset_manifest_file,.benchmark.dataset_sha256,"dataset manifest"], [.benchmark.official_harness_manifest_file,.benchmark.official_harness_sha256,"official harness manifest"], [.benchmark.reference_frontier_file,.benchmark.reference_frontier_sha256,"official reference frontier"], [.experiment.config_file,.experiment.config_sha256,"experiment config"] ][] | @tsv' "$receipt")
+done < <(jq -r '[ [.benchmark.dataset_manifest_file,.benchmark.dataset_manifest_sha256,"dataset manifest"], [.benchmark.official_harness_manifest_file,.benchmark.official_harness_manifest_sha256,"official harness manifest"], [.benchmark.reference_frontier_file,.benchmark.reference_frontier_sha256,"official reference frontier"], [.experiment.config_file,.experiment.config_sha256,"experiment config"], [.experiment.reader_prompt_file,.experiment.reader_prompt_sha256,"reader prompt"], [.experiment.judge_prompt_file,.experiment.judge_prompt_sha256,"judge prompt"] ][] | @tsv' "$receipt")
 
 echo "PASS: complete LongMemEval-V2 receipt; per-arm domain coverage, 451 unique paired case IDs, and all artifact hashes verified"
