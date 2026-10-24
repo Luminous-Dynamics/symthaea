@@ -1,0 +1,125 @@
+name: Temporal trajectory qualifier
+
+on:
+  push:
+    branches:
+      - research/temporal-semantics-contract-v0-1-2026-10-12
+    paths:
+      - "src/consciousness/temporal/temporal_consciousness.rs"
+      - "docs/architecture/TEMPORAL_SEMANTICS_CONTRACT_V0_1.md"
+      - "docs/architecture/ANCIENT_WISDOM_TO_ENGINEERING_INVARIANTS_V0_1.md"
+      - ".github/workflows/temporal-trajectory-qualifier.yml"
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "src/consciousness/temporal/temporal_consciousness.rs"
+      - "docs/architecture/TEMPORAL_SEMANTICS_CONTRACT_V0_1.md"
+      - "docs/architecture/ANCIENT_WISDOM_TO_ENGINEERING_INVARIANTS_V0_1.md"
+      - ".github/workflows/temporal-trajectory-qualifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temporal-trajectory-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  temporal:
+    name: Build and test cadence-aware temporal trajectory
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Check out the exact pushed commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@3fc1e40d4c4ce3007de028907c886bc3996ce2ea # toolchain 1.96.0
+        with:
+          components: rustfmt
+
+      - name: Record exact-head identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence=".temporal-trajectory-evidence"
+          mkdir -p "$evidence"
+          {
+            echo "github_sha=$GITHUB_SHA"
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee "$evidence/run-identity.txt"
+          sha256sum \
+            Cargo.toml \
+            Cargo.lock \
+            src/consciousness/temporal/temporal_consciousness.rs \
+            docs/architecture/TEMPORAL_SEMANTICS_CONTRACT_V0_1.md \
+            docs/architecture/ANCIENT_WISDOM_TO_ENGINEERING_INVARIANTS_V0_1.md \
+            > "$evidence/source-digests.sha256"
+
+      - name: Resolve lockfile against workspace manifests
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence=".temporal-trajectory-evidence"
+          cp Cargo.lock "$evidence/Cargo.lock.committed"
+          sha256sum Cargo.lock > "$evidence/lockfile-committed.sha256"
+
+          # Resolve against the current registry index because fresh runners do not carry a
+          # complete local sparse index. Preserve the generated lock and diff as evidence
+          # so any required lock change can be reviewed and committed, not discarded.
+          set +e
+          cargo metadata --format-version 1 > /dev/null 2> "$evidence/lock-resolution.log"
+          result=$?
+          set -e
+          cp Cargo.lock "$evidence/Cargo.lock.resolved"
+          sha256sum Cargo.lock > "$evidence/lockfile-resolved.sha256"
+          if ! cmp -s "$evidence/Cargo.lock.committed" "$evidence/Cargo.lock.resolved"; then
+            git diff -- Cargo.lock > "$evidence/Cargo.lock.diff" || true
+            echo "lockfile_changed=true" > "$evidence/lock-resolution-result.txt"
+          else
+            echo "lockfile_changed=false" > "$evidence/lock-resolution-result.txt"
+          fi
+          echo "metadata_exit_code=$result" >> "$evidence/lock-resolution-result.txt"
+          exit "$result"
+
+      - name: Check temporal module formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            src/consciousness/temporal/temporal_consciousness.rs 2>&1 \
+            | tee .temporal-trajectory-evidence/rustfmt.log
+
+      - name: Compile Symthaea library
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea --lib 2>&1 \
+            | tee .temporal-trajectory-evidence/cargo-check.log
+
+      - name: Test temporal consciousness module
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea --lib \
+            temporal_consciousness::tests -- --nocapture 2>&1 \
+            | tee .temporal-trajectory-evidence/temporal-tests.log
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: temporal-trajectory-evidence-${{ github.sha }}
+          path: .temporal-trajectory-evidence/**
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14
