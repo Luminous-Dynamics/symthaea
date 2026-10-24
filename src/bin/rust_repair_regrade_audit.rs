@@ -51,6 +51,7 @@ struct ScoreReport {
     format_version: u32,
     protocol_id: String,
     task_manifest_sha256: String,
+    task_manifest_file_sha256: String,
     candidate_jsonl_sha256: String,
     predictions_sha256: String,
     task_count: usize,
@@ -61,6 +62,26 @@ struct ScoreReport {
     lockable: bool,
     pass_at_1: Option<f64>,
     tasks: Vec<ScoreTask>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct ManifestTask {
+    instance_id: String,
+    repo_head_sha: String,
+    runtime_platform: String,
+    container_image_id: String,
+    network_mode: String,
+    workspace_clean: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct LockedTaskManifest {
+    format_version: u32,
+    protocol_id: String,
+    task_records_sha256: String,
+    candidate_jsonl_sha256: String,
+    eligible_task_count: usize,
+    tasks: Vec<ManifestTask>,
 }
 
 #[derive(Clone, Debug)]
@@ -77,6 +98,8 @@ struct Cli {
     expected_primary_report_sha256: String,
     regrade_report: PathBuf,
     expected_regrade_report_sha256: String,
+    task_manifest: PathBuf,
+    expected_task_manifest_file_sha256: String,
     expected_task_manifest_sha256: String,
     report_out: PathBuf,
 }
@@ -399,6 +422,7 @@ fn build_report(
     primary: &LoadedReport,
     regrade: &LoadedReport,
     expected_task_manifest_sha256: &str,
+    task_manifest_file_sha256: &str,
 ) -> Result<RegradeAuditReport, String> {
     if primary.canonical_path == regrade.canonical_path || primary.sha256 == regrade.sha256 {
         return Err("primary and regrade must be distinct, independently pinned report artifacts".to_string());
@@ -527,6 +551,7 @@ fn build_report(
         format_version: REPORT_VERSION,
         protocol_id: "symthaea-rust-regrade-audit-v1".to_string(),
         task_manifest_sha256: expected_task_manifest_sha256.to_ascii_lowercase(),
+        task_manifest_file_sha256: task_manifest_file_sha256.to_ascii_lowercase(),
         candidate_jsonl_sha256: primary.report.candidate_jsonl_sha256.clone(),
         predictions_sha256: primary.report.predictions_sha256.clone(),
         primary_report_sha256: primary.sha256.clone(),
@@ -545,6 +570,7 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
             "Usage: rust-repair-regrade-audit ",
             "--primary-report PATH --expected-primary-report-sha256 HEX ",
             "--regrade-report PATH --expected-regrade-report-sha256 HEX ",
+            "--task-manifest PATH --expected-task-manifest-file-sha256 HEX ",
             "--expected-task-manifest-sha256 HEX --report-out PATH"
         ));
         return Ok(None);
@@ -572,6 +598,8 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         "--expected-primary-report-sha256",
         "--regrade-report",
         "--expected-regrade-report-sha256",
+        "--task-manifest",
+        "--expected-task-manifest-file-sha256",
         "--expected-task-manifest-sha256",
         "--report-out",
     ];
@@ -595,9 +623,114 @@ fn parse_cli(args: &[String]) -> Result<Option<Cli>, String> {
         expected_primary_report_sha256: required_digest("--expected-primary-report-sha256")?,
         regrade_report: PathBuf::from(values.get("--regrade-report").expect("required argument")),
         expected_regrade_report_sha256: required_digest("--expected-regrade-report-sha256")?,
+        task_manifest: PathBuf::from(values.get("--task-manifest").expect("required argument")),
+        expected_task_manifest_file_sha256: required_digest("--expected-task-manifest-file-sha256")?,
         expected_task_manifest_sha256: required_digest("--expected-task-manifest-sha256")?,
         report_out: PathBuf::from(values.get("--report-out").expect("required argument")),
     }))
+}
+
+fn read_pinned_manifest(
+    path: &Path,
+    expected_file_sha256: &str,
+    expected_record_sha256: &str,
+) -> Result<(LockedTaskManifest, BTreeMap<String, ManifestTask>), String> {
+    if !is_hex(expected_file_sha256, 64) || !is_hex(expected_record_sha256, 64) {
+        return Err("expected manifest file and task-record digests must be 64 hexadecimal characters".to_string());
+    }
+    let canonical_path = fs::canonicalize(path)
+        .map_err(|error| format!("cannot resolve task manifest {}: {error}", path.display()))?;
+    if !canonical_path.is_file() {
+        return Err(format!("task manifest {} is not a regular file", canonical_path.display()));
+    }
+    let bytes = fs::read(&canonical_path)
+        .map_err(|error| format!("cannot read task manifest {}: {error}", canonical_path.display()))?;
+    let observed_file_sha256 = sha256_bytes(&bytes);
+    if observed_file_sha256 != expected_file_sha256.to_ascii_lowercase() {
+        return Err(format!(
+            "task manifest file digest mismatch: expected {}, observed {}",
+            expected_file_sha256, observed_file_sha256
+        ));
+    }
+    let manifest: LockedTaskManifest = serde_json::from_slice(&bytes)
+        .map_err(|error| format!("task manifest {} is malformed JSON: {error}", canonical_path.display()))?;
+    if manifest.format_version != 1 || manifest.protocol_id != PROTOCOL_ID {
+        return Err("task manifest has unsupported format_version or protocol_id".to_string());
+    }
+    if manifest.task_records_sha256 != expected_record_sha256.to_ascii_lowercase()
+        || !is_hex(&manifest.task_records_sha256, 64)
+        || !is_hex(&manifest.candidate_jsonl_sha256, 64)
+    {
+        return Err("task manifest record digest or candidate digest differs from the external pin".to_string());
+    }
+    if manifest.eligible_task_count != manifest.tasks.len() || manifest.tasks.is_empty() {
+        return Err("task manifest eligible_task_count is empty or differs from task rows".to_string());
+    }
+    let mut tasks = BTreeMap::new();
+    for task in &manifest.tasks {
+        if task.instance_id.trim().is_empty()
+            || !(is_hex(&task.repo_head_sha, 40) || is_hex(&task.repo_head_sha, 64))
+            || !valid_image_id(&task.container_image_id)
+            || task.runtime_platform != "linux"
+            || task.network_mode != "none"
+            || !task.workspace_clean
+        {
+            return Err(format!(
+                "task manifest row {:?} violates repository/image/Linux/offline/clean requirements",
+                task.instance_id
+            ));
+        }
+        if tasks.insert(task.instance_id.clone(), task.clone()).is_some() {
+            return Err(format!("task manifest repeats instance_id {:?}", task.instance_id));
+        }
+    }
+    Ok((manifest, tasks))
+}
+
+fn validate_manifest_bindings(
+    primary: &LoadedReport,
+    regrade: &LoadedReport,
+    manifest: &LockedTaskManifest,
+    manifest_tasks: &BTreeMap<String, ManifestTask>,
+) -> Result<(), String> {
+    if primary.report.candidate_jsonl_sha256 != manifest.candidate_jsonl_sha256
+        || regrade.report.candidate_jsonl_sha256 != manifest.candidate_jsonl_sha256
+    {
+        return Err("primary/regrade candidate split digest differs from the locked manifest".to_string());
+    }
+    let expected_ids = manifest_tasks.keys().cloned().collect::<BTreeSet<_>>();
+    if primary.tasks.keys().cloned().collect::<BTreeSet<_>>() != expected_ids
+        || regrade.tasks.keys().cloned().collect::<BTreeSet<_>>() != expected_ids
+    {
+        return Err("primary/regrade exact task-ID sets differ from the locked manifest".to_string());
+    }
+    for (instance_id, expected) in manifest_tasks {
+        for (label, report) in [("primary", primary), ("regrade", regrade)] {
+            let row = report.tasks.get(instance_id)
+                .ok_or_else(|| format!("{label} report lacks manifest task {instance_id:?}"))?;
+            if let Some(image_id) = &row.container_image_id
+                && image_id != &expected.container_image_id
+            {
+                return Err(format!("{label} task {instance_id:?} image differs from locked manifest"));
+            }
+            if let Some(repo_head) = &row.repo_head_sha_observed
+                && repo_head.to_ascii_lowercase() != expected.repo_head_sha.to_ascii_lowercase()
+            {
+                return Err(format!("{label} task {instance_id:?} repository HEAD differs from locked manifest"));
+            }
+            if let Some(platform) = &row.runtime_platform_observed
+                && platform != &expected.runtime_platform
+            {
+                return Err(format!("{label} task {instance_id:?} platform differs from locked manifest"));
+            }
+            if let Some(network_mode) = &row.network_mode_observed
+                && network_mode != &expected.network_mode
+            {
+                return Err(format!("{label} task {instance_id:?} network policy differs from locked manifest"));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn run(cli: Cli) -> Result<(), String> {
@@ -611,7 +744,18 @@ fn run(cli: Cli) -> Result<(), String> {
         &cli.expected_regrade_report_sha256,
         &cli.expected_task_manifest_sha256,
     )?;
-    let report = build_report(&primary, &regrade, &cli.expected_task_manifest_sha256)?;
+    let (manifest, manifest_tasks) = read_pinned_manifest(
+        &cli.task_manifest,
+        &cli.expected_task_manifest_file_sha256,
+        &cli.expected_task_manifest_sha256,
+    )?;
+    validate_manifest_bindings(&primary, &regrade, &manifest, &manifest_tasks)?;
+    let report = build_report(
+        &primary,
+        &regrade,
+        &cli.expected_task_manifest_sha256,
+        &cli.expected_task_manifest_file_sha256,
+    )?;
     if let Some(parent) = cli.report_out.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         fs::create_dir_all(parent)
             .map_err(|error| format!("cannot create output directory {}: {error}", parent.display()))?;
