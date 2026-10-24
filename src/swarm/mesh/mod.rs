@@ -390,6 +390,8 @@ pub enum MeshError {
     Io(String),
     /// A complete frame exceeds the selected transport's declared MTU.
     MtuExceeded { frame_size: usize, mtu: usize },
+    /// Encrypted-only transmission was requested but no key is configured.
+    EncryptionKeyUnavailable,
     /// Fragment reassembly failed (too many losses).
     ReassemblyFailed,
     /// Payload too large for fragmentation.
@@ -403,6 +405,9 @@ impl std::fmt::Display for MeshError {
             Self::Io(msg) => write!(f, "mesh I/O error: {msg}"),
             Self::MtuExceeded { frame_size, mtu } => {
                 write!(f, "mesh frame size {frame_size} exceeds transport MTU {mtu}")
+            }
+            Self::EncryptionKeyUnavailable => {
+                write!(f, "encrypted-only send requested without encryption key")
             }
             Self::ReassemblyFailed => write!(f, "fragment reassembly failed"),
             Self::PayloadTooLarge => write!(f, "payload exceeds max fragment count"),
