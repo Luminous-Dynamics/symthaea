@@ -143,7 +143,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     output_dir = Path(args.output_dir).resolve()
-    if output_dir == ROOT or output_dir == VLEB_ROOT or ROOT in output_dir.parents and output_dir == ROOT:
+    if output_dir == ROOT or ROOT in output_dir.parents:
         print("Refusing to use a source-tree directory as the evidence output directory.", file=sys.stderr)
         return 2
     if output_dir.exists():
