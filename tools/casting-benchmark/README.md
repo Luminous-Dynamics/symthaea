@@ -6,7 +6,9 @@ This directory contains benchmark-only tooling for CASTING-MO-BO-001. It is not 
 
 - `docs/research/CASTING_BENCHMARK_PROTOCOL_V1.json`: preregistered benchmark design and acceptance gates.
 - `docs/research/CASTING_BENCHMARK_RECEIPT.schema.json`: strict JSON Schema for a per-run receipt.
-- `tools/casting-benchmark/validate_receipt.py`: semantic validator for accounting invariants that JSON Schema alone cannot express.\n- `docs/research/CASTING_BENCHMARK_TRACE.schema.json`: versioned JSONL schema for each objective-oracle call.\n- `tools/casting-benchmark/score_trace.py`: independent exact 2D hypervolume scorer that verifies trace/schema/scorer digests and recomputes receipt metrics.
+- `tools/casting-benchmark/validate_receipt.py`: semantic validator for accounting invariants that JSON Schema alone cannot express.
+- `docs/research/CASTING_BENCHMARK_TRACE.schema.json`: versioned JSONL schema for each objective-oracle call.
+- `tools/casting-benchmark/score_trace.py`: independent exact 2D hypervolume scorer that verifies trace/schema/scorer digests and recomputes receipt metrics.
 - `tools/casting-benchmark/fixtures/success_receipt.fixture.json`: structure-only fixture, **not measured data**.
 - `tools/casting-benchmark/test_validate_receipt.py`: negative and positive checks for the validator.
 
@@ -16,6 +18,7 @@ From the repository root:
 
 ```sh
 python3 tools/casting-benchmark/validate_receipt.py path/to/run-receipt.json
+python3 tools/casting-benchmark/score_trace.py path/to/run-receipt.json path/to/evaluations.jsonl
 python3 -m unittest discover -s tools/casting-benchmark -p 'test_*.py' -v
 ```
 
