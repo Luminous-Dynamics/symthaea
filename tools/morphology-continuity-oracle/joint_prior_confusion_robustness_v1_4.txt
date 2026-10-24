@@ -30,6 +30,13 @@ case.narrow_prior.worst_policy_loss=3.64
 case.narrow_prior.net_value=0.26
 case.narrow_prior.disposition=select
 
+case.joint_uncertainty.calibration_trials_per_class=1000
+case.joint_uncertainty.confusion_matrix_counts=chair:950,50,0;table:50,950,0;stool:50,950,0
+case.joint_uncertainty.baseline_robust_loss=4.0
+case.joint_uncertainty.worst_policy_loss=8.8648
+case.joint_uncertainty.net_value=-4.9648
+case.joint_uncertainty.disposition=abstain
+
 decision_contract=baseline-action-is-chosen-before-the-unknown-prior-is-revealed
 forbidden_oracle=do-not-let-baseline-action-adapt-to-true-prior
 invalid-prior-bounds=fail-closed
