@@ -2228,6 +2228,136 @@ mod tests {
     }
 
     #[test]
+    fn unary_heldout_truth_is_valid_but_absent_from_typed_initial_candidates() {
+        let mut design_rng = 0x51A7_0000_2026_0001_u64;
+        let design: Vec<Experiment> = (0..EXPERIMENT_POOL_SIZE)
+            .map(|_| random_experiment(&mut design_rng))
+            .collect();
+        let mut truth_rng = 0x0A11_0F00_2026_0001_u64;
+        let truth = nontrivial_unary_ground_truth(&mut truth_rng, &design)
+            .expect("declared sin/cos family should yield a sane ENERGY law");
+        assert!(expr_contains_unary_function(&truth));
+        assert!(matches!(
+            infer_dimensions(&truth, &demo_units()),
+            InferenceResult::Inferred(dimension) if dimension == DimensionalSignature::ENERGY
+        ));
+
+        let candidates = generate_truth_absent_candidates(
+            0xCA7A_10_2026_0001,
+            PipelineConfig {
+                typed_candidates: true,
+                active_selection: true,
+                smoothing: false,
+            },
+            &design,
+        )
+        .expect("typed algebraic generator should fill its bounded initial pool");
+        assert_eq!(candidates.len(), POOL_SIZE);
+        assert!(
+            candidates.iter().all(|candidate| !expr_contains_unary_function(candidate)),
+            "held-out unary operators must not leak into the initial typed candidate grammar"
+        );
+    }
+
+    /// Full diagnostic for a true law whose unary operator is withheld from the initial typed
+    /// grammar. Results remain separate from oracle-present and in-grammar recovery rates.
+    #[test]
+    fn operator_heldout_recovery_is_reported_separately_from_in_grammar_recovery() {
+        const SEEDS: u64 = 8;
+        const ROUND_BUDGET: usize = 16;
+        let config = PipelineConfig {
+            typed_candidates: true,
+            active_selection: true,
+            smoothing: false,
+        };
+        let mut evaluable_worlds = 0usize;
+        let mut incomplete_evaluator_worlds = 0usize;
+        let mut initial_reference_hits = 0usize;
+        let mut baseline_reference_hits = 0usize;
+        let mut baseline_unresolved = 0usize;
+        let mut recovery_unresolved = 0usize;
+        let mut pool_collapse_recoveries = 0usize;
+        let mut accepted_unary_corrections = 0usize;
+        let mut same_domain_matches = 0usize;
+        let mut ood_matches = 0usize;
+        let mut full_successes = 0usize;
+        let mut post_recovery_validation_measurements = 0usize;
+
+        for seed in 1..=SEEDS {
+            let baseline = run_operator_heldout_trial(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::InformationGainWithAudits,
+                false,
+            );
+            let recovered = run_operator_heldout_trial(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::InformationGainWithAudits,
+                true,
+            );
+            if recovered.reference_audit_evaluable {
+                evaluable_worlds += 1;
+                initial_reference_hits += if recovered.initial_pool_contains_reference {
+                    1
+                } else {
+                    0
+                };
+            } else {
+                incomplete_evaluator_worlds += 1;
+            }
+            baseline_reference_hits += if baseline.reference_audit_evaluable
+                && baseline.initial_pool_contains_reference
+            {
+                1
+            } else {
+                0
+            };
+            baseline_unresolved += if baseline.final_live != 1 || !baseline.success {
+                1
+            } else {
+                0
+            };
+            recovery_unresolved += if recovered.final_live != 1 || !recovered.success {
+                1
+            } else {
+                0
+            };
+            pool_collapse_recoveries +=
+                if recovered.recovery_triggered_on_empty_pool { 1 } else { 0 };
+            accepted_unary_corrections += recovered.unary_function_recovery_candidates;
+            same_domain_matches += if recovered.ground_truth_equivalent { 1 } else { 0 };
+            ood_matches += if recovered.ground_truth_extrapolation_equivalent {
+                1
+            } else {
+                0
+            };
+            full_successes += if recovered.success { 1 } else { 0 };
+            post_recovery_validation_measurements +=
+                recovered.post_recovery_validation_measurements;
+
+            assert!(
+                !recovered.success
+                    || (recovered.ground_truth_equivalent
+                        && recovered.ground_truth_extrapolation_equivalent
+                        && recovered.post_recovery_validation_measurements
+                            >= MIN_POST_RECOVERY_VALIDATION_MEASUREMENTS)
+            );
+        }
+        println!(
+            "operator_heldout_recovery,seeds={SEEDS},budget={ROUND_BUDGET},evaluable_worlds={evaluable_worlds},incomplete_evaluator_worlds={incomplete_evaluator_worlds},initial_reference_hits={initial_reference_hits},baseline_reference_hits={baseline_reference_hits},baseline_unresolved={baseline_unresolved},recovery_unresolved={recovery_unresolved},pool_collapse_recoveries={pool_collapse_recoveries},accepted_unary_corrections={accepted_unary_corrections},same_domain_matches={same_domain_matches},ood_matches={ood_matches},full_successes={full_successes},post_recovery_validation_measurements={post_recovery_validation_measurements}"
+        );
+        assert_eq!(evaluable_worlds + incomplete_evaluator_worlds, SEEDS as usize);
+        assert_eq!(initial_reference_hits, 0);
+        assert_eq!(baseline_reference_hits, 0);
+        assert!(same_domain_matches <= evaluable_worlds);
+        assert!(ood_matches <= same_domain_matches);
+        assert!(full_successes <= ood_matches);
+    }
+
+    #[test]
     fn truth_absent_candidate_generation_exhaustion_returns_none_without_panicking() {
         let mut rng = 0xA11C_E55E_2026_0001_u64;
         let design = vec![random_experiment(&mut rng)];
