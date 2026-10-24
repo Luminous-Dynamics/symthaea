@@ -695,20 +695,25 @@ fn select_next_calibration_class_robust(
     best
 }
 
-fn predictive_ambiguity_from_rows(lower: [[u16; 3]; 3], upper: [[u16; 3]; 3]) -> Option<[[Interval; 3]; 3]> {
+fn predictive_ambiguity_from_rows(
+    lower: [[u16; 3]; 3],
+    upper: [[u16; 3]; 3],
+) -> Option<[[Interval; 3]; 3]> {
     let mut ambiguity = [[Interval { lower: 0, upper: 0 }; 3]; 3];
-    for row_index in 0..3 {
+    for ((slot, lower_row), upper_row) in ambiguity.iter_mut().zip(lower.iter()).zip(upper.iter()) {
         let mut row = [Interval { lower: 0, upper: 0 }; 3];
-        for outcome_index in 0..3 {
-            row[outcome_index] = Interval {
-                lower: lower[row_index][outcome_index],
-                upper: upper[row_index][outcome_index],
+        for ((interval, minimum), maximum) in
+            row.iter_mut().zip(lower_row.iter()).zip(upper_row.iter())
+        {
+            *interval = Interval {
+                lower: *minimum,
+                upper: *maximum,
             };
         }
         if row_vertices(row).is_empty() {
             return None;
         }
-        ambiguity[row_index] = row;
+        *slot = row;
     }
     Some(ambiguity)
 }
