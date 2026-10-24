@@ -289,6 +289,7 @@ pub mod semantic_decoder;
 pub mod semantic_encoder; // Universal semantic encoding with embeddings support
 pub mod sequence_encoder;
 pub mod statistical_retrieval;
+pub mod retrieval_contract;
 pub mod temporal_encoder;
 pub mod text_encoder; // Revolutionary Enhancement: Text → HDC encoding
 pub mod unified_network_phi; // Phi measurement and validation for HdcLtcUnifiedNetwork // HV → Primitive sequence (generative direction) - THE MOUTH
