@@ -662,8 +662,12 @@ mod tests {
                 Observation::Observed(value) => value,
                 other => panic!("unexpected observation: {other:?}"),
             };
-            heavy_extremes += usize::from(heavy_value.abs() > 3.0);
-            gaussian_extremes += usize::from(gaussian_value.abs() > 3.0);
+            if heavy_value.abs() > 3.0 {
+                heavy_extremes += 1;
+            }
+            if gaussian_value.abs() > 3.0 {
+                gaussian_extremes += 1;
+            }
         }
         assert!(heavy_extremes > 50, "heavy-tail extremes={heavy_extremes}");
         assert!(
