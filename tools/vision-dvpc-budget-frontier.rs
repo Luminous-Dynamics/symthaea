@@ -617,6 +617,7 @@ META\tdataset_revision\tr1\n\
 META\tsplit\ttest\n\
 META\tutility_spec_sha256\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n\
 META\tbundle_lock_sha256\t{TRACE_LOCK}\n\
+META\tpaired_unit_set_sha256\tcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\n\
 META\tpolicy_count\t4\n\
 META\tbudget_point_count\t3\n\
 META\texpected_evaluated_traces\t100\n\
@@ -648,7 +649,7 @@ META\tsafety_violations_max\t0\n\
                 };
                 let _ = writeln!(
                     output,
-                    "SWEEP\t{point}\t{policy}\t{lat_budget}\t{energy_budget}\t{utility:.4}\t{latency}\t{energy}\t100\t50\t0\t0\ttrue\t{safety}\t{cvar:.4}\t{pooled:.4}\t{worst:.4}\t{cert}\t100\t10"
+                    "SWEEP\t{point}\t{policy}\t{lat_budget}\t{energy_budget}\t{utility:.4}\t{latency}\t{energy}\t100\t50\t0\t0\ttrue\t{safety}\t{cvar:.4}\t{pooled:.4}\t{worst:.4}\t{cert}\tcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\t100\t10"
                 );
             }
         }
@@ -738,9 +739,18 @@ META\tsafety_violations_max\t0\n\
 
     #[test]
     fn changed_cluster_counts_fail() {
-        let content = fixture().replace("SWEEP\tp20\tcandidate\t1000\t1000\t0.0500\t950\t950\t100\t50\t0\t0\ttrue\t0\t0.1200\t0.0200\t0.0400\tCERTIFIED\t100\t10",
-                                         "SWEEP\tp20\tcandidate\t1000\t1000\t0.0500\t950\t950\t100\t50\t0\t0\ttrue\t0\t0.1200\t0.0200\t0.0400\tCERTIFIED\t99\t10");
+        let content = fixture().replace("SWEEP\tp20\tcandidate\t1000\t1000\t0.0500\t950\t950\t100\t50\t0\t0\ttrue\t0\t0.1200\t0.0200\t0.0400\tCERTIFIED\tcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\t100\t10",
+                                         "SWEEP\tp20\tcandidate\t1000\t1000\t0.0500\t950\t950\t100\t50\t0\t0\ttrue\t0\t0.1200\t0.0200\t0.0400\tCERTIFIED\tcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\t99\t10");
         assert!(execute(&content).unwrap_err().contains("trace/cluster counts differ"));
+    }
+
+    #[test]
+    fn mismatched_paired_trace_set_digest_fails() {
+        let content = fixture().replace(
+            "CERTIFIED\\tcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\\t100\\t10",
+            "CERTIFIED\\tdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\\t100\\t10",
+        );
+        assert!(execute(&content).unwrap_err().contains("paired trace/cluster set digest differs"));
     }
 
     #[test]
