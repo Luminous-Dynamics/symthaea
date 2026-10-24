@@ -1090,6 +1090,29 @@ mod tests {
     }
 
     #[test]
+    fn service_reset_clears_encoder_prediction_provenance() {
+        let mut svc = make_service();
+        let _ = svc.cycle("seed prediction before reset");
+        assert_eq!(svc.encoder.prediction_cycle(), Some(svc.stats.total_cycles as u64));
+
+        svc.reset();
+
+        assert_eq!(svc.encoder.prediction_cycle(), None);
+        assert_eq!(svc.encoder.last_compared_prediction_cycle(), None);
+        let after_reset = svc.cycle("first observation after reset");
+        assert!(!after_reset.prediction_error_valid);
+        assert_eq!(
+            after_reset
+                .metadata
+                .prediction_evidence
+                .as_ref()
+                .expect("typed PE telemetry")
+                .status,
+            crate::cognitive_loop::types::PredictionEvidenceStatus::NoPriorPrediction
+        );
+    }
+
+    #[test]
     fn invalid_prediction_sentinels_do_not_enter_cycle_evidence_histories() {
         let mut svc = make_service();
 
