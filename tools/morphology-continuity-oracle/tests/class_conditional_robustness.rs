@@ -461,6 +461,74 @@ fn exact_matrix_coverage(
         .product()
 }
 
+fn expected_binomial_interval_width(
+    total: u64,
+    truth_probability: f64,
+    interval_method: fn(u64, u64) -> Option<Interval>,
+) -> f64 {
+    (0..=total)
+        .map(|successes| {
+            let probability_mass = log_binomial_mass(total, successes, truth_probability).exp();
+            let interval = interval_method(successes, total).expect("valid interval input");
+            probability_mass * f64::from(interval.upper - interval.lower)
+        })
+        .sum()
+}
+
+/// Expected sum of the nine cell-interval widths under the true matrix, in per-mille units.
+fn expected_matrix_interval_width(
+    trials_per_class: u64,
+    truth: [[f64; 3]; 3],
+    interval_method: fn(u64, u64) -> Option<Interval>,
+) -> f64 {
+    truth
+        .iter()
+        .flat_map(|row| row.iter())
+        .map(|probability| {
+            expected_binomial_interval_width(trials_per_class, *probability, interval_method)
+        })
+        .sum()
+}
+
+#[test]
+fn coverage_width_frontier_compares_exact_and_wilson_regions() {
+    let rare_event = [
+        [0.99, 0.009, 0.001],
+        [0.005, 0.99, 0.005],
+        [0.001, 0.009, 0.99],
+    ];
+    let cases = [
+        (10_u64, 0.997_500, 0.739_700, 4_082.703, 3_970.067),
+        (20_u64, 0.996_676, 0.918_596, 2_396.361, 2_575.044),
+        (50_u64, 0.995_195, 0.840_230, 1_121.239, 1_293.004),
+    ];
+
+    for (trials, expected_cp_coverage, expected_wilson_coverage, expected_cp_width, expected_wilson_width) in cases {
+        let cp_coverage =
+            exact_matrix_coverage(trials, rare_event, clopper_pearson_cell_interval);
+        let wilson_coverage =
+            exact_matrix_coverage(trials, rare_event, wilson_cell_interval_negative_control);
+        let cp_width =
+            expected_matrix_interval_width(trials, rare_event, clopper_pearson_cell_interval);
+        let wilson_width =
+            expected_matrix_interval_width(trials, rare_event, wilson_cell_interval_negative_control);
+
+        assert!((cp_coverage - expected_cp_coverage).abs() < 1.0e-5);
+        assert!((wilson_coverage - expected_wilson_coverage).abs() < 1.0e-5);
+        assert!((cp_width - expected_cp_width).abs() < 0.1);
+        assert!((wilson_width - expected_wilson_width).abs() < 0.1);
+        assert!(cp_coverage >= 0.95);
+        assert!(wilson_coverage < 0.95);
+        // Width is not universally better: the exact region costs more at n=10, then
+        // becomes narrower than Wilson for this rare-event matrix at n=20 and n=50.
+        if trials >= 20 {
+            assert!(cp_width < wilson_width);
+        } else {
+            assert!(cp_width > wilson_width);
+        }
+    }
+}
+
 #[test]
 fn exact_coverage_qualification_catches_rare_event_undercoverage() {
     let cases = [
