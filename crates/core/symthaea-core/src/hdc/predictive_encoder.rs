@@ -664,9 +664,10 @@ impl PredictiveHdcEncoder {
     fn compute_prediction_error(&self, current_hdv: &ContinuousHV) -> (f32, PredictionDegeneracy) {
         match &self.predicted_hdv {
             Some(predicted) => {
-                if predicted.is_empty()
-                    || predicted.iter().any(|value| !value.is_finite())
-                {
+                if predicted.is_empty() {
+                    return (1.0, PredictionDegeneracy::ZeroPrediction);
+                }
+                if predicted.iter().any(|value| !value.is_finite()) {
                     return (1.0, PredictionDegeneracy::NonFinitePrediction);
                 }
 
@@ -981,6 +982,74 @@ mod tests {
         assert_eq!(result.hdv.values.len(), HDC_DIMENSION);
         assert!(result.prediction_error >= 0.0);
         assert!(result.prediction_error <= 1.0);
+    }
+
+    #[test]
+    fn encode_at_rejects_prediction_from_skipped_cycle_without_learning() {
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
+        let initial = encoder.encode("cycle one seed");
+        let prediction = encoder.compress_for_ltc(&initial.hdv, 64);
+        encoder.set_prediction_at(prediction, 1);
+        assert_eq!(encoder.prediction_cycle(), Some(1));
+
+        let result = encoder.encode_at("cycle three after skipped cycle", 3);
+
+        assert_eq!(
+            encoder.last_prediction_degeneracy(),
+            PredictionDegeneracy::StalePrediction
+        );
+        assert_eq!(result.prediction_error, 1.0);
+        assert_eq!(encoder.last_compared_prediction_cycle(), Some(1));
+        assert_eq!(
+            encoder.stats().degenerate_stale_prediction_cycles,
+            1
+        );
+        assert_eq!(
+            encoder.stats().avg_prediction_error,
+            0.0,
+            "a stale prediction must not contaminate the PE EMA"
+        );
+        assert_eq!(
+            encoder.stats().cumulative_error,
+            0.0,
+            "a stale prediction must not enter cumulative PE"
+        );
+        assert_eq!(encoder.prediction_cycle(), None);
+    }
+
+    #[test]
+    fn encode_at_accepts_prediction_from_immediately_previous_cycle() {
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
+        let initial = encoder.encode("same input");
+        let prediction = encoder.compress_for_ltc(&initial.hdv, 64);
+        encoder.set_prediction_at(prediction, 1);
+
+        let result = encoder.encode_at("same input", 2);
+
+        assert_eq!(
+            encoder.last_prediction_degeneracy(),
+            PredictionDegeneracy::Genuine
+        );
+        assert_eq!(encoder.last_compared_prediction_cycle(), Some(1));
+        assert!(result.prediction_error.is_finite());
+        assert!(encoder.stats().cumulative_error.is_finite());
+    }
+
+    #[test]
+    fn non_finite_prediction_never_enters_attention_or_pe_statistics() {
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
+        encoder.set_prediction_at(vec![f32::INFINITY; 64], 1);
+
+        let result = encoder.encode_at("non finite prediction", 2);
+
+        assert_eq!(
+            encoder.last_prediction_degeneracy(),
+            PredictionDegeneracy::NonFinitePrediction
+        );
+        assert_eq!(result.prediction_error, 1.0);
+        assert_eq!(encoder.stats().degenerate_non_finite_prediction_cycles, 1);
+        assert_eq!(encoder.stats().avg_prediction_error, 0.0);
+        assert_eq!(encoder.stats().cumulative_error, 0.0);
     }
 
     #[test]
