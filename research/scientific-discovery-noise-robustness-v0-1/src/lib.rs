@@ -307,6 +307,7 @@ pub enum DesignScheduleError {
     ZeroAnchorReplicates,
     ZeroBlocks,
     NonFiniteCovariate,
+    DuplicateCandidateCovariate,
     TooManyDesignPoints,
 }
 
@@ -338,6 +339,11 @@ pub fn interleaved_anchor_schedule(
         || candidate_covariates.iter().any(|value| !value.is_finite())
     {
         return Err(DesignScheduleError::NonFiniteCovariate);
+    }
+    for index in 0..candidate_covariates.len() {
+        if candidate_covariates[..index].contains(&candidate_covariates[index]) {
+            return Err(DesignScheduleError::DuplicateCandidateCovariate);
+        }
     }
     let per_block = candidate_covariates
         .len()
@@ -751,6 +757,10 @@ mod tests {
         assert_eq!(
             interleaved_anchor_schedule(&[f64::NAN], 0.0, 1, 1, 1).unwrap_err(),
             DesignScheduleError::NonFiniteCovariate
+        );
+        assert_eq!(
+            interleaved_anchor_schedule(&[1.0, 1.0], 0.0, 1, 1, 1).unwrap_err(),
+            DesignScheduleError::DuplicateCandidateCovariate
         );
         assert_eq!(
             interleaved_anchor_schedule(&[1.0], 0.0, MAX_DESIGN_POINTS, 2, 1).unwrap_err(),
