@@ -165,6 +165,28 @@ A full coverage panel is necessary for the registered comparison, but it is not 
 - Shaer et al., *Testing for Distribution Shifts with Conditional Conformal Test Martingales*, ICML 2026. https://proceedings.mlr.press/v306/shaer26a.html
 - *Concept drift detection in district heating: A characterization framework and detector-centric benchmark*, Energy and AI 25 (September 2026), 100788. https://doi.org/10.1016/j.egyai.2026.100788
 
+## Industry baseline and competitive thesis
+
+The competitive baseline should include production observability systems, not only academic detectors. The public documentation reviewed describes mature capabilities for monitoring distribution/data quality, model quality when actual outcomes arrive, performance/latency/cost thresholds, alerts, and slice-level investigation:
+
+| Industry reference | Publicly documented strength | Symthaea comparison to run |
+| --- | --- | --- |
+| [WhyLabs monitors](https://docs.whylabs.ai/docs/monitor-manager/) | Data drift, data quality, concept/label drift, and model-performance monitors. | Compare false alarms, detection latency, delayed-label behavior, missingness robustness, and monitoring overhead on the same streams. |
+| [Arize AX monitoring](https://arize.com/docs/ax/get-started/get-started-production) | Metric thresholds, alerts, tracing, and analysis of performance/cost/latency signals. | Compare end-to-end detection-to-decision latency, cost per verified recovery, and fraction of interventions that improve held-out outcomes. |
+| [Evidently](https://github.com/evidentlyai/evidently) | Broad evaluation library for data quality, drift tests, prediction quality, and LLM outputs. | Use relevant open-source tests as detector/quality adapters where feasible; record exact package version, metric settings, and runtime cost. |
+| [Azure ML model monitoring](https://learn.microsoft.com/en-us/azure/machine-learning/concept-model-monitoring) | Multiple drift/data-quality signals and objective model-performance checks when actuals are available. | Compare feature/prediction drift and delayed actuals separately; do not equate a statistically significant shift with a need to adapt. |
+
+This is not a claim that these systems cannot support custom interventions. The current comparison is based on what their public documentation describes, not an exhaustive audit of vendor internals. The benchmark should use product adapters or exportable traces when access is available, and otherwise compare against documented open baselines while clearly marking the gap.
+
+**The proposed differentiation is an evidence-backed intervention contract.** Monitoring tells an operator what changed. Symthaea should also be able to show whether an intervention helped, what it cost, how it recovered, and whether the evidence used at decision time was valid. To substantiate that differentiation, measure:
+- alarm-to-action and action-to-verified-recovery latency, not detector latency alone;
+- task-loss improvement and harm rate per intervention, with no-adapt and benefit-gated controls;
+- false adaptation under nuisance shifts, label delay, autocorrelation, and missingness;
+- rollback correctness and recovery time after deliberately harmful candidate updates;
+- total compute, memory, event throughput, and review/label cost at matched service-level objectives.
+
+The fair comparison must hold input streams, label availability, decision budgets, workload, and declared access tracks constant. If a proprietary platform cannot run the same replay or expose decision traces, report an **interface/observability comparison** instead of inventing a numerical head-to-head score.
+
 ## Implementation order
 
 1. Specify schema and event ledger; add red-team negative fixtures for leakage and arm mismatch.
