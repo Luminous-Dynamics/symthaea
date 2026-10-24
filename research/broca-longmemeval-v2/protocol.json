@@ -34,12 +34,12 @@
     "memory_query_avg_seconds"
   ],
   "receipt_requirements": {
-    "pin_upstream_symthaea_dataset_and_config": true,
     "shared_reader_judge_prompts_and_token_cap_across_arms": true,
     "require_both_domains_per_arm": true,
     "require_451_examples_per_arm_across_domains": true,
-    "verify_sha256_for_each_domain_output_and_combined_aggregate": true,
-    "forbid_incomplete_or_skipped_runs": true
+    "forbid_incomplete_or_skipped_runs": true,
+    "pin_upstream_symthaea_dataset_manifests_and_config": true,
+    "verify_sha256_for_each_domain_output_combined_aggregate_manifest_and_prompt": true
   },
   "evidence_boundary": "Receipt validation proves protocol/artifact completeness and digest consistency only. It does not prove that the benchmark implementation is correct, that an answer is accurate, or that a SOTA claim is justified."
 }
