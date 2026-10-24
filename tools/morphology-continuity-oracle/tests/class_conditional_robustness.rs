@@ -505,6 +505,80 @@ fn robust_net_value_over_prior_uncertainty(
     ))
 }
 
+fn worst_policy_risk_from_counts(
+    counts: [[u64; 3]; 3],
+    weights: [u64; 3],
+    decisions: &[[u32; 3]],
+    actions: [usize; 3],
+) -> Option<f64> {
+    let regions = confusion_intervals(counts)?;
+    worst_case_policy_risk(regions, weights, decisions, actions)
+}
+
+/// Predictive value of collecting one additional labeled calibration sample from a known class.
+/// The current deployed action policy is held fixed; only the confidence region is updated.
+/// Outcome probabilities are taken from the explicitly supplied assumed calibration row.
+fn expected_risk_after_one_calibration_sample(
+    counts: [[u64; 3]; 3],
+    class_index: usize,
+    assumed: [[u16; 3]; 3],
+    weights: [u64; 3],
+    decisions: &[[u32; 3]],
+    actions: [usize; 3],
+) -> Option<f64> {
+    if class_index >= 3 || !valid_probability_matrix(assumed) {
+        return None;
+    }
+    let mut expected_risk = 0.0;
+    for (outcome_index, probability) in assumed[class_index].iter().enumerate() {
+        if *probability == 0 {
+            continue;
+        }
+        let mut updated = counts;
+        updated[class_index][outcome_index] =
+            updated[class_index][outcome_index].checked_add(1)?;
+        let risk = worst_policy_risk_from_counts(updated, weights, decisions, actions)?;
+        expected_risk += risk * f64::from(*probability) / f64::from(PROBABILITY_SCALE);
+    }
+    Some(expected_risk)
+}
+
+/// Select the next calibration class by expected reduction in robust decision risk per unit cost.
+/// Returns None if no candidate has positive expected value or if the cost contract is invalid.
+fn select_next_calibration_class(
+    counts: [[u64; 3]; 3],
+    assumed: [[u16; 3]; 3],
+    weights: [u64; 3],
+    decisions: &[[u32; 3]],
+    actions: [usize; 3],
+    class_costs: [f64; 3],
+) -> Option<(usize, f64)> {
+    if class_costs.iter().any(|cost| !cost.is_finite() || *cost <= 0.0) {
+        return None;
+    }
+    let current_risk = worst_policy_risk_from_counts(counts, weights, decisions, actions)?;
+    let mut best: Option<(usize, f64)> = None;
+    for class_index in 0..3 {
+        let expected_risk = expected_risk_after_one_calibration_sample(
+            counts,
+            class_index,
+            assumed,
+            weights,
+            decisions,
+            actions,
+        )?;
+        let improvement = current_risk - expected_risk;
+        if improvement <= EPSILON {
+            continue;
+        }
+        let ratio = improvement / class_costs[class_index];
+        if best.is_none_or(|(_, best_ratio)| ratio > best_ratio + EPSILON) {
+            best = Some((class_index, ratio));
+        }
+    }
+    best
+}
+
 fn nominal_counts(per_class: u64) -> [[u64; 3]; 3] {
     [
         [per_class * 95 / 100, per_class * 5 / 100, 0],
@@ -817,6 +891,72 @@ fn joint_prior_and_matrix_robustness_is_invariant_to_class_relabeling() {
         assert!((result.1 - base.1).abs() <= EPSILON);
         assert!((result.2 - base.2).abs() <= EPSILON);
     }
+}
+
+#[test]
+fn active_calibration_allocation_targets_the_class_with_highest_marginal_decision_value() {
+    let counts = [[19, 1, 0], [1, 19, 0], [1, 19, 0]];
+    let actions = deployed_policy(assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, 1)
+        .expect("valid assumed model");
+    let current_risk = worst_policy_risk_from_counts(
+        counts,
+        PRIOR_WEIGHTS,
+        &DECISION_LOSSES,
+        actions,
+    )
+    .expect("valid initial calibration region");
+    assert!((current_risk - 15.5128).abs() <= EPSILON);
+
+    let expected_after_chair = expected_risk_after_one_calibration_sample(
+        counts, 0, assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, actions,
+    ).expect("chair calibration is valid");
+    let expected_after_table = expected_risk_after_one_calibration_sample(
+        counts, 1, assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, actions,
+    ).expect("table calibration is valid");
+    let expected_after_stool = expected_risk_after_one_calibration_sample(
+        counts, 2, assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, actions,
+    ).expect("stool calibration is valid");
+
+    assert!((expected_after_chair - 15.48736).abs() <= EPSILON);
+    assert!((expected_after_table - 15.20752).abs() <= EPSILON);
+    assert!((expected_after_stool - 15.41104).abs() <= EPSILON);
+
+    let equal_costs = select_next_calibration_class(
+        counts, assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, actions, [1.0, 1.0, 1.0],
+    ).expect("a positive-value next sample exists");
+    assert_eq!(equal_costs.0, 1, "equal costs should prioritize table, the highest risk reduction");
+    assert!((equal_costs.1 - 0.30528).abs() <= EPSILON);
+
+    let unequal_costs = select_next_calibration_class(
+        counts, assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, actions, [1.0, 1.0, 0.25],
+    ).expect("a positive-value next sample exists");
+    assert_eq!(unequal_costs.0, 2, "lower stool-label cost changes the optimal acquisition");
+    assert!((unequal_costs.1 - 0.40704).abs() <= EPSILON);
+}
+
+#[test]
+fn active_calibration_allocator_fails_closed_for_invalid_costs_and_classes() {
+    let counts = [[19, 1, 0], [1, 19, 0], [1, 19, 0]];
+    let actions = deployed_policy(assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, 1)
+        .expect("valid assumed model");
+    assert_eq!(
+        expected_risk_after_one_calibration_sample(
+            counts, 3, assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, actions,
+        ),
+        None
+    );
+    assert_eq!(
+        select_next_calibration_class(
+            counts, assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, actions, [1.0, 0.0, 1.0],
+        ),
+        None
+    );
+    assert_eq!(
+        select_next_calibration_class(
+            counts, assumed_sensor(), PRIOR_WEIGHTS, &DECISION_LOSSES, actions, [1.0, f64::NAN, 1.0],
+        ),
+        None
+    );
 }
 
 #[test]
