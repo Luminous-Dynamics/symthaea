@@ -40,6 +40,16 @@ For alternate platforms use an equivalent SHA-256 utility. Store the exact file,
 - Use a published deterministic seed derivation or frozen seed list. Never regenerate a graph independently in each solver arm; generate once, hash, and share the exact graph.
 - Keep a held-out seed set for confirmation. This helps prevent instance leakage, but does not turn public algorithm code/angles into a blind test or establish generalization to other graph families.
 
+### Two comparison tracks: same graph versus same distribution
+
+Do not force every method into one paired table if its algorithmic interface differs.
+
+**Track A — fixed-graph decision quality.** Generate each completed DIMACS graph once, hash it, and pass the exact bytes to every method that accepts an existing graph. Use paired per-graph outcomes for deterministic/randomized min-degree greedy, local search, fixed-graph classical heuristics, and any QGreedy implementation that uses that graph as input. The randomized-greedy restart-budget curve already illustrates why budgets must be matched.
+
+**Track B — distribution-level deferred-decision methods.** Marino–Kirkpatrick's 2020 paper develops a deferred-decision algorithm that builds a random regular graph while deciding the independent set, using virtual-node contractions. Do not silently assume its paper-native algorithm is a fixed-input solver. First establish from the exact implementation/protocol whether a faithful fixed-graph version exists. If the method must co-generate its graph, retain the graph it generated and independently verify its output; compare graph-level objective-ratio distributions against independently sampled completed-graph methods using the unpaired inference path, not by matching seed numbers. A fixed-graph adaptation may enter Track A only with an explicit algorithm identity and validation showing how the deferred-decision choices changed.
+
+The primary estimand, uncertainty method, and resource boundary must be specified separately for the two tracks. A fixed-graph paired improvement answers a different question from an across-distribution mean ratio comparison. Matching seed integers never creates a pair unless the actual graph identity is the same.
+
 ### Baseline arms
 
 1. Uniform-random tie-breaking minimal-degree greedy (paper-aligned baseline).
@@ -73,7 +83,7 @@ Controls:
 3. Algorithm correctness: every solution independently verified.
 4. Baseline adequacy: compare with Marino–Kirkpatrick or clearly state why it could not be reproduced. Greedy-only wins are not enough for a state-of-the-art claim.
 5. Evidence correctness: simulation, tensor-network calculation, circuit export and actual hardware execution are never blended into one score.
-6. Statistical correctness: graph instances are the primary paired units; nested repetitions are not counted as additional independent graphs. Freeze the analysis plan, cohort, and multiplicity family before confirmatory runs.
+6. Statistical correctness: use graph-instance pairing only for identical completed graph bytes. For independently generated/deferred-decision graph cohorts use unpaired distribution-level inference; nested repetitions are not counted as additional independent graphs. Freeze the analysis plan, cohort, and multiplicity family before confirmatory runs.
 7. Practical-advantage claim: demonstrate an improved final solution quality or lower all-in cost to the same target under matched conditions. Matching a paper's approximation ratio or beating one implementation is not, by itself, quantum advantage.
 
 ## Generator-quality regression
