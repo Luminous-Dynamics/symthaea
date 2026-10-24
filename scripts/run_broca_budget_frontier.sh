@@ -51,6 +51,19 @@ cargo run --manifest-path research/broca-consolidation/Cargo.toml --release --bi
 STATUS=$?
 set -e
 
+OUTPUT_LINES="$(awk 'END { print NR + 0 }' "$OUTPUT")"
+SUMMARY_RECORDS="$(awk '/"record":"budget_summary"/ { count++ } END { print count + 0 }' "$OUTPUT")"
+RECORD_VALIDATION="not_checked"
+if (( STATUS == 0 )); then
+  if (( OUTPUT_LINES != 82 || SUMMARY_RECORDS != 81 )) || ! head -n 1 "$OUTPUT" | grep -q '^{"record":"run","protocol":"GMC-BUDGET-FRONTIER-V1",'; then
+    STATUS=65
+    RECORD_VALIDATION="failed"
+    printf 'FAIL: expected one run record plus 81 budget summaries; got lines=%s summaries=%s\n' "$OUTPUT_LINES" "$SUMMARY_RECORDS" >> "$STDERR_LOG"
+  else
+    RECORD_VALIDATION="passed"
+  fi
+fi
+
 OUTPUT_SHA="$(sha256sum "$OUTPUT" | awk '{print $1}')"
 STDERR_SHA="$(sha256sum "$STDERR_LOG" | awk '{print $1}')"
 RUSTC_VERSION="$(rustc --version 2>&1 || printf 'unavailable')"
@@ -70,6 +83,9 @@ CPU_MODEL="${CPU_MODEL:-unavailable}"
   printf 'uname=%s\n' "$(uname -a)"
   printf 'cpu_model=%s\n' "$CPU_MODEL"
   printf 'output_sha256=%s\n' "$OUTPUT_SHA"
+  printf 'output_lines=%s\n' "$OUTPUT_LINES"
+  printf 'summary_records=%s\n' "$SUMMARY_RECORDS"
+  printf 'record_validation=%s\n' "$RECORD_VALIDATION"
   printf 'stderr_sha256=%s\n' "$STDERR_SHA"
   printf 'exit_status=%s\n' "$STATUS"
 } > "$RECEIPT"
