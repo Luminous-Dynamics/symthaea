@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:broca-task-eval:v1",
+  "title": "Broca held-out task evaluation record",
+  "description": "One record per held-out case and experiment arm. CSV column order is the properties order here; the companion checker rejects quoted fields and requires a source/config/dataset receipt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_id", "run_id", "source_sha", "dataset_id", "dataset_sha256",
+    "config_sha256", "split", "case_id", "group_id", "stratum", "arm",
+    "task_success", "action_applicable", "action_correct",
+    "abstention_applicable", "abstention_correct", "stale_memory_reuse",
+    "unauthorized_memory_exposure", "deleted_memory_resurrection",
+    "query_latency_ms", "write_latency_ms", "input_tokens", "output_tokens",
+    "storage_bytes", "energy_j"
+  ],
+  "properties": {
+    "protocol_id": { "const": "BROCA-TASK-EVAL-V1" },
+    "run_id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._-]+$" },
+    "source_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "dataset_id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._-]+$" },
+    "dataset_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "config_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "split": { "const": "heldout" },
+    "case_id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._-]+$" },
+    "group_id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._-]+$" },
+    "stratum": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._-]+$" },
+    "arm": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._-]+$" },
+    "task_success": { "type": "integer", "enum": [0, 1] },
+    "action_applicable": { "type": "integer", "enum": [0, 1] },
+    "action_correct": { "type": "integer", "enum": [0, 1] },
+    "abstention_applicable": { "type": "integer", "enum": [0, 1] },
+    "abstention_correct": { "type": "integer", "enum": [0, 1] },
+    "stale_memory_reuse": { "type": "integer", "enum": [0, 1] },
+    "unauthorized_memory_exposure": { "type": "integer", "enum": [0, 1] },
+    "deleted_memory_resurrection": { "type": "integer", "enum": [0, 1] },
+    "query_latency_ms": { "type": "number", "minimum": 0 },
+    "write_latency_ms": { "type": "number", "minimum": 0 },
+    "input_tokens": { "type": "integer", "minimum": 0 },
+    "output_tokens": { "type": "integer", "minimum": 0 },
+    "storage_bytes": { "type": "integer", "minimum": 0 },
+    "energy_j": {
+      "description": "-1 means unmeasured; otherwise Joules measured under the declared protocol.",
+      "type": "number",
+      "anyOf": [
+        { "const": -1 },
+        { "minimum": 0 }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "action_applicable": { "const": 0 } } },
+      "then": { "properties": { "action_correct": { "const": 0 } } }
+    },
+    {
+      "if": { "properties": { "abstention_applicable": { "const": 0 } } },
+      "then": { "properties": { "abstention_correct": { "const": 0 } } }
+    }
+  ]
+}
