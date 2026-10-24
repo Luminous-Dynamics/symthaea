@@ -35,6 +35,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Audit locked fixture hashes and mutation inventory
+        run: bash tools/vleb/check-fixture-integrity.sh
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
