@@ -740,6 +740,43 @@ mod tests {
         assert_eq!(receiver.stats().fragments_corrupt, 1);
     }
 
+    #[test]
+    fn malformed_fragment_does_not_evict_valid_inflight_assembly() {
+        let mut receiver = MeshReceiver::new().with_max_pending(1);
+        let packet_a = test_packet(77, PEER_A, 0x77);
+        let wire_a = to_wire(&packet_a.fragment());
+
+        // A legitimate stream claims the only pending assembly slot.
+        assert!(receiver.receive_fragment(PEER_A, &wire_a[0]).is_none());
+        assert_eq!(receiver.pending_count(), 1);
+
+        // A malformed packet from another peer must be rejected before
+        // ensure_capacity can evict the valid stream to make room.
+        let packet_b = test_packet(78, PEER_B, 0x78);
+        let wire_b = to_wire(&packet_b.fragment());
+        let malformed_b = rewrite_wire_header(
+            wire_b.last().expect("packet B has an FEC frame"),
+            (wire_b.len() - 1) as u8,
+            wire_b.len() as u8,
+            0, // Non-FEC frame at reserved parity slot, with recomputed CRC.
+        );
+        assert!(receiver.receive_fragment(PEER_B, &malformed_b).is_none());
+        assert_eq!(receiver.pending_count(), 1);
+        assert_eq!(receiver.stats().fragments_corrupt, 1);
+
+        // The original valid stream still completes after the hostile input.
+        let mut completed = None;
+        for raw in &wire_a[1..] {
+            if let Some(packet) = receiver.receive_fragment(PEER_A, raw) {
+                completed = Some(packet);
+            }
+        }
+        let recovered = completed.expect("valid in-flight assembly must survive");
+        assert_eq!(recovered.sequence, 77);
+        assert_eq!(recovered.wisdom.0, packet_a.wisdom.0);
+        assert_eq!(receiver.pending_count(), 0);
+    }
+
     // -- FEC recovery --
 
     #[test]

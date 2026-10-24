@@ -83,8 +83,8 @@ pub use dual_layer::{
     BiLoopbackTransport, DualLayerMesh, LoopbackTransport, MeshRoute, MeshTransport,
 };
 pub use lora_fragment::{
-    FLAG_FEC, FragmentAssembler, HEADER_SIZE, LORA_MTU, LoRaFragment, PAYLOAD_SIZE, crc16_ccitt,
-    fragment,
+    FLAG_FEC, FragmentAssembler, FragmentEncodeError, HEADER_SIZE, LORA_MTU, LoRaFragment,
+    PAYLOAD_SIZE, crc16_ccitt, fragment,
 };
 pub use mesh_receiver::{MeshPeer, MeshReceiver, ReceiverStats, StreamKey};
 pub use sensor::{MockSensor, SensorInput, SensorReading, SensorRegistry};
@@ -388,6 +388,8 @@ pub enum MeshError {
     NoTransport,
     /// Transport I/O error.
     Io(String),
+    /// A fragment could not be serialized under the canonical V1 contract.
+    FragmentEncoding(FragmentEncodeError),
     /// Fragment reassembly failed (too many losses).
     ReassemblyFailed,
     /// Payload too large for fragmentation.
@@ -399,6 +401,7 @@ impl std::fmt::Display for MeshError {
         match self {
             Self::NoTransport => write!(f, "no mesh transport available"),
             Self::Io(msg) => write!(f, "mesh I/O error: {msg}"),
+            Self::FragmentEncoding(err) => write!(f, "mesh fragment encoding error: {err}"),
             Self::ReassemblyFailed => write!(f, "fragment reassembly failed"),
             Self::PayloadTooLarge => write!(f, "payload exceeds max fragment count"),
         }
