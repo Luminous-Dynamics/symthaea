@@ -6,9 +6,9 @@
 //!
 //! This is a *planning aid*, not a proof checker or an empirical benchmark
 //! result. It models shared family difficulty, heterogeneous family-level
-//! treatment effects, and paired target potential outcomes. It uses a cluster-level
-//! t-interval as the preregistered gate approximation. The report records the
-//! model and its limitations so it cannot be mistaken for measured utility.
+//! treatment effects, and paired target potential outcomes. It applies the paired
+//! component-percentile-bootstrap interval rule used by PITB's frontier analysis.
+//! It remains a planning sensitivity model, not a benchmark result.
 
 use std::{env, fs, path::Path};
 
@@ -17,6 +17,7 @@ use serde_json::{Value, json};
 
 const MIN_CLUSTERS: usize = 20;
 const MIN_SIMULATIONS: usize = 1_000;
+const MIN_BOOTSTRAP_REPLICATES: usize = 1_000;
 const Z_975: f64 = 1.959_963_984_540_054;
 
 #[derive(Debug, Clone)]
@@ -29,6 +30,7 @@ struct Config {
     pair_association: f64,
     cluster_sizes: Vec<usize>,
     simulations: usize,
+    bootstrap_replicates: usize,
     seed: u64,
 }
 
@@ -116,9 +118,9 @@ impl Rng {
 }
 
 fn parse_config(args: &[String]) -> Result<Config> {
-    if args.len() != 11 || args.get(1).is_some_and(|x| x == "--help" || x == "-h") {
+    if args.len() != 12 || args.get(1).is_some_and(|x| x == "--help" || x == "-h") {
         bail!(
-            "usage: {} <baseline_rate> <expected_gain> <minimum_observed_gain> <icc_0_to_lt_1> <cluster_effect_sd_0_to_1> <pair_association_0_to_1> <cluster_sizes_csv> <simulations>=1000 <seed> <output.json>",
+            "usage: {} <baseline_rate> <expected_gain> <minimum_observed_gain> <icc_0_to_lt_1> <cluster_effect_sd_0_to_1> <pair_association_0_to_1> <cluster_sizes_csv> <simulations>=1000 <bootstrap_replicates>=1000 <seed> <output.json>",
             args.first().map(String::as_str).unwrap_or("plan_pitb_power")
         );
     }
@@ -140,7 +142,8 @@ fn parse_config(args: &[String]) -> Result<Config> {
         })
         .collect::<Result<Vec<_>>>()?;
     let simulations = args[8].parse::<usize>().context("parse simulations")?;
-    let seed = args[9].parse::<u64>().context("parse seed")?;
+    let bootstrap_replicates = args[9].parse::<usize>().context("parse bootstrap replicates")?;
+    let seed = args[10].parse::<u64>().context("parse seed")?;
 
     if !(0.0..1.0).contains(&baseline_rate) {
         bail!("baseline_rate must be strictly between 0 and 1");
@@ -194,6 +197,9 @@ fn parse_config(args: &[String]) -> Result<Config> {
     if simulations < MIN_SIMULATIONS {
         bail!("simulations must be at least {MIN_SIMULATIONS}");
     }
+    if bootstrap_replicates < MIN_BOOTSTRAP_REPLICATES {
+        bail!("bootstrap replicates must be at least {MIN_BOOTSTRAP_REPLICATES}");
+    }
 
     Ok(Config {
         baseline_rate,
@@ -204,6 +210,7 @@ fn parse_config(args: &[String]) -> Result<Config> {
         pair_association,
         cluster_sizes,
         simulations,
+        bootstrap_replicates,
         seed,
     })
 }
@@ -216,44 +223,46 @@ fn parse_f64(raw: &str, name: &str) -> Result<f64> {
     Ok(value)
 }
 
-fn t_critical_975(df: usize) -> f64 {
-    // Cornish-Fisher expansion around the two-sided normal 97.5th percentile.
-    // The planner requires >=20 clusters, where this approximation is adequate
-    // for a design sensitivity analysis; final analysis still uses the frozen
-    // benchmark analysis procedure.
-    let v = df as f64;
-    let z = Z_975;
-    z + (z.powi(3) + z) / (4.0 * v)
-        + (5.0 * z.powi(5) + 16.0 * z.powi(3) + 3.0 * z) / (96.0 * v.powi(2))
-        + (3.0 * z.powi(7) + 19.0 * z.powi(5) + 17.0 * z.powi(3) - 15.0 * z)
-            / (384.0 * v.powi(3))
+fn percentile(sorted: &[f64], probability: f64) -> Option<f64> {
+    if sorted.is_empty() || !(0.0..=1.0).contains(&probability) {
+        return None;
+    }
+    let position = probability * (sorted.len() - 1) as f64;
+    let lower_index = position.floor() as usize;
+    let upper_index = position.ceil() as usize;
+    let weight = position - lower_index as f64;
+    let lower = *sorted.get(lower_index)?;
+    let upper = *sorted.get(upper_index)?;
+    Some(lower * (1.0 - weight) + upper * weight)
 }
 
-fn paired_bernoulli(
+fn bootstrap_paired_interval(
+    differences: &[(usize, i64)],
+    replicates: usize,
     rng: &mut Rng,
-    p_control: f64,
-    p_treatment: f64,
-    positive_association_fraction: f64,
-) -> (bool, bool) {
-    // A valid bivariate Bernoulli coupling. The association parameter scales
-    // the available positive joint-success covariance from independence (0)
-    // to the Frechet upper bound (1); it is not a Pearson correlation.
-    let independent_joint = p_control * p_treatment;
-    let joint_success = independent_joint
-        + positive_association_fraction * (p_control.min(p_treatment) - independent_joint);
-    let draw = rng.uniform();
-    let both_success = joint_success;
-    let control_only = p_control - joint_success;
-    let treatment_only = p_treatment - joint_success;
-    if draw < both_success {
-        (true, true)
-    } else if draw < both_success + control_only {
-        (true, false)
-    } else if draw < both_success + control_only + treatment_only {
-        (false, true)
-    } else {
-        (false, false)
+) -> Option<[f64; 2]> {
+    if differences.len() < MIN_CLUSTERS || replicates < MIN_BOOTSTRAP_REPLICATES {
+        return None;
     }
+    let mut estimates = Vec::with_capacity(replicates);
+    for _ in 0..replicates {
+        let mut delta_sum = 0i64;
+        let mut target_count = 0usize;
+        for _ in 0..differences.len() {
+            let index = (rng.next_u64() as usize) % differences.len();
+            let (cluster_targets, cluster_delta) = differences[index];
+            delta_sum += cluster_delta;
+            target_count += cluster_targets;
+        }
+        if target_count > 0 {
+            estimates.push(delta_sum as f64 / target_count as f64);
+        }
+    }
+    if estimates.len() != replicates {
+        return None;
+    }
+    estimates.sort_by(f64::total_cmp);
+    Some([percentile(&estimates, 0.025)?, percentile(&estimates, 0.975)?])
 }
 
 fn simulate_trial(config: &Config, rng: &mut Rng) -> Trial {
@@ -310,28 +319,20 @@ fn simulate_trial(config: &Config, rng: &mut Rng) -> Trial {
     }
 
     let estimate = (treatment_total as f64 - control_total as f64) / total_n as f64;
-    let mut sum_sq = 0.0;
-    for (n, cluster_difference) in &differences {
-        let residual = *cluster_difference as f64 - *n as f64 * estimate;
-        sum_sq += residual * residual;
-    }
-    let variance = clusters as f64 / (clusters - 1) as f64
-        * sum_sq
-        / ((total_n as f64) * (total_n as f64));
-    let se = variance.max(0.0).sqrt();
-
-    // Degenerate samples are deliberately not granted a zero-width interval.
-    let (lower_95, upper_95, passed_gate) = if se.is_finite() && se > f64::EPSILON {
-        let margin = t_critical_975(clusters - 1) * se;
-        let lower = estimate - margin;
-        let upper = estimate + margin;
-        (
+    // Resample whole independent components, matching PITB's paired-delta
+    // percentile-bootstrap design. A degenerate interval does not pass.
+    let interval = bootstrap_paired_interval(
+        &differences,
+        config.bootstrap_replicates,
+        rng,
+    );
+    let (lower_95, upper_95, passed_gate) = match interval {
+        Some([lower, upper]) if upper - lower > f64::EPSILON => (
             Some(lower),
             Some(upper),
             estimate >= config.minimum_observed_gain && lower > 0.0,
-        )
-    } else {
-        (None, None, false)
+        ),
+        _ => (None, None, false),
     };
 
     Trial {
@@ -401,6 +402,7 @@ fn build_report(config: &Config) -> Value {
             "cluster_sizes": config.cluster_sizes,
             "total_targets_per_simulated_study": config.cluster_sizes.iter().sum::<usize>(),
             "simulations": config.simulations,
+            "bootstrap_replicates": config.bootstrap_replicates,
             "seed": config.seed,
             "confidence_level": 0.95
         },
@@ -411,7 +413,7 @@ fn build_report(config: &Config) -> Value {
             "paired_target_outcomes": "bivariate Bernoulli potential outcomes using configured fraction of maximum feasible positive joint-success association",
             "pair_association_semantics": "0 means independent potential outcomes conditional on family probabilities; 1 means the Frechet upper bound on joint successes; this parameter is not a Pearson correlation",
             "pairing": "control and treatment potential outcomes are simulated on the same target inside each shared family",
-            "interval": "cluster-level paired difference t interval with Cornish-Fisher critical-value approximation",
+            "interval": "paired component-percentile bootstrap, resampling whole components with replacement and recomputing the target-weighted treatment-minus-control difference",
             "gate": "estimated gain >= minimum_observed_gain_gate AND 95% lower bound > 0; degenerate intervals do not pass"
         },
         "results": {
@@ -432,7 +434,8 @@ fn build_report(config: &Config) -> Value {
             "The beta-binomial family effect and family-specific treatment-effect variation are sensitivity assumptions, not estimates from PITB.",
             "Family treatment-effect deviations can be negative or positive; the resulting target probabilities are clipped to [0,1], so inspect mean_generated_marginal_gain.",
             "Pair association is a sensitivity parameter that scales feasible positive joint-success association, not an empirically estimated Pearson correlation.",
-            "The interval is approximate and is not a substitute for the preregistered final analysis or an independently reviewed power plan.",
+            "The interval uses a finite number of paired component-bootstrap replicates; increase bootstrap_replicates for a stability analysis and match the final preregistered analysis setting.",
+            "Degenerate bootstrap intervals are suppressed and never counted as passing the gate.",
             "Use actual eligible family/component sizes and a range of plausible baseline rates, gains, and ICC values; do not tune the assumptions after inspecting test outcomes."
         ]
     })
@@ -449,14 +452,14 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() == 2 && (args[1] == "--help" || args[1] == "-h") {
         println!(
-            "usage: {} <baseline_rate> <expected_gain> <minimum_observed_gain> <icc_0_to_lt_1> <cluster_effect_sd_0_to_1> <pair_association_0_to_1> <cluster_sizes_csv> <simulations>=1000 <seed> <output.json>\nExample: 0.35 0.15 0.10 0.05 0.05 0.5 2,3,1,4,... 10000 12345 power.json",
+            "usage: {} <baseline_rate> <expected_gain> <minimum_observed_gain> <icc_0_to_lt_1> <cluster_effect_sd_0_to_1> <pair_association_0_to_1> <cluster_sizes_csv> <simulations>=1000 <bootstrap_replicates>=1000 <seed> <output.json>\nExample: 0.35 0.15 0.10 0.05 0.05 0.5 2,3,1,4,... 10000 1000 12345 power.json",
             args.first().map(String::as_str).unwrap_or("plan_pitb_power")
         );
         return Ok(());
     }
 
     let config = parse_config(&args)?;
-    let output = Path::new(&args[10]);
+    let output = Path::new(&args[11]);
     let report = run(&config, output)?;
     println!(
         "PITB_POWER_PLAN_WRITTEN: clusters={} targets={} simulations={} gate_power={:.4} gate_passes={}/{}",
@@ -484,6 +487,7 @@ mod tests {
             pair_association: 0.5,
             cluster_sizes: vec![2, 3, 1, 4, 2, 2, 3, 1, 4, 2, 3, 1, 2, 4, 1, 3, 2, 2, 4, 1],
             simulations,
+            bootstrap_replicates: MIN_BOOTSTRAP_REPLICATES,
             seed,
         }
     }
@@ -507,10 +511,10 @@ mod tests {
     }
 
     #[test]
-    fn critical_value_is_finite_and_decreases_with_more_clusters() {
-        assert!(t_critical_975(19).is_finite());
-        assert!(t_critical_975(99) < t_critical_975(19));
-        assert!(t_critical_975(19) > Z_975);
+    fn percentile_uses_linear_interpolation() {
+        let values = [0.0, 10.0, 20.0, 30.0];
+        assert_eq!(percentile(&values, 0.25), Some(7.5));
+        assert_eq!(percentile(&values, 0.975), Some(29.25));
     }
 
     #[test]
@@ -542,6 +546,7 @@ mod tests {
             "0.5".to_owned(),
             vec!["2"; MIN_CLUSTERS].join(","),
             "1000".to_owned(),
+            "1000".to_owned(),
             "123".to_owned(),
             "power.json".to_owned(),
         ];
@@ -559,6 +564,7 @@ mod tests {
             "0.05".to_owned(),
             "0.5".to_owned(),
             "2,3,1".to_owned(),
+            "1000".to_owned(),
             "1000".to_owned(),
             "123".to_owned(),
             "power.json".to_owned(),
@@ -596,7 +602,7 @@ mod tests {
             "plan_pitb_power".to_owned(), "0.35".to_owned(), "0.15".to_owned(),
             "0.10".to_owned(), "0.05".to_owned(), "0.05".to_owned(),
             "1.01".to_owned(), vec!["2"; MIN_CLUSTERS].join(","),
-            "1000".to_owned(), "123".to_owned(), "power.json".to_owned(),
+            "1000".to_owned(), "1000".to_owned(), "123".to_owned(), "power.json".to_owned(),
         ];
         assert!(parse_config(&args).is_err());
     }
@@ -612,6 +618,7 @@ mod tests {
             pair_association: 0.0,
             cluster_sizes: vec![1; MIN_CLUSTERS],
             simulations: MIN_SIMULATIONS,
+            bootstrap_replicates: MIN_BOOTSTRAP_REPLICATES,
             seed: 1,
         };
         let mut rng = Rng::new(c.seed);
