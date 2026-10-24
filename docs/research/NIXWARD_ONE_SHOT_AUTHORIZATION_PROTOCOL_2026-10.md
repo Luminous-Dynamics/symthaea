@@ -1,0 +1,98 @@
+# Nixward one-shot execution authorization: contract and evaluation plan
+
+Date: 2026-10-24  
+Status: **primitive only; not yet wired into process dispatch**
+
+## Why this boundary matters
+
+A scalar confidence, Phi value, model verdict, caller boolean, or log entry is not an authorization artifact. A privileged dispatcher needs evidence for the *specific action it is about to execute*. The minimum binding is the exact executable plus ordered argument vector, principal, action scope, authority kind, unique decision ID, freshness, revocation state, and one-shot consumption.
+
+This implementation adds a process-local typed ledger in `crates/core/nixward/src/action/authorization.rs`. It intentionally does not change existing executor behavior yet. The next integration stage must route every governed process invocation through permit consumption, then remove or narrow unguarded confirmed-execution APIs only after every call site—including rollback, recovery, daemon, CLI, and legacy executor paths—has explicit semantics.
+
+## Implemented primitive
+
+- Exact `executable + argv[]` equality. Arguments are not flattened into a shell string, so argument-boundary changes are detectable.
+- Principal, action-scope, and authority-kind checks are independent.
+- Monotonic-clock expiry and a configurable maximum permit lifetime; default is 30 seconds.
+- Decision IDs can be issued only once per in-memory ledger.
+- A failed first dispatch attempt burns the permit, including a wrong-command attempt.
+- Revocation and per-ledger identity; permits are opaque, non-cloneable, and not serializable.
+- Rollback and recovery have separate authority kinds rather than masquerading as a human approval.
+
+## Trust model and limits
+
+This is deliberately a **same-process, in-memory primitive**, not a complete security boundary.
+
+1. The caller of `issue` remains trusted to call it only after a real approval or policy decision. The type does not authenticate its own issuer.
+2. An executor can still bypass the ledger until dispatch integration is complete. No current Nixward execution path is claimed to be protected by this change alone.
+3. The handle and receipt are not signed and must not cross a process boundary as trusted evidence. A future daemon/worker split needs authenticated, replay-resistant receipts and a well-defined key/identity lifecycle.
+4. The ledger's IDs and replay state are process-local, not durable across restart. Persistence and crash consistency belong in the later enforcement design.
+5. Command equality does not by itself prove that a command is safe, that the principal is correctly authenticated, or that policy was appropriate. It only binds the permit to the attempt that consumes it.
+
+## Deterministic invariants
+
+The unit-test contract is:
+
+| Invariant | Required result |
+|---|---|
+| Same exact executable and ordered argv, principal, scope, authority, fresh permit | consume once |
+| Same permit consumed again | reject replay |
+| Different executable or one changed/reordered argument | reject and burn permit |
+| Different principal | reject and burn permit |
+| Different scope or authority class | reject and burn permit |
+| Expired permit | reject and burn permit |
+| Revoked decision | reject |
+| Reuse decision ID to issue another permit | reject |
+| Present permit to another ledger instance | reject |
+| Whitespace-bearing arguments versus multiple argv entries | remain distinguishable |
+| Empty executable, embedded NUL, zero lifetime | reject |
+
+The library tests prove the in-memory model only. They do not prove that the real process runner has been gated.
+
+## Integration acceptance gates
+
+Before treating this as production enforcement:
+
+- Inventory and route every real process dispatch through a common point-of-use authorization check; no legacy escape hatch may remain for governed modifying actions.
+- Consume authorization immediately before dispatch, after command construction and after all plan/approval updates, closing the approval-to-dispatch TOCTOU window.
+- Check the authority required by the action at the dispatcher, not merely the authority string supplied by the caller.
+- Treat rollback and recovery as explicit bounded policies with their own permitted commands and reason codes.
+- Inject a mock process runner and assert **zero calls** for denied, mismatched, stale, revoked, replayed, unauthenticated, and policy-error cases.
+- Assert exactly one call for valid positive controls. A deny-everything implementation must fail the benchmark.
+- Exercise concurrent consumption and cancellation; if a permit is consumed before a process spawn fails, it remains consumed and needs a new decision.
+- Record exact source SHA, toolchain, test command, test output, and independent review. Queued/skipped checks are not passes.
+
+## Benchmark plan: attack resistance *and* utility
+
+Use frozen paired cases with an identical command/policy context across a baseline path and the gated path. Separate these events; do not collapse them into one “safety score”:
+
+1. request generated;
+2. authorization decision;
+3. dispatch attempted;
+4. process actually invoked;
+5. protected side effect occurred;
+6. decision was attributable to a current, correctly scoped authority.
+
+Proposed initial deterministic suite: 10,000 generated attempts, stratified across command mismatch, argv-boundary mutation, replay, expiry, revocation, principal mismatch, scope mismatch, authority mismatch, duplicate decision issuance, and legitimate allowlisted actions. Add property-based fuzzing around argument vectors, concurrent replay tests, and long-running restart/crash tests in later stages.
+
+Proposed targets—not current results:
+
+- **100%** rejection of all deterministic invalid/replayed capabilities in the frozen suite.
+- **0** protected side effects on denied paths in the mock-runner harness.
+- **100%** valid positive-control dispatches for policies defined as allowed.
+- **0** duplicate process invocations from concurrent consumption of one permit.
+- Report false permits, false blocks, request rate, dispatch rate, side effects, and p50/p95/p99 overhead separately.
+- Target **less than 1 ms p95** for in-process ledger verification on the reference machine, but only accept this after measuring with a reproducible benchmark and recording the hardware/toolchain. Do not trade away enforcement correctness for latency.
+
+For an agent-level evaluation, include noisy natural-language contexts, explicit opt-outs, quoted/reported/conditional instructions, adversarial prompt variations, benign workflows, and culturally/domain-specific acceptable responses. Moral competence should not be reduced to one verdict-accuracy number; moral sensitivity, context counterfactuals, reasoning quality, steerability, and pluralism need distinct metrics.
+
+## External baselines and reading
+
+These are external reports, not results for Symthaea or Nixward:
+
+- [Open Agent Passport: Before the Tool Call (March 2026)](https://arxiv.org/abs/2603.20953) describes synchronous pre-action policy checks and signed audit records; its abstract reports a 53 ms median enforcement latency for its particular 1,000-request test.
+- [APort Vault (September 2026)](https://arxiv.org/abs/2609.22076) reports 4,371 human-authored attacks replayed across 14 models and 225,964 completed evaluations. It distinguishes unpermitted successful transfers from requests and policy decisions, and reports that many allowed payments still executed—an important guard against “deny everything” scoring.
+- [A roadmap for evaluating moral competence in LLMs (Nature, February 2026)](https://www.nature.com/articles/s41586-025-10021-1) argues for adversarial and confirmatory evaluation, sensitivity to relevant context, and pluralism rather than binary verdict accuracy alone.
+- [Beyond Verdicts: Evaluating Language Model Moral Competence (AAAI, March 2026)](https://ojs.aaai.org/index.php/AAAI/article/view/41131) identifies weaknesses in curated scenarios and overreliance on verdict accuracy, and advocates testing moral sensitivity, reasoning quality, and steerability.
+
+A fair comparison must pin versions, policies, prompts, hardware, retries, and failure rows, publish the raw per-case outcomes, and compare the same task/policy conditions. External headline numbers are not transferable to this repository without running the same evaluation.
