@@ -2420,6 +2420,7 @@ mod tests {
             RecoveryProposalFamily::AdditiveCorrection,
             RecoveryProposalFamily::MultiplicativeCorrection,
             RecoveryProposalFamily::InteractionCorrection,
+            RecoveryProposalFamily::UnaryFunctionCorrection,
         ];
         let mut rng = 0xCAFE_BABE_1234_5678_u64;
 
@@ -2602,6 +2603,7 @@ mod tests {
             &mut live,
             &mut rejected,
             0,
+            false,
         );
 
         assert!(
@@ -2637,6 +2639,7 @@ mod tests {
             &mut live,
             &mut rejected,
             second_alarmed,
+            false,
         );
         assert!(rejected.contains(&0) && rejected.contains(&second_alarmed));
         assert!(!live.contains(&0) && !live.contains(&second_alarmed));
