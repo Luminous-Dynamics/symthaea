@@ -62,7 +62,7 @@ Let A and B be eligible points, and let `[L_A, U_A]` and `[L_B, U_B]` be their s
 - **BAND_DOMINATED:** A certainly dominates B under the supplied bands when A is no worse in both measured resource dimensions, `L_A >= U_B`, and at least one objective is strictly better.
 - **BAND_NONDOMINATED:** no eligible point can dominate B under the supplied bands and resource ordering.
 - **UNRESOLVED:** at least one point might dominate B, but the intervals do not establish dominance or rule it out.
-- **DUPLICATE_EQUIVALENT:** a lexicographically earlier point has identical resource values and interval bounds. This is deterministic deduplication, not statistical evidence that one point is better.
+- **DUPLICATE_EQUIVALENT:** two or more points have identical point estimates, interval bounds and resource values. The exact-tie class is surfaced without naming a unique winner; this is not statistical evidence that any point is better.
 - **INFEASIBLE:** the upstream safety/resource gate failed; uncertainty cannot rehabilitate it.
 
 “Certified” here is conditional on the validity of the supplied simultaneous bands and the measured resource values. The analyzer explicitly records `interval_procedure_verified_here=false` and `upstream_safety_certificate_verified_here=false`; it does not issue a formal statistical or safety certificate.
