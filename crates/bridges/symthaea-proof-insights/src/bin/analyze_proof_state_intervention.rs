@@ -1853,7 +1853,29 @@ mod tests {
         gate["statement_correspondence"]["reviewers"].as_array_mut().unwrap().pop();
         let error = validate_semantic_gate(&gate, "test-execution", &target_digest)
             .expect_err("one review cannot qualify the semantic gate");
-        assert!(error.to_string().contains("contradicts component evidence"));
+        assert!(error.to_string().contains("statement-correspondence status contradicts individual reviewer decisions"));
+    }
+
+    #[test]
+    fn semantic_gate_does_not_vote_away_reviewer_disagreement() {
+        let target_digest = "d".repeat(64);
+        let mut gate = passing_semantic_gate(&target_digest);
+        gate["statement_correspondence"]["reviewers"][1]["decision"] =
+            Value::String("mismatch".into());
+        let error = validate_semantic_gate(&gate, "test-execution", &target_digest)
+            .expect_err("reviewer disagreement must not become a passing correspondence label");
+        assert!(error.to_string().contains("statement-correspondence status contradicts individual reviewer decisions"));
+    }
+
+    #[test]
+    fn semantic_gate_rejects_duplicate_reviewer_ids() {
+        let target_digest = "d".repeat(64);
+        let mut gate = passing_semantic_gate(&target_digest);
+        gate["statement_correspondence"]["reviewers"][1]["reviewer_id"] =
+            Value::String("reviewer-a".into());
+        let error = validate_semantic_gate(&gate, "test-execution", &target_digest)
+            .expect_err("duplicate reviewer identities must be rejected");
+        assert!(error.to_string().contains("duplicate semantic-gate reviewer identity"));
     }
 
     #[test]
