@@ -24,12 +24,12 @@
       "repository": "Luminous-Dynamics/symthaea",
       "pull_request": 8324,
       "branch": "research/qcomp-portfolio-001a-mis-verifier-current",
-      "inspected_commit": "988ef2766170d6242d9aa2d99362cd7cc1020379",
+      "inspected_commit": "c1a42dea47bddbe6816d7943f762265e3a98aaf5",
       "generator_path": "crates/domains/symthaea-quantum-comp/src/mis_random_regular.rs",
-      "generator_blob_sha1": "a51cb79f336233bf9b5e823fa05cf664402dd897",
+      "generator_blob_sha1": "247414ded11cb7cb12637a56e7c2699564a6efe1",
       "cli_path": "crates/domains/symthaea-quantum-comp/src/bin/qcomp_rrg_generate.rs",
-      "cli_blob_sha1": "bf9c5de13dca0b4e117263cbf3dfe87b2bbb7482",
-      "note": "Source pin updated after the CLI began recording the configured max_attempts in DIMACS comments. The Rust implementation is not compiled or executed in this authoring environment."
+      "cli_blob_sha1": "0d0488d8605a2256d813e0c09740b9e4ebd5b9bf",
+      "note": "Source pin includes generator exhaustion errors that retain n, degree, seed and max_attempts, plus a structured JSON failure receipt emitted to stderr by the CLI while preserving DIMACS-only stdout. Rust remains uncompiled in this environment."
     }
   },
   "motivation": {
@@ -12342,10 +12342,11 @@
     "rust_regression_test_source": "crates/domains/symthaea-quantum-comp/src/mis_random_regular.rs in PR #8324",
     "seed_stream_note": "Canonical PR #8324 implementation was aligned to the preflight seed stream: same XorShift64* generator, rejection-sampled Fisher-Yates bounded draws, and in-place re-shuffle of the stub vector between rejected attempts. Byte parity must still be verified by compiling/running Rust.",
     "canonical_rust_generator": {
-      "commit": "3ced24ce2768f480b8b8945560eebeffcece5eaf",
-      "module_blob_sha1": "a51cb79f336233bf9b5e823fa05cf664402dd897",
+      "commit": "c1a42dea47bddbe6816d7943f762265e3a98aaf5",
+      "module_blob_sha1": "247414ded11cb7cb12637a56e7c2699564a6efe1",
       "seed_stream_semantics": "XorShift64* plus rejection-sampled Fisher-Yates; the canonical generator shuffles the stub vector in place between rejected attempts, matching the JS preflight's specified deterministic stream semantics.",
-      "execution_status": "not compiled or executed; JavaScript preflight does not substitute for Rust tests or byte-parity verification"
+      "execution_status": "not compiled or executed; JavaScript preflight does not substitute for Rust tests or byte-parity verification",
+      "cli_blob_sha1": "0d0488d8605a2256d813e0c09740b9e4ebd5b9bf"
     }
   }
 }
