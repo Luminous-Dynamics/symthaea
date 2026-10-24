@@ -30,6 +30,8 @@ pub enum PredictionEvidenceStatus {
     StaleOrOutOfOrder,
     /// The upstream source did not provide a trustworthy comparison.
     SourceUnavailable,
+    /// The cycle was gated before a prediction comparison was evaluated.
+    NotEvaluated,
 }
 
 /// A prediction error with status and observation provenance.
@@ -274,6 +276,18 @@ mod tests {
         assert_eq!(evidence.value_for_observation(5), Some(0.25));
         assert_eq!(evidence.value_for_observation(6), None);
         assert!(!evidence.is_usable_for(6));
+    }
+
+    #[test]
+    fn not_evaluated_status_remains_missing_evidence() {
+        let evidence = PredictionErrorEvidence::from_comparison(
+            PredictionEvidenceStatus::NotEvaluated,
+            Some(0.0),
+            None,
+            7,
+        );
+        assert_eq!(evidence.status(), PredictionEvidenceStatus::NotEvaluated);
+        assert_eq!(evidence.value_for_observation(7), None);
     }
 
     #[test]
