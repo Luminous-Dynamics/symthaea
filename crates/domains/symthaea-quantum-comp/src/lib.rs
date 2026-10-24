@@ -46,6 +46,7 @@ pub mod phase_hdc;
 pub mod preflight;
 pub mod presets;
 pub mod probe;
+pub mod qubo_mis;
 pub mod provenance;
 #[cfg(feature = "qasm-export")]
 pub mod qasm;
@@ -118,6 +119,7 @@ pub use preflight::{
 };
 pub use presets::{RunPreset, supported_preset_names};
 pub use probe::{BindingProbeConfig, BindingProbeRunner};
+pub use qubo_mis::{MisIsingModel, MisQuboError, MisQuboModel};
 pub use provenance::{ReproducibilityRecord, RunEnvironment, fnv1a64};
 pub use receipts::ResearchArtifactReceipt;
 pub use release_gate::{
