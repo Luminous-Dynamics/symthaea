@@ -115,7 +115,7 @@ impl Rng {
 }
 
 fn parse_config(args: &[String]) -> Result<Config> {
-    if args.len() != 8 || args.get(1).is_some_and(|x| x == "--help" || x == "-h") {
+    if args.len() != 9 || args.get(1).is_some_and(|x| x == "--help" || x == "-h") {
         bail!(
             "usage: {} <baseline_rate> <expected_gain> <minimum_observed_gain> <icc_0_to_lt_1> <cluster_sizes_csv> <simulations>=1000 <seed> <output.json>",
             args.first().map(String::as_str).unwrap_or("plan_pitb_power")
@@ -151,8 +151,17 @@ fn parse_config(args: &[String]) -> Result<Config> {
     if baseline_rate + expected_gain <= baseline_rate {
         bail!("expected_gain is below representable precision for baseline_rate");
     }
-    if !(0.0..1.0).contains(&icc) && icc != 0.0 {
+    if !(0.0..1.0).contains(&icc) {
         bail!("icc must be in [0, 1)");
+    }
+    if icc > 0.0 {
+        let concentration = (1.0 - icc) / icc;
+        if !concentration.is_finite()
+            || !(baseline_rate * concentration).is_finite()
+            || !((1.0 - baseline_rate) * concentration).is_finite()
+        {
+            bail!("icc is too close to zero for a finite beta-binomial concentration");
+        }
     }
     if cluster_sizes.len() < MIN_CLUSTERS {
         bail!(
@@ -225,8 +234,8 @@ fn simulate_trial(config: &Config, rng: &mut Rng) -> Trial {
             config.baseline_rate
         };
         let p_treatment = (p_control + config.expected_gain).min(1.0);
-        generated_baseline_probability += p_control;
-        generated_treatment_probability += p_treatment;
+        generated_baseline_probability += p_control * n as f64;
+        generated_treatment_probability += p_treatment * n as f64;
 
         let mut control_successes = 0usize;
         let mut treatment_successes = 0usize;
@@ -274,7 +283,7 @@ fn simulate_trial(config: &Config, rng: &mut Rng) -> Trial {
         upper_95,
         passed_gate,
         generated_gain: (generated_treatment_probability - generated_baseline_probability)
-            / clusters as f64,
+            / total_n as f64,
     }
 }
 
