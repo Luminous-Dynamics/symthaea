@@ -13,4 +13,5 @@ categories = ["simulation", "science"]
 
 [dependencies]
 symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+blake3 = { workspace = true }
 

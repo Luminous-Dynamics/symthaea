@@ -1,0 +1,14 @@
+* Critically damped series RLC step-response reference.
+* Ideal 1 V input; R=200 ohm, L=10 mH, C=1 uF.
+* wn = 1/sqrt(L*C) = 10,000 rad/s; zeta = R/2*sqrt(C/L) = 1.
+Vstep in 0 PULSE(0 1 0 1n 1n 10m 20m)
+R1 in node_r 200
+L1 node_r out 10m
+C1 out 0 1u IC=0
+.control
+set filetype=ascii
+tran 1us 1ms
+write rlc_step_actual.raw time v(out)
+quit
+.endc
+.end
