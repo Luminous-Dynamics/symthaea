@@ -279,7 +279,16 @@ fn transformation_score(
         }
     };
     let value = match kind {
-        ReturnTransformation::Literal => 0.55 * literal + 0.25 * rhythm + 0.20 * coverage,
+        ReturnTransformation::Literal => {
+            // A literal return must preserve absolute note durations, not
+            // merely normalized rhythm shape. Otherwise uniform augmentation
+            // and diminution tie with literal identity and are misclassified
+            // because pitch and normalized duration proportions are unchanged.
+            0.45 * literal
+                + 0.20 * rhythm
+                + 0.20 * coverage
+                + 0.15 * ratio_similarity(1.0) * duration_scale_consistency
+        },
         ReturnTransformation::Transposed => {
             0.45 * transposed + 0.25 * interval + 0.20 * rhythm + 0.10 * coverage
         }
@@ -690,6 +699,51 @@ mod tests {
             compare_melodic_sequences(&source, &longer_target, ReturnTransformation::Transposed);
         assert!(evidence.overall_similarity > 0.75);
         assert!(!evidence.meets_threshold(0.75));
+    }
+
+    #[test]
+    fn detected_transformation_distinguishes_identity_augmentation_and_diminution() {
+        let source = vec![
+            note(60, 0, Duration::quarter()),
+            note(62, 1, Duration::eighth()),
+            note(65, 2, Duration::half()),
+            note(64, 3, Duration::quarter()),
+        ];
+
+        let literal = compare_melodic_sequences(&source, &source, ReturnTransformation::Literal);
+        assert_eq!(literal.detected_transformation, ReturnTransformation::Literal);
+
+        let augmented: Vec<_> = source
+            .iter()
+            .copied()
+            .map(|mut event| {
+                event.duration = event.duration.scale(2, 1);
+                event
+            })
+            .collect();
+        let augmentation = compare_melodic_sequences(
+            &source,
+            &augmented,
+            ReturnTransformation::Augmented,
+        );
+        assert_eq!(augmentation.detected_transformation, ReturnTransformation::Augmented);
+        assert!(augmentation.meets_threshold(0.99));
+
+        let diminished: Vec<_> = source
+            .iter()
+            .copied()
+            .map(|mut event| {
+                event.duration = event.duration.scale(1, 2);
+                event
+            })
+            .collect();
+        let diminution = compare_melodic_sequences(
+            &source,
+            &diminished,
+            ReturnTransformation::Diminished,
+        );
+        assert_eq!(diminution.detected_transformation, ReturnTransformation::Diminished);
+        assert!(diminution.meets_threshold(0.99));
     }
 
     #[test]
