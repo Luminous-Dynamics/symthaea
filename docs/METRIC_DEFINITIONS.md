@@ -8,24 +8,14 @@
 
 ## Critical Distinction: Consciousness Metrics
 
-### IIT Integrated Information (Phi)
+### IIT Integrated Information (formal, causal measure)
 
-| Property | Value |
-|----------|-------|
-| **Symbol** | Phi (uppercase) |
-| **Measures** | Irreducible information integration across system partition |
-| **Theory** | Integrated Information Theory (Tononi et al., 2004-2024) |
-| **Complexity** | O(2^n) - exponential, intractable for n > 12 |
-| **Implementation** | `src/hdc/tiered_phi/core.rs` (Exact tier only) |
-| **Valid For** | Consciousness research (small systems only) |
+IIT integrated-information quantities are defined relative to a specified IIT formalism, causal substrate / transition model, system state, and the formalism's cause-effect and partition machinery. IIT 3.0, IIT 4.0 (2023), and IIT 4.0 (2026) are not numerically interchangeable.
 
-**Definition:**
-```
-Phi = min_{partition} [I(whole) - I(parts)]
-```
-The minimum information lost when partitioning the system at its Minimum Information Partition (MIP).
+**Important implementation boundary:** current Symthaea HDC code named `ExhaustivePartition` exhaustively searches partitions of an HDC similarity-based objective. It does **not** thereby become an exact IIT implementation: the objective is not an IIT transition-probability / cause-effect repertoire computation. The entropy-based HDC proxy likewise is not formal IIT Phi. The legacy PyPhi comparison remains blocked until it has a maintained adapter and reproducible paired causal models; see `validation/README.md`.
 
----
+For reference calculations, pin PyPhi's version and formalism explicitly (PyPhi 2.0 supports `IIT_3_0`, `IIT_4_0_2023`, and `IIT_4_0_2026`). Do not label an HDC proxy "ground truth" or infer consciousness from a scalar score.
+
 
 ### Algebraic Connectivity (lambda-2)
 
@@ -51,16 +41,14 @@ lambda-2 = second-smallest eigenvalue of L
 
 ## Tiered Phi System
 
-Symthaea implements a 4-tier Phi approximation system:
+| Tier | Actual computation | Interpretation / limitation |
+|------|--------------------|-----------------------------|
+| RandomBaseline | Deterministic fixture/mock score | Testing only; never a measurement |
+| SampledPartition | HDC similarity-derived sampled partition proxy | Approximation to the HDC objective, not formal IIT Phi; external accuracy is not yet qualified |
+| ExhaustivePartition | Exhaustive partition search over an HDC similarity objective | Exhaustive for that proxy only, not exact IIT |
+| SpectralConnectivity | Algebraic connectivity lambda-2 | Graph connectivity / mixing diagnostic; not IIT Phi |
+| Resonator | Coupled-oscillator / resonance approximation | Resonance diagnostic until a target-specific validation establishes more |
 
-| Tier | Method | Complexity | Accuracy | Use Case |
-|------|--------|-----------|----------|----------|
-| **Exact** | Full IIT 3.0 | O(2^n) | Ground truth | n <= 12 only |
-| **Heuristic (SampledPartition)** | HDC binding | O(n^2) | r = 0.9998 vs exact | Research approximation |
-| **Resonator** | Coupled oscillators | O(n log n) | r = 0.72 vs exact | Real-time monitoring |
-| **Spectral (SpectralConnectivity)** | lambda-2 | O(n^3) | r = -0.14 vs exact | **NOT for consciousness** (measures mixing time, not integration) |
-
----
 
 ## HDC (Hyperdimensional Computing) Metrics
 
@@ -85,7 +73,7 @@ sim(A, B) = (A . B) / (||A|| * ||B||)
 | **Symbol** | R or reversibility |
 | **Range** | [0, 1] |
 | **Measures** | Information preservation through bind/unbind cycle |
-| **Significance** | Relates to phenomenal structure in consciousness |
+| **Significance** | Representation reversibility diagnostic; does not establish phenomenal structure or consciousness |
 
 **Definition:**
 ```
@@ -136,31 +124,17 @@ C(t) = sigma(softmin(Phi, B, W, A, R, E, K; tau)) * weighted_sum
 
 ## Validation Correlation Matrix
 
-Cross-validation results between metric implementations:
+Historical proxy-comparison numbers in repository documentation are not PyPhi/IIT validation results unless each result has a reproducible causal model, exact source/tool versions, a declared formalism, a paired dataset, and an independent receipt. The current cross-validation scaffold does not meet that requirement. Each HDC proxy's relationship to formal IIT metrics must be re-established with a qualified benchmark.
 
-| Metric A | Metric B | Pearson r | Interpretation |
-|----------|----------|-----------|----------------|
-| Exact Phi | Heuristic (SampledPartition) | 0.9998 | Excellent proxy (Spearman rho = 0.9985) |
-| Exact Phi | Resonator Phi | 0.72 | Moderate proxy |
-| Exact Phi | lambda-2 (SpectralConnectivity) | -0.14 | **No relationship** (Spearman rho = -0.59; earlier methodology incorrectly reported r = 0.097) |
-| Exact Phi | Binding (R) | 0.45 | Weak relationship |
-
----
 
 ## Quick Reference
 
-**When measuring consciousness:**
-- Use Exact tier (n <= 12) or Heuristic tier (n > 12)
-- NEVER use lambda-2 / Spectral tier
+**When studying integration-related telemetry:**
 
-**When analyzing network topology:**
-- lambda-2 is valid and efficient
-- Do NOT claim consciousness implications
+- Select the estimator whose operational definition matches the question.
+- Keep entropy, dependence, spectral connectivity, causal-cut diagnostics, and IIT measures distinct.
+- Treat HDC similarity-based scores as research proxies until independently validated.
+- Do not infer consciousness, truth confidence, consent, or execution authority from a scalar metric.
 
-**When computing semantic similarity:**
-- Use cosine similarity on hypervectors
-- Threshold > 0.5 typically indicates meaningful relationship
-
----
 
 *For detailed validation data, see [METRIC_CLARIFICATION.md](METRIC_CLARIFICATION.md)*

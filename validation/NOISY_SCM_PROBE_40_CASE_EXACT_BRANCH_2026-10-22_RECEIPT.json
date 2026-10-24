@@ -1,0 +1,78 @@
+{
+  "schema": "symthaea-noisy-scm-exact-branch-receipt-v1",
+  "date": "2026-10-22",
+  "status": "LOCAL_EXACT_SOURCE_VALIDATION; NOT_EXTERNAL_QUALIFICATION",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/entropy-causal-cut-benchmark-v1",
+  "source_path": "validation/noisy_scm_probe_benchmark.py",
+  "source_git_blob": "7b92460b60c6722681389981d8cbfbaa80122cf5",
+  "test_path": "validation/test_noisy_scm_probe_benchmark.py",
+  "test_git_blob": "c69e398b53170d355fcbb9f834cd79b4e175f09f",
+  "run": {
+    "command": "python3 validation/noisy_scm_probe_benchmark.py --instances 40 --budget 2 --nodes 3 --hypotheses 8 --noise 0.1 --source-sha 7b92460b60c6722681389981d8cbfbaa80122cf5 --output validation/NOISY_SCM_PROBE_40_CASE_EXACT_BRANCH_2026-10-22.json",
+    "instances": 40,
+    "seeds": "0..39",
+    "nodes": 3,
+    "hypothesis_count": 8,
+    "noise_probability": 0.1,
+    "intervention_budget": 2,
+    "embedded_self_test": "PASS_LOCAL",
+    "unittest_definitions": 10,
+    "unittests": "10/10_PASS_LOCAL",
+    "artifact_path": "validation/NOISY_SCM_PROBE_40_CASE_EXACT_BRANCH_2026-10-22.json",
+    "artifact_bytes": 87416,
+    "artifact_sha256": "3fab6c0dbccba5986de9a36a46f1e2fdb5cd08201512bcb5f940a4dc004d1302",
+    "artifact_git_blob_when_local": "bf11487df04f3fe7ac0c49e962b13a6c8856570f"
+  },
+  "mean_metrics": {
+    "fixed_order": {
+      "graph_entropy_bits": 1.4700670857207874,
+      "model_entropy_bits": 1.593790782503741,
+      "map_graph_posterior": 0.5977513471465328,
+      "expected_cost": 2,
+      "synthetic_disturbance": 1.725
+    },
+    "random": {
+      "graph_entropy_bits": 1.4617361634496369,
+      "model_entropy_bits": 1.5880611258490365,
+      "map_graph_posterior": 0.5887871378757212,
+      "expected_cost": 2,
+      "synthetic_disturbance": 1.625
+    },
+    "cost_first": {
+      "graph_entropy_bits": 1.3418562892084185,
+      "model_entropy_bits": 1.4614054845185378,
+      "map_graph_posterior": 0.6270671339253051,
+      "expected_cost": 1.875,
+      "synthetic_disturbance": 1.225
+    },
+    "greedy_eig": {
+      "graph_entropy_bits": 1.337145485644401,
+      "model_entropy_bits": 1.4879494169737133,
+      "map_graph_posterior": 0.6509988339739536,
+      "expected_cost": 1.975,
+      "synthetic_disturbance": 1.8273644850455377
+    },
+    "greedy_efficiency": {
+      "graph_entropy_bits": 1.2534437993527163,
+      "model_entropy_bits": 1.375765718466519,
+      "map_graph_posterior": 0.6669947400146968,
+      "expected_cost": 1.875,
+      "synthetic_disturbance": 1.4595498367893105
+    },
+    "exact_oracle": {
+      "graph_entropy_bits": 1.2137750236490723,
+      "model_entropy_bits": 1.3371793698484893,
+      "map_graph_posterior": 0.6852860574147808,
+      "expected_cost": 1.975,
+      "synthetic_disturbance": 1.973495693288815
+    }
+  },
+  "caveats": [
+    "Synthetic policy costs and disturbances are not measured operational risk.",
+    "The exact oracle is exact only within the benchmark's stated candidate model class and objective.",
+    "No direct ACDB or CausalArena score comparison is claimed.",
+    "GitHub Actions are independent of this local exact-source receipt; skipped is not passed.",
+    "The out-of-class audit shows entropy minimization can yield false confidence when truth is excluded."
+  ]
+}

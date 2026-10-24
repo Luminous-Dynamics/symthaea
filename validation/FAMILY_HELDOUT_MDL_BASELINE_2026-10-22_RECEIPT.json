@@ -1,0 +1,124 @@
+{
+  "schema": "symthaea-family-heldout-mdl-baseline-receipt-v1",
+  "date": "2026-10-22",
+  "status": "LOCAL_EXACT_SOURCE_VALIDATION_NOT_EXTERNAL_QUALIFICATION",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/entropy-causal-cut-benchmark-v1",
+  "source": {
+    "path": "validation/family_heldout_mdl_baseline.py",
+    "git_blob": "3698ecce55bbd02210c9221a8e31eb2c81ac7c05"
+  },
+  "tests": {
+    "path": "validation/test_family_heldout_mdl_baseline.py",
+    "git_blob": "1540b1d32f82c757b22cb45af508f3f198dc28e3",
+    "count": 6,
+    "result": "6/6_PASS_LOCAL"
+  },
+  "protocol": {
+    "node_count": 4,
+    "exhaustive_dag_candidates": 543,
+    "worlds": 120,
+    "cases_per_topology_mechanism_cell": 4,
+    "topology_families": [
+      "chain",
+      "fork",
+      "collider",
+      "diamond",
+      "sparse_random",
+      "dense_random"
+    ],
+    "mechanism_families": [
+      "and",
+      "or",
+      "xor",
+      "threshold",
+      "random_essential"
+    ],
+    "split_counts": {
+      "train_id": 36,
+      "topology_ood": 36,
+      "mechanism_ood": 24,
+      "combined_ood": 24
+    },
+    "observational_arm": 512,
+    "mixed_arm": {
+      "observational": 256,
+      "per_hard_intervention": 32,
+      "hard_intervention_count": 8,
+      "total": 512
+    },
+    "noise_probability": 0.1,
+    "score": "negative log-likelihood bits + log2(comb(n-1,k)) parent-set coding bits + 2^k Boolean truth-table coding bits per node",
+    "pairing": "same SCM and total row count; observational-only versus observational plus every do(X_i=0/1)"
+  },
+  "artifact": {
+    "path": "family_heldout_mdl_baseline_2026-10-22.json",
+    "bytes": 146963,
+    "sha256": "7db7c8ceeb2438039636479c919ab5ea5cf7d618608d044320e3c9d0aca49707",
+    "source_git_blob_bound": "3698ecce55bbd02210c9221a8e31eb2c81ac7c05"
+  },
+  "overall_means": {
+    "observational": {
+      "skeleton_f1": 0.9486,
+      "directed_f1": 0.9486,
+      "shd": 0.0667
+    },
+    "observational_plus_interventions": {
+      "skeleton_f1": 0.9448,
+      "directed_f1": 0.9448,
+      "shd": 0.05
+    },
+    "paired_delta": {
+      "skeleton_f1": -0.0038,
+      "directed_f1": -0.0038,
+      "shd": -0.0167
+    },
+    "equal_f1_cases": 110,
+    "interventional_better_f1_cases": 7,
+    "observational_better_f1_cases": 3
+  },
+  "per_split": {
+    "train_id": {
+      "count": 36,
+      "observational_f1": 0.9071,
+      "mixed_f1": 0.9167,
+      "delta_f1": 0.0095,
+      "observational_shd": 0.0556,
+      "mixed_shd": 0
+    },
+    "topology_ood": {
+      "count": 36,
+      "observational_f1": 0.9857,
+      "mixed_f1": 0.9549,
+      "delta_f1": -0.0309,
+      "observational_shd": 0.1111,
+      "mixed_shd": 0.1667
+    },
+    "mechanism_ood": {
+      "count": 24,
+      "observational_f1": 0.9167,
+      "mixed_f1": 0.9167,
+      "delta_f1": 0,
+      "observational_shd": 0,
+      "mixed_shd": 0
+    },
+    "combined_ood": {
+      "count": 24,
+      "observational_f1": 0.987,
+      "mixed_f1": 1,
+      "delta_f1": 0.013,
+      "observational_shd": 0.0833,
+      "mixed_shd": 0
+    }
+  },
+  "caveats": [
+    "Four-node Boolean finite candidate family only",
+    "Known noise supplied and matched; no latent confounding, omitted variables, or intervention failures",
+    "Observational versus mixed intervention result is mixed; global mean F1 is slightly lower with interventions",
+    "The generated grid is finite and simple; no learned model trained on the train split",
+    "MDL baseline is not PC, GES, NOTEARS, or an ACDB contestant",
+    "Mixed graph scoring and efficiency are not yet exact-parity verified against official ACDB",
+    "Local tests are not GitHub Actions passes; skipped workflows are not passes",
+    "No SOTA or general superiority claim"
+  ]
+}

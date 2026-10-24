@@ -1,0 +1,87 @@
+{
+  "schema": "symthaea-selective-causal-discovery-receipt-v1",
+  "date": "2026-10-22",
+  "status": "LOCAL_EXACT_ENUMERATION_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "branch": "research/entropy-causal-cut-benchmark-v1",
+  "source_path": "validation/selective_causal_discovery.py",
+  "source_git_blob": "1b17b9bf81c8519e5520e5c1a765c2cde64dcc62",
+  "test_path": "validation/test_selective_causal_discovery.py",
+  "test_git_blob": "1de489f9d75b475aa58cb4df66ac029e8fa2f585",
+  "validation": {
+    "embedded_self_test": "PASS_LOCAL",
+    "unit_tests": "8/8_PASS_LOCAL",
+    "enumeration": "exact outcome/path mass for 3-node Boolean SCM fixture",
+    "source_bytes_ran_match_source_blob": true,
+    "test_bytes_ran_match_test_blob": true
+  },
+  "artifact": {
+    "path": "selective_causal_results.json",
+    "bytes": 60971,
+    "sha256": "aa94e2aee4f6b6eed43eb1f0a1699bc0e3869669862e7bae48c71ba7b22c8068",
+    "source_git_blob_bound": "1b17b9bf81c8519e5520e5c1a765c2cde64dcc62"
+  },
+  "calibration": {
+    "method": "Choose max-surprisal cutoff with exact in-class rejection mass <= 0.05",
+    "caveat": "Calibration sees the single known-truth chain fixture; it is optimistic benchmark calibration, not a deployment guarantee",
+    "assumed_model_oracle": {
+      "threshold_bits": 4.321928094887363,
+      "in_class_rejection": 0.01,
+      "out_of_class_rejection_at_noise_0_1": 0.09
+    },
+    "greedy_eig": {
+      "threshold_bits": 3.608232280044003,
+      "in_class_rejection": 0.0352,
+      "out_of_class_rejection_at_noise_0_1": 0.1072
+    },
+    "fixed_order": {
+      "threshold_bits": 4.321928094887363,
+      "in_class_rejection": 0.0018,
+      "out_of_class_rejection_at_noise_0_1": 0.0738
+    }
+  },
+  "key_cases": {
+    "assumed_model_oracle_in_class_noise_0_1": {
+      "always_commit": {
+        "coverage": 1,
+        "selective_error": 0.0829,
+        "wrong_claim_mass": 0.0829
+      },
+      "calibrated_surprise": {
+        "coverage": 0.99,
+        "selective_error": 0.0836,
+        "wrong_claim_mass": 0.0828
+      }
+    },
+    "assumed_model_oracle_out_of_class_noise_0_1": {
+      "always_commit": {
+        "coverage": 1,
+        "selective_error": 1,
+        "wrong_claim_mass": 1
+      },
+      "posterior_gate_0_8": {
+        "coverage": 0.8938,
+        "selective_error": 1,
+        "wrong_claim_mass": 0.8938
+      },
+      "calibrated_surprise": {
+        "coverage": 0.91,
+        "selective_error": 1,
+        "wrong_claim_mass": 0.91
+      }
+    },
+    "assumed_model_oracle_out_of_class_noise_0_25": {
+      "always_commit": {
+        "coverage": 1,
+        "selective_error": 1,
+        "wrong_claim_mass": 1
+      },
+      "calibrated_surprise": {
+        "coverage": 0.8125,
+        "selective_error": 1,
+        "wrong_claim_mass": 0.8125
+      }
+    }
+  },
+  "conclusion": "Selective abstention reduces wrong-claim probability mass in this particular out-of-class fixture, but every emitted out-of-class claim remains wrong. No general advantage or SOTA claim established.",
+  "github_actions": "Independent of local tests; skipped workflow runs are not passes."
+}

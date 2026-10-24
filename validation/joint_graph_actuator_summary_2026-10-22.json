@@ -1,0 +1,121 @@
+{
+  "conclusion": "Jointly marginalizing over graph and compliance yields zero in-class zero-support mass when actual q belongs to the declared grid, unlike the naive q=1 baseline under partial actuation. The actuator-information term modestly improves compliance information and OOD surprise ranking in this toy grid; the JSD add-on contributes little separate gain. No external baseline or SOTA result is established.",
+  "date": "2026-10-22",
+  "full_artifact": {
+    "bytes": 27572,
+    "rows": 60,
+    "sha256": "153e8d61e2928ccc459308273d7c502e8c7b42843d080d9eb6206d34e02509eb"
+  },
+  "means_by_noise": [
+    {
+      "noise": 0.1,
+      "policies": {
+        "joint_graph_actuator_balanced": {
+          "mean_compliance_information_bits": 0.3246,
+          "mean_graph_information_bits": 0.4024,
+          "mean_in_class_zero_support_mass": 0.0,
+          "mean_ood_surprise_auc": 0.9036
+        },
+        "joint_graph_actuator_falsification": {
+          "mean_compliance_information_bits": 0.3246,
+          "mean_graph_information_bits": 0.4024,
+          "mean_in_class_zero_support_mass": 0.0,
+          "mean_ood_surprise_auc": 0.9036
+        },
+        "joint_graph_eig": {
+          "mean_compliance_information_bits": 0.3083,
+          "mean_graph_information_bits": 0.4024,
+          "mean_in_class_zero_support_mass": 0.0,
+          "mean_ood_surprise_auc": 0.8785
+        },
+        "naive_perfect_compliance": {
+          "mean_compliance_information_bits": 0.0,
+          "mean_graph_information_bits": 0.3824,
+          "mean_in_class_zero_support_mass": 0.2215,
+          "mean_ood_surprise_auc": 0.6391
+        },
+        "oracle_known_compliance": {
+          "mean_compliance_information_bits": 0.0,
+          "mean_graph_information_bits": 0.4024,
+          "mean_in_class_zero_support_mass": 0.0,
+          "mean_ood_surprise_auc": 0.6658
+        }
+      }
+    },
+    {
+      "noise": 0.25,
+      "policies": {
+        "joint_graph_actuator_balanced": {
+          "mean_compliance_information_bits": 0.2537,
+          "mean_graph_information_bits": 0.158,
+          "mean_in_class_zero_support_mass": 0.0,
+          "mean_ood_surprise_auc": 0.7449
+        },
+        "joint_graph_actuator_falsification": {
+          "mean_compliance_information_bits": 0.2537,
+          "mean_graph_information_bits": 0.158,
+          "mean_in_class_zero_support_mass": 0.0,
+          "mean_ood_surprise_auc": 0.7447
+        },
+        "joint_graph_eig": {
+          "mean_compliance_information_bits": 0.2506,
+          "mean_graph_information_bits": 0.158,
+          "mean_in_class_zero_support_mass": 0.0,
+          "mean_ood_surprise_auc": 0.7327
+        },
+        "naive_perfect_compliance": {
+          "mean_compliance_information_bits": 0.0,
+          "mean_graph_information_bits": 0.14,
+          "mean_in_class_zero_support_mass": 0.2025,
+          "mean_ood_surprise_auc": 0.5999
+        },
+        "oracle_known_compliance": {
+          "mean_compliance_information_bits": 0.0,
+          "mean_graph_information_bits": 0.158,
+          "mean_in_class_zero_support_mass": 0.0,
+          "mean_ood_surprise_auc": 0.6964
+        }
+      }
+    }
+  ],
+  "schema": "symthaea-joint-graph-actuator-summary-v1",
+  "selected_q_0_5_noise_0_1": [
+    {
+      "compliance_information_bits": 0.4751,
+      "graph_information_bits": 0.3026,
+      "in_class_zero_support_mass": 0.0,
+      "ood_surprise_auc": 0.799,
+      "policy": "joint_graph_eig"
+    },
+    {
+      "compliance_information_bits": 0.5029,
+      "graph_information_bits": 0.3026,
+      "in_class_zero_support_mass": 0.0,
+      "ood_surprise_auc": 0.825,
+      "policy": "joint_graph_actuator_balanced"
+    },
+    {
+      "compliance_information_bits": 0.5029,
+      "graph_information_bits": 0.3026,
+      "in_class_zero_support_mass": 0.0,
+      "ood_surprise_auc": 0.825,
+      "policy": "joint_graph_actuator_falsification"
+    },
+    {
+      "compliance_information_bits": 0.0,
+      "graph_information_bits": 0.3026,
+      "in_class_zero_support_mass": 0.0,
+      "ood_surprise_auc": 0.6035,
+      "policy": "oracle_known_compliance"
+    },
+    {
+      "compliance_information_bits": 0.0,
+      "graph_information_bits": 0.2644,
+      "in_class_zero_support_mass": 0.4395,
+      "ood_surprise_auc": 0.5746,
+      "policy": "naive_perfect_compliance"
+    }
+  ],
+  "source_git_blob": "80939b1e17dbd5bd1384824586ea12e9d0cfe08b",
+  "test_git_blob": "6c464e13deffc18974a930131599eb41da7a5a1f"
+}

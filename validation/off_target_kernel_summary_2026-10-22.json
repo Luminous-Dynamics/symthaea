@@ -1,0 +1,52 @@
+{
+  "schema": "symthaea-off-target-kernel-summary-v1",
+  "date": "2026-10-22",
+  "status": "ROUNDED_SUMMARY_OF_EXACT_LOCAL_ENUMERATION_NOT_EXTERNAL_QUALIFICATION",
+  "source_git_blob": "aadfb064aa8369a1d1e5417bf089703ce9f5d0fb",
+  "test_git_blob": "525858c74a83cb9476000e6c2ddafda92c5bed63",
+  "full_artifact": {
+    "filename": "off_target_kernel_results_exact.json",
+    "bytes": 37320,
+    "sha256": "f54c7f56d21f4ba53e5fafe600e545cf1846310ccbc738877d8ba5cd2a92dc4d",
+    "rows": 48
+  },
+  "mean_metrics_by_regime": [
+    {
+      "regime": "matched_clean",
+      "noise": 0.1,
+      "q": 0.75,
+      "r": 0.0,
+      "joint_graph_eig": {"ood_auc": 0.8796, "graph_info_bits": 0.33, "q_info_bits": 0.3142, "r_info_bits": 0.0093, "zero_support": 0.0},
+      "joint_graph_actuation_balanced": {"ood_auc": 0.9045, "graph_info_bits": 0.33, "q_info_bits": 0.3306, "r_info_bits": 0.0093, "zero_support": 0.0},
+      "naive_perfect_hard_do": {"ood_auc": 0.6298, "zero_support": 0.2249}
+    },
+    {
+      "regime": "matched_off_target",
+      "noise": 0.1,
+      "q": 0.75,
+      "r": 0.25,
+      "joint_graph_eig": {"ood_auc": 0.8519, "graph_info_bits": 0.3019, "q_info_bits": 0.3146, "r_info_bits": 0.0088, "zero_support": 0.0},
+      "joint_graph_actuation_balanced": {"ood_auc": 0.8914, "graph_info_bits": 0.3019, "q_info_bits": 0.331, "r_info_bits": 0.0088, "zero_support": 0.0},
+      "naive_perfect_hard_do": {"ood_auc": 0.6195, "zero_support": 0.2249}
+    },
+    {
+      "regime": "weak_off_target",
+      "noise": 0.1,
+      "q": 0.5,
+      "r": 0.25,
+      "joint_graph_eig": {"ood_auc": 0.7727, "graph_info_bits": 0.2324, "q_info_bits": 0.4752, "r_info_bits": 0.0062, "zero_support": 0.0},
+      "joint_graph_actuation_balanced": {"ood_auc": 0.809, "graph_info_bits": 0.2324, "q_info_bits": 0.503, "r_info_bits": 0.0062, "zero_support": 0.0},
+      "naive_perfect_hard_do": {"ood_auc": 0.5693, "zero_support": 0.4395}
+    },
+    {
+      "regime": "noisy_off_target",
+      "noise": 0.25,
+      "q": 0.75,
+      "r": 0.25,
+      "joint_graph_eig": {"ood_auc": 0.6784, "graph_info_bits": 0.1238, "q_info_bits": 0.2277, "r_info_bits": 0.0089, "zero_support": 0.0},
+      "joint_graph_actuation_balanced": {"ood_auc": 0.7142, "graph_info_bits": 0.1238, "q_info_bits": 0.2597, "r_info_bits": 0.009, "zero_support": 0.0},
+      "naive_perfect_hard_do": {"ood_auc": 0.5821, "zero_support": 0.209}
+    }
+  ],
+  "interpretation": "Joint graph/compliance/off-target inference maintains support when the true q/r are included on-grid in this fixture. The naive perfect-hard-do baseline assigns nonzero mass to valid in-class paths zero likelihood. The two-probe budget yields little information about r; no external or SOTA comparison was run."
+}
