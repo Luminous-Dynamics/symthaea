@@ -128,5 +128,34 @@
     "https://doi.org/10.1145/3801959",
     "https://www.nature.com/articles/s43588-025-00822-9",
     "https://link.springer.com/article/10.1007/s43939-026-00685-5"
-  ]
+  ],
+  "sweeps": {
+    "paired_seeds_default": [
+      17,
+      23,
+      29,
+      31,
+      37,
+      41,
+      43,
+      47,
+      53,
+      59
+    ],
+    "discrepancy_severity_default": [
+      0,
+      0.5,
+      1,
+      1.5,
+      2
+    ],
+    "run_count_default": 200,
+    "reporting": [
+      "Preserve each seed-level result; do not report only pooled means.",
+      "Per policy and severity, report median and interquartile range of normalized finite-pool hypervolume fraction.",
+      "Report mean false-promotion rate, mean high-fidelity calls, and cost spent.",
+      "Use these descriptive distributions as engineering diagnostics, not inferential SOTA claims until preregistered paired confidence intervals and external baselines are added."
+    ]
+  },
+  "policy_comparison_caveat": "The default stress severity sweep is paired across policies by seed and has a fixed 200-unit cap. Cost mixes and fidelity calls differ per policy by design; interpret it as quality under a fixed cost cap and report high-fidelity calls separately. This is not an iso-high-fidelity-call comparison."
 }
