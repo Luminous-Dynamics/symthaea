@@ -247,7 +247,10 @@ pub fn extract_snapshot(
 ) -> CognitiveSnapshot {
     CognitiveSnapshot {
         consciousness_level: metadata.consciousness.consciousness_level,
-        prediction_error: metadata.fep.fep_surprise as f32,
+        // FEP surprise is not, by itself, proof of a comparable PE observation.
+        // This metadata-only adapter has no source-cycle validity, so fail closed.
+        prediction_error: 0.0,
+        prediction_error_valid: false,
         living_mind_vitality: metadata.living_mind_vitality,
         living_mind_coherence: metadata.living_mind_coherence,
         dopamine: neuromod.dopamine_effective,
@@ -299,7 +302,8 @@ pub(crate) fn snapshot_from_cycle(
 
     CognitiveSnapshot {
         consciousness_level: cs.unified_psi,
-        prediction_error: cs.prediction_error,
+        prediction_error: cs.prediction_error_sample().unwrap_or(0.0),
+        prediction_error_valid: cs.prediction_error_sample().is_some(),
         living_mind_vitality: cs.dissipative_health,
         living_mind_coherence: cs.coherence as f64,
         dopamine: bath.dopamine.effective(),
