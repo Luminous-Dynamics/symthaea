@@ -23,6 +23,7 @@ use super::super::subsystem_trait::{
     CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags,
 };
 use super::super::thresholds;
+use crate::cognitive_loop::types::PredictionEvidenceCursor;
 
 /// Memory Manager — models meta-level memory dynamics.
 ///
@@ -38,6 +39,8 @@ pub struct MemoryManager {
     consolidation_active: bool,
     /// Cycles since last consolidation
     cycles_since_consolidation: u32,
+    /// Exactly-once admission cursor for PE-driven pressure.
+    prediction_error_cursor: PredictionEvidenceCursor,
 }
 
 impl Default for MemoryManager {
@@ -49,6 +52,7 @@ impl Default for MemoryManager {
             retrieval_count: 0,
             consolidation_active: false,
             cycles_since_consolidation: 0,
+            prediction_error_cursor: PredictionEvidenceCursor::default(),
         }
     }
 }
@@ -115,7 +119,10 @@ impl CognitiveSubsystem for MemoryManager {
 
         // ── 1. Update consolidation pressure ──────────────────────────────
         // Prediction error generates encoding demand → pressure builds
-        if let Some(pe) = snapshot.prediction_error_sample() {
+        if let Some(pe) = self
+            .prediction_error_cursor
+            .admit(snapshot.cycle_number, snapshot.prediction_error_sample())
+        {
             self.consolidation_pressure += pe * Self::PRESSURE_BUILD_RATE;
         }
         // Natural decay (forgetting curve integration)
@@ -222,6 +229,31 @@ mod tests {
             unified_psi: f64::from(psi),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn duplicate_pe_cycle_does_not_add_pressure_twice() {
+        let mut repeated = MemoryManager::default();
+        let mut control = MemoryManager::default();
+
+        let mut valid = CycleSnapshot::default();
+        valid.cycle_number = 77;
+        valid.prediction_error = 0.8;
+        valid.prediction_error_valid = 1;
+
+        let mut invalid = valid;
+        invalid.prediction_error_valid = 0;
+
+        repeated.process(&valid);
+        repeated.process(&valid);
+        control.process(&valid);
+        control.process(&invalid);
+
+        assert_eq!(
+            repeated.consolidation_pressure(),
+            control.consolidation_pressure(),
+            "a duplicate snapshot must not admit the same PE pressure twice"
+        );
     }
 
     #[test]
