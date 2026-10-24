@@ -684,6 +684,7 @@ impl CognitiveLoopService {
         // deliberately excluded from replay due to invalid prediction evidence.
         self.last_state = Some(state.to_vec());
         self.last_prediction = Some(prediction.to_vec());
+        self.last_prediction_cycle = Some(self.stats.total_cycles as u64);
     }
 
     /// Copy `last_state` into the reusable `training_state_buf` without
@@ -1024,6 +1025,7 @@ impl CognitiveLoopService {
         self.last_state = None;
         self.training_state_buf = None;
         self.last_prediction = None;
+        self.last_prediction_cycle = None;
         self.stats = LoopStats::default();
         self.start_time = Instant::now();
         self.language_comm.reset();
