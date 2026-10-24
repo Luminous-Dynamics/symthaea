@@ -11,42 +11,58 @@
     },
     "tests": {
       "path": "validation/test_policy_frontier_column_generation_benchmark.py",
-      "git_blob": "a85689ca8627ff1d858f9853624df70da9ef78e7",
-      "commit": "a70009cb70ba3a1a1295f451a358c65cc4333f62",
-      "local_source_sha256": "ce3e03defcf242103e2cd5cba0927d341ff0468abb85bac7852f3ea4593c389e"
+      "git_blob": "e99ce5c1c5a994c4646e190470a8fdb156371e49",
+      "commit": "92abd84cac27719ae89495760e26660b4db17d11",
+      "local_source_sha256": "a304df823802f6fa6b2a120eb6c3f67a4f69999a13766447394b885f4fef28d6"
     },
     "report": {
       "path": "docs/research/POLICY_FRONTIER_COLUMN_GENERATION_BENCHMARK_2026-10-24.md",
-      "git_blob": "69438860c7561caf03e8700fa8347b3baebb9d84",
-      "commit": "2924aff70c404e25ecef1c52279ff53590925e7f"
+      "git_blob": "f951fa1fcf3351200526366559580b947ded2d98",
+      "commit": "683c3c45d3b360a6f0def1317f6505db79137523"
     },
     "summary": {
       "path": "validation/policy_frontier_column_generation_summary_2026-10-24.json",
-      "git_blob": "d1e464bac27292bc94b11275d6f08809c77c1aed",
-      "commit": "a730e03efc2561f6e23b4b1bf2e629056665146e"
+      "git_blob": "f5ea005ce241933431e6c164f013c175992b820f",
+      "commit": "26a3d1f983b29880a2e7c45c7fdbf675bf8e536b"
     },
     "exact_result_json": {
       "path": "local-only: policy_frontier_column_generation_results_exact_2026-10-24.json",
       "bytes": 74511,
       "sha256": "e48554121720fc480aeeed5f63cf7144e51d2fe8fdbee57731105bd21d9476f7"
+    },
+    "horizon_three_pricing_only_result": {
+      "path": "local-only: validation/policy_frontier_column_generation_horizon3_2026-10-24.json",
+      "bytes": 3084,
+      "sha256": "fd809bf5bdaaadfee6f15ae03c682099227259313dd48843c3cdd2868dd8a1a1",
+      "local_source_git_blob": "1f2656c5f49a375043ffe42155df11952a27217a",
+      "exhaustive_frontier_oracle_used": false
     }
   },
   "validation": {
-    "local_regression": "77/77 PASS",
+    "local_regression": "78/78 PASS",
     "rows": 36,
     "all_local_rows_certified": true,
     "maximum_primal_to_pricing_gap_bits": 8.881784197001252e-16,
     "maximum_difference_from_exhaustive_oracle_bits": 8.881784197001252e-16,
     "external_benchmark_run": false,
     "exact_head_integration": false,
-    "remote_ci_pass_claimed": false
+    "remote_ci_pass_claimed": false,
+    "local_test_sha256": "a304df823802f6fa6b2a120eb6c3f67a4f69999a13766447394b885f4fef28d6",
+    "horizon_three_pricing_slice": {
+      "rows": 6,
+      "certified_rows": 6,
+      "maximum_primal_to_pricing_gap_bits": 2.0294876890147862e-13,
+      "horizon": 3,
+      "exact_frontier_oracle_used": false
+    }
   },
   "source_binding": {
     "executed_local_source_sha256": "08371649907d5a3252036789a7f774f3f01b9ff57143467c0001d15c3d116409",
     "executed_local_source_git_blob": "1f2656c5f49a375043ffe42155df11952a27217a",
     "committed_source_git_blob": "cb4a18d01e003df29ee1ea9453a47090253b34b4",
     "match": false,
-    "disclosure": "The local measurements were generated before a compacted rendition of the solver was committed. The local runtime had no repository checkout, and the imported fixed-prior helper was reconstructed from displayed source. Regenerate the benchmark from the committed implementation in an exact branch checkout before treating it as exact-head evidence."
+    "disclosure": "The local measurements were generated before a compacted rendition of the solver was committed. The local runtime had no repository checkout, and the imported fixed-prior helper was reconstructed from displayed source. Regenerate the benchmark from the committed implementation in an exact branch checkout before treating it as exact-head evidence.",
+    "test_source_git_blob": "e99ce5c1c5a994c4646e190470a8fdb156371e49"
   },
   "scientific_boundary": [
     "Finite 16-hypothesis chain/fork toy problem; horizons 1-2",
