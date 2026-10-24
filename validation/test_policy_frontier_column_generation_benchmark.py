@@ -66,6 +66,13 @@ class PolicyFrontierColumnGenerationTests(unittest.TestCase):
         self.assertGreaterEqual(exact_count, row["policy_tree_columns"])
         self.assertTrue(row["converged"])
 
+    def test_horizon_three_kernel_certificate_without_frontier_enumeration(self):
+        row = solve_column_generation("kernel", "graph_kernel_correlated", PRIOR_NAMES, 3)
+        self.assertTrue(row["converged"])
+        self.assertEqual(row["status"], "CERTIFIED_COLUMN_GENERATION")
+        self.assertLessEqual(row["primal_dual_certificate_gap_bits"], 2e-8)
+        self.assertLessEqual(row["policy_tree_columns"], 3)
+
     def test_invalid_horizon_and_tolerance_fail_closed(self):
         with self.assertRaises(ValueError):
             solve_column_generation("joint", "uniform", ("uniform",), 4)
