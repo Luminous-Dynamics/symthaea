@@ -174,31 +174,21 @@ impl CognitiveLoopService {
         // Keep the legacy numeric fallback for CycleResult compatibility, but
         // preserve validity separately so missing/mismatched/non-finite evidence
         // is excluded from learning statistics and replay.
-        let prediction_error_evidence = Self::compute_prediction_error_evidence(
+        let observation_cycle = self.stats.total_cycles as u64;
+        let prediction_evidence = Self::compute_prediction_error_sample(
             &compressed_state,
             self.last_prediction.as_deref(),
-        );
-        let observation_cycle = self.stats.total_cycles as u64;
-        let evidence_status = if prediction_error_evidence.is_some() {
-            super::types::PredictionEvidenceStatus::Valid
-        } else if self.last_prediction.is_none() {
-            super::types::PredictionEvidenceStatus::NoPriorPrediction
-        } else {
-            super::types::PredictionEvidenceStatus::SourceUnavailable
-        };
-        let prediction_evidence = super::types::PredictionErrorEvidence::from_comparison(
-            evidence_status,
-            prediction_error_evidence,
-            None,
             observation_cycle,
         );
-        let prediction_error = prediction_error_evidence.unwrap_or(0.0);
+        let prediction_error_sample =
+            prediction_evidence.value_for_observation(observation_cycle);
+        let prediction_error = prediction_error_sample.unwrap_or(0.0);
 
         // 9. Store experience
         self.create_experience_with_evidence(
             &compressed_state,
             &prediction,
-            prediction_error_evidence,
+            prediction_error_sample,
         );
 
         // 7 (deferred). Move prediction to encoder (no clone needed)
@@ -223,7 +213,7 @@ impl CognitiveLoopService {
 
         // 11. Update error history only for valid finite comparisons. A fallback
         // numeric value of 0.0 is retained only for the legacy CycleResult field.
-        if let Some(valid_error) = prediction_error_evidence {
+        if let Some(valid_error) = prediction_error_sample {
             if self.error_history.len() >= super::thresholds::ERROR_HISTORY_CAPACITY {
                 self.error_history.pop_front();
             }
@@ -256,7 +246,7 @@ impl CognitiveLoopService {
         Ok(CycleResult {
             output,
             prediction_error,
-            prediction_error_valid: prediction_error_evidence.is_some(),
+            prediction_error_valid: prediction_error_sample.is_some(),
             peak_attention: 0.0, // No text-based attention for embedding input
             detected_primitives: Vec::new(), // No text primitives for embedding input
             learning_occurred,
@@ -349,31 +339,21 @@ impl CognitiveLoopService {
         // Keep the legacy numeric fallback for CycleResult compatibility, but
         // preserve validity separately so missing/mismatched/non-finite evidence
         // is excluded from learning statistics and replay.
-        let prediction_error_evidence = Self::compute_prediction_error_evidence(
+        let observation_cycle = self.stats.total_cycles as u64;
+        let prediction_evidence = Self::compute_prediction_error_sample(
             &compressed_state,
             self.last_prediction.as_deref(),
-        );
-        let observation_cycle = self.stats.total_cycles as u64;
-        let evidence_status = if prediction_error_evidence.is_some() {
-            super::types::PredictionEvidenceStatus::Valid
-        } else if self.last_prediction.is_none() {
-            super::types::PredictionEvidenceStatus::NoPriorPrediction
-        } else {
-            super::types::PredictionEvidenceStatus::SourceUnavailable
-        };
-        let prediction_evidence = super::types::PredictionErrorEvidence::from_comparison(
-            evidence_status,
-            prediction_error_evidence,
-            None,
             observation_cycle,
         );
-        let prediction_error = prediction_error_evidence.unwrap_or(0.0);
+        let prediction_error_sample =
+            prediction_evidence.value_for_observation(observation_cycle);
+        let prediction_error = prediction_error_sample.unwrap_or(0.0);
 
         // 7. Store experience
         self.create_experience_with_evidence(
             &compressed_state,
             &prediction,
-            prediction_error_evidence,
+            prediction_error_sample,
         );
 
         // 5 (deferred). Move prediction to encoder (no clone needed)
@@ -394,7 +374,7 @@ impl CognitiveLoopService {
             * self.carryover.learning.adaptive_threshold_scale as f32;
 
         // 9. Learn if error is significant
-        let (learning_occurred, training_loss) = if prediction_error_evidence.is_some()
+        let (learning_occurred, training_loss) = if prediction_error_sample.is_some()
             && prediction_error > effective_threshold
         {
             self.stats.learning_cycles += 1;
@@ -427,7 +407,7 @@ impl CognitiveLoopService {
 
         // 10. Update prediction-error statistics only for valid evidence. Other
         // cycle metrics continue to update independently of the PE comparison.
-        if let Some(valid_error) = prediction_error_evidence {
+        if let Some(valid_error) = prediction_error_sample {
             self.update_stats(valid_error, cycle_start.elapsed());
         }
         self.stats.temporal_coherence = coherence;
@@ -479,7 +459,7 @@ impl CognitiveLoopService {
                 cycle_id: self.stats.total_cycles as u64,
                 captured_at_us: now,
                 prediction_error,
-                prediction_error_valid: prediction_error_evidence.is_some(),
+                prediction_error_valid: prediction_error_sample.is_some(),
                 urgency,
             };
             self.push_psi_attestation(record);
@@ -508,7 +488,7 @@ impl CognitiveLoopService {
         super::CycleResult {
             output,
             prediction_error,
-            prediction_error_valid: prediction_error_evidence.is_some(),
+            prediction_error_valid: prediction_error_sample.is_some(),
             peak_attention: 0.0,
             detected_primitives: Vec::new(),
             learning_occurred,
