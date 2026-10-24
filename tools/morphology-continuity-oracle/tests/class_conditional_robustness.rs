@@ -732,6 +732,26 @@ fn prior_shift_uncertainty_can_reverse_a_nominally_positive_acquisition_decision
 }
 
 #[test]
+fn joint_matrix_and_prevalence_uncertainty_compose_conservatively() {
+    let regions = confusion_intervals(nominal_counts(1_000)).expect("valid calibration counts");
+    let result = robust_net_value_over_prior_uncertainty(
+        regions,
+        [200, 100, 0],
+        [800, 700, 500],
+        [6, 3, 1],
+        assumed_sensor(),
+        &DECISION_LOSSES,
+        1,
+        ACQUISITION_COST,
+    )
+    .expect("feasible joint uncertainty region");
+    assert!((result.0 - 4.0).abs() <= EPSILON);
+    assert!((result.1 - 8.8648).abs() <= EPSILON);
+    assert!((result.2 + 4.9648).abs() <= EPSILON);
+    assert!(result.2 < 0.0);
+}
+
+#[test]
 fn invalid_or_infeasible_prior_regions_fail_closed() {
     assert_eq!(prior_vertices([800, 300, 100], [900, 400, 200]), None);
     assert_eq!(prior_vertices([300, 300, 300], [300, 300, 300]), None);
