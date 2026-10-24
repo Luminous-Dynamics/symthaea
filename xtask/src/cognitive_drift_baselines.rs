@@ -198,7 +198,7 @@ pub fn run_scalar_detector(mut input: ScalarDriftRunInput) -> anyhow::Result<Sca
         valid_evaluation_observation_count: valid_count,
         detections,
         score,
-        interpretation_guard: "Fixed threshold and EWMA are reference controls for the valid-PE-only track, not a complete KDD 2026 reproduction or SOTA claim. Calibration observations must be disjoint from the scored evaluation stream. Invalid evidence is skipped and cannot update detector state. Detection F1 must be reported alongside false alarms, delay, task impact, and adaptation cost.".to_owned(),
+        interpretation_guard: "Fixed threshold, EWMA, Page-Hinkley, and predictive-rank martingale are reference controls for the valid-PE-only track, not a complete KDD 2026 reproduction or SOTA claim. Calibration observations must be disjoint from the scored evaluation stream. Invalid evidence is skipped and cannot update detector state. Detection F1 must be reported alongside false alarms, delay, task impact, and adaptation cost. The PRM first-crossing martingale interpretation assumes an IID null and independent tie randomization; this implementation uses a deterministic seed-derived PRNG, so do not claim a formal guarantee conditional on a fixed seed. It emits one alarm per calibration epoch.".to_owned(),
     };
     result.result_sha256 = Some(result_digest(&result)?);
     Ok(result)
