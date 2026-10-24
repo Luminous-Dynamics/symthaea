@@ -45,7 +45,7 @@ The CI workflow runs `tools/vleb/run_mutation_campaign.py` against isolated copi
 - `VLEB-LDG-004`: replace checked aggregate additions with wrapping arithmetic.
 - `VLEB-LDG-007`: swap CREDIT and DEBIT aggregation paths.
 
-Each variant must compile before the contract suite is run. A compile failure, timeout, or harness error is **unresolved**, never counted as a semantic kill. A mutant is counted as killed only when it compiles and the locked suite reports failed tests. CI retains the machine-readable result and raw per-mutant logs as an artifact, with hashes and the checkout/expected-head identity.
+Each variant must compile before the contract suite is run. A compile failure, timeout, or harness error is **unresolved**, never counted as a semantic kill. A mutant is counted as killed only when its preregistered target test itself fails; unrelated suite failures do not count as a kill. CI retains the machine-readable result and raw per-mutant logs as an artifact, with hashes and both the checked-out revision and expected PR-head SHA.
 
 The catalog contains 17 probes; only these four semantic source mutants are executable in the current harness. The remaining semantic and evidence-manipulation probes remain planned and must not be represented as executed. Even a 4/4 kill result would be an initial oracle-smoke test, not a broad mutation score or a production-safety result.
 
