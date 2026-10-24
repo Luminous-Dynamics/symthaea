@@ -83,6 +83,7 @@ CPU_MODEL="${CPU_MODEL:-unavailable}"
   printf 'uname=%s\n' "$(uname -a)"
   printf 'cpu_model=%s\n' "$CPU_MODEL"
   printf 'output_sha256=%s\n' "$OUTPUT_SHA"
+  printf 'stderr_log=%s\n' "$STDERR_LOG"
   printf 'output_lines=%s\n' "$OUTPUT_LINES"
   printf 'summary_records=%s\n' "$SUMMARY_RECORDS"
   printf 'record_validation=%s\n' "$RECORD_VALIDATION"
@@ -95,6 +96,13 @@ if (( STATUS != 0 )); then
   exit "$STATUS"
 fi
 
-echo "PASS: source-bound benchmark exited 0"
+if ! bash scripts/check_broca_budget_frontier.sh "$OUTPUT"; then
+  sed -i 's/^exit_status=0$/exit_status=65/' "$RECEIPT"
+  sed -i 's/^record_validation=passed$/record_validation=failed/' "$RECEIPT"
+  echo "FAIL: independent frontier artifact verification failed; artifacts preserved at $OUT_DIR" >&2
+  exit 65
+fi
+
+echo "PASS: source-bound benchmark and independent artifact verifier passed"
 echo "output=$OUTPUT"
 echo "receipt=$RECEIPT"
