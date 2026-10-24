@@ -69,6 +69,7 @@
       "ledger.amount_token_canonical",
       "ledger.maximum_credit_debit_valid",
       "ledger.transaction_order_invariant",
+      "ledger.final_line_ending_invariant",
       "ledger.duplicate_multiplicity_idempotent",
       "ledger.generated_differential_reducer",
       "ledger.malformed_csv_rejected"
