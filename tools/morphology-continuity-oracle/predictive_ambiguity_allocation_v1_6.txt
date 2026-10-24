@@ -34,6 +34,14 @@ robust_expected_gain=chair:0.02544;table:-1.45728;stool:-0.48576
 robust_selection=chair
 robust_value_per_cost=0.02544
 
+calibration_derived_ambiguity.source=Clopper-Pearson-confidence-region-from-the-initial-20-samples-per-class
+calibration_derived_ambiguity.chair.cell_bounds=659-1000,0-341,0-255
+calibration_derived_ambiguity.table.cell_bounds=0-341,659-1000,0-255
+calibration_derived_ambiguity.stool.cell_bounds=0-341,659-1000,0-255
+calibration_derived_ambiguity.worst_future_risk=chair:15.5348512;table:15.7774144;stool:15.6010048
+calibration_derived_ambiguity.worst_case_gain=chair:-0.0220512;table:-0.2646144;stool:-0.0882048
+calibration_derived_ambiguity.disposition=abstain
+
 fully_ambiguous_predictive_rows=each-class-outcomes-0-and-1-bounded-0-to-1000;outcome-2-fixed-zero
 fully_ambiguous_disposition=abstain
 malformed-rows=fail-closed
