@@ -64,7 +64,7 @@
     "source_identity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source_kind", "revision", "source_sha256", "fixture_sha256"],
+      "required": ["source_kind", "revision", "source_sha256"],
       "properties": {
         "source_kind": {
           "enum": ["repository", "synthetic_fixture", "benchmark_sample"]
@@ -81,13 +81,9 @@
         },
         "fixture_sha256": {
           "type": "object",
-          "additionalProperties": false,
-          "required": ["input_csv", "expected_output_json", "negative_control_csv"],
-          "properties": {
-            "input_csv": {"$ref": "#/$defs/sha256"},
-            "expected_output_json": {"$ref": "#/$defs/sha256"},
-            "negative_control_csv": {"$ref": "#/$defs/sha256"}
-          }
+          "minProperties": 1,
+          "propertyNames": {"pattern": "^[a-zA-Z0-9._-]+$"},
+          "additionalProperties": {"$ref": "#/$defs/sha256"}
         },
         "task_manifest_sha256": {
           "$ref": "#/$defs/sha256"
