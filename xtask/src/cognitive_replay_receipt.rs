@@ -77,6 +77,8 @@ pub struct ReplayDecision {
     pub state_after_sha256: String,
     pub snapshot_sha256: Option<String>,
     pub candidate_state_sha256: Option<String>,
+    /// Digest of the evidence artifact used to authorize a verify decision.
+    pub verification_evidence_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -302,6 +304,22 @@ fn validate_arm_decisions(
             );
         }
 
+        if decision.action == "verify" {
+            required_digest(
+                decision.verification_evidence_sha256.as_deref(),
+                "verify.verification_evidence_sha256",
+            )?;
+            ensure!(
+                !decision.observed_event_ids.is_empty(),
+                "verification must reference at least one observed event"
+            );
+        } else {
+            ensure!(
+                decision.verification_evidence_sha256.is_none(),
+                "verification_evidence_sha256 is only valid on a verify action"
+            );
+        }
+
         match decision.action.as_str() {
             "no-op" | "abstain" => {
                 ensure!(
@@ -500,6 +518,7 @@ mod tests {
                     state_after_sha256: after,
                     snapshot_sha256,
                     candidate_state_sha256,
+                    verification_evidence_sha256: if action == "verify" { Some(digest('3')) } else { None },
                 });
             }
             arms.push(ReplayArm {
@@ -568,6 +587,13 @@ mod tests {
         let mut receipt = valid_receipt();
         receipt.arms[0].oracle_channel_access = true;
         assert!(validate_receipt(receipt).unwrap_err().to_string().contains("oracle_channel_access"));
+    }
+
+    #[test]
+    fn rejects_verification_without_evidence_digest() {
+        let mut receipt = valid_receipt();
+        receipt.arms[3].decisions[2].verification_evidence_sha256 = None;
+        assert!(validate_receipt(receipt).unwrap_err().to_string().contains("verify.verification_evidence_sha256"));
     }
 
     #[test]
