@@ -348,6 +348,12 @@ fn bench_pivot_exact_search(c: &mut Criterion) {
                 "clustered" => perturb(&corpus[5], 32, 491),
                 _ => unreachable!(),
             };
+            if profile == "random" {
+                assert!(
+                    corpus.iter().all(|candidate| candidate != &query),
+                    "random-control query unexpectedly duplicates a corpus vector"
+                );
+            }
             let expected = exact_argmin(&query, &corpus);
 
             group.throughput(Throughput::Elements(corpus_size as u64));
