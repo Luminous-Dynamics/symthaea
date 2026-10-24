@@ -1,0 +1,73 @@
+{
+  "schema": "org.luminousdynamics.symthaea.qcomp.mk-reference.v1",
+  "status": "source-pinned-no-Symthaea-reproduction-no-code-vendored",
+  "paper": {
+    "title": "Large independent sets on random d-regular graphs with fixed degree d",
+    "authors": [
+      "Raffaele Marino",
+      "Scott Kirkpatrick"
+    ],
+    "arxiv_id": "2003.12293",
+    "paper_version": "v2",
+    "paper_version_date_utc": "2021-08-17",
+    "url": "https://arxiv.org/html/2003.12293v2",
+    "relevant_claim_for_degree_3": "The paper reports an asymptotic independence ratio of about 0.445330(3) for its deferred-decision algorithm on random 3-regular graphs; this is an algorithmic lower-bound result on its workload, not a finite-instance upper bound or proof of MIS optimality."
+  },
+  "source_repository": {
+    "repository": "RaffaeleMarino/Large-Independent-Set-on-random-d-regular-graphs-with-small-and-fixed-connectivity-d",
+    "url": "https://github.com/RaffaeleMarino/Large-Independent-Set-on-random-d-regular-graphs-with-small-and-fixed-connectivity-d",
+    "default_branch": "master",
+    "commit": "ae59badc1c07fc27d12088593546e8b98e909c8a",
+    "commit_url": "https://github.com/RaffaeleMarino/Large-Independent-Set-on-random-d-regular-graphs-with-small-and-fixed-connectivity-d/commit/ae59badc1c07fc27d12088593546e8b98e909c8a",
+    "repository_language": "C++",
+    "last_pushed_at_utc": "2020-03-27T22:12:02Z",
+    "license_metadata": null,
+    "license_audit": {
+      "root_license_file_present_in_pinned_tree": false,
+      "detected_spdx_headers": false,
+      "decision": "Do not vendor, copy, or redistribute source code until reuse permission/license is clarified. Public availability alone does not grant an open-source license.",
+      "safe_next_step": "Treat the pinned repository as an external executable reference only if its owner-approved reuse terms allow it; otherwise implement a clean-room Rust reimplementation from the published paper and validate it independently."
+    },
+    "tree_entries": [
+      {
+        "path": "Header.h",
+        "git_blob_sha1": "9d76291d16fdc8201a7011da376fa97fb87ba262",
+        "size_bytes": 864
+      },
+      {
+        "path": "README.md",
+        "git_blob_sha1": "0cdeb91be523896d1c2364870fd53994570222c5",
+        "size_bytes": 243
+      },
+      {
+        "path": "Random.hpp",
+        "git_blob_sha1": "a22ba638a7cc6db23f5833fdbb4eb7acd2529f50",
+        "size_bytes": 4557
+      },
+      {
+        "path": "main.cpp",
+        "git_blob_sha1": "60a076e70d47825a1c27ae0ed716e1edd17eeb6c",
+        "size_bytes": 43804
+      }
+    ]
+  },
+  "role_in_qcomp": {
+    "class": "strong-classical-baseline-for-random-3-regular-graph-distribution",
+    "why_it_matters": "The 2026 quantum-enhanced greedy MIS paper explicitly compares to the Marino-Kirkpatrick linear-time prioritized/deferred-decision algorithm. A minimal-degree greedy win is therefore not sufficient evidence of beating the strongest classical baseline for this track.",
+    "fixed_graph_compatibility": "The paper's algorithm co-generates a random regular graph and the independent-set labeling through deferred decisions and virtual-node operations. Do not presume it is a fixed-input graph solver. Establish its native input/output contract before choosing the statistical comparison.",
+    "recommended_comparison_design": [
+      "Track A: for completed graph bytes shared by every policy, compare methods that accept fixed graphs and use paired graph-instance inference.",
+      "Track B: run a faithful deferred-decision implementation on its native generated-graph distribution; preserve and independently verify each generated graph and solution, then compare distribution-level outcomes with correctly specified unpaired inference.",
+      "Do not match seed integers to claim pairs unless the completed graph bytes are identical.",
+      "Report independence ratio, absolute set cardinality, graph size/degree, source generation, runtime and memory, random seed, algorithm revision and raw result digest."
+    ]
+  },
+  "qaoa_2026_context": {
+    "title": "A scalable quantum-enhanced greedy algorithm for maximum independent set problems on random regular graphs",
+    "doi": "10.1103/ds1n-wsdm",
+    "accepted_date": "2026-10-19",
+    "url": "https://journals.aps.org/prresearch/accepted/10.1103/ds1n-wsdm",
+    "relevance": "The paper reports statistically significant p=4 improvements against the prioritized baseline for the considered sizes up to N <= 2000, while its paper text also notes the finite-size simulations had not yet exceeded the asymptotic 0.445330 value. These are external published claims, not Symthaea results."
+  },
+  "validation_boundary": "This manifest pins public source metadata only. It does not establish the source license, run the C++ code, reproduce the paper, validate a fixed-graph adapter, or demonstrate a SOTA result or quantum advantage."
+}
