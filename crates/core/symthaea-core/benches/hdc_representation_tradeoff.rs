@@ -9,7 +9,6 @@
 //! permits exact-cue lookup and a fuzzy component-scan fallback.
 
 use std::collections::HashMap;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::Duration;
 
 use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
@@ -17,6 +16,7 @@ use symthaea_core::hdc::binary_hv::BinaryHV;
 
 const ARITIES: [usize; 3] = [3, 7, 15];
 const CORPUS_SIZES: [usize; 3] = [256, 1024, 4096];
+const BUILD_CORPUS_SIZES: [usize; 2] = [256, 1024];
 const NOISE_BPS: [usize; 4] = [0, 100, 500, 1000];
 const TIMED_NOISE_BPS: [usize; 3] = [0, 500, 1000];
 const METRIC_QUERIES: usize = 8;
@@ -154,9 +154,12 @@ fn scalar_component_top1(query: &BinaryHV, facts: &[BinaryHV], arity: usize) -> 
 type ExactFactIndex = HashMap<u64, Vec<usize>>;
 
 fn fingerprint(vector: &BinaryHV) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    vector.hash(&mut hasher);
-    hasher.finish()
+    let digest = blake3::hash(&vector.0);
+    u64::from_le_bytes(
+        digest.as_bytes()[..8]
+            .try_into()
+            .expect("BLAKE3 digest always contains at least eight bytes"),
+    )
 }
 
 /// Build a fingerprint-to-flat-fact-index map. The fingerprint only routes to
@@ -357,7 +360,7 @@ fn bench_representation_tradeoff(c: &mut Criterion) {
     build_group.warm_up_time(Duration::from_millis(100));
     build_group.measurement_time(Duration::from_millis(250));
     for arity in ARITIES {
-        for corpus_size in CORPUS_SIZES {
+        for corpus_size in BUILD_CORPUS_SIZES {
             build_group.throughput(Throughput::Elements(corpus_size as u64));
             build_group.bench_with_input(
                 BenchmarkId::new(format!("k{arity}_n{corpus_size}"), corpus_size),
