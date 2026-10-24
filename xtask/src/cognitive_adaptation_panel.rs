@@ -555,6 +555,19 @@ mod tests {
     }
 
     #[test]
+    fn rejects_score_without_receipt_linkage_even_when_score_digest_is_recomputed() {
+        let mut input = empty_panel();
+        let mut record = score("dataset-a", 0, REQUIRED_SCENARIO_IDS[0]);
+        record.source_replay_receipt_sha256 = None;
+        let mut copy = record.clone();
+        copy.result_sha256 = None;
+        record.result_sha256 = Some(sha256_hex(&serde_json::to_vec(&copy).unwrap()));
+        input.runs.push(record);
+        let error = evaluate(input).unwrap_err().to_string();
+        assert!(error.contains("source_replay_receipt_sha256 is required"));
+    }
+
+    #[test]
     fn complete_panel_aggregates_paired_post_shift_effect_and_uses_dataset_clustered_bootstrap() {
         let mut input = empty_panel();
         for dataset_id in &input.expected_dataset_ids.clone() {
