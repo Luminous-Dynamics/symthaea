@@ -35,8 +35,35 @@ pub struct FepTemporalBenchmarkResult {
     pub fep_initial_free_energy: f64,
     pub fep_final_free_energy: f64,
     pub coherence_stability: f32,
+    /// PE estimates by cycle; pair with prediction_error_validity before scoring.
     pub prediction_errors: Vec<f32>,
+    /// True only when the cycle's PE represents a genuine prediction comparison.
+    pub prediction_error_validity: Vec<bool>,
+    /// Number of valid observations used for the initial-window error estimate.
+    pub initial_valid_samples: usize,
+    /// Number of valid observations used for the final-window error estimate.
+    pub final_valid_samples: usize,
     pub passed: bool,
+}
+
+/// Mean and sample count for a window, excluding invalid PE fallbacks.
+fn mean_valid_pe_window(
+    errors: &[f32],
+    validity: &[bool],
+    start: usize,
+    end: usize,
+) -> (f32, usize) {
+    let upper = end.min(errors.len()).min(validity.len());
+    let lower = start.min(upper);
+    let mut sum = 0.0f32;
+    let mut count = 0usize;
+    for (&error, &valid) in errors[lower..upper].iter().zip(&validity[lower..upper]) {
+        if valid && error.is_finite() {
+            sum += error;
+            count += 1;
+        }
+    }
+    (if count == 0 { 0.0 } else { sum / count as f32 }, count)
 }
 
 /// FEP temporal benchmark runner.
@@ -98,11 +125,13 @@ impl FepTemporalBenchmark {
             .expect("Failed to create CognitiveLoopService");
 
         let mut errors: Vec<f32> = Vec::with_capacity(self.config.num_cycles);
+        let mut error_validity: Vec<bool> = Vec::with_capacity(self.config.num_cycles);
         let mut free_energies: Vec<f64> = Vec::new();
 
         for (i, input) in sequence.iter().enumerate() {
             let result = service.cycle(input);
             errors.push(result.prediction_error);
+            error_validity.push(result.prediction_error_valid);
 
             if let Some(fe) = service.fep_free_energy() {
                 free_energies.push(fe);
@@ -115,23 +144,16 @@ impl FepTemporalBenchmark {
         let w = self.config.measurement_window;
         let warmup = self.config.warmup_cycles;
 
-        // Initial error: average over first measurement window after warmup
+        // Score observed prediction errors only; a fallback/prior estimate is not
+        // a new observation and must not improve or degrade the benchmark score.
         let initial_start = warmup;
         let initial_end = (warmup + w).min(errors.len());
-        let initial_error = if initial_end > initial_start {
-            errors[initial_start..initial_end].iter().sum::<f32>()
-                / (initial_end - initial_start) as f32
-        } else {
-            errors.first().copied().unwrap_or(1.0)
-        };
+        let (initial_error, initial_valid_samples) =
+            mean_valid_pe_window(&errors, &error_validity, initial_start, initial_end);
 
-        // Final error: average over last measurement window
         let final_start = errors.len().saturating_sub(w);
-        let final_error = if final_start < errors.len() {
-            errors[final_start..].iter().sum::<f32>() / (errors.len() - final_start) as f32
-        } else {
-            errors.last().copied().unwrap_or(1.0)
-        };
+        let (final_error, final_valid_samples) =
+            mean_valid_pe_window(&errors, &error_validity, final_start, errors.len());
 
         let error_reduction_pct = if initial_error > 0.0 {
             ((initial_error - final_error) / initial_error) * 100.0
@@ -157,8 +179,10 @@ impl FepTemporalBenchmark {
         let coherence_stats = service.coherence_tracker().stats();
         let coherence_stability = coherence_stats.stability;
 
-        // Pass criteria: error reduced by at least some amount
-        let passed = error_reduction_pct > 5.0 || final_error < initial_error;
+        // Missing comparison coverage cannot count as a successful error reduction.
+        let passed = initial_valid_samples > 0
+            && final_valid_samples > 0
+            && (error_reduction_pct > 5.0 || final_error < initial_error);
 
         FepTemporalBenchmarkResult {
             initial_error,
@@ -168,6 +192,9 @@ impl FepTemporalBenchmark {
             fep_final_free_energy: fep_final,
             coherence_stability,
             prediction_errors: errors,
+            prediction_error_validity: error_validity,
+            initial_valid_samples,
+            final_valid_samples,
             passed,
         }
     }
@@ -326,8 +353,12 @@ pub struct TMazeBenchmarkResult {
     pub late_accuracy: f32,
     /// Average steps per episode
     pub avg_steps: f32,
-    /// Average prediction error during episodes
+    /// Average valid prediction error during episodes; see valid sample count.
     pub avg_prediction_error: f32,
+    /// Number of cycles with a genuine PE comparison.
+    pub valid_prediction_error_cycles: usize,
+    /// Total cycles attempted, including invalid/missing comparisons.
+    pub total_cycles: usize,
     /// Whether the agent learned (late > early + random)
     pub passed: bool,
     /// Per-episode success history
@@ -364,6 +395,7 @@ pub fn run_t_maze_with_loop_config(
     let mut successes: Vec<bool> = Vec::with_capacity(config.num_episodes);
     let mut total_steps: usize = 0;
     let mut total_error: f32 = 0.0;
+    let mut valid_error_cycles: usize = 0;
     let mut total_cycles: usize = 0;
 
     for episode in 0..config.num_episodes {
@@ -375,7 +407,10 @@ pub fn run_t_maze_with_loop_config(
         for _step in 0..config.max_steps {
             let obs = env.observation();
             let result = service.cycle(&obs);
-            total_error += result.prediction_error;
+            if result.prediction_error_valid {
+                total_error += result.prediction_error;
+                valid_error_cycles += 1;
+            }
             total_cycles += 1;
 
             let (done, rewarded) = env.step(&result.output);
@@ -386,7 +421,10 @@ pub fn run_t_maze_with_loop_config(
                 // Run one more cycle to let the reward propagate through FEP
                 let obs_final = env.observation();
                 let final_result = service.cycle(&obs_final);
-                total_error += final_result.prediction_error;
+                if final_result.prediction_error_valid {
+                    total_error += final_result.prediction_error;
+                    valid_error_cycles += 1;
+                }
                 total_cycles += 1;
                 if rewarded {
                     episode_reward = true;
@@ -422,7 +460,11 @@ pub fn run_t_maze_with_loop_config(
     };
 
     let avg_steps = total_steps as f32 / config.num_episodes as f32;
-    let avg_prediction_error = total_error / total_cycles.max(1) as f32;
+    let avg_prediction_error = if valid_error_cycles > 0 {
+        total_error / valid_error_cycles as f32
+    } else {
+        0.0
+    };
 
     // Pass if late accuracy exceeds random (50%) by any margin
     let passed = late_accuracy > 0.5;
@@ -433,6 +475,8 @@ pub fn run_t_maze_with_loop_config(
         late_accuracy,
         avg_steps,
         avg_prediction_error,
+        valid_prediction_error_cycles: valid_error_cycles,
+        total_cycles,
         passed,
         episode_successes: successes,
     }
@@ -441,6 +485,28 @@ pub fn run_t_maze_with_loop_config(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn valid_pe_window_excludes_invalid_fallbacks_and_non_finite_values() {
+        let errors = [0.2, 1.0, f32::NAN, 0.6];
+        let validity = [true, false, true, true];
+
+        let (mean, count) = mean_valid_pe_window(&errors, &validity, 0, errors.len());
+
+        assert_eq!(count, 2);
+        assert!((mean - 0.4).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn valid_pe_window_with_no_valid_samples_reports_empty_coverage() {
+        let errors = [1.0, 0.8];
+        let validity = [false, false];
+
+        let (mean, count) = mean_valid_pe_window(&errors, &validity, 0, errors.len());
+
+        assert_eq!(mean, 0.0);
+        assert_eq!(count, 0);
+    }
 
     #[test]
     fn test_fep_error_reduction_sine() {
@@ -456,8 +522,19 @@ mod tests {
         let bench = FepTemporalBenchmark::new(FepTemporalBenchmarkConfig::default());
         let result = bench.run_sine_pattern();
         println!(
-            "Sine: initial_error={:.4}, final_error={:.4}, reduction={:.1}%",
-            result.initial_error, result.final_error, result.error_reduction_pct
+            "Sine: initial_error={:.4} (n={}), final_error={:.4} (n={}), reduction={:.1}%",
+            result.initial_error,
+            result.initial_valid_samples,
+            result.final_error,
+            result.final_valid_samples,
+            result.error_reduction_pct
+        );
+        assert_eq!(result.prediction_errors.len(), result.prediction_error_validity.len());
+        assert!(
+            result.initial_valid_samples > 0 && result.final_valid_samples > 0,
+            "PE reduction needs valid samples in both windows (initial={}, final={})",
+            result.initial_valid_samples,
+            result.final_valid_samples
         );
         // The system should show some learning over 200 cycles of repeating input.
         // Tolerance is 25% because CfC temporal dynamics involve rayon-parallel
@@ -491,14 +568,19 @@ mod tests {
         // Measure recovery within the second half (after the distribution shift at cycle 150):
         // Compare the spike region (first 20 cycles after shift) vs recovery region (last 20).
         let half = result.prediction_errors.len() / 2;
-        let early_2nd: f32 = result.prediction_errors[half..half + 20]
-            .iter()
-            .sum::<f32>()
-            / 20.0;
-        let late_2nd: f32 = result.prediction_errors[result.prediction_errors.len() - 20..]
-            .iter()
-            .sum::<f32>()
-            / 20.0;
+        let (early_2nd, early_valid) = mean_valid_pe_window(
+            &result.prediction_errors,
+            &result.prediction_error_validity,
+            half,
+            half + 20,
+        );
+        let (late_2nd, late_valid) = mean_valid_pe_window(
+            &result.prediction_errors,
+            &result.prediction_error_validity,
+            result.prediction_errors.len().saturating_sub(20),
+            result.prediction_errors.len(),
+        );
+        assert!(early_valid > 0 && late_valid > 0, "recovery windows need valid PE samples");
         println!(
             "Step 2nd-half: early_avg={:.4}, late_avg={:.4}, recovery={:.1}%",
             early_2nd,

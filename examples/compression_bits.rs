@@ -106,6 +106,7 @@ struct CycleRow {
     bits_zero: Option<f32>,
     kappa: Option<f32>,
     pe: f32,
+    pe_valid: bool,
 }
 
 struct BlockStats {
@@ -114,6 +115,7 @@ struct BlockStats {
     /// Mean Δcos vs persistence — the verdict quantity (Amendment 3).
     mean_dcos_persist: f64,
     mean_pe: f64,
+    pe_coverage: usize,
     coverage: usize,
     total: usize,
 }
@@ -137,7 +139,11 @@ fn summarize(rows: &[CycleRow]) -> BlockStats {
             _ => None,
         })
         .collect();
-    let pe: f64 = rows.iter().map(|r| r.pe as f64).sum::<f64>() / rows.len().max(1) as f64;
+    let valid_pe: Vec<f64> = rows
+        .iter()
+        .filter(|r| r.pe_valid)
+        .map(|r| r.pe as f64)
+        .collect();
     let mean = |v: &[f64]| {
         if v.is_empty() {
             f64::NAN
@@ -149,7 +155,8 @@ fn summarize(rows: &[CycleRow]) -> BlockStats {
         mean_bits_persist: mean(&persist),
         mean_bits_zero: mean(&zero),
         mean_dcos_persist: mean(&dcos),
-        mean_pe: pe,
+        mean_pe: mean(&valid_pe),
+        pe_coverage: valid_pe.len(),
         coverage: persist.len(),
         total: rows.len(),
     }
@@ -165,6 +172,7 @@ fn run_cycle(svc: &mut CognitiveLoopService, arm: &str, input: &str) -> CycleRow
         bits_zero: r.bits_saved_zero,
         kappa: r.bits_kappa,
         pe: r.prediction_error,
+        pe_valid: r.prediction_error_valid,
     }
 }
 
@@ -227,8 +235,8 @@ fn main() {
     // Rows carry a "C1|" sigil: loop subsystems print their own study banners
     // to stdout mid-run, so the report is recovered with `grep '^C1|'`.
     println!(
-        "C1| {:<12} {:<28} {:<11} {:>10} {:>12} {:>10} {:>8} {:>9}",
-        "arm", "seed", "block", "dcos", "bits/persist", "bits/zero", "meanPE", "coverage"
+        "C1| {:<12} {:<28} {:<11} {:>10} {:>12} {:>10} {:>8} {:>9} {:>13}",
+        "arm", "seed", "block", "dcos", "bits/persist", "bits/zero", "meanPE(valid)", "coverage", "PE coverage"
     );
 
     let script = varied_script();
@@ -250,7 +258,7 @@ fn main() {
                 }
                 let s = summarize(&measured);
                 println!(
-                    "C1| {:<12} {:<28} {:<11} {:>10.5} {:>12.4} {:>10.4} {:>8.4} {:>6}/{}",
+                    "C1| {:<12} {:<28} {:<11} {:>10.5} {:>12.4} {:>10.4} {:>8.4} {:>6}/{} {:>6}/{}",
                     arm,
                     seed_short,
                     regime,
@@ -259,6 +267,8 @@ fn main() {
                     s.mean_bits_zero,
                     s.mean_pe,
                     s.coverage,
+                    s.total,
+                    s.pe_coverage,
                     s.total,
                 );
             }
@@ -286,7 +296,7 @@ fn main() {
             // with exposure.
             let growth = sl.mean_dcos_persist - se.mean_dcos_persist;
             println!(
-                "C1| {:<12} {:<28} {:<11} {:>10.5} {:>12.4} {:>10.4} {:>8.4} {:>6}/{}  (dcos early {:.5} → late {:.5}, growth {:+.5})",
+                "C1| {:<12} {:<28} {:<11} {:>10.5} {:>12.4} {:>10.4} {:>8.4} {:>6}/{} {:>6}/{} (dcos early {:.5} → late {:.5}, growth {:+.5})",
                 arm,
                 seed_short,
                 "script",
@@ -295,6 +305,8 @@ fn main() {
                 sl.mean_bits_zero,
                 sl.mean_pe,
                 sl.coverage,
+                sl.total,
+                sl.pe_coverage,
                 sl.total,
                 se.mean_dcos_persist,
                 sl.mean_dcos_persist,

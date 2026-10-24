@@ -168,6 +168,7 @@ impl CognitiveLoopService {
         Some(CycleResult {
             output: vec![0.0; self.config.cfc_config.num_neurons],
             prediction_error: 0.0,
+            prediction_error_valid: false,
             peak_attention: 0.0,
             detected_primitives: vec![],
             learning_occurred: false,
@@ -1172,6 +1173,7 @@ impl CognitiveLoopService {
         &mut self,
         pattern: crate::dynamics::temporal_signatures::ConsciousnessPattern,
         prediction_error: f32,
+        prediction_error_valid: bool,
         coherence: f32,
     ) {
         let adapted_thresholds = self
@@ -1179,25 +1181,29 @@ impl CognitiveLoopService {
             .self_model_tier
             .self_reflection
             .get_thresholds();
-        self.behavior.flow_state.update_with_thresholds(
-            pattern,
-            prediction_error,
-            coherence,
-            self.prediction_confidence as f32,
-            adapted_thresholds.flow_error,
-            adapted_thresholds.flow_coherence,
-        );
+        if prediction_error_valid {
+            self.behavior.flow_state.update_with_thresholds(
+                pattern,
+                prediction_error,
+                coherence,
+                self.prediction_confidence as f32,
+                adapted_thresholds.flow_error,
+                adapted_thresholds.flow_coherence,
+            );
+        }
 
         // Curiosity drive — route exploration mutation through feedback system
         self.behavior
             .curiosity_drive
             .set_boredom_threshold(adapted_thresholds.boredom);
-        match self.behavior.curiosity_drive.update(prediction_error) {
-            super::super::drives::ExplorationUpdate::Set(val) => {
-                self.set_exploration("curiosity_drive_boredom", val);
-            }
-            super::super::drives::ExplorationUpdate::Scale(factor) => {
-                self.scale_exploration("curiosity_drive_decay", factor);
+        if prediction_error_valid {
+            match self.behavior.curiosity_drive.update(prediction_error) {
+                super::super::drives::ExplorationUpdate::Set(val) => {
+                    self.set_exploration("curiosity_drive_boredom", val);
+                }
+                super::super::drives::ExplorationUpdate::Scale(factor) => {
+                    self.scale_exploration("curiosity_drive_decay", factor);
+                }
             }
         }
 
@@ -1217,53 +1223,56 @@ impl CognitiveLoopService {
             }
         }
 
-        // Self-reflection
-        self.consciousness
-            .self_model_tier
-            .self_reflection
-            .record_cycle(
-                prediction_error,
-                self.behavior.flow_state.in_flow,
-                self.behavior.curiosity_drive.should_explore(),
-                self.prediction_confidence as f32,
-            );
-        if self
-            .consciousness
-            .self_model_tier
-            .self_reflection
-            .should_reflect()
-        {
-            let recommendations = self.consciousness.self_model_tier.self_reflection.reflect();
-            for rec in &recommendations {
-                if rec.confidence < REFLECTION_CONFIDENCE_THRESHOLD {
-                    continue;
-                }
-                match rec.target {
-                    super::super::RecommendationTarget::LearningRate => match rec.direction {
-                        super::super::AdjustmentDirection::Decrease => {
-                            self.scale_lr("reflection_decrease", REFLECTION_LR_DECREASE);
-                        }
-                        super::super::AdjustmentDirection::Increase => {
-                            self.scale_lr("reflection_increase", REFLECTION_LR_INCREASE);
-                        }
+        // Record PE-based self-reflection only when an outcome was observed.
+        if prediction_error_valid {
+            // Self-reflection
+            self.consciousness
+                .self_model_tier
+                .self_reflection
+                .record_cycle(
+                    prediction_error,
+                    self.behavior.flow_state.in_flow,
+                    self.behavior.curiosity_drive.should_explore(),
+                    self.prediction_confidence as f32,
+                );
+            if self
+                .consciousness
+                .self_model_tier
+                .self_reflection
+                .should_reflect()
+            {
+                let recommendations = self.consciousness.self_model_tier.self_reflection.reflect();
+                for rec in &recommendations {
+                    if rec.confidence < REFLECTION_CONFIDENCE_THRESHOLD {
+                        continue;
+                    }
+                    match rec.target {
+                        super::super::RecommendationTarget::LearningRate => match rec.direction {
+                            super::super::AdjustmentDirection::Decrease => {
+                                self.scale_lr("reflection_decrease", REFLECTION_LR_DECREASE);
+                            }
+                            super::super::AdjustmentDirection::Increase => {
+                                self.scale_lr("reflection_increase", REFLECTION_LR_INCREASE);
+                            }
+                            _ => {}
+                        },
+                        super::super::RecommendationTarget::ExplorationFactor => match rec.direction {
+                            super::super::AdjustmentDirection::Increase => {
+                                self.adjust_exploration(
+                                    "metacog_explore_increase",
+                                    REFLECTION_EXPLORATION_INCREASE,
+                                );
+                            }
+                            super::super::AdjustmentDirection::Decrease => {
+                                self.scale_exploration(
+                                    "metacog_explore_decrease",
+                                    REFLECTION_EXPLORATION_DECREASE,
+                                );
+                            }
+                            _ => {}
+                        },
                         _ => {}
-                    },
-                    super::super::RecommendationTarget::ExplorationFactor => match rec.direction {
-                        super::super::AdjustmentDirection::Increase => {
-                            self.adjust_exploration(
-                                "metacog_explore_increase",
-                                REFLECTION_EXPLORATION_INCREASE,
-                            );
-                        }
-                        super::super::AdjustmentDirection::Decrease => {
-                            self.scale_exploration(
-                                "metacog_explore_decrease",
-                                REFLECTION_EXPLORATION_DECREASE,
-                            );
-                        }
-                        _ => {}
-                    },
-                    _ => {}
+                    }
                 }
             }
         }
