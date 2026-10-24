@@ -1158,7 +1158,7 @@ mod tests {
         ]), &"2".repeat(64));
         let result = build_report(&primary, &regrade, &"a".repeat(64)).unwrap();
         assert_eq!(result.summary.unresolved_in_either_grade_count, 1);
-        assert_eq!(result.summary.strict_pass_at_1, None);
+        assert_eq!(result.summary.strict_double_verified_pass_rate, None);
     }
 
     #[test]
