@@ -66,7 +66,7 @@ impl CommandBinding {
         S: Into<String>,
     {
         let executable = executable.into();
-        let args = args.into_iter().map(Into::into).collect::<Vec<_>>();
+        let args = args.into_iter().map(|arg| arg.into()).collect::<Vec<String>>();
 
         if executable.trim().is_empty() {
             return Err(AuthorizationError::EmptyExecutable);
