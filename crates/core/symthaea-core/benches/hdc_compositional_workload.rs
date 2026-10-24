@@ -323,6 +323,16 @@ fn correctness_contract() {
         }
     }
 
+    // Open-set threshold sanity checks: a cleanly separated calibration set
+    // must yield a threshold between the classes with zero calibration errors.
+    let threshold = calibrate_acceptance_threshold(
+        &[0.80, 0.82, 0.84, 0.86],
+        &[0.50, 0.52, 0.54, 0.56],
+    );
+    assert!(threshold.score > 0.56 && threshold.score < 0.80);
+    assert_eq!(threshold.calibration_false_reject_rate, 0.0);
+    assert_eq!(threshold.calibration_false_accept_rate, 0.0);
+
     // Explicit lowest-ID tie test, including repeated exact matches.
     let query = BinaryHV::random(0x71E_001);
     let corpus = vec![
