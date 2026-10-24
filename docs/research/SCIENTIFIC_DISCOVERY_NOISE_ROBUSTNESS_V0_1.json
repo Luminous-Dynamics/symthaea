@@ -1,6 +1,6 @@
 {
   "protocol_id": "SCI-NOISE-001",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "status": "proposal_only",
   "linked_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8607",
   "protocol_document": "docs/research/SCIENTIFIC_DISCOVERY_NOISE_ROBUSTNESS_V0_1.md",
@@ -109,7 +109,19 @@
       "minimum_structural_families": 6,
       "paired_seeds_per_world": 20,
       "noise_regime_precision_target_required": true,
-      "full_factorial_denominators_required": true
+      "full_factorial_denominators_required": true,
+      "false_alarm_precision": {
+        "target_rate": 0.05,
+        "one_sided_confidence": 0.95,
+        "zero_event_minimum_independent_worlds_per_cell": 59,
+        "bound": "p_upper = 1 - 0.05^(1/n)",
+        "method": "one-sided exact binomial upper confidence bound",
+        "applies_per_declared_cell": true,
+        "zero_event_shortcut_only": true,
+        "freeze_sample_plan_before_unblinding": true,
+        "seeds_within_world_count_as_independent_worlds": false,
+        "pooling_noise_regimes_to_meet_gate_allowed": false
+      }
     },
     "diagnostic_controls": {
       "fixed_design": "interleaved_anchor_schedule",
@@ -296,7 +308,8 @@
     "never_drop_non_evaluable_worlds_without_reporting": true,
     "seeds_within_world_not_independent_worlds": true,
     "queued_skipped_stale_head_checks_are_not_passes": true,
-    "published_external_results_are_not_matched_replications": true
+    "published_external_results_are_not_matched_replications": true,
+    "per_cell_false_alarm_claim_requires_cellwise_denominator": true
   },
   "references": {
     "robust_design_misspecification": "https://proceedings.mlr.press/v300/callahan26a.html",
