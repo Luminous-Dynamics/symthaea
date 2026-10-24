@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/power-planning-report.schema.json",
   "title": "PITB Simulation-Based Power Planning Report v0",
-  "description": "A reproducible sensitivity-analysis report for planning a paired, family-clustered experiment. This report is not model evaluation or evidence that the configured assumptions describe the real benchmark.",
+  "description": "A reproducible sensitivity-analysis report for planning a paired, family-clustered experiment using component-percentile-bootstrap intervals. This report is not model evaluation or evidence that the configured assumptions describe the real benchmark.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -34,6 +34,7 @@
         "cluster_sizes",
         "total_targets_per_simulated_study",
         "simulations",
+        "bootstrap_replicates",
         "seed",
         "confidence_level"
       ],
@@ -85,6 +86,10 @@
           "minimum": 20
         },
         "simulations": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "bootstrap_replicates": {
           "type": "integer",
           "minimum": 1000
         },
