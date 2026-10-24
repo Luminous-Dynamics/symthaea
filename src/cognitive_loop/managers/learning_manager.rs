@@ -277,26 +277,14 @@ impl CognitiveSubsystem for LearningManager {
     }
 
     fn checkpoint(&self) -> Vec<u8> {
-        // Preserve the legacy 13-byte prefix. PEVC v2 stores observed and
-        // admitted watermarks separately so invalid newer cycles still block
-        // delayed older samples after restart, while same-cycle retry remains possible.
-        let mut data = Vec::with_capacity(36);
+        // Preserve the legacy 13-byte prefix; the shared PEVC codec owns the
+        // versioned observed/admitted watermarks appended to new checkpoints.
+        let mut data = Vec::with_capacity(13 + 23);
         data.extend_from_slice(&self.plasticity.to_le_bytes());
         data.extend_from_slice(&self.error_trend.to_le_bytes());
         data.extend_from_slice(&self.low_arousal_streak.to_le_bytes());
         data.push(self.in_dream_phase as u8);
-        data.extend_from_slice(b"PEVC");
-        data.push(2); // extension version
-        let observed_cycle = self
-            .prediction_error_cursor
-            .last_observed_observation_cycle();
-        data.push(u8::from(observed_cycle.is_some()));
-        data.extend_from_slice(&observed_cycle.unwrap_or_default().to_le_bytes());
-        let admitted_cycle = self
-            .prediction_error_cursor
-            .last_admitted_observation_cycle();
-        data.push(u8::from(admitted_cycle.is_some()));
-        data.extend_from_slice(&admitted_cycle.unwrap_or_default().to_le_bytes());
+        data.extend_from_slice(&self.prediction_error_cursor.encode_checkpoint_extension_v2());
         data
     }
 
@@ -308,63 +296,12 @@ impl CognitiveSubsystem for LearningManager {
             ));
         }
 
-        // Decode and validate the extension before mutating manager state.
-        // Legacy 13-byte checkpoints contain no cursor and therefore restore
-        // with a cleared cursor rather than inheriting state from this instance.
-        let (restored_observed_cycle, restored_admitted_cycle) = if data.len() == 13 {
-            (None, None)
+        // Decode/validate the extension before mutating manager state. Legacy
+        // 13-byte checkpoints contain no cursor provenance.
+        let restored_cursor = if data.len() == 13 {
+            PredictionEvidenceCursor::default()
         } else {
-            if &data[13..17] != b"PEVC" {
-                return Err("LearningManager: invalid PE cursor checkpoint magic".to_string());
-            }
-            if data[17] != 2 {
-                return Err(format!(
-                    "LearningManager: unsupported PE cursor checkpoint version {}",
-                    data[17]
-                ));
-            }
-            let has_observed = data[18];
-            let observed_value = u64::from_le_bytes(
-                data[19..27]
-                    .try_into()
-                    .map_err(|_| "LearningManager: corrupt observed-cycle bytes".to_string())?,
-            );
-            let has_admitted = data[27];
-            let admitted_value = u64::from_le_bytes(
-                data[28..36]
-                    .try_into()
-                    .map_err(|_| "LearningManager: corrupt admitted-cycle bytes".to_string())?,
-            );
-            if has_observed > 1 || has_admitted > 1 {
-                return Err("LearningManager: invalid PE cursor presence flag".to_string());
-            }
-            let observed = match has_observed {
-                1 => Some(observed_value),
-                0 if observed_value == 0 => None,
-                0 => {
-                    return Err(
-                        "LearningManager: absent observed cycle must encode zero".to_string()
-                    );
-                }
-                _ => unreachable!("presence flag was checked above"),
-            };
-            let admitted = match has_admitted {
-                1 => Some(admitted_value),
-                0 if admitted_value == 0 => None,
-                0 => {
-                    return Err(
-                        "LearningManager: absent admitted cycle must encode zero".to_string()
-                    );
-                }
-                _ => unreachable!("presence flag was checked above"),
-            };
-            if admitted.is_some_and(|cycle| observed.is_none_or(|observed_cycle| cycle > observed_cycle)) {
-                return Err(
-                    "LearningManager: admitted PE cycle exceeds observed high-water mark"
-                        .to_string(),
-                );
-            }
-            (observed, admitted)
+            PredictionEvidenceCursor::decode_checkpoint_extension_v2(&data[13..36])?
         };
 
         self.plasticity = f32::from_le_bytes(
@@ -383,8 +320,7 @@ impl CognitiveSubsystem for LearningManager {
                 .map_err(|_| "LearningManager: corrupt checkpoint bytes [8..12]".to_string())?,
         );
         self.in_dream_phase = data[12] != 0;
-        self.prediction_error_cursor
-            .restore_cycles(restored_observed_cycle, restored_admitted_cycle);
+        self.prediction_error_cursor = restored_cursor;
         Ok(())
     }
 }

@@ -198,6 +198,97 @@ impl PredictionEvidenceCursor {
         self.last_admitted_observation_cycle
     }
 
+    /// Encode the shared 23-byte PEVC v2 extension used by stateful consumers.
+    ///
+    /// Layout: magic(4), version(1), observed-present(1), observed-cycle(8),
+    /// admitted-present(1), admitted-cycle(8). Absent cycles are encoded as zero.
+    /// Keeping this serializer centralized prevents consumer checkpoint formats
+    /// from silently diverging.
+    pub(crate) fn encode_checkpoint_extension_v2(&self) -> [u8; 23] {
+        let mut data = [0_u8; 23];
+        data[0..4].copy_from_slice(b"PEVC");
+        data[4] = 2;
+
+        let observed = self.last_observed_observation_cycle;
+        data[5] = u8::from(observed.is_some());
+        data[6..14].copy_from_slice(&observed.unwrap_or_default().to_le_bytes());
+
+        let admitted = self.last_admitted_observation_cycle;
+        data[14] = u8::from(admitted.is_some());
+        data[15..23].copy_from_slice(&admitted.unwrap_or_default().to_le_bytes());
+        data
+    }
+
+    /// Decode and validate the shared PEVC v2 extension.
+    ///
+    /// The decoder is pure: callers can parse the extension before mutating
+    /// manager state, then atomically install the returned cursor.
+    pub(crate) fn decode_checkpoint_extension_v2(data: &[u8]) -> Result<Self, String> {
+        if data.len() != 23 {
+            return Err(format!(
+                "PredictionEvidenceCursor PEVC v2 extension has length {}, expected 23",
+                data.len()
+            ));
+        }
+        if &data[0..4] != b"PEVC" {
+            return Err("PredictionEvidenceCursor: invalid PEVC magic".to_string());
+        }
+        if data[4] != 2 {
+            return Err(format!(
+                "PredictionEvidenceCursor: unsupported PEVC version {}",
+                data[4]
+            ));
+        }
+
+        let has_observed = data[5];
+        let observed_value = u64::from_le_bytes(
+            data[6..14]
+                .try_into()
+                .map_err(|_| "PredictionEvidenceCursor: corrupt observed-cycle bytes".to_string())?,
+        );
+        let has_admitted = data[14];
+        let admitted_value = u64::from_le_bytes(
+            data[15..23]
+                .try_into()
+                .map_err(|_| "PredictionEvidenceCursor: corrupt admitted-cycle bytes".to_string())?,
+        );
+        if has_observed > 1 || has_admitted > 1 {
+            return Err("PredictionEvidenceCursor: invalid PEVC presence flag".to_string());
+        }
+
+        let observed = match has_observed {
+            1 => Some(observed_value),
+            0 if observed_value == 0 => None,
+            0 => {
+                return Err(
+                    "PredictionEvidenceCursor: absent observed cycle must encode zero".to_string(),
+                );
+            }
+            _ => unreachable!("presence flag was checked above"),
+        };
+        let admitted = match has_admitted {
+            1 => Some(admitted_value),
+            0 if admitted_value == 0 => None,
+            0 => {
+                return Err(
+                    "PredictionEvidenceCursor: absent admitted cycle must encode zero".to_string(),
+                );
+            }
+            _ => unreachable!("presence flag was checked above"),
+        };
+        if admitted.is_some_and(|cycle| observed.is_none_or(|observed_cycle| cycle > observed_cycle)) {
+            return Err(
+                "PredictionEvidenceCursor: admitted cycle exceeds observed high-water mark"
+                    .to_string(),
+            );
+        }
+
+        Ok(Self {
+            last_observed_observation_cycle: observed,
+            last_admitted_observation_cycle: admitted,
+        })
+    }
+
     /// Restore the cursor from a validated consumer checkpoint.
     ///
     /// This is crate-visible so checkpoint owners can preserve exactly-once
@@ -465,6 +556,54 @@ mod tests {
     }
 
     #[test]
+    fn checkpoint_extension_roundtrip_preserves_both_watermarks() {
+        use super::PredictionEvidenceCursor;
+
+        let mut cursor = PredictionEvidenceCursor::default();
+        assert_eq!(cursor.admit(10, Some(0.4)), Some(0.4));
+        assert_eq!(cursor.admit(12, None), None);
+        let encoded = cursor.encode_checkpoint_extension_v2();
+        assert_eq!(encoded.len(), 23);
+
+        let restored = PredictionEvidenceCursor::decode_checkpoint_extension_v2(&encoded).unwrap();
+        assert_eq!(restored.last_observed_observation_cycle(), Some(12));
+        assert_eq!(restored.last_admitted_observation_cycle(), Some(10));
+    }
+
+    #[test]
+    fn checkpoint_extension_decoder_rejects_bad_magic_flags_and_watermark_order() {
+        use super::PredictionEvidenceCursor;
+
+        let cursor = PredictionEvidenceCursor::default();
+        let encoded = cursor.encode_checkpoint_extension_v2();
+
+        let mut bad_magic = encoded;
+        bad_magic[0] = b'X';
+        assert!(PredictionEvidenceCursor::decode_checkpoint_extension_v2(&bad_magic).is_err());
+
+        let mut bad_version = encoded;
+        bad_version[4] = 1;
+        assert!(PredictionEvidenceCursor::decode_checkpoint_extension_v2(&bad_version).is_err());
+
+        let mut bad_flag = encoded;
+        bad_flag[5] = 2;
+        assert!(PredictionEvidenceCursor::decode_checkpoint_extension_v2(&bad_flag).is_err());
+
+        let mut absent_nonzero = encoded;
+        absent_nonzero[6..14].copy_from_slice(&9_u64.to_le_bytes());
+        assert!(PredictionEvidenceCursor::decode_checkpoint_extension_v2(&absent_nonzero).is_err());
+
+        let mut admitted_ahead = encoded;
+        admitted_ahead[5] = 1;
+        admitted_ahead[6..14].copy_from_slice(&10_u64.to_le_bytes());
+        admitted_ahead[14] = 1;
+        admitted_ahead[15..23].copy_from_slice(&11_u64.to_le_bytes());
+        assert!(PredictionEvidenceCursor::decode_checkpoint_extension_v2(&admitted_ahead).is_err());
+
+        assert!(PredictionEvidenceCursor::decode_checkpoint_extension_v2(&encoded[..22]).is_err());
+    }
+
+    #[test]
     fn missing_evidence_does_not_advance_admitted_cursor() {
         use super::PredictionEvidenceCursor;
 
@@ -623,22 +762,33 @@ mod tests {
         let mut last_admitted = None;
         let mut admitted = 0usize;
 
-        for _ in 0..10_000 {
-            // Reproducible stream with cycles deliberately repeated and shuffled.
+        for index in 0..10_000u64 {
+            // Reproducible values/status variation combined with a deliberately
+            // adversarial six-event cycle schedule. Each group exercises:
+            // valid admission, duplicate, invalid newer cycle, delayed older
+            // cycle, requested/evidence-cycle mismatch, then same-cycle recovery.
             bits ^= bits << 13;
             bits ^= bits >> 17;
             bits ^= bits << 5;
 
-            let cycle = u64::from(bits % 512);
+            let phase = index % 6;
+            let base_cycle = (index / 6) * 4;
+            let (cycle, requested_cycle) = match phase {
+                0 | 1 => (base_cycle, base_cycle),
+                2 => (base_cycle + 2, base_cycle + 2),
+                3 => (base_cycle + 1, base_cycle + 1),
+                4 => (base_cycle + 2, base_cycle + 3),
+                _ => (base_cycle + 3, base_cycle + 3),
+            };
             let value = (bits as f32) / (u32::MAX as f32);
-            let evidence = match bits % 4 {
-                0 => PredictionErrorEvidence::invalid(
+            let evidence = match phase {
+                2 if bits & 1 == 0 => PredictionErrorEvidence::invalid(
                     PredictionEvidenceStatus::InvalidValidityFlag,
                     None,
                     cycle,
                 )
                 .unwrap(),
-                1 => PredictionErrorEvidence::invalid(
+                2 => PredictionErrorEvidence::invalid(
                     PredictionEvidenceStatus::SourceUnavailable,
                     None,
                     cycle,
@@ -646,15 +796,10 @@ mod tests {
                 .unwrap(),
                 _ => PredictionErrorEvidence::valid(value, None, cycle).unwrap(),
             };
-            let requested_cycle = if bits & 0x100 != 0 {
-                cycle.saturating_add(1)
-            } else {
-                cycle
-            };
 
             // Independent reference model for both watermarks: every
-            // non-stale requested cycle is observed, even if its evidence is
-            // invalid or belongs to a different cycle.
+            // non-stale requested cycle is observed even when its evidence is
+            // invalid or belongs to a different observation cycle.
             let requested_is_stale =
                 last_observed.is_some_and(|last| requested_cycle < last);
             let expected = if requested_is_stale {
@@ -671,7 +816,7 @@ mod tests {
                 }
             };
             let actual = cursor.admit_evidence(&evidence, requested_cycle);
-            assert_eq!(actual, expected, "trace mismatch at observation {cycle}");
+            assert_eq!(actual, expected, "trace mismatch at event {index}");
 
             if actual.is_some() {
                 admitted += 1;
@@ -681,7 +826,12 @@ mod tests {
             assert_eq!(cursor.last_admitted_observation_cycle(), last_admitted);
         }
 
-        assert!(admitted > 0, "generated trace should contain valid admissions");
+        // Fail if a future generator edit degenerates into an almost-all-stale
+        // stream that barely exercises successful admissions.
+        assert!(
+            admitted >= 3_000,
+            "adversarial trace must exercise thousands of valid admissions, got {admitted}"
+        );
     }
 
     #[test]

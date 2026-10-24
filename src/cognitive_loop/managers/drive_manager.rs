@@ -283,10 +283,9 @@ impl CognitiveSubsystem for DriveManager {
     }
 
     fn checkpoint(&self) -> Vec<u8> {
-        // Preserve the legacy 25-byte state prefix. PEVC v2 appends both cycle
-        // watermarks so invalid newer observations still block delayed older PE
-        // after restart while allowing a valid retry at that same cycle.
-        let mut data = Vec::with_capacity(48);
+        // Preserve the legacy 25-byte state prefix; serialize cycle provenance
+        // with the shared PEVC v2 extension.
+        let mut data = Vec::with_capacity(25 + 23);
         data.extend_from_slice(&self.boredom.to_le_bytes());
         data.extend_from_slice(&self.flow_intensity.to_le_bytes());
         data.extend_from_slice(&self.exploration_threshold.to_le_bytes());
@@ -294,18 +293,7 @@ impl CognitiveSubsystem for DriveManager {
         data.push(self.in_flow as u8);
         data.extend_from_slice(&self.low_error_streak.to_le_bytes());
         data.extend_from_slice(&self.flow_streak.to_le_bytes());
-        data.extend_from_slice(b"PEVC");
-        data.push(2); // extension version
-        let observed_cycle = self
-            .prediction_error_cursor
-            .last_observed_observation_cycle();
-        data.push(u8::from(observed_cycle.is_some()));
-        data.extend_from_slice(&observed_cycle.unwrap_or_default().to_le_bytes());
-        let admitted_cycle = self
-            .prediction_error_cursor
-            .last_admitted_observation_cycle();
-        data.push(u8::from(admitted_cycle.is_some()));
-        data.extend_from_slice(&admitted_cycle.unwrap_or_default().to_le_bytes());
+        data.extend_from_slice(&self.prediction_error_cursor.encode_checkpoint_extension_v2());
         data
     }
 
@@ -317,62 +305,12 @@ impl CognitiveSubsystem for DriveManager {
             ));
         }
 
-        // Validate the extension before mutating manager state. Legacy 25-byte
-        // checkpoints contain no cursor, so restore an empty cursor rather than
-        // retaining a watermark from this manager instance.
-        let (restored_observed_cycle, restored_admitted_cycle) = if data.len() == 25 {
-            (None, None)
+        // Validate cursor bytes before mutating manager state. Legacy checkpoints
+        // have no provenance, so they restore with a fresh cursor.
+        let restored_cursor = if data.len() == 25 {
+            PredictionEvidenceCursor::default()
         } else {
-            if &data[25..29] != b"PEVC" {
-                return Err("DriveManager: invalid PE cursor checkpoint magic".to_string());
-            }
-            if data[29] != 2 {
-                return Err(format!(
-                    "DriveManager: unsupported PE cursor checkpoint version {}",
-                    data[29]
-                ));
-            }
-            let has_observed = data[30];
-            let observed_value = u64::from_le_bytes(
-                data[31..39]
-                    .try_into()
-                    .map_err(|_| "DriveManager: corrupt observed-cycle bytes".to_string())?,
-            );
-            let has_admitted = data[39];
-            let admitted_value = u64::from_le_bytes(
-                data[40..48]
-                    .try_into()
-                    .map_err(|_| "DriveManager: corrupt admitted-cycle bytes".to_string())?,
-            );
-            if has_observed > 1 || has_admitted > 1 {
-                return Err("DriveManager: invalid PE cursor presence flag".to_string());
-            }
-            let observed = match has_observed {
-                1 => Some(observed_value),
-                0 if observed_value == 0 => None,
-                0 => {
-                    return Err(
-                        "DriveManager: absent observed cycle must encode zero".to_string()
-                    );
-                }
-                _ => unreachable!("presence flag was checked above"),
-            };
-            let admitted = match has_admitted {
-                1 => Some(admitted_value),
-                0 if admitted_value == 0 => None,
-                0 => {
-                    return Err(
-                        "DriveManager: absent admitted cycle must encode zero".to_string()
-                    );
-                }
-                _ => unreachable!("presence flag was checked above"),
-            };
-            if admitted.is_some_and(|cycle| observed.is_none_or(|observed_cycle| cycle > observed_cycle)) {
-                return Err(
-                    "DriveManager: admitted PE cycle exceeds observed high-water mark".to_string(),
-                );
-            }
-            (observed, admitted)
+            PredictionEvidenceCursor::decode_checkpoint_extension_v2(&data[25..48])?
         };
 
         self.boredom = f32::from_le_bytes(
@@ -402,8 +340,7 @@ impl CognitiveSubsystem for DriveManager {
                 .try_into()
                 .map_err(|_| "DriveManager: corrupt checkpoint bytes [21..25]".to_string())?,
         );
-        self.prediction_error_cursor
-            .restore_cycles(restored_observed_cycle, restored_admitted_cycle);
+        self.prediction_error_cursor = restored_cursor;
         Ok(())
     }
 }
