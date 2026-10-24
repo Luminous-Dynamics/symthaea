@@ -336,18 +336,17 @@ impl PredictiveHdcEncoder {
         let stale_prediction = self.predicted_hdv.is_some()
             && expected_prediction_cycle
                 .map_or(true, |expected| self.prediction_cycle != Some(expected));
+        let stale_source_cycle = if stale_prediction {
+            self.prediction_cycle
+        } else {
+            None
+        };
         if stale_prediction {
             // encode() will execute the ordinary missing-prediction path, which
             // cannot train attention or PE statistics. Preserve the more specific
             // provenance failure for the caller after encoding completes.
             self.clear_prediction();
         }
-
-        let stale_source_cycle = if stale_prediction {
-            self.prediction_cycle
-        } else {
-            None
-        };
         let result = self.encode(input);
         if stale_prediction {
             self.last_degeneracy = PredictionDegeneracy::StalePrediction;
