@@ -746,8 +746,8 @@ META\tsafety_violations_max\t0\n\
 
     #[test]
     fn mismatched_paired_trace_set_digest_fails() {
-        let old = ["CERTIFIED", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "100", "10"].join("\\t");
-        let new = ["CERTIFIED", "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "100", "10"].join("\\t");
+        let old = ["CERTIFIED", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "100", "10"].join("\t");
+        let new = ["CERTIFIED", "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "100", "10"].join("\t");
         let content = fixture().replace(&old, &new);
         assert!(execute(&content).unwrap_err().contains("paired trace/cluster set digest differs"));
     }
