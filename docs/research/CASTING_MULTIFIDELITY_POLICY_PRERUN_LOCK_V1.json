@@ -120,7 +120,17 @@
       "--cost-budget",
       "200",
       "--design-count",
-      "128"
+      "128",
+      "--bootstrap-samples",
+      "1000"
+    ],
+    "environment_recording": [
+      "Python executable path",
+      "Python runtime version",
+      "execution HEAD commit",
+      "pre-run and post-run source-lock verifier output",
+      "raw result SHA-256",
+      "replay receipt SHA-256"
     ]
   }
 }
