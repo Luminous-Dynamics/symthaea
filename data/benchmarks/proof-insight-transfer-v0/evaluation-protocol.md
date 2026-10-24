@@ -363,3 +363,10 @@ The outcome analyzer now validates the suite contract before joining outcomes: b
 ### 2026-10-24 amendment — validate intervention evidence, not just intervention labels
 
 The Rust analyzer now checks that the declared operation matches the intervention kind and that the before/after declaration receipts and precondition contract agree. A cleared required hypothesis must be present before, absent after, type-matched to the insight's required type, and paired with an available→absent precondition status and a move-forbidden/replan policy. Alpha-renaming must preserve declaration type/position while changing the name. Irrelevant removal and independent-declaration reordering have separate structural contracts. This validates receipt consistency; it does not replace Lean replay or independent adjudication of whether a precondition is logically necessary.
+
+
+### 2026-10-24 amendment — semantic-gate-qualified primary endpoint
+
+Executed outcome rows must carry a semantic-gate record bound to the exact target statement. The record separately captures (i) statement correspondence with at least two independent reviewers for a pass, (ii) axiom-policy compliance and receipt, (iii) dependent-successor testing or a reasoned not-applicable decision, and (iv) mutation-control status and suite receipt. The analyzer derives `passed` / `failed` / `unknown` from the component evidence and rejects contradictions. The primary exact-target solve rate now requires both checker success and semantic-gate pass; raw checker success is reported separately.
+
+The semantic-gate digests remain references, not self-authenticating proof of reviewer identity or receipt truth. Independent review and verification of receipt contents remain required. This changes the evidence contract, not the result of an experiment.
