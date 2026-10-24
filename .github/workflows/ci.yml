@@ -42,6 +42,46 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  prediction-market-integrity:
+    name: Prediction Market Integrity Lab (Exact Head)
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assert exact checkout revision
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_SHA"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@d86e0fa8f147d6539442c26a61ebba8becc19489
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Check standalone lab formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml --check
+
+      - name: Run deterministic integrity tests
+        run: cargo test --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml
+
+      - name: Run deterministic synthetic replay negative controls
+        env:
+          BENCHMARK_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: cargo run --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml --example replay_benchmark_v1
+
+      - name: Enforce strict Clippy
+        run: cargo clippy --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml --all-targets -- -D warnings
+
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest

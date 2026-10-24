@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-futures-market-integrity"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Synthetic-only prediction-market integrity controls: source concentration, same-owner turnover, and resolution-policy admission."
+
+[workspace]
+
+[lib]
+path = "src/lib.rs"
