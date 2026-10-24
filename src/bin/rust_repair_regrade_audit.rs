@@ -60,6 +60,7 @@ struct ScoreReport {
     unresolved_count: usize,
     lockable: bool,
     pass_at_1: Option<f64>,
+    completed_run_success_rate: Option<f64>,
     tasks: Vec<ScoreTask>,
 }
 
@@ -355,6 +356,17 @@ fn read_pinned_report(
     if !same_optional_float(report.pass_at_1, expected_pass_at_1) {
         return Err(format!(
             "score report {} has inconsistent pass_at_1 aggregate",
+            canonical_path.display()
+        ));
+    }
+    let expected_completed_run_success_rate = (scored_count > 0)
+        .then(|| success_count as f64 / scored_count as f64);
+    if !same_optional_float(
+        report.completed_run_success_rate,
+        expected_completed_run_success_rate,
+    ) {
+        return Err(format!(
+            "score report {} has inconsistent completed_run_success_rate aggregate",
             canonical_path.display()
         ));
     }
@@ -1024,6 +1036,29 @@ mod tests {
             "--expected-task-manifest-sha256".to_string(), "c".repeat(64),
         ];
         assert!(parse_cli(&args).unwrap_err().contains("--report-out"));
+    }
+
+
+    #[test]
+    fn completed_run_success_rate_is_recomputed_from_resolved_rows() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut raw = serde_json::to_value(report(vec![
+            task("task-a", Outcome::Pass, "1", "2", "3"),
+            task("task-b", Outcome::Fail, "4", "5", "6"),
+            task("task-c", Outcome::Unresolved, "7", "8", "9"),
+        ])).unwrap();
+        raw["completed_run_success_rate"] = serde_json::json!(1.0);
+        let bytes = serde_json::to_vec(&raw).unwrap();
+        fs::write(temp.path().join("bad-rate.json"), &bytes).unwrap();
+        assert!(
+            read_pinned_report(
+                &temp.path().join("bad-rate.json"),
+                &sha256_bytes(&bytes),
+                &"a".repeat(64),
+            )
+            .unwrap_err()
+            .contains("completed_run_success_rate aggregate")
+        );
     }
 
     #[test]
