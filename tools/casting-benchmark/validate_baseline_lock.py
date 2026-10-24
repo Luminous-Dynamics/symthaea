@@ -158,7 +158,9 @@ def validate_lock(document: Any, for_execution: bool = False) -> list[str]:
             "source_pinned_environment_unlocked", "locked_for_execution"
         }:
             errors.append(f"{label}.pin_status is not a supported status")
-        if pin["track"] not in {"single_fidelity", "multi_fidelity", "non_bayesian", "repository_baseline", "test_fixture"}:
+        if not isinstance(pin["track"], str) or pin["track"] not in {
+            "single_fidelity", "multi_fidelity", "non_bayesian", "repository_baseline", "test_fixture"
+        }:
             errors.append(f"{label}.track is not a supported track")
         if not isinstance(pin["execution_eligible"], bool):
             errors.append(f"{label}.execution_eligible must be a boolean")
