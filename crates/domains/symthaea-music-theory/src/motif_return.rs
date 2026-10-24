@@ -18,7 +18,7 @@ use crate::score::{Score, ScoreNote, VoiceRole};
 use serde::{Deserialize, Serialize};
 
 /// Version of the transformation-aware motif-return measurement contract.
-pub const MOTIF_RETURN_MEASUREMENT_VERSION: &str = "motif-return-v2";
+pub const MOTIF_RETURN_MEASUREMENT_VERSION: &str = "motif-return-v3";
 
 /// Auditable evidence that one melodic region recalls another.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -50,6 +50,14 @@ pub struct MotifReturnEvidence {
     pub duration_scale_consistency: f32,
     /// Best contiguous interval-window match for fragment recognition.
     pub fragment_similarity: f32,
+    /// Rhythm-shape similarity measured against the same aligned source window.
+    /// Defaults to zero when reading legacy evidence without this channel.
+    #[serde(default)]
+    pub fragment_rhythmic_shape_similarity: f32,
+    /// Zero-based start-note index of the selected fragment in the sorted source.
+    /// None means no eligible fragment alignment was found.
+    #[serde(default)]
+    pub fragment_source_start_note: Option<usize>,
     /// Fraction of the longer phrase represented by the alignment.
     pub coverage: f32,
     /// Transformation-specific composite in [0, 1].
@@ -141,7 +149,8 @@ pub fn compare_melodic_sequences(
             .map(|value| value.signum())
             .collect::<Vec<_>>(),
     );
-    let fragment_similarity = best_fragment_similarity(&source_intervals, &target_intervals);
+    let (fragment_similarity, fragment_rhythmic_shape_similarity, fragment_source_start_note) =
+        best_fragment_alignment(&source, &target, &source_intervals, &target_intervals);
     let rhythmic_shape_similarity = normalized_rhythm_similarity(&source, &target);
     let (duration_scale, duration_scale_consistency) =
         duration_scale_metrics(&source, &target);
@@ -158,6 +167,7 @@ pub fn compare_melodic_sequences(
             duration_scale,
             duration_scale_consistency,
             fragment_similarity,
+            fragment_rhythmic_shape_similarity,
             coverage,
         )
     };
@@ -199,6 +209,8 @@ pub fn compare_melodic_sequences(
         duration_scale,
         duration_scale_consistency,
         fragment_similarity,
+        fragment_rhythmic_shape_similarity,
+        fragment_source_start_note,
         coverage,
         overall_similarity,
     }
@@ -232,6 +244,7 @@ fn transformation_score(
     duration_scale: f32,
     duration_scale_consistency: f32,
     fragment: f32,
+    fragment_rhythm: f32,
     coverage: f32,
 ) -> f32 {
     let ratio_similarity = |expected: f32| {
@@ -266,7 +279,9 @@ fn transformation_score(
                 * duration_scale_consistency
         }
         ReturnTransformation::Fragmented => {
-            0.55 * fragment + 0.20 * contour + 0.15 * rhythm + 0.10 * coverage
+            // Use the rhythm of the same source window that produced the
+            // fragment match; prefix-relative rhythm can score the wrong notes.
+            0.65 * fragment + 0.25 * fragment_rhythm + 0.10 * coverage
         }
         ReturnTransformation::Restored => {
             0.50 * literal.max(transposed) + 0.20 * interval + 0.20 * rhythm + 0.10 * coverage
@@ -365,23 +380,44 @@ fn duration_scale_metrics(source: &[ScoreNote], target: &[ScoreNote]) -> (f32, f
     (scale as f32, consistency as f32)
 }
 
-fn best_fragment_similarity(source: &[i32], target: &[i32]) -> f32 {
+fn best_fragment_alignment(
+    source: &[ScoreNote],
+    target: &[ScoreNote],
+    source_intervals: &[i32],
+    target_intervals: &[i32],
+) -> (f32, f32, Option<usize>) {
     // Fragmentation is directional: target must be a proper fragment of the
-    // earlier/source material. Require at least two matching intervals so a
-    // single two-note interval cannot masquerade as long-range thematic return.
-    if source.len() < 3 || target.len() < 2 || target.len() >= source.len() {
-        return 0.0;
+    // earlier/source material. Require at least two intervals (three notes).
+    if source.len() < 4
+        || target.len() < 3
+        || target.len() >= source.len()
+        || target_intervals.len() >= source_intervals.len()
+    {
+        return (0.0, 0.0, None);
     }
-    (0..=source.len() - target.len())
-        .map(|offset| {
-            target
-                .iter()
-                .zip(&source[offset..offset + target.len()])
-                .filter(|(left, right)| left == right)
-                .count() as f32
-                / target.len() as f32
-        })
-        .fold(0.0_f32, f32::max)
+
+    let mut best: Option<(f32, f32, usize)> = None;
+    for start in 0..=source.len() - target.len() {
+        let interval_score = sequence_similarity(
+            target_intervals,
+            &source_intervals[start..start + target_intervals.len()],
+        );
+        let rhythm_score = normalized_rhythm_similarity(
+            &source[start..start + target.len()],
+            target,
+        );
+        let is_better = best.as_ref().is_none_or(|(best_intervals, best_rhythm, _)| {
+            interval_score > *best_intervals
+                || (interval_score == *best_intervals && rhythm_score > *best_rhythm)
+        });
+        if is_better {
+            best = Some((interval_score, rhythm_score, start));
+        }
+    }
+
+    best.map_or((0.0, 0.0, None), |(intervals, rhythm, start)| {
+        (intervals, rhythm, Some(start))
+    })
 }
 
 #[cfg(test)]
@@ -576,6 +612,37 @@ mod tests {
         );
         assert_eq!(too_short.fragment_similarity, 0.0);
         assert!(!too_short.meets_threshold(0.75));
+    }
+
+    #[test]
+    fn fragment_rhythm_uses_the_same_interior_window_as_interval_match() {
+        let source = vec![
+            note(60, 0, Duration::quarter()),
+            note(62, 1, Duration::eighth()),
+            note(65, 2, Duration::half()),
+            note(64, 3, Duration::quarter()),
+            note(67, 4, Duration::eighth()),
+            note(65, 5, Duration::half()),
+        ];
+        // The target is an exact fragment from source note index 2. Its
+        // rhythm differs from the source prefix, but matches its own window.
+        let target = vec![
+            note(65, 0, Duration::half()),
+            note(64, 1, Duration::quarter()),
+            note(67, 2, Duration::eighth()),
+            note(65, 3, Duration::half()),
+        ];
+        let evidence = compare_melodic_sequences(
+            &source,
+            &target,
+            ReturnTransformation::Fragmented,
+        );
+
+        assert_eq!(evidence.fragment_similarity, 1.0);
+        assert_eq!(evidence.fragment_source_start_note, Some(2));
+        assert_eq!(evidence.fragment_rhythmic_shape_similarity, 1.0);
+        assert!(evidence.rhythmic_shape_similarity < 1.0);
+        assert!(evidence.meets_threshold(0.75));
     }
 
     #[test]
