@@ -25,18 +25,20 @@ cargo run --locked \
   --expected-primary-report-sha256 <INDEPENDENTLY-RETAINED-64-HEX> \
   --regrade-report build/rust-repair/fresh-regrade/score-report.json \
   --expected-regrade-report-sha256 <INDEPENDENTLY-RETAINED-64-HEX> \
-  --expected-task-manifest-sha256 <PRE-REGISTERED-64-HEX> \
+  --task-manifest build/rust-repair/locked-task-manifest.json \
+  --expected-task-manifest-sha256 <INDEPENDENTLY-RETAINED-MANIFEST-FILE-SHA256> \
   --report-out build/rust-repair/fresh-regrade/parity-audit.json
 ```
 
 ## Fail-closed checks
 
 - Both input reports must be regular files whose bytes match their externally supplied SHA-256 values; they must be distinct files and distinct digests.
-- Both reports must identify protocol `symthaea-rust-repair`, format version 1, and the exact pinned task-manifest SHA-256.
+- Both reports must identify protocol `symthaea-rust-repair`, format version 1, and the exact pinned task-manifest SHA-256. The same externally retained digest is checked against the exact locked manifest file bytes via `--task-manifest`.
+- The verifier parses the locked manifest, checks its full task-record schema, recomputes the canonical sorted `task_records_sha256`, and requires its exact task-ID set, candidate-split digest, per-task immutable image IDs and repository HEADs to agree with the two grade reports. The expected manifest SHA-256 is the digest of the complete JSON file, not the inner task-record digest.
 - Candidate JSONL SHA, predictions-file SHA, task count, and exact task-ID set must match across reports.
 - Aggregates (`success_count`, `failure_count`, `unresolved_count`, `scored_count`, `lockable`, and `pass_at_1`) are recomputed from task rows and compared with the claimed top-level values.
 - Each task's exact prediction patch digest must match between grades. When both sides provide image IDs or repository HEADs, those values must match. Resolved task rows must carry patch/log/evidence hashes, immutable `sha256:` image ID, Linux platform, network mode `none`, clean-workspace result, observed repository HEAD, and required-test counts; a passing row also needs all required tests passing and exit code zero.
-- If both grades resolve a task, the scored-log hash and evaluation-evidence hash must differ. Reusing the same receipt or log cannot be presented as an independent run.
+- If both grades resolve a task, the evaluation-evidence hash must differ. Identical test-log hashes are permitted because deterministic tests can produce byte-identical output on independent executions; the execution-specific evidence still needs to differ. Reusing the same runtime receipt cannot be presented as an independent run.
 - The output names the relation for every task: `concordant_pass`, `concordant_fail`, `primary_only_pass`, `regrade_only_pass`, or an unresolved relation. Both directions of disagreement remain visible.
 
 ## Metrics and interpretation
