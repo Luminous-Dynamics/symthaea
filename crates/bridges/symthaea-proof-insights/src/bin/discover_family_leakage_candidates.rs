@@ -506,6 +506,31 @@ mod tests {
     }
 
     #[test]
+    fn lexical_overlap_can_be_false_positive_but_stays_unreviewed() {
+        let tag = Regex::new(r"<[^>]*>").unwrap();
+        let entity = Regex::new(r"&[A-Za-z]+;").unwrap();
+        let token = Regex::new(r"(?u)[\p{L}\p{N}]{3,}").unwrap();
+        let stop = stopwords();
+        let mut a = family(
+            "182",
+            "Power savings for intersective polynomial differences and prime arguments",
+            "test",
+        );
+        let mut b = family(
+            "183",
+            "Power savings for planar halving lines and k-sets",
+            "train",
+        );
+        a.tokens = token_set(&a.title, &tag, &entity, &token, &stop);
+        b.tokens = token_set(&b.title, &tag, &entity, &token, &stop);
+        let candidates = discover(&[a, b]);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].candidate_relation, "title_similarity_only");
+        assert_eq!(candidates[0].candidate_status, "unreviewed");
+        assert_eq!(candidates[0].source_family_id, "182");
+        assert_eq!(candidates[0].target_family_id, "183");
+    }
+
     fn candidate_order_is_deterministic() {
         let tag = Regex::new(r"<[^>]*>").unwrap();
         let entity = Regex::new(r"&[A-Za-z]+;").unwrap();
