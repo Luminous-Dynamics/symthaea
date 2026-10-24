@@ -924,11 +924,17 @@ mod tests {
             .expect_err("policy configuration mismatch must fail closed");
         assert!(error.to_string().contains("configuration differs"));
 
-        let mut wrong_outcome = receipt;
+        let mut wrong_outcome = receipt.clone();
         wrong_outcome.arms[0].decisions[0].task_loss = Some(99.0);
         let error = bind_replay_receipt(&mut score.clone(), &input, wrong_outcome)
             .expect_err("receipt outcomes must match the observations being scored");
         assert!(error.to_string().contains("task_loss differs from scored outcome"));
+
+        let mut wrong_availability = receipt;
+        wrong_availability.arms[0].decisions[1].task_loss_available_at_tick = Some(3);
+        let error = bind_replay_receipt(&mut score.clone(), &input, wrong_availability)
+            .expect_err("outcome availability timestamps must match the scored input");
+        assert!(error.to_string().contains("task_loss_available_at_tick differs from scored observation"));
     }
 
 }
