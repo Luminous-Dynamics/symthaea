@@ -103,9 +103,10 @@ fn sha256(bytes: &[u8]) -> String {
 fn stopwords() -> BTreeSet<&'static str> {
     concat!(
         "the a an and or nor but of on in to for from with by at as is are was were be been being ",
-        "not does do did every each any all some over under into beyond across between within without ",
-        "against after before through during result results family families conjecture conjectures ",
-        "theorem theorems lemma lemmas proof proofs bound bounds formula formulas problem problems ",
+        "not does do did every each any all some over under into beyond ",
+        "across between within without against after before through during ",
+        "result results family families conjecture conjectures theorem theorems ",
+        "lemma lemmas proof proofs bound bounds formula formulas problem problems ",
         "new related general using its their this that preprints preprint lean docs paper pdf main ",
         "final manuscript version draft supplement supplemental appendix appendices october september ",
         "august july june may april march january february december november"
@@ -423,7 +424,10 @@ fn make_report(
             min_shared_rare_tokens: MIN_SHARED_RARE_TOKENS,
             min_path_jaccard: MIN_PATH_JACCARD,
             min_rarity_score: MIN_RARITY_SCORE,
-            note: "artifact-path lexical similarity only; not proof of shared artifact bytes or mathematical dependency",
+            note: concat!(
+                "artifact-path lexical similarity only; not proof of shared artifact bytes ",
+                "or mathematical dependency",
+            ),
         },
         counts: report_counts(&candidates),
         candidates,
@@ -448,7 +452,10 @@ fn main() -> Result<()> {
     fs::write(&args[1], serde_json::to_vec_pretty(&report)?)
         .with_context(|| format!("cannot write {}", args[1]))?;
     println!(
-        "PITB_ARTIFACT_PATH_CANDIDATES: pairs={} cross_split={} train_test={} relation=artifact_path_similarity_only",
+        concat!(
+            "PITB_ARTIFACT_PATH_CANDIDATES: pairs={} cross_split={} ",
+            "train_test={} relation=artifact_path_similarity_only"
+        ),
         report.counts.candidate_pairs,
         report.counts.cross_split_pairs,
         report.counts.train_test_pairs
@@ -487,14 +494,25 @@ mod tests {
             title: "Torus packets".to_owned(),
             split: "train".to_owned(),
             paths: vec!["preprints/Equidistribution-of-Prime-Degree-Torus-Packets.pdf".to_owned()],
-            path_tokens: BTreeSet::from(["prime".to_owned(), "degree".to_owned(), "torus".to_owned(), "packets".to_owned()]),
+            path_tokens: BTreeSet::from([
+                "prime".to_owned(),
+                "degree".to_owned(),
+                "torus".to_owned(),
+                "packets".to_owned(),
+            ]),
         };
         let b = Family {
             id: "002".to_owned(),
             title: "Polynomial differences".to_owned(),
             split: "test".to_owned(),
             paths: vec!["preprints/Power-Saving-for-Prime-Degree-Arguments.pdf".to_owned()],
-            path_tokens: BTreeSet::from(["prime".to_owned(), "degree".to_owned(), "power".to_owned(), "saving".to_owned(), "arguments".to_owned()]),
+            path_tokens: BTreeSet::from([
+                "prime".to_owned(),
+                "degree".to_owned(),
+                "power".to_owned(),
+                "saving".to_owned(),
+                "arguments".to_owned(),
+            ]),
         };
         let candidates = discover(&[a, b]);
         assert_eq!(candidates.len(), 1);
