@@ -799,6 +799,19 @@ mod tests {
         receipt.dataset_id = input.dataset_id.clone();
         receipt.stream_id = input.stream_id.clone();
         receipt.environment_seed = input.seed;
+        // Keep the test receipt cycle panel aligned with the four scored observations.
+        receipt.stream_length_ticks = input.no_adapt.observations.len() as u64;
+        receipt.events.truncate(receipt.stream_length_ticks as usize);
+        let deliveries: Vec<crate::cognitive_replay_receipt::DeliveryRecord> = receipt.events.iter()
+            .map(|event| crate::cognitive_replay_receipt::DeliveryRecord {
+                event_id: event.event_id.clone(),
+                delivered_at_tick: event.available_at_tick,
+            })
+            .collect();
+        for receipt_arm in &mut receipt.arms {
+            receipt_arm.decisions.truncate(receipt.stream_length_ticks as usize);
+            receipt_arm.deliveries = deliveries.clone();
+        }
 
         let stream_digest = hex_sha256(&serde_json::to_vec(&receipt.events).expect("serialize event ledger"));
         receipt.event_ledger_sha256 = stream_digest.clone();
