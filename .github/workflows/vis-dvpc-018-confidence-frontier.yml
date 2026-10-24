@@ -1,0 +1,41 @@
+name: VIS-DVPC-018 uncertainty-aware Pareto frontier
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-confidence-frontier.rs"
+      - "docs/research/VIS_DVPC_018_CONFIDENCE_AWARE_FRONTIER_V1.md"
+      - ".github/workflows/vis-dvpc-018-confidence-frontier.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-confidence-frontier.rs"
+      - "docs/research/VIS_DVPC_018_CONFIDENCE_AWARE_FRONTIER_V1.md"
+      - ".github/workflows/vis-dvpc-018-confidence-frontier.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Compile and run confidence-frontier tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-confidence-frontier.rs -o /tmp/vis-dvpc-018-tests
+          /tmp/vis-dvpc-018-tests
+
+      - name: Build standalone analyzer
+        run: rustc --edition=2024 -O tools/vision-dvpc-confidence-frontier.rs -o /tmp/vis-dvpc-018
+
+      - name: Check formatting after executable tests
+        if: always()
+        run: rustfmt --edition 2024 --check tools/vision-dvpc-confidence-frontier.rs
