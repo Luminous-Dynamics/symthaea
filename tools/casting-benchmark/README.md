@@ -97,3 +97,27 @@ Do not use this custom AUC in place of COCO's native target-reaching/ECDF analys
 
 
 The analysis lock is versioned separately at `docs/research/CASTING_BENCHMARK_ANALYSIS_LOCK_V1.json`. A receipt's protocol and analysis-lock hashes must match the exact checked-out bytes, and its per-run ideal/reference points must exactly match the suite+instance contract. The test-only known-answer suite is explicitly fixture-only; real-run mode cannot use its [0,0]/[10,10] range. This prevents an algorithm from inflating its score by selecting an easier per-run reference point.
+
+
+## Controlled multi-fidelity stress benchmark
+
+- `docs/research/CASTING_MULTIFIDELITY_STRESS_V1.json` locks the synthetic formulas, severity knob, finite grid and fidelity costs.
+- `tools/casting-benchmark/multifidelity_stress.py` runs four policies at a default budget of 200 cost units: high-only (8 HF), low-screen (75 LF + 5 HF), fixed top-k (50 LF + 10 MF + 4 HF), and discrepancy-aware (55 LF + 4 MF + 5 HF).
+- `tools/casting-benchmark/test_multifidelity_stress.py` tests deterministic outputs, exact cost accounting, nontrivial objective-rank and feasibility inversions, the policy-facing interface, and known-answer hypervolume.
+
+Run from the repository root:
+
+```sh
+python3 -m unittest discover -s tools/casting-benchmark -p 'test_*.py' -v
+python3 tools/casting-benchmark/multifidelity_stress.py --seed 17 --cost-budget 200 --grid-size 21 --severity 1.0
+```
+
+All runs are labelled `synthetic_fixture_only`. At the default settings all four policy templates spend 200 cost units, but the high-fidelity call counts vary by design; this is a cost-constrained comparison, not a fixed-HF-count comparison. Report both total-cost and high-fidelity-call count. The fixture has known analytical truth for independent audit but is not a CFD solver, validated casting model, or physical foundry result.
+
+The low-fidelity response includes deliberate non-monotone objective bias, deterministic heteroscedastic perturbations, and constraint-margin inversions. The test checks that the stress properties are actually present instead of assuming low fidelity is informative. The discrepancy-aware baseline uses four paired low/medium probes and two high-fidelity anchors to construct a simple correction; it is intentionally a transparent reference policy, not a claim to beat MF-HVKG/MOMF. Its accuracy must be measured across severity sweeps and paired seeds.
+
+Benchmarks and research context:
+- BoTorch's MF-HVKG/MOMF tutorial: https://archive.botorch.org/tutorials/Multi_objective_multi_fidelity_BO
+- Multi-Fidelity Methods for Optimization: A Survey (2026): https://doi.org/10.1145/3801959
+- Best practices for multi-fidelity Bayesian optimization in materials/molecular research: https://www.nature.com/articles/s43588-025-00822-9
+- Review of casting/foundry digital twins, validation and reproducible benchmarking: https://link.springer.com/article/10.1007/s43939-026-00685-5
