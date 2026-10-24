@@ -183,7 +183,7 @@ The follow-on LearningManager admission lane uses the same typed cursor for surp
 - PerceptionManager only allows an admitted, current-cycle PE sample to enter or exit vigilance; duplicate/stale PE cannot toggle attention, and independent budget/coherence/arousal signals remain active.
 - All PEVC v2 checkpoint extensions use the same encoder/decoder and validation rules; malformed flags, absent-but-nonzero cycles, invalid magic/version, wrong length, and admitted cycles beyond the observed high-water mark are rejected consistently.
 - Checkpoint/restore must preserve observed and admitted watermarks independently; legacy PEVC v1 migration must retain its known admitted-cycle floor.
-- A fixed-seed 10,000-entry mixed trace interleaves valid samples, unavailable evidence, non-canonical flags, duplicate and out-of-order cycle numbers, and requested-cycle mismatches. Each admission decision and the cursor state must match an independent reference rule.
+- A fixed-seed 10,000-entry adversarial trace uses a repeating six-event schedule: valid admission, duplicate, invalid newer cycle, delayed older cycle, evidence/requested-cycle mismatch, and valid same-cycle recovery. Every admission decision and both cursor watermarks must match an independent reference rule; a minimum of 3,000 successful admissions prevents a random schedule from degenerating into an almost-all-stale stream.
 - This trace is a cursor/adapter contract test, not a substitute for the 15 consumer-level counterfactual cases. End-to-end state-digest comparisons across downstream learners, replay stores, safety, and checkpoint restoration remain required.
 
 The above are acceptance tests, not measured results until executed against the exact tested commit with a supported Rust toolchain.
