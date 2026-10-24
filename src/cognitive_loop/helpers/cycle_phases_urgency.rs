@@ -489,3 +489,90 @@ impl CognitiveLoopService {
         }
     }
 }
+
+#[cfg(test)]
+mod prediction_evidence_urgency_tests {
+    use crate::cognitive_loop::types::{
+        PredictionErrorEvidence, PredictionEvidenceStatus,
+    };
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+
+    #[test]
+    fn stale_evidence_does_not_advance_urgency_history_or_low_error_streak() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+        service.stats.total_cycles = 10;
+        service.stats.avg_prediction_error = 0.2;
+        service.carryover.urgency.consecutive_low_error = 4;
+        service
+            .carryover
+            .history
+            .error_history
+            .extend([0.2, 0.25, 0.3]);
+        let history_before: Vec<f32> = service
+            .carryover
+            .history
+            .error_history
+            .iter()
+            .copied()
+            .collect();
+
+        // The measurement is valid for cycle 9, but cycle 10 is being evaluated.
+        let stale = PredictionErrorEvidence::valid(0.0, Some(8), 9).unwrap();
+        service.compute_urgency_and_error_pattern(&stale, 10, false, 0.5);
+
+        let history_after: Vec<f32> = service
+            .carryover
+            .history
+            .error_history
+            .iter()
+            .copied()
+            .collect();
+        assert_eq!(history_after, history_before);
+        assert_eq!(service.carryover.urgency.consecutive_low_error, 4);
+        assert_eq!(service.stats.avg_prediction_error, 0.2);
+    }
+
+    #[test]
+    fn current_valid_evidence_is_admitted_once_by_urgency() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+        service.stats.total_cycles = 10;
+        service.carryover.urgency.consecutive_low_error = 2;
+        let evidence = PredictionErrorEvidence::valid(0.1, Some(9), 10).unwrap();
+
+        service.compute_urgency_and_error_pattern(&evidence, 10, false, 0.5);
+
+        assert_eq!(
+            service
+                .carryover
+                .history
+                .error_history
+                .iter()
+                .copied()
+                .filter(|value| (*value - 0.1).abs() < f32::EPSILON)
+                .count(),
+            1
+        );
+        assert_eq!(service.carryover.urgency.consecutive_low_error, 3);
+    }
+
+    #[test]
+    fn missing_evidence_does_not_become_a_low_error_observation() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+            .expect("default cognitive loop should initialize");
+        service.stats.total_cycles = 10;
+        service.carryover.urgency.consecutive_low_error = 3;
+        let evidence = PredictionErrorEvidence::invalid(
+            PredictionEvidenceStatus::NoPriorPrediction,
+            None,
+            10,
+        )
+        .expect("NoPriorPrediction is an invalid status");
+
+        service.compute_urgency_and_error_pattern(&evidence, 10, false, 0.5);
+
+        assert!(service.carryover.history.error_history.is_empty());
+        assert_eq!(service.carryover.urgency.consecutive_low_error, 3);
+    }
+}
