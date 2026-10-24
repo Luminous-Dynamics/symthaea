@@ -42,6 +42,7 @@ struct StateRow {
     model_version: Option<String>,
     config_sha256: Option<String>,
     budget_caps: Option<Usage>,
+    semantic_gate_status: Option<String>,
     applicability_judgment: Option<String>,
     decision: Option<String>,
     original_move_applied: Option<bool>,
@@ -502,6 +503,7 @@ fn analyze(
             model_version: parsed.model_version,
             config_sha256: parsed.config_sha256,
             budget_caps: parsed.budget_caps,
+            semantic_gate_status: parsed.semantic_gate_status,
             applicability_judgment: parsed.applicability_judgment,
             decision: parsed.decision,
             original_move_applied: parsed.original_move_applied,
@@ -562,6 +564,18 @@ fn analyze(
     counts.insert(
         "checked_failure_rows".into(),
         json!(selected.iter().filter(|row| row.checker_result == "checked_failure").count()),
+    );
+    counts.insert(
+        "semantic_gate_pass_rows".into(),
+        json!(selected.iter().filter(|row| row.semantic_gate_status.as_deref() == Some("passed")).count()),
+    );
+    counts.insert(
+        "semantic_gate_failed_rows".into(),
+        json!(selected.iter().filter(|row| row.semantic_gate_status.as_deref() == Some("failed")).count()),
+    );
+    counts.insert(
+        "semantic_gate_unknown_rows".into(),
+        json!(selected.iter().filter(|row| row.semantic_gate_status.as_deref() == Some("unknown")).count()),
     );
 
     let mut resource_usage = Map::new();
@@ -669,6 +683,103 @@ struct Usage {
     cost_microusd: u64,
 }
 
+fn validate_semantic_gate(
+    gate: &Value,
+    context: &str,
+    expected_target_statement_sha256: &str,
+) -> Result<String> {
+    let gate_context = format!("{context}.semantic_gate");
+    let status = string(gate, "status", &gate_context)?.to_owned();
+    if !matches!(status.as_str(), "passed" | "failed" | "unknown") {
+        bail!("{context}: unsupported semantic gate status {status:?}");
+    }
+
+    let target_digest = string(gate, "checked_target_statement_sha256", &gate_context)?;
+    validate_sha256(target_digest, &format!("{gate_context}.checked_target_statement_sha256"))?;
+    if target_digest != expected_target_statement_sha256 {
+        bail!("{context}: semantic gate is bound to a different target statement");
+    }
+
+    let correspondence = field(gate, "statement_correspondence", &gate_context)?;
+    let correspondence_status = string(correspondence, "status", &gate_context)?;
+    if !matches!(correspondence_status, "matches_intended_claim" | "mismatch" | "unknown") {
+        bail!("{context}: invalid semantic-gate statement-correspondence status");
+    }
+    let reviewers = unsigned(correspondence, "independent_reviewer_count", &gate_context)?;
+    validate_sha256(
+        string(correspondence, "receipt_sha256", &gate_context)?,
+        &format!("{gate_context}.statement_correspondence.receipt_sha256"),
+    )?;
+
+    let axiom_policy = field(gate, "axiom_policy", &gate_context)?;
+    let axiom_status = string(axiom_policy, "status", &gate_context)?;
+    if !matches!(axiom_status, "compliant" | "violation" | "unknown") {
+        bail!("{context}: invalid semantic-gate axiom-policy status");
+    }
+    if string(axiom_policy, "policy_id", &gate_context)?.trim().is_empty() {
+        bail!("{context}: semantic-gate axiom policy ID must not be blank");
+    }
+    validate_sha256(
+        string(axiom_policy, "receipt_sha256", &gate_context)?,
+        &format!("{gate_context}.axiom_policy.receipt_sha256"),
+    )?;
+
+    let successor = field(gate, "successor_check", &gate_context)?;
+    let successor_status = string(successor, "status", &gate_context)?;
+    if !matches!(successor_status, "passed" | "failed" | "not_applicable" | "unknown") {
+        bail!("{context}: invalid semantic-gate dependent-successor status");
+    }
+    validate_sha256(
+        string(successor, "receipt_sha256", &gate_context)?,
+        &format!("{gate_context}.successor_check.receipt_sha256"),
+    )?;
+    let successor_reason = field(successor, "reason", &gate_context)?;
+    if successor_status == "not_applicable" {
+        if !successor_reason.as_str().is_some_and(|value| !value.trim().is_empty()) {
+            bail!("{context}: not_applicable successor check requires a reason");
+        }
+    } else if !successor_reason.is_null() {
+        bail!("{context}: successor-check reason is only allowed when status is not_applicable");
+    }
+
+    let mutation = field(gate, "mutation_controls", &gate_context)?;
+    let mutation_status = string(mutation, "status", &gate_context)?;
+    if !matches!(mutation_status, "passed" | "failed" | "unknown") {
+        bail!("{context}: invalid semantic-gate mutation-control status");
+    }
+    validate_sha256(
+        string(mutation, "suite_sha256", &gate_context)?,
+        &format!("{gate_context}.mutation_controls.suite_sha256"),
+    )?;
+    validate_sha256(
+        string(mutation, "receipt_sha256", &gate_context)?,
+        &format!("{gate_context}.mutation_controls.receipt_sha256"),
+    )?;
+
+    let hard_failure = correspondence_status == "mismatch"
+        || axiom_status == "violation"
+        || successor_status == "failed"
+        || mutation_status == "failed";
+    let unresolved_evidence = correspondence_status == "unknown"
+        || reviewers < 2
+        || axiom_status == "unknown"
+        || successor_status == "unknown"
+        || mutation_status == "unknown";
+    let derived_status = if hard_failure {
+        "failed"
+    } else if unresolved_evidence {
+        "unknown"
+    } else {
+        "passed"
+    };
+    if status != derived_status {
+        bail!(
+            "{context}: declared semantic gate status {status:?} contradicts component evidence; expected {derived_status:?}"
+        );
+    }
+    Ok(status)
+}
+
 fn parse_execution(
     execution: &Value,
     context: &str,
@@ -691,6 +802,7 @@ fn parse_execution(
             "run_receipt_sha256",
             "resource_usage",
             "budget_caps",
+            "semantic_gate",
         ] {
             if !field(execution, key, context)?.is_null() {
                 bail!("{context}: not_run execution must set {key} to null");
@@ -705,6 +817,7 @@ fn parse_execution(
             model_version: None,
             config_sha256: None,
             budget_caps: None,
+            semantic_gate_status: None,
             applicability_judgment: None,
             decision: None,
             original_move_applied: None,
@@ -736,6 +849,10 @@ fn parse_execution(
     if checked_target_sha != expected_target_statement_sha256 {
         bail!("{context}: checker target statement digest does not match the paired suite target");
     }
+
+    let semantic_gate = field(execution, "semantic_gate", context)?;
+    let semantic_gate_status =
+        validate_semantic_gate(semantic_gate, context, expected_target_statement_sha256)?;
 
     let applicability_judgment = string(execution, "applicability_judgment", context)?.to_owned();
     if !matches!(applicability_judgment.as_str(), "eligible" | "not_applicable" | "uncertain") {
@@ -815,6 +932,7 @@ fn parse_execution(
         model_version: Some(model_version),
         config_sha256: Some(config_sha256),
         budget_caps: Some(budget_caps),
+        semantic_gate_status: Some(semantic_gate_status),
         applicability_judgment: Some(applicability_judgment),
         decision: Some(decision),
         original_move_applied: Some(original_move_applied),
@@ -900,13 +1018,26 @@ fn compute_metrics(
     let selected: Vec<&StateRow> = rows.iter().filter(|row| row.split == split).collect();
     let mut metrics = Map::new();
 
-    let assigned_solve = selected.iter().map(|row| Point {
+    let raw_checker_success = selected.iter().map(|row| Point {
         component_id: row.component_id.clone(),
         success: row.execution_status == "executed" && row.checker_result == "checked_success",
     }).collect();
     metrics.insert(
+        "raw_checker_success_rate_on_assigned_rows".into(),
+        metric_json(estimate(raw_checker_success, bootstrap_replicates, seed)),
+    );
+
+    // The primary exact-target endpoint requires both kernel checking and the
+    // independent semantic gate; raw compilation success remains separately visible.
+    let qualified_target_success = selected.iter().map(|row| Point {
+        component_id: row.component_id.clone(),
+        success: row.execution_status == "executed"
+            && row.checker_result == "checked_success"
+            && row.semantic_gate_status.as_deref() == Some("passed"),
+    }).collect();
+    metrics.insert(
         "exact_target_solve_rate_on_assigned_rows".into(),
-        metric_json(estimate(assigned_solve, bootstrap_replicates, seed)),
+        metric_json(estimate(qualified_target_success, bootstrap_replicates, seed.wrapping_add(20))),
     );
 
     let coverage = selected.iter().map(|row| Point {
@@ -1535,6 +1666,33 @@ mod tests {
         );
     }
 
+    fn passing_semantic_gate(target_digest: &str) -> Value {
+        json!({
+            "status": "passed",
+            "checked_target_statement_sha256": target_digest,
+            "statement_correspondence": {
+                "status": "matches_intended_claim",
+                "independent_reviewer_count": 2,
+                "receipt_sha256": "1".repeat(64)
+            },
+            "axiom_policy": {
+                "status": "compliant",
+                "policy_id": "test-allowed-axioms-v0",
+                "receipt_sha256": "2".repeat(64)
+            },
+            "successor_check": {
+                "status": "not_applicable",
+                "receipt_sha256": "3".repeat(64),
+                "reason": "The fixture target has no meaningful dependent successor."
+            },
+            "mutation_controls": {
+                "status": "passed",
+                "suite_sha256": "4".repeat(64),
+                "receipt_sha256": "5".repeat(64)
+            }
+        })
+    }
+
     #[test]
     fn checker_result_must_bind_to_exact_expected_statement_digest() {
         let target_digest = "d".repeat(64);
@@ -1557,6 +1715,7 @@ mod tests {
                 "decision": "apply_original_move",
                 "original_move_applied": true,
                 "checked_target_statement_sha256": checked_target,
+                "semantic_gate": passing_semantic_gate(checked_target),
                 "checker_result": "checked_success",
                 "proof_sha256": "b".repeat(64),
                 "run_receipt_sha256": "c".repeat(64),
@@ -1590,6 +1749,51 @@ mod tests {
     }
 
     #[test]
+    fn semantic_gate_must_bind_to_the_exact_target() {
+        let target_digest = "d".repeat(64);
+        let make_execution = |gate: Value| json!({
+            "status": "executed",
+            "model": {"model_id":"test-model","model_version":"test-version","config_sha256":"a".repeat(64)},
+            "applicability_judgment": "eligible",
+            "decision": "apply_original_move",
+            "original_move_applied": true,
+            "checked_target_statement_sha256": target_digest,
+            "semantic_gate": gate,
+            "checker_result": "checked_success",
+            "proof_sha256": "b".repeat(64),
+            "run_receipt_sha256": "c".repeat(64),
+            "budget_caps": {"model_calls":2,"input_tokens":16,"output_tokens":8,"wall_time_ms":100,"cost_microusd":10},
+            "resource_usage": {"model_calls":1,"input_tokens":8,"output_tokens":3,"wall_time_ms":12,"cost_microusd":4}
+        });
+        let wrong = make_execution(passing_semantic_gate(&"e".repeat(64)));
+        let error = parse_execution(&wrong, "test-execution", "reviewed_benchmark", &target_digest)
+            .expect_err("semantic gate bound to the wrong target must fail closed");
+        assert!(error.to_string().contains("semantic gate is bound to a different target statement"));
+        let valid = make_execution(passing_semantic_gate(&target_digest));
+        assert!(parse_execution(&valid, "test-execution", "reviewed_benchmark", &target_digest).is_ok());
+    }
+
+    #[test]
+    fn semantic_gate_cannot_pass_with_an_axiom_violation() {
+        let target_digest = "d".repeat(64);
+        let mut gate = passing_semantic_gate(&target_digest);
+        gate["axiom_policy"]["status"] = Value::String("violation".into());
+        let error = validate_semantic_gate(&gate, "test-execution", &target_digest)
+            .expect_err("passed semantic gate with an axiom violation must be rejected");
+        assert!(error.to_string().contains("contradicts component evidence"));
+    }
+
+    #[test]
+    fn semantic_gate_requires_two_independent_statement_reviews_to_pass() {
+        let target_digest = "d".repeat(64);
+        let mut gate = passing_semantic_gate(&target_digest);
+        gate["statement_correspondence"]["independent_reviewer_count"] = json!(1);
+        let error = validate_semantic_gate(&gate, "test-execution", &target_digest)
+            .expect_err("one review cannot qualify the semantic gate");
+        assert!(error.to_string().contains("contradicts component evidence"));
+    }
+
+    #[test]
     fn executed_outcome_cannot_exceed_declared_resource_caps() {
         let target_digest = "d".repeat(64);
         let mut execution = json!({
@@ -1603,6 +1807,7 @@ mod tests {
             "decision": "apply_original_move",
             "original_move_applied": true,
             "checked_target_statement_sha256": target_digest,
+            "semantic_gate": passing_semantic_gate(&target_digest),
             "checker_result": "checked_success",
             "proof_sha256": "b".repeat(64),
             "run_receipt_sha256": "c".repeat(64),
