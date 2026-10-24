@@ -68,7 +68,9 @@ Hold detector revisions fixed while comparing policy logic, and hold policy logi
 
 ## Primary outcomes and report contract
 
-There is no default composite score. Report these separately:
+There is no default composite score. The **single confirmatory comparison** is staged-verify-rollback versus detector-triggered adaptation on held-out post-shift task loss (lower is better), with the policy, endpoint, direction, and interpretation frozen before held-out evaluation. Other detector, policy, metric, and scenario comparisons are exploratory unless a family and a multiplicity-control procedure are preregistered. This prevents choosing the best-looking result across many combinations and presenting an unadjusted interval as confirmatory evidence.
+
+Report these separately:
 
 **Task outcomes**
 - Pre-shift, transition-window, post-shift, and whole-stream task loss.
