@@ -30,6 +30,8 @@ pub enum PredictionEvidenceStatus {
     StaleOrOutOfOrder,
     /// The upstream source did not provide a trustworthy comparison.
     SourceUnavailable,
+    /// The ABI validity byte was not the canonical value 1.
+    InvalidValidityFlag,
     /// The cycle was gated before a prediction comparison was evaluated.
     NotEvaluated,
 }
@@ -133,6 +135,21 @@ impl PredictionEvidenceCursor {
         }
         self.last_admitted_observation_cycle = Some(observation_cycle);
         Some(value)
+    }
+
+    /// Admit typed evidence only when it is valid for the requested observation.
+    ///
+    /// This is the preferred consumer API: callers cannot accidentally pass a
+    /// sentinel or a sample whose embedded observation cycle differs from the
+    /// consumer's requested cycle. The cursor still enforces monotonic,
+    /// exactly-once admission after the evidence contract is satisfied.
+    pub fn admit_evidence(
+        &mut self,
+        evidence: &PredictionErrorEvidence,
+        observation_cycle: u64,
+    ) -> Option<f32> {
+        let value = evidence.value_for_observation(observation_cycle)?;
+        self.admit(observation_cycle, Some(value))
     }
 
     /// Highest observation cycle whose PE sample was admitted.
@@ -331,6 +348,29 @@ mod tests {
         assert_eq!(cursor.admit(9, Some(0.8)), None);
         assert_eq!(cursor.admit(11, Some(0.6)), Some(0.6));
         assert_eq!(cursor.last_admitted_observation_cycle(), Some(11));
+    }
+
+    #[test]
+    fn typed_cursor_admission_requires_matching_cycle_and_valid_status() {
+        use super::PredictionEvidenceCursor;
+
+        let mut cursor = PredictionEvidenceCursor::default();
+        let valid = PredictionErrorEvidence::valid(0.4, None, 12).unwrap();
+        assert_eq!(cursor.admit_evidence(&valid, 11), None);
+        assert_eq!(cursor.last_admitted_observation_cycle(), None);
+
+        let invalid = PredictionErrorEvidence::invalid(
+            PredictionEvidenceStatus::InvalidValidityFlag,
+            None,
+            12,
+        )
+        .unwrap();
+        assert_eq!(cursor.admit_evidence(&invalid, 12), None);
+        assert_eq!(cursor.last_admitted_observation_cycle(), None);
+
+        assert_eq!(cursor.admit_evidence(&valid, 12), Some(0.4));
+        assert_eq!(cursor.admit_evidence(&valid, 12), None);
+        assert_eq!(cursor.last_admitted_observation_cycle(), Some(12));
     }
 
     #[test]
