@@ -442,12 +442,48 @@ fn structured_correction_basis(
             )
         }
         RecoveryProposalFamily::UnaryFunctionCorrection => {
-            // This family is only enabled in the operator-held-out track. Construct a
-            // dimensionally valid oscillatory expression and subtract the rejected base so the
-            // fitted coefficient can replace the old structure when it is identifiable.
-            // The proposal uses a public dimensionless invariant basis: q=v*t/r or q^-1.
-            // This is deliberately a narrow operator-holdout task, not a claim of arbitrary
-            // new-operator invention or unrestricted grammar expansion.
+            // This proposal family is only enabled in the operator-held-out track. Search a
+            // small public set of ENERGY scales and dimensionless phase invariants, independent
+            // of the hidden reference. The coefficient fit composes (scale * sin/cos(phase))
+            // with the rejected base; this remains a bounded grammar extension, not arbitrary
+            // operator invention.
+            let energy_scale = match rand_index(rng, 3) {
+                0 => Expr::BinOp(
+                    BinOp::Mul,
+                    Box::new(Expr::Var("m".to_string())),
+                    Box::new(Expr::BinOp(
+                        BinOp::Pow,
+                        Box::new(Expr::Var("v".to_string())),
+                        Box::new(Expr::Const(2.0)),
+                    )),
+                ),
+                1 => Expr::BinOp(
+                    BinOp::Mul,
+                    Box::new(Expr::Var("m".to_string())),
+                    Box::new(Expr::BinOp(
+                        BinOp::Pow,
+                        Box::new(Expr::BinOp(
+                            BinOp::Div,
+                            Box::new(Expr::Var("r".to_string())),
+                            Box::new(Expr::Var("t".to_string())),
+                        )),
+                        Box::new(Expr::Const(2.0)),
+                    )),
+                ),
+                _ => Expr::BinOp(
+                    BinOp::Mul,
+                    Box::new(Expr::BinOp(
+                        BinOp::Mul,
+                        Box::new(Expr::Var("m".to_string())),
+                        Box::new(Expr::Var("v".to_string())),
+                    )),
+                    Box::new(Expr::BinOp(
+                        BinOp::Div,
+                        Box::new(Expr::Var("r".to_string())),
+                        Box::new(Expr::Var("t".to_string())),
+                    )),
+                ),
+            };
             let velocity_time = Expr::BinOp(
                 BinOp::Mul,
                 Box::new(Expr::Var("v".to_string())),
@@ -471,11 +507,8 @@ fn structured_correction_basis(
             } else {
                 UnaryFn::Cos
             };
-            let oscillatory = Expr::BinOp(
-                BinOp::Mul,
-                Box::new(base.clone()),
-                Box::new(Expr::Func(unary, Box::new(phase))),
-            );
+            let oscillatory =
+                Expr::BinOp(BinOp::Mul, Box::new(energy_scale), Box::new(Expr::Func(unary, Box::new(phase))));
             Expr::BinOp(BinOp::Sub, Box::new(oscillatory), Box::new(base.clone()))
         }
         RecoveryProposalFamily::GenericTyped => return None,
