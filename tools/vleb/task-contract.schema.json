@@ -64,7 +64,7 @@
     "source_identity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source_kind", "revision", "source_sha256"],
+      "required": ["source_kind", "revision", "source_sha256", "fixture_sha256"],
       "properties": {
         "source_kind": {
           "enum": ["repository", "synthetic_fixture", "benchmark_sample"]
