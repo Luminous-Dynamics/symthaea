@@ -1,0 +1,41 @@
+name: VIS-DVPC-016 safety-gated budget-sweep Pareto analyzer
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-budget-frontier.rs"
+      - "docs/research/VIS_DVPC_016_BUDGET_SWEEP_PARETO_V1.md"
+      - ".github/workflows/vis-dvpc-016-budget-pareto-frontier.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-budget-frontier.rs"
+      - "docs/research/VIS_DVPC_016_BUDGET_SWEEP_PARETO_V1.md"
+      - ".github/workflows/vis-dvpc-016-budget-pareto-frontier.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Compile and run budget-frontier tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-budget-frontier.rs -o /tmp/vis-dvpc-016-tests
+          /tmp/vis-dvpc-016-tests
+
+      - name: Build standalone analyzer
+        run: rustc --edition=2024 -O tools/vision-dvpc-budget-frontier.rs -o /tmp/vis-dvpc-016
+
+      - name: Check formatting after executable tests
+        if: always()
+        run: rustfmt --edition 2024 --check tools/vision-dvpc-budget-frontier.rs
