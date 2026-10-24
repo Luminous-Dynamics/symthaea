@@ -79,7 +79,7 @@ jobs:
         run: echo "492101dd369d679bf45ca700b5fa70f7277a0e6a5109091c268351f3f161f464  tools/morphology-continuity-oracle/active_calibration_allocation_v1_5.txt" | sha256sum --check -
 
       - name: Verify frozen predictive ambiguity allocation request digest
-        run: echo "fcc7ad2e1521b5b453cb54e140ac445875f8dd472c5368443654af3bedfe614d  tools/morphology-continuity-oracle/predictive_ambiguity_allocation_v1_6.txt" | sha256sum --check -
+        run: echo "d08391a7e43354a80eb8ee1099b02d7bd7722b017d1da2f6e61ac73fbc0187be  tools/morphology-continuity-oracle/predictive_ambiguity_allocation_v1_6.txt" | sha256sum --check -
 
       - name: Formatting
         run: cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
