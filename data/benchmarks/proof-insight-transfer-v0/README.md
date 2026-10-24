@@ -150,9 +150,11 @@ Example (synthetic planning assumptions only; 20 cluster sizes shown):
 
 ```sh
 cargo run --locked --bin plan_pitb_power -- \
-  0.35 0.15 0.10 0.05 \
+  0.35 0.15 0.10 0.05 0.05 0.5 \
   2,3,1,4,2,2,3,1,4,2,3,1,2,4,1,3,2,2,4,1 \
   10000 12345 power-plan.json
 ```
 
-The output is governed by `power-planning-report.schema.json`. Repeat with a sensitivity grid over baseline success, expected gain, and ICC; use the real eligible connected-component sizes once the relationship audit is complete. A power estimate is conditional on this explicit generative model, not proof that the assumed baseline or ICC matches PITB. Do not use synthetic assumptions to claim that the benchmark is powered, and do not tune assumptions after observing held-out outcomes.
+The output is governed by `power-planning-report.schema.json`. The parameters after ICC are the standard deviation of a family-level treatment-effect deviation on the probability scale and a pair-association fraction: 0 means independent potential outcomes conditional on family success probabilities, while 1 reaches the Frechet upper bound on joint success. This association fraction is not a Pearson correlation. The treatment effect can vary by family and can be negative; success probabilities are clipped to [0,1], so the report exposes the generated marginal gain rather than assuming it equals the input.
+
+Repeat across a predeclared sensitivity grid over baseline success, expected gain, ICC, family-effect heterogeneity, and pair association; use the real eligible connected-component sizes once the relationship audit is complete. The model is a planning sensitivity analysis, not an estimate of PITB's effect distribution or pair correlation. Do not use synthetic assumptions to claim that the benchmark is powered, and do not tune assumptions after observing held-out outcomes.
