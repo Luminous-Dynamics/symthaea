@@ -565,6 +565,23 @@ impl CognitiveLoopService {
             observation_cycle,
         ));
 
+        // Close the HDC↔LTC loop for the next cycle: this prediction is tagged
+        // with its producer cycle, and encode_at() rejects it after a skipped
+        // or out-of-order observation. Never feed an incompatible shape.
+        if !dynamics.core.prediction.is_empty()
+            && dynamics.core.prediction.len() == self.config.cfc_config.input_dim
+        {
+            self.encoder.set_prediction_at(
+                dynamics.core.prediction.clone(),
+                observation_cycle,
+            );
+            self.encoder.set_first_horizon_prediction(
+                dynamics.core.prediction_first_horizon.clone(),
+            );
+        } else {
+            self.encoder.clear_prediction();
+        }
+
         CycleResult {
             output,
             prediction_error: dynamics.core.prediction_error,
