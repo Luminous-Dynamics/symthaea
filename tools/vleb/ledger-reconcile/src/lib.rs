@@ -131,7 +131,12 @@ pub fn reconcile_csv(input: &str) -> Result<LedgerReport, LedgerError> {
         return Err(LedgerError::new("CSV is empty; expected header row"));
     };
 
-    if header.iter().map(String::as_str).collect::<Vec<_>>() != EXPECTED_HEADER {
+    if header.len() != EXPECTED_HEADER.len()
+        || !header
+            .iter()
+            .zip(EXPECTED_HEADER.iter())
+            .all(|(actual, expected)| actual.as_str() == *expected)
+    {
         return Err(LedgerError::new(
             "invalid CSV header; expected transaction_id,account_id,side,amount_minor",
         ));
