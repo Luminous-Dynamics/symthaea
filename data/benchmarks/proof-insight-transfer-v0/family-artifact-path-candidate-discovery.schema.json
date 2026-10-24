@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb.family-artifact-path-candidates.v0.json",
+  "title": "PITB linked artifact-path candidate discovery report",
+  "description": "Candidate relations derived from lexical overlap among linked artifact path slugs. A candidate is a review lead only; paths and token overlap do not authenticate artifact bytes or prove mathematical dependence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "upstream_repository",
+    "upstream_commit",
+    "source_partition_digest_sha256",
+    "total_family_count",
+    "original_family_counts",
+    "config",
+    "counts",
+    "candidates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.family-artifact-path-candidates.v0"
+    },
+    "upstream_repository": {
+      "const": "https://github.com/openai/math"
+    },
+    "upstream_commit": {
+      "const": "1581d4cbdd69a0faf34b2089614fe2a814316a6a"
+    },
+    "source_partition_digest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "total_family_count": {
+      "const": 372
+    },
+    "original_family_counts": {
+      "$ref": "#/$defs/splitCounts"
+    },
+    "config": {
+      "$ref": "#/$defs/config"
+    },
+    "counts": {
+      "$ref": "#/$defs/counts"
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "splitCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "train",
+        "validation",
+        "test"
+      ],
+      "properties": {
+        "train": {
+          "const": 260
+        },
+        "validation": {
+          "const": 56
+        },
+        "test": {
+          "const": 56
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tokenizer",
+        "stopword_policy",
+        "max_document_frequency",
+        "min_shared_rare_tokens",
+        "min_path_jaccard",
+        "min_rarity_score",
+        "note"
+      ],
+      "properties": {
+        "tokenizer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stopword_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_document_frequency": {
+          "const": 15
+        },
+        "min_shared_rare_tokens": {
+          "const": 2
+        },
+        "min_path_jaccard": {
+          "const": 0.1
+        },
+        "min_rarity_score": {
+          "const": 4
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_pairs",
+        "cross_split_pairs",
+        "train_test_pairs"
+      ],
+      "properties": {
+        "candidate_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cross_split_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "train_test_pairs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_family_id",
+        "target_family_id",
+        "source_split",
+        "target_split",
+        "source_title",
+        "target_title",
+        "source_matching_paths",
+        "target_matching_paths",
+        "shared_path_tokens",
+        "rare_shared_path_tokens",
+        "path_token_jaccard",
+        "rare_token_rarity_score",
+        "candidate_relation",
+        "candidate_status",
+        "evidence_sha256"
+      ],
+      "properties": {
+        "source_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_split": {
+          "enum": [
+            "train",
+            "validation",
+            "test"
+          ]
+        },
+        "target_split": {
+          "enum": [
+            "train",
+            "validation",
+            "test"
+          ]
+        },
+        "source_title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_matching_paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "target_matching_paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "shared_path_tokens": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rare_shared_path_tokens": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "path_token_jaccard": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "rare_token_rarity_score": {
+          "type": "number",
+          "minimum": 0
+        },
+        "candidate_relation": {
+          "const": "artifact_path_similarity_only"
+        },
+        "candidate_status": {
+          "const": "unreviewed"
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
