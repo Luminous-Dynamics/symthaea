@@ -612,6 +612,80 @@ mod tests {
         }
     }
 
+
+    #[test]
+    fn weighted_qubo_and_ising_match_and_minima_are_optimal_for_all_graphs_up_to_three_vertices() {
+        for vertex_count in 0..=3 {
+            let possible_edges: Vec<(usize, usize)> = (0..vertex_count)
+                .flat_map(|u| ((u + 1)..vertex_count).map(move |v| (u, v)))
+                .collect();
+            let graph_count = 1_usize << possible_edges.len();
+            let weight_vector_count = 3_usize.pow(vertex_count as u32);
+
+            for graph_mask in 0..graph_count {
+                let edges: Vec<(usize, usize)> = possible_edges
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, &edge)| {
+                        (graph_mask & (1_usize << index) != 0).then_some(edge)
+                    })
+                    .collect();
+
+                for weight_code in 0..weight_vector_count {
+                    let mut code = weight_code;
+                    let mut weights = Vec::with_capacity(vertex_count);
+                    for _ in 0..vertex_count {
+                        weights.push((code % 3) as f64);
+                        code /= 3;
+                    }
+                    let maximum_weight = weights.iter().copied().fold(0.0_f64, f64::max);
+                    let penalty = maximum_weight + 1.0;
+                    let model = MisQuboModel::new(vertex_count, &edges, &weights, penalty)
+                        .expect("valid weighted mapping");
+                    let ising = model.to_ising().expect("finite weighted Ising mapping");
+
+                    let mut optimum_weight = 0.0_f64;
+                    let mut minimum_energy = f64::INFINITY;
+                    let mut minimizers = Vec::new();
+                    for assignment_mask in 0..(1_usize << vertex_count) {
+                        let assignment = assignment_from_mask(vertex_count, assignment_mask);
+                        let spins = spin_encoding(&assignment);
+                        let qubo_energy = model.energy(&assignment).expect("finite QUBO energy");
+                        let ising_energy = ising.energy(&spins).expect("finite Ising energy");
+                        assert!(
+                            (qubo_energy - ising_energy).abs() < 1e-10,
+                            "weighted energy mismatch n={vertex_count} graph={graph_mask} weights={weights:?} assignment={assignment_mask}"
+                        );
+
+                        if model.is_feasible(&assignment).expect("assignment shape") {
+                            optimum_weight =
+                                optimum_weight.max(model.objective_weight(&assignment).expect("finite objective"));
+                        }
+                        if qubo_energy < minimum_energy {
+                            minimum_energy = qubo_energy;
+                            minimizers.clear();
+                            minimizers.push(assignment);
+                        } else if qubo_energy == minimum_energy {
+                            minimizers.push(assignment);
+                        }
+                    }
+
+                    for candidate in minimizers {
+                        assert!(
+                            model.is_feasible(&candidate).expect("assignment shape"),
+                            "infeasible weighted minimum n={vertex_count} graph={graph_mask} weights={weights:?}"
+                        );
+                        assert_eq!(
+                            model.objective_weight(&candidate).expect("finite objective"),
+                            optimum_weight,
+                            "non-optimal weighted minimum n={vertex_count} graph={graph_mask} weights={weights:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn ising_energy_rejects_non_spin_values_and_decode_is_fail_closed() {
         let model = MisQuboModel::unweighted(1, &[], 2.0).expect("valid model");
