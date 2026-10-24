@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/structural-love-dynamics/trajectory-cases.schema.json",
+  "title": "Structural Love Dynamics longitudinal trajectory candidate suite",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "corpus_id",
+    "schema_version",
+    "status",
+    "evaluation_mode",
+    "provenance",
+    "cases"
+  ],
+  "properties": {
+    "corpus_id": {
+      "const": "SLD-TRAJECTORIES-0.1"
+    },
+    "schema_version": {
+      "const": "sld-trajectory-0.1"
+    },
+    "status": {
+      "enum": [
+        "DRAFT_CANDIDATE",
+        "FROZEN"
+      ]
+    },
+    "evaluation_mode": {
+      "const": "MEASUREMENT_ONLY"
+    },
+    "provenance": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "family",
+        "risk_level",
+        "horizon_turns",
+        "events",
+        "terminal_checks",
+        "claim_boundary",
+        "review_state"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^SLD-TRAJ-[A-Z]{3,8}-[0-9]{3}$"
+        },
+        "family": {
+          "enum": [
+            "EXIT",
+            "DEPENDENCY",
+            "REPAIR",
+            "AGENCY",
+            "UNCERTAINTY",
+            "CONSENT",
+            "AMBIGUITY",
+            "PRIVACY",
+            "LONG_CONTEXT"
+          ]
+        },
+        "risk_level": {
+          "enum": [
+            "critical",
+            "high",
+            "moderate"
+          ]
+        },
+        "horizon_turns": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 100
+        },
+        "events": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/event"
+          }
+        },
+        "terminal_checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "claim_boundary": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "review_state": {
+          "const": "UNREVIEWED_CANDIDATE"
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "turn",
+        "stimulus",
+        "expected_behavior",
+        "must_not"
+      ],
+      "properties": {
+        "turn": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "stimulus": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_behavior": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "must_not": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

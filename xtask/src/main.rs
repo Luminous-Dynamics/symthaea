@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
+mod sld_manifest;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -62,6 +63,16 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Verify the pinned SHA-256 digests of SLD research artifacts.
+    VerifySldManifest {
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
+        #[arg(
+            long,
+            default_value = "docs/research/structural-love-dynamics/ARTIFACT_MANIFEST.json"
+        )]
+        manifest: PathBuf,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +116,24 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::VerifySldManifest { root, manifest } => {
+            let root = if root.is_absolute() {
+                root
+            } else {
+                std::env::current_dir()?.join(root)
+            };
+            let root = root.canonicalize()?;
+            let manifest = if manifest.is_absolute() {
+                manifest
+            } else {
+                root.join(manifest)
+            };
+            let count = sld_manifest::verify(&root, &manifest)?;
+            println!(
+                "Verified {count} SLD artifact digests from {}",
+                manifest.display()
+            );
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];

@@ -1,0 +1,363 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/structural-love-dynamics/oracle-adjudication.schema.json",
+  "title": "SLD independent oracle adjudication ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "case_id_inventory_sha256",
+    "rubric_sha256",
+    "protocol_sha256",
+    "assignment_seed",
+    "randomized_case_order",
+    "reviewers",
+    "cases",
+    "summary",
+    "completed_at",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sld-oracle-ledger-0.1"
+    },
+    "status": {
+      "enum": [
+        "DRAFT",
+        "IN_REVIEW",
+        "COMPLETE",
+        "INELIGIBLE"
+      ]
+    },
+    "rubric_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "reviewers": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/reviewer"
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/caseReview"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "completed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "case_id_inventory_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "assignment_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "randomized_case_order": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer_id",
+        "expertise_categories",
+        "case_authorship_conflicts",
+        "conflict_disclosure",
+        "independence_attested"
+      ],
+      "properties": {
+        "reviewer_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9_-]{3,64}$"
+        },
+        "expertise_categories": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "RELATIONAL_SAFETY",
+              "AI_SAFETY",
+              "MEASUREMENT",
+              "DOMAIN_ETHICS",
+              "HUMAN_FACTORS",
+              "ACCESSIBILITY",
+              "CULTURAL_CONTEXT",
+              "OTHER"
+            ]
+          }
+        },
+        "case_authorship_conflicts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "conflict_disclosure": {
+          "enum": [
+            "NONE_DECLARED",
+            "DISCLOSED_AND_MANAGED",
+            "UNRESOLVED"
+          ]
+        },
+        "independence_attested": {
+          "const": true
+        }
+      }
+    },
+    "judgment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer_id",
+        "disposition",
+        "critical_invariant_flags",
+        "confidence",
+        "rationale",
+        "assumptions",
+        "ambiguity_flags",
+        "submitted_at"
+      ],
+      "properties": {
+        "reviewer_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9_-]{3,64}$"
+        },
+        "disposition": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "critical_invariant_flags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ambiguity_flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "submitted_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "caseReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "risk_level",
+        "initial_labels_blinded",
+        "initial_judgments",
+        "adjudication",
+        "dissent"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "initial_labels_blinded": {
+          "const": true
+        },
+        "initial_judgments": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/judgment"
+          }
+        },
+        "adjudication": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "final_disposition",
+            "adjudicator_id",
+            "rationale",
+            "reviewed_at"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "ACCEPTED",
+                "REVISED",
+                "INDETERMINATE",
+                "REJECTED"
+              ]
+            },
+            "final_disposition": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "minLength": 1
+            },
+            "adjudicator_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[A-Z0-9_-]{3,64}$"
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reviewed_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "dissent": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reviewer_id",
+              "reason"
+            ],
+            "properties": {
+              "reviewer_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "risk_level": {
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "other"
+          ]
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_case_count",
+        "cases_with_two_independent_initial_reviews",
+        "cases_adjudicated",
+        "cases_indeterminate",
+        "unresolved_disagreements",
+        "critical_cases_reviewed",
+        "reviewer_count",
+        "blind_initial_reviews",
+        "case_assignment_randomized",
+        "case_authors_excluded_from_adjudication",
+        "conflicts_disclosed"
+      ],
+      "properties": {
+        "expected_case_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cases_with_two_independent_initial_reviews": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cases_adjudicated": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cases_indeterminate": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_disagreements": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "critical_cases_reviewed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reviewer_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "blind_initial_reviews": {
+          "type": "boolean"
+        },
+        "case_assignment_randomized": {
+          "type": "boolean"
+        },
+        "case_authors_excluded_from_adjudication": {
+          "type": "boolean"
+        },
+        "conflicts_disclosed": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

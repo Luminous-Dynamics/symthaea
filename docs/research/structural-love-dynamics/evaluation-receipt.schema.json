@@ -1,0 +1,690 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/structural-love-dynamics/evaluation-receipt.schema.json",
+  "title": "Structural Love Dynamics evaluation run receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_id",
+    "schema_version",
+    "run_status",
+    "evaluation_mode",
+    "started_at",
+    "source",
+    "case_set",
+    "subject",
+    "generation",
+    "evaluator",
+    "oracle_adjudication",
+    "environment",
+    "case_results",
+    "summary",
+    "limitations",
+    "comparison_eligibility"
+  ],
+  "properties": {
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^SLD-RUN-[A-Z0-9-]{8,64}$"
+    },
+    "schema_version": {
+      "const": "sld-evaluation-receipt-0.1"
+    },
+    "run_status": {
+      "enum": [
+        "COMPLETE",
+        "PARTIAL",
+        "FAILED"
+      ]
+    },
+    "evaluation_mode": {
+      "enum": [
+        "CONTRACT_ONLY",
+        "MODEL_BEHAVIOR",
+        "HUMAN_REFERENCE"
+      ]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finished_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit_sha",
+        "working_tree",
+        "toolchain"
+      ],
+      "properties": {
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "working_tree": {
+          "enum": [
+            "CLEAN",
+            "DIRTY",
+            "UNKNOWN"
+          ]
+        },
+        "toolchain": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "case_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "dataset_version",
+        "visibility",
+        "schema_sha256",
+        "corpus_sha256",
+        "inventory_sha256",
+        "expected_case_count"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "visibility": {
+          "enum": [
+            "PUBLIC",
+            "HIDDEN",
+            "MIXED"
+          ]
+        },
+        "schema_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "corpus_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "inventory_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expected_case_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "expected_case_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "split_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split_seed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "model_id",
+        "model_snapshot",
+        "weights_sha256",
+        "endpoint_class"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_snapshot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "weights_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "endpoint_class": {
+          "enum": [
+            "COMMERCIAL_API",
+            "SELF_HOSTED_OPEN_WEIGHT",
+            "LOCAL_RUNTIME",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "region": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "license_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system_prompt_sha256",
+        "prompt_bundle_sha256",
+        "decoding_config_sha256",
+        "tool_policy_sha256",
+        "memory_policy",
+        "max_turns"
+      ],
+      "properties": {
+        "system_prompt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "prompt_bundle_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "decoding_config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "tool_policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "memory_policy": {
+          "enum": [
+            "NONE",
+            "SESSION_ONLY",
+            "PERSISTENT",
+            "EXTERNAL_RETRIEVAL",
+            "MIXED",
+            "UNKNOWN"
+          ]
+        },
+        "max_turns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "temperature": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 2
+        },
+        "top_p": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "tool_versions_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rubric_sha256",
+        "judge_panel",
+        "human_review_status",
+        "independent_adjudication_status"
+      ],
+      "properties": {
+        "rubric_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "judge_panel": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/judge"
+          }
+        },
+        "human_review_status": {
+          "enum": [
+            "NOT_PERFORMED",
+            "IN_PROGRESS",
+            "COMPLETE",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "human_rater_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "agreement_statistic": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "agreement_value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "independent_adjudication_status": {
+          "enum": [
+            "NOT_PERFORMED",
+            "IN_PROGRESS",
+            "COMPLETE",
+            "DISAGREEMENTS_UNRESOLVED"
+          ]
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "os_arch",
+        "runtime",
+        "dependency_lock_sha256",
+        "hardware_class"
+      ],
+      "properties": {
+        "os_arch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runtime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dependency_lock_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "hardware_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "determinism_notes": {
+          "type": "string"
+        }
+      }
+    },
+    "case_results": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/caseResult"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected",
+        "observed",
+        "pass",
+        "fail",
+        "indeterminate",
+        "error",
+        "skipped",
+        "missing",
+        "duplicate_ids",
+        "critical_invariant_failures"
+      ],
+      "properties": {
+        "expected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pass": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fail": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "indeterminate": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "error": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duplicate_ids": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "critical_invariant_failures": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "transcript_bundle_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "receipt_notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "comparison_eligibility": {
+      "enum": [
+        "COMPARABLE",
+        "NOT_COMPARABLE"
+      ]
+    },
+    "oracle_adjudication": {
+      "$ref": "#/$defs/oracleAdjudication"
+    }
+  },
+  "$defs": {
+    "judge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "judge_id",
+        "snapshot",
+        "implementation_sha256"
+      ],
+      "properties": {
+        "judge_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "snapshot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "implementation_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "caseResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "status",
+        "expected_policy",
+        "observed_policy",
+        "critical_invariant_failure",
+        "response_sha256",
+        "reason_codes"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "INDETERMINATE",
+            "ERROR",
+            "SKIPPED"
+          ]
+        },
+        "expected_policy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_policy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "critical_invariant_failure": {
+          "type": "boolean"
+        },
+        "response_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reason_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "turn_results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "turn",
+              "status",
+              "reason_codes"
+            ],
+            "properties": {
+              "turn": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "status": {
+                "enum": [
+                  "PASS",
+                  "FAIL",
+                  "INDETERMINATE",
+                  "ERROR",
+                  "SKIPPED"
+                ]
+              },
+              "reason_codes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "oracleAdjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "case_id_inventory_sha256",
+        "ledger_sha256",
+        "protocol_sha256",
+        "rubric_sha256",
+        "reviewer_count",
+        "expected_case_count",
+        "cases_with_two_independent_initial_reviews",
+        "cases_adjudicated",
+        "cases_indeterminate",
+        "unresolved_disagreements",
+        "critical_cases_reviewed",
+        "blind_initial_reviews",
+        "case_assignment_randomized",
+        "case_authors_excluded_from_adjudication",
+        "conflicts_disclosed",
+        "completed_at",
+        "initial_label_pairwise_agreement_rate",
+        "initial_label_unanimous_case_rate"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NOT_PERFORMED",
+            "IN_PROGRESS",
+            "COMPLETE",
+            "INELIGIBLE"
+          ]
+        },
+        "ledger_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "protocol_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "rubric_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reviewer_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_case_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cases_with_two_independent_initial_reviews": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cases_adjudicated": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cases_indeterminate": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_disagreements": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "critical_cases_reviewed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blind_initial_reviews": {
+          "type": "boolean"
+        },
+        "case_assignment_randomized": {
+          "type": "boolean"
+        },
+        "case_authors_excluded_from_adjudication": {
+          "type": "boolean"
+        },
+        "conflicts_disclosed": {
+          "type": "boolean"
+        },
+        "completed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "case_id_inventory_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "initial_label_pairwise_agreement_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "initial_label_unanimous_case_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

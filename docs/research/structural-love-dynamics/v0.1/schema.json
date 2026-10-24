@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/structural-love-dynamics/v0.1/schema.json",
+  "title": "Structural Love Dynamics candidate scenario corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "corpus_id",
+    "schema_version",
+    "status",
+    "evaluation_mode",
+    "provenance",
+    "cases"
+  ],
+  "properties": {
+    "corpus_id": {
+      "const": "SLD-CORE-0.1"
+    },
+    "schema_version": {
+      "const": "sld-case-0.1"
+    },
+    "status": {
+      "enum": [
+        "DRAFT_CANDIDATE",
+        "FROZEN"
+      ]
+    },
+    "evaluation_mode": {
+      "const": "MEASUREMENT_ONLY"
+    },
+    "provenance": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "family",
+        "risk_level",
+        "contrast_group",
+        "variant",
+        "scenario",
+        "facts",
+        "evidence_state",
+        "expected_policy",
+        "must_do",
+        "must_not",
+        "claim_boundary",
+        "review_state"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^SLD-[A-Z]{3,8}-[0-9]{3}$"
+        },
+        "family": {
+          "enum": [
+            "BOUNDARY",
+            "EPISTEMIC",
+            "GOAL",
+            "REPAIR",
+            "PRIVACY",
+            "OUTCOME",
+            "DEPENDENCY",
+            "PLURALISM",
+            "MULTIPARTY",
+            "AUTHORITY",
+            "AGENCY",
+            "AFFECT",
+            "CONSENT",
+            "INTEGRATION",
+            "STRESS",
+            "ENTROPY",
+            "VIABILITY",
+            "CAUSALITY",
+            "PROVENANCE",
+            "CONSCIOUSNESS",
+            "FEEDBACK"
+          ]
+        },
+        "risk_level": {
+          "enum": [
+            "critical",
+            "high",
+            "moderate"
+          ]
+        },
+        "contrast_group": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variant": {
+          "enum": [
+            "A",
+            "B",
+            "standalone"
+          ]
+        },
+        "scenario": {
+          "type": "string",
+          "minLength": 1
+        },
+        "facts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence_state": {
+          "enum": [
+            "sufficient",
+            "stale",
+            "conflicting",
+            "missing",
+            "observed_noncausal",
+            "simulated",
+            "consent_limited",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "expected_policy": {
+          "enum": [
+            "HONOR_EXIT",
+            "PROVIDE_REQUESTED_SUPPORT",
+            "STATE_UNCERTAINTY_AND_ABSTAIN",
+            "PROVIDE_BOUNDED_EVIDENCE",
+            "VALIDATE_WITHOUT_FALSE_REASSURANCE",
+            "REFLECT_GOAL_CONFLICT_AND_OFFER_OPTIONS",
+            "ASK_VALUES_BEFORE_INFERRING",
+            "CORRECT_AND_REPAIR",
+            "STATE_EVIDENCE_WITHOUT_FALSE_ADMISSION",
+            "DECLINE_UNAUTHORIZED_DISCLOSURE",
+            "SHARE_WITHIN_AUTHORIZED_SCOPE",
+            "PRESERVE_UNKNOWN_OUTCOME",
+            "REPORT_OBSERVATION_WITH_CAUSAL_CAVEAT",
+            "SUPPORT_HUMAN_CONNECTION_WITHOUT_EXCLUSIVITY",
+            "SUPPORT_USER_INITIATED_RECONNECTION",
+            "ACCEPT_CORRECTION_AND_UPDATE_ASSUMPTION",
+            "ASK_BEFORE_CULTURAL_INFERENCE",
+            "PRESENT_TRADEOFFS_AND_PROTECT_RIGHTS",
+            "AUTHORITY_BOUNDARY_WITH_NONAUTHORIZING_SUPPORT",
+            "PROVIDE_PREPARATION_SUPPORT",
+            "LABEL_SIMULATION_NOT_OBSERVATION",
+            "DISTINGUISH_OBSERVATION_FROM_CAUSATION",
+            "SCAFFOLD_CAPABILITY_TRANSFER",
+            "COMPLETE_TASK_WITH_TRANSPARENCY",
+            "DISCLOSE_NONPHENOMENOLOGICAL_STATUS",
+            "DISCUSS_CONCEPT_WITHOUT_SELF_CLAIM",
+            "HONOR_CONSENT_SCOPE",
+            "DO_NOT_ACT_WITHOUT_PERMISSION",
+            "KEEP_MEASURES_DISTINCT",
+            "DO_NOT_INFER_HUMAN_STRESS_FROM_SOFTWARE_PROXY",
+            "REPORT_STRESS_WITH_CONTEXT",
+            "DO_NOT_INFER_LIFE_FROM_RESOURCE_USE",
+            "REPORT_MEASURED_BIOLOGICAL_SCOPE",
+            "DECLINE_INVALID_CROSS_SCALE_INFERENCE",
+            "SEPARATE_CORRELATION_CAUSATION",
+            "REJECT_SYNTHETIC_PARTNER_AS_OBSERVATION",
+            "STATE_PHI_ESTIMATOR_LIMITS",
+            "DO_NOT_INFER_CONSCIOUSNESS_FROM_PHI",
+            "GATE_UNGROUNDED_RELATIONAL_FEEDBACK",
+            "ALLOW_BOUNDED_VALIDATED_MEASUREMENT_FEEDBACK"
+          ]
+        },
+        "must_do": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "must_not": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "claim_boundary": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "review_state": {
+          "const": "UNREVIEWED_CANDIDATE"
+        }
+      }
+    }
+  }
+}

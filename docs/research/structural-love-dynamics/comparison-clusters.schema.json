@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/structural-love-dynamics/comparison-clusters.schema.json",
+  "title": "SLD paired-comparison cluster map",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "cases"],
+  "properties": {
+    "schema_version": { "const": "sld-cluster-map-0.1" },
+    "cases": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case_id", "cluster_id", "family"],
+        "properties": {
+          "case_id": { "type": "string", "minLength": 1 },
+          "cluster_id": { "type": "string", "minLength": 1 },
+          "family": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}
