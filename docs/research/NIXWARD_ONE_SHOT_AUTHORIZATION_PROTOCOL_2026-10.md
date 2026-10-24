@@ -100,6 +100,28 @@ Proposed targets—not current results:
 
 For an agent-level evaluation, include noisy natural-language contexts, explicit opt-outs, quoted/reported/conditional instructions, adversarial prompt variations, benign workflows, and culturally/domain-specific acceptable responses. Moral competence should not be reduced to one verdict-accuracy number; moral sensitivity, context counterfactuals, reasoning quality, steerability, and pluralism need distinct metrics.
 
+## Composition with the repository-wide action runtime
+
+Nixward's local ledger is a useful narrow guard, but it must not become a parallel authority system. The repository already has a broader action-runtime theorem and migration line:
+
+- [ACTION-RUNTIME-V2E-R1 #4556](https://github.com/Luminous-Dynamics/symthaea/issues/4556) defines the repaired effect-entry firewall using an affine `DispatchPermitV2`, exact `CapabilityGrant`, fresh `VerifiedAuthorityStateV2` / `VerifiedAuthorityTime`, and executor/dispatch-incarnation binding.
+- [ACTION-RUNTIME-V2F #4545](https://github.com/Luminous-Dynamics/symthaea/issues/4545) addresses the stronger reconciliation theorem for proving both non-application and absence of any live/delayed dispatch before authority may be released.
+- [ACTION-LEGACY-PEP-001 #4593](https://github.com/Luminous-Dynamics/symthaea/issues/4593) owns the legacy `SimpleExecutor` filesystem/process effect plane.
+- [NIXWARD-AUTH-CROSS-046 #6849](https://github.com/Luminous-Dynamics/symthaea/issues/6849) owns unmanaged real I/O in `MoleculeExecutor`.
+
+The intended composition is:
+
+```text
+verified current authority + exact grant + durable use reservation
+        -> affine dispatch permit / repaired effect-entry firewall
+        -> NixOS, file, command, service, robot or connector effect adapter
+        -> normalized outcome evidence + postcondition evidence
+```
+
+The one-shot ledger from this PR should either become a documented local adapter to the qualified runtime contract or be superseded at integration time by the existing permit lineage. It must not independently grant new authority simply because a process-local request has an `AuthorizationAuthority` enum value. Nixward's domain-specific checks can further restrict an already-authorized action, but must not bypass or replace the shared authority theorem.
+
+A source search on default-branch `main` also surfaced direct command execution through `SimpleExecutor::execute(ActionIR::RunCommand)`, `MoleculeExecutor::execute_atom_real(Atom::Exec)`, `src/bin/symthaea.rs::run_structured_command`, the root NixOS executor, plus separate daemon/watchdog paths. These code paths are not all introduced by this PR and are not all governed mutations; their presence means a Nixward-only green test cannot substantiate a repository-wide no-bypass claim. Track their migration through the linked work items and use an explicit authority-surface registry in the eventual qualification gate.
+
 ## Additional assurance boundary: issuance is not verification
 
 The ledger enforces a capability once one has been issued, but the enum `AuthorizationAuthority` and the public `issue(request)` operation do not authenticate the issuer. The current profile therefore assumes that code with mutable ledger access is inside the trusted computing base and calls `issue` only after a qualified decision. This is a stated trust assumption, not an enforcement property of the type.
