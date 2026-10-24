@@ -28,6 +28,8 @@
         "expected_gain_input",
         "minimum_observed_gain_gate",
         "icc",
+        "cluster_effect_sd",
+        "pair_association",
         "cluster_count",
         "cluster_sizes",
         "total_targets_per_simulated_study",
@@ -55,6 +57,16 @@
           "type": "number",
           "minimum": 0,
           "exclusiveMaximum": 1
+        },
+        "cluster_effect_sd": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "pair_association": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         },
         "cluster_count": {
           "type": "integer",
@@ -91,7 +103,9 @@
       "required": [
         "cluster_difficulty",
         "treatment_probability",
-        "within_cluster_outcomes",
+        "family_treatment_effect_heterogeneity",
+        "paired_target_outcomes",
+        "pair_association_semantics",
         "pairing",
         "interval",
         "gate"
@@ -107,7 +121,15 @@
           "type": "string",
           "minLength": 1
         },
-        "within_cluster_outcomes": {
+        "family_treatment_effect_heterogeneity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paired_target_outcomes": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_association_semantics": {
           "type": "string",
           "minLength": 1
         },
@@ -180,7 +202,7 @@
         },
         "mean_generated_marginal_gain": {
           "type": "number",
-          "minimum": 0,
+          "minimum": -1,
           "maximum": 1
         },
         "mean_interval_bounds_over_valid_trials": {
