@@ -139,6 +139,15 @@ fn near_miss_unknown_query(
     let source_value = workload.query_atoms[source_record_id].bind(&workload.role_zero);
     let unseen_value = corrupt_query(&source_value, noise_bps, source_record_id);
     let query = workload.role_zero.bind(&unseen_value);
+    assert_eq!(
+        query,
+        corrupt_query(
+            &workload.query_atoms[source_record_id],
+            noise_bps,
+            source_record_id,
+        ),
+        "near-miss and noisy-known profiles must share the exact observed bit vector"
+    );
     assert!(
         !workload.query_atoms.iter().any(|known| *known == query),
         "near-miss negative unexpectedly aliases a stored role-bound value"
