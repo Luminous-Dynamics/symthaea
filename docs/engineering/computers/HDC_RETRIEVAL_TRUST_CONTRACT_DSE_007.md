@@ -191,3 +191,12 @@ Tracking issue: https://github.com/Luminous-Dynamics/symthaea/issues/8647
 Next benchmark sweep: N = 1, 16, 256, 1,024, 4,096, 16,384 and 65,536+; random and clustered/correlated corpora; shared components, duplicates and hard negatives; multi-seed independent test partitions. Calibrate on one partition, freeze the threshold, and evaluate the maximum score over the complete held-out corpus. Report empirical maximum-score quantiles, false accepts/rejects, selective risk versus coverage and confidence bounds.
 
 Important: pairwise z-scores are not cryptographic proof or public reproducibility. Multiple-comparison adjustments are only a theoretical starting point when candidates are correlated or the deployment distribution shifts.
+
+
+## 12. Legacy statistical-evidence naming audit
+
+Source review found a separate compatibility concern in the existing statistical retrieval API: `EmpiricalTier::from_z_score` maps z-score bands to names including `E3CryptographicallyProven` and `E4PubliclyReproducible`. A statistical score alone cannot substantiate either claim. Also, the legacy retrieval path skips the optional unbind-residual check when no expected residual is supplied.
+
+Tracking issue: https://github.com/Luminous-Dynamics/symthaea/issues/8650
+
+This issue is an API semantics/evidence-contract audit; it does not assert a demonstrated production exploit or a measured false-accept rate. Remediation should preserve source compatibility initially, add accurate names/labels and migration guidance, audit callers, and avoid silently changing existing retrieval defaults without tests.
