@@ -77,6 +77,14 @@ The random-unknown control is not enough by itself: a threshold may separate ind
 
 These are synthetic-model results, not Rust output. They show that a threshold can look perfect on independent negatives yet have substantial false accepts on near-miss identities, especially for K=7/15 when the unseen cue is only 10% different from a stored cue. This reinforces a key architectural limit: a single nearest-similarity threshold is not sufficient for all open-set or identity-sensitive tasks. A production design should calibrate using hard negatives and may need richer provenance/identity context, a second-stage verifier, or an explicit abstain state. It must still report false-reject and false-accept trade-offs rather than hide them behind nearest-neighbor accuracy.
 
+
+### Observational ambiguity is a contract, not a kernel bug
+
+The near-miss generator now asserts that each absent-value hard-negative query is **bit-for-bit identical** to the corresponding corrupted known cue. XOR binding is self-inverse, so recovering a known value, flipping the deterministic mask, and re-binding the same role produces exactly the same observed cue bytes as applying that mask directly to the original role-bound cue. The constructed value is nevertheless absent from the stored value set.
+
+This creates a fundamental limit: a vector-only decision function receives identical input for two examples whose intended identity labels differ. It cannot always accept the corrupted cue as a noisy version of the stored identity while always rejecting the bit-identical cue as a distinct absent identity. No search-kernel optimization or similarity threshold can recover intent that is not present in the observation. The real system must define whether near-miss similarity means “related enough” or “wrong identity,” then use additional evidence where that distinction matters—such as an explicit requested record ID, provenance, surrounding context, version metadata or a second-stage verification step. The benchmark intentionally exposes this ambiguity instead of claiming that a better threshold can solve it.
+
+
 ## Independent model and evidence boundary
 
 A separate NumPy-based Python pilot (not Rust execution) tested N = 256, eight sampled query/target pairs, the same role-bind / majority-bundle semantics, and the same deterministic bit-flip schedule. In every arity/noise cell, sampled semantic hit@1 was 8/8. The minimum target-versus-strongest-impostor similarity margins were:
