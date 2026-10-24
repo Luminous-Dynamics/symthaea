@@ -30,7 +30,6 @@ CLUSTERS="${CLUSTERS:-64}"
 CLUSTER_NOISE_BITS="${CLUSTER_NOISE_BITS:-1024}"
 NOISE_BITS="${NOISE_BITS:-128}"
 HARD_NOISE_BITS="${HARD_NOISE_BITS:-4096}"
-SEED="${SEED:-42}"
 LSH_CONFIGS="${LSH_CONFIGS:-32x8,16x16,64x4}"
 CANDIDATE_MULTIPLIER="${CANDIDATE_MULTIPLIER:-4}"
 OUT_DIR="${OUT_DIR:-$ROOT/artifacts/broca-ann}"
@@ -44,11 +43,17 @@ if [[ ${#SEEDS_ARRAY[@]} -eq 0 ]]; then
   echo "SEEDS must contain at least one non-negative integer" >&2
   exit 2
 fi
+declare -A SEEN_SEEDS=()
 for seed_value in "${SEEDS_ARRAY[@]}"; do
   if [[ ! "$seed_value" =~ ^[0-9]+$ ]]; then
     echo "SEEDS entries must be non-negative integers; got '$seed_value'" >&2
     exit 2
   fi
+  if [[ -n "${SEEN_SEEDS[$seed_value]+x}" ]]; then
+    echo "SEEDS must not contain duplicates: '$seed_value'" >&2
+    exit 2
+  fi
+  SEEN_SEEDS[$seed_value]=1
 done
 for value in "$QUERIES" "$ROUNDS" "$TOP_K" "$CLUSTERS" "$CLUSTER_NOISE_BITS" "$NOISE_BITS" "$HARD_NOISE_BITS" "$CANDIDATE_MULTIPLIER"; do
   if [[ ! "$value" =~ ^[0-9]+$ ]]; then
@@ -61,11 +66,6 @@ if (( QUERIES == 0 || ROUNDS == 0 || TOP_K == 0 || CLUSTERS == 0 )); then
   echo "QUERIES, ROUNDS, TOP_K and CLUSTERS must be positive" >&2
   exit 2
 fi
-if [[ ! "$SEED" =~ ^[0-9]+$ ]]; then
-  echo "SEED must be a non-negative integer" >&2
-  exit 2
-fi
-
 for SIZE in "${SIZES_ARRAY[@]}"; do
   if [[ ! "$SIZE" =~ ^[1-9][0-9]*$ ]]; then
     echo "each SIZES entry must be a positive integer; got '$SIZE'" >&2
