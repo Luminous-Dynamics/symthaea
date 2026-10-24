@@ -1,0 +1,785 @@
+{
+  "schema": "atomfab-pcb-route-corpus-v0.3",
+  "version": "0.3.0",
+  "authority": "synthetic_route_and_evidence_gate_only_no_fabrication_or_execution_authority",
+  "case_count": 16,
+  "evidence_boundary": {
+    "all_case_inputs_are_synthetic": true,
+    "route_feasibility_does_not_mean_physical_part_conforms": true,
+    "evidence_completeness_does_not_mean_physical_qualification": true,
+    "route_or_evidence_result_does_not_authorize_execution": true,
+    "synthetic_evidence_cannot_establish_physical_qualification": true
+  },
+  "route_dispositions": [
+    "feasible",
+    "infeasible",
+    "unresolved"
+  ],
+  "evidence_dispositions": [
+    "complete",
+    "incomplete",
+    "rejected"
+  ],
+  "cases": [
+    {
+      "id": "PCB-ROUTE-001",
+      "description": "Outsourced two-layer board with declared supplier capability and complete handoff evidence",
+      "route": {
+        "profile": "P0",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer",
+          "plated_vias",
+          "solder_mask",
+          "surface_finish",
+          "drilled_holes"
+        ],
+        "minimum_trace_space_um": 100
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer",
+          "plated_vias",
+          "solder_mask",
+          "surface_finish"
+        ],
+        "minimum_trace_space_um": 150
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "feasible",
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
+        },
+        "evidence": {
+          "disposition": "complete",
+          "reason_codes": [
+            "DECLARED_EVIDENCE_GATES_SATISFIED"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-002",
+      "description": "Local isolation-milled simple board whose declared geometry is inside the fixture envelope",
+      "route": {
+        "profile": "P1",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer",
+          "milled_copper",
+          "drilled_unplated_holes"
+        ],
+        "minimum_trace_space_um": 300
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer",
+          "milled_copper",
+          "drilled_unplated_holes"
+        ],
+        "minimum_trace_space_um": 400
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "feasible",
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
+        },
+        "evidence": {
+          "disposition": "complete",
+          "reason_codes": [
+            "DECLARED_EVIDENCE_GATES_SATISFIED"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-003",
+      "description": "Milling route is asked to provide plated-through vias it does not declare",
+      "route": {
+        "profile": "P1",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer",
+          "milled_copper",
+          "drilled_unplated_holes"
+        ],
+        "minimum_trace_space_um": 300
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer",
+          "plated_vias"
+        ],
+        "minimum_trace_space_um": 400
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "infeasible",
+          "reason_codes": [
+            "CAPABILITY_MISSING:plated_vias"
+          ]
+        },
+        "evidence": {
+          "disposition": "complete",
+          "reason_codes": [
+            "DECLARED_EVIDENCE_GATES_SATISFIED"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-004",
+      "description": "Single-layer prototype route is asked to fabricate a multilayer stack-up",
+      "route": {
+        "profile": "P1",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer",
+          "milled_copper",
+          "drilled_unplated_holes"
+        ],
+        "minimum_trace_space_um": 300
+      },
+      "requirements": {
+        "capabilities": [
+          "multilayer"
+        ],
+        "minimum_trace_space_um": 400
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "infeasible",
+          "reason_codes": [
+            "CAPABILITY_MISSING:multilayer"
+          ]
+        },
+        "evidence": {
+          "disposition": "complete",
+          "reason_codes": [
+            "DECLARED_EVIDENCE_GATES_SATISFIED"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-005",
+      "description": "Required minimum trace/space capability is unknown for the selected route",
+      "route": {
+        "profile": "P1",
+        "capability_state": "unknown",
+        "capabilities": [
+          "two_layer",
+          "milled_copper",
+          "drilled_unplated_holes"
+        ],
+        "minimum_trace_space_um": null
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer",
+          "milled_copper"
+        ],
+        "minimum_trace_space_um": 400
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "unresolved",
+          "reason_codes": [
+            "CAPABILITY_UNKNOWN"
+          ]
+        },
+        "evidence": {
+          "disposition": "complete",
+          "reason_codes": [
+            "DECLARED_EVIDENCE_GATES_SATISFIED"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-006",
+      "description": "DRC result is stale for the current board revision",
+      "route": {
+        "profile": "P0",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 100
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 150
+      },
+      "evidence": {
+        "drc": "stale",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "feasible",
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
+        },
+        "evidence": {
+          "disposition": "incomplete",
+          "reason_codes": [
+            "DRC_NOT_CURRENT"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-007",
+      "description": "Drill export does not bind the current board revision",
+      "route": {
+        "profile": "P0",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer",
+          "drilled_holes"
+        ],
+        "minimum_trace_space_um": 100
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer",
+          "drilled_holes"
+        ],
+        "minimum_trace_space_um": 150
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "revision_mismatch",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "feasible",
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
+        },
+        "evidence": {
+          "disposition": "incomplete",
+          "reason_codes": [
+            "DRILL_EXPORT_NOT_CURRENT"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-008",
+      "description": "Route lacks the solder-mask capability required by the board profile",
+      "route": {
+        "profile": "P1",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer",
+          "milled_copper",
+          "drilled_unplated_holes"
+        ],
+        "minimum_trace_space_um": 300
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer",
+          "solder_mask"
+        ],
+        "minimum_trace_space_um": 400
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "infeasible",
+          "reason_codes": [
+            "CAPABILITY_MISSING:solder_mask"
+          ]
+        },
+        "evidence": {
+          "disposition": "complete",
+          "reason_codes": [
+            "DECLARED_EVIDENCE_GATES_SATISFIED"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-009",
+      "description": "Bill of materials uses a substitution that has not been approved against protected requirements",
+      "route": {
+        "profile": "P0",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 100
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 150
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "unapproved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "feasible",
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
+        },
+        "evidence": {
+          "disposition": "rejected",
+          "reason_codes": [
+            "UNAPPROVED_BOM_SUBSTITUTION"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-010",
+      "description": "Required bare-board inspection evidence is absent",
+      "route": {
+        "profile": "P0",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 100
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 150
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "missing",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "feasible",
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
+        },
+        "evidence": {
+          "disposition": "incomplete",
+          "reason_codes": [
+            "BARE_BOARD_INSPECTION_INCOMPLETE"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-011",
+      "description": "Calibration for a measurement used in acceptance is stale",
+      "route": {
+        "profile": "P0",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 100
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 150
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "stale",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "feasible",
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
+        },
+        "evidence": {
+          "disposition": "incomplete",
+          "reason_codes": [
+            "CALIBRATION_NOT_CURRENT"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-012",
+      "description": "Assembly or placement data needed to reproduce the assembly step is missing",
+      "route": {
+        "profile": "P0",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 100
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 150
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "missing",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "feasible",
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
+        },
+        "evidence": {
+          "disposition": "incomplete",
+          "reason_codes": [
+            "ASSEMBLY_PACKAGE_INCOMPLETE"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-013",
+      "description": "Assembly inspection is incomplete for the declared product profile",
+      "route": {
+        "profile": "P0",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 100
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 150
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "incomplete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "feasible",
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
+        },
+        "evidence": {
+          "disposition": "incomplete",
+          "reason_codes": [
+            "ASSEMBLY_INSPECTION_INCOMPLETE"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-014",
+      "description": "Functional test evidence refers to a different firmware or board revision",
+      "route": {
+        "profile": "P0",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 100
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 150
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": false,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "feasible",
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
+        },
+        "evidence": {
+          "disposition": "incomplete",
+          "reason_codes": [
+            "FUNCTIONAL_TEST_REVISION_MISMATCH"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-015",
+      "description": "Required material lot or as-built provenance is missing",
+      "route": {
+        "profile": "P0",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 100
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 150
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "missing",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "route_admissibility_only"
+      },
+      "expected": {
+        "route": {
+          "disposition": "feasible",
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
+        },
+        "evidence": {
+          "disposition": "incomplete",
+          "reason_codes": [
+            "PROVENANCE_INCOMPLETE"
+          ]
+        }
+      }
+    },
+    {
+      "id": "PCB-ROUTE-016",
+      "description": "Synthetic evidence is falsely claimed as independent physical qualification",
+      "route": {
+        "profile": "P0",
+        "capability_state": "declared_for_synthetic_fixture",
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 100
+      },
+      "requirements": {
+        "capabilities": [
+          "two_layer"
+        ],
+        "minimum_trace_space_um": 150
+      },
+      "evidence": {
+        "drc": "current",
+        "gerber": "current",
+        "drill": "current",
+        "bom_substitutions": "approved",
+        "bare_board_inspection": "complete",
+        "calibration": "current",
+        "assembly_package": "complete",
+        "assembly_inspection": "complete",
+        "functional_test_revision_match": true,
+        "provenance": "complete",
+        "evidence_source_class": "synthetic",
+        "qualification_claim": "independent_physical_qualification"
+      },
+      "expected": {
+        "route": {
+          "disposition": "feasible",
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
+        },
+        "evidence": {
+          "disposition": "rejected",
+          "reason_codes": [
+            "PHYSICAL_QUALIFICATION_OUT_OF_SCOPE"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,288 @@
+name: AtomFab PCB Route and Package Corpus
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-fabrication-kernel/Cargo.toml"
+      - "crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_route.rs"
+      - "crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_package.rs"
+      - "crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_artifacts.rs"
+      - "crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_route_corpus.rs"
+      - "crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_package_corpus.rs"
+      - "crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_artifact_inventory.rs"
+      - "docs/research/ATOMFAB_PCB_PRODUCTIVE_CLOSURE.md"
+      - "docs/research/ATOMFAB_BENCHMARK_PROTOCOL_V0_1.md"
+      - "docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_3.json"
+      - "docs/research/fixtures/ATOMFAB_PCB_PACKAGE_CORPUS_V0_1.json"
+      - "docs/research/fixtures/ATOMFAB_PCB_ARTIFACT_INVENTORY_V0_1.json"
+      - "docs/research/fixtures/atomfab-pcb-artifact-inventory-v0_1/**"
+      - ".github/workflows/atomfab-pcb-route.yml"
+      - ".github/workflows/atomfab-kicad-cli-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-fabrication-kernel/Cargo.toml"
+      - "crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_route.rs"
+      - "crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_package.rs"
+      - "crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_artifacts.rs"
+      - "crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_route_corpus.rs"
+      - "crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_package_corpus.rs"
+      - "crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_artifact_inventory.rs"
+      - "docs/research/ATOMFAB_PCB_PRODUCTIVE_CLOSURE.md"
+      - "docs/research/ATOMFAB_BENCHMARK_PROTOCOL_V0_1.md"
+      - "docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_3.json"
+      - "docs/research/fixtures/ATOMFAB_PCB_PACKAGE_CORPUS_V0_1.json"
+      - "docs/research/fixtures/ATOMFAB_PCB_ARTIFACT_INVENTORY_V0_1.json"
+      - "docs/research/fixtures/atomfab-pcb-artifact-inventory-v0_1/**"
+      - ".github/workflows/atomfab-pcb-route.yml"
+      - ".github/workflows/atomfab-kicad-cli-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atomfab-pcb-route-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  route-corpus:
+    name: Route oracle, adversarial tests, receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Validate frozen v0.3 corpus schema and cardinality
+        run: |
+          jq empty docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_3.json
+          jq -e '
+            .schema == "atomfab-pcb-route-corpus-v0.3"
+            and .version == "0.3.0"
+            and .case_count == 16
+            and (.cases | length) == 16
+            and ([.cases[].id] | unique | length) == 16
+            and .authority == "synthetic_route_and_evidence_gate_only_no_fabrication_or_execution_authority"
+            and .evidence_boundary.all_case_inputs_are_synthetic
+            and .evidence_boundary.route_feasibility_does_not_mean_physical_part_conforms
+            and .evidence_boundary.evidence_completeness_does_not_mean_physical_qualification
+            and .evidence_boundary.route_or_evidence_result_does_not_authorize_execution
+            and .evidence_boundary.synthetic_evidence_cannot_establish_physical_qualification
+            and ([.cases[].expected.route.disposition] | group_by(.) | map({key: .[0], value: length}) | from_entries) ==
+                {"feasible": 12, "infeasible": 3, "unresolved": 1}
+            and ([.cases[].expected.evidence.disposition] | group_by(.) | map({key: .[0], value: length}) | from_entries) ==
+                {"complete": 6, "incomplete": 8, "rejected": 2}
+            and ([.cases[] | select(.id == "PCB-ROUTE-016")][0].expected.evidence.reason_codes) ==
+                ["PHYSICAL_QUALIFICATION_OUT_OF_SCOPE"]
+          ' docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_3.json
+
+          jq empty docs/research/fixtures/ATOMFAB_PCB_PACKAGE_CORPUS_V0_1.json
+          jq -e '
+            .schema == "atomfab-pcb-package-corpus-v0.1"
+            and .version == "0.1.0"
+            and .case_count == 12
+            and (.cases | length) == 12
+            and ([.cases[].id] | unique | length) == 12
+            and .authority == "synthetic_package_integrity_only_no_fabrication_or_execution_authority"
+            and .evidence_boundary.inputs_are_synthetic
+            and .evidence_boundary.ready_for_review_does_not_mean_manufacturable
+            and .evidence_boundary.ready_for_review_does_not_mean_physical_qualification
+            and .evidence_boundary.package_validation_does_not_authorize_machine_execution
+            and ([.cases[].expected.disposition] | group_by(.) | map({key: .[0], value: length}) | from_entries) ==
+                {"ready_for_review": 1, "incomplete": 3, "rejected": 8}
+          ' docs/research/fixtures/ATOMFAB_PCB_PACKAGE_CORPUS_V0_1.json
+
+          jq empty docs/research/fixtures/ATOMFAB_PCB_ARTIFACT_INVENTORY_V0_1.json
+          jq -e '
+            .schema == "atomfab-pcb-artifact-inventory-v0.1"
+            and .design_id == "ATOMFAB-ARTIFACT-IO-SMOKE"
+            and .design_revision == "r0"
+            and (.required_roles | sort) == ["drc_report", "gerber_top_copper", "native_board"]
+            and (.artifacts | length) == 3
+            and ([.artifacts[].role] | unique | length) == 3
+            and .authority == "artifact_presence_and_digest_inventory_only_no_design_or_production_authority"
+            and .claim_ceiling == "Artifact presence and SHA-256 inventory only; no KiCad DRC, design manufacturability, physical quality, safety, or production-release authority."
+          ' docs/research/fixtures/ATOMFAB_PCB_ARTIFACT_INVENTORY_V0_1.json
+
+      # The workspace currently cannot resolve metadata because a globbed
+      # member has no Cargo.toml (tracked in issues #7048 / #6971). Do not
+      # weaken that gate or make a workspace-wide edit in this feature PR.
+      # Format the exact changed Rust files, then compile/test this pure module
+      # through a temporary standalone harness that uses the same source file.
+      - name: Format exact AtomFab Rust sources
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_route.rs \
+            crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_package.rs \
+            crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_artifacts.rs \
+            crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_route_corpus.rs \
+            crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_package_corpus.rs \
+            crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_artifact_inventory.rs
+
+      - name: Prepare isolated exact-source harness
+        run: |
+          export HARNESS_DIR="${RUNNER_TEMP}/atomfab-pcb-route-check"
+          mkdir -p "${HARNESS_DIR}/src" "${HARNESS_DIR}/examples"
+          cat > "${HARNESS_DIR}/Cargo.toml" <<EOF
+          [package]
+          name = "symthaea-fabrication-kernel-atomfab-check"
+          version = "0.1.0"
+          edition = "2024"
+
+          [lib]
+          name = "symthaea_fabrication_kernel"
+          path = "src/lib.rs"
+
+          [[example]]
+          name = "atomfab_pcb_route_corpus"
+          path = "examples/atomfab_pcb_route_corpus.rs"
+
+          [[example]]
+          name = "atomfab_pcb_package_corpus"
+          path = "examples/atomfab_pcb_package_corpus.rs"
+
+          [[example]]
+          name = "atomfab_pcb_artifact_inventory"
+          path = "examples/atomfab_pcb_artifact_inventory.rs"
+
+          [dependencies]
+          serde = { version = "1.0", features = ["derive"] }
+          serde_json = "1.0"
+          sha2 = "0.10"
+          EOF
+          cat > "${HARNESS_DIR}/src/lib.rs" <<EOF
+          #[path = "${GITHUB_WORKSPACE}/crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_route.rs"]
+          pub mod atomfab_pcb_route;
+          #[path = "${GITHUB_WORKSPACE}/crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_package.rs"]
+          pub mod atomfab_pcb_package;
+          #[path = "${GITHUB_WORKSPACE}/crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_artifacts.rs"]
+          pub mod atomfab_pcb_artifacts;
+          EOF
+          cp crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_route_corpus.rs "${HARNESS_DIR}/examples/atomfab_pcb_route_corpus.rs"
+          cp crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_package_corpus.rs "${HARNESS_DIR}/examples/atomfab_pcb_package_corpus.rs"
+          cp crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_artifact_inventory.rs "${HARNESS_DIR}/examples/atomfab_pcb_artifact_inventory.rs"
+
+      - name: Unit tests for exact-source route and package integrity oracles
+        run: |
+          cargo test --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --lib
+
+      - name: Produce exact-head-bound receipt
+        run: |
+          export ATOMFAB_GIT_HEAD="$(git rev-parse HEAD)"
+          cargo run --quiet --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --example atomfab_pcb_route_corpus > atomfab-pcb-route-receipt.json
+          jq -e --arg head "$(git rev-parse HEAD)" '
+            .schema == "atomfab-pcb-route-receipt-v0.3"
+            and .corpus_schema == "atomfab-pcb-route-corpus-v0.3"
+            and .corpus_version == "0.3.0"
+            and (.corpus_sha256 | test("^[0-9a-f]{64}$"))
+          ' atomfab-pcb-route-receipt.json
+          jq -e --arg head "$(git rev-parse HEAD)" '
+            .git_head == $head
+            and .exact_head_bound
+            and .case_count == 16
+            and .matched_route_cases == 16
+            and .matched_evidence_cases == 16
+            and .status == "passed"
+            and .authority == "synthetic_route_and_evidence_gate_only_no_fabrication_or_execution_authority"
+          ' atomfab-pcb-route-receipt.json
+
+      - name: Produce exact-head-bound PCB package receipt
+        run: |
+          export ATOMFAB_GIT_HEAD="$(git rev-parse HEAD)"
+          cargo run --quiet --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --example atomfab_pcb_package_corpus > atomfab-pcb-package-receipt.json
+          jq -e --arg head "$(git rev-parse HEAD)" '
+            .schema == "atomfab-pcb-package-receipt-v0.1"
+            and .corpus_schema == "atomfab-pcb-package-corpus-v0.1"
+            and .corpus_version == "0.1.0"
+            and (.corpus_sha256 | test("^[0-9a-f]{64}$"))
+            and .git_head == $head
+            and .exact_head_bound
+            and .case_count == 12
+            and .matched_cases == 12
+            and .status == "passed"
+            and .authority == "synthetic_package_integrity_only_no_fabrication_or_execution_authority"
+            and .disposition_counts == {"incomplete": 3, "ready_for_review": 1, "rejected": 8}
+          ' atomfab-pcb-package-receipt.json
+
+
+      - name: Produce exact-head artifact inventory receipt
+        run: |
+          export ATOMFAB_GIT_HEAD="$(git rev-parse HEAD)"
+          cargo run --quiet --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --example atomfab_pcb_artifact_inventory -- \
+            docs/research/fixtures/ATOMFAB_PCB_ARTIFACT_INVENTORY_V0_1.json docs/research/fixtures > atomfab-pcb-artifact-inventory-receipt.json
+          jq -e --arg head "$(git rev-parse HEAD)" '
+            .schema == "atomfab-pcb-artifact-inventory-head-receipt-v0.1"
+            and .git_head == $head
+            and .exact_head_bound
+            and .inventory.schema == "atomfab-pcb-artifact-inventory-receipt-v0.1"
+            and .inventory.status == "complete"
+            and .inventory.required_role_count == 3
+            and .inventory.observed_artifact_count == 3
+            and (.inventory.manifest_sha256 | test("^[0-9a-f]{64}$"))
+            and all(.inventory.artifacts[]; .sha256 | test("^[0-9a-f]{64}$"))
+            and .inventory.authority == "artifact_presence_and_digest_inventory_only_no_design_or_production_authority"
+          ' atomfab-pcb-artifact-inventory-receipt.json
+          cargo run --quiet --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --example atomfab_pcb_artifact_inventory -- \
+            docs/research/fixtures/ATOMFAB_PCB_ARTIFACT_INVENTORY_V0_1.json docs/research/fixtures > atomfab-pcb-artifact-inventory-repeat.json
+          cmp atomfab-pcb-artifact-inventory-receipt.json atomfab-pcb-artifact-inventory-repeat.json
+          export ATOMFAB_GIT_HEAD="$(printf '0%.0s' $(seq 1 40))"
+          if cargo run --quiet --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --example atomfab_pcb_artifact_inventory -- \
+            docs/research/fixtures/ATOMFAB_PCB_ARTIFACT_INVENTORY_V0_1.json docs/research/fixtures >/dev/null 2>&1; then
+            echo "mismatched Git HEAD unexpectedly produced an artifact inventory receipt"
+            exit 1
+          fi
+
+      - name: Verify deterministic receipt and refuse an incorrect head
+        run: |
+          export ATOMFAB_GIT_HEAD="$(git rev-parse HEAD)"
+          cargo run --quiet --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --example atomfab_pcb_route_corpus > receipt-repeat.json
+          cmp atomfab-pcb-route-receipt.json receipt-repeat.json
+
+          export ATOMFAB_GIT_HEAD="$(git rev-parse HEAD)"
+          cargo run --quiet --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --example atomfab_pcb_package_corpus > package-receipt-repeat.json
+          cmp atomfab-pcb-package-receipt.json package-receipt-repeat.json
+
+          export ATOMFAB_GIT_HEAD="$(printf '0%.0s' $(seq 1 40))"
+          if cargo run --quiet --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --example atomfab_pcb_route_corpus >/dev/null 2>&1; then
+            echo "mismatched Git HEAD unexpectedly produced a route receipt"
+            exit 1
+          fi
+          if cargo run --quiet --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --example atomfab_pcb_package_corpus >/dev/null 2>&1; then
+            echo "mismatched Git HEAD unexpectedly produced a package receipt"
+            exit 1
+          fi
+
+      - name: Hash source, corpus, and receipt
+        run: |
+          sha256sum \
+            crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_route.rs \
+            crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_package.rs \
+            crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_artifacts.rs \
+            crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_route_corpus.rs \
+            crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_package_corpus.rs \
+            crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_artifact_inventory.rs \
+            docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_3.json \
+            docs/research/fixtures/ATOMFAB_PCB_PACKAGE_CORPUS_V0_1.json \
+            docs/research/fixtures/ATOMFAB_PCB_ARTIFACT_INVENTORY_V0_1.json \
+            docs/research/fixtures/atomfab-pcb-artifact-inventory-v0_1/native-board.fixture.txt \
+            docs/research/fixtures/atomfab-pcb-artifact-inventory-v0_1/drc-report.fixture.txt \
+            docs/research/fixtures/atomfab-pcb-artifact-inventory-v0_1/gerber-top-copper.fixture.txt \
+            atomfab-pcb-route-receipt.json \
+            atomfab-pcb-package-receipt.json \
+            atomfab-pcb-artifact-inventory-receipt.json > atomfab-pcb-route-receipt.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atomfab-pcb-route-corpus-receipt
+          path: |
+            atomfab-pcb-route-receipt.json
+            atomfab-pcb-package-receipt.json
+            atomfab-pcb-artifact-inventory-receipt.json
+            atomfab-pcb-route-receipt.sha256
+          if-no-files-found: error
