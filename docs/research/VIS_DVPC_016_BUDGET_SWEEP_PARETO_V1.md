@@ -36,6 +36,7 @@ The exact META key set is required:
 - held-out split (test or private_test)
 - utility specification SHA-256
 - paired evidence bundle-lock SHA-256
+- exact paired trace/cluster set SHA-256, repeated in each row to prevent method/budget grid drift
 - expected policy count and budget-point count
 - fixed evaluated-trace count and independent-cluster count
 - harm-rate upper-bound target, CVaR95 incremental-loss ceiling and safety-violation ceiling
@@ -46,9 +47,9 @@ Thresholds belong in the frozen sweep file; the sweep file digest must be prereg
 
 The exact header is:
 
-    SWEEP_HEADER<TAB>budget_point_id<TAB>policy_id<TAB>latency_budget_us<TAB>energy_budget_uj<TAB>utility_delta_vs_all_cheap<TAB>actual_all_in_latency_us<TAB>actual_all_in_energy_uj<TAB>allocator_latency_us<TAB>allocator_energy_uj<TAB>latency_budget_violations<TAB>energy_budget_violations<TAB>cost_measurement_complete<TAB>safety_violations<TAB>cvar95_incremental_loss<TAB>pooled_harm_upper_bound<TAB>worst_group_harm_upper_bound<TAB>risk_certificate_state<TAB>evaluated_traces<TAB>independent_clusters
+    SWEEP_HEADER<TAB>budget_point_id<TAB>policy_id<TAB>latency_budget_us<TAB>energy_budget_uj<TAB>utility_delta_vs_all_cheap<TAB>actual_all_in_latency_us<TAB>actual_all_in_energy_uj<TAB>allocator_latency_us<TAB>allocator_energy_uj<TAB>latency_budget_violations<TAB>energy_budget_violations<TAB>cost_measurement_complete<TAB>safety_violations<TAB>cvar95_incremental_loss<TAB>pooled_harm_upper_bound<TAB>worst_group_harm_upper_bound<TAB>risk_certificate_state<TAB>paired_unit_set_sha256<TAB>evaluated_traces<TAB>independent_clusters
 
-Each budget-point/policy pair appears once. Every budget point must contain the exact same policy set. Ceilings must be consistent across policies for one point and distinct across points. All rows must use the same frozen evaluated-trace and independent-cluster counts.
+Each budget-point/policy pair appears once. Every budget point must contain the exact same policy set. Ceilings must be consistent across policies for one point and distinct across points. All rows must use the same frozen paired-unit-set digest, evaluated-trace count and independent-cluster count. The paired-unit digest must identify the exact trace/cluster manifest from the same frozen experiment; counts alone do not establish that identical traces were scored.
 
 The policy family must include all-cheap and all-full plus predeclared deployable baselines. Include the same-budget random and lightweight confidence/entropy/value routers when they are available. Preserve infeasible/high-utility/unsafe/over-budget rows; do not remove them to improve the frontier.
 
