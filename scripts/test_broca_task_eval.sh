@@ -86,4 +86,23 @@ if bash "$CHECKER" "$DUPLICATE" > "$TMP/duplicate.out" 2>&1; then
 fi
 grep -q 'duplicate case_id/arm pair' "$TMP/duplicate.out"
 
-echo "PASS: good fixture accepted; governance violation and duplicate-row negative controls rejected"
+UNMATCHED="$TMP/unmatched.csv"
+awk -F, 'BEGIN { OFS="," } !($8 == "case-0001" && $11 == "approx_hdc") { print }' "$GOOD" > "$UNMATCHED"
+make_receipt "$UNMATCHED"
+if bash "$CHECKER" "$UNMATCHED" > "$TMP/unmatched.out" 2>&1; then
+  echo "FAIL: checker accepted a missing case/arm pair" >&2
+  exit 1
+fi
+grep -q 'is missing arm approx_hdc' "$TMP/unmatched.out"
+
+TAMPERED="$TMP/tampered.csv"
+cp "$GOOD" "$TAMPERED"
+cp "$TMP/good.receipt.txt" "$TMP/tampered.receipt.txt"
+printf '\n' >> "$TAMPERED"
+if bash "$CHECKER" "$TAMPERED" > "$TMP/tampered.out" 2>&1; then
+  echo "FAIL: checker accepted a CSV whose hash no longer matches its receipt" >&2
+  exit 1
+fi
+grep -q 'CSV SHA-256 does not match receipt' "$TMP/tampered.out"
+
+echo "PASS: good fixture accepted; governance violation, duplicate, missing-pair and tampered-receipt negative controls rejected"
