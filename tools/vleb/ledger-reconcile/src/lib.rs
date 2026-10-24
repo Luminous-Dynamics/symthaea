@@ -597,6 +597,14 @@ mod tests {
     }
 
     #[test]
+    fn presence_of_final_line_ending_does_not_change_semantics() {
+        let with_newline = reconcile_csv(INPUT).expect("fixture with final newline is valid");
+        let without_newline = reconcile_csv(INPUT.trim_end_matches('\n'))
+            .expect("fixture without final newline is valid");
+        assert_eq!(with_newline, without_newline);
+    }
+
+    #[test]
     fn repeated_exact_duplicate_is_idempotent_for_arbitrary_multiplicity() {
         let header = "transaction_id,account_id,side,amount_minor\n";
         let row = "TX-1,AC-1,CREDIT,10\n";
