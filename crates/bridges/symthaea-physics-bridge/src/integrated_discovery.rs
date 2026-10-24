@@ -648,6 +648,22 @@ fn generate_truth_absent_candidates(
     config: PipelineConfig,
     design: &[Experiment],
 ) -> Option<Vec<Expr>> {
+    generate_truth_absent_candidates_with_attempt_cap(
+        seed,
+        config,
+        design,
+        GEN_ATTEMPT_CAP * POOL_SIZE,
+    )
+}
+
+/// Bounded core exposed to tests so exhaustion can be exercised deterministically without
+/// changing the production attempt budget or panicking.
+fn generate_truth_absent_candidates_with_attempt_cap(
+    seed: u64,
+    config: PipelineConfig,
+    design: &[Experiment],
+    attempt_cap: usize,
+) -> Option<Vec<Expr>> {
     let mut hypotheses: Vec<Expr> = Vec::with_capacity(POOL_SIZE);
     let mut candidate_rng = seed
         ^ if config.typed_candidates {
@@ -657,7 +673,6 @@ fn generate_truth_absent_candidates(
         };
     let mut candidate_values: Vec<Vec<f64>> = Vec::new();
     let mut attempts = 0usize;
-    let attempt_cap = GEN_ATTEMPT_CAP * POOL_SIZE;
     while hypotheses.len() < POOL_SIZE && attempts < attempt_cap {
         attempts += 1;
         let candidate = if config.typed_candidates {
@@ -2023,6 +2038,25 @@ mod tests {
         assert!(same_domain_recovered <= SEEDS as usize);
         assert!(ood_recovered <= same_domain_recovered);
         assert!(full_recovery_successes <= ood_recovered);
+    }
+
+    #[test]
+    fn truth_absent_candidate_generation_exhaustion_returns_none_without_panicking() {
+        let design = vec![random_experiment(&mut 0xA11C_E55E_2026_0001_u64)];
+        let result = generate_truth_absent_candidates_with_attempt_cap(
+            0xA11C_E55E_2026_0001,
+            PipelineConfig {
+                typed_candidates: true,
+                active_selection: true,
+                smoothing: false,
+            },
+            &design,
+            0,
+        );
+        assert!(
+            result.is_none(),
+            "zero-attempt candidate generation must return unresolved rather than panic or invent a pool"
+        );
     }
 
     #[test]
