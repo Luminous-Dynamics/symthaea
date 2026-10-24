@@ -728,7 +728,9 @@ DELTA_HEADER\tcomparison_id\tcandidate_id\tbaseline_id\tcluster_id\tdelta\n",
 
     #[test]
     fn family_size_must_match_predeclared_comparisons() {
-        let broken = fixture().replace("META\tcomparison_family_size\t2", "META\tcomparison_family_size\t3");
+        let broken = fixture()
+            .replace("META\tcomparison_family_size\t2", "META\tcomparison_family_size\t3")
+            .replace("META\tbootstrap_replicates\t2000", "META\tbootstrap_replicates\t3000");
         assert!(analyze(&broken, LOCK).unwrap_err().contains("preregistered family size"));
     }
 
