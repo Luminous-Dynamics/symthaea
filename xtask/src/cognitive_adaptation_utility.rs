@@ -18,6 +18,8 @@ pub struct CounterfactualUtilityInput {
     pub dataset_id: String,
     pub stream_id: String,
     pub scenario_id: String,
+    /// Information-access track shared by every arm in this panel.
+    pub comparison_track: String,
     pub shared_stream_sha256: String,
     pub seed: u64,
     pub task_loss_metric_id: String,
@@ -98,6 +100,7 @@ pub struct CounterfactualUtilityScore {
     pub dataset_id: String,
     pub stream_id: String,
     pub scenario_id: String,
+    pub comparison_track: String,
     pub shared_stream_sha256: String,
     pub seed: u64,
     pub task_loss_metric_id: String,
@@ -159,6 +162,11 @@ pub fn score_counterfactual_utility(
     nonempty(&input.dataset_id, "dataset_id")?;
     nonempty(&input.stream_id, "stream_id")?;
     nonempty(&input.scenario_id, "scenario_id")?;
+    ensure!(
+        ["valid-pe-only", "feature-only-unsupervised", "auxiliary-loss-unsupervised", "observed-outcome"]
+            .contains(&input.comparison_track.as_str()),
+        "comparison_track must be one of the declared evidence-access tracks"
+    );
     nonempty(&input.task_loss_metric_id, "task_loss_metric_id")?;
     nonempty(&input.task_loss_unit, "task_loss_unit")?;
     validate_digest(&input.shared_stream_sha256, 64, "shared_stream_sha256")?;
@@ -310,6 +318,7 @@ pub fn score_counterfactual_utility(
         dataset_id: input.dataset_id,
         stream_id: input.stream_id,
         scenario_id: input.scenario_id,
+        comparison_track: input.comparison_track,
         shared_stream_sha256: input.shared_stream_sha256,
         seed: input.seed,
         task_loss_metric_id: input.task_loss_metric_id,
@@ -545,6 +554,7 @@ mod tests {
             dataset_id: "dataset-a".to_owned(),
             stream_id: "stream-17".to_owned(),
             scenario_id: "gradual-drift-recovery".to_owned(),
+            comparison_track: "valid-pe-only".to_owned(),
             shared_stream_sha256: "c".repeat(64),
             seed: 17,
             task_loss_metric_id: "one-step-prediction-loss".to_owned(),
@@ -635,6 +645,13 @@ mod tests {
         let mut out_of_range = fixture();
         out_of_range.evaluation_windows.post_shift_end_cycle = 5;
         assert!(score_counterfactual_utility(out_of_range).unwrap_err().to_string().contains("within the common cycle panel"));
+    }
+
+    #[test]
+    fn rejects_undeclared_information_access_track() {
+        let mut input = fixture();
+        input.comparison_track = "future-labels-and-oracle".to_owned();
+        assert!(score_counterfactual_utility(input).unwrap_err().to_string().contains("comparison_track"));
     }
 
     #[test]
