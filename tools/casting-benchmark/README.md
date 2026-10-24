@@ -299,3 +299,16 @@ Targeted tests:
 ```sh
 python3 -m unittest discover -s tools/casting-benchmark -p 'test_score_scenario_policy_bakeoff.py' -v
 ```
+
+
+## Pre-run source freeze for the adversarial policy diagnostic
+
+`docs/research/CASTING_MULTIFIDELITY_POLICY_PRERUN_LOCK_V1.json` freezes the exact scenario, policy, scorer and test source blobs at a named source commit before a diagnostic sweep. Verify the frozen inputs in a clean tracked worktree:
+
+```sh
+python3 tools/casting-benchmark/validate_scenario_prerun_lock.py
+```
+
+The verifier refuses stale or modified source blobs, an unknown manifest key, duplicate paths, a missing locked source, or a dirty tracked worktree. Its JSON report records the exact lock SHA-256 and execution HEAD SHA. Those digests are identity/provenance checks, not signatures. Run this gate **before** generating the sweep output, then run the separate replay scorer on the saved output.
+
+This lock freezes only the current internal synthetic diagnostic: six scenarios, dimensions 2/5/10, severities 0.5/1/2, seeds 17/23/29, five in-repository policies and a cost budget of 200 with default fidelity costs 1:5:25 (810 planned runs). Three seeds are exploratory only. It is not the external baseline environment lock, does not execute the benchmark, and cannot support a SOTA or physical casting claim. Any source change requires a new lock and a new preregistration; do not silently refresh expected hashes after seeing results.
