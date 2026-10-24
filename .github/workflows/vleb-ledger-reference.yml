@@ -16,8 +16,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: Verify VLEB ledger contract
+  format:
+    name: Check Rust formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/vleb/ledger-reconcile/Cargo.toml -- --check
+
+  test:
+    name: Test VLEB ledger contract
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -25,9 +38,7 @@ jobs:
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
-          components: clippy, rustfmt
-      - name: Check formatting
-        run: cargo fmt --manifest-path tools/vleb/ledger-reconcile/Cargo.toml -- --check
+          components: clippy
       - name: Test reference implementation and CLI contract
         run: cargo test --locked --manifest-path tools/vleb/ledger-reconcile/Cargo.toml
       - name: Run strict Clippy across all targets
