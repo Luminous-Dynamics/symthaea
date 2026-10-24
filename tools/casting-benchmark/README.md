@@ -116,10 +116,30 @@ python3 tools/casting-benchmark/validate_baseline_lock.py --for-execution
 
 The current source lock is intentionally partial: seven required baselines remain unresolved (random, Sobol, NSGA-II and four repository methods). The benchmark protocol remains blocked until those entries and the full environment are immutable. The validator verifies the recorded structure and hash syntax; it does not download, hash, or authenticate remote files. A source SHA recorded in the manifest is a claim that must be independently checked during environment materialization.
 
+Verify the pinned source tree without network access after checking out the recorded release tag:
+
+```sh
+git clone https://github.com/meta-pytorch/botorch.git /tmp/botorch
+git -C /tmp/botorch checkout --detach v0.18.1
+python3 tools/casting-benchmark/verify_baseline_source_tree.py --source-tree /tmp/botorch
+```
+
+To also verify both downloaded PyPI artifact checksums, supply the archive and wheel paths:
+
+```sh
+python3 tools/casting-benchmark/verify_baseline_source_tree.py \
+  --source-tree /tmp/botorch \
+  --sdist /path/to/botorch-0.18.1.tar.gz \
+  --wheel /path/to/botorch-0.18.1-py3-none-any.whl \
+  --require-artifacts
+```
+
+This verifier calculates Git blob SHA-1 over the exact file bytes and checks the checkout commit and clean-tree state. It can verify local inputs offline; the example `git clone` is only for materializing the source. A pass authenticates the pinned source/artifact inputs, not the Python dependency resolution, method adapter, smoke test, or optimizer result.
+
 Tests for the lock validator:
 
 ```sh
-python3 -m unittest tools/casting-benchmark/test_validate_baseline_lock.py -v
+python3 -m unittest tools/casting-benchmark/test_validate_baseline_lock.py tools/casting-benchmark/test_verify_baseline_source_tree.py -v
 ```
 
 Use the test discovery command in the main section to run all benchmark test modules.
