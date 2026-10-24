@@ -119,6 +119,10 @@ pub struct DualLayerMesh {
     /// Adds 28 bytes overhead per fragment (nonce + tag).
     #[cfg(feature = "mesh-encryption")]
     fragment_encryption: bool,
+    /// Reject transmission if encrypted-only mode has no key material.
+    /// Kept separate from key availability to prevent implicit downgrade.
+    #[cfg(feature = "mesh-encryption")]
+    encryption_required: bool,
 }
 
 impl DualLayerMesh {
@@ -135,6 +139,8 @@ impl DualLayerMesh {
             encryption_epoch: 0,
             #[cfg(feature = "mesh-encryption")]
             fragment_encryption: false,
+            #[cfg(feature = "mesh-encryption")]
+            encryption_required: false,
         }
     }
 
@@ -178,6 +184,22 @@ impl DualLayerMesh {
     #[cfg(feature = "mesh-encryption")]
     pub fn set_encryption_epoch(&mut self, epoch: u8) {
         self.encryption_epoch = epoch;
+    }
+
+    /// Configure whether this sender requires authenticated encryption.
+    ///
+    /// When required, key unavailability is an error rather than permission
+    /// to send a plaintext envelope. Defaults to false for compatibility.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn with_encryption_required(mut self, required: bool) -> Self {
+        self.encryption_required = required;
+        self
+    }
+
+    /// Change the encrypted-only policy without changing key material.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn set_encryption_required(&mut self, required: bool) {
+        self.encryption_required = required;
     }
 
     /// Attach a LoRa transport (Cruise-mode routing).
@@ -246,6 +268,11 @@ impl DualLayerMesh {
     /// Automatically fragments for LoRa, sends whole for B.A.T.M.A.N./Yggdrasil.
     /// Returns the route that was used.
     pub fn send(&self, packet: &WisdomPacket) -> Result<MeshRoute, MeshError> {
+        #[cfg(feature = "mesh-encryption")]
+        if self.encryption_required && self.encryption_key.is_none() {
+            return Err(MeshError::EncryptionKeyUnavailable);
+        }
+
         let route = self.route(packet.urgency).ok_or(MeshError::NoTransport)?;
 
         // Compress the packet into an envelope (1-byte header + payload).
@@ -790,6 +817,49 @@ mod tests {
         let mesh = DualLayerMesh::new([0; 32]);
         let packet = test_packet(MeshUrgency::Normal);
         assert!(mesh.send(&packet).is_err());
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn encrypted_only_sender_rejects_missing_key_before_any_write() {
+        let (transport, sent) = SharedCaptureTransport::new(4096);
+        let mut mesh = DualLayerMesh::new([0; 32])
+            .with_batman(Box::new(transport))
+            .with_encryption_key([0x42; 32])
+            .with_encryption_required(true);
+
+        // Key loss must not turn encrypted-only transmission into plaintext.
+        mesh.set_encryption_key(None);
+        let result = mesh.send(&test_packet(MeshUrgency::Critical));
+
+        assert!(matches!(result, Err(MeshError::EncryptionKeyUnavailable)));
+        assert!(
+            sent.lock().unwrap_or_else(|e| e.into_inner()).is_empty(),
+            "encrypted-only key-unavailable failure must precede every transport write"
+        );
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn encrypted_only_sender_positive_control_sends_authenticated_ciphertext() {
+        let key = [0x24; 32];
+        let (transport, sent) = SharedCaptureTransport::new(4096);
+        let mesh = DualLayerMesh::new([0; 32])
+            .with_batman(Box::new(transport))
+            .with_encryption_key(key)
+            .with_encryption_required(true);
+        let packet = test_packet(MeshUrgency::Critical);
+
+        assert_eq!(mesh.send(&packet).unwrap(), MeshRoute::Batman);
+        let frames = sent.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(frames.len(), 1);
+        let decrypted = super::super::decrypt_packet(&frames[0], &key)
+            .expect("configured key should decrypt the emitted envelope");
+        let decoded = super::super::decompress_packet(&decrypted)
+            .and_then(|raw| WisdomPacket::from_bytes(&raw))
+            .expect("decrypted envelope should preserve the original packet");
+        assert_eq!(decoded.sequence, packet.sequence);
+        assert_eq!(decoded.wisdom.0, packet.wisdom.0);
     }
 
     #[test]
