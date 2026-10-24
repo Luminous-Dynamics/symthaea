@@ -33,7 +33,7 @@ The LSH parameters are explicit and recorded in the output. By default, each run
 
 To test the approximate path with its candidate-count and empty-result fallbacks disabled, run a separate matrix with `--candidate-multiplier=0 --fallback-on-empty=false`. Keep the default-fallback matrix as well: disabling fallback may improve latency while degrading recall, so neither matrix is sufficient by itself.
 
-The example includes ten focused source-level tests for deterministic workload replay, exact corruption count, clustered-neighborhood separation, Recall@K semantics including ties, LSH sweep parsing, and deterministic bootstrap intervals. Run them with:
+The example includes eleven authored source-level tests for deterministic workload replay, exact corruption count, clustered-neighborhood separation, Recall@K semantics including ties, LSH sweep parsing, and deterministic/group-aware bootstrap behavior. Rust tests have not yet run in this authoring environment. Run them with:
 
 ```sh
 cargo test -p symthaea-hdc-store --example ann_benchmark
@@ -49,7 +49,7 @@ The CLI requires a full 40-hex source SHA that exactly matches `git rev-parse HE
 - For the synthetic OOD class, exact top-K is still a mathematical retrieval reference but does not imply there is a semantically relevant answer; do not use its Recall@K as the primary quality gate.
 - The LSH path reports vectors examined, total live vectors, exhaustive status and exact-fallback status.
 - Exact and approximate retrieval calls alternate order per query/round. Query creation, store construction, ID comparison and CSV output are outside the timed retrieval intervals.
-- The report separately emits quality and latency summaries for `near_neighbor` and `novel` queries for each LSH configuration. Quality uses unique queries from round zero; latency percentiles use all repeated samples. For uncertainty, each query's median exact/approximate speedup across rounds is computed first, then a deterministic percentile bootstrap resamples query-level values 2,000 times and emits a 95% interval. Repeated rounds are timing repetitions, not independent query samples.
+- The report separately emits quality and latency summaries for `near_neighbor` and `novel` queries for each LSH configuration. Quality uses unique queries from round zero; latency percentiles use all repeated samples. Each query's median exact/approximate speedup across rounds is computed first. The speedup interval then uses a deterministic 2,000-resample **group bootstrap**: known-memory probes are grouped by the source cluster that generated their anchor, while each random novel/OOD probe is a singleton group. Every query within a selected group travels together during resampling. The raw CSV includes `group_id`, and the report records the resampling unit and group count. Repeated timing rounds remain timing repetitions, not independent query samples. This corrects a dependence issue in the earlier query-level bootstrap; it is still synthetic-query uncertainty, not hardware/run-to-run uncertainty.
 
 This controlled clustered workload is still not a realistic semantic-memory corpus. It does not reproduce organic topic structure, duplicate/contradictory facts, temporal updates, deletion semantics, user/session isolation or long-running agent behavior. Passing these gates is a retrieval-substrate signal only, not evidence that downstream memory tasks improve.
 
@@ -90,14 +90,14 @@ Do not pool the binary ANN result, MemoryAgentBench scores and the external lead
 
 ## Machine and run receipt
 
-Archive the complete CSV (including its metadata and per-query exact/approximate IDs) alongside:
+Archive the complete CSV (including its metadata, per-query exact/approximate IDs, and group ID used for uncertainty resampling) alongside:
 - exact commit SHA and clean/dirty source state;
 - `rustc -Vv`, Cargo version, build flags and CPU model;
 - OS/kernel, memory, storage medium and power mode;
 - exact command line and exit status;
 - whether each sample is warm-cache, cold-cache or mixed, and whether the store was reconstructed between repetitions.
 
-The current program reports OS, target architecture, available parallelism, workload settings, source SHA, per-arm p50/p95 latency, exact-ID and tie-aware recall, vector examinations and fallback/exhaustive fractions, plus per-query-class median speedup and deterministic bootstrap 95% intervals. A fully cold-cache test, memory/RSS accounting, energy measurements and production-scale corpus are not implemented by this first slice. The bootstrap interval covers variation across the current synthetic query sample; it does not cover hardware-to-hardware or run-to-run variation. Record those limitations rather than implying that the current CSV contains them.
+The current program reports OS, target architecture, available parallelism, workload settings, source SHA, per-arm p50/p95 latency, exact-ID and tie-aware recall, vector examinations and fallback/exhaustive fractions, plus per-query-class median speedup and deterministic group-bootstrap 95% intervals. Near-neighbor queries inherit cluster membership from their source memory, so resampling individual rows as though they were independent would overstate the independent evidence when within-cluster outcomes co-vary. Cluster-robust inference guidance emphasizes that the cluster—not an individual row—is the independent unit when the sample is clustered (see [MacKinnon, Nielsen & Webb, cluster-robust inference guide](https://doi.org/10.1016/j.jeconom.2022.04.001)). The synthetic OOD probes are treated as singleton groups because they have no stored source anchor in this generator. A fully cold-cache test, memory/RSS accounting, energy measurements and production-scale corpus are not implemented by this first slice. The interval does not cover hardware-to-hardware or run-to-run variation and does not establish reliability under real memory distributions.
 
 ## Next gates
 
