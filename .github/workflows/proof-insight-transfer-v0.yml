@@ -528,6 +528,14 @@ jobs:
               "applicability_judgment": "eligible",
               "original_move_applied": True,
               "checked_target_statement_sha256": "d" * 64,
+              "semantic_gate": {
+                  "status": "passed",
+                  "checked_target_statement_sha256": "d" * 64,
+                  "statement_correspondence": {"status": "matches_intended_claim", "independent_reviewer_count": 2, "receipt_sha256": "1" * 64},
+                  "axiom_policy": {"status": "compliant", "policy_id": "schema-control-allowed-axioms", "receipt_sha256": "2" * 64},
+                  "successor_check": {"status": "not_applicable", "receipt_sha256": "3" * 64, "reason": "No meaningful successor theorem exists for this schema-only example."},
+                  "mutation_controls": {"status": "passed", "suite_sha256": "4" * 64, "receipt_sha256": "5" * 64}
+              },
               "checker_result": "checked_success",
               "proof_sha256": "b" * 64,
               "run_receipt_sha256": "c" * 64,
@@ -574,7 +582,31 @@ jobs:
               pass
           else:
               raise SystemExit("executed-row schema accepted missing checked-target statement digest")
-          print("PITB_PROOF_STATE_EXECUTION_SCHEMA_PASS: valid executed row accepted; 5 contradictory/incomplete execution controls rejected")
+          bad_execution = copy.deepcopy(valid_execution)
+          bad_execution["semantic_gate"]["statement_correspondence"]["independent_reviewer_count"] = 1
+          try:
+              execution_validator.validate(bad_execution)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("semantic gate schema accepted a pass with fewer than two independent statement reviewers")
+          bad_execution = copy.deepcopy(valid_execution)
+          bad_execution["semantic_gate"]["axiom_policy"]["status"] = "violation"
+          try:
+              execution_validator.validate(bad_execution)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("semantic gate schema accepted a pass despite an axiom-policy violation")
+          bad_execution = copy.deepcopy(valid_execution)
+          bad_execution["semantic_gate"]["mutation_controls"]["status"] = "failed"
+          try:
+              execution_validator.validate(bad_execution)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("semantic gate schema accepted a pass despite failed mutation controls")
+          print("PITB_PROOF_STATE_EXECUTION_SCHEMA_PASS: valid executed row accepted; 8 contradictory/incomplete execution controls rejected")
           print(f"PITB_PROOF_STATE_OUTCOME_CONTRACT_PASS: {count} explicitly not_run state rows; {len(mutants)}/{len(mutants)} negative controls rejected")
           PY
       - name: Analyze paired proof-state outcomes with the Rust scorekeeper
@@ -613,6 +645,9 @@ jobs:
           assert report["counts"]["rows_in_split"] == 8
           assert report["counts"]["executed_rows_in_split"] == 0
           assert report["counts"]["not_run_rows_in_split"] == 8
+          assert report["counts"]["semantic_gate_pass_rows"] == 0
+          assert report["counts"]["semantic_gate_failed_rows"] == 0
+          assert report["counts"]["semantic_gate_unknown_rows"] == 0
           assert report["metrics"] == {}, "synthetic fixtures must not generate model performance metrics"
           assert report["confirmatory_decision"] == "not_evaluated_synthetic_fixture"
           assert report["resource_usage"]["executed_rows_with_usage"] == 0
