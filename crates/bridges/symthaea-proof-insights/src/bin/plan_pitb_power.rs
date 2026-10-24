@@ -301,8 +301,8 @@ fn simulate_trial(config: &Config, rng: &mut Rng) -> Trial {
                 p_treatment,
                 config.pair_association,
             );
-            control_successes += usize::from(control_success);
-            treatment_successes += usize::from(treatment_success);
+            control_successes += if control_success { 1 } else { 0 };
+            treatment_successes += if treatment_success { 1 } else { 0 };
         }
         differences.push((n, treatment_successes as i64 - control_successes as i64));
         control_total += control_successes;
@@ -531,7 +531,7 @@ mod tests {
     }
 
     #[test]
-    fn parser_accepts_eight_positional_arguments_after_program_name() {
+    fn parser_accepts_all_config_arguments() {
         let args = vec![
             "plan_pitb_power".to_owned(),
             "0.35".to_owned(),
@@ -583,8 +583,8 @@ mod tests {
         let n = 50_000;
         for _ in 0..n {
             let (control, treatment) = paired_bernoulli(&mut rng, 0.25, 0.4, 0.5);
-            control_successes += usize::from(control);
-            treatment_successes += usize::from(treatment);
+            control_successes += if control { 1 } else { 0 };
+            treatment_successes += if treatment { 1 } else { 0 };
         }
         assert!((control_successes as f64 / n as f64 - 0.25).abs() < 0.015);
         assert!((treatment_successes as f64 / n as f64 - 0.4).abs() < 0.015);
