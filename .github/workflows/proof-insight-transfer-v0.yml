@@ -163,9 +163,9 @@ jobs:
           set -euo pipefail
           cd "$(dirname "$PITB_MANIFEST")"
           cluster_sizes="2,3,1,4,2,2,3,1,4,2,3,1,2,4,1,3,2,2,4,1"
-          cargo run --locked --bin plan_pitb_power -- 0.35 0.15 0.10 0.05 0.05 0.5 "$cluster_sizes" 1000 12345 "$RUNNER_TEMP/pitb-power-a.json"
-          cargo run --locked --bin plan_pitb_power -- 0.35 0.15 0.10 0.05 0.05 0.5 "$cluster_sizes" 1000 12345 "$RUNNER_TEMP/pitb-power-b.json"
-          cargo run --locked --bin plan_pitb_power -- 0.35 0.15 0.10 0.05 0.20 0.0 "$cluster_sizes" 1000 12346 "$RUNNER_TEMP/pitb-power-heterogeneous.json"
+          cargo run --locked --bin plan_pitb_power -- 0.35 0.15 0.10 0.05 0.05 0.5 "$cluster_sizes" 1000 1000 12345 "$RUNNER_TEMP/pitb-power-a.json"
+          cargo run --locked --bin plan_pitb_power -- 0.35 0.15 0.10 0.05 0.05 0.5 "$cluster_sizes" 1000 1000 12345 "$RUNNER_TEMP/pitb-power-b.json"
+          cargo run --locked --bin plan_pitb_power -- 0.35 0.15 0.10 0.05 0.20 0.0 "$cluster_sizes" 1000 1000 12346 "$RUNNER_TEMP/pitb-power-heterogeneous.json"
           cmp "$RUNNER_TEMP/pitb-power-a.json" "$RUNNER_TEMP/pitb-power-b.json"
           "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$RUNNER_TEMP/pitb-power-a.json" "$RUNNER_TEMP/pitb-power-heterogeneous.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/power-planning-report.schema.json" <<'PY'
           import copy
