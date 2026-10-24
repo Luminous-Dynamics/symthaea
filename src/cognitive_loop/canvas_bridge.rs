@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 use symthaea_aesthetic::{AestheticConfig, AestheticFeedback, AestheticScore};
 #[cfg(feature = "canvas")]
 use symthaea_canvas::{
-    AestheticEngine, AestheticState, CognitiveSnapshot, aesthetic_score, build_scene, render_svg,
+    AestheticEngine, AestheticState, CognitiveSnapshot, RemoteScene, aesthetic_score, build_scene,
+    render_svg,
 };
 
 /// Telemetry from the canvas pipeline, stored in CycleMetadata.
@@ -56,6 +57,8 @@ pub(crate) struct CanvasManager {
     cycles_since_generation: u32,
     /// Last generated SVG string.
     last_svg: Option<String>,
+    /// Last generated renderer-neutral scene for typed GPU/browser transport.
+    last_scene: Option<RemoteScene>,
     /// Last aesthetic state (for telemetry extraction).
     last_state: Option<AestheticState>,
     /// Telemetry from the most recent tick.
@@ -76,6 +79,7 @@ impl CanvasManager {
             generation_interval: 5,
             cycles_since_generation: 0,
             last_svg: None,
+            last_scene: None,
             last_state: None,
             last_telemetry: CanvasTelemetry::default(),
             // Neutral prior: mid-scale expectation so the first frames neither
@@ -128,6 +132,7 @@ impl CanvasManager {
         let mut state = self.engine.process(snap);
         let scene = build_scene(&state);
         state.aesthetic_score = aesthetic_score(&state, &scene);
+        let remote_scene = RemoteScene::from_scene(&scene);
         let svg = render_svg(&scene, snap.consciousness_level);
 
         let elapsed = start.elapsed();
@@ -156,6 +161,7 @@ impl CanvasManager {
         };
 
         self.last_svg = Some(svg);
+        self.last_scene = Some(remote_scene);
         self.last_state = Some(state);
 
         self.last_svg.as_deref()
@@ -209,6 +215,11 @@ impl CanvasManager {
     /// Take the last generated SVG (drains it).
     pub fn take_svg(&mut self) -> Option<String> {
         self.last_svg.take()
+    }
+
+    /// Take the last generated typed scene (drains it).
+    pub fn take_scene(&mut self) -> Option<RemoteScene> {
+        self.last_scene.take()
     }
 
     /// Reference to last aesthetic state (for external inspection).

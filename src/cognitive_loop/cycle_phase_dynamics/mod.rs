@@ -1047,6 +1047,9 @@ impl CognitiveLoopService {
                         if let Some(svg) = mgr.take_svg() {
                             self.sensorimotor.motor_rendering.last_canvas_svg = Some(svg);
                         }
+                        if let Some(scene) = mgr.take_scene() {
+                            self.sensorimotor.motor_rendering.last_canvas_scene = Some(scene);
+                        }
                     }
                     if let Some((da_delta, se_delta)) = canvas_feedback {
                         if da_delta != 0.0 {
