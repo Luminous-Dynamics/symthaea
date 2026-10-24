@@ -579,9 +579,6 @@
                                 "status": {
                                   "const": "matches_intended_claim"
                                 },
-                                "independent_reviewer_count": {
-                                  "minimum": 2
-                                },
                                 "reviewers": {
                                   "type": "array",
                                   "minItems": 2
