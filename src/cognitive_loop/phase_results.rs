@@ -86,12 +86,8 @@ pub(super) struct PercUrgency {
     pub(super) error_pattern: &'static str,
     pub(super) predicted_urgency: &'static str,
     pub(super) prediction_coherence_urgency_bias: f32,
-    /// Compatibility-facing numeric PE may be a sentinel; this flag marks whether
-    /// the current cycle contains a genuine, comparable prediction observation.
-    pub(super) prediction_error_valid: bool,
     /// Typed evidence shared with downstream consumer phases.
     pub(super) prediction_evidence: PredictionErrorEvidence,
-    pub(super) prediction_error: f32,
     pub(super) error_slope: f32,
     pub(super) oscillation_ratio: f32,
 }
