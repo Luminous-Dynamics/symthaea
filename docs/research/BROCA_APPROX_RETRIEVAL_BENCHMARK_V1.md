@@ -24,10 +24,10 @@ Run the recommended multi-size/fallback matrix through the checked-in helper. It
 bash scripts/run_broca_ann_sweep.sh
 ```
 
-By default this performs 6 benchmark runs (1k / 10k / 50k vectors × empty-result fallback on/off), at 200 queries × 5 timing rounds, and writes CSVs plus receipts under `artifacts/broca-ann/`. Override the workload without editing the script:
+By default this performs 18 benchmark runs (1k / 10k / 50k vectors × seeds 42 / 43 / 44 × empty-result fallback on/off), at 200 queries × 5 timing rounds, and writes separate CSVs, stderr logs and receipts under `artifacts/broca-ann/`. Seeds are fixed before the experiment; do not drop an unfavorable seed after observing results. Override the workload without editing the script:
 
 ```sh
-SIZES="10000 50000" QUERIES=500 ROUNDS=7 OUT_DIR=/tmp/broca-results \
+SIZES="10000 50000" SEEDS="11 12 13 14 15" QUERIES=500 ROUNDS=7 OUT_DIR=/tmp/broca-results \
   bash scripts/run_broca_ann_sweep.sh
 ```
 
