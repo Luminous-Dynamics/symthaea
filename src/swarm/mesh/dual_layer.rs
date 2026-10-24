@@ -272,6 +272,14 @@ impl DualLayerMesh {
         #[cfg(not(feature = "mesh-encryption"))]
         let envelope = compressed;
 
+        // Encryption helpers historically return an empty Vec on failure.
+        // Never allow that sentinel to become an apparently successful send.
+        if envelope.is_empty() {
+            return Err(MeshError::Io(
+                "compression/encryption produced an empty mesh envelope".into(),
+            ));
+        }
+
         match route {
             MeshRoute::LoRa => {
                 let transport = self.lora.as_ref().ok_or(MeshError::NoTransport)?;
