@@ -80,6 +80,44 @@ pub struct QuadratureState {
     pub previous_p: Vec<f64>,
 }
 
+impl QuadratureState {
+    /// Project the in-phase quadrature to discrete Ising spins.
+    ///
+    /// The source paper defines the scored spin using only the sign of x_i;
+    /// the out-of-phase quadrature p_i does not decide the discrete label.
+    /// If |x_i| is less than or equal to zero_tolerance, projection fails closed
+    /// rather than choosing a sign silently. The caller must freeze this tolerance
+    /// before a confirmatory benchmark and account for ambiguous projections.
+    pub fn project_x_to_spins(
+        &self,
+        zero_tolerance: f64,
+    ) -> Result<Vec<i8>, PhotonicDynamicsError> {
+        if !zero_tolerance.is_finite() || zero_tolerance < 0.0 {
+            return Err(PhotonicDynamicsError::InvalidProjectionTolerance {
+                value: zero_tolerance,
+            });
+        }
+        let mut spins = Vec::with_capacity(self.x.len());
+        for (index, &value) in self.x.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(PhotonicDynamicsError::NonFiniteState {
+                    name: "x",
+                    index,
+                });
+            }
+            if value.abs() <= zero_tolerance {
+                return Err(PhotonicDynamicsError::AmbiguousSpinProjection {
+                    index,
+                    x: value,
+                    tolerance: zero_tolerance,
+                });
+            }
+            spins.push(if value > 0.0 { 1 } else { -1 });
+        }
+        Ok(spins)
+    }
+}
+
 /// One numerical update and diagnostic values from the exact step just evaluated.
 #[derive(Debug, Clone, PartialEq)]
 pub struct QuadratureStep {
@@ -125,6 +163,20 @@ pub enum PhotonicDynamicsError {
         row: usize,
         /// Second vertex.
         column: usize,
+    },
+    /// The sign projection tolerance is negative or non-finite.
+    InvalidProjectionTolerance {
+        /// Supplied absolute tolerance.
+        value: f64,
+    },
+    /// The in-phase quadrature is too close to zero for an unambiguous sign.
+    AmbiguousSpinProjection {
+        /// Spin index.
+        index: usize,
+        /// In-phase value that could not be projected.
+        x: f64,
+        /// Declared absolute tolerance.
+        tolerance: f64,
     },
     /// A time step or other parameter is outside its valid domain.
     InvalidParameter {
@@ -214,6 +266,13 @@ impl fmt::Display for PhotonicDynamicsError {
             Self::AsymmetricCouplings { row, column } => {
                 write!(f, "couplings ({row}, {column}) and ({column}, {row}) differ")
             }
+            Self::InvalidProjectionTolerance { value } => {
+                write!(f, "projection tolerance must be finite and non-negative, got {value}")
+            }
+            Self::AmbiguousSpinProjection { index, x, tolerance } => write!(
+                f,
+                "x[{index}]={x} is within projection tolerance {tolerance}"
+            ),
             Self::InvalidParameter { name, value } => {
                 write!(f, "parameter {name} has invalid value {value}")
             }
@@ -674,6 +733,38 @@ mod tests {
         assert!((out.next_state.p[0] - 1.825).abs() < 1e-12);
         assert_eq!(out.next_state.previous_x, s.x);
         assert_eq!(out.next_state.previous_p, s.p);
+    }
+
+    #[test]
+    fn spin_projection_uses_only_x_and_fails_closed_near_zero() {
+        let s = state(&[-0.5, 0.75], &[100.0, -100.0], &[0.0, 0.0], &[0.0, 0.0]);
+        assert_eq!(s.project_x_to_spins(0.0).expect("nonzero x"), vec![-1, 1]);
+
+        let ambiguous = state(&[0.0, 0.75], &[0.0, 0.0], &[0.0, 0.0], &[0.0, 0.0]);
+        assert!(matches!(
+            ambiguous.project_x_to_spins(0.0),
+            Err(PhotonicDynamicsError::AmbiguousSpinProjection { index: 0, .. })
+        ));
+
+        let near_zero = state(&[1e-6], &[0.0], &[0.0], &[0.0]);
+        assert!(matches!(
+            near_zero.project_x_to_spins(1e-5),
+            Err(PhotonicDynamicsError::AmbiguousSpinProjection { index: 0, .. })
+        ));
+    }
+
+    #[test]
+    fn spin_projection_rejects_invalid_tolerance_and_non_finite_x() {
+        let invalid_tolerance = state(&[1.0], &[0.0], &[0.0], &[0.0]);
+        assert!(matches!(
+            invalid_tolerance.project_x_to_spins(f64::NAN),
+            Err(PhotonicDynamicsError::InvalidProjectionTolerance { .. })
+        ));
+        let non_finite = state(&[f64::INFINITY], &[0.0], &[0.0], &[0.0]);
+        assert!(matches!(
+            non_finite.project_x_to_spins(0.0),
+            Err(PhotonicDynamicsError::NonFiniteState { .. })
+        ));
     }
 
     #[test]
