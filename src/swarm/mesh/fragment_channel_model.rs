@@ -3,10 +3,16 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Deterministic, test-only LoRa fragment channel model.
 //!
-//! This module is deliberately a research baseline, not a radio simulator.
-//! It applies seeded IID or two-state burst loss to the repository's actual
-//! fragment output and XOR-FEC assembler. Airtime/energy are not inferred here;
-//! those require a separately frozen PHY profile and device measurements.
+//! This module is a research baseline, not a radio simulator. It applies
+//! seeded IID or two-state burst loss to the repository's actual fragment
+//! output and XOR-FEC assembler, then compares no recovery, XOR-FEC, one-round
+//! selective retry, and hybrid FEC+retry.
+//!
+//! Retry strategies assume perfect aggregated feedback and one retry per
+//! initially lost data fragment. ACK loss, timing, contention, PHY airtime,
+//! hardware energy, and multi-hop effects are intentionally not modelled.
+//! The retry results are optimistic upper bounds, not claims about runtime
+//! behavior. Real airtime/energy need a frozen PHY profile and device data.
 
 use super::{fragment, FragmentAssembler, HEADER_SIZE, LORA_MTU, PAYLOAD_SIZE};
 
@@ -28,25 +34,29 @@ struct Summary {
     trials: usize,
     no_fec_successes: usize,
     xor_fec_successes: usize,
+    selective_retry_successes: usize,
+    hybrid_successes: usize,
     xor_fec_recoveries: usize,
+    hybrid_fec_recoveries: usize,
     xor_fec_incorrect_outputs: usize,
+    hybrid_incorrect_outputs: usize,
     no_fec_frames_per_message: usize,
     xor_fec_frames_per_message: usize,
+    selective_retry_frames_per_message_milli: usize,
+    hybrid_frames_per_message_milli: usize,
     no_fec_wire_bytes_per_message: usize,
     xor_fec_wire_bytes_per_message: usize,
+    selective_retry_wire_bytes_per_message_milli: usize,
+    hybrid_wire_bytes_per_message_milli: usize,
 }
 
 impl Summary {
-    fn no_fec_delivery_per_mille(self) -> usize {
-        self.no_fec_successes * 1000 / self.trials
+    fn delivery_per_mille(self, successes: usize) -> usize {
+        successes * 1000 / self.trials
     }
 
-    fn xor_fec_delivery_per_mille(self) -> usize {
-        self.xor_fec_successes * 1000 / self.trials
-    }
-
-    /// Wilson score interval for a binomial delivery rate; displayed as a
-    /// proportion rather than presented as a confidence claim about real radios.
+    /// Wilson score interval for a binomial delivery rate. This describes the
+    /// synthetic model only, not a confidence interval for field-radio truth.
     fn wilson_95(self, successes: usize) -> (f64, f64) {
         let n = self.trials as f64;
         let p = successes as f64 / n;
@@ -125,12 +135,16 @@ fn wire_len(payload_len: u8) -> usize {
     HEADER_SIZE + payload_len as usize
 }
 
-/// Runs paired no-recovery and XOR-FEC variants with a shared deterministic
-/// trace for each packet. The no-recovery baseline sends data fragments only;
-/// the XOR strategy sends the same data fragments plus one parity fragment.
+/// Run four packet-delivery strategies against paired deterministic traces:
 ///
-/// This is a packet-delivery model only: there are no ACKs, retries, radio
-/// timing, contention, PHY airtime, or energy claims in this first baseline.
+/// - no FEC/retry: success only if all initial data fragments arrive;
+/// - XOR-FEC: existing parity/assembler behavior, without retries;
+/// - selective retry: one retry for each initially lost data fragment;
+/// - hybrid: XOR parity plus those same one-shot retries.
+///
+/// Each trial reserves a parity slot and one possible retry slot per data
+/// fragment in the synthetic time trace. Unused retry slots are idle slots.
+/// Perfect aggregated feedback is assumed by the retry strategies.
 fn run_benchmark(
     payload: &[u8],
     model: LossModel,
@@ -141,15 +155,21 @@ fn run_benchmark(
     assert!(trials > 0, "benchmark requires at least one trial");
     let frames = fragment(0xC0DE, payload);
     let data_count = frames.len() - 1;
-    let no_fec_wire_bytes_per_message = frames[..data_count]
+    let fec_index = data_count;
+    let trace_slots = frames.len() + data_count;
+
+    let no_fec_wire_bytes_per_message: usize = frames[..data_count]
         .iter()
         .map(|frame| wire_len(frame.payload_len))
         .sum();
-    let xor_fec_wire_bytes_per_message = frames.iter()
+    let xor_fec_wire_bytes_per_message: usize = frames
+        .iter()
         .map(|frame| wire_len(frame.payload_len))
         .sum();
 
-    assert!(frames.iter().all(|frame| wire_len(frame.payload_len) <= LORA_MTU));
+    assert!(frames
+        .iter()
+        .all(|frame| wire_len(frame.payload_len) <= LORA_MTU));
 
     let mut rng = DeterministicRng::new(seed);
     let mut in_bad_state = false;
@@ -157,44 +177,121 @@ fn run_benchmark(
         trials,
         no_fec_successes: 0,
         xor_fec_successes: 0,
+        selective_retry_successes: 0,
+        hybrid_successes: 0,
         xor_fec_recoveries: 0,
+        hybrid_fec_recoveries: 0,
         xor_fec_incorrect_outputs: 0,
+        hybrid_incorrect_outputs: 0,
         no_fec_frames_per_message: data_count,
         xor_fec_frames_per_message: frames.len(),
+        selective_retry_frames_per_message_milli: 0,
+        hybrid_frames_per_message_milli: 0,
         no_fec_wire_bytes_per_message,
         xor_fec_wire_bytes_per_message,
+        selective_retry_wire_bytes_per_message_milli: 0,
+        hybrid_wire_bytes_per_message_milli: 0,
     };
+    let mut selective_frames_total = 0usize;
+    let mut hybrid_frames_total = 0usize;
+    let mut selective_bytes_total = 0usize;
+    let mut hybrid_bytes_total = 0usize;
 
     for _ in 0..trials {
-        // Precompute one shared loss trace so both strategies see the same
-        // data-frame outcomes. The parity slot is an extra potential frame.
-        let trace: Vec<bool> = (0..frames.len())
+        // The data-frame outcomes are shared by all strategies. Slots after
+        // the initial data+parity group represent one possible retry per data
+        // fragment; the channel state continues evolving through idle slots.
+        let trace: Vec<bool> = (0..trace_slots)
             .map(|_| frame_delivered(model, &mut rng, &mut in_bad_state))
             .collect();
+        let initial_data_ok = &trace[..data_count];
+        let all_initial_data = initial_data_ok.iter().all(|&delivered| delivered);
 
-        if trace[..data_count].iter().all(|&delivered| delivered) {
+        if all_initial_data {
             summary.no_fec_successes += 1;
         }
 
-        let mut assembler = FragmentAssembler::new(0xC0DE, frames.len() as u8, payload.len());
-        for (frame, &delivered) in frames.iter().zip(trace.iter()) {
-            if delivered {
-                assembler.feed(frame);
+        let mut xor_assembler =
+            FragmentAssembler::new(0xC0DE, frames.len() as u8, payload.len());
+        for (index, frame) in frames.iter().enumerate() {
+            if trace[index] {
+                xor_assembler.feed(frame);
             }
         }
-
-        if let Some(recovered) = assembler.assemble() {
+        if let Some(recovered) = xor_assembler.assemble() {
             if recovered.as_slice() == payload {
                 summary.xor_fec_successes += 1;
-                if !trace[..data_count].iter().all(|&delivered| delivered) {
+                if !all_initial_data {
                     summary.xor_fec_recoveries += 1;
                 }
             } else {
                 summary.xor_fec_incorrect_outputs += 1;
             }
         }
+
+        // One-round selective retry: an ideal aggregated acknowledgement
+        // identifies every initially missing data fragment. Each gets exactly
+        // one retry; ACK loss and ACK byte overhead are out of this model.
+        let mut selective_data_ok = initial_data_ok.to_vec();
+        let mut selective_frames = data_count;
+        let mut selective_bytes = no_fec_wire_bytes_per_message;
+        for index in 0..data_count {
+            if !selective_data_ok[index] {
+                selective_frames += 1;
+                selective_bytes += wire_len(frames[index].payload_len);
+                selective_data_ok[index] = trace[frames.len() + index];
+            }
+        }
+        if selective_data_ok.iter().all(|&delivered| delivered) {
+            summary.selective_retry_successes += 1;
+        }
+        selective_frames_total += selective_frames;
+        selective_bytes_total += selective_bytes;
+
+        // Hybrid retry uses the identical retry outcomes, but begins with the
+        // additional XOR parity transmission. It can succeed with all data or
+        // use parity to recover one remaining lost data fragment.
+        let mut hybrid_data_ok = initial_data_ok.to_vec();
+        let mut hybrid_frames = frames.len();
+        let mut hybrid_bytes = xor_fec_wire_bytes_per_message;
+        for index in 0..data_count {
+            if !hybrid_data_ok[index] {
+                hybrid_frames += 1;
+                hybrid_bytes += wire_len(frames[index].payload_len);
+                hybrid_data_ok[index] = trace[frames.len() + index];
+            }
+        }
+
+        let mut hybrid_assembler =
+            FragmentAssembler::new(0xC0DE, frames.len() as u8, payload.len());
+        for index in 0..data_count {
+            if hybrid_data_ok[index] {
+                hybrid_assembler.feed(&frames[index]);
+            }
+        }
+        if trace[fec_index] {
+            hybrid_assembler.feed(&frames[fec_index]);
+        }
+        if let Some(recovered) = hybrid_assembler.assemble() {
+            if recovered.as_slice() == payload {
+                summary.hybrid_successes += 1;
+                if !hybrid_data_ok.iter().all(|&delivered| delivered) {
+                    summary.hybrid_fec_recoveries += 1;
+                }
+            } else {
+                summary.hybrid_incorrect_outputs += 1;
+            }
+        }
+        hybrid_frames_total += hybrid_frames;
+        hybrid_bytes_total += hybrid_bytes;
     }
 
+    // Fixed-point milli-units preserve deterministic, integer-only receipts.
+    summary.selective_retry_frames_per_message_milli =
+        selective_frames_total * 1000 / trials;
+    summary.hybrid_frames_per_message_milli = hybrid_frames_total * 1000 / trials;
+    summary.selective_retry_wire_bytes_per_message_milli = selective_bytes_total * 1000 / trials;
+    summary.hybrid_wire_bytes_per_message_milli = hybrid_bytes_total * 1000 / trials;
     summary
 }
 
@@ -202,6 +299,23 @@ fn payload_of_len(len: usize, seed: u8) -> Vec<u8> {
     (0..len)
         .map(|index| seed.wrapping_mul(index as u8).wrapping_add((index >> 3) as u8))
         .collect()
+}
+
+fn assert_strategies_are_ordered(summary: Summary) {
+    assert_eq!(summary.xor_fec_incorrect_outputs, 0);
+    assert_eq!(summary.hybrid_incorrect_outputs, 0);
+    assert!(
+        summary.xor_fec_successes >= summary.no_fec_successes,
+        "under paired traces, single XOR parity must not reduce delivery"
+    );
+    assert!(
+        summary.selective_retry_successes >= summary.no_fec_successes,
+        "a retry cannot make a delivered initial data frame disappear"
+    );
+    assert!(
+        summary.hybrid_successes >= summary.xor_fec_successes,
+        "hybrid retry must preserve every success that XOR-FEC already had"
+    );
 }
 
 #[test]
@@ -237,7 +351,7 @@ fn xor_fec_reconstructs_exact_bytes_after_every_single_frame_loss() {
 }
 
 #[test]
-fn iid_loss_sweep_is_reproducible_and_fec_never_fabricates_payloads() {
+fn iid_loss_sweep_is_reproducible_and_reports_seeded_replicates() {
     let payload = payload_of_len(2048, 0xA5);
     let replicate_seeds = [0x1010_0001, 0x2020_0002, 0x3030_0003];
 
@@ -247,55 +361,57 @@ fn iid_loss_sweep_is_reproducible_and_fec_never_fabricates_payloads() {
         let second = run_benchmark(&payload, model, 0x5EED_1234, 2000);
 
         assert_eq!(first, second, "same seed/config must produce same results");
-        assert_eq!(first.xor_fec_incorrect_outputs, 0);
-        assert!(
-            first.xor_fec_successes >= first.no_fec_successes,
-            "under paired traces, single XOR parity must not reduce delivery"
-        );
-        let no_fec_ci = first.wilson_95(first.no_fec_successes);
-        let xor_fec_ci = first.wilson_95(first.xor_fec_successes);
+        assert_strategies_are_ordered(first);
+
         eprintln!(
-            "mesh-iid loss={}‰ seed=0x5eed1234 trials={} no_fec={}‰ CI95=[{:.1},{:.1}]% xor_fec={}‰ CI95=[{:.1},{:.1}]% fec_recoveries={} wire_bytes/message={}/{}",
+            "mesh-iid loss={}‰ seed=0x5eed1234 n={} no_fec={}‰ xor_fec={}‰ selective_retry={}‰ hybrid={}‰ frames×1000/message={}/{}/{}/{} bytes×1000/message={}/{}/{}/{}",
             loss_per_mille,
             first.trials,
-            first.no_fec_delivery_per_mille(),
-            no_fec_ci.0 * 100.0,
-            no_fec_ci.1 * 100.0,
-            first.xor_fec_delivery_per_mille(),
-            xor_fec_ci.0 * 100.0,
-            xor_fec_ci.1 * 100.0,
-            first.xor_fec_recoveries,
-            first.no_fec_wire_bytes_per_message,
-            first.xor_fec_wire_bytes_per_message,
+            first.delivery_per_mille(first.no_fec_successes),
+            first.delivery_per_mille(first.xor_fec_successes),
+            first.delivery_per_mille(first.selective_retry_successes),
+            first.delivery_per_mille(first.hybrid_successes),
+            first.no_fec_frames_per_message * 1000,
+            first.xor_fec_frames_per_message * 1000,
+            first.selective_retry_frames_per_message_milli,
+            first.hybrid_frames_per_message_milli,
+            first.no_fec_wire_bytes_per_message * 1000,
+            first.xor_fec_wire_bytes_per_message * 1000,
+            first.selective_retry_wire_bytes_per_message_milli,
+            first.hybrid_wire_bytes_per_message_milli,
         );
 
-        // Independent deterministic replicates expose seed sensitivity. CI
-        // intervals describe the synthetic model only, never field-radio truth.
         for seed in replicate_seeds {
             let replicate = run_benchmark(&payload, model, seed, 1000);
-            assert_eq!(replicate.xor_fec_incorrect_outputs, 0);
-            assert!(replicate.xor_fec_successes >= replicate.no_fec_successes);
-            let baseline_ci = replicate.wilson_95(replicate.no_fec_successes);
-            let fec_ci = replicate.wilson_95(replicate.xor_fec_successes);
+            assert_strategies_are_ordered(replicate);
+            let no_fec_ci = replicate.wilson_95(replicate.no_fec_successes);
+            let xor_ci = replicate.wilson_95(replicate.xor_fec_successes);
+            let retry_ci = replicate.wilson_95(replicate.selective_retry_successes);
+            let hybrid_ci = replicate.wilson_95(replicate.hybrid_successes);
             eprintln!(
-                "mesh-iid-replicate loss={}‰ seed={:#010x} trials={} no_fec={}‰ CI95=[{:.1},{:.1}]% xor_fec={}‰ CI95=[{:.1},{:.1}]% fec_recoveries={}",
+                "mesh-iid-replicate loss={}‰ seed={:#010x} n={} delivery‰={}/{}/{}/{} CI95-no-fec=[{:.1},{:.1}]% xor=[{:.1},{:.1}]% retry=[{:.1},{:.1}]% hybrid=[{:.1},{:.1}]%",
                 loss_per_mille,
                 seed,
                 replicate.trials,
-                replicate.no_fec_delivery_per_mille(),
-                baseline_ci.0 * 100.0,
-                baseline_ci.1 * 100.0,
-                replicate.xor_fec_delivery_per_mille(),
-                fec_ci.0 * 100.0,
-                fec_ci.1 * 100.0,
-                replicate.xor_fec_recoveries,
+                replicate.delivery_per_mille(replicate.no_fec_successes),
+                replicate.delivery_per_mille(replicate.xor_fec_successes),
+                replicate.delivery_per_mille(replicate.selective_retry_successes),
+                replicate.delivery_per_mille(replicate.hybrid_successes),
+                no_fec_ci.0 * 100.0,
+                no_fec_ci.1 * 100.0,
+                xor_ci.0 * 100.0,
+                xor_ci.1 * 100.0,
+                retry_ci.0 * 100.0,
+                retry_ci.1 * 100.0,
+                hybrid_ci.0 * 100.0,
+                hybrid_ci.1 * 100.0,
             );
         }
     }
 }
 
 #[test]
-fn burst_loss_model_is_reproducible_and_exact() {
+fn burst_loss_model_is_reproducible_and_compares_four_strategies() {
     let payload = payload_of_len(2048, 0x6D);
     let model = LossModel::GilbertElliott {
         good_loss_per_mille: 20,
@@ -307,18 +423,21 @@ fn burst_loss_model_is_reproducible_and_exact() {
     let second = run_benchmark(&payload, model, 0xBADC_0FFE, 5000);
 
     assert_eq!(first, second);
-    assert_eq!(first.xor_fec_incorrect_outputs, 0);
-    assert!(
-        first.xor_fec_successes >= first.no_fec_successes,
-        "paired traces require FEC delivery to dominate the no-recovery baseline"
-    );
+    assert_strategies_are_ordered(first);
     eprintln!(
-        "mesh-burst trials={} no_fec={}‰ xor_fec={}‰ fec_recoveries={} wire_bytes/message={}/{}",
+        "mesh-burst seed=0xbadc0ffe n={} delivery‰={}/{}/{}/{} frames×1000/message={}/{}/{}/{} bytes×1000/message={}/{}/{}/{}",
         first.trials,
-        first.no_fec_delivery_per_mille(),
-        first.xor_fec_delivery_per_mille(),
-        first.xor_fec_recoveries,
-        first.no_fec_wire_bytes_per_message,
-        first.xor_fec_wire_bytes_per_message,
+        first.delivery_per_mille(first.no_fec_successes),
+        first.delivery_per_mille(first.xor_fec_successes),
+        first.delivery_per_mille(first.selective_retry_successes),
+        first.delivery_per_mille(first.hybrid_successes),
+        first.no_fec_frames_per_message * 1000,
+        first.xor_fec_frames_per_message * 1000,
+        first.selective_retry_frames_per_message_milli,
+        first.hybrid_frames_per_message_milli,
+        first.no_fec_wire_bytes_per_message * 1000,
+        first.xor_fec_wire_bytes_per_message * 1000,
+        first.selective_retry_wire_bytes_per_message_milli,
+        first.hybrid_wire_bytes_per_message_milli,
     );
 }
