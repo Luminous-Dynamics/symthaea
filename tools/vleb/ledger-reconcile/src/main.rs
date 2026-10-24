@@ -12,7 +12,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let extra = arguments.next();
 
     if flag.as_deref() != Some("--input") || path.is_none() || extra.is_some() {
-        return Err("usage: ledger-reconcile --input <csv-path>".into());
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "usage: ledger-reconcile --input <csv-path>",
+        )
+        .into());
     }
 
     let input = fs::read_to_string(path.expect("validated path argument"))?;
