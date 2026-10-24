@@ -6,8 +6,8 @@
   "artifacts": {
     "source": {
       "path": "validation/policy_frontier_column_generation_benchmark.py",
-      "git_blob": "cb4a18d01e003df29ee1ea9453a47090253b34b4",
-      "commit": "4446b19a411072aac0ba9b31b4dea5488815931a"
+      "git_blob": "98cb554d3a474cb3c6c398049845519f211508bd",
+      "commit": "8b3734b586f1d99af114ce913202abe425b18adf"
     },
     "tests": {
       "path": "validation/test_policy_frontier_column_generation_benchmark.py",
@@ -17,13 +17,13 @@
     },
     "report": {
       "path": "docs/research/POLICY_FRONTIER_COLUMN_GENERATION_BENCHMARK_2026-10-24.md",
-      "git_blob": "f951fa1fcf3351200526366559580b947ded2d98",
-      "commit": "683c3c45d3b360a6f0def1317f6505db79137523"
+      "git_blob": "b06b20a118059ffb568f8a4e861ac7f544c9214a",
+      "commit": "7fa910e595f7edb643361ed7abc18f3f9800c9b9"
     },
     "summary": {
       "path": "validation/policy_frontier_column_generation_summary_2026-10-24.json",
-      "git_blob": "f5ea005ce241933431e6c164f013c175992b820f",
-      "commit": "26a3d1f983b29880a2e7c45c7fdbf675bf8e536b"
+      "git_blob": "94bb0391bd527653b803f851cded54852e2b2919",
+      "commit": "8fff7e9e38ec9a45e8df9dfbf541f0fcb1692ec8"
     },
     "exact_result_json": {
       "path": "local-only: policy_frontier_column_generation_results_exact_2026-10-24.json",
@@ -59,9 +59,9 @@
   "source_binding": {
     "executed_local_source_sha256": "08371649907d5a3252036789a7f774f3f01b9ff57143467c0001d15c3d116409",
     "executed_local_source_git_blob": "1f2656c5f49a375043ffe42155df11952a27217a",
-    "committed_source_git_blob": "cb4a18d01e003df29ee1ea9453a47090253b34b4",
+    "committed_source_git_blob": "98cb554d3a474cb3c6c398049845519f211508bd",
     "match": false,
-    "disclosure": "The local measurements were generated before a compacted rendition of the solver was committed. The local runtime had no repository checkout, and the imported fixed-prior helper was reconstructed from displayed source. Regenerate the benchmark from the committed implementation in an exact branch checkout before treating it as exact-head evidence.",
+    "disclosure": "The executed local source blob is 1f2656c5f49a375043ffe42155df11952a27217a, while the current committed source blob is 98cb554d3a474cb3c6c398049845519f211508bd; they are not byte-identical. The local runtime had no repository checkout and the fixed-prior helper used for local execution was reconstructed from displayed source, not the exact repository blob. Regenerate from an exact checkout before treating these results as exact-head evidence.",
     "test_source_git_blob": "e99ce5c1c5a994c4646e190470a8fdb156371e49"
   },
   "scientific_boundary": [
@@ -70,5 +70,14 @@
     "Exact subset telemetry; no costs, noisy/missing/delayed telemetry, or task disturbance",
     "No external causal discovery benchmark; no SOTA or novelty claim",
     "Average runtime was slower than exhaustive frontier plus LP; no overall speedup claimed"
-  ]
+  ],
+  "branch_artifacts": {
+    "source_git_blob": "98cb554d3a474cb3c6c398049845519f211508bd",
+    "test_git_blob": "e99ce5c1c5a994c4646e190470a8fdb156371e49",
+    "report_git_blob": "b06b20a118059ffb568f8a4e861ac7f544c9214a",
+    "summary_git_blob": "94bb0391bd527653b803f851cded54852e2b2919",
+    "source_matches_local_executed_version": false,
+    "exact_head_integration_tested": false,
+    "ci_pass_claimed": false
+  }
 }
