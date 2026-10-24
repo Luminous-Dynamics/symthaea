@@ -132,3 +132,8 @@ The frontier analyzer is deliberately **descriptive only**: `confirmatory_decisi
 `discover_family_leakage_candidates` is a deterministic first-pass triage tool. It reads only the frozen family titles, normalizes away markup, downweights common tokens using document frequency, and emits candidates with shared-token explanations, a Jaccard score, a rarity score and an evidence digest. It is run twice in CI and the exact outputs must match.
 
 The output schema is `family-leakage-candidate-discovery.schema.json`. Candidate rows are always marked `title_similarity_only` and `unreviewed`. They are not converted automatically into hard leakage edges, do not change the split, and must not be counted as dependency or contamination findings. This screen is intended to prioritize expert review; it can both miss real dependencies and surface unrelated theorems with overlapping words.
+### Separate artifact-path candidate channel
+
+`discover_artifact_path_candidates` scans the manifest's linked artifact paths independently of title similarity. It strips generic directory, filename, publication-date and document-type tokens, computes rare path-token overlap, and emits the actual matching paths alongside shared-token explanations and a content digest. Its output schema is `family-artifact-path-candidate-discovery.schema.json`.
+
+Every row is forced to `artifact_path_similarity_only` and `unreviewed`. Path slugs are metadata, not artifact bytes: overlap does not prove that two families share a source document or a mathematical dependency. The path channel has its own thresholds, output and reproducibility check; do not combine its scores with the title channel without a preregistered calibration.
