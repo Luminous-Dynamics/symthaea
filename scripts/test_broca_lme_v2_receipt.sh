@@ -7,16 +7,20 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 make_fixture() {
-  local root=$1 arm domain n path digest arms runs aggregates dataset_digest harness_digest frontier_digest config_digest i
+  local root=$1 arm domain n path digest arms runs aggregates dataset_digest harness_digest frontier_digest config_digest reader_prompt_digest judge_prompt_digest i
   mkdir -p "$root/outputs" "$root/aggregates" "$root/pins"
   printf 'dataset-id=longmemeval-v2\nsnapshot=test-fixture\n' > "$root/pins/dataset.manifest"
   printf 'repository=https://github.com/xiaowu0162/LongMemEval-V2\ncommit=%040d\n' 1 > "$root/pins/harness.manifest"
   printf '{"reference":"fixture-only","tier":"small"}\n' > "$root/pins/reference-frontier.json"
   printf '{"reader":"test-reader","judge":"test-judge","context_cap":4096,"arms":["broca","no_retrieval","rag_query_to_slice"]}\n' > "$root/pins/config.json"
+  printf 'fixture reader prompt\n' > "$root/pins/reader.prompt"
+  printf 'fixture judge prompt\n' > "$root/pins/judge.prompt"
   dataset_digest=$(sha256sum "$root/pins/dataset.manifest" | awk '{print $1}')
   harness_digest=$(sha256sum "$root/pins/harness.manifest" | awk '{print $1}')
   frontier_digest=$(sha256sum "$root/pins/reference-frontier.json" | awk '{print $1}')
   config_digest=$(sha256sum "$root/pins/config.json" | awk '{print $1}')
+  reader_prompt_digest=$(sha256sum "$root/pins/reader.prompt" | awk '{print $1}')
+  judge_prompt_digest=$(sha256sum "$root/pins/judge.prompt" | awk '{print $1}')
   arms='["broca","no_retrieval","rag_query_to_slice"]'
   runs='[]' aggregates='[]'
   for arm in broca no_retrieval rag_query_to_slice; do
@@ -38,8 +42,9 @@ make_fixture() {
   jq -n \
     --arg dataset_digest "$dataset_digest" --arg harness_digest "$harness_digest" \
     --arg frontier_digest "$frontier_digest" --arg config_digest "$config_digest" \
+    --arg reader_prompt_digest "$reader_prompt_digest" --arg judge_prompt_digest "$judge_prompt_digest" \
     --argjson arms "$arms" --argjson runs "$runs" --argjson aggregates "$aggregates" \
-    '{protocol_id:"BROCA-LME-V2-RECEIPT-V1",status:"completed",benchmark:{name:"LongMemEval-V2",repository:"https://github.com/xiaowu0162/LongMemEval-V2",upstream_commit:("1"*40),dataset_manifest_file:"pins/dataset.manifest",dataset_sha256:$dataset_digest,official_harness_manifest_file:"pins/harness.manifest",official_harness_sha256:$harness_digest,reference_frontier_file:"pins/reference-frontier.json",reference_frontier_sha256:$frontier_digest,tier:"small",question_count:451,arms:$arms},experiment:{symthaea_commit:("5"*40),config_file:"pins/config.json",config_sha256:$config_digest,reader_model:"test-reader",reader_revision:"test-reader-rev",judge_model:"test-judge",judge_revision:"test-judge-rev",reader_prompt_sha256:("7"*64),judge_prompt_sha256:("8"*64),memory_context_max_tokens:4096,runs:$runs,aggregates:$aggregates}}' > "$root/receipt.json"
+    '{protocol_id:"BROCA-LME-V2-RECEIPT-V1",status:"completed",benchmark:{name:"LongMemEval-V2",repository:"https://github.com/xiaowu0162/LongMemEval-V2",upstream_commit:("1"*40),dataset_manifest_file:"pins/dataset.manifest",dataset_manifest_sha256:$dataset_digest,official_harness_manifest_file:"pins/harness.manifest",official_harness_manifest_sha256:$harness_digest,reference_frontier_file:"pins/reference-frontier.json",reference_frontier_sha256:$frontier_digest,tier:"small",question_count:451,arms:$arms},experiment:{symthaea_commit:("5"*40),config_file:"pins/config.json",config_sha256:$config_digest,reader_model:"test-reader",reader_revision:"test-reader-rev",judge_model:"test-judge",judge_revision:"test-judge-rev",reader_prompt_file:"pins/reader.prompt",reader_prompt_sha256:$reader_prompt_digest,judge_prompt_file:"pins/judge.prompt",judge_prompt_sha256:$judge_prompt_digest,memory_context_max_tokens:4096,runs:$runs,aggregates:$aggregates}}' > "$root/receipt.json"
 }
 expect_pass() {
   local receipt=$1
