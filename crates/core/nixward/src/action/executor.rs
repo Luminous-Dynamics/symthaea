@@ -16,7 +16,11 @@ use super::authorization::{
 use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::process::Stdio;
+use std::future::Future;
+use std::io;
+use std::pin::Pin;
+use std::process::{Output, Stdio};
+use std::sync::Arc;
 use tokio::process::Command;
 use tracing::{info, warn};
 
@@ -373,12 +377,44 @@ pub enum ExecutionResult {
     },
 }
 
+/// Injectable boundary for external process invocation.
+///
+/// Production uses Tokio's process runner. Tests can provide a mock to prove
+/// denied authorization decisions never invoke the process boundary.
+pub trait NixOSCommandRunner: Send + Sync {
+    fn run<'a>(
+        &'a self,
+        executable: &'a str,
+        args: &'a [String],
+    ) -> Pin<Box<dyn Future<Output = io::Result<Output>> + Send + 'a>>;
+}
+
+struct TokioNixOSCommandRunner;
+
+impl NixOSCommandRunner for TokioNixOSCommandRunner {
+    fn run<'a>(
+        &'a self,
+        executable: &'a str,
+        args: &'a [String],
+    ) -> Pin<Box<dyn Future<Output = io::Result<Output>> + Send + 'a>> {
+        Box::pin(async move {
+            Command::new(executable)
+                .args(args)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .await
+        })
+    }
+}
+
 /// NixOS-aware command executor with Φ integration
 pub struct NixOSExecutor {
     current_generation: Option<u32>,
     thresholds: ConsciousnessThresholds,
     history: VecDeque<ExecutionRecord>,
     dry_run: bool,
+    runner: Arc<dyn NixOSCommandRunner>,
 }
 
 /// Record of an execution for learning
@@ -403,7 +439,14 @@ impl NixOSExecutor {
             thresholds: ConsciousnessThresholds::default(),
             history: VecDeque::with_capacity(1000),
             dry_run: false,
+            runner: Arc::new(TokioNixOSCommandRunner),
         }
+    }
+
+    /// Replace the process runner. Primarily useful for deterministic tests.
+    pub fn with_runner(mut self, runner: Arc<dyn NixOSCommandRunner>) -> Self {
+        self.runner = runner;
+        self
     }
 
     pub fn with_dry_run(mut self, dry_run: bool) -> Self {
@@ -491,12 +534,7 @@ impl NixOSExecutor {
 
         let start = std::time::Instant::now();
 
-        let result = Command::new(&cmd)
-            .args(&args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .await;
+        let result = self.runner.run(&cmd, &args).await;
 
         let elapsed = start.elapsed().as_millis() as u64;
 
@@ -517,12 +555,7 @@ impl NixOSExecutor {
 
                 if let Some(rollback_cmd) = command.rollback_command() {
                     let (rb_cmd, rb_args) = rollback_cmd.to_command();
-                    let rb_result = Command::new(&rb_cmd)
-                        .args(&rb_args)
-                        .stdout(Stdio::piped())
-                        .stderr(Stdio::piped())
-                        .output()
-                        .await;
+                    let rb_result = self.runner.run(&rb_cmd, &rb_args).await;
 
                     match rb_result {
                         Ok(rb_output) if rb_output.status.success() => {
@@ -726,6 +759,39 @@ impl NixOSExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+#[cfg(unix)]
+    #[derive(Clone)]
+    struct CountingRunner {
+        invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    #[cfg(unix)]
+    impl NixOSCommandRunner for CountingRunner {
+        fn run<'a>(
+            &'a self,
+            _executable: &'a str,
+            _args: &'a [String],
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = std::io::Result<std::process::Output>,
+                    > + Send
+                    + 'a,
+            >,
+        > {
+            self.invocations
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Box::pin(async {
+                use std::os::unix::process::ExitStatusExt;
+                Ok(std::process::Output {
+                    status: std::process::ExitStatus::from_raw(0),
+                    stdout: Vec::new(),
+                    stderr: Vec::new(),
+                })
+            })
+        }
+    }
+
 
     #[test]
     fn test_command_safety_levels() {
