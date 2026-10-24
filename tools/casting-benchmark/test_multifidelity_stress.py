@@ -161,6 +161,15 @@ class MultiFidelityStressTests(unittest.TestCase):
         self.assertEqual(default["cost_spent"], 200)
         self.assertEqual(default["fidelity_evaluations"], {"low": 60, "medium": 8, "high": 4})
 
+        minimum_budget = required_policy_costs()["adaptive_budget"]
+        minimum = run_policy(
+            "adaptive_budget", seed=17, cost_budget=minimum_budget, grid_size=9,
+            severity=1.0,
+        )
+        self.assertEqual(minimum_budget, 65)
+        self.assertEqual(minimum["cost_spent"], minimum_budget)
+        self.assertEqual(minimum["fidelity_evaluations"], {"low": 5, "medium": 2, "high": 2})
+
         costs = {"low": 1, "medium": 10, "high": 50}
         budget = max(required_policy_costs(costs).values())
         adaptive = run_policy(
