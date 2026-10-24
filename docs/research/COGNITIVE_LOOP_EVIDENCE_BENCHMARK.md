@@ -284,6 +284,24 @@ The v2 CLI smoke tests assert the preregistered staged-versus-detector post-shif
 The synthetic fixture at `benchmarks/cognitive-loop-evidence/synthetic-counterfactual-adaptation.json` exists solely for CLI regression tests. Its values are synthetic, not benchmark results. This evaluator is a scoring primitive, not the replay engine; actual task runs, pinned datasets, cost instrumentation, and counterfactual state-isolation checks remain necessary before reporting efficacy.
 
 
+### Complete-panel aggregation and the confirmatory gate
+
+The Rust `xtask compare-cognitive-adaptation-panel` command consumes v2 utility-score records and validates their per-record result digests, fixed policy revisions, per-dataset configuration stability, task-loss metric/unit, and information-access track before aggregation. The expected grid is pinned as seven dataset IDs × 50 seed IDs × the eight registered abrupt/gradual drift cells, for 2,800 unique records. Duplicate cells, unexpected identities, invalid metric digests, a mismatched primary effect, or revision/config drift fail closed.
+
+If any required cell is absent, the command writes the exact missing-cell list and **does not emit a primary comparison or confidence interval**. For complete coverage only, it reuses the existing hierarchical paired bootstrap that resamples datasets first, then seeds while retaining each seed's scenario block. The primary estimate is the dataset-macro paired effect of staged-verify-rollback versus detector-triggered adaptation on post-shift mean task loss, with lower loss oriented as a positive candidate effect. The bootstrap fraction above zero is descriptive, not a p-value.
+
+Example:
+
+```bash
+cargo run --locked -p xtask -- compare-cognitive-adaptation-panel \
+  --input path/to/adaptation-panel.json \
+  --out reports/adaptation-panel-comparison.json
+cargo test --locked -p xtask cognitive_adaptation_panel
+```
+
+The workflow fixture `synthetic-adaptation-panel-incomplete.json` deliberately contains zero runs. It must report all 2,800 cells missing and `primary_comparison: null`; it tests fail-closed coverage wiring only. The panel aggregator validates scored summaries and their declared provenance, not the honesty of the original replay, the correctness of the model adapter, or causal execution. A full panel score is still not proof of SOTA superiority.
+
+
 ## Runnable scalar drift reference baselines
 
 The Rust `xtask run-cognitive-drift-baseline` command now implements two executable baselines on the **valid-PE-only** track: a fixed threshold and a calibration-centred EWMA control chart. Both consume a disjoint calibration vector plus a cycle-indexed evaluation stream, then feed generated alarm timestamps into the common timing-aware scorer.
