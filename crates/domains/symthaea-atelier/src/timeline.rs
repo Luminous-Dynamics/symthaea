@@ -308,6 +308,36 @@ mod tests {
     }
 
     #[test]
+    fn prediction_error_interpolation_requires_valid_endpoints() {
+        let mut a = CognitiveSnapshot::dormant();
+        a.prediction_error = 0.2;
+        a.prediction_error_valid = true;
+        let mut b = CognitiveSnapshot::dormant();
+        b.prediction_error = 0.8;
+        b.prediction_error_valid = true;
+
+        let mid = interpolate_snapshots(
+            &a,
+            &b,
+            0.5,
+            EasingCurve::Linear,
+            InterpolationMode::Linear,
+        );
+        assert_eq!(mid.prediction_error_sample(), Some(0.5));
+
+        b.prediction_error_valid = false;
+        let missing = interpolate_snapshots(
+            &a,
+            &b,
+            0.5,
+            EasingCurve::Linear,
+            InterpolationMode::Linear,
+        );
+        assert_eq!(missing.prediction_error, 0.0);
+        assert_eq!(missing.prediction_error_sample(), None);
+    }
+
+    #[test]
     fn midpoint_interpolation() {
         let tl = make_timeline();
         let mid = sample_at_time(&tl, 1.0);
