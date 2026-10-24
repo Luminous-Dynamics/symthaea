@@ -90,6 +90,7 @@ for SIZE in "${SIZES_ARRAY[@]}"; do
   for FALLBACK in true false; do
     STEM="broca-ann-sha-${SOURCE_SHA}-n${SIZE}-q${QUERIES}-r${ROUNDS}-k${TOP_K}-seed${SEED}-empty-fallback-${FALLBACK}"
     OUTPUT="$OUT_DIR/$STEM.csv"
+    STDERR="$OUT_DIR/$STEM.stderr.log"
     RECEIPT="$OUT_DIR/$STEM.receipt.txt"
     ARGS=(
       "--source-sha=$SOURCE_SHA"
@@ -109,14 +110,18 @@ for SIZE in "${SIZES_ARRAY[@]}"; do
     printf 'Running n=%s fallback_on_empty=%s source=%s\n' "$SIZE" "$FALLBACK" "$SOURCE_SHA"
     write_environment_receipt "$RECEIPT" cargo run --release -p symthaea-hdc-store --example ann_benchmark -- "${ARGS[@]}"
     set +e
-    cargo run --release -p symthaea-hdc-store --example ann_benchmark -- "${ARGS[@]}" > "$OUTPUT"
+    cargo run --release -p symthaea-hdc-store --example ann_benchmark -- "${ARGS[@]}" > "$OUTPUT" 2> "$STDERR"
     STATUS=$?
     set -e
     {
       echo "exit_status=$STATUS"
       echo "output=$OUTPUT"
+      echo "stderr_log=$STDERR"
       if command -v sha256sum >/dev/null 2>&1 && [[ -f "$OUTPUT" ]]; then
         echo "output_sha256=$(sha256sum "$OUTPUT" | cut -d' ' -f1)"
+      fi
+      if command -v sha256sum >/dev/null 2>&1 && [[ -f "$STDERR" ]]; then
+        echo "stderr_sha256=$(sha256sum "$STDERR" | cut -d' ' -f1)"
       fi
     } >> "$RECEIPT"
     if (( STATUS != 0 )); then
