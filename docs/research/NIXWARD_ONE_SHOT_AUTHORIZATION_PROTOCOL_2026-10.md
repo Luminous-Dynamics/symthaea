@@ -62,6 +62,20 @@ Before treating this as production enforcement:
 - Exercise concurrent consumption and cancellation; if a permit is consumed before a process spawn fails, it remains consumed and needs a new decision.
 - Record exact source SHA, toolchain, test command, test output, and independent review. Queued/skipped checks are not passes.
 
+## Runnable primitive microbenchmark
+
+The repository now includes `crates/core/nixward/examples/one_shot_authorization_bench.rs`.
+
+Run it with:
+
+```sh
+cargo run -p nixward --example one_shot_authorization_bench --release
+```
+
+It generates 10,000 deterministic scenario trials across valid authorization, command substitution, principal mismatch, scope mismatch, authority mismatch, revocation, and replay. It reports p50/p95/p99 for `ledger.consume`, plus false permits, false blocks, and per-scenario counts; the process exits nonzero if the decision contract is violated. Scenario setup and permit issuance are outside the timed region.
+
+This is intentionally a *microbenchmark of the ledger*, not an end-to-end agent benchmark. It does not measure process launch, policy-generation latency, real system side effects, expiry under a production clock, or the repository-wide bypass surface. The authored harness has not been compiled or run in this environment; no latency number is claimed yet.
+
 ## Benchmark plan: attack resistance *and* utility
 
 Use frozen paired cases with an identical command/policy context across a baseline path and the gated path. Separate these events; do not collapse them into one “safety score”:
@@ -91,7 +105,7 @@ For an agent-level evaluation, include noisy natural-language contexts, explicit
 These are external reports, not results for Symthaea or Nixward:
 
 - [Open Agent Passport: Before the Tool Call (March 2026)](https://arxiv.org/abs/2603.20953) describes synchronous pre-action policy checks and signed audit records; its abstract reports a 53 ms median enforcement latency for its particular 1,000-request test.
-- [APort Vault (September 2026)](https://arxiv.org/abs/2609.22076) reports 4,371 human-authored attacks replayed across 14 models and 225,964 completed evaluations. It distinguishes unpermitted successful transfers from requests and policy decisions, and reports that many allowed payments still executed—an important guard against “deny everything” scoring.
+- [APort Vault (September 2026)](https://arxiv.org/abs/2609.22076) reports 4,371 human-authored attacks replayed across 14 models and 225,964 completed evaluations. It distinguishes unpermitted successful transfers from requests and policy decisions, and reports that many allowed payments still executed—an important guard against “deny everything” scoring. Its [released dataset](https://huggingface.co/datasets/aporthq/vault-benchmark-v1) discloses 5,395 error rows against a planned 244,776-evaluation grid, which is a reminder to make failed/missing runs first-class benchmark outcomes.
 - [A roadmap for evaluating moral competence in LLMs (Nature, February 2026)](https://www.nature.com/articles/s41586-025-10021-1) argues for adversarial and confirmatory evaluation, sensitivity to relevant context, and pluralism rather than binary verdict accuracy alone.
 - [Beyond Verdicts: Evaluating Language Model Moral Competence (AAAI, March 2026)](https://ojs.aaai.org/index.php/AAAI/article/view/41131) identifies weaknesses in curated scenarios and overreliance on verdict accuracy, and advocates testing moral sensitivity, reasoning quality, and steerability.
 
