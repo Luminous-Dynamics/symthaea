@@ -785,6 +785,11 @@ fn exact_row_coverage(
     truth: [f64; 3],
     interval_method: fn(u64, u64) -> Option<Interval>,
 ) -> f64 {
+    // Each cell count reuses the same interval for a fixed n. Precompute once rather than
+    // inverting the same binomial tails for every multinomial count triple.
+    let intervals_by_count: Vec<Interval> = (0..=total)
+        .map(|successes| interval_method(successes, total).expect("valid cell count"))
+        .collect();
     let mut covered_mass = 0.0;
     let mut total_mass = 0.0;
     for first in 0..=total {
@@ -794,9 +799,9 @@ fn exact_row_coverage(
             let mass = multinomial_mass(total, counts, truth);
             total_mass += mass;
             let intervals = [
-                interval_method(first, total).expect("valid first-cell count"),
-                interval_method(second, total).expect("valid second-cell count"),
-                interval_method(third, total).expect("valid third-cell count"),
+                intervals_by_count[first as usize],
+                intervals_by_count[second as usize],
+                intervals_by_count[third as usize],
             ];
             if truth.iter().zip(intervals.iter()).all(|(probability, interval)| {
                 *probability * f64::from(PROBABILITY_SCALE) + 1.0e-9
