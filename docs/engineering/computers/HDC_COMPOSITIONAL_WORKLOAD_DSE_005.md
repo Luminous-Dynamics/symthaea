@@ -39,6 +39,7 @@ The sweep covers:
 - record-build benchmarks for the smaller 256 / 1,024 / 4,096 corpus sizes;
 - an independent byte-wise XOR/popcount top-1 oracle on smaller non-power-of-two and ordinary corpora;
 - a duplicated exact-match fixture that enforces lowest-candidate-ID tie behavior;
+- a threshold sanity contract that asserts a known cleanly separable calibration fixture yields zero calibration false rejects and false accepts;
 - open-set rejection diagnostics: calibrate a nearest-similarity acceptance threshold on clean known cues and absent-target cues, freeze that threshold, then report held-out false-reject rates for noisy known cues and false-accept rates for absent-target cues;
 - optimized-versus-scalar top-1 oracle checks at every query-noise rate on 17- and 257-record fixtures, plus an assertion that each noise fixture flips exactly the requested number of bits.
 
