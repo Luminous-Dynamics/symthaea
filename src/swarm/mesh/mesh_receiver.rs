@@ -17,7 +17,7 @@
 //! - **Peer discovery**: Learns about peers from received data.
 //! - **Telemetry**: Fragment loss rates, FEC recovery stats, peer visibility.
 
-use super::{FragmentAssembler, LoRaFragment, WISDOM_PACKET_SIZE, WisdomPacket};
+use super::{FragmentAssembler, LoRaFragment, PAYLOAD_SIZE, WISDOM_PACKET_SIZE, WisdomPacket};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -285,6 +285,23 @@ impl MeshReceiver {
                 self.stats.packets_decrypt_failed += 1;
                 return None;
             }
+        }
+
+        // Validate stream shape before it can allocate state or evict a valid
+        // stream. The last slot is reserved for exactly one XOR FEC fragment.
+        // The expected payload size bounds the maximum legitimate data count.
+        let max_data_count = self
+            .expected_payload_size
+            .saturating_add(PAYLOAD_SIZE - 1)
+            / PAYLOAD_SIZE;
+        let data_count = frag.total_fragments.saturating_sub(1) as usize;
+        if self.expected_payload_size == 0
+            || frag.total_fragments < 2
+            || data_count > max_data_count
+            || frag.is_fec() != (frag.fragment_index == frag.total_fragments - 1)
+        {
+            self.stats.fragments_corrupt += 1;
+            return None;
         }
 
         self.stats.fragments_received += 1;
@@ -618,6 +635,28 @@ mod tests {
         }
     }
 
+    /// Rewrite a legacy header field and recompute CRC to model a validly
+    /// checksummed but structurally hostile radio frame.
+    fn rewrite_wire_header(
+        raw: &[u8],
+        fragment_index: u8,
+        total_fragments: u8,
+        flags: u8,
+    ) -> Vec<u8> {
+        let mut wire = raw.to_vec();
+        wire[2] = fragment_index;
+        wire[3] = total_fragments;
+        wire[5] = flags;
+
+        let payload_end = 8 + wire[4] as usize;
+        let mut checksum_input = Vec::with_capacity(6 + wire[4] as usize);
+        checksum_input.extend_from_slice(&wire[..6]);
+        checksum_input.extend_from_slice(&wire[8..payload_end]);
+        let checksum = super::super::crc16_ccitt(&checksum_input);
+        wire[6..8].copy_from_slice(&checksum.to_le_bytes());
+        wire
+    }
+
     /// Serialize fragments to raw wire bytes (as they'd arrive from radio).
     fn to_wire(frags: &[LoRaFragment]) -> Vec<Vec<u8>> {
         frags
@@ -660,6 +699,45 @@ mod tests {
         assert_eq!(receiver.stats().packets_complete, 1);
         assert_eq!(receiver.stats().packets_recovered, 0);
         assert_eq!(receiver.pending_count(), 0);
+    }
+
+    // -- Malformed fragment metadata is rejected before assembly state --
+
+    #[test]
+    fn malformed_non_fec_frame_in_parity_slot_is_rejected() {
+        let mut receiver = MeshReceiver::new();
+        let packet = test_packet(37, PEER_A, 0x37);
+        let wire = to_wire(&packet.fragment());
+        let malformed = rewrite_wire_header(
+            &wire[wire.len() - 1],
+            (wire.len() - 1) as u8,
+            wire.len() as u8,
+            0, // clears FLAG_FEC while keeping the parity-slot index
+        );
+
+        assert!(receiver.receive_fragment(PEER_A, &malformed).is_none());
+        assert_eq!(receiver.pending_count(), 0);
+        assert_eq!(receiver.stats().fragments_received, 0);
+        assert_eq!(receiver.stats().fragments_corrupt, 1);
+    }
+
+    #[test]
+    fn excessive_declared_fragment_count_is_rejected_before_allocation() {
+        let mut receiver = MeshReceiver::new();
+        let packet = test_packet(38, PEER_A, 0x38);
+        let wire = to_wire(&packet.fragment());
+        let fec = wire.last().expect("standard packet includes FEC");
+        let malformed = rewrite_wire_header(
+            fec,
+            11,
+            12,
+            0x01, // FLAG_FEC, but the declared stream exceeds payload bounds
+        );
+
+        assert!(receiver.receive_fragment(PEER_A, &malformed).is_none());
+        assert_eq!(receiver.pending_count(), 0);
+        assert_eq!(receiver.stats().fragments_received, 0);
+        assert_eq!(receiver.stats().fragments_corrupt, 1);
     }
 
     // -- FEC recovery --
